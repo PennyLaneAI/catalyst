@@ -29,8 +29,7 @@ namespace catalyst {
 struct RegisterInactiveCallbackPass
     : impl::RegisterInactiveCallbackPassBase<RegisterInactiveCallbackPass> {
     using RegisterInactiveCallbackPassBase::RegisterInactiveCallbackPassBase;
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto mod = getOperation();
         StringRef inactive_callbackFnName = "__catalyst_inactive_callback";
         auto fnDecl = mod.lookupSymbol<LLVM::LLVMFuncOp>(inactive_callbackFnName);

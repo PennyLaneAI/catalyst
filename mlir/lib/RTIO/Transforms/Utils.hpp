@@ -23,8 +23,7 @@ namespace catalyst {
 namespace rtio {
 
 /// Extract the static channel ID from an RTIO channel type.
-inline int32_t extractChannelId(mlir::Value channelValue)
-{
+inline int32_t extractChannelId(mlir::Value channelValue) {
     auto type = mlir::cast<ChannelType>(channelValue.getType());
 
     assert(type.isStatic() && "Only static channel IDs are supported");
@@ -33,8 +32,7 @@ inline int32_t extractChannelId(mlir::Value channelValue)
 
 /// Compute the device address for a given channel value.
 inline mlir::Value computeChannelDeviceAddr(mlir::OpBuilder &builder, mlir::Operation *op,
-                                            mlir::Value channelValue)
-{
+                                            mlir::Value channelValue) {
     mlir::Location loc = op->getLoc();
     mlir::ModuleOp mod = op->getParentOfType<mlir::ModuleOp>();
     auto configAttr = mod->getAttrOfType<ConfigAttr>(ConfigAttr::getModuleAttrName());
@@ -45,8 +43,7 @@ inline mlir::Value computeChannelDeviceAddr(mlir::OpBuilder &builder, mlir::Oper
     for (llvm::StringRef key : {"device_db", "ttl_urukul0_sw0", "arguments", "channel"}) {
         if (auto dict = mlir::dyn_cast<mlir::DictionaryAttr>(current)) {
             current = dict.get(key);
-        }
-        else if (auto cfg = mlir::dyn_cast<ConfigAttr>(current)) {
+        } else if (auto cfg = mlir::dyn_cast<ConfigAttr>(current)) {
             current = cfg.get(key);
         }
     }

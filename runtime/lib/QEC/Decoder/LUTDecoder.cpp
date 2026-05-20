@@ -51,8 +51,7 @@ using namespace Catalyst::Runtime::QEC;
  * @param err_idx Pointer to the error qubit indices data.
  */
 void __catalyst__qecp__lut_decoder(TannerGraph_CSC_int32 *tanner_graph_csc,
-                                   MemRefT_int8_1d *current_syndromes, MemRefT_int64_1d *err_idx)
-{
+                                   MemRefT_int8_1d *current_syndromes, MemRefT_int64_1d *err_idx) {
     // TODOs: We should expect the following const value from args.
     // The default values here only work for the [[7, 1, 3]] Steane code.
     const size_t code_size = 7;

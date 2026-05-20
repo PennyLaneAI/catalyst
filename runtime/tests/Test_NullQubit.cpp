@@ -44,8 +44,7 @@ struct NullQubitRuntimeFixture {
      *
      * Initialize the Catalyst runtime before each test case.
      */
-    NullQubitRuntimeFixture()
-    {
+    NullQubitRuntimeFixture() {
         __catalyst__rt__initialize(nullptr);
 
         const auto [rtd_lib, rtd_name, rtd_kwargs] =
@@ -62,15 +61,13 @@ struct NullQubitRuntimeFixture {
      *
      * Release the device and finalize the runtime after each test case.
      */
-    ~NullQubitRuntimeFixture()
-    {
+    ~NullQubitRuntimeFixture() {
         __catalyst__rt__device_release();
         __catalyst__rt__finalize();
     }
 };
 
-TEST_CASE("Test success of loading a device", "[NullQubit]")
-{
+TEST_CASE("Test success of loading a device", "[NullQubit]") {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
     std::unique_ptr<QuantumDevice> device(
         loadDevice("NullQubit", "librtd_null_qubit" + get_dylib_ext()));
@@ -78,8 +75,7 @@ TEST_CASE("Test success of loading a device", "[NullQubit]")
     CHECK(device);
 }
 
-TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[NullQubit]")
-{
+TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[NullQubit]") {
     __catalyst__rt__initialize(nullptr);
 
     char rtd_name[11] = "null.qubit";
@@ -90,8 +86,7 @@ TEST_CASE("Test __catalyst__rt__device_init registering device=null.qubit", "[Nu
     __catalyst__rt__finalize();
 }
 
-TEST_CASE("Test runtime device kwargs parsing", "[NullQubit]")
-{
+TEST_CASE("Test runtime device kwargs parsing", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim0 = std::make_unique<NullQubit>("{foo : bar}");
     auto kwargs0 = sim0->GetDeviceKwargs();
     CHECK(kwargs0["foo"] == "bar");
@@ -109,8 +104,7 @@ TEST_CASE("Test runtime device kwargs parsing", "[NullQubit]")
                         ContainsSubstring("Device kwargs string is malformed."));
 }
 
-TEST_CASE("Test automatic qubit management", "[NullQubit]")
-{
+TEST_CASE("Test automatic qubit management", "[NullQubit]") {
     constexpr size_t shots = 10;
     const auto [rtd_lib, rtd_name, rtd_kwargs] =
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
@@ -141,14 +135,12 @@ TEST_CASE("Test automatic qubit management", "[NullQubit]")
     __catalyst__rt__finalize();
 }
 
-TEST_CASE("Test NullQubit qubit allocation is successful.", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit qubit allocation is successful.", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
     sim->AllocateQubit();
 }
 
-TEST_CASE("Test ReleaseQubits", "[NullQubit]")
-{
+TEST_CASE("Test ReleaseQubits", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
     auto qubits = sim->AllocateQubits(3);
     CHECK(sim->GetNumQubits() == 3);
@@ -157,8 +149,7 @@ TEST_CASE("Test ReleaseQubits", "[NullQubit]")
     CHECK(sim->GetNumQubits() == 1);
 }
 
-TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]")
-{
+TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     // state-vector with #qubits = n
@@ -181,8 +172,7 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=2 ", "[NullQubit]")
     CHECK(obs_keys.empty());
 }
 
-TEST_CASE("Test a NullQubit circuit with num_qubits=4", "[NullQubit]")
-{
+TEST_CASE("Test a NullQubit circuit with num_qubits=4", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     // state-vector with #qubit = n
@@ -211,8 +201,7 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4", "[NullQubit]")
     CHECK(obs_keys.empty());
 }
 
-TEST_CASE("Test a NullQubit circuit with num_qubits=4 and observables", "[NullQubit]")
-{
+TEST_CASE("Test a NullQubit circuit with num_qubits=4 and observables", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     // state-vector with #qubits = n
@@ -247,8 +236,7 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4 and observables", "[NullQu
     CHECK(obs_keys.empty());
 }
 
-TEST_CASE("Test a NullQubit circuit with num_qubits=1 that performs a measurement", "[NullQubit]")
-{
+TEST_CASE("Test a NullQubit circuit with num_qubits=1 that performs a measurement", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     // state-vector with #qubits = n
@@ -272,8 +260,7 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=1 that performs a measuremen
 }
 
 TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit circuit with pauli measurement succeeds",
-                 "[NullQubit]")
-{
+                 "[NullQubit]") {
     QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
 
     auto reg_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
@@ -290,8 +277,7 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit circuit with pauli me
 
 TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
           "ControlledPhaseShift, IsingYY, and CRX quantum operations",
-          "[CoreQIS]")
-{
+          "[CoreQIS]") {
     const auto [rtd_lib, rtd_name, rtd_kwargs] =
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
     __catalyst__rt__initialize(nullptr);
@@ -330,8 +316,7 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
     __catalyst__rt__finalize();
 }
 
-TEST_CASE("Test NullQubit state vector - 0 qubits", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit state vector - 0 qubits", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     CHECK(sim->GetNumQubits() == 0);
@@ -345,8 +330,7 @@ TEST_CASE("Test NullQubit state vector - 0 qubits", "[NullQubit]")
     CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
 }
 
-TEST_CASE("Test NullQubit state vector - 1 qubit", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit state vector - 1 qubit", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     sim->AllocateQubit();
@@ -364,8 +348,7 @@ TEST_CASE("Test NullQubit state vector - 1 qubit", "[NullQubit]")
     CHECK_THAT(view(1).imag(), WithinRel(0.0, 1e-5));
 }
 
-TEST_CASE("Test NullQubit state vector - 2 qubits", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit state vector - 2 qubits", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     sim->AllocateQubit();
@@ -388,8 +371,7 @@ TEST_CASE("Test NullQubit state vector - 2 qubits", "[NullQubit]")
     CHECK_THAT(view(3).imag(), WithinRel(0.0, 1e-5));
 }
 
-TEST_CASE("Test NullQubit state vector after ReleaseQubit", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit state vector after ReleaseQubit", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     sim->AllocateQubit();
@@ -412,8 +394,7 @@ TEST_CASE("Test NullQubit state vector after ReleaseQubit", "[NullQubit]")
     CHECK_THAT(view(1).imag(), WithinRel(0.0, 1e-5));
 }
 
-TEST_CASE("Test NullQubit state vector after AllocateQubits", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit state vector after AllocateQubits", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     CHECK(sim->AllocateQubits(0).size() == 0);
@@ -437,8 +418,7 @@ TEST_CASE("Test NullQubit state vector after AllocateQubits", "[NullQubit]")
     CHECK_THAT(view(3).imag(), WithinRel(0.0, 1e-5));
 }
 
-TEST_CASE("Test NullQubit state vector after AllocateQubits and ReleaseQubit", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit state vector after AllocateQubits and ReleaseQubit", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     CHECK(sim->AllocateQubits(0).size() == 0);
@@ -462,8 +442,7 @@ TEST_CASE("Test NullQubit state vector after AllocateQubits and ReleaseQubit", "
     CHECK_THAT(view(1).imag(), WithinRel(0.0, 1e-5));
 }
 
-TEST_CASE("test AllocateQubits generates a proper std::vector<QubitIdType>", "[NullQubit]")
-{
+TEST_CASE("test AllocateQubits generates a proper std::vector<QubitIdType>", "[NullQubit]") {
     std::size_t num_qubits = 4;
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
@@ -480,8 +459,7 @@ TEST_CASE("test AllocateQubits generates a proper std::vector<QubitIdType>", "[N
     }
 }
 
-TEST_CASE("Test allocation of multiple registers", "[NullQubit]")
-{
+TEST_CASE("Test allocation of multiple registers", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     auto &&reg1 = sim->AllocateQubits(1);
@@ -492,8 +470,7 @@ TEST_CASE("Test allocation of multiple registers", "[NullQubit]")
     CHECK(sim->GetNumQubits() == 3);
 }
 
-TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test insertion of qubit into register", "[NullQubit]")
-{
+TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test insertion of qubit into register", "[NullQubit]") {
     // Allocate register with three qubits, [0, 1, 2]
     QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
 
@@ -523,8 +500,7 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test insertion of qubit into register
 }
 
 TEST_CASE_METHOD(NullQubitRuntimeFixture,
-                 "Test insertion of qubit from a register into another register", "[NullQubit]")
-{
+                 "Test insertion of qubit from a register into another register", "[NullQubit]") {
     // Allocate two registers
     QirArray *reg1 = __catalyst__rt__qubit_allocate_array(1); // [0]
     QirArray *reg2 = __catalyst__rt__qubit_allocate_array(2); // [1, 2]
@@ -558,8 +534,7 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture,
 TEST_CASE_METHOD(
     NullQubitRuntimeFixture,
     "Test insertion of qubit into register at position beyond its size throws an exception",
-    "[NullQubit]")
-{
+    "[NullQubit]") {
     // Allocate register with three qubits, [0, 1, 2]
     QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
 
@@ -574,8 +549,7 @@ TEST_CASE_METHOD(
                       ContainsSubstring("qubit register does not contain the requested wire"));
 }
 
-TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
-{
+TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     std::vector<QubitIdType> Qs = sim->AllocateQubits(4);
@@ -595,8 +569,7 @@ TEST_CASE("Mix Gate test R(X,Y,Z) num_qubits=4", "[NullQubit]")
     CHECK_THAT(view(0).imag(), WithinRel(0.0, 1e-5));
 }
 
-TEST_CASE("Gate PCPhase num_qubits=3", "[NullQubit]")
-{
+TEST_CASE("Gate PCPhase num_qubits=3", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     std::vector<QubitIdType> Qs = sim->AllocateQubits(3);
@@ -615,8 +588,7 @@ TEST_CASE("Gate PCPhase num_qubits=3", "[NullQubit]")
 
 TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
           "Obs=[X]",
-          "[Gradient]")
-{
+          "[Gradient]") {
     const std::vector<double> param{0.3, 0.7, 0.4};
 
     std::vector<int64_t> trainParams{0, 1, 2};
@@ -671,8 +643,7 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
     delete[] buffer_tp;
 }
 
-TEST_CASE("Test __catalyst__rt__result_get_zero", "[CoreQIS]")
-{
+TEST_CASE("Test __catalyst__rt__result_get_zero", "[CoreQIS]") {
     __catalyst__rt__initialize(nullptr);
 
     bool *result = __catalyst__rt__result_get_zero();
@@ -681,8 +652,7 @@ TEST_CASE("Test __catalyst__rt__result_get_zero", "[CoreQIS]")
     __catalyst__rt__finalize();
 }
 
-TEST_CASE("Test __catalyst__rt__print_state", "[CoreQIS]")
-{
+TEST_CASE("Test __catalyst__rt__print_state", "[CoreQIS]") {
     __catalyst__rt__initialize(nullptr);
 
     bool *result = __catalyst__rt__result_get_one();
@@ -691,8 +661,7 @@ TEST_CASE("Test __catalyst__rt__print_state", "[CoreQIS]")
     __catalyst__rt__finalize();
 }
 
-TEST_CASE("Test __catalyst__rt__print_state", "[NullQubit]")
-{
+TEST_CASE("Test __catalyst__rt__print_state", "[NullQubit]") {
     __catalyst__rt__initialize(nullptr);
     auto [rtd_lib, rtd_name, rtd_kwargs] =
         std::array<std::string, 3>{"null.qubit", "null_qubit", ""};
@@ -719,8 +688,7 @@ TEST_CASE("Test __catalyst__rt__print_state", "[NullQubit]")
     __catalyst__rt__finalize();
 }
 
-TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     constexpr size_t num_qubits = 0;
@@ -728,8 +696,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
 
     sim->SetDeviceShots(shots);
 
-    SECTION("State")
-    {
+    SECTION("State") {
         std::vector<std::complex<double>> state(1);
         DataView<std::complex<double>, 1> state_view(state);
         sim->State(state_view);
@@ -738,8 +705,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         CHECK_THAT(state_view(0).imag(), WithinAbs(0.0, 1e-5));
     }
 
-    SECTION("Probs")
-    {
+    SECTION("Probs") {
         std::vector<double> probs(1);
         DataView<double, 1> probs_view(probs);
         sim->Probs(probs_view);
@@ -747,8 +713,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         CHECK_THAT(probs_view(0), WithinAbs(1.0, 1e-5));
     }
 
-    SECTION("PartialProbs")
-    {
+    SECTION("PartialProbs") {
         std::vector<double> probs(1);
         DataView<double, 1> probs_view(probs);
         std::vector<QubitIdType> wires;
@@ -757,8 +722,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         CHECK_THAT(probs_view(0), WithinAbs(1.0, 1e-5));
     }
 
-    SECTION("Sample")
-    {
+    SECTION("Sample") {
         double *_data_aligned = nullptr;
         size_t _offset = 0U;
         size_t _sizes[2] = {shots, num_qubits};
@@ -770,8 +734,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         CHECK(sample_view.size() == 0);
     }
 
-    SECTION("PartialSample")
-    {
+    SECTION("PartialSample") {
         double *_data_aligned = nullptr;
         size_t _offset = 0U;
         size_t _sizes[2] = {shots, num_qubits};
@@ -784,8 +747,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         CHECK(sample_view.size() == 0);
     }
 
-    SECTION("Counts")
-    {
+    SECTION("Counts") {
         std::vector<int64_t> counts(1);
         DataView<int64_t, 1> counts_view(counts);
         std::vector<double> eigvals(1);
@@ -796,8 +758,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
         CHECK(counts_view(0) == shots);
     }
 
-    SECTION("PartialCounts")
-    {
+    SECTION("PartialCounts") {
         std::vector<int64_t> counts(1);
         DataView<int64_t, 1> counts_view(counts);
         std::vector<double> eigvals(1);
@@ -810,8 +771,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=0", "[NullQubit]
     }
 }
 
-TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     constexpr size_t num_qubits = 1;
@@ -823,8 +783,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
     Qs.reserve(num_qubits);
     Qs.push_back(sim->AllocateQubit());
 
-    SECTION("State")
-    {
+    SECTION("State") {
         std::vector<std::complex<double>> state(2);
         DataView<std::complex<double>, 1> state_view(state);
         sim->State(state_view);
@@ -835,8 +794,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         CHECK_THAT(state_view(1).imag(), WithinAbs(0.0, 1e-5));
     }
 
-    SECTION("Probs")
-    {
+    SECTION("Probs") {
         std::vector<double> probs(2);
         DataView<double, 1> probs_view(probs);
         sim->Probs(probs_view);
@@ -845,8 +803,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         CHECK_THAT(probs_view(1), WithinAbs(0.0, 1e-5));
     }
 
-    SECTION("PartialProbs")
-    {
+    SECTION("PartialProbs") {
         std::vector<double> probs(2);
         DataView<double, 1> probs_view(probs);
         std::vector<QubitIdType> wires;
@@ -856,8 +813,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         CHECK_THAT(probs_view(1), WithinAbs(0.0, 1e-5));
     }
 
-    SECTION("Sample")
-    {
+    SECTION("Sample") {
         double _data_aligned[shots * num_qubits];
         size_t _offset = 0U;
         size_t _sizes[2] = {shots, num_qubits};
@@ -870,8 +826,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         CHECK(sample_view(0, 0) == 0.0);
     }
 
-    SECTION("PartialSample")
-    {
+    SECTION("PartialSample") {
         double _data_aligned[shots * num_qubits];
         size_t _offset = 0U;
         size_t _sizes[2] = {shots, num_qubits};
@@ -885,8 +840,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         CHECK(sample_view(0, 0) == 0.0);
     }
 
-    SECTION("Counts")
-    {
+    SECTION("Counts") {
         std::vector<int64_t> counts(2);
         DataView<int64_t, 1> counts_view(counts);
         std::vector<double> eigvals(2);
@@ -899,8 +853,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
         CHECK(counts_view(1) == 0);
     }
 
-    SECTION("PartialCounts")
-    {
+    SECTION("PartialCounts") {
         std::vector<int64_t> counts(2);
         DataView<int64_t, 1> counts_view(counts);
         std::vector<double> eigvals(2);
@@ -915,8 +868,7 @@ TEST_CASE("Test NullQubit measurement processes with num_qubits=1", "[NullQubit]
     }
 }
 
-TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit device shots methods", "[NullQubit]") {
     std::unique_ptr<NullQubit> sim = std::make_unique<NullQubit>();
 
     for (size_t i = 0; i < 3; i++) {
@@ -925,8 +877,7 @@ TEST_CASE("Test NullQubit device shots methods", "[NullQubit]")
     }
 }
 
-TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
-{
+TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]") {
     // The name of the file where the resource usage data is stored
     const std::string RESOURCES_FILENAME = "__pennylane_resources_data.json";
 

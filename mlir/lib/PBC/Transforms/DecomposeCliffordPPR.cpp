@@ -50,8 +50,7 @@ namespace {
 /// If we prepare |Y⟩ as axillary qubit, then we can use P⊗Z as the measurement operator
 /// on first operation instead of -P⊗Y.
 SmallVector<Value> emitPiOverFourDecomposition(bool avoidPauliYMeasure, PPRotationOp op,
-                                               PatternRewriter &rewriter)
-{
+                                               PatternRewriter &rewriter) {
     auto loc = op.getLoc();
 
     // Initialize |0⟩ (zero) or Fabricate |Y⟩ (plus_i)
@@ -96,8 +95,7 @@ SmallVector<Value> emitPiOverFourDecomposition(bool avoidPauliYMeasure, PPRotati
 }
 
 void decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotationOp op,
-                                       PatternRewriter &rewriter)
-{
+                                       PatternRewriter &rewriter) {
     auto loc = op.getLoc();
     ValueRange inQubits = op.getInQubits();
 
@@ -137,12 +135,9 @@ struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
     bool avoidPauliYMeasure;
 
     DecomposeCliffordPPR(MLIRContext *context, bool avoidPauliYMeasure, PatternBenefit benefit = 1)
-        : OpRewritePattern(context, benefit), avoidPauliYMeasure(avoidPauliYMeasure)
-    {
-    }
+        : OpRewritePattern(context, benefit), avoidPauliYMeasure(avoidPauliYMeasure) {}
 
-    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override {
         if (op.hasPiOverFourRotation()) {
             decompose_pi_over_four_flattening(avoidPauliYMeasure, op, rewriter);
             return success();
@@ -155,8 +150,7 @@ struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace pbc {
 
-void populateDecomposeCliffordPPRPatterns(RewritePatternSet &patterns, bool avoidPauliYMeasure)
-{
+void populateDecomposeCliffordPPRPatterns(RewritePatternSet &patterns, bool avoidPauliYMeasure) {
     patterns.add<DecomposeCliffordPPR>(patterns.getContext(), avoidPauliYMeasure, 1);
 }
 

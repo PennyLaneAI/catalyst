@@ -56,8 +56,7 @@ enum LevelTransition {
  */
 std::optional<SmallVector<Value>> convertQuantumBitsToIonQubits(mlir::PatternRewriter &rewriter,
                                                                 mlir::Location &loc,
-                                                                mlir::ValueRange qubits)
-{
+                                                                mlir::ValueRange qubits) {
     MLIRContext *ctx = rewriter.getContext();
     SmallVector<Value> ionQubits;
     for (Value qubit : qubits) {
@@ -86,8 +85,7 @@ std::optional<SmallVector<Value>> convertQuantumBitsToIonQubits(mlir::PatternRew
  */
 std::optional<SmallVector<Value>> convertIonQubitsToQuantumBits(mlir::PatternRewriter &rewriter,
                                                                 mlir::Location &loc,
-                                                                mlir::ValueRange ionQubits)
-{
+                                                                mlir::ValueRange ionQubits) {
     MLIRContext *ctx = rewriter.getContext();
     SmallVector<Value> qubits;
     for (Value ionQubit : ionQubits) {
@@ -117,8 +115,7 @@ static std::optional<int64_t> walkBackSingleQubitSSA(mlir::Value qubit);
  * @param position The position of the qubit SSA in the gate.
  * @return The index of the qubit SSA if it is known, otherwise std::nullopt.
  */
-std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position)
-{
+std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position) {
     // TODO (backlog): make that function able to cross control flow op (for, while, ...)
     // Delegate to the general single-qubit SSA walk, which handles all op types including
     // ion.parallelprotocol, ion.readout_bit, unrealized_cast, quantum.measure, and quantum.custom.
@@ -155,8 +152,7 @@ std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position
  * @param idx2 Index of the second qubit.
  * @return int64_t
  */
-int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
-{
+int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2) {
     assert(nQubits >= 2 && "At least two qubits must be present in the system.");
 
     assert(idx1 >= 0 && idx1 < nQubits && "First qubit index is out of range.");
@@ -172,8 +168,7 @@ int64_t getTwoQubitCombinationIndex(int64_t nQubits, int64_t idx1, int64_t idx2)
 }
 
 mlir::Value CreateNormalizedAngle(mlir::PatternRewriter &rewriter, mlir::Location loc,
-                                  mlir::Value angle)
-{
+                                  mlir::Value angle) {
     constexpr double PI = llvm::numbers::pi;
     constexpr double FOUR_PI = 4.0 * PI;
 
@@ -241,8 +236,7 @@ mlir::Value CreateNormalizedAngle(mlir::PatternRewriter &rewriter, mlir::Locatio
  * @return mlir::Value The pulse duration.
  */
 mlir::Value computePulseDuration(mlir::PatternRewriter &rewriter, mlir::Location &loc,
-                                 const mlir::Value &angle, double rabi, double detuning)
-{
+                                 const mlir::Value &angle, double rabi, double detuning) {
     auto normalizedAngle = CreateNormalizedAngle(rewriter, loc, angle);
     TypedAttr rabiAttr = rewriter.getF64FloatAttr(rabi);
     mlir::Value rabiValue = arith::ConstantOp::create(rewriter, loc, rabiAttr).getResult();
@@ -258,8 +252,7 @@ mlir::Value computePulseDuration(mlir::PatternRewriter &rewriter, mlir::Location
 }
 
 mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter, double phase1,
-                                        double phase2, const std::vector<Beam> &beams1)
-{
+                                        double phase2, const std::vector<Beam> &beams1) {
     auto qubitIndex = walkBackQubitSSA(op, 0);
     if (qubitIndex.has_value()) {
         // Set the optional transition index now
@@ -314,16 +307,14 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 
         rewriter.replaceOp(op, qubitResults.value());
         return success();
-    }
-    else {
+    } else {
         op.emitError() << "Impossible to determine the original qubit because of dynamism.";
         return failure();
     }
 };
 
 mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
-                                  const std::vector<Beam> &beams2)
-{
+                                  const std::vector<Beam> &beams2) {
     auto qnode = op->getParentOfType<func::FuncOp>();
     MLIRContext *ctx = op.getContext();
 
@@ -459,14 +450,12 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             }
             rewriter.replaceOp(op, qubitResults.value());
             return success();
-        }
-        else {
+        } else {
             op.emitError()
                 << "Impossible to determine the number of qubits because the value is dynamic";
             return failure();
         }
-    }
-    else {
+    } else {
         op.emitError() << "Impossible to determine the original qubit because the value is dynamic";
         return failure();
     }
@@ -479,8 +468,7 @@ struct GatesToPulsesRewritePattern : public mlir::OpConversionPattern<CustomOp> 
     std::vector<Beam> beams2;
 
     GatesToPulsesRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
-        : mlir::OpConversionPattern<CustomOp>::OpConversionPattern(ctx)
-    {
+        : mlir::OpConversionPattern<CustomOp>::OpConversionPattern(ctx) {
         beams1 = dataManager.getBeams1Params();
         beams2 = dataManager.getBeams2Params();
     }
@@ -511,8 +499,7 @@ struct GatesToPulsesRewritePattern : public mlir::OpConversionPattern<CustomOp> 
 };
 
 // Helper to walk back a qubit SSA value (single-value version) to find its original wire index.
-static std::optional<int64_t> walkBackSingleQubitSSA(Value qubit)
-{
+static std::optional<int64_t> walkBackSingleQubitSSA(Value qubit) {
     auto definingOp = qubit.getDefiningOp();
     if (!definingOp) {
         return std::nullopt;
@@ -561,14 +548,12 @@ struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp>
     double measurementDuration;
 
     MeasureOpToMeasurePulsePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
-        : mlir::OpRewritePattern<MeasureOp>(ctx)
-    {
+        : mlir::OpRewritePattern<MeasureOp>(ctx) {
         detectionBeams = dataManager.getDetectionBeamParams();
         measurementDuration = dataManager.getMeasurementDuration();
     }
 
-    LogicalResult matchAndRewrite(MeasureOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(MeasureOp op, PatternRewriter &rewriter) const override {
         if (detectionBeams.empty()) {
             op.emitError() << "no detection_beam entries in gate decomposition configuration, "
                               "cannot lower measure";
@@ -638,14 +623,12 @@ struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp>
 };
 
 void populateGatesToPulsesPatterns(RewritePatternSet &patterns,
-                                   const OQDDatabaseManager &dataManager)
-{
+                                   const OQDDatabaseManager &dataManager) {
     patterns.add<GatesToPulsesRewritePattern>(patterns.getContext(), dataManager);
 }
 
 void populateMeasureToPulsesPatterns(RewritePatternSet &patterns,
-                                     const OQDDatabaseManager &dataManager)
-{
+                                     const OQDDatabaseManager &dataManager) {
     patterns.add<MeasureOpToMeasurePulsePattern>(patterns.getContext(), dataManager);
 }
 

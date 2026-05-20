@@ -37,8 +37,7 @@ struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(MeasureInBasisOp op, MeasureInBasisOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -85,8 +84,7 @@ struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
 namespace catalyst {
 namespace mbqc {
 
-void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
-{
+void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns) {
     patterns.add<MeasureInBasisOpPattern>(typeConverter, patterns.getContext());
 }
 

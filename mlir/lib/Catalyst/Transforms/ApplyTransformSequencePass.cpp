@@ -34,8 +34,7 @@ using namespace mlir;
 namespace catalyst {
 
 /// Generate a meaningful name for a transform operation for pass instrumentation
-static std::string getTransformOpName(transform::TransformOpInterface transformOp)
-{
+static std::string getTransformOpName(transform::TransformOpInterface transformOp) {
     std::string baseName = transformOp->getName().getStringRef().str();
 
     if (auto applyPassOp = dyn_cast<transform::ApplyRegisteredPassOp>(transformOp.getOperation())) {
@@ -61,12 +60,9 @@ class TransformOpSubPass : public OperationPass<> {
 
     TransformOpSubPass(transform::TransformOpInterface op)
         : OperationPass(TypeID::get<TransformOpSubPass>()), transformOp(op),
-          opNameStr(getTransformOpName(op))
-    {
-    }
+          opNameStr(getTransformOpName(op)) {}
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         llvm_unreachable("TransformOpSubPass should not be executed");
     }
 
@@ -74,8 +70,7 @@ class TransformOpSubPass : public OperationPass<> {
     StringRef getArgument() const override { return opNameStr; }
     StringRef getDescription() const override { return "Transform dialect operation"; }
 
-    std::unique_ptr<Pass> clonePass() const override
-    {
+    std::unique_ptr<Pass> clonePass() const override {
         return std::make_unique<TransformOpSubPass>(transformOp);
     }
 
@@ -90,8 +85,7 @@ class TransformOpSubPass : public OperationPass<> {
 /// Dialect/Transform/IR/TransformOps.cpp#L2378
 LogicalResult applyTransformsWithSubpassTracking(Operation *payload,
                                                  transform::NamedSequenceOp namedSequence,
-                                                 PassInstrumentor *passInstrumentor)
-{
+                                                 PassInstrumentor *passInstrumentor) {
     // TODO: We currently only expect to have a single block in the sequence. It may change in the
     // future.
     assert(namedSequence.getBody().hasOneBlock() &&
@@ -146,8 +140,7 @@ struct ApplyTransformSequencePass
     using impl::ApplyTransformSequencePassBase<
         ApplyTransformSequencePass>::ApplyTransformSequencePassBase;
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         // We need to remove the transformer module from the payload,
         // then apply the transformer module to the payload.
         // This is because we should not modify a module that contains
@@ -183,8 +176,7 @@ struct ApplyTransformSequencePass
                 if (failed(applyTransformsWithSubpassTracking(payload, op, passInstrumentor))) {
                     return WalkResult::interrupt();
                 }
-            }
-            else {
+            } else {
                 if (failed(transform::applyTransforms(payload, op, {},
                                                       transform::TransformOptions(), false))) {
                     return WalkResult::interrupt();

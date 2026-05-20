@@ -25,8 +25,7 @@ using namespace catalyst::quantum;
 
 namespace {
 
-std::optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
-{
+std::optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op) {
     size_t counter = 0;
     std::optional<LLVM::LLVMFuncOp> callee = std::nullopt;
     op.walk([&](LLVM::CallOp callOp) {
@@ -41,21 +40,18 @@ std::optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
     return counter == 1 ? callee : std::nullopt;
 }
 
-bool hasCWrapperAttribute(LLVM::LLVMFuncOp op)
-{
+bool hasCWrapperAttribute(LLVM::LLVMFuncOp op) {
     return (bool)(op->getAttrOfType<UnitAttr>(LLVM::LLVMDialect::getEmitCWrapperAttrName()));
 }
 
-bool hasCalleeCWrapperAttribute(LLVM::LLVMFuncOp op)
-{
+bool hasCalleeCWrapperAttribute(LLVM::LLVMFuncOp op) {
     std::optional<LLVM::LLVMFuncOp> callee = getCallee(op);
     if (!callee)
         return false;
     return hasCWrapperAttribute(callee.value());
 }
 
-bool matchesNamingConvention(LLVM::LLVMFuncOp op)
-{
+bool matchesNamingConvention(LLVM::LLVMFuncOp op) {
     std::string _mlir_ciface = "_mlir_ciface_";
     size_t _mlir_ciface_len = _mlir_ciface.length();
     auto symName = op.getSymName();
@@ -69,8 +65,7 @@ bool matchesNamingConvention(LLVM::LLVMFuncOp op)
     return nameMatches;
 }
 
-bool isFunctionMLIRCWrapper(LLVM::LLVMFuncOp op)
-{
+bool isFunctionMLIRCWrapper(LLVM::LLVMFuncOp op) {
     if (!matchesNamingConvention(op))
         return false;
     if (!hasCalleeCWrapperAttribute(op))
@@ -78,22 +73,19 @@ bool isFunctionMLIRCWrapper(LLVM::LLVMFuncOp op)
     return true;
 }
 
-bool functionHasReturns(LLVM::LLVMFuncOp op)
-{
+bool functionHasReturns(LLVM::LLVMFuncOp op) {
     auto functionType = op.getFunctionType();
     return !isa<LLVM::LLVMVoidType>(functionType.getReturnType());
 }
 
-bool functionHasInputs(LLVM::LLVMFuncOp op)
-{
+bool functionHasInputs(LLVM::LLVMFuncOp op) {
     auto functionType = op.getFunctionType();
     return !(functionType.getParams().empty());
 }
 
 LLVM::LLVMFunctionType convertFunctionTypeCatalystWrapper(PatternRewriter &rewriter,
                                                           LLVM::LLVMFunctionType functionType,
-                                                          bool hasReturns, bool hasInputs)
-{
+                                                          bool hasReturns, bool hasInputs) {
     SmallVector<Type, 2> transformedInputs;
 
     Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
@@ -113,8 +105,7 @@ LLVM::LLVMFunctionType convertFunctionTypeCatalystWrapper(PatternRewriter &rewri
 }
 
 void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewriter,
-                                    std::string nameWithoutPrefix)
-{
+                                    std::string nameWithoutPrefix) {
     // Guaranteed by match
     LLVM::LLVMFuncOp callee = getCallee(op).value();
     bool hasReturns = functionHasReturns(callee);
@@ -177,8 +168,7 @@ struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFunc
 };
 
 LogicalResult EmitCatalystPyInterfaceTransform::matchAndRewrite(LLVM::LLVMFuncOp op,
-                                                                PatternRewriter &rewriter) const
-{
+                                                                PatternRewriter &rewriter) const {
     if (!isFunctionMLIRCWrapper(op)) {
         return failure();
     }
@@ -208,8 +198,7 @@ struct EmitCatalystPyInterfacePass
     : impl::EmitCatalystPyInterfacePassBase<EmitCatalystPyInterfacePass> {
     using EmitCatalystPyInterfacePassBase::EmitCatalystPyInterfacePassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<EmitCatalystPyInterfaceTransform>(context);

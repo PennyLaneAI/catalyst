@@ -32,8 +32,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
     using mlir::OpRewritePattern<func::CallOp>::OpRewritePattern;
 
     void insertDropRefOps(func::CallOp op, async::ExecuteOp executeOp,
-                          PatternRewriter &rewriter) const
-    {
+                          PatternRewriter &rewriter) const {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         // Let's first place the awaits just before the terminator of this block.
         // If there is no terminator in this block, then we will place the await
@@ -45,8 +44,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             !block->empty() && block->back().mightHaveTrait<OpTrait::IsTerminator>();
         if (mightHaveTerminator) {
             rewriter.setInsertionPoint(block->getTerminator());
-        }
-        else {
+        } else {
             rewriter.setInsertionPointToEnd(block);
         }
 
@@ -65,8 +63,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
     }
 
     void insertAwaitOps(func::CallOp op, async::ExecuteOp executeOp,
-                        PatternRewriter &rewriter) const
-    {
+                        PatternRewriter &rewriter) const {
         // If there are no results for the call, just return
         if (op.getResults().size() == 0) {
             return;
@@ -164,8 +161,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
     }
 
     mlir::LogicalResult matchAndRewrite(func::CallOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(op.getCallableForCallee());
         func::FuncOp func = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, symbol);
         if (!func) {
@@ -211,8 +207,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
     }
 };
 
-void populateQnodeToAsyncPatterns(RewritePatternSet &patterns)
-{
+void populateQnodeToAsyncPatterns(RewritePatternSet &patterns) {
     patterns.add<catalyst::CallOpToAsyncOPRewritePattern>(patterns.getContext(), 1);
 }
 

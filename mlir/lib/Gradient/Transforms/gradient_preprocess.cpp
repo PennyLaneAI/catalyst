@@ -36,8 +36,7 @@ namespace gradient {
 struct GradientPreprocessingPass : impl::GradientPreprocessingPassBase<GradientPreprocessingPass> {
     using GradientPreprocessingPassBase::GradientPreprocessingPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
         populatePreprocessingPatterns(patterns);
 

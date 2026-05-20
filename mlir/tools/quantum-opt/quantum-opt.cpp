@@ -54,8 +54,7 @@ namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     llvm::cl::AddExtraVersionPrinter(catalyst::printVersion);
     mlir::registerAllPasses();
     catalyst::registerAllPasses();

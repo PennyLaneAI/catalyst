@@ -55,8 +55,7 @@ struct ResourceTracker final {
      * @param controlled_wires The control wires the operation is being applied to
      */
     void UpdateDepth(const std::vector<QubitIdType> &wires,
-                     const std::vector<QubitIdType> &controlled_wires = {})
-    {
+                     const std::vector<QubitIdType> &controlled_wires = {}) {
         if (!compute_depth_) {
             return;
         }
@@ -96,8 +95,7 @@ struct ResourceTracker final {
      * @param controlled_wires The control wires the operation is being applied to
      */
     void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
-                         const std::vector<QubitIdType> &controlled_wires)
-    {
+                         const std::vector<QubitIdType> &controlled_wires) {
         UpdateDepth(wires, controlled_wires);
         std::size_t total_wires = wires.size() + controlled_wires.size();
 
@@ -121,8 +119,7 @@ struct ResourceTracker final {
      * and resets the maximum wire count to zero. Does not affect configuration
      * settings like depth computation or filename settings.
      */
-    void Reset()
-    {
+    void Reset() {
         gate_types_.clear();
         gate_sizes_.clear();
         wire_depths_.clear();
@@ -141,8 +138,7 @@ struct ResourceTracker final {
      * @return The count of gates matching the specified name, or total gate count if no name
      * provided
      */
-    auto GetNumGates(const std::string &gate_name = "") -> std::size_t
-    {
+    auto GetNumGates(const std::string &gate_name = "") -> std::size_t {
         if (gate_name != "") {
             return gate_types_[gate_name];
         }
@@ -163,8 +159,7 @@ struct ResourceTracker final {
      * @return The count of measurements matching the specified name, or total measurement count if
      * no name provided
      */
-    auto GetNumMeasurements(const std::string &meas_name = "") -> std::size_t
-    {
+    auto GetNumMeasurements(const std::string &meas_name = "") -> std::size_t {
         if (meas_name != "") {
             return measurements_[meas_name];
         }
@@ -182,8 +177,7 @@ struct ResourceTracker final {
      * @param gate_size The number of qubits that gates of interest act upon
      * @return The count of gates that act on exactly gate_size qubits
      */
-    auto GetNumGatesBySize(const std::size_t &gate_size) -> std::size_t
-    {
+    auto GetNumGatesBySize(const std::size_t &gate_size) -> std::size_t {
         return gate_sizes_[gate_size];
     }
 
@@ -221,8 +215,7 @@ struct ResourceTracker final {
      *
      * @return The maximum depth across all wires if depth tracking is enabled, 0 otherwise
      */
-    auto GetDepth() const -> std::size_t
-    {
+    auto GetDepth() const -> std::size_t {
         if (compute_depth_) {
             if (!wire_depths_.empty()) {
                 auto max_pair = std::max_element(wire_depths_.begin(), wire_depths_.end(),
@@ -244,8 +237,7 @@ struct ResourceTracker final {
      * Once this function has been called, dynamic filenames will no longer be generated
      * @param filename The filename to use for writing resource tracking data
      */
-    void SetResourcesFilename(const std::string &filename)
-    {
+    void SetResourcesFilename(const std::string &filename) {
         resources_filename_ = filename;
         static_filename_ = true;
     }
@@ -255,8 +247,7 @@ struct ResourceTracker final {
      *
      * @param qid The qubit ID of the newly allocated qubit
      */
-    void AllocateQubit(QubitIdType qid)
-    {
+    void AllocateQubit(QubitIdType qid) {
         curr_num_wires_++;
         total_allocd_wires_++;
         max_num_wires_ = std::max(max_num_wires_, curr_num_wires_);
@@ -271,8 +262,7 @@ struct ResourceTracker final {
      *
      * @param qid The qubit ID of the qubit to deallocate
      */
-    void ReleaseQubit(QubitIdType qid)
-    {
+    void ReleaseQubit(QubitIdType qid) {
         curr_num_wires_--;
 
         if (compute_depth_) {
@@ -289,8 +279,7 @@ struct ResourceTracker final {
      * @param compute_depth Whether to enable depth tracking
      * @throws Runtime error if called after qubits have already been allocated
      */
-    void SetComputeDepth(const bool compute_depth)
-    {
+    void SetComputeDepth(const bool compute_depth) {
         if (total_allocd_wires_ != 0) {
             RT_FAIL("Cannot set depth tracking after qubits have been allocated.");
         }
@@ -312,8 +301,7 @@ struct ResourceTracker final {
      */
     void NamedOperation(const std::string &name, bool inverse,
                         const std::vector<QubitIdType> &wires,
-                        const std::vector<QubitIdType> &controlled_wires = {})
-    {
+                        const std::vector<QubitIdType> &controlled_wires = {}) {
         std::string prefix = "";
         std::string suffix = "";
         if (!controlled_wires.empty()) {
@@ -343,8 +331,7 @@ struct ResourceTracker final {
      * non-controlled)
      */
     void MatrixOperation(bool inverse, const std::vector<QubitIdType> &wires,
-                         const std::vector<QubitIdType> &controlled_wires = {})
-    {
+                         const std::vector<QubitIdType> &controlled_wires = {}) {
         std::string op_name = "QubitUnitary";
 
         if (!controlled_wires.empty()) {
@@ -361,8 +348,7 @@ struct ResourceTracker final {
      *
      * @param wires The target wires the operation acts upon
      */
-    void SetState(const std::vector<QubitIdType> &wires)
-    {
+    void SetState(const std::vector<QubitIdType> &wires) {
         RecordOperation("StatePrep", wires, {});
     }
 
@@ -371,8 +357,7 @@ struct ResourceTracker final {
      *
      * @param wires The target wires the operation acts upon
      */
-    void SetBasisState(const std::vector<QubitIdType> &wires)
-    {
+    void SetBasisState(const std::vector<QubitIdType> &wires) {
         RecordOperation("BasisState", wires, {});
     }
 
@@ -382,8 +367,7 @@ struct ResourceTracker final {
      * @param obs_id The observable identifier (e.g., Identity, PauliZ, Hadamard)
      * @return ObsIdType An identifier for the created observable
      */
-    auto Observable(ObsId obs_id) -> ObsIdType
-    {
+    auto Observable(ObsId obs_id) -> ObsIdType {
         ObsIdType id = static_cast<ObsIdType>(observable_names_.size() + 1);
         std::string name = "Observable";
         switch (obs_id) {
@@ -418,8 +402,7 @@ struct ResourceTracker final {
      * @param num_terms The number of terms in the combined observable
      * @return ObsIdType An identifier for the created observable
      */
-    auto CombinedObservable(std::string obs_type, std::size_t num_terms) -> ObsIdType
-    {
+    auto CombinedObservable(std::string obs_type, std::size_t num_terms) -> ObsIdType {
         ObsIdType id = static_cast<ObsIdType>(observable_names_.size() + 1);
         std::string name = obs_type + "(num_terms=" + std::to_string(num_terms) + ")";
         observable_names_[id] = name;
@@ -433,8 +416,7 @@ struct ResourceTracker final {
      * @param meas_type The type of measurement (e.g., "expval", "var", "sample")
      * @param obs_id The identifier of the observable being measured
      */
-    void ObsMeasurement(std::string meas_type, ObsIdType obs_id)
-    {
+    void ObsMeasurement(std::string meas_type, ObsIdType obs_id) {
         std::string obs_name = "";
         auto it = observable_names_.find(obs_id);
         if (it != observable_names_.end()) {
@@ -451,8 +433,7 @@ struct ResourceTracker final {
      * @param meas_type The type of measurement (e.g., "state", "probs")
      * @param n_wires The number of wires involved in the measurement (or "all")
      */
-    void AnalyticalMeasurement(std::string meas_type, std::string n_wires)
-    {
+    void AnalyticalMeasurement(std::string meas_type, std::string n_wires) {
         std::string full_meas_name = meas_type + "(" + n_wires + " wires)";
         measurements_[full_meas_name]++;
     }
@@ -466,8 +447,7 @@ struct ResourceTracker final {
      * @param name The name including weight (e.g. "PauliMeasure-w2")
      * @param wires The qubits being measured
      */
-    void PauliMeasure(const std::string &name, const std::vector<QubitIdType> &wires)
-    {
+    void PauliMeasure(const std::string &name, const std::vector<QubitIdType> &wires) {
         RecordOperation(name, wires, {});
     }
 
@@ -488,8 +468,7 @@ struct ResourceTracker final {
      * @param resources_file File pointer where JSON data will be written
      * @throws Runtime error if file writing fails
      */
-    void PrintResourceUsageToFile(FILE *resources_file)
-    {
+    void PrintResourceUsageToFile(FILE *resources_file) {
         std::stringstream resources;
 
         resources << "{\n";
@@ -507,8 +486,7 @@ struct ResourceTracker final {
         resources << ",\n";
         if (compute_depth_) {
             resources << "  \"depth\": " << GetDepth();
-        }
-        else {
+        } else {
             resources << "  \"depth\": null";
         }
         resources << "\n}" << std::endl;
@@ -535,8 +513,7 @@ struct ResourceTracker final {
      *
      * @throws Runtime error if file cannot be opened or written to
      */
-    void WriteOut()
-    {
+    void WriteOut() {
         if (!static_filename_) {
             auto time = std::chrono::high_resolution_clock::now();
             auto timestamp =
@@ -555,8 +532,7 @@ struct ResourceTracker final {
             std::string err_msg =
                 "Error opening file '" + this->resources_filename_ + "'."; // LCOV_EXCL_LINE
             RT_FAIL(err_msg.c_str());                                      // LCOV_EXCL_LINE
-        }
-        else {
+        } else {
             PrintResourceUsageToFile(resources_file);
             fclose(resources_file);
         }

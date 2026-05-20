@@ -40,8 +40,7 @@ namespace hlo_extensions {
 struct HloCustomCallLoweringPass : impl::HloCustomCallLoweringPassBase<HloCustomCallLoweringPass> {
     using HloCustomCallLoweringPassBase::HloCustomCallLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "hlo custom call lowering pass"
                           << "\n");
 

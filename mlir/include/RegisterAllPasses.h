@@ -30,8 +30,7 @@
 
 namespace catalyst {
 
-inline void registerAllPasses()
-{
+inline void registerAllPasses() {
     registerCatalystPasses();
     gradient::registerGradientPasses();
     hlo_extensions::registerStablehloPasses();

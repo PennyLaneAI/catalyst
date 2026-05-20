@@ -29,8 +29,7 @@ using namespace catalyst::qecp;
 
 #include "QecPhysical/IR/QecPhysicalOpsDialect.cpp.inc"
 
-void QecPhysicalDialect::initialize()
-{
+void QecPhysicalDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "QecPhysical/IR/QecPhysicalOpsTypes.cpp.inc"

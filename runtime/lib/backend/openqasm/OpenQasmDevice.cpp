@@ -20,8 +20,7 @@
 
 namespace Catalyst::Runtime::Device {
 
-auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
-{
+auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> {
     if (!num_qubits) {
         return {};
     }
@@ -44,8 +43,7 @@ auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdTyp
     return result;
 }
 
-void OpenQasmDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
-{
+void OpenQasmDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits) {
     std::set<QubitIdType> dealloc_Ids(qubits.begin(), qubits.end());
     RT_FAIL_IF(this->initial_allocated_QubitIds != dealloc_Ids,
                "OpenQASM device does not support dynamic qubit allocation. Please ensure the "
@@ -56,8 +54,7 @@ void OpenQasmDevice::ReleaseQubits(const std::vector<QubitIdType> &qubits)
     // refresh the builder for device re-use.
     if (builder_type != OpenQasm::BuilderType::Common) {
         builder = std::make_unique<OpenQasm::BraketBuilder>();
-    }
-    else {
+    } else {
         builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
     }
 }
@@ -72,8 +69,7 @@ void OpenQasmDevice::NamedOperation(
     const std::string &name, const std::vector<double> &params,
     const std::vector<QubitIdType> &wires, bool inverse,
     const std::vector<QubitIdType> &controlled_wires, const std::vector<bool> &controlled_values,
-    [[maybe_unused]] const std::vector<std::string> &optional_params)
-{
+    [[maybe_unused]] const std::vector<std::string> &optional_params) {
     RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
                "OpenQasm device does not support native quantum control.");
 
@@ -95,8 +91,7 @@ void OpenQasmDevice::NamedOperation(
 void OpenQasmDevice::MatrixOperation(const std::vector<std::complex<double>> &matrix,
                                      const std::vector<QubitIdType> &wires, bool inverse,
                                      const std::vector<QubitIdType> &controlled_wires,
-                                     const std::vector<bool> &controlled_values)
-{
+                                     const std::vector<bool> &controlled_values) {
     RT_FAIL_IF(builder_type == OpenQasm::BuilderType::Common, "Unsupported functionality");
     // TODO: Remove when controlled wires API is supported
     RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
@@ -110,8 +105,7 @@ void OpenQasmDevice::MatrixOperation(const std::vector<std::complex<double>> &ma
 }
 
 auto OpenQasmDevice::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
-                                const std::vector<QubitIdType> &wires) -> ObsIdType
-{
+                                const std::vector<QubitIdType> &wires) -> ObsIdType {
     RT_FAIL_IF(wires.size() > GetNumQubits(), "Invalid number of wires");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
 
@@ -124,19 +118,16 @@ auto OpenQasmDevice::Observable(ObsId id, const std::vector<std::complex<double>
     return obs_manager.createNamedObs(id, dev_wires);
 }
 
-auto OpenQasmDevice::TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType
-{
+auto OpenQasmDevice::TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType {
     return obs_manager.createTensorProdObs(obs);
 }
 
 auto OpenQasmDevice::HamiltonianObservable(const std::vector<double> &coeffs,
-                                           const std::vector<ObsIdType> &obs) -> ObsIdType
-{
+                                           const std::vector<ObsIdType> &obs) -> ObsIdType {
     return obs_manager.createHamiltonianObs(coeffs, obs);
 }
 
-auto OpenQasmDevice::Expval(ObsIdType obsKey) -> double
-{
+auto OpenQasmDevice::Expval(ObsIdType obsKey) -> double {
     RT_ASSERT(builder->getQubits().size());
     RT_FAIL_IF(!obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
     auto &&obs = obs_manager.getObservable(obsKey);
@@ -155,16 +146,14 @@ auto OpenQasmDevice::Expval(ObsIdType obsKey) -> double
     std::string device_info{};
     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+    } else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
         device_info = device_kwargs["backend"];
     }
 
     return runner->Expval(circuit, device_info, device_shots, s3_folder_str);
 }
 
-auto OpenQasmDevice::Var(ObsIdType obsKey) -> double
-{
+auto OpenQasmDevice::Var(ObsIdType obsKey) -> double {
     RT_ASSERT(builder->getQubits().size());
     RT_FAIL_IF(!obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
     auto &&obs = obs_manager.getObservable(obsKey);
@@ -183,16 +172,14 @@ auto OpenQasmDevice::Var(ObsIdType obsKey) -> double
     std::string device_info{};
     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+    } else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
         device_info = device_kwargs["backend"];
     }
 
     return runner->Var(circuit, device_info, device_shots, s3_folder_str);
 }
 
-void OpenQasmDevice::State(DataView<std::complex<double>, 1> &state)
-{
+void OpenQasmDevice::State(DataView<std::complex<double>, 1> &state) {
     std::ostringstream oss;
     oss << "#pragma braket result state_vector";
     auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
@@ -205,8 +192,7 @@ void OpenQasmDevice::State(DataView<std::complex<double>, 1> &state)
     std::string device_info{};
     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+    } else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
         device_info = device_kwargs["backend"];
     }
 
@@ -217,8 +203,7 @@ void OpenQasmDevice::State(DataView<std::complex<double>, 1> &state)
     std::move(dv_state.begin(), dv_state.end(), state.begin());
 }
 
-void OpenQasmDevice::Probs(DataView<double, 1> &probs)
-{
+void OpenQasmDevice::Probs(DataView<double, 1> &probs) {
     std::string s3_folder_str{};
     if (device_kwargs.contains("s3_destination_folder")) {
         s3_folder_str = device_kwargs["s3_destination_folder"];
@@ -227,8 +212,7 @@ void OpenQasmDevice::Probs(DataView<double, 1> &probs)
     std::string device_info{};
     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+    } else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
         device_info = device_kwargs["backend"];
     }
 
@@ -240,8 +224,8 @@ void OpenQasmDevice::Probs(DataView<double, 1> &probs)
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void OpenQasmDevice::PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires)
-{
+void OpenQasmDevice::PartialProbs(DataView<double, 1> &probs,
+                                  const std::vector<QubitIdType> &wires) {
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
 
@@ -258,8 +242,7 @@ void OpenQasmDevice::PartialProbs(DataView<double, 1> &probs, const std::vector<
     std::string device_info{};
     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+    } else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
         device_info = device_kwargs["backend"];
     }
 
@@ -271,8 +254,7 @@ void OpenQasmDevice::PartialProbs(DataView<double, 1> &probs, const std::vector<
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void OpenQasmDevice::Sample(DataView<double, 2> &samples)
-{
+void OpenQasmDevice::Sample(DataView<double, 2> &samples) {
     std::string s3_folder_str{};
     if (device_kwargs.contains("s3_destination_folder")) {
         s3_folder_str = device_kwargs["s3_destination_folder"];
@@ -281,8 +263,7 @@ void OpenQasmDevice::Sample(DataView<double, 2> &samples)
     std::string device_info{};
     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+    } else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
         device_info = device_kwargs["backend"];
     }
 
@@ -301,8 +282,7 @@ void OpenQasmDevice::Sample(DataView<double, 2> &samples)
 }
 
 void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
-                                   const std::vector<QubitIdType> &wires)
-{
+                                   const std::vector<QubitIdType> &wires) {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
 
@@ -322,8 +302,7 @@ void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
     std::string device_info{};
     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+    } else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
         device_info = device_kwargs["backend"];
     }
 
@@ -338,8 +317,7 @@ void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
     }
 }
 
-void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
-{
+void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts) {
     const size_t numQubits = GetNumQubits();
     const size_t numElements = 1U << numQubits;
 
@@ -354,8 +332,7 @@ void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
     std::string device_info{};
     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+    } else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
         device_info = device_kwargs["backend"];
     }
 
@@ -376,8 +353,7 @@ void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
 }
 
 void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                                   const std::vector<QubitIdType> &wires)
-{
+                                   const std::vector<QubitIdType> &wires) {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
     const size_t numElements = 1U << numWires;
@@ -397,8 +373,7 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
     std::string device_info{};
     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
-    }
-    else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+    } else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
         device_info = device_kwargs["backend"];
     }
 
@@ -418,8 +393,7 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
     }
 }
 
-auto OpenQasmDevice::Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result
-{
+auto OpenQasmDevice::Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result {
     RT_FAIL_IF(postselect, "Post-selection is not supported yet");
 
     if (builder_type != OpenQasm::BuilderType::Common) {

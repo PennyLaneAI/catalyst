@@ -21,8 +21,7 @@
 using namespace RSDecomp::NormalForms;
 using namespace RSDecomp::CliffordData;
 
-TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]")
-{
+TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]") {
     // For this test, we construct the SO3 matrix, then test the decomposition
     std::vector<std::vector<GateType>> cl_list;
     for (const auto &[gates, matrix] : clifford_group_to_SO3) {
@@ -50,15 +49,13 @@ TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]")
         b_str += (bit ? '1' : '0');
     }
 
-    DYNAMIC_SECTION("a = " << a << ", b = " << b_str << ", c = " << c)
-    {
+    DYNAMIC_SECTION("a = " << a << ", b = " << b_str << ", c = " << c) {
         SO3Matrix so3mat({}, 0);
         std::vector<GateType> expected_sol;
         if (a) {
             so3mat = SO3Matrix(DyadicMatrix({0, 0, 0, 1}, {}, {}, {0, 0, 1, 0}));
             expected_sol.push_back(GateType::T);
-        }
-        else {
+        } else {
             so3mat = SO3Matrix(DyadicMatrix({0, 0, 0, 1}, {}, {}, {0, 0, 0, 1}));
         }
 
@@ -68,8 +65,7 @@ TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]")
                     so3_matrix_mul(so3mat, SO3Matrix(DyadicMatrix({0, 0, 0, 1}, {0, 0, 1, 0},
                                                                   {0, 1, 0, 0}, {-1, 0, 0, 0}, 1)));
                 expected_sol.push_back(GateType::SHT);
-            }
-            else {
+            } else {
                 so3mat =
                     so3_matrix_mul(so3mat, SO3Matrix(DyadicMatrix({0, 0, 0, 1}, {0, 0, 1, 0},
                                                                   {0, 0, 0, 1}, {0, 0, -1, 0}, 1)));

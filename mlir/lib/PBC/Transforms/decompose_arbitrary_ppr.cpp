@@ -33,8 +33,7 @@ namespace pbc {
 struct DecomposeArbitraryPPRPass : impl::DecomposeArbitraryPPRPassBase<DecomposeArbitraryPPRPass> {
     using DecomposeArbitraryPPRPassBase::DecomposeArbitraryPPRPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto ctx = &getContext();
         auto module = getOperation();
 

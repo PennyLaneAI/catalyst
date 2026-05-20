@@ -27,8 +27,7 @@
 
 #define NO_MODIFIERS ((const Modifiers *)NULL)
 
-inline auto get_dylib_ext() -> std::string
-{
+inline auto get_dylib_ext() -> std::string {
 #ifdef __linux__
     return ".so";
 #elif defined(__APPLE__)
@@ -37,8 +36,7 @@ inline auto get_dylib_ext() -> std::string
 }
 
 static inline Catalyst::Runtime::QuantumDevice *loadDevice(const std::string &device_name,
-                                                           const std::string &filename)
-{
+                                                           const std::string &filename) {
     auto init_rtd_dylib = std::make_unique<Catalyst::Runtime::SharedLibraryManager>(filename);
     std::string factory_name{device_name + "Factory"};
     void *f_ptr = init_rtd_dylib->getSymbol(factory_name);

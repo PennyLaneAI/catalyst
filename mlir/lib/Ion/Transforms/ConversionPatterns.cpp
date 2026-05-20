@@ -29,8 +29,8 @@ using json = nlohmann::json;
 
 namespace {
 
-LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter, BeamAttr &beamAttr)
-{
+LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter,
+                                          BeamAttr &beamAttr) {
     return LLVM::LLVMStructType::getLiteral(
         ctx, {
                  IntegerType::get(ctx, 64), // transition index
@@ -43,8 +43,7 @@ LLVM::LLVMStructType createBeamStructType(MLIRContext *ctx, OpBuilder &rewriter,
              });
 }
 
-Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, BeamAttr &beamAttr)
-{
+Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, BeamAttr &beamAttr) {
     Type beamStructType = createBeamStructType(ctx, rewriter, beamAttr);
 
     auto transitionIndex = beamAttr.getTransitionIndex();
@@ -90,8 +89,7 @@ struct IonOpPattern : public OpConversionPattern<catalyst::ion::IonOp> {
 
     // Create the ion JSON and pass it into the device kwargs as a JSON string
     LogicalResult matchAndRewrite(catalyst::ion::IonOp op, catalyst::ion::IonOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
 
         DeviceInitOp deviceInitOp = *funcOp.getOps<DeviceInitOp>().begin();
@@ -172,8 +170,7 @@ struct ModesOpPattern : public OpConversionPattern<catalyst::ion::ModesOp> {
 
     // Create the modes JSON and pass it into the device kwargs as a JSON string
     LogicalResult matchAndRewrite(catalyst::ion::ModesOp op, catalyst::ion::ModesOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
 
         DeviceInitOp deviceInitOp = *funcOp.getOps<DeviceInitOp>().begin();
@@ -206,8 +203,7 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
 
     LogicalResult matchAndRewrite(catalyst::ion::ParallelProtocolOp op,
                                   catalyst::ion::ParallelProtocolOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -231,13 +227,11 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
                 irMapping.map(regionOp.getResults(), clonedPulseOp->getResults());
                 // keep track of parallel Pulses for the runtime call
                 parallelPulses.push_back(clonedPulseOp->getResult(0));
-            }
-            else if (auto measurePulseOp = dyn_cast<catalyst::ion::MeasurePulseOp>(&regionOp)) {
+            } else if (auto measurePulseOp = dyn_cast<catalyst::ion::MeasurePulseOp>(&regionOp)) {
                 auto *clonedMeasurePulseOp = rewriter.clone(regionOp, irMapping);
                 irMapping.map(regionOp.getResults(), clonedMeasurePulseOp->getResults());
                 parallelPulses.push_back(clonedMeasurePulseOp->getResult(0));
-            }
-            else if (!isa<catalyst::ion::YieldOp>(&regionOp)) {
+            } else if (!isa<catalyst::ion::YieldOp>(&regionOp)) {
                 // Clone other operations (e.g., llvm.fdiv) that aren't YieldOp
                 auto *clonedRegionOp = rewriter.clone(regionOp, irMapping);
                 irMapping.map(regionOp.getResults(), clonedRegionOp->getResults());
@@ -287,8 +281,7 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
 
 LogicalResult buildPulseCall(Operation *op, Value inQubit, Value time, FloatAttr phaseAttr,
                              BeamAttr beamAttr, StringRef qirName, const TypeConverter *conv,
-                             ConversionPatternRewriter &rewriter)
-{
+                             ConversionPatternRewriter &rewriter) {
     Location loc = op->getLoc();
     MLIRContext *ctx = op->getContext();
 
@@ -313,8 +306,7 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
     using OpConversionPattern<catalyst::ion::PulseOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(catalyst::ion::PulseOp op, catalyst::ion::PulseOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         return buildPulseCall(op, adaptor.getInQubit(), op.getTime(), op.getPhase(), op.getBeam(),
                               "__catalyst__oqd__pulse", getTypeConverter(), rewriter);
     }
@@ -325,8 +317,7 @@ struct MeasurePulseOpPattern : public OpConversionPattern<catalyst::ion::Measure
 
     LogicalResult matchAndRewrite(catalyst::ion::MeasurePulseOp op,
                                   catalyst::ion::MeasurePulseOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         return buildPulseCall(op, adaptor.getInQubit(), op.getTime(), op.getPhase(), op.getBeam(),
                               "__catalyst__oqd__measure_pulse", getTypeConverter(), rewriter);
     }
@@ -337,8 +328,7 @@ struct ReadoutBitOpPattern : public OpConversionPattern<catalyst::ion::ReadoutBi
 
     LogicalResult matchAndRewrite(catalyst::ion::ReadoutBitOp op,
                                   catalyst::ion::ReadoutBitOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         Type ptrType = LLVM::LLVMPointerType::get(ctx);
@@ -362,8 +352,7 @@ struct ReadoutBitOpPattern : public OpConversionPattern<catalyst::ion::ReadoutBi
 namespace catalyst {
 namespace ion {
 
-void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
-{
+void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns) {
     patterns.add<IonOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ModesOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PulseOpPattern>(typeConverter, patterns.getContext());

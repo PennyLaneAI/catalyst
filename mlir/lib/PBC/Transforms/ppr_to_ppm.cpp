@@ -36,8 +36,7 @@ namespace pbc {
 struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
     using PPRToPPMPassBase::PPRToPPMPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto ctx = &getContext();
         auto module = getOperation();
 

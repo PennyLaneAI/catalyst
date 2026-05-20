@@ -45,9 +45,7 @@ struct QuantumCache {
 class AugmentedCircuitGenerator {
   public:
     AugmentedCircuitGenerator(mlir::IRMapping &oldToCloned, QuantumCache &cache)
-        : oldToCloned(oldToCloned), cache(cache)
-    {
-    }
+        : oldToCloned(oldToCloned), cache(cache) {}
 
     /// Given a `region` containing classical preprocessing and quantum operations, generate an
     /// augmented version that caches all the parameters required to deterministically re-execute
@@ -71,8 +69,7 @@ class AugmentedCircuitGenerator {
                     const mlir::DenseMap<unsigned, unsigned> &argIdxMapping);
 
     // Emit an operation to cache a dynamic wire for quantum.insert/extract ops.
-    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, mlir::OpBuilder &builder)
-    {
+    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, mlir::OpBuilder &builder) {
         if (!op.getIdxAttr().has_value()) {
             ListPushOp::create(builder, op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
                                cache.wireVector);

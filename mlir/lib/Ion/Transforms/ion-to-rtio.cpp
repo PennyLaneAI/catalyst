@@ -45,8 +45,7 @@ namespace ion {
 namespace {
 
 /// Load a JSON file and convert it to an rtio.config attribute
-FailureOr<rtio::ConfigAttr> loadDeviceDbAsConfig(MLIRContext *ctx, StringRef filePath)
-{
+FailureOr<rtio::ConfigAttr> loadDeviceDbAsConfig(MLIRContext *ctx, StringRef filePath) {
     auto dictAttr = loadJsonFileAsDict(ctx, filePath);
     if (failed(dictAttr)) {
         return failure();
@@ -56,8 +55,7 @@ FailureOr<rtio::ConfigAttr> loadDeviceDbAsConfig(MLIRContext *ctx, StringRef fil
 
 /// Clean up unused quantum/ion/memref/linalg/builtin operations after conversion
 /// Runs iteratively until no more ops can be erased
-void cleanupUnusedOps(func::FuncOp funcOp)
-{
+void cleanupUnusedOps(func::FuncOp funcOp) {
     bool changed = true;
     while (changed) {
         changed = false;
@@ -101,8 +99,8 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
 
     LogicalResult IonPulseConversion(func::FuncOp funcOp, ConversionTarget &baseTarget,
                                      TypeConverter &typeConverter, IonInfo ionInfo,
-                                     DenseMap<Value, Value> &qextractToMemrefMap, MLIRContext *ctx)
-    {
+                                     DenseMap<Value, Value> &qextractToMemrefMap,
+                                     MLIRContext *ctx) {
         ConversionTarget target(baseTarget);
         target.addIllegalOp<ion::PulseOp>();
 
@@ -115,8 +113,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
     }
 
     LogicalResult ParallelProtocolConversion(func::FuncOp funcOp, ConversionTarget &baseTarget,
-                                             TypeConverter &typeConverter, MLIRContext *ctx)
-    {
+                                             TypeConverter &typeConverter, MLIRContext *ctx) {
         ConversionTarget target(baseTarget);
         target.addIllegalOp<ion::ParallelProtocolOp>();
 
@@ -129,8 +126,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
     }
 
     LogicalResult SCFStructuralConversion(func::FuncOp funcOp, ConversionTarget &target,
-                                          TypeConverter &typeConverter, MLIRContext *ctx)
-    {
+                                          TypeConverter &typeConverter, MLIRContext *ctx) {
         TypeConverter scfTypeConverter(typeConverter);
         scfTypeConverter.addConversion(
             [ctx](quantum::QubitType) -> Type { return rtio::EventType::get(ctx); });
@@ -209,8 +205,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         return success();
     }
 
-    LogicalResult FinalizeKernelFunction(func::FuncOp funcOp, MLIRContext *ctx)
-    {
+    LogicalResult FinalizeKernelFunction(func::FuncOp funcOp, MLIRContext *ctx) {
         RewritePatternSet patterns(ctx);
         for (auto *dialect : ctx->getLoadedDialects()) {
             dialect->getCanonicalizationPatterns(patterns);
@@ -233,16 +228,14 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         return success();
     }
 
-    SmallVector<IonInfo> getIonInfos()
-    {
+    SmallVector<IonInfo> getIonInfos() {
         SmallVector<IonInfo> ionInfos;
         getOperation()->walk([&](ion::IonOp ionOp) { ionInfos.emplace_back(IonInfo(ionOp)); });
         return ionInfos;
     }
 
     func::FuncOp createKernelFunction(func::FuncOp qnodeFunc, std::string kernelName,
-                                      OpBuilder &builder)
-    {
+                                      OpBuilder &builder) {
         MLIRContext *ctx = builder.getContext();
 
         auto newQnodeFunc = qnodeFunc.clone();
@@ -264,8 +257,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
 
     void initializeMemrefMap(func::FuncOp funcOp, ModuleOp module,
                              DenseMap<Value, Value> &qregToMemrefMap,
-                             DenseMap<Value, Value> &qextractToMemrefMap, MLIRContext *ctx)
-    {
+                             DenseMap<Value, Value> &qextractToMemrefMap, MLIRContext *ctx) {
         OpBuilder builder(ctx);
 
         int globalCounter = 0;
@@ -324,8 +316,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
                                 builder, extractOp.getLoc(), builder.getIndexType(), idx);
                             memrefLoadValue = memref::LoadOp::create(
                                 builder, extractOp.getLoc(), memref, ValueRange{indexValue});
-                        }
-                        else if (IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
+                        } else if (IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
                             Value indexValue = arith::ConstantIndexOp::create(
                                 builder, extractOp.getLoc(), idxAttr.getInt());
                             memrefLoadValue = memref::LoadOp::create(
@@ -342,8 +333,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
     }
 
     // In ARTIQ's compilation flow, we need to drop the pulse with transition 0 from the protocol
-    void dropOnePulseFromProtocol(func::FuncOp funcOp)
-    {
+    void dropOnePulseFromProtocol(func::FuncOp funcOp) {
         SmallVector<ion::PulseOp> pulsesToErase;
         funcOp.walk([&](ion::PulseOp pulseOp) {
             if (pulseOp.getBeamAttr().getTransitionIndex().getInt() == 0) {
@@ -355,8 +345,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         }
     }
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         MLIRContext *ctx = &getContext();
         auto module = cast<ModuleOp>(getOperation());
 

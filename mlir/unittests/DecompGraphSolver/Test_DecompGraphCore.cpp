@@ -22,8 +22,7 @@
 using namespace Catch::Matchers;
 using namespace DecompGraph::Core;
 
-TEST_CASE("Test OperatorNode construction", "[DecompGraph::Core]")
-{
+TEST_CASE("Test OperatorNode construction", "[DecompGraph::Core]") {
     const OperatorNode op1{"H", 1, 0, false};
     const OperatorNode op2{"CNOT", 2, 0, false};
     const OperatorNode op3{"RX", 1, 1, false};
@@ -50,8 +49,7 @@ TEST_CASE("Test OperatorNode construction", "[DecompGraph::Core]")
     REQUIRE(op4.adjoint == true);
 }
 
-TEST_CASE("Test OperatorNode equality operator", "[DecompGraph::Core]")
-{
+TEST_CASE("Test OperatorNode equality operator", "[DecompGraph::Core]") {
     const OperatorNode op1{"H", 1, 0, false};
     const OperatorNode op2{"H", 1, 0, false};
     const OperatorNode op3{"H", 1, 0, true};
@@ -62,8 +60,7 @@ TEST_CASE("Test OperatorNode equality operator", "[DecompGraph::Core]")
     REQUIRE_FALSE(op1 == op4);
 }
 
-TEST_CASE("Test OperatorNodeHash", "[DecompGraph::Core]")
-{
+TEST_CASE("Test OperatorNodeHash", "[DecompGraph::Core]") {
     const OperatorNode op1{"H", 1, 0, false};
     const OperatorNode op2{"H", 1, 0, false};
     const OperatorNode op3{"H", 1, 0, true};
@@ -75,8 +72,7 @@ TEST_CASE("Test OperatorNodeHash", "[DecompGraph::Core]")
     REQUIRE(hashFunc(op1) != hashFunc(op4));
 }
 
-TEST_CASE("Test OperatorNode in unordered_map", "[DecompGraph::Core]")
-{
+TEST_CASE("Test OperatorNode in unordered_map", "[DecompGraph::Core]") {
     std::unordered_map<OperatorNode, double, OperatorNodeHash> opMap;
     const OperatorNode op1{"H", 1, 0, false};
     const OperatorNode op2{"CNOT", 2, 0, false};
@@ -90,8 +86,7 @@ TEST_CASE("Test OperatorNode in unordered_map", "[DecompGraph::Core]")
     REQUIRE(opMap.find(op3) == opMap.end());
 }
 
-TEST_CASE("Test RuleNode construction", "[DecompGraph::Core]")
-{
+TEST_CASE("Test RuleNode construction", "[DecompGraph::Core]") {
     const auto h = OperatorNode{"H"};
     const auto rz = OperatorNode{"RZ"};
     const auto rx = OperatorNode{"RX"};
@@ -106,8 +101,7 @@ TEST_CASE("Test RuleNode construction", "[DecompGraph::Core]")
     REQUIRE(h_to_rz_rx_rz.inputs[1].multiplicity == 1);
 }
 
-TEST_CASE("Test WeightedGateset construction and contains", "[DecompGraph::Core]")
-{
+TEST_CASE("Test WeightedGateset construction and contains", "[DecompGraph::Core]") {
     const OperatorNode h{"H"};
     const OperatorNode cnot{"CNOT"};
     const OperatorNode rx{"RX"};
@@ -122,8 +116,7 @@ TEST_CASE("Test WeightedGateset construction and contains", "[DecompGraph::Core]
     REQUIRE(gateset.getCost(cnot) == 2.0);
 }
 
-TEST_CASE("Test ChosenDecompRule construction", "[DecompGraph::Core]")
-{
+TEST_CASE("Test ChosenDecompRule construction", "[DecompGraph::Core]") {
     const OperatorNode h{"H"};
     const OperatorNode rz{"RZ"};
     const OperatorNode rx{"RX"};

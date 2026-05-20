@@ -29,8 +29,7 @@ template <typename T> inline T max(T x, T y) { return (x > y) ? x : y; }
 
 template <typename T> inline T abs_val(T x) { return (x < 0) ? -x : x; }
 
-template <typename T> inline T floor_div(T a, T b)
-{
+template <typename T> inline T floor_div(T a, T b) {
     RT_FAIL_IF(b == T(0), "Division by zero");
     T q = a / b;
     T r = a % b;
@@ -43,8 +42,7 @@ template <typename T> inline T floor_div(T a, T b)
 /**
  * @brief Computes GCD for generic types supporting % and comparison with 0.
  */
-template <typename T> T gcd(T a, T b)
-{
+template <typename T> T gcd(T a, T b) {
     while (b != T(0)) {
         T temp = a % b;
         a = b;
@@ -80,8 +78,7 @@ template <typename Key, typename Value, size_t MaxSize> class lru_cache {
      * @param key The key to look up.
      * @return std::optional<Value> The value if found, otherwise std::nullopt.
      */
-    std::optional<Value> get(const Key &key)
-    {
+    std::optional<Value> get(const Key &key) {
         auto map_it = cache_map.find(key);
 
         if (map_it == cache_map.end()) {
@@ -103,15 +100,13 @@ template <typename Key, typename Value, size_t MaxSize> class lru_cache {
      * @param key The key of the item.
      * @param value The value of the item.
      */
-    void put(const Key &key, const Value &value)
-    {
+    void put(const Key &key, const Value &value) {
         auto map_it = cache_map.find(key);
 
         if (map_it != cache_map.end()) {
             map_it->second->second = value;
             cache_list.splice(cache_list.begin(), cache_list, map_it->second);
-        }
-        else {
+        } else {
             if (cache_map.size() >= MaxSize) {
                 const auto &[lru_key, lru_value] = cache_list.back();
                 cache_map.erase(lru_key);
@@ -130,8 +125,7 @@ template <typename Key, typename Value, size_t MaxSize> class lru_cache {
     /**
      * @brief Clears all items from the cache.
      */
-    void clear()
-    {
+    void clear() {
         cache_map.clear();
         cache_list.clear();
     }

@@ -29,8 +29,7 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
-void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
-{
+void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter) {
     // Delete measurement operations.
     std::deque<Operation *> opsToDelete;
     function.walk([&](MeasurementProcess op) { opsToDelete.push_back(op); });
@@ -55,15 +54,13 @@ void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter
         }
         if (currentOp && currentOp->use_empty()) {
             rewriter.eraseOp(currentOp);
-        }
-        else {
+        } else {
             opsToDelete.push_back(currentOp);
         }
     }
 }
 
-void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter)
-{
+void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter) {
     function.walk([&](MeasurementProcess op) {
         auto types = op->getResults().getTypes();
         auto loc = op.getLoc();
@@ -75,19 +72,16 @@ void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewrite
                 auto elemType = tensorType.getElementType();
                 auto res = tensor::EmptyOp::create(rewriter, loc, shape, elemType);
                 results.push_back(res);
-            }
-            else {
+            } else {
                 if (type.isInteger()) {
                     auto res = arith::ConstantOp::create(rewriter, loc, type,
                                                          rewriter.getIntegerAttr(type, 0));
                     results.push_back(res);
-                }
-                else if (type.isIntOrFloat()) {
+                } else if (type.isIntOrFloat()) {
                     auto res = arith::ConstantOp::create(rewriter, loc, type,
                                                          rewriter.getFloatAttr(type, 0.0));
                     results.push_back(res);
-                }
-                else {
+                } else {
                     op.emitError() << "Unexpected measurement type " << *op;
                 }
             }
@@ -96,8 +90,7 @@ void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewrite
     });
 }
 
-LogicalResult verifyQuantumFree(func::FuncOp function)
-{
+LogicalResult verifyQuantumFree(func::FuncOp function) {
     assert(function->hasAttr("QuantumFree") &&
            "verifying function that doesn't have QuantumFree attribute");
 

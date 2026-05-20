@@ -26,8 +26,7 @@ namespace catalyst {
 using MergeMethod = ResourceResult::MergeMethod;
 
 /// Helper: select merge function based on method enum.
-static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method)
-{
+static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method) {
     switch (method) {
     case MergeMethod::Max:
         return std::max(a, b);
@@ -39,8 +38,7 @@ static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method)
     return -1; // unreachable, silences warning
 }
 
-void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
-{
+void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) {
     for (const auto &opEntry : other.operations) {
         StringRef opName = opEntry.getKey();
         for (const auto &sizeEntry : opEntry.getValue()) {
@@ -81,8 +79,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     hasDynLoop = hasDynLoop || other.hasDynLoop;
 }
 
-void ResourceResult::multiplyByScalar(int64_t scalar)
-{
+void ResourceResult::multiplyByScalar(int64_t scalar) {
     for (auto &opEntry : operations) {
         for (auto &sizeEntry : opEntry.getValue()) {
             sizeEntry.second *= scalar;
@@ -109,8 +106,7 @@ void ResourceResult::multiplyByScalar(int64_t scalar)
     numArgQubits *= scalar;
 }
 
-std::string ResourceResult::toJson(int indent) const
-{
+std::string ResourceResult::toJson(int indent) const {
     // Build JSON object using llvm::json
     llvm::json::Object root;
 

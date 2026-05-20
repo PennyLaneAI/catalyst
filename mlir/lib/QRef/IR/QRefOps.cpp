@@ -36,8 +36,7 @@ using namespace catalyst::qref;
 namespace catalyst::qref {
 
 // Utils
-static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1)
-{
+static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1) {
     ShapedType tensor = cast<ShapedType>(ty);
     if (!tensor.hasStaticShape() || tensor.getShape().size() != 2 ||
         tensor.getShape()[0] != length0 || tensor.getShape()[1] != length1) {
@@ -56,15 +55,13 @@ static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "
 static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
                                                "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
 
-LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
-{
+LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         auto name = op.getGateName();
         if (hermitianOps.contains(name)) {
             op.setAdjoint(false);
             return success();
-        }
-        else if (rotationsOps.contains(name)) {
+        } else if (rotationsOps.contains(name)) {
             auto params = op.getParams();
             SmallVector<Value> paramsNeg;
             for (auto param : params) {
@@ -82,8 +79,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
     return failure();
 }
 
-LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
-{
+LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
@@ -95,8 +91,7 @@ LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewri
     return failure();
 }
 
-LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter)
-{
+LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
@@ -108,8 +103,7 @@ LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewri
     return failure();
 }
 
-LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter) {
     if (alloc->use_empty()) {
         rewriter.eraseOp(alloc);
         return success();
@@ -118,8 +112,7 @@ LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewrit
     return failure();
 }
 
-LogicalResult AllocQubitOp::canonicalize(AllocQubitOp allocQb, mlir::PatternRewriter &rewriter)
-{
+LogicalResult AllocQubitOp::canonicalize(AllocQubitOp allocQb, mlir::PatternRewriter &rewriter) {
     if (allocQb->use_empty()) {
         rewriter.eraseOp(allocQb);
         return success();
@@ -128,8 +121,7 @@ LogicalResult AllocQubitOp::canonicalize(AllocQubitOp allocQb, mlir::PatternRewr
     return failure();
 }
 
-LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter) {
     if (auto alloc = dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
         if (dealloc.getQreg().hasOneUse()) {
             rewriter.eraseOp(dealloc);
@@ -142,8 +134,7 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &
 }
 
 LogicalResult DeallocQubitOp::canonicalize(DeallocQubitOp deallocQb,
-                                           mlir::PatternRewriter &rewriter)
-{
+                                           mlir::PatternRewriter &rewriter) {
     if (auto allocQb = dyn_cast_if_present<AllocQubitOp>(deallocQb.getQubit().getDefiningOp())) {
         if (allocQb.getQubit().hasOneUse()) {
             rewriter.eraseOp(deallocQb);
@@ -155,8 +146,7 @@ LogicalResult DeallocQubitOp::canonicalize(DeallocQubitOp deallocQb,
     return failure();
 }
 
-template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
-{
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx) {
     // Prefer using an attribute when the index is constant.
     bool hasNoIdxAttr = !op.getIdxAttr().has_value();
     bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
@@ -171,8 +161,7 @@ template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp o
     return failure();
 }
 
-OpFoldResult GetOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult GetOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -186,8 +175,7 @@ OpFoldResult GetOp::fold(FoldAdaptor adaptor)
 
 static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
 
-LogicalResult AllocOp::verify()
-{
+LogicalResult AllocOp::verify() {
     if (!(getNqubits() || getNqubitsAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null allocation size";
     }
@@ -215,8 +203,7 @@ LogicalResult AllocOp::verify()
     return success();
 }
 
-LogicalResult CustomOp::verify()
-{
+LogicalResult CustomOp::verify() {
     if (getQubits().size() == 0) {
         return emitOpError("expected op to have at least one qubit");
     }
@@ -224,8 +211,7 @@ LogicalResult CustomOp::verify()
     return success();
 }
 
-LogicalResult PauliRotOp::verify()
-{
+LogicalResult PauliRotOp::verify() {
     size_t pauliWordLength = getPauliProduct().size();
     size_t numQubits = getQubits().size();
     if (pauliWordLength != numQubits) {
@@ -243,8 +229,7 @@ LogicalResult PauliRotOp::verify()
     return success();
 }
 
-LogicalResult QubitUnitaryOp::verify()
-{
+LogicalResult QubitUnitaryOp::verify() {
     size_t dim = 1 << getQubits().size();
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
@@ -253,8 +238,7 @@ LogicalResult QubitUnitaryOp::verify()
     return success();
 }
 
-LogicalResult AdjointOp::verify()
-{
+LogicalResult AdjointOp::verify() {
     auto res = this->getRegion().walk(
         [](catalyst::quantum::MeasurementProcess op) { return WalkResult::interrupt(); });
 
@@ -270,8 +254,7 @@ LogicalResult AdjointOp::verify()
     return success();
 }
 
-LogicalResult ComputationalBasisOp::verify()
-{
+LogicalResult ComputationalBasisOp::verify() {
     if ((getQubits().size() != 0) && (getQreg() != nullptr)) {
         return emitOpError()
                << "computational basis op cannot simultaneously take in both qubits and quregs";
@@ -280,8 +263,7 @@ LogicalResult ComputationalBasisOp::verify()
     return success();
 }
 
-LogicalResult HermitianOp::verify()
-{
+LogicalResult HermitianOp::verify() {
     size_t dim = std::pow(2, getQubits().size());
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
@@ -290,8 +272,7 @@ LogicalResult HermitianOp::verify()
     return success();
 }
 
-LogicalResult GraphStatePrepOp::verify()
-{
+LogicalResult GraphStatePrepOp::verify() {
     ShapedType adjMatrixType = cast<ShapedType>(getAdjMatrix().getType());
     size_t adjMatrixSize = adjMatrixType.getShape()[0];
 

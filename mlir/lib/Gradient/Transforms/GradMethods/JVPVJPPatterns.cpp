@@ -37,8 +37,7 @@ using llvm::dbgs;
 
 namespace llvm {
 
-template <class T> raw_ostream &operator<<(raw_ostream &oss, const std::vector<T> &v)
-{
+template <class T> raw_ostream &operator<<(raw_ostream &oss, const std::vector<T> &v) {
     oss << "[";
     bool first = true;
     for (auto i : v) {
@@ -53,13 +52,11 @@ template <class T> raw_ostream &operator<<(raw_ostream &oss, const std::vector<T
 namespace catalyst {
 namespace gradient {
 
-template <class T> std::vector<int64_t> _tovec(const T &x)
-{
+template <class T> std::vector<int64_t> _tovec(const T &x) {
     return std::vector<int64_t>(x.begin(), x.end());
 };
 
-LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const
-{
+LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const {
     Location loc = op.getLoc();
 
     auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
@@ -154,8 +151,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
             if (!acc.has_value()) {
                 acc = res;
-            }
-            else {
+            } else {
                 assert(acc.value().getType() == res.getType());
                 auto addOp =
                     linalg::AddOp::create(rewriter, loc, res.getType(),
@@ -175,8 +171,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     return success();
 }
 
-LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const
-{
+LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const {
     Location loc = op.getLoc();
 
     auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
@@ -268,8 +263,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
 
             if (!acc.has_value()) {
                 acc = res;
-            }
-            else {
+            } else {
                 assert(acc.value().getType() == res.getType());
 
                 auto addOp =

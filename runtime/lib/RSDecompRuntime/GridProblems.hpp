@@ -47,8 +47,7 @@ using bbox = std::array<double, 4>;
  * @param bbox The bounding box defined as {x_min, x_max, y_min, y_max}.
  * @return The number of grid points within the bounding box.
  */
-inline int bbox_grid_points(const bbox &bbox)
-{
+inline int bbox_grid_points(const bbox &bbox) {
     const double d_ = std::log2(LAMBDA_D);
     ZSqrtTwo l1(1, 1);
     ZSqrtTwo l2(-1, 1);
@@ -125,8 +124,7 @@ class one_dim_problem_solution_iterator {
      * @brief Encapsulates the main loop logic.
      * It searches for the next valid solution starting from b_current.
      */
-    void find_next_solution()
-    {
+    void find_next_solution() {
         for (long b = b_current; b >= b_min; b--) {
             // Use the constraints x0 <= a + b * sqrt(2) <= x1 to obtain the bounds on a.
             double lower_bound_a = x0_scaled - b * M_SQRT2;
@@ -189,8 +187,7 @@ class one_dim_problem_solution_iterator {
      * @param y0 The lower bound of the y-interval.
      * @param y1 The upper bound of the y-interval.
      */
-    one_dim_problem_solution_iterator(double x0, double x1, double y0, double y1)
-    {
+    one_dim_problem_solution_iterator(double x0, double x1, double y0, double y1) {
         ZSqrtTwo l1(1, 1);                     // 1 + sqrt(2)
         ZSqrtTwo l2(-1, 1);                    // -1 + sqrt(2)
         const double d_ = std::log2(LAMBDA_D); // log2(1 + sqrt(2))
@@ -258,8 +255,7 @@ class one_dim_problem_solution_iterator {
     }
 
     // Dereference operator: gets the current solution
-    const ZSqrtTwo &operator*() const
-    {
+    const ZSqrtTwo &operator*() const {
         if (is_done) {
             throw std::out_of_range("Iterator is out of bounds.");
         }
@@ -267,8 +263,7 @@ class one_dim_problem_solution_iterator {
     }
 
     // Pre-increment operator: advances to the next solution
-    one_dim_problem_solution_iterator &operator++()
-    {
+    one_dim_problem_solution_iterator &operator++() {
         if (!is_done) {
             find_next_solution();
         }
@@ -276,13 +271,11 @@ class one_dim_problem_solution_iterator {
     }
 
     // Comparison operators to check for the end of the iteration
-    bool operator==(const one_dim_problem_solution_iterator &other) const
-    {
+    bool operator==(const one_dim_problem_solution_iterator &other) const {
         return is_done == other.is_done;
     }
 
-    bool operator!=(const one_dim_problem_solution_iterator &other) const
-    {
+    bool operator!=(const one_dim_problem_solution_iterator &other) const {
         return !(*this == other);
     }
 
@@ -324,8 +317,7 @@ class upright_problem_solution_iterator {
     size_t beta_idx = 0;
 
     // --- Private method to find the next valid solution ---
-    void find_next_solution()
-    {
+    void find_next_solution() {
         switch (mode) {
         case Mode::BETA_FIRST:
             find_next_beta_first();
@@ -340,8 +332,7 @@ class upright_problem_solution_iterator {
     }
 
     // Logic corresponding to: if num_b[0]:
-    void find_next_beta_first()
-    {
+    void find_next_beta_first() {
         // Iterate over beta_solutions1 = self.solve_one_dim_problem(Ay0, Ay1, By0, By1)
         while (outer_iter && *outer_iter != outer_iter->end()) {
             // If we don't have an inner iterator, create one for the current outer element.
@@ -354,8 +345,7 @@ class upright_problem_solution_iterator {
                     if (Ax1 > Ax0 && Bx1 > Bx0) {
                         inner_iter.emplace(Ax0, Ax1, Bx0, Bx1);
                     }
-                }
-                catch (const std::runtime_error &) {
+                } catch (const std::runtime_error &) {
                     // This beta is invalid and won't create an inner_iter.
                 }
             }
@@ -378,8 +368,7 @@ class upright_problem_solution_iterator {
     }
 
     // Logic corresponding to: elif num_b[1]:
-    void find_next_alpha_first()
-    {
+    void find_next_alpha_first() {
         while (outer_iter && *outer_iter != outer_iter->end()) {
             // If we don't have an inner iterator, create one.
             if (!inner_iter) {
@@ -391,8 +380,7 @@ class upright_problem_solution_iterator {
                     if (Ay1 > Ay0 && By1 > By0) {
                         inner_iter.emplace(Ay0, Ay1, By0, By1);
                     }
-                }
-                catch (const std::runtime_error &) {
+                } catch (const std::runtime_error &) {
                     // This alpha is invalid.
                 }
             }
@@ -415,8 +403,7 @@ class upright_problem_solution_iterator {
     }
 
     // Logic corresponding to: else (Balanced case)
-    void find_next_balanced()
-    {
+    void find_next_balanced() {
         if (alpha_solutions_cache.empty() || beta_solutions_cache.empty() ||
             alpha_idx >= alpha_solutions_cache.size()) {
             is_done = true;
@@ -444,9 +431,7 @@ class upright_problem_solution_iterator {
 
     // Default constructor for the "end" iterator
     upright_problem_solution_iterator()
-        : state(Ellipse(), Ellipse()), is_done(true), mode(Mode::BALANCED)
-    {
-    }
+        : state(Ellipse(), Ellipse()), is_done(true), mode(Mode::BALANCED) {}
 
     /**
      * @brief Main constructor that sets up the problem.
@@ -463,8 +448,7 @@ class upright_problem_solution_iterator {
                                       bool is_beta_first,  // Corresponds to num_b[0]
                                       bool is_alpha_first, // Corresponds to num_b[1]
                                       const ZOmega &shift_in)
-        : state(state_in), shift(shift_in)
-    {
+        : state(state_in), shift(shift_in) {
         double Ax0 = bbox1[0], Ax1 = bbox1[1], Ay0 = bbox1[2], Ay1 = bbox1[3];
         double Bx0 = bbox2[0], Bx1 = bbox2[1], By0 = bbox2[2], By1 = bbox2[3];
 
@@ -475,14 +459,12 @@ class upright_problem_solution_iterator {
             mode = Mode::BETA_FIRST;
             // Initialize the outer iterator for beta solutions.
             outer_iter.emplace(Ay0, Ay1, By0, By1);
-        }
-        else if (is_alpha_first) {
+        } else if (is_alpha_first) {
             // If it is easier to solve for alpha first.
             mode = Mode::ALPHA_FIRST;
             // Initialize the outer iterator for alpha solutions.
             outer_iter.emplace(Ax0, Ax1, Bx0, Bx1);
-        }
-        else {
+        } else {
             // If both of them are balanced, solve for both and refine.
             // (Here we cache results to simulate the Cartesian product loop)
             mode = Mode::BALANCED;
@@ -505,8 +487,7 @@ class upright_problem_solution_iterator {
     /**
      * @brief Dereference operator to get the current solution.
      */
-    const ZOmega &operator*() const
-    {
+    const ZOmega &operator*() const {
         if (is_done) {
             throw std::out_of_range("Iterator is out of bounds.");
         }
@@ -516,8 +497,7 @@ class upright_problem_solution_iterator {
     /**
      * @brief Pre-increment operator to advance to the next solution.
      */
-    upright_problem_solution_iterator &operator++()
-    {
+    upright_problem_solution_iterator &operator++() {
         if (!is_done) {
             find_next_solution();
         }
@@ -527,13 +507,11 @@ class upright_problem_solution_iterator {
     /**
      * @brief Comparison operators to check for the end of the iteration.
      */
-    bool operator==(const upright_problem_solution_iterator &other) const
-    {
+    bool operator==(const upright_problem_solution_iterator &other) const {
         return is_done == other.is_done;
     }
 
-    bool operator!=(const upright_problem_solution_iterator &other) const
-    {
+    bool operator!=(const upright_problem_solution_iterator &other) const {
         return !(*this == other);
     }
 
@@ -564,8 +542,7 @@ class two_dim_problem_solution_iterator {
     std::optional<upright_problem_solution_iterator> current_upright_iter;
 
     // Private method to find the next valid solution that passes the final check
-    void find_next_solution()
-    {
+    void find_next_solution() {
         while (true) {
             // Check if current iterator has a valid solution
             // Corresponds to iterating through potential_sols1 or potential_sols2
@@ -588,8 +565,7 @@ class two_dim_problem_solution_iterator {
                     return; // Found a valid solution, yield it.
                 }
                 // If check fails, loop continues to get next potential solution immediately.
-            }
-            else {
+            } else {
                 // The current upright iterator is exhausted.
                 // This logic handles the `chain(potential_sols1, potential_sols2)` transition.
                 if (is_on_first_coset) {
@@ -620,8 +596,7 @@ class two_dim_problem_solution_iterator {
                     // (ZOmega(c=1)).
                     current_upright_iter.emplace(shifted_state, shifted_bbox1, shifted_bbox2,
                                                  is_beta_first, is_alpha_first, ZOmega(0, 0, 1, 0));
-                }
-                else {
+                } else {
                     // Both cosets have been processed. We are done.
                     is_done = true;
                     return;
@@ -640,8 +615,7 @@ class two_dim_problem_solution_iterator {
 
     // Default constructor for the "end" iterator
     two_dim_problem_solution_iterator()
-        : original_state(Ellipse(), Ellipse()), shifted_state(Ellipse(), Ellipse()), is_done(true)
-    {
+        : original_state(Ellipse(), Ellipse()), shifted_state(Ellipse(), Ellipse()), is_done(true) {
     }
 
     /**
@@ -654,8 +628,7 @@ class two_dim_problem_solution_iterator {
     two_dim_problem_solution_iterator(const EllipseState &state, int num_points = 1000)
         : original_state(state),
           shifted_state(state.e1.offset(-1.0 / M_SQRT2), state.e2.offset(1.0 / M_SQRT2)),
-          is_on_first_coset(true), num_points(num_points)
-    {
+          is_on_first_coset(true), num_points(num_points) {
         // --- Setup for the first coset (potential_sols1) ---
         auto bbox1_orig = original_state.e1.bounding_box();
         auto bbox2_orig = original_state.e2.bounding_box();
@@ -685,29 +658,25 @@ class two_dim_problem_solution_iterator {
         find_next_solution();
     }
 
-    const ZOmega &operator*() const
-    {
+    const ZOmega &operator*() const {
         if (is_done) {
             throw std::out_of_range("Iterator is out of bounds.");
         }
         return current_solution;
     }
 
-    two_dim_problem_solution_iterator &operator++()
-    {
+    two_dim_problem_solution_iterator &operator++() {
         if (!is_done) {
             find_next_solution();
         }
         return *this;
     }
 
-    bool operator==(const two_dim_problem_solution_iterator &other) const
-    {
+    bool operator==(const two_dim_problem_solution_iterator &other) const {
         return is_done == other.is_done;
     }
 
-    bool operator!=(const two_dim_problem_solution_iterator &other) const
-    {
+    bool operator!=(const two_dim_problem_solution_iterator &other) const {
         return !(*this == other);
     }
 
@@ -771,8 +740,7 @@ class GridIterator {
      * @brief Phase 1: Iterates through trivial guesses.
      * @return true if a solution was found (yield), false if we should transition state.
      */
-    bool run_guessing_phase()
-    {
+    bool run_guessing_phase() {
         // Solutions for the trivial cases.
         while (guess_idx < guess_solutions.size()) {
             const ZOmega &sol = guess_solutions[guess_idx];
@@ -803,8 +771,7 @@ class GridIterator {
      * Corresponds to: for ix in range(self.max_trials):
      * @return true if a solution was found, false if we need to loop/transition.
      */
-    bool run_main_loop_phase()
-    {
+    bool run_main_loop_phase() {
         // Do we have an active inner iterator? If so, try to drain it.
         // Corresponds to: for solution in potential_solutions:
         if (two_dim_iter) {
@@ -836,8 +803,7 @@ class GridIterator {
                     if (dot_prod >= target) {
                         current_solution = {scaled_sol, k_};
                         return true; // Found a solution, exit
-                    }
-                    else if (dot_prod >= t_) {
+                    } else if (dot_prod >= t_) {
                         // Fallback solution collection
                         int_s.emplace_back(scaled_sol);
                         init_k.emplace_back(k_);
@@ -856,8 +822,7 @@ class GridIterator {
 
                 auto [en_, _] = Ellipse::from_region(theta, e_, kmin).normalize();
                 grid_op = EllipseState(en_, e2).skew_grid_op();
-            }
-            else {
+            } else {
                 k = k + 1;
             }
             e1 = Ellipse::from_region(theta, e_, k);
@@ -890,8 +855,7 @@ class GridIterator {
             EllipseState state = EllipseState(e1, e2_).apply_grid_op(grid_op);
 
             two_dim_iter.emplace(state);
-        }
-        catch (const std::exception &e) {
+        } catch (const std::exception &e) {
             // Corresponds to Python's `except (ValueError, ZeroDivisionError): break`
             iter_state = IterState::FALLBACK;
             fallback_idx = 0;
@@ -909,8 +873,7 @@ class GridIterator {
      * @brief Phase 3: Returns fallback solutions collected during main loop.
      * @return true if solution yielded, false if finished.
      */
-    bool run_fallback_phase()
-    {
+    bool run_fallback_phase() {
         if (fallback_idx < int_s.size()) {
             current_solution = {int_s[fallback_idx], init_k[fallback_idx]};
             fallback_idx++;
@@ -926,8 +889,7 @@ class GridIterator {
      * @brief Private helper to find the next valid solution.
      * This is the core state machine of the iterator.
      */
-    void find_next_solution()
-    {
+    void find_next_solution() {
         while (true) {
             switch (iter_state) {
             case IterState::GUESSING:
@@ -1006,8 +968,7 @@ class GridIterator {
     /**
      * @brief Dereference operator. Gets the current solution.
      */
-    const value_type &operator*() const
-    {
+    const value_type &operator*() const {
         if (iter_state == IterState::DONE) {
             throw std::out_of_range("Iterator is out of bounds.");
         }
@@ -1017,8 +978,7 @@ class GridIterator {
     /**
      * @brief Pre-increment operator. Advances to the next solution.
      */
-    GridIterator &operator++()
-    {
+    GridIterator &operator++() {
         if (iter_state != IterState::DONE) {
             find_next_solution();
         }
@@ -1028,8 +988,7 @@ class GridIterator {
     /**
      * @brief Equality comparison.
      */
-    bool operator==(const GridIterator &other) const
-    {
+    bool operator==(const GridIterator &other) const {
         // Two iterators are equal if they are both in the DONE state.
         return iter_state == IterState::DONE && other.iter_state == IterState::DONE;
     }

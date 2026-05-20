@@ -37,8 +37,7 @@ namespace quantum {
 struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
     using GridsynthPassBase::GridsynthPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(llvm::dbgs() << "Running GridsynthPass\n");
         mlir::Operation *module = getOperation();
         mlir::MLIRContext *context = &getContext();

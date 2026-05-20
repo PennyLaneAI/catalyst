@@ -30,8 +30,7 @@ namespace pbc {
 #define GEN_PASS_DEF_PARTITIONLAYERSPASS
 #include "PBC/Transforms/Passes.h.inc"
 
-void eraseUnusedOps(PBCLayer &layer, IRRewriter &writer)
-{
+void eraseUnusedOps(PBCLayer &layer, IRRewriter &writer) {
     // Erase original PBC ops from the block after wiring the layer results
     // Bound iterations to avoid pathological loops
     int maxIter = static_cast<int>(layer.getOps().size()) * 2;
@@ -49,8 +48,7 @@ void eraseUnusedOps(PBCLayer &layer, IRRewriter &writer)
     assert(layer.empty() && "Expected no remaining ops after layer erasure");
 }
 
-void constructLayer(PBCLayer &layer, IRRewriter &writer)
-{
+void constructLayer(PBCLayer &layer, IRRewriter &writer) {
     if (layer.empty())
         return;
 
@@ -98,8 +96,7 @@ void constructLayer(PBCLayer &layer, IRRewriter &writer)
     eraseUnusedOps(layer, writer);
 }
 
-bool isParentLayerOp(PBCOpInterface op)
-{
+bool isParentLayerOp(PBCOpInterface op) {
     // Skip ops nested inside an existing pbc.layer region
     auto parentOp = op->getParentOp();
     while (parentOp != nullptr) {
@@ -115,8 +112,7 @@ bool isParentLayerOp(PBCOpInterface op)
 struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayersPass> {
     using PartitionLayersPassBase::PartitionLayersPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         mlir::IRRewriter writer(context);
 

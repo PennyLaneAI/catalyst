@@ -42,8 +42,7 @@ namespace {
 // Misc helper functions
 //
 
-bool isZeroShots(Value shots)
-{
+bool isZeroShots(Value shots) {
     Operation *shotsDefOp = shots.getDefiningOp();
     if (shotsDefOp == nullptr) {
         return false;
@@ -76,8 +75,7 @@ bool isZeroShots(Value shots)
     return false;
 }
 
-void getMPDynamicNumQubitsSizeValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<Value, 8> &vals)
-{
+void getMPDynamicNumQubitsSizeValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<Value, 8> &vals) {
     // Collect all SSA values in a FuncOp that represents the dynamic shape dimensions of MPs
 
     qnodeFunc->walk([&](quantum::ProbsOp probsOp) {
@@ -104,8 +102,8 @@ void getMPDynamicNumQubitsSizeValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<V
 
 void clearFuncExcept(IRRewriter &builder, func::FuncOp qnodeFunc,
                      const llvm::SmallPtrSet<Value, 8> &exceptionValues,
-                     const llvm::SmallPtrSet<Operation *, 8> &exceptionOps, IRMapping &cloneMapper)
-{
+                     const llvm::SmallPtrSet<Operation *, 8> &exceptionOps,
+                     IRMapping &cloneMapper) {
     // Delete the body of a funcop, except the operations that are excepted.
     // In addition, remove all erased Values from the mapper.
     //
@@ -145,8 +143,7 @@ void clearFuncExcept(IRRewriter &builder, func::FuncOp qnodeFunc,
     }
 }
 
-void eraseAllUsersExcept(IRRewriter &builder, Value v, Operation *exception)
-{
+void eraseAllUsersExcept(IRRewriter &builder, Value v, Operation *exception) {
     // Erase all users of a Value, and all users of these users, etc., in its forward slice,
     // except the marked exception.
 
@@ -163,8 +160,7 @@ void eraseAllUsersExcept(IRRewriter &builder, Value v, Operation *exception)
     }
 }
 
-func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qnodeFunc)
-{
+func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qnodeFunc) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = qnodeFunc->getLoc();
     MLIRContext *ctx = qnodeFunc->getContext();
@@ -278,8 +274,7 @@ func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qno
 }
 
 func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Operation *mod,
-                                 IRMapping &mapper)
-{
+                                 IRMapping &mapper) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = mod->getLoc();
     MLIRContext *ctx = mod->getContext();
@@ -304,8 +299,7 @@ func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Op
     return oneShotKernel;
 }
 
-scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterArgs)
-{
+scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterArgs) {
     // Create a for loop op with an empty body that loops from 0 to num_shots with step size one
 
     OpBuilder::InsertionGuard guard(builder);
@@ -323,8 +317,7 @@ scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterAr
 }
 
 std::unordered_map<size_t, size_t>
-getDuplicateIndexPairs(SmallVector<quantum::MeasurementProcess> MPs)
-{
+getDuplicateIndexPairs(SmallVector<quantum::MeasurementProcess> MPs) {
     std::unordered_map<size_t, size_t> pairs;
     std::unordered_map<Operation *, size_t> firstSeen; // Map of {MP -> first seen index}
 
@@ -332,8 +325,7 @@ getDuplicateIndexPairs(SmallVector<quantum::MeasurementProcess> MPs)
         Operation *current = MPs[i].getOperation();
         if (firstSeen.find(current) != firstSeen.end()) {
             pairs.insert({firstSeen[current], i});
-        }
-        else {
+        } else {
             firstSeen[current] = i;
         }
     }
@@ -348,8 +340,7 @@ getDuplicateIndexPairs(SmallVector<quantum::MeasurementProcess> MPs)
 //
 
 void editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
-                         size_t retIdx)
-{
+                         size_t retIdx) {
     // If the kernel returns expval on a mcm,
     // the single-shot expval of a mcm is just the mcm boolean result itself
     // So we just cast it to the correct type and return it.
@@ -379,8 +370,7 @@ void editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneShotKernel, quantu
 }
 
 void editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
-                        size_t retIdx)
-{
+                        size_t retIdx) {
     // If the kernel returns probs on MCMs,
     // the single-shot probs of the MCM is a zero tensor, with a single one at
     // the index specified by the MCM results
@@ -412,8 +402,7 @@ void editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel, quantum
     Value zero;
     if (isInt) {
         zero = arith::ConstantOp::create(builder, loc, i64Type, builder.getIntegerAttr(i64Type, 0));
-    }
-    else if (isFloat) {
+    } else if (isFloat) {
         zero = arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 0));
     }
     for (int64_t i = 0; i < probsSize; i++) {
@@ -443,8 +432,7 @@ void editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel, quantum
     Value one;
     if (isInt) {
         one = arith::ConstantOp::create(builder, loc, i64Type, builder.getIntegerAttr(i64Type, 1));
-    }
-    else if (isFloat) {
+    } else if (isFloat) {
         one = arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 1));
     }
     auto insertedTensor =
@@ -458,8 +446,7 @@ void editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel, quantum
 }
 
 void editKernelMCMSample(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
-                         size_t retIdx)
-{
+                         size_t retIdx) {
     // If the kernel returns sample on MCMs,
     // the single-shot sample of a MCM is just the MCM boolean result itself
     // So we just cast it to the correct type and return it.
@@ -490,8 +477,7 @@ void editKernelMCMSample(IRRewriter &builder, func::FuncOp oneShotKernel, quantu
 }
 
 void editKernelSampleShapes(func::FuncOp oneShotKernel, ShapedType fullSampleType,
-                            quantum::SampleOp sampleOp, size_t retIdx)
-{
+                            quantum::SampleOp sampleOp, size_t retIdx) {
     // Change the one-shot kernel's sample op, and its users, to return one-shot shaped results
 
     SmallVector<int64_t> oneShotSampleShape = {1, fullSampleType.getShape()[1]};
@@ -534,8 +520,7 @@ void editKernelSampleShapes(func::FuncOp oneShotKernel, ShapedType fullSampleTyp
 }
 
 void editKernelMCMCounts(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
-                         size_t eigensRetIdx, size_t countsRetIdx)
-{
+                         size_t eigensRetIdx, size_t countsRetIdx) {
     // If the kernel returns counts on MCMs,
     // the single-shot counts of the MCM is a zero tensor, with a single one at
     // the index specified by the MCM results
@@ -564,8 +549,7 @@ void editKernelMCMCounts(IRRewriter &builder, func::FuncOp oneShotKernel, quantu
 void prepareForLoopExpvalArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                               quantum::ExpvalOp expvalOp, size_t retIdx,
                               SmallVector<Value> &loopIterArgs,
-                              SmallVector<std::string> &loopIterArgsMPKinds)
-{
+                              SmallVector<std::string> &loopIterArgsMPKinds) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
     Type f64Type = builder.getF64Type();
@@ -586,8 +570,7 @@ void prepareForLoopExpvalArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
 LogicalResult prepareForLoopVarianceArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                                          quantum::VarianceOp varianceOp, size_t retIdx,
                                          SmallVector<Value> &loopIterArgs,
-                                         SmallVector<std::string> &loopIterArgsMPKinds)
-{
+                                         SmallVector<std::string> &loopIterArgsMPKinds) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
     Type f64Type = builder.getF64Type();
@@ -632,8 +615,7 @@ void prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                              quantum::ProbsOp probsOp, size_t retIdx,
                              SmallVector<Value> &loopIterArgs,
                              SmallVector<std::string> &loopIterArgsMPKinds,
-                             const IRMapping &cloneMapper)
-{
+                             const IRMapping &cloneMapper) {
     // Create a zero tensor. Each shot's probs results are added together.
 
     OpBuilder::InsertionGuard guard(builder);
@@ -668,8 +650,7 @@ void prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
             builder, loc, RankedTensorType::get({ShapedType::kDynamic}, f64Type),
             zeroScalar.getResult(), shapeTensor.getResult(), builder.getDenseI64ArrayAttr({}));
         loopIterArgs.push_back(probsSum);
-    }
-    else {
+    } else {
         auto probsSum = stablehlo::ConstantOp::create(
             builder, loc, probsType,
             DenseElementsAttr::get(probsType, builder.getFloatAttr(f64Type, 0)));
@@ -682,8 +663,7 @@ void prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                               quantum::SampleOp sampleOp, size_t retIdx,
                               SmallVector<Value> &loopIterArgs,
                               SmallVector<std::string> &loopIterArgsMPKinds,
-                              const IRMapping &cloneMapper)
-{
+                              const IRMapping &cloneMapper) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
 
@@ -699,8 +679,7 @@ void prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                 builder, loc, builder.getIndexType(),
                 cloneMapper.lookup(sampleOp.getDynamicShape()[sampleDynShapeOperandIdx++]));
             sizes.push_back(indexCast.getResult());
-        }
-        else {
+        } else {
             sizes.push_back(builder.getIndexAttr(dim));
         }
     }
@@ -724,8 +703,7 @@ void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                               quantum::CountsOp countsOp, size_t eigensRetIdx, size_t countsRetIdx,
                               SmallVector<Value> &loopIterArgs,
                               SmallVector<std::string> &loopIterArgsMPKinds,
-                              const IRMapping &cloneMapper)
-{
+                              const IRMapping &cloneMapper) {
     // Create a zero tensor. Each shot's counts results are added together.
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
@@ -760,8 +738,7 @@ void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
         countsSum = stablehlo::DynamicBroadcastInDimOp::create(
             builder, loc, RankedTensorType::get({ShapedType::kDynamic}, i64Type),
             zeroScalar.getResult(), shapeTensor.getResult(), builder.getDenseI64ArrayAttr({}));
-    }
-    else {
+    } else {
         countsSum = stablehlo::ConstantOp::create(
             builder, loc, countsType,
             DenseElementsAttr::get(countsType, builder.getIntegerAttr(i64Type, 0)));
@@ -775,8 +752,7 @@ void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
         auto indexCast = index::CastSOp::create(builder, loc, builder.getIndexType(),
                                                 cloneMapper.lookup(countsOp.getDynamicShape()));
         sizes.push_back(indexCast.getResult());
-    }
-    else {
+    } else {
         sizes.push_back(builder.getIndexAttr(eigensType.getShape()[0]));
     }
 
@@ -792,8 +768,7 @@ void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
 LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                                      func::FuncOp qnodeFunc, SmallVector<Value> &loopIterArgs,
                                      SmallVector<std::string> &loopIterArgsMPKinds,
-                                     const IRMapping &cloneMapper)
-{
+                                     const IRMapping &cloneMapper) {
     OpBuilder::InsertionGuard guard(builder);
 
     Operation *retOp = oneShotKernel.getBody().back().getTerminator();
@@ -867,8 +842,7 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
 
 void constructForLoopSampleBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
                                 func::CallOp kernalCallOp, size_t retIdx,
-                                SmallVector<Value> &loopYields, const IRMapping &cloneMapper)
-{
+                                SmallVector<Value> &loopYields, const IRMapping &cloneMapper) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = forOp->getLoc();
 
@@ -891,8 +865,7 @@ void constructForLoopSampleBody(IRRewriter &builder, scf::ForOp forOp, func::Fun
         numQubits = index::CastSOp::create(builder, loc, builder.getIndexType(),
                                            cloneMapper.lookup(kernelSampleOp.getDynamicShape()[0]))
                         .getResult();
-    }
-    else {
+    } else {
         numQubits = builder.getIndexAttr(oneShotSampleShape[1]);
     }
     SmallVector<OpFoldResult> sizes = {one, numQubits};
@@ -906,8 +879,7 @@ void constructForLoopSampleBody(IRRewriter &builder, scf::ForOp forOp, func::Fun
 
 void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
                           const SmallVector<std::string> &loopIterArgsMPKinds,
-                          const IRMapping &cloneMapper)
-{
+                          const IRMapping &cloneMapper) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = forOp->getLoc();
 
@@ -931,8 +903,7 @@ void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp on
             auto addOp = arith::AddFOp::create(builder, loc, kernalCallOp.getResult(i),
                                                forOp.getRegionIterArg(i));
             loopYields.push_back(addOp.getResult());
-        }
-        else if (mpKind == "probs" || mpKind == "counts") {
+        } else if (mpKind == "probs" || mpKind == "counts") {
             auto addOp = stablehlo::AddOp::create(builder, loc, kernalCallOp.getResult(i),
                                                   forOp.getRegionIterArg(i));
             loopYields.push_back(addOp.getResult());
@@ -957,8 +928,7 @@ void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp on
 
 void postProcessLoopProbsResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
                                  Value shots, SmallVector<Value> &retVals, size_t retIdx,
-                                 const IRMapping &cloneMapper)
-{
+                                 const IRMapping &cloneMapper) {
     // Divide the sum by shots
     // shots Value is I64, need to turn into tensor<f64> and then broadcast for
     // division
@@ -990,8 +960,7 @@ void postProcessLoopProbsResults(IRRewriter &builder, scf::ForOp forOp, func::Fu
             builder, loc, RankedTensorType::get({ShapedType::kDynamic}, f64Type),
             shotsFromElementsOp.getResult(), shapeTensor.getResult(),
             builder.getDenseI64ArrayAttr({}));
-    }
-    else {
+    } else {
         broadcastedShots = stablehlo::BroadcastInDimOp::create(builder, loc, probsType,
                                                                shotsFromElementsOp.getResult(),
                                                                builder.getDenseI64ArrayAttr({}));
@@ -1004,8 +973,7 @@ void postProcessLoopProbsResults(IRRewriter &builder, scf::ForOp forOp, func::Fu
 void postProcessLoopResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
                             Value shots, SmallVector<Value> &retVals,
                             const SmallVector<std::string> &loopIterArgsMPKinds,
-                            const IRMapping &cloneMapper)
-{
+                            const IRMapping &cloneMapper) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = forOp->getLoc();
     Type f64Type = builder.getF64Type();
@@ -1040,11 +1008,9 @@ void postProcessLoopResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp 
 
         else if (mpKind == "sample") {
             retVals.push_back(forOp->getResult(i));
-        }
-        else if (mpKind == "eigens") {
+        } else if (mpKind == "eigens") {
             retVals.push_back(forOp->getResult(i));
-        }
-        else if (mpKind == "counts") {
+        } else if (mpKind == "counts") {
             retVals.push_back(forOp->getResult(i));
         }
     }
@@ -1061,8 +1027,7 @@ namespace quantum {
 struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPass> {
     using impl::DynamicOneShotPassBase<DynamicOneShotPass>::DynamicOneShotPassBase;
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         ModuleOp mod = getOperation();
         Location loc = mod->getLoc();
         IRRewriter builder(mod->getContext());

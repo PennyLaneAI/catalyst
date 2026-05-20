@@ -40,8 +40,7 @@ using namespace catalyst::ion;
 //===----------------------------------------------------------------------===//
 
 void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, ValueRange inQubits,
-                               BodyBuilderFn bodyBuilder)
-{
+                               BodyBuilderFn bodyBuilder) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = result.location;
 

@@ -34,8 +34,7 @@ namespace {
 enum class GateEnum { H, S, T, CNOT, X, Y, Z, I, Unknown };
 
 // Hash gate name to GateEnum
-GateEnum hashGate(CustomOp op)
-{
+GateEnum hashGate(CustomOp op) {
     auto gateName = op.getGateName();
     if (gateName == "H" || gateName == "Hadamard")
         return GateEnum::H;
@@ -62,23 +61,19 @@ struct GateConversion {
     SmallVector<StringRef> pauliOperators;
     int8_t rotationKind;
     GateConversion(SmallVector<StringRef> pauliOperators, int8_t rotationKind)
-        : pauliOperators(pauliOperators), rotationKind(rotationKind)
-    {
-    }
+        : pauliOperators(pauliOperators), rotationKind(rotationKind) {}
     GateConversion() : pauliOperators(), rotationKind(0) {}
 };
 
 // Apply adjoint transformation to a gate conversion
 // If adjoint attribute is true, invert the sign of rotationKind
-void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
-{
+void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op) {
     if (op.getAdjoint()) {
         gateConversion.rotationKind = -gateConversion.rotationKind;
     }
 }
 
-void applyGlobalPhase(Location loc, Value phaseValue, ConversionPatternRewriter &rewriter)
-{
+void applyGlobalPhase(Location loc, Value phaseValue, ConversionPatternRewriter &rewriter) {
     //   static GlobalPhaseOp create(::mlir::OpBuilder &builder, ::mlir::Location location,
     //   ::mlir::TypeRange out_ctrl_qubits, ::mlir::Value params, /*optional*/bool adjoint,
     //   ::mlir::ValueRange in_ctrl_qubits, ::mlir::ValueRange in_ctrl_values);
@@ -88,8 +83,7 @@ void applyGlobalPhase(Location loc, Value phaseValue, ConversionPatternRewriter 
                           /*in_ctrl_values*/ ValueRange{});
 }
 
-void applyGlobalPhase(Location loc, const double phase, ConversionPatternRewriter &rewriter)
-{
+void applyGlobalPhase(Location loc, const double phase, ConversionPatternRewriter &rewriter) {
     Value paramValue = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(phase));
     applyGlobalPhase(loc, paramValue, rewriter);
 }
@@ -100,8 +94,7 @@ void applyGlobalPhase(Location loc, const double phase, ConversionPatternRewrite
 
 // C(P) = G(Angle)
 void applySingleQubitConversion(CustomOp op, const ArrayRef<GateConversion> &gateConversions,
-                                ConversionPatternRewriter &rewriter)
-{
+                                ConversionPatternRewriter &rewriter) {
     Location loc = op->getLoc();
     ValueRange inQubits = op.getInQubits();
     PPRotationOp pprOp;
@@ -123,8 +116,7 @@ void applySingleQubitConversion(CustomOp op, const ArrayRef<GateConversion> &gat
 // G1 = (P1 ⊗ 1)−π/4
 // G2 = (1 ⊗ P2)−π/4
 LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
-                                   ConversionPatternRewriter &rewriter)
-{
+                                   ConversionPatternRewriter &rewriter) {
     auto loc = op->getLoc();
 
     auto g0 = GateConversion({P1, P2}, 4);
@@ -162,8 +154,7 @@ LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
 }
 
 // H = (Z · X · Z)π/4
-LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
 
     auto Z0 = GateConversion({"Z"}, 4);
@@ -174,8 +165,7 @@ LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
 }
 
 // S = (Z)π/4
-LogicalResult convertSGate(CustomOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertSGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 4, rewriter);
 
     auto gate = GateConversion({"Z"}, 4);
@@ -184,8 +174,7 @@ LogicalResult convertSGate(CustomOp op, ConversionPatternRewriter &rewriter)
 }
 
 // T = (Z)π/8
-LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 8, rewriter);
 
     auto gate = GateConversion({"Z"}, 8);
@@ -194,8 +183,7 @@ LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 }
 
 // X = (X)π/2
-LogicalResult convertXGate(CustomOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertXGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
 
     auto gate = GateConversion({"X"}, 2);
@@ -204,8 +192,7 @@ LogicalResult convertXGate(CustomOp op, ConversionPatternRewriter &rewriter)
 }
 
 // Y = (Y)π/2
-LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
 
     auto gate = GateConversion({"Y"}, 2);
@@ -214,8 +201,7 @@ LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter)
 }
 
 // Z = (Z)π/2
-LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
 
     auto gate = GateConversion({"Z"}, 2);
@@ -224,23 +210,20 @@ LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter)
 }
 
 // I = I
-LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     auto gate = GateConversion({"I"}, 1);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
 }
 
-LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
     return controlledConversion(op, "Z", "X", rewriter);
 }
 
 // Convert a MeasureOp to a PPMeasurementOp
 LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
-                                    ConversionPatternRewriter &rewriter)
-{
+                                    ConversionPatternRewriter &rewriter) {
     auto loc = op.getLoc();
 
     ArrayAttr pauliProduct = rewriter.getStrArrayAttr({axis});
@@ -257,8 +240,7 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
     return success();
 }
 
-LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewriter) {
     auto loc = op.getLoc();
 
     auto angleValue = op.getAngle();
@@ -307,8 +289,7 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
     if (op.getAdjoint()) {
         constResult =
             arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(-2.0)).getResult();
-    }
-    else {
+    } else {
         constResult =
             arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)).getResult();
     }
@@ -321,8 +302,7 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
     return success();
 }
 
-LogicalResult convertMeasureZ(MeasureOp op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertMeasureZ(MeasureOp op, ConversionPatternRewriter &rewriter) {
     return convertMeasureOpToPPM(op, "Z", rewriter);
 }
 
@@ -333,13 +313,10 @@ LogicalResult convertMeasureZ(MeasureOp op, ConversionPatternRewriter &rewriter)
 template <typename OriginOp, typename LoweredPBCOp>
 struct PBCOpLowering : public ConversionPattern {
     PBCOpLowering(MLIRContext *context)
-        : ConversionPattern(OriginOp::getOperationName(), 1, context)
-    {
-    }
+        : ConversionPattern(OriginOp::getOperationName(), 1, context) {}
 
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const final
-    {
+                                  ConversionPatternRewriter &rewriter) const final {
         // cast to OriginOp
         if (auto originOp = dyn_cast_or_null<CustomOp>(op)) {
             switch (hashGate(originOp)) {
@@ -365,11 +342,9 @@ struct PBCOpLowering : public ConversionPattern {
                 return failure();
             }
             }
-        }
-        else if (auto originOp = dyn_cast_or_null<PauliRotOp>(op)) {
+        } else if (auto originOp = dyn_cast_or_null<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
-        }
-        else if (auto originOp = dyn_cast_or_null<MeasureOp>(op)) {
+        } else if (auto originOp = dyn_cast_or_null<MeasureOp>(op)) {
             return convertMeasureZ(originOp, rewriter);
         }
         op->emitError("Unsupported operation. Supported operations: CustomOp, MeasureOp");
@@ -386,8 +361,7 @@ using MeasureOpLowering = PBCOpLowering<quantum::MeasureOp, pbc::PPMeasurementOp
 namespace catalyst {
 namespace pbc {
 
-void populateToPPRPatterns(RewritePatternSet &patterns)
-{
+void populateToPPRPatterns(RewritePatternSet &patterns) {
     patterns.add<CustomOpLowering>(patterns.getContext());
     patterns.add<PauliRotOpLowering>(patterns.getContext());
     patterns.add<MeasureOpLowering>(patterns.getContext());

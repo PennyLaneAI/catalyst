@@ -41,8 +41,7 @@ class IonInfo {
     llvm::SmallVector<TransitionInfo> transitions;
 
   public:
-    explicit IonInfo(ion::IonOp op)
-    {
+    explicit IonInfo(ion::IonOp op) {
         auto levelAttrs = op.getLevels();
         auto transitionsAttr = op.getTransitions();
 
@@ -67,8 +66,7 @@ class IonInfo {
     }
 
     /// Get energy of a level by label
-    std::optional<double> getLevelEnergy(llvm::StringRef label) const
-    {
+    std::optional<double> getLevelEnergy(llvm::StringRef label) const {
         auto it = levelEnergyMap.find(label.str());
         if (it != levelEnergyMap.end()) {
             return it->second;
@@ -78,8 +76,7 @@ class IonInfo {
 
     /// Get level energy of a transition by index
     template <int IndexT>
-    std::optional<double> getTransitionLevelEnergy(size_t transitionIndex) const
-    {
+    std::optional<double> getTransitionLevelEnergy(size_t transitionIndex) const {
         static_assert(IndexT == 0 || IndexT == 1, "IndexT must be 0 or 1");
 
         if (transitionIndex >= transitions.size()) {
@@ -89,15 +86,13 @@ class IonInfo {
         const auto &transition = transitions[transitionIndex];
         if constexpr (IndexT == 0) {
             return getLevelEnergy(transition.level0);
-        }
-        else {
+        } else {
             return getLevelEnergy(transition.level1);
         }
     }
 
     /// Get energy difference of a transition (level1 energy - level0 energy)
-    std::optional<double> getTransitionEnergyDiff(size_t index) const
-    {
+    std::optional<double> getTransitionEnergyDiff(size_t index) const {
         if (index >= transitions.size()) {
             return std::nullopt;
         }
@@ -116,8 +111,7 @@ class IonInfo {
     size_t getNumTransitions() const { return transitions.size(); }
 
     /// Get transition info by index
-    std::optional<TransitionInfo> getTransition(size_t index) const
-    {
+    std::optional<TransitionInfo> getTransition(size_t index) const {
         if (index < transitions.size()) {
             return transitions[index];
         }

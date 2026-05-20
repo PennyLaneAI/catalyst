@@ -29,8 +29,7 @@ namespace catalyst {
 // 2. func::FuncOp (for standard MLIR lowering, marks visibility as private)
 template <typename OpT, typename TypeT>
 OpT ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op, StringRef fnSymbol,
-                              TypeT fnType)
-{
+                              TypeT fnType) {
     // Lookup the symbol to see if it already exists
     Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
 
@@ -50,8 +49,7 @@ OpT ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op, StringRe
         }
 
         fnDecl = newFunc;
-    }
-    else {
+    } else {
         // Verify the existing symbol is the correct type
         assert(isa<OpT>(fnDecl) && "Existing symbol is not the expected operation type");
     }

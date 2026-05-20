@@ -28,8 +28,7 @@ struct PreprocessForwardOp : public OpRewritePattern<ForwardOp> {
     using mlir::OpRewritePattern<ForwardOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(ForwardOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         if (!op.getBody().empty()) {
             return failure();
         }
@@ -61,8 +60,7 @@ struct PreprocessReverseOp : public OpRewritePattern<ReverseOp> {
     using OpRewritePattern<ReverseOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(ReverseOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         if (!op.getBody().empty()) {
             return failure();
         }
@@ -106,8 +104,7 @@ struct PreprocessReverseOp : public OpRewritePattern<ReverseOp> {
 namespace catalyst {
 namespace gradient {
 
-void populatePreprocessingPatterns(RewritePatternSet &patterns)
-{
+void populatePreprocessingPatterns(RewritePatternSet &patterns) {
     patterns.add<PreprocessForwardOp>(patterns.getContext());
     patterns.add<PreprocessReverseOp>(patterns.getContext());
 }

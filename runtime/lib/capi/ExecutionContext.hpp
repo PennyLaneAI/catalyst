@@ -41,8 +41,7 @@ class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
   public:
     explicit MemoryManager() { _impl.reserve(1024); };
 
-    ~MemoryManager()
-    {
+    ~MemoryManager() {
         // Lock the mutex to protect _impl free
         std::lock_guard<std::mutex> lock(mu);
         for (auto *allocation : _impl) {
@@ -50,20 +49,17 @@ class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
         }
     }
 
-    void insert(void *ptr)
-    {
+    void insert(void *ptr) {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
         _impl.insert(ptr);
     }
-    void erase(void *ptr)
-    {
+    void erase(void *ptr) {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
         _impl.erase(ptr);
     }
-    bool contains(void *ptr)
-    {
+    bool contains(void *ptr) {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
         return _impl.contains(ptr);
@@ -76,8 +72,7 @@ class SharedLibraryManager final {
 
   public:
     SharedLibraryManager() = delete;
-    explicit SharedLibraryManager(const std::string &filename)
-    {
+    explicit SharedLibraryManager(const std::string &filename) {
 #ifdef __APPLE__
         auto rtld_flags = RTLD_LAZY;
 #else
@@ -91,8 +86,7 @@ class SharedLibraryManager final {
         RT_FAIL_IF(!_handler, dlerror());
     }
 
-    ~SharedLibraryManager()
-    {
+    ~SharedLibraryManager() {
         // dlopen and dlclose increment and decrement reference counters.
         // Since we have a guaranteed _handler in a valid SharedLibraryManager instance
         // then we don't really need to worry about dlclose.
@@ -125,8 +119,7 @@ class SharedLibraryManager final {
     SharedLibraryManager(SharedLibraryManager &&other) = delete;
     SharedLibraryManager &operator=(SharedLibraryManager &&other) = delete;
 
-    void *getSymbol(const std::string &symbol)
-    {
+    void *getSymbol(const std::string &symbol) {
         void *sym = dlsym(_handler, symbol.c_str());
         RT_FAIL_IF(!sym, dlerror());
         return sym;
@@ -169,8 +162,8 @@ class RTDevice {
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
 
-    static void _complete_dylib_os_extension(std::string &rtd_lib, const std::string &name) noexcept
-    {
+    static void _complete_dylib_os_extension(std::string &rtd_lib,
+                                             const std::string &name) noexcept {
 #ifdef __linux__
         rtd_lib = "librtd_" + name + ".so";
 #elif defined(__APPLE__)
@@ -178,8 +171,7 @@ class RTDevice {
 #endif
     }
 
-    static void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept
-    {
+    static void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept {
         // The following if-elif is required for C++ tests where these backend devices
         // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
         // Besides, this provides support for runtime device (RTD) libraries added to the system
@@ -188,16 +180,13 @@ class RTDevice {
         if (rtd_lib == "null.qubit") {
             rtd_name = "NullQubit";
             _complete_dylib_os_extension(rtd_lib, "null_qubit");
-        }
-        else if (rtd_lib == "lightning.qubit") {
+        } else if (rtd_lib == "lightning.qubit") {
             rtd_name = "LightningSimulator";
             _complete_dylib_os_extension(rtd_lib, "lightning");
-        }
-        else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
+        } else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
             rtd_name = "OpenQasmDevice";
             _complete_dylib_os_extension(rtd_lib, "openqasm");
-        }
-        else if (rtd_lib == "oqd.qubit") {
+        } else if (rtd_lib == "oqd.qubit") {
             rtd_name = "oqd";
             _complete_dylib_os_extension(rtd_lib, "oqd_device");
         }
@@ -207,16 +196,14 @@ class RTDevice {
     explicit RTDevice(std::string _rtd_lib, std::string _rtd_name = {},
                       std::string _rtd_kwargs = {}, bool _auto_qubit_management = false)
         : rtd_lib(std::move(_rtd_lib)), rtd_name(std::move(_rtd_name)),
-          rtd_kwargs(std::move(_rtd_kwargs)), auto_qubit_management(_auto_qubit_management)
-    {
+          rtd_kwargs(std::move(_rtd_kwargs)), auto_qubit_management(_auto_qubit_management) {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
     explicit RTDevice(std::string_view _rtd_lib, std::string_view _rtd_name,
                       std::string_view _rtd_kwargs, bool _auto_qubit_management)
         : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs),
-          auto_qubit_management(_auto_qubit_management)
-    {
+          auto_qubit_management(_auto_qubit_management) {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
@@ -226,15 +213,13 @@ class RTDevice {
     RTDevice(RTDevice &&other) = delete;
     RTDevice &operator=(RTDevice &&other) = delete;
 
-    auto operator==(const RTDevice &other) const -> bool
-    {
+    auto operator==(const RTDevice &other) const -> bool {
         return (this->rtd_lib == other.rtd_lib && this->rtd_name == other.rtd_name) &&
                this->rtd_kwargs == other.rtd_kwargs &&
                this->auto_qubit_management == other.auto_qubit_management;
     }
 
-    [[nodiscard]] auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> &
-    {
+    [[nodiscard]] auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> & {
         if (rtd_qdevice) {
             return rtd_qdevice;
         }
@@ -250,8 +235,7 @@ class RTDevice {
     }
 
     [[nodiscard]] auto getDeviceInfo() const
-        -> std::tuple<std::string, std::string, std::string, bool>
-    {
+        -> std::tuple<std::string, std::string, std::string, bool> {
         return {rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management};
     }
 
@@ -263,8 +247,7 @@ class RTDevice {
 
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
 
-    friend std::ostream &operator<<(std::ostream &os, const RTDevice &device)
-    {
+    friend std::ostream &operator<<(std::ostream &os, const RTDevice &device) {
         os << "RTD, name: " << device.rtd_name << " lib: " << device.rtd_lib
            << " kwargs: " << device.rtd_kwargs
            << "auto_qubit_management: " << device.auto_qubit_management;
@@ -288,8 +271,7 @@ class ExecutionContext final {
     std::mt19937 gen;
 
   public:
-    explicit ExecutionContext(uint32_t *seed = nullptr) : seed(seed)
-    {
+    explicit ExecutionContext(uint32_t *seed = nullptr) : seed(seed) {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
         if (this->seed != nullptr) {
@@ -305,20 +287,17 @@ class ExecutionContext final {
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
 
-    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool
-    {
+    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool {
         return initial_tape_recorder_status;
     }
 
-    [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> &
-    {
+    [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> & {
         return memory_man_ptr;
     }
 
     [[nodiscard]] auto getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,
                                          std::string_view rtd_kwargs, bool auto_qubit_management)
-        -> const std::shared_ptr<RTDevice> &
-    {
+        -> const std::shared_ptr<RTDevice> & {
         std::lock_guard<std::mutex> lock(pool_mu);
 
         auto device =
@@ -339,8 +318,7 @@ class ExecutionContext final {
         device->setDeviceStatus(RTDeviceStatus::Active);
         if (this->seed != nullptr) {
             device->getQuantumDevicePtr()->SetDevicePRNG(&(this->gen));
-        }
-        else {
+        } else {
             device->getQuantumDevicePtr()->SetDevicePRNG(nullptr);
         }
         device_pool.push_back(device);
@@ -351,21 +329,18 @@ class ExecutionContext final {
     [[nodiscard]] auto
     getOrCreateDevice(const std::string &rtd_lib, const std::string &rtd_name = {},
                       const std::string &rtd_kwargs = {}, bool auto_qubit_management = false)
-        -> const std::shared_ptr<RTDevice> &
-    {
+        -> const std::shared_ptr<RTDevice> & {
         return getOrCreateDevice(std::string_view{rtd_lib}, std::string_view{rtd_name},
                                  std::string_view{rtd_kwargs}, auto_qubit_management);
     }
 
-    [[nodiscard]] auto getDevice(size_t device_key) -> const std::shared_ptr<RTDevice> &
-    {
+    [[nodiscard]] auto getDevice(size_t device_key) -> const std::shared_ptr<RTDevice> & {
         std::lock_guard<std::mutex> lock(pool_mu);
         RT_FAIL_IF(device_key >= device_pool.size(), "Invalid device_key");
         return device_pool[device_key];
     }
 
-    void deactivateDevice(RTDevice *RTD_PTR)
-    {
+    void deactivateDevice(RTDevice *RTD_PTR) {
         std::lock_guard<std::mutex> lock(pool_mu);
         RTD_PTR->setDeviceStatus(RTDeviceStatus::Inactive);
     }

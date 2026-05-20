@@ -79,8 +79,7 @@ constexpr std::array rt_qasm_gate_map = {
 /**
  * Lookup OpenQasm gate names.
  */
-constexpr auto lookup_qasm_gate_name(std::string_view gate_name) -> std::string_view
-{
+constexpr auto lookup_qasm_gate_name(std::string_view gate_name) -> std::string_view {
     for (auto &&[gate_qir, gate_qasm] : rt_qasm_gate_map) {
         if (gate_qir == gate_name) {
             return gate_qasm;
@@ -105,9 +104,7 @@ class QASMRegister {
 
   public:
     explicit QASMRegister(RegisterType _type, const std::string &_name, size_t _size)
-        : type(_type), name(_name), size(_size)
-    {
-    }
+        : type(_type), name(_name), size(_size) {}
     ~QASMRegister() = default;
 
     [[nodiscard]] auto getType() const -> RegisterType { return type; }
@@ -117,19 +114,16 @@ class QASMRegister {
     void updateSize(size_t new_size) { size = new_size; }
     void resetSize() { size = 0; }
 
-    [[nodiscard]] auto toOpenQASM2(RegisterMode mode) const -> std::string
-    {
+    [[nodiscard]] auto toOpenQASM2(RegisterMode mode) const -> std::string {
         std::ostringstream oss;
         switch (mode) {
         case RegisterMode::Alloc: {
             // qubit[size] name;
             if (type == RegisterType::Qubit) {
                 oss << "qreg ";
-            }
-            else if (type == RegisterType::Bit) {
+            } else if (type == RegisterType::Bit) {
                 oss << "creg ";
-            }
-            else {
+            } else {
                 RT_FAIL("Unsupported OpenQasm register type");
             }
             oss << name << "[" << size << "]"
@@ -165,9 +159,7 @@ class QASMGate {
   public:
     explicit QASMGate(const std::string &_name, const std::vector<double> &_params_val,
                       const std::vector<size_t> &_wires)
-        : name(lookup_qasm_gate_name(_name)), params_val(_params_val), wires(_wires)
-    {
-    }
+        : name(lookup_qasm_gate_name(_name)), params_val(_params_val), wires(_wires) {}
     ~QASMGate() = default;
 
     [[nodiscard]] auto getName() const -> std::string { return name; }
@@ -175,8 +167,7 @@ class QASMGate {
     [[nodiscard]] auto getWires() const -> std::vector<size_t> { return wires; }
 
     [[nodiscard]] auto toOpenQASM2(const QASMRegister &qregister, size_t precision = 5) const
-        -> std::string
-    {
+        -> std::string {
         std::ostringstream oss;
         // name(param_1, ..., param_n) qubit_1, ..., qubit_m
         oss << name;
@@ -187,8 +178,7 @@ class QASMGate {
                 oss << std::setprecision(precision) << *iter << ", ";
             }
             oss << std::setprecision(precision) << *iter << ") ";
-        }
-        else {
+        } else {
             oss << " ";
         }
         auto iter = wires.begin();
@@ -220,8 +210,7 @@ class QASMMeasure {
     [[nodiscard]] auto getBit() const -> size_t { return qubit; }
 
     [[nodiscard]] auto toOpenQASM2(const QASMRegister &qregister,
-                                   const QASMRegister &cregister) const -> std::string
-    {
+                                   const QASMRegister &cregister) const -> std::string {
         // measure wire
         std::ostringstream oss;
         oss << "measure " << qregister.getName() << "[" << qubit << "] -> " << cregister.getName()
@@ -253,22 +242,19 @@ class OpenQASM2Builder {
     virtual ~OpenQASM2Builder() = default;
 
     void AddRegisters(const std::string &nameQreg, const size_t &numQubits,
-                      const std::string &nameCreg, const size_t &numCbits)
-    {
+                      const std::string &nameCreg, const size_t &numCbits) {
         qregs.emplace_back(RegisterType::Qubit, nameQreg, numQubits);
         num_qubits += numQubits;
         cregs.emplace_back(RegisterType::Bit, nameCreg, numCbits);
     }
     void AddGate(const std::string &name, const std::vector<double> &params_val,
-                 const std::vector<size_t> &qubits)
-    {
+                 const std::vector<size_t> &qubits) {
         gates.emplace_back(name, params_val, qubits);
     }
     void AddMeasurement(size_t bit, size_t qubit) { measurements.emplace_back(bit, qubit); }
     void AddMeasurements() { measure_all = true; }
     size_t getNumQubits() { return num_qubits; }
-    [[nodiscard]] virtual auto toOpenQASM2(size_t precision = 5) const -> std::string
-    {
+    [[nodiscard]] virtual auto toOpenQASM2(size_t precision = 5) const -> std::string {
         std::ostringstream oss;
 
         // header
@@ -292,8 +278,7 @@ class OpenQASM2Builder {
             for (auto &m : measurements) {
                 oss << m.toOpenQASM2(qregs[0], cregs[0]);
             }
-        }
-        else {
+        } else {
             oss << "measure " << qregs[0].getName() << " -> " << cregs[0].getName() << ";\n";
         }
 

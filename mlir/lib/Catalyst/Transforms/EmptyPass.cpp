@@ -31,8 +31,7 @@ namespace catalyst {
 struct EmptyPass : impl::EmptyPassBase<EmptyPass> {
     using EmptyPassBase::EmptyPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "empty pass"
                           << "\n");
         return;

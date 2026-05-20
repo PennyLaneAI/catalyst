@@ -28,8 +28,7 @@ namespace catalyst {
 namespace gradient {
 
 static Value genSelectiveShift(PatternRewriter &rewriter, Location loc, Value param, Value shift,
-                               const std::vector<std::pair<Value, Value>> &selectors)
-{
+                               const std::vector<std::pair<Value, Value>> &selectors) {
     if (selectors.empty()) {
         return arith::AddFOp::create(rewriter, loc, shift, param);
     }
@@ -57,8 +56,7 @@ static Value genSelectiveShift(PatternRewriter &rewriter, Location loc, Value pa
 
 func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter, Location loc,
                                                       func::FuncOp callee, const int64_t numShifts,
-                                                      const int64_t loopDepth)
-{
+                                                      const int64_t loopDepth) {
     // The shiftVector is a new function argument with 1 element for each gate parameter to be
     // shifted. For gates inside of loops, we additionally use a selector to dynamically
     // choose on which iteration of a loop to shift the gate parameter.
@@ -103,8 +101,7 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                 Value selector = tensor::ExtractOp::create(rewriter, loc, selectorVector, idx);
                 Value iteration = forOp.getInductionVar();
                 selectors.push_back({iteration, selector});
-            }
-            else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+            } else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
                 if (gate.getDiffParams().empty()) {
                     return;
                 }
@@ -125,8 +122,7 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                 }
 
                 gate->setOperands(gate.getDiffOperandIdx(), shiftedParams.size(), shiftedParams);
-            }
-            else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
+            } else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
                 // When we reach the end of a for loop, remove its iteration variable from the list.
                 selectors.pop_back();
             }

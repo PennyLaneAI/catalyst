@@ -32,8 +32,7 @@ using namespace catalyst;
 // Catalyst dialect.
 //===----------------------------------------------------------------------===//
 
-void CatalystDialect::initialize()
-{
+void CatalystDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "Catalyst/IR/CatalystOpsTypes.cpp.inc"
@@ -52,8 +51,7 @@ void CatalystDialect::initialize()
 // CallbackOp
 //===----------------------------------------------------------------------===//
 
-ParseResult CallbackOp::parse(OpAsmParser &parser, OperationState &result)
-{
+ParseResult CallbackOp::parse(OpAsmParser &parser, OperationState &result) {
     auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
                             function_interface_impl::VariadicFlag,
                             std::string &) { return builder.getFunctionType(argTypes, results); };
@@ -63,8 +61,7 @@ ParseResult CallbackOp::parse(OpAsmParser &parser, OperationState &result)
         buildFuncType, getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
 }
 
-void CallbackOp::print(OpAsmPrinter &p)
-{
+void CallbackOp::print(OpAsmPrinter &p) {
     function_interface_impl::printFunctionOp(p, *this, /*isVariadic=*/false,
                                              getFunctionTypeAttrName(), getArgAttrsAttrName(),
                                              getResAttrsAttrName());
@@ -74,13 +71,11 @@ void CallbackOp::print(OpAsmPrinter &p)
 // CallbackCallOp
 //===----------------------------------------------------------------------===//
 
-CallInterfaceCallable CallbackCallOp::getCallableForCallee()
-{
+CallInterfaceCallable CallbackCallOp::getCallableForCallee() {
     return (*this)->getAttrOfType<SymbolRefAttr>("callee");
 }
 
-void CallbackCallOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
+void CallbackCallOp::setCalleeFromCallable(CallInterfaceCallable callee) {
     (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 }
 
@@ -92,13 +87,11 @@ MutableOperandRange CallbackCallOp::getArgOperandsMutable() { return getInputsMu
 // LaunchKernelOp
 //===----------------------------------------------------------------------===//
 
-CallInterfaceCallable LaunchKernelOp::getCallableForCallee()
-{
+CallInterfaceCallable LaunchKernelOp::getCallableForCallee() {
     return (*this)->getAttrOfType<SymbolRefAttr>("callee");
 }
 
-void LaunchKernelOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
+void LaunchKernelOp::setCalleeFromCallable(CallInterfaceCallable callee) {
     (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 }
 

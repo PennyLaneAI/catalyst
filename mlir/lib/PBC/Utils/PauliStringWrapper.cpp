@@ -23,16 +23,14 @@
 namespace catalyst {
 namespace pbc {
 
-PauliStringWrapper::PauliStringWrapper(stim::FlexPauliString &&fps)
-{
+PauliStringWrapper::PauliStringWrapper(stim::FlexPauliString &&fps) {
     pauliString = std::make_unique<stim::FlexPauliString>(std::move(fps));
 
     // allocated nullptr for correspondingQubits
     correspondingQubits.resize(pauliString->value.num_qubits, nullptr);
 }
 
-PauliStringWrapper::PauliStringWrapper(PauliStringWrapper &&other)
-{
+PauliStringWrapper::PauliStringWrapper(PauliStringWrapper &&other) {
     pauliString.reset(other.pauliString.release());
     correspondingQubits = std::move(other.correspondingQubits);
     op = other.op;
@@ -40,8 +38,7 @@ PauliStringWrapper::PauliStringWrapper(PauliStringWrapper &&other)
 
 PauliStringWrapper::~PauliStringWrapper() = default;
 
-PauliStringWrapper PauliStringWrapper::from_pauli_word(const PauliWord &pauliWord)
-{
+PauliStringWrapper PauliStringWrapper::from_pauli_word(const PauliWord &pauliWord) {
     std::string pauliStringStr;
     for (auto pauli : pauliWord) {
         pauliStringStr += pauli;
@@ -49,8 +46,7 @@ PauliStringWrapper PauliStringWrapper::from_pauli_word(const PauliWord &pauliWor
     return PauliStringWrapper(stim::FlexPauliString::from_text(pauliStringStr));
 }
 
-PauliStringWrapper PauliStringWrapper::from_pbc_op(PBCOpInterface op)
-{
+PauliStringWrapper PauliStringWrapper::from_pbc_op(PBCOpInterface op) {
     std::string pauliStringStr;
     for (auto pauli : op.getPauliProduct()) {
         auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
@@ -64,8 +60,7 @@ bool PauliStringWrapper::isImaginary() const { return pauliString->imag; }
 
 void PauliStringWrapper::updateSign(bool sign) { pauliString->value.sign = sign; }
 
-PauliWord PauliStringWrapper::get_pauli_word() const
-{
+PauliWord PauliStringWrapper::get_pauli_word() const {
     PauliWord pauliWord;
 
     for (char c : pauliString->value.str()) {
@@ -81,26 +76,22 @@ PauliWord PauliStringWrapper::get_pauli_word() const
     return pauliWord;
 }
 
-bool PauliStringWrapper::commutes(const PauliStringWrapper &other) const
-{
+bool PauliStringWrapper::commutes(const PauliStringWrapper &other) const {
     return this->pauliString->value.ref().commutes(other.pauliString->value.ref());
 }
 
 PauliStringWrapper
-PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) const
-{
+PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) const {
     stim::FlexPauliString result = *rhs.pauliString;
     assert(llvm::isa<PPRotationOp>(this->op) && "Clifford Operation is not PPRotationOp");
     auto this_op = llvm::cast<PPRotationOp>(this->op);
     if (this_op.hasPiOverTwoRotation()) {
         // -P'
         result.value.sign = !result.value.sign;
-    }
-    else if (this_op.hasPiOverFourRotation()) {
+    } else if (this_op.hasPiOverFourRotation()) {
         // P * P' * i
         result = (*this->pauliString) * result * stim::FlexPauliString::from_text("i");
-    }
-    else {
+    } else {
         llvm_unreachable("Clifford rotation should be π/2 or π/4");
     }
     assert(!result.imag && "Resulting Pauli string should be real");
@@ -108,8 +99,7 @@ PauliStringWrapper::computeCommutationRulesWith(const PauliStringWrapper &rhs) c
 }
 
 template <typename T, typename U>
-PauliWord expandPauliWord(const T &operands, const U &inOutOperands, PBCOpInterface op)
-{
+PauliWord expandPauliWord(const T &operands, const U &inOutOperands, PBCOpInterface op) {
     PauliWord pauliWord(operands.size(), "I");
     for (auto [qubit, pauli] : llvm::zip(inOutOperands, op.getPauliProduct())) {
         // Find the position of the qubit in array of qubits
@@ -127,14 +117,12 @@ PauliWord expandPauliWord(const T &operands, const U &inOutOperands, PBCOpInterf
 template PauliWord expandPauliWord<llvm::SetVector<Value>, std::vector<Value>>(
     const llvm::SetVector<Value> &, const std::vector<Value> &, PBCOpInterface);
 
-PauliWordPair normalizePPROps(PBCOpInterface lhs, PBCOpInterface rhs)
-{
+PauliWordPair normalizePPROps(PBCOpInterface lhs, PBCOpInterface rhs) {
     return normalizePPROps(lhs, rhs, lhs.getOutQubits(), rhs.getInQubits());
 }
 
 PauliWordPair normalizePPROps(PBCOpInterface lhs, PBCOpInterface rhs, ValueRange lhsQubits,
-                              ValueRange rhsQubits)
-{
+                              ValueRange rhsQubits) {
     llvm::SetVector<Value> qubits;
     qubits.insert(lhsQubits.begin(), lhsQubits.end());
     qubits.insert(rhsQubits.begin(), rhsQubits.end());
@@ -170,8 +158,7 @@ PauliWordPair normalizePPROps(PBCOpInterface lhs, PBCOpInterface rhs, ValueRange
     return std::make_pair(std::move(lhsPSWrapper), std::move(rhsPSWrapper));
 }
 
-SmallVector<StringRef> removeIdentityPauli(PBCOpInterface op, SmallVector<Value> &qubits)
-{
+SmallVector<StringRef> removeIdentityPauli(PBCOpInterface op, SmallVector<Value> &qubits) {
     assert(op.getPauliProduct().size() == qubits.size());
 
     auto pauliProduct = op.getPauliProduct();
@@ -192,8 +179,7 @@ SmallVector<StringRef> removeIdentityPauli(PBCOpInterface op, SmallVector<Value>
 }
 
 SmallVector<Value> replaceValueWithOperands(const PauliStringWrapper &lhsPauliWrapper,
-                                            const PauliStringWrapper &rhsPauliWrapper)
-{
+                                            const PauliStringWrapper &rhsPauliWrapper) {
     auto lhs = lhsPauliWrapper.op;
     auto rhs = rhsPauliWrapper.op;
     auto rhsPauliSize = rhsPauliWrapper.correspondingQubits.size();
@@ -217,29 +203,25 @@ SmallVector<Value> replaceValueWithOperands(const PauliStringWrapper &lhsPauliWr
     return newRHSOperands;
 }
 
-void updatePauliWord(PBCOpInterface op, const PauliWord &newPauliWord, PatternRewriter &rewriter)
-{
+void updatePauliWord(PBCOpInterface op, const PauliWord &newPauliWord, PatternRewriter &rewriter) {
     SmallVector<StringRef> pauliProductArrayAttr(newPauliWord.begin(), newPauliWord.end());
     auto pauliProduct = rewriter.getStrArrayAttr(pauliProductArrayAttr);
     op.setPauliProductAttr(pauliProduct);
 }
 
-void updatePauliWordSign(PBCOpInterface op, bool isNegated, PatternRewriter &rewriter)
-{
+void updatePauliWordSign(PBCOpInterface op, bool isNegated, PatternRewriter &rewriter) {
     if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
         int8_t rotationKind = std::abs(pprOp.getRotationKind());
         if (isNegated) {
             rotationKind = -rotationKind;
         }
         pprOp.setRotationKind(rotationKind);
-    }
-    else if (auto ppmOp = dyn_cast<PPMeasurementOp>(op.getOperation())) {
+    } else if (auto ppmOp = dyn_cast<PPMeasurementOp>(op.getOperation())) {
         ppmOp.setNegated(isNegated);
     }
 }
 
-SmallVector<StringRef> extractPauliString(PBCOpInterface op)
-{
+SmallVector<StringRef> extractPauliString(PBCOpInterface op) {
     SmallVector<StringRef> pauliWord;
     for (auto pauli : op.getPauliProduct()) {
         pauliWord.emplace_back(mlir::cast<mlir::StringAttr>(pauli).getValue());
@@ -249,8 +231,7 @@ SmallVector<StringRef> extractPauliString(PBCOpInterface op)
 
 bool isNoSizeLimit(size_t MaxPauliSize) { return MaxPauliSize == 0; }
 
-bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize)
-{
+bool exceedPauliSizeLimit(size_t pauliSize, size_t MaxPauliSize) {
     // No size limit
     if (isNoSizeLimit(MaxPauliSize)) {
         return false;

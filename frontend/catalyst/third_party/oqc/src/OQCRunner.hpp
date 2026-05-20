@@ -31,8 +31,7 @@ struct OQCRunner {
 
     [[nodiscard]] auto Counts(const std::string &circuit, const std::string &qpu_id, size_t shots,
                               size_t num_qubits, const std::string &kwargs = "") const
-        -> std::vector<size_t>
-    {
+        -> std::vector<size_t> {
         DynamicLibraryLoader libLoader(OQC_PY, RTLD_LAZY | RTLD_GLOBAL);
 
         using countsImpl_t = int (*)(const char *, const char *, size_t, size_t, const char *,

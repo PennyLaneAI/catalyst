@@ -26,23 +26,19 @@ using namespace mlir;
 
 namespace {
 
-bool hasCWrapperAttribute(func::FuncOp op)
-{
+bool hasCWrapperAttribute(func::FuncOp op) {
     return (bool)(op->getAttrOfType<UnitAttr>(LLVM::LLVMDialect::getEmitCWrapperAttrName()));
 }
 
-bool hasCopyWrapperAttribute(func::FuncOp op)
-{
+bool hasCopyWrapperAttribute(func::FuncOp op) {
     return (bool)(op->getAttrOfType<UnitAttr>("llvm.copy_memref"));
 }
 
-bool hasCWrapperButNoCopyWrapperAttribute(func::FuncOp op)
-{
+bool hasCWrapperButNoCopyWrapperAttribute(func::FuncOp op) {
     return hasCWrapperAttribute(op) && !hasCopyWrapperAttribute(op);
 }
 
-bool hasMemRefReturnTypes(func::FuncOp op)
-{
+bool hasMemRefReturnTypes(func::FuncOp op) {
     auto types = op.getResultTypes();
     if (types.empty())
         return false;
@@ -55,20 +51,17 @@ bool hasMemRefReturnTypes(func::FuncOp op)
     return isMemRefType;
 }
 
-void setCopyWrapperAttribute(func::FuncOp op, PatternRewriter &rewriter)
-{
+void setCopyWrapperAttribute(func::FuncOp op, PatternRewriter &rewriter) {
     return op->setAttr("llvm.copy_memref", rewriter.getUnitAttr());
 }
 
-llvm::SmallVector<func::ReturnOp> getReturnOps(func::FuncOp op)
-{
+llvm::SmallVector<func::ReturnOp> getReturnOps(func::FuncOp op) {
     llvm::SmallVector<func::ReturnOp> returnOps;
     op.walk([&](func::ReturnOp returnOp) { returnOps.push_back(returnOp); });
     return returnOps;
 }
 
-llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op)
-{
+llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op) {
     auto values = op.getOperands();
     llvm::SmallVector<Value> memrefs;
     for (auto value : values) {
@@ -85,8 +78,7 @@ llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op)
  * Allocate memref similar to the given one and copy the contents to a new location. Take dynamic
  * dimentions into account. Return the newly-allocated memref.
  */
-Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
-{
+Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter) {
     auto memrefType = cast<MemRefType>(memref.getType());
     llvm::SmallVector<Value> dynDims;
     {
@@ -110,8 +102,7 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
  * Take a function and wrap all the memrefs it returns with an alloc-copy wrappers. The wrappers
  * would handle the memory-allocation errors by returning the original memrefs instead of new ones.
  */
-void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewriter)
-{
+void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewriter) {
     llvm::SmallVector<Value> memrefs = getReturnMemRefs(op);
     if (memrefs.empty())
         return;
@@ -152,8 +143,7 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
     rewriter.replaceOpWithNewOp<func::ReturnOp>(op, newMemRefs);
 }
 
-void applyCopyGlobalMemRefTransform(func::FuncOp op, PatternRewriter &rewriter)
-{
+void applyCopyGlobalMemRefTransform(func::FuncOp op, PatternRewriter &rewriter) {
     llvm::SmallVector<func::ReturnOp> returnOps = getReturnOps(op);
     for (func::ReturnOp returnOp : returnOps) {
         // The insertion point will be just right before
@@ -170,8 +160,7 @@ struct CopyGlobalMemRefTransform : public OpRewritePattern<func::FuncOp> {
 };
 
 LogicalResult CopyGlobalMemRefTransform::matchAndRewrite(func::FuncOp op,
-                                                         PatternRewriter &rewriter) const
-{
+                                                         PatternRewriter &rewriter) const {
     bool isCandidate = hasCWrapperButNoCopyWrapperAttribute(op);
     if (!isCandidate) {
         return failure();
@@ -196,8 +185,7 @@ namespace quantum {
 struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPass> {
     using CopyGlobalMemRefPassBase::CopyGlobalMemRefPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<CopyGlobalMemRefTransform>(context);

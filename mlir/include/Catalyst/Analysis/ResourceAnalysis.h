@@ -32,8 +32,7 @@ class ResourceAnalysis {
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 
-    const ResourceResult *getResult(llvm::StringRef funcName) const
-    {
+    const ResourceResult *getResult(llvm::StringRef funcName) const {
         auto it = funcResults.find(funcName);
         if (it == funcResults.end()) {
             return nullptr;

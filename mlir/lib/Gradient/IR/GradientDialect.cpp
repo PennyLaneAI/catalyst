@@ -34,8 +34,7 @@ struct GradientInlinerInterface : public DialectInlinerInterface {
     using DialectInlinerInterface::DialectInlinerInterface;
 
     /// Operations in Gradient dialect are always legal to inline.
-    bool isLegalToInline(Operation *, Region *, bool, IRMapping &valueMapping) const final
-    {
+    bool isLegalToInline(Operation *, Region *, bool, IRMapping &valueMapping) const final {
         return true;
     }
 };
@@ -45,8 +44,7 @@ struct GradientInlinerInterface : public DialectInlinerInterface {
 // Gradient dialect.
 //===----------------------------------------------------------------------===//
 
-void GradientDialect::initialize()
-{
+void GradientDialect::initialize() {
     addOperations<
 #define GET_OP_LIST
 #include "Gradient/IR/GradientOps.cpp.inc"
@@ -61,8 +59,7 @@ void GradientDialect::initialize()
 // ForwardOp
 //===----------------------------------------------------------------------===//
 
-ParseResult ForwardOp::parse(OpAsmParser &parser, OperationState &result)
-{
+ParseResult ForwardOp::parse(OpAsmParser &parser, OperationState &result) {
     auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
                             function_interface_impl::VariadicFlag,
                             std::string &) { return builder.getFunctionType(argTypes, results); };
@@ -72,8 +69,7 @@ ParseResult ForwardOp::parse(OpAsmParser &parser, OperationState &result)
         buildFuncType, getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
 }
 
-void ForwardOp::print(OpAsmPrinter &p)
-{
+void ForwardOp::print(OpAsmPrinter &p) {
     function_interface_impl::printFunctionOp(p, *this, /*isVariadic=*/false,
                                              getFunctionTypeAttrName(), getArgAttrsAttrName(),
                                              getResAttrsAttrName());
@@ -83,8 +79,7 @@ void ForwardOp::print(OpAsmPrinter &p)
 // ReverseOp
 //===----------------------------------------------------------------------===//
 
-ParseResult ReverseOp::parse(OpAsmParser &parser, OperationState &result)
-{
+ParseResult ReverseOp::parse(OpAsmParser &parser, OperationState &result) {
     auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
                             function_interface_impl::VariadicFlag,
                             std::string &) { return builder.getFunctionType(argTypes, results); };
@@ -94,8 +89,7 @@ ParseResult ReverseOp::parse(OpAsmParser &parser, OperationState &result)
         buildFuncType, getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
 }
 
-void ReverseOp::print(OpAsmPrinter &p)
-{
+void ReverseOp::print(OpAsmPrinter &p) {
     function_interface_impl::printFunctionOp(p, *this, /*isVariadic=*/false,
                                              getFunctionTypeAttrName(), getArgAttrsAttrName(),
                                              getResAttrsAttrName());

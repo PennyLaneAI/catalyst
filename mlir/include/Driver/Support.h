@@ -26,8 +26,7 @@ namespace catalyst {
 namespace driver {
 
 template <typename Obj>
-void dumpToFile(const CompilerOptions &options, mlir::StringRef fileName, const Obj &obj)
-{
+void dumpToFile(const CompilerOptions &options, mlir::StringRef fileName, const Obj &obj) {
     using std::filesystem::path;
     std::error_code errCode;
     path fullPath = path(options.workspace.str()) / path(fileName.str());

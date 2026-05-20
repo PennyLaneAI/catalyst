@@ -104,8 +104,7 @@ using namespace mlir::bufferization;
 /// Walks over all immediate return-like terminators in the given region.
 static LogicalResult
 walkReturnOperations(Region *region,
-                     llvm::function_ref<LogicalResult(RegionBranchTerminatorOpInterface)> func)
-{
+                     llvm::function_ref<LogicalResult(RegionBranchTerminatorOpInterface)> func) {
     for (Block &block : *region) {
         Operation *terminator = block.getTerminator();
         // Skip non region-return-like terminators.
@@ -120,8 +119,7 @@ walkReturnOperations(Region *region,
 /// Checks if all operations that have at least one attached region implement
 /// the RegionBranchOpInterface. This is not required in edge cases, where we
 /// have a single attached region and the parent operation has no results.
-static bool validateSupportedControlFlow(Operation *op)
-{
+static bool validateSupportedControlFlow(Operation *op) {
     WalkResult result = op->walk([&](Operation *operation) {
         // Only check ops that are inside a function.
         if (!operation->getParentOfType<func::FuncOp>())
@@ -176,8 +174,7 @@ class Backedges {
     /// Enters the current block and inserts a backedge into the `edgeSet` if we
     /// have already visited the current block. The inserted edge links the given
     /// `predecessor` with the `current` block.
-    bool enter(Block &current, Block *predecessor)
-    {
+    bool enter(Block &current, Block *predecessor) {
         bool inserted = visited.insert(&current).second;
         if (!inserted)
             edgeSet.insert(std::make_pair(predecessor, &current));
@@ -189,8 +186,7 @@ class Backedges {
 
     /// Recurses into the given operation while taking all attached regions into
     /// account.
-    void recurse(Operation *op)
-    {
+    void recurse(Operation *op) {
         Block *current = op->getBlock();
         // If the current op implements the `BranchOpInterface`, there can be
         // cycles in the scope of all successor blocks.
@@ -208,8 +204,7 @@ class Backedges {
 
     /// Recurses into explicit control-flow structures that are given by
     /// the successor relation defined on the block level.
-    void recurse(Block &block, Block *predecessor)
-    {
+    void recurse(Block &block, Block *predecessor) {
         // Try to enter the current block. If this is not possible, we are
         // currently processing this block and can safely return here.
         if (!enter(block, predecessor))
@@ -242,17 +237,14 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
     using AliasAllocationMapT = llvm::DenseMap<Value, bufferization::AllocationOpInterface>;
 
     BufferDeallocation(Operation *op)
-        : BufferPlacementTransformationBase(op), dominators(op), postDominators(op)
-    {
-    }
+        : BufferPlacementTransformationBase(op), dominators(op), postDominators(op) {}
 
     /// Checks if all allocation operations either provide an already existing
     /// deallocation operation or implement the AllocationOpInterface. In
     /// addition, this method initializes the internal alias to
     /// AllocationOpInterface mapping in order to get compatible
     /// AllocationOpInterface implementations for aliases.
-    LogicalResult prepare()
-    {
+    LogicalResult prepare() {
         for (const BufferPlacementAllocs::AllocEntry &entry : allocs) {
             // Get the defining allocation operation.
             Value alloc = std::get<0>(entry);
@@ -281,8 +273,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 
     /// Performs the actual placement/creation of all temporary clone and dealloc
     /// nodes.
-    LogicalResult deallocate()
-    {
+    LogicalResult deallocate() {
         // Add additional clones that are required.
         if (failed(introduceClones()))
             return failure();
@@ -293,8 +284,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 
   private:
     /// Introduces required clone operations to avoid memory leaks.
-    LogicalResult introduceClones()
-    {
+    LogicalResult introduceClones() {
         // Initialize the set of values that require a dedicated memory free
         // operation since their operands cannot be safely deallocated in a post
         // dominator.
@@ -322,8 +312,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
                     (definingBlock == parentBlock && isa<BlockArgument>(value))) {
                     toProcess.emplace_back(value, parentBlock);
                     valuesToFree.insert(value);
-                }
-                else if (visitedValues.insert(std::make_tuple(value, definingBlock)).second)
+                } else if (visitedValues.insert(std::make_tuple(value, definingBlock)).second)
                     toProcess.emplace_back(value, definingBlock);
             }
         };
@@ -363,8 +352,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 
     /// Introduces temporary clones in all predecessors and copies the source
     /// values into the newly allocated buffers.
-    LogicalResult introduceBlockArgCopy(BlockArgument blockArg)
-    {
+    LogicalResult introduceBlockArgCopy(BlockArgument blockArg) {
         // Allocate a buffer for the current block argument in the block of
         // the associated value (which will be a predecessor block by
         // definition).
@@ -439,8 +427,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 
     /// Introduces temporary clones in front of all associated nested-region
     /// terminators and copies the source values into the newly allocated buffers.
-    LogicalResult introduceValueCopyForRegionResult(Value value)
-    {
+    LogicalResult introduceValueCopyForRegionResult(Value value) {
         // Get the actual result index in the scope of the parent terminator.
         Operation *operation = value.getDefiningOp();
         auto regionInterface = cast<RegionBranchOpInterface>(operation);
@@ -466,8 +453,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
     LogicalResult introduceClonesForRegionSuccessors(RegionBranchOpInterface regionInterface,
                                                      MutableArrayRef<Region> regions,
                                                      Value argValue,
-                                                     const TPredicate &regionPredicate)
-    {
+                                                     const TPredicate &regionPredicate) {
         for (Region &region : regions) {
             // Query the regionInterface to get all successor regions of the current
             // one.
@@ -511,8 +497,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
     /// Creates a new memory allocation for the given source value and clones
     /// its content into the newly allocated buffer. The terminator operation is
     /// used to insert the clone operation at the right place.
-    FailureOr<Value> introduceCloneBuffers(Value sourceValue, Operation *terminator)
-    {
+    FailureOr<Value> introduceCloneBuffers(Value sourceValue, Operation *terminator) {
         // Avoid multiple clones of the same source value. This can happen in the
         // presence of loops when a branch acts as a backedge while also having
         // another successor that returns to its parent operation. Note: that
@@ -536,8 +521,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
     /// Finds correct dealloc positions according to the algorithm described at
     /// the top of the file for all alloc nodes and block arguments that can be
     /// handled by this analysis.
-    LogicalResult placeDeallocs()
-    {
+    LogicalResult placeDeallocs() {
         // Move or insert deallocs using the previously computed information.
         // These deallocations will be linked to their associated allocation nodes
         // since they don't have any aliases that can (potentially) increase their
@@ -584,8 +568,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
             Operation *deallocOperation = std::get<1>(entry);
             if (deallocOperation) {
                 deallocOperation->moveAfter(endOperation);
-            }
-            else {
+            } else {
                 // If the Dealloc position is at the terminator operation of the
                 // block, then the value should escape from a deallocation.
                 Operation *nextOp = endOperation->getNextNode();
@@ -603,8 +586,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
     /// value. If there is no registered AllocationOpInterface implementation for
     /// the given value (e.g. in the case of a function parameter), this method
     /// builds a memref::DeallocOp.
-    LogicalResult buildDealloc(Operation *op, Value alloc)
-    {
+    LogicalResult buildDealloc(Operation *op, Value alloc) {
         OpBuilder builder(op);
         auto it = aliasToAllocations.find(alloc);
         if (it != aliasToAllocations.end()) {
@@ -614,8 +596,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
             if (!dealloc)
                 return op->emitError() << "allocations without compatible deallocations are "
                                           "not supported";
-        }
-        else {
+        } else {
             // Build a "default" DeallocOp for unknown allocation sources.
             memref::DeallocOp::create(builder, alloc.getLoc(), alloc);
         }
@@ -626,8 +607,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
     /// there is no registered AllocationOpInterface implementation for the given
     /// value (e.g. in the case of a function parameter), this method builds a
     /// bufferization::CloneOp.
-    FailureOr<Value> buildClone(Operation *op, Value alloc)
-    {
+    FailureOr<Value> buildClone(Operation *op, Value alloc) {
         OpBuilder builder(op);
         auto it = aliasToAllocations.find(alloc);
         if (it != aliasToAllocations.end()) {
@@ -667,14 +647,12 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 /// necessary. It uses the algorithm described at the top of the file.
 struct BufferDeallocationPass
     : public catalyst::impl::BufferDeallocationPassBase<BufferDeallocationPass> {
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
+    void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<bufferization::BufferizationDialect>();
         registry.insert<memref::MemRefDialect>();
     }
 
-    LogicalResult deallocateBuffers(Operation *op)
-    {
+    LogicalResult deallocateBuffers(Operation *op) {
         if (isa<ModuleOp>(op)) {
             WalkResult result = op->walk([&](func::FuncOp funcOp) {
                 if (failed(deallocateBuffers(funcOp)))
@@ -710,8 +688,7 @@ struct BufferDeallocationPass
         return success();
     }
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         func::FuncOp func = getOperation();
         if (func.isExternal())
             return;

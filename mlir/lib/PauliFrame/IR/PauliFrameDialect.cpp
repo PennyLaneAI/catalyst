@@ -29,8 +29,7 @@ using namespace catalyst::pauli_frame;
 
 #include "PauliFrame/IR/PauliFrameOpsDialect.cpp.inc"
 
-void PauliFrameDialect::initialize()
-{
+void PauliFrameDialect::initialize() {
     /// Uncomment the lines below if defining types for the PauliFrame dialect
     //     addTypes<
     // #define GET_TYPEDEF_LIST

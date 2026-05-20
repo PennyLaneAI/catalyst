@@ -44,8 +44,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     std::set<QubitIdType> initial_allocated_QubitIds;
     std::unordered_map<std::string, std::string> device_kwargs;
 
-    inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
-    {
+    inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t> {
         std::vector<size_t> res;
         res.reserve(wires.size());
         std::transform(wires.begin(), wires.end(), std::back_inserter(res),
@@ -53,16 +52,14 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
         return res;
     }
 
-    inline auto isValidQubits(const std::vector<QubitIdType> &wires) -> bool
-    {
+    inline auto isValidQubits(const std::vector<QubitIdType> &wires) -> bool {
         return std::all_of(wires.begin(), wires.end(),
                            [this](QubitIdType w) { return qubit_manager.isValidQubitId(w); });
     }
 
   public:
     explicit OpenQasmDevice(
-        const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
-    {
+        const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}") {
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
 
         if (device_kwargs.contains("device_type")) {
@@ -72,18 +69,15 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
                     device_kwargs["device_arn"] =
                         "arn:aws:braket:::device/quantum-simulator/amazon/sv1";
                 }
-            }
-            else if (device_kwargs["device_type"] == "braket.local.qubit") {
+            } else if (device_kwargs["device_type"] == "braket.local.qubit") {
                 builder_type = OpenQasm::BuilderType::BraketLocal;
                 if (!device_kwargs.contains("backend")) {
                     device_kwargs["backend"] = "default";
                 }
-            }
-            else {
+            } else {
                 RT_ASSERT("Invalid OpenQasm device type");
             }
-        }
-        else {
+        } else {
             builder_type = OpenQasm::BuilderType::Common;
             builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
             runner = std::make_unique<OpenQasm::OpenQasmRunner>();

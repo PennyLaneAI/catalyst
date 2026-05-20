@@ -50,8 +50,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
 /// indices:
 /// [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1)].
 void iterateOverEntries(RankedTensorType resultType, OpBuilder &builder, Location loc,
-                        function_ref<void(ValueRange indices)> processWithIndices)
-{
+                        function_ref<void(ValueRange indices)> processWithIndices) {
     assert(resultType.hasStaticShape());
 
     ArrayRef<int64_t> shape = resultType.getShape();
@@ -78,8 +77,7 @@ void iterateOverEntries(RankedTensorType resultType, OpBuilder &builder, Locatio
 }
 
 void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, ValueRange indices,
-                          OpBuilder &builder, Location loc, SmallVectorImpl<Value> &cotangents)
-{
+                          OpBuilder &builder, Location loc, SmallVectorImpl<Value> &cotangents) {
     Type activeResultType = primalResultTypes[activeResult];
     FloatType elementType =
         cast<FloatType>(isa<RankedTensorType>(activeResultType)
@@ -95,8 +93,7 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
     if (auto activeResultTensor = dyn_cast<RankedTensorType>(activeResultType)) {
         zeroTensor = tensor::EmptyOp::create(builder, loc, activeResultTensor,
                                              /*dynamicSizes=*/ValueRange{});
-    }
-    else {
+    } else {
         zeroTensor = tensor::EmptyOp::create(builder, loc, ArrayRef<int64_t>(), activeResultType);
     }
     zeroTensor = linalg::FillOp::create(builder, loc, zero, zeroTensor).getResult(0);
@@ -106,16 +103,14 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
     for (const auto &[resultIdx, primalResultType] : llvm::enumerate(primalResultTypes)) {
         if (resultIdx == activeResult) {
             cotangents.push_back(cotangent);
-        }
-        else {
+        } else {
             // We're not differentiating this output, so we push back a completely
             // zero cotangent. This memory still needs to be writable, hence using
             // an explicit empty + fill vs a constant tensor.
             Value zeroTensor;
             if (isa<RankedTensorType>(primalResultType)) {
                 zeroTensor = tensor::EmptyOp::create(builder, loc, primalResultType, ValueRange{});
-            }
-            else {
+            } else {
                 zeroTensor =
                     tensor::EmptyOp::create(builder, loc, ArrayRef<int64_t>(), primalResultType);
             }
@@ -129,8 +124,7 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
 /// BackpropOps will be called with `backpropArgs`.
 static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, Operation *callSite,
                                            OperandRange argOperands, func::FuncOp callee,
-                                           SmallVectorImpl<Value> &backpropArgs)
-{
+                                           SmallVectorImpl<Value> &backpropArgs) {
     assert(callSite && "Operation pointer is null");
 
     Location loc = callee.getLoc();
@@ -148,8 +142,7 @@ static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, Operation 
         traverseCallGraph(callee, &symbolTable, [&](func::FuncOp funcOp) {
             if (funcOp == callee && isQNode(callee)) {
                 qnodes.insert(callee);
-            }
-            else if (isQNode(funcOp)) {
+            } else if (isQNode(funcOp)) {
                 qnodes.insert(funcOp);
             }
         });
@@ -213,8 +206,7 @@ static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, Operation 
     return clonedCallee;
 }
 
-LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const
-{
+LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const {
     if (op.getMethod() != "auto") {
         return failure();
     }
@@ -248,8 +240,7 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
 }
 
 LogicalResult HybridValueAndGradientLowering::matchAndRewrite(ValueAndGradOp op,
-                                                              PatternRewriter &rewriter) const
-{
+                                                              PatternRewriter &rewriter) const {
     if (op.getMethod() != "auto") {
         return failure();
     }
@@ -284,8 +275,8 @@ LogicalResult HybridValueAndGradientLowering::matchAndRewrite(ValueAndGradOp op,
 
 /// Generate a version of the QNode that accepts the parameter buffer. This is so Enzyme will
 /// see that the gate parameters flow into the custom quantum function.
-static func::FuncOp genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc, func::FuncOp qnode)
-{
+static func::FuncOp genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc,
+                                        func::FuncOp qnode) {
     std::string fnName = (qnode.getName() + ".quantum").str();
     SmallVector<Type> fnArgTypes(qnode.getArgumentTypes());
     auto paramsTensorType = RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
@@ -343,8 +334,7 @@ static func::FuncOp genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc,
 /// Generate a function that computes a Jacobian row-by-row using one or more BackpropOps.
 static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                                         GradientOpInterface op, FunctionType fnType,
-                                        func::FuncOp callee, mlir::BoolAttr keepValueResults)
-{
+                                        func::FuncOp callee, mlir::BoolAttr keepValueResults) {
     mlir::DenseIntElementsAttr diffArgIndicesAttr = op.getDiffArgIndicesAttr();
     ValueTypeRange<ResultRange> resultTypes = op->getResultTypes();
 
@@ -354,8 +344,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
     SmallVector<Type> valTypes;
     if (isa<GradOp>(op)) {
         numGradients = op->getNumResults();
-    }
-    else if (isa<ValueAndGradOp>(op)) {
+    } else if (isa<ValueAndGradOp>(op)) {
         // one of the results is the value; the remaining ones are grad
         numGradients = op->getNumResults() - 1;
 
@@ -394,8 +383,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                 if (auto tensorType = dyn_cast<RankedTensorType>(jacobianType)) {
                     jacobians.push_back(tensor::EmptyOp::create(
                         rewriter, loc, tensorType.getShape(), tensorType.getElementType()));
-                }
-                else {
+                } else {
                     jacobians.push_back(arith::ConstantFloatOp::create(
                         rewriter, loc, cast<FloatType>(jacobianType), APFloat(0.0)));
                 }
@@ -461,12 +449,10 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                                     jacobians[backpropIdx] = tensor::InsertSliceOp::create(
                                         rewriter, loc, jacobianSlice, jacobians[backpropIdx],
                                         offsets, sizes, strides);
-                                }
-                                else {
+                                } else {
                                     jacobians[backpropIdx] = jacobianSlice;
                                 }
-                            }
-                            else {
+                            } else {
                                 assert(isa<FloatType>(jacobianSlice.getType()));
                                 jacobians[backpropIdx] = tensor::InsertOp::create(
                                     rewriter, loc, jacobianSlice, jacobians[backpropIdx], indices);
@@ -476,8 +462,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                                 jacobians[backpropIdx];
                         }
                     });
-            }
-            else {
+            } else {
                 // Backprop through a scalar result.
                 SmallVector<Value> cotangents;
                 initializeCotangents(callee.getResultTypes(), cotangentIdx, ValueRange(), rewriter,

@@ -31,8 +31,7 @@ using namespace mlir;
 
 namespace {
 
-TEST(ParserTests, dynamicAllocationSize)
-{
+TEST(ParserTests, dynamicAllocationSize) {
     std::string moduleStr = R"mlir(
 func.func @test_alloc(%arg0 : i64) {
     %0 = qref.alloc(2) : !qref.reg<2>
@@ -64,8 +63,7 @@ func.func @test_alloc(%arg0 : i64) {
     ASSERT_TRUE(dynamicType.getSize().getInt() == mlir::ShapedType::kDynamic);
 }
 
-TEST(InterfaceTests, Getters)
-{
+TEST(InterfaceTests, Getters) {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %q1: !qref.bit, %param: f64, %bool: i1) {
     qref.custom "Rot"(%param, %param) %q0 adj ctrls (%q1) ctrlvals (%bool) : !qref.bit ctrls !qref.bit
@@ -110,8 +108,7 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %param: f64, %bool: i1) {
     ASSERT_TRUE(customOp.getParam(1) == args[2]);
 }
 
-TEST(InterfaceTests, setQubitOperands)
-{
+TEST(InterfaceTests, setQubitOperands) {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %q1: !qref.bit, %bool: i1) {
     qref.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !qref.bit ctrls !qref.bit
@@ -140,8 +137,7 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %bool: i1) {
                 qubitOperands[1] == args[0]);
 }
 
-TEST(InterfaceTests, setNonCtrlQubitOperands)
-{
+TEST(InterfaceTests, setNonCtrlQubitOperands) {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %q1: !qref.bit, %q2: !qref.bit, %bool: i1) {
     qref.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !qref.bit ctrls !qref.bit
@@ -169,8 +165,7 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %q2: !qref.bit, %bool: i1) {
     ASSERT_TRUE(nonCtrlqubitOperands.size() == 1 && nonCtrlqubitOperands[0] == args[2]);
 }
 
-TEST(InterfaceTests, setCtrlQubitOperands)
-{
+TEST(InterfaceTests, setCtrlQubitOperands) {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %q1: !qref.bit, %q2: !qref.bit, %bool: i1) {
     qref.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !qref.bit ctrls !qref.bit
@@ -198,8 +193,7 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %q2: !qref.bit, %bool: i1) {
     ASSERT_TRUE(ctrlqubitOperands.size() == 1 && ctrlqubitOperands[0] == args[2]);
 }
 
-TEST(InterfaceTests, setCtrlValueOperands)
-{
+TEST(InterfaceTests, setCtrlValueOperands) {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %q1: !qref.bit, %bool: i1, %other_bool: i1) {
     qref.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !qref.bit ctrls !qref.bit
@@ -227,8 +221,7 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %bool: i1, %other_bool: i1) {
     ASSERT_TRUE(ctrlValueOperands.size() == 1 && ctrlValueOperands[0] == args[3]);
 }
 
-TEST(InterfaceTests, setAdjointFlag)
-{
+TEST(InterfaceTests, setAdjointFlag) {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit) {
     qref.custom "PauliX"() %q0 : !qref.bit
@@ -255,8 +248,7 @@ func.func @f(%q0: !qref.bit) {
     ASSERT_TRUE(!customOp.getAdjointFlag());
 }
 
-TEST(InterfaceTests, globalPhase)
-{
+TEST(InterfaceTests, globalPhase) {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %cv: i1, %param: f64) {
     qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : ctrls !qref.bit

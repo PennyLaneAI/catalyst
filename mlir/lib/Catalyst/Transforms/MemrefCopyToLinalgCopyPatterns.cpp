@@ -27,8 +27,7 @@ struct MemrefCopyToLinalgCopyRewritePattern : public mlir::OpRewritePattern<memr
     using mlir::OpRewritePattern<memref::CopyOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(memref::CopyOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         auto srcType = cast<BaseMemRefType>(op.getSource().getType());
         auto srcMemRefType = dyn_cast<MemRefType>(srcType);
         bool layoutIsIdentity = srcMemRefType.getLayout().isIdentity();
@@ -44,8 +43,7 @@ struct MemrefCopyToLinalgCopyRewritePattern : public mlir::OpRewritePattern<memr
 
 namespace catalyst {
 
-void populateMemrefCopyToLinalgCopyPatterns(RewritePatternSet &patterns)
-{
+void populateMemrefCopyToLinalgCopyPatterns(RewritePatternSet &patterns) {
     patterns.add<MemrefCopyToLinalgCopyRewritePattern>(patterns.getContext());
 }
 

@@ -75,8 +75,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Collect the qubit SSA values an observable acts on.
     /// For NamedObsOp: the single qubit operand.
     /// For TensorOp: the union of qubits from all sub-observables.
-    static llvm::DenseSet<Value> getObservableQubits(Value obs)
-    {
+    static llvm::DenseSet<Value> getObservableQubits(Value obs) {
         llvm::DenseSet<Value> qubits;
         Operation *defOp = obs.getDefiningOp();
         if (!defOp) {
@@ -100,8 +99,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     }
 
     /// Two observables are equivalent if they have the same exact structure.
-    static bool observablesEqual(Value lhs, Value rhs)
-    {
+    static bool observablesEqual(Value lhs, Value rhs) {
         if (lhs == rhs) {
             return true;
         }
@@ -133,8 +131,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// - canonicalMeas: maps a measurement index to a canonical measurement index.
     static int assignGroups(func::FuncOp funcOp, const std::string &strategy,
                             SmallVector<MeasInfo> &measInfos, llvm::DenseMap<int, int> &measToGroup,
-                            llvm::DenseMap<int, int> &canonicalMeas)
-    {
+                            llvm::DenseMap<int, int> &canonicalMeas) {
         // Collect all measurements and assign them to groups.
         int measIdx = 0;
         funcOp.walk([&](Operation *op) {
@@ -189,8 +186,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
                 // assign the new group index to the measurement.
                 measToGroup[i] = static_cast<int>(it - groupQubits.begin());
-            }
-            else {
+            } else {
                 measToGroup[i] = static_cast<int>(uniqueIndices.size()) - 1;
             }
         }
@@ -202,8 +198,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
     /// Find the measurement index that a return value traces back to.
     /// Returns -1 if not found.
-    static int findMeasIdxForReturnValue(Value returnValue)
-    {
+    static int findMeasIdxForReturnValue(Value returnValue) {
         SmallVector<Operation *, 4> worklist;
         llvm::SmallPtrSet<Operation *, 4> visited;
 
@@ -243,8 +238,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     static std::pair<llvm::DenseMap<int, SmallVector<int>>, SmallVector<int>>
     analyzeGroupReturnPositions(func::FuncOp funcOp, int numGroups,
                                 const llvm::DenseMap<int, int> &measToGroup,
-                                SmallVector<int> &returnValueMeasIds)
-    {
+                                SmallVector<int> &returnValueMeasIds) {
         Operation *returnOp = funcOp.front().getTerminator();
 
         llvm::DenseMap<int, SmallVector<int>> groupPositions;
@@ -271,8 +265,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Update the return statement of a function to remove specified values,
     /// and update the function signature accordingly.
     static void updateReturnStatement(func::FuncOp funcOp,
-                                      const llvm::DenseSet<Value> &valuesToRemove)
-    {
+                                      const llvm::DenseSet<Value> &valuesToRemove) {
         Operation *returnOp = funcOp.front().getTerminator();
         if (!returnOp) {
             return;
@@ -309,8 +302,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
     /// Walk the def chain upward from the given seed operations and erase dead
     /// operations (those with no remaining uses), stopping at qubit/qreg boundaries.
-    static void eraseDeadOps(ArrayRef<Operation *> seedOps)
-    {
+    static void eraseDeadOps(ArrayRef<Operation *> seedOps) {
         std::deque<Operation *> removeOps(seedOps.begin(), seedOps.end());
         llvm::SmallPtrSet<Operation *, 4> visited;
         while (!removeOps.empty()) {
@@ -340,8 +332,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     }
 
     /// Remove the given return values from the function, then erase dead def chains.
-    static void removeReturnValues(func::FuncOp funcOp, const llvm::DenseSet<Value> &toRemove)
-    {
+    static void removeReturnValues(func::FuncOp funcOp, const llvm::DenseSet<Value> &toRemove) {
         if (toRemove.empty()) {
             return;
         }
@@ -357,8 +348,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
     /// Remove return values that belong to groups other than targetGroup.
     static void removeOtherGroups(func::FuncOp groupFunc, int targetGroup,
-                                  ArrayRef<int> returnValueGroupIds)
-    {
+                                  ArrayRef<int> returnValueGroupIds) {
         Operation *returnOp = groupFunc.front().getTerminator();
         llvm::DenseSet<Value> toRemove;
         for (auto [pos, operand] : llvm::enumerate(returnOp->getOperands())) {
@@ -371,8 +361,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Remove duplicate measurements within a group function, keeping only the first occurrence of
     /// each canonical observable.
     static void deduplicateMeasurements(func::FuncOp groupFunc,
-                                        const llvm::DenseMap<int, int> &canonicalMeas)
-    {
+                                        const llvm::DenseMap<int, int> &canonicalMeas) {
         Operation *returnOp = groupFunc.front().getTerminator();
         llvm::DenseSet<Value> toRemove;
         llvm::DenseSet<int> seen;
@@ -393,8 +382,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
     /// Distribute device shots among group functions by dividing the original shots by the number
     /// of groups.
-    static void distributeShots(func::FuncOp groupFunc, int numGroups)
-    {
+    static void distributeShots(func::FuncOp groupFunc, int numGroups) {
         // Find the DeviceInitOp in the group function
         DeviceInitOp deviceOp = nullptr;
         for (auto op : groupFunc.getOps<DeviceInitOp>()) {
@@ -421,8 +409,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
             int64_t dividedVal = intAttr.getValue().getSExtValue() / numGroups;
             dividedShots =
                 arith::ConstantOp::create(builder, loc, builder.getI64IntegerAttr(dividedVal));
-        }
-        else {
+        } else {
             Value numGroupsVal = arith::ConstantOp::create(
                 builder, loc, builder.getI64IntegerAttr(static_cast<int64_t>(numGroups)));
             dividedShots = arith::DivSIOp::create(builder, loc, shots, numGroupsVal);
@@ -437,8 +424,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     func::FuncOp createGroupFunction(func::FuncOp funcOp, int groupIdx, int numGroups,
                                      ArrayRef<int> returnValueGroupIds,
                                      const llvm::DenseMap<int, int> &canonicalMeas,
-                                     SymbolTable &modSymTable)
-    {
+                                     SymbolTable &modSymTable) {
         // clone the entire function
         func::FuncOp groupFunc = funcOp.clone();
         std::string groupName = funcOp.getSymName().str() + ".group." + std::to_string(groupIdx);
@@ -464,8 +450,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     void replaceOriginalWithCalls(func::FuncOp funcOp, ArrayRef<func::FuncOp> groupFunctions,
                                   const llvm::DenseMap<int, SmallVector<int>> &groupReturnPositions,
                                   const llvm::DenseMap<int, int> &canonicalMeas,
-                                  ArrayRef<int> returnValueMeasIds)
-    {
+                                  ArrayRef<int> returnValueMeasIds) {
         Block &originalBlock = funcOp.front();
 
         // Erase all operations in reverse order
@@ -515,8 +500,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     }
 
     /// Simplify the identity-expval to a constant 1.0.
-    void simplifyIdentityExpval(func::FuncOp funcOp)
-    {
+    void simplifyIdentityExpval(func::FuncOp funcOp) {
         SmallVector<std::pair<ExpvalOp, NamedObsOp>> toSimplify;
         funcOp.walk([&](ExpvalOp expvalOp) {
             auto namedObsOp = expvalOp.getObs().getDefiningOp<NamedObsOp>();
@@ -536,8 +520,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         }
     }
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         ModuleOp moduleOp = getOperation();
 
         // Run split-to-single-terms pass first to decompose Hamiltonian expvals

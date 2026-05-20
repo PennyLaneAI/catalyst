@@ -80,8 +80,7 @@
                   const std::vector<size_t> &trainParams) override;
 
 namespace Catalyst::Runtime {
-static inline bool has_nested_curly_braces(const std::string &kwargs)
-{
+static inline bool has_nested_curly_braces(const std::string &kwargs) {
     // We disallow nested dictionaries in the kwargs string.
     // To check this, we check that there are no nested curly braces.
 
@@ -93,8 +92,7 @@ static inline bool has_nested_curly_braces(const std::string &kwargs)
             if (openBraceCount > 1) {
                 return true;
             }
-        }
-        else if (c == '}') {
+        } else if (c == '}') {
             openBraceCount--;
             if (openBraceCount < 0) {
                 // This case handles malformed strings like "}{"
@@ -105,8 +103,8 @@ static inline bool has_nested_curly_braces(const std::string &kwargs)
     return false;
 }
 
-static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::string, std::string>
-{
+static inline auto parse_kwargs(std::string kwargs)
+    -> std::unordered_map<std::string, std::string> {
     // cleaning kwargs
     if (kwargs.empty()) {
         return {};
@@ -158,8 +156,7 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
 
 template <class K, class V>
 void pretty_print_dict(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0,
-                       std::ostream &out = std::cout)
-{
+                       std::ostream &out = std::cout) {
     const std::string indent(leadingSpaces, ' ');
     const std::string innerIndent = indent + "  ";
 
@@ -279,8 +276,7 @@ using SimulatorGateInfoDataT = std::array<GateInfoTupleT, size>;
 
 template <size_t size = simulator_observable_support_size>
 constexpr auto lookup_obs(const std::array<std::tuple<ObsId, std::string_view, bool>, size> &arr,
-                          const ObsId key) -> std::string_view
-{
+                          const ObsId key) -> std::string_view {
     for (size_t idx = 0; idx < size; idx++) {
         auto &&[op_id, op_str, op_support] = arr[idx];
         if (op_id == key && op_support) {
@@ -292,8 +288,7 @@ constexpr auto lookup_obs(const std::array<std::tuple<ObsId, std::string_view, b
 
 template <size_t size = simulator_gate_info_size>
 constexpr auto lookup_gates(const SimulatorGateInfoDataT<size> &arr, const std::string &key)
-    -> std::pair<size_t, size_t>
-{
+    -> std::pair<size_t, size_t> {
     for (size_t idx = 0; idx < size; idx++) {
         auto &&[op, op_str, op_num_wires, op_num_params] = arr[idx];
         if (op_str == key) {
@@ -304,8 +299,7 @@ constexpr auto lookup_gates(const SimulatorGateInfoDataT<size> &arr, const std::
 }
 
 template <size_t size = simulator_gate_info_size>
-constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::string &key) -> bool
-{
+constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::string &key) -> bool {
     for (size_t idx = 0; idx < size; idx++) {
         if (std::get<1>(arr[idx]) == key) {
             return true;
@@ -317,8 +311,7 @@ constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::stri
 static inline auto
 simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect,
              std::mt19937 *gen = nullptr) // NOLINT(readability-non-const-parameter)
-    -> bool
-{
+    -> bool {
     if (postselect) {
         auto postselect_value = postselect.value();
         RT_FAIL_IF(postselect_value < 0 || postselect_value > 1, "Invalid postselect value");
@@ -334,8 +327,7 @@ simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect
     if (gen != nullptr) {
         draw = dis(*gen);
         (*gen)();
-    }
-    else {
+    } else {
         std::random_device rd;
         std::mt19937 gen_no_seed(rd());
         draw = dis(gen_no_seed);
