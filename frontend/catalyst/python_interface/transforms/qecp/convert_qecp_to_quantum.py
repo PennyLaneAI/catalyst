@@ -16,11 +16,12 @@
 
 This module contains the implementation of the xDSL convert-qecp-to-quantum dialect-conversion pass.
 
-Known Limitations:
-* The hyperregister related lowering is experimental and the target is for circuits with 1 more
-logical codeblocks, where there is a loop for encoding each logical codeblocks. It's sufficient for
-the GHZ circuit. We might have to come back to this later.
+Known Limitations
+-----------------
 
+  * The hyper-register lowering is experimental can only target programs with more than one logical
+    codeblock, where there is a loop for encoding each logical codeblock. It's sufficient for the
+    GHZ circuit. We might have to come back to this later.
 """
 
 from dataclasses import dataclass
