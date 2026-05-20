@@ -81,11 +81,6 @@
   `qecp.{extract_block, insert_block, extract, insert}`.
   [(#2846)](https://github.com/PennyLaneAI/catalyst/pull/2846)
 
-* The strategy to decode physical measurements in the `convert-qecl-to-qecp` pass has been updated
-  to perform the decoding directly in the IR rather than offloading to a pre-compiled runtime
-  function.
-  [(#2813)](https://github.com/PennyLaneAI/catalyst/pull/2813)
-
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
