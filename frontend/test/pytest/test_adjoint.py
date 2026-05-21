@@ -1076,11 +1076,13 @@ class TestAdjointOperation:
         base = qp.RX(param, wires=0)
         op = adjoint(base)
 
-        base_angles = qp.single_qubit_zyz_angles(base)
-        angles = qp.single_qubit_zyz_angles(op)
+        *base_angles, base_phase = qp.single_qubit_zyz_angles(base)
+        *angles, phase = qp.single_qubit_zyz_angles(op)
 
         for angle1, angle2 in zip(angles, reversed(base_angles)):
             assert angle1 == -angle2
+
+        assert base_phase == phase
 
     def test_control_wires(self):
         """Test the control_wires of an adjoint are the same as the base op."""
