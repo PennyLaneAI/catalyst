@@ -680,7 +680,8 @@ void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegion
     llvm::SmallDenseSet<Value, 8> rQregsTakenIn;
 
     r.walk([&](Operation *op) {
-        if (!isa<qref::QRefDialect>(op->getDialect()) && !isa<func::CallOp>(op)) {
+        if (!isa<qref::QRefDialect>(op->getDialect()) &&
+            !isa<func::CallOp, mbqc::RefMeasureInBasisOp, pbc::RefPPMeasurementOp>(op)) {
             return;
         }
         if (isa<qref::GetOp>(op)) {
