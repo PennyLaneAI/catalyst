@@ -836,9 +836,9 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.hadamard {{%.+}}[0]
             # CHECK: qecl.qec
             # CHECK: qecl.measure {{%.+}}[0]
+            # CHECK: qecl.insert_block
             # CHECK: quantum.mcmobs
             # CHECK: quantum.sample
-            # CHECK: qecl.insert_block
             # CHECK: qecl.dealloc
             qp.H(0)
             m0 = qp.measure(0)
@@ -873,9 +873,9 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.measure
             # CHECK: qecl.measure
             # CHECK: qecl.measure
+            # CHECK: qecl.insert_block
             # CHECK: quantum.mcmobs
             # CHECK: quantum.sample
-            # CHECK: qecl.insert_block
             # CHECK: qecl.dealloc
             qp.H(0)
             qp.CNOT([0, 1])
