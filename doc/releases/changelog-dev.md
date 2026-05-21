@@ -31,7 +31,7 @@
   layer; ``1`` = only ops with disjoint qubit support may share a layer). The Python API accepts
   ``only_disjoint_qubit=True`` to run ``ppm-specs{disjoint-qubit=true}``. AOT ``ppm_specs`` no
   longer requires an explicit pipeline and no longer mixes MLIR into the JSON output.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
 
 
 <h3>Breaking changes 💔</h3>
