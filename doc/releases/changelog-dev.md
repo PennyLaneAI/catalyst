@@ -14,18 +14,13 @@
 
 <h3>Improvements 🛠</h3>
 
-* The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
-  argument is at an arbitrary position in the argument list.
-  [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
-
 * A new `catalyst.debug.compile_mlir` function has been added, allowing standalone MLIR files to be
   compiled through the full Catalyst pipeline and returned as a callable Python object.
   [(#2832)](https://github.com/PennyLaneAI/catalyst/pull/2832)
-
-* The `--decompose-lowering` pass can now handle null decomposition rules, which are rule functions
-  that do not have any quantum values as arguments or results. Gates with null decomposition rules
-  are simply removed.
-  [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+  
+* The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
+  argument is at an arbitrary position in the argument list.
+  [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
 
 <h3>Breaking changes 💔</h3>
 
