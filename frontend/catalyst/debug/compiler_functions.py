@@ -396,6 +396,15 @@ def compile_mlir(mlir_source, *, func_name, result_types, **options):
     workspace = WorkspaceManager.get_or_create_workspace(func_name, preferred_dir)
 
     compiler = Compiler(options=compile_options)
+
+    # If the IR carries xDSL passes the native catalyst-opt does not know about them.
+    if "catalyst.uses_xdsl_passes" in ir_text:
+        # pylint: disable-next=import-outside-toplevel
+        from catalyst.python_interface import Compiler as UnifiedCompiler
+
+        callback = compiler._create_xdsl_pass_save_callback(workspace)
+        ir_text = UnifiedCompiler.run(ir_text, callback=callback)
+
     shared_object, _ = compiler.run_from_ir(ir_text, func_name, workspace)
 
     ctx = ir.Context()

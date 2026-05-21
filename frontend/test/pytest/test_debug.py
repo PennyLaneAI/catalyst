@@ -751,6 +751,26 @@ class TestCompileMLIR:
         with pytest.raises(Exception):
             compile_mlir("this is not valid mlir", func_name="jit_foo")
 
+    def test_xdsl_marker_compiles(self):
+        """compile_mlir handles IR carrying the `catalyst.uses_xdsl_passes` marker by
+        routing through the Python-side transform-sequence interpreter before handing
+        the IR to catalyst-opt."""
+        xdsl_mlir = """
+        module @identity attributes {catalyst.uses_xdsl_passes} {
+          func.func public @jit_identity(%arg0: tensor<f64>) -> tensor<f64>
+              attributes {llvm.emit_c_interface} {
+            return %arg0 : tensor<f64>
+          }
+          func.func @setup() { quantum.init return }
+          func.func @teardown() { quantum.finalize return }
+        }
+        """
+        fn = compile_mlir(
+            xdsl_mlir, func_name="jit_identity", result_types=_IDENTITY_RESULT_TYPES
+        )
+        result = fn(np.float64(2.5))
+        np.testing.assert_allclose(result[0], 2.5)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
