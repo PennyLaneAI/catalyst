@@ -427,8 +427,8 @@ class TestQecPhysicalOps:
             tanner_graph, esm, TensorType(IndexType(), shape=(2,))
         )
         assert len(decode_esm_css_op.operands) == 2
-        assert isinstance(decode_esm_css_op.operands[0].type, qecp.TannerGraphType)
-        assert isinstance(decode_esm_css_op.operands[1].type, TensorType)
+        assert isinstance(decode_esm_css_op.operands[0].type, TensorType)
+        assert isinstance(decode_esm_css_op.operands[1].type, qecp.TannerGraphType)
         assert len(decode_esm_css_op.result_types) == 1
         assert isinstance(decode_esm_css_op.result_types[0], TensorType)
 

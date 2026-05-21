@@ -42,8 +42,10 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_get_p,
     qref_gphase_p,
     qref_hermitian_p,
+    qref_measure_in_basis_p,
     qref_measure_p,
     qref_namedobs_p,
+    qref_pauli_measure_p,
     qref_pauli_rot_p,
     qref_qinst_p,
     qref_set_basis_state_p,
@@ -58,8 +60,6 @@ from catalyst.jax_primitives import (
     expval_p,
     hamiltonian_p,
     mcmobs_p,
-    measure_in_basis_p,
-    pauli_measure_p,
     probs_p,
     sample_p,
     state_p,
@@ -539,14 +539,15 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_pauli_measure_prim)
-def handle_pauli_measure(self, *invals, pauli_word, **params):
+def handle_pauli_measure(self, *wires_inval, pauli_word, **params):
     """Handle the conversion from plxpr to Catalyst jaxpr for the PauliMeasure primitive"""
-    # invals are the input wires
-    in_qregs, in_qubits = get_in_qubit_values(invals, self.qubit_index_recorder, self.init_qreg)
-    outvals = pauli_measure_p.bind(*in_qubits, pauli_word=pauli_word, qubits_len=len(in_qubits))
-    result, *out_qubits = outvals  # First element is the measurement result
-    for in_qreg, w, new_wire in zip(in_qregs, invals, out_qubits):
-        in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
+    in_qubits = []
+    for w in wires_inval:
+        if isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit):
+            in_qubits.append(w)
+        else:
+            in_qubits.append(qref_get_p.bind(self.init_qreg, w))
+    result = qref_pauli_measure_p.bind(*in_qubits, pauli_word=pauli_word, qubits_len=len(in_qubits))
     result = jnp.astype(result, int)
     return result
 
@@ -644,12 +645,11 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
             f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
         ) from e
 
-    in_qreg, in_wire = (
-        _[0] for _ in get_in_qubit_values([wire], self.qubit_index_recorder, self.init_qreg)
-    )
-    result, out_wire = measure_in_basis_p.bind(_angle, in_wire, plane=_plane, postselect=postselect)
-
-    in_qreg[in_qreg.global_index_to_local_index(wire)] = out_wire
+    if isinstance(wire, DynamicJaxprTracer) and isinstance(wire.val.aval, QrefQubit):
+        in_qubit = wire
+    else:
+        in_qubit = qref_get_p.bind(self.init_qreg, wire)
+    result = qref_measure_in_basis_p.bind(_angle, in_qubit, plane=_plane, postselect=postselect)
 
     return result
 
