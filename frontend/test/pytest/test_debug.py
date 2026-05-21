@@ -765,9 +765,7 @@ class TestCompileMLIR:
           func.func @teardown() { quantum.finalize return }
         }
         """
-        fn = compile_mlir(
-            xdsl_mlir, func_name="jit_identity", result_types=_IDENTITY_RESULT_TYPES
-        )
+        fn = compile_mlir(xdsl_mlir, func_name="jit_identity", result_types=_IDENTITY_RESULT_TYPES)
         result = fn(np.float64(2.5))
         np.testing.assert_allclose(result[0], 2.5)
 
