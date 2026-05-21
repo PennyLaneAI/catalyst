@@ -23,6 +23,8 @@ Unit tests for lowering gate-like primitives to reference semantics MLIR during 
 import numpy as np
 import pennylane as qp
 
+from catalyst.ftqc import mbqc_pipeline
+
 
 # CHECK: func.func public @test_custom_op(%arg0: tensor<i64>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
@@ -93,6 +95,23 @@ def test_measure():
 print(test_measure.mlir)
 
 
+@qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
+@qp.qnode(qp.device("null.qubit", wires=1))
+def test_mbqc_measurement_in_basis():
+    """
+    Test mbqc measurement in basis.
+    """
+    # CHECK: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
+    # CHECK: [[reg:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<1> -> !qref.bit
+    # CHECK: [[mres:%.+]] = mbqc.ref.measure_in_basis[ XY, [[angle]]] [[q0]] : i1
+    qp.ftqc.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY")
+    return qp.expval(qp.Z(0))
+
+
+print(test_mbqc_measurement_in_basis.mlir)
+
+
 # CHECK: func.func public @test_dynamic_qubit_allocation(%arg0: tensor<2x2xf64>, %arg1: tensor<i64>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
@@ -134,6 +153,9 @@ def test_dynamic_qubit_allocation(i: int):
 
         # CHECK: {{%.+}} = qref.measure [[alloc_q0]] : i1
         qp.measure(q[0])
+
+        # CHECK: {{%.+}} = mbqc.ref.measure_in_basis[ XY, {{%.+}}] [[alloc_q0]] : i1
+        qp.ftqc.measure_arbitrary_basis(wires=q[0], angle=0.1, plane="XY")
 
     # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<2>
 
