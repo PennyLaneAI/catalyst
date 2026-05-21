@@ -31,7 +31,6 @@ from catalyst.passes import (
     ppr_to_ppm,
     to_ppr,
 )
-from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=missing-function-docstring
 
