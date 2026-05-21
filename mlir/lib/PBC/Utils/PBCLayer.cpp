@@ -31,8 +31,9 @@ bool isParentLayerOp(PBCOpInterface op)
     // Skip ops nested inside an existing pbc.layer region
     auto parentOp = op->getParentOp();
     while (parentOp != nullptr) {
-        if (isa<LayerOp>(parentOp))
+        if (isa<LayerOp>(parentOp)) {
             return true;
+        }
 
         parentOp = parentOp->getParentOp();
     }
