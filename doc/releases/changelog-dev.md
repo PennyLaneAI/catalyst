@@ -23,6 +23,11 @@
   are simply removed.
   [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
 
+* The ``--partition-layers`` pass now supports a ``disjoint-qubit`` option to group PBC ops
+  into the same layer only when they act on disjoint qubits. By default, commuting ops on
+  overlapping qubits may still be merged into one layer.
+  [(#2858)](https://github.com/PennyLaneAI/catalyst/pull/2858)
+
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values
   trace back to the same allocation.
@@ -105,6 +110,7 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
+Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,

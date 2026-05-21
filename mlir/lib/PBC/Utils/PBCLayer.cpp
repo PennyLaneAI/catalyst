@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 
+#include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h" // for quantum.extract op
@@ -24,6 +25,40 @@ using namespace catalyst::pbc;
 
 namespace catalyst {
 namespace pbc {
+
+// Partition PBC ops into layer groups using commutation/disjoint-qubit rules.
+// Only op membership is recorded; operand/result bookkeeping is deferred until
+// construction so that SSA values reflect any layers already materialized in IR.
+llvm::SmallVector<std::vector<PBCOpInterface>>
+PBCLayerContext::groupLayers(mlir::Operation *root, bool onlyOnDisjointQubit)
+{
+    bool hasExistingLayers = false;
+    root->walk([&](LayerOp) {
+        hasExistingLayers = true;
+        return WalkResult::interrupt();
+    });
+    assert(!hasExistingLayers &&
+           "groupLayers expects flat PBC ops; pbc.layer must not exist in IR yet");
+
+    llvm::SmallVector<std::vector<PBCOpInterface>> groups;
+    PBCLayer layer(this);
+    root->walk([&](PBCOpInterface op) {
+        if (layer.insert(op, onlyOnDisjointQubit)) {
+            return WalkResult::skip();
+        }
+
+        groups.emplace_back(layer.getOps());
+        layer = PBCLayer(this);
+        layer.insert(op, onlyOnDisjointQubit);
+
+        return WalkResult::advance();
+    });
+
+    if (!layer.empty()) {
+        groups.emplace_back(layer.getOps());
+    }
+    return groups;
+}
 
 void PBCLayer::insertToLayer(PBCOpInterface op)
 {
@@ -182,7 +217,7 @@ bool PBCLayer::insertsAreAfterExistingOps(PBCOpInterface op) const
     return true;
 }
 
-bool PBCLayer::insert(PBCOpInterface op)
+bool PBCLayer::insert(PBCOpInterface op, bool onlyDisjointQubit)
 {
     if (empty()) {
         insertToLayer(op);
@@ -202,7 +237,8 @@ bool PBCLayer::insert(PBCOpInterface op)
         return true;
     }
 
-    if (commuteToLayer(op)) {
+    // If onlyOnDisjointQubit is true, we only check the disjoint qubit condition
+    if (!onlyDisjointQubit && commuteToLayer(op)) {
         insertToLayer(op);
         return true;
     }
