@@ -26,44 +26,30 @@ using namespace catalyst::pbc;
 namespace catalyst {
 namespace pbc {
 
-bool isParentLayerOp(PBCOpInterface op)
-{
-    // Skip ops nested inside an existing pbc.layer region
-    auto parentOp = op->getParentOp();
-    while (parentOp != nullptr) {
-        if (isa<LayerOp>(parentOp)) {
-            return true;
-        }
-
-        parentOp = parentOp->getParentOp();
-    }
-
-    return false;
-}
-
 // Partition PBC ops into layer groups using commutation/disjoint-qubit rules.
 // Only op membership is recorded; operand/result bookkeeping is deferred until
 // construction so that SSA values reflect any layers already materialized in IR.
 llvm::SmallVector<std::vector<PBCOpInterface>>
 PBCLayerContext::groupLayers(mlir::Operation *root, bool onlyOnDisjointQubit)
 {
+    bool hasExistingLayers = false;
+    root->walk([&](LayerOp) {
+        hasExistingLayers = true;
+        return WalkResult::interrupt();
+    });
+    assert(!hasExistingLayers &&
+           "groupLayers expects flat PBC ops; pbc.layer must not exist in IR yet");
+
     llvm::SmallVector<std::vector<PBCOpInterface>> groups;
     PBCLayer layer(this);
     root->walk([&](PBCOpInterface op) {
-        if (isParentLayerOp(op)) {
-            return WalkResult::skip();
-        }
-
         if (layer.insert(op, onlyOnDisjointQubit)) {
             return WalkResult::skip();
         }
 
-        // insert() can fail on an empty layer (e.g. block ordering); do not push [].
-        if (!layer.empty()) {
-            groups.emplace_back(layer.getOps());
-        }
+        groups.emplace_back(layer.getOps());
         layer = PBCLayer(this);
-        layer.insert(op);
+        layer.insert(op, onlyOnDisjointQubit);
 
         return WalkResult::advance();
     });
