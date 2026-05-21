@@ -130,6 +130,10 @@ def test_dynamic_qubit_allocation(i: int):
         # CHECK: qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
         qp.X(q[0])
 
+        # CHECK: [[q0:%.+]] = qref.get [[reg_device]][ 0] : !qref.reg<3> -> !qref.bit
+        # CHECK: qref.custom "CNOT"() [[q0]], [[alloc_q0]] : !qref.bit, !qref.bit
+        qp.CNOT(wires=[0, q[0]])
+
         # CHECK: [[i:%.+]] = tensor.extract %arg1[] : tensor<i64>
         # CHECK: [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
         # CHECK: [[q2:%.+]] = qref.get [[reg_device]][ 2] : !qref.reg<3> -> !qref.bit
@@ -156,6 +160,10 @@ def test_dynamic_qubit_allocation(i: int):
 
         # CHECK: {{%.+}} = mbqc.ref.measure_in_basis[ XY, {{%.+}}] [[alloc_q0]] : i1
         qp.ftqc.measure_arbitrary_basis(wires=q[0], angle=0.1, plane="XY")
+
+        # CHECK: [[q0:%.+]] = qref.get [[reg_device]][ 0] : !qref.reg<3> -> !qref.bit
+        # CHECK: {{%.+}} = pbc.ref.ppm ["X", "Y"] [[q0]], [[alloc_q1]] : i1
+        qp.pauli_measure("XY", wires=[0, q[1]])
 
     # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<2>
 
@@ -268,6 +276,30 @@ def test_pauli_rot():
 
 
 print(test_pauli_rot.mlir)
+
+
+# CHECK: func.func public @test_pauli_measure() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_pauli_measure():
+    """
+    Test paulirot.
+    """
+    # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: {{%.+}} = pbc.ref.ppm ["X"] [[q0]] : i1
+    qp.pauli_measure("X", wires=0)
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
+    # CHECK: {{%.+}} = pbc.ref.ppm ["X", "Y"] [[q0]], [[q1]] : i1
+    qp.pauli_measure("XY", wires=[0, 1])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_pauli_measure.mlir)
 
 
 # CHECK: func.func public @test_global_phase() -> tensor<f64>
