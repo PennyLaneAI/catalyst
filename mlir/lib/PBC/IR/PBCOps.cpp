@@ -22,6 +22,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Region.h"
 
+#include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 
 using namespace mlir;
@@ -80,6 +81,14 @@ LogicalResult PPMeasurementOp::verify()
         return emitOpError("Number of qubits must match number of pauli operators");
     }
     return mlir::success();
+}
+
+LogicalResult RefPPMeasurementOp::verify()
+{
+    if (getQubits().size() != getPauliProduct().size()) {
+        return emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return success();
 }
 
 LogicalResult SelectPPMeasurementOp::verify()
