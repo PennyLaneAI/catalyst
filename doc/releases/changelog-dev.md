@@ -28,6 +28,11 @@
   overlapping qubits may still be merged into one layer.
   [(#2858)](https://github.com/PennyLaneAI/catalyst/pull/2858)
 
+* The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
+  extracted from different quantum register SSA values, as long as all these quantum register values
+  trace back to the same allocation.
+  [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -45,6 +50,9 @@
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
 <h3>Internal changes ⚙️</h3>
+
+* Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
+  [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
 
 * Fixed ``KeyError`` in autograph when using ``qp.prod`` as a decorator with PennyLane >= 0.45.
   [(#2844)](https://github.com/PennyLaneAI/catalyst/pull/2844)
