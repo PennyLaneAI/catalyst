@@ -25,6 +25,7 @@
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -41,6 +42,7 @@
 #include "mlir/Support/WalkResult.h"
 
 #include "MBQC/IR/MBQCOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
@@ -1061,6 +1063,23 @@ void handleMeasureInBasis(IRRewriter &builder, mbqc::RefMeasureInBasisOp rMeasur
     builder.eraseOp(rMeasureInBasisOp);
 }
 
+void handlePPM(IRRewriter &builder, pbc::RefPPMeasurementOp rPPMOp, QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    MLIRContext *ctx = rPPMOp.getContext();
+
+    SmallVector<Type> qubitResultsType;
+    for (size_t i = 0; i < rPPMOp.getQubits().size(); i++) {
+        qubitResultsType.push_back(quantum::QubitType::get(ctx));
+    }
+
+    auto vPPMOp =
+        migrateOpToValueSemantics<pbc::PPMeasurementOp>(builder, rPPMOp, tracker, qubitResultsType);
+
+    builder.replaceAllUsesWith(rPPMOp.getMres(), vPPMOp.getMres());
+    builder.eraseOp(rPPMOp);
+}
+
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -1676,57 +1695,28 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
 {
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
-        if (auto rAllocOp = dyn_cast<qref::AllocOp>(op)) {
-            handleAlloc(builder, rAllocOp, tracker);
-        }
-        else if (auto rDeallocOp = dyn_cast<qref::DeallocOp>(op)) {
-            handleDealloc(builder, rDeallocOp, tracker);
-        }
-        else if (auto rAllocQbOp = dyn_cast<qref::AllocQubitOp>(op)) {
-            handleAllocQubit(builder, rAllocQbOp, tracker);
-        }
-        else if (auto rDeallocQbOp = dyn_cast<qref::DeallocQubitOp>(op)) {
-            handleDeallocQubit(builder, rDeallocQbOp, tracker);
-        }
-        else if (auto rGateOp = dyn_cast<qref::QuantumOperation>(op)) {
-            handleGate(builder, rGateOp, tracker);
-        }
-        else if (auto callOp = dyn_cast<func::CallOp>(op)) {
-            handleCall(builder, callOp, tracker);
-        }
-        else if (auto rCompbasisOp = dyn_cast<qref::ComputationalBasisOp>(op)) {
-            handleCompbasis(builder, rCompbasisOp, tracker);
-        }
-        else if (auto rNamedObsOp = dyn_cast<qref::NamedObsOp>(op)) {
-            handleNamedObs(builder, rNamedObsOp, tracker);
-        }
-        else if (auto rHermitianOp = dyn_cast<qref::HermitianOp>(op)) {
-            handleHermitian(builder, rHermitianOp, tracker);
-        }
-        else if (auto rMeasureOp = dyn_cast<qref::MeasureOp>(op)) {
-            handleMeasure(builder, rMeasureOp, tracker);
-        }
-        else if (auto rMeasureInBasisOp = dyn_cast<mbqc::RefMeasureInBasisOp>(op)) {
-            handleMeasureInBasis(builder, rMeasureInBasisOp, tracker);
-        }
-        else if (auto adjointOp = dyn_cast<qref::AdjointOp>(op)) {
-            handleAdjoint(builder, adjointOp, tracker);
-        }
-        else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
-            handleIf(builder, ifOp, tracker);
-        }
-        else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
-            handleSwitch(builder, switchOp, tracker);
-        }
-        else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
-            handleFor(builder, forOp, tracker);
-        }
-        else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
-            handleWhile(builder, whileOp, tracker);
-        }
-        else if (auto rGraphStatePrepOp = dyn_cast<mbqc::RefGraphStatePrepOp>(op)) {
-            handleGraphStatePrep(builder, rGraphStatePrepOp, tracker);
-        }
+        llvm::TypeSwitch<Operation *, void>(op)
+            .Case<qref::AllocOp>([&](auto o) { handleAlloc(builder, o, tracker); })
+            .Case<qref::DeallocOp>([&](auto o) { handleDealloc(builder, o, tracker); })
+            .Case<qref::AllocQubitOp>([&](auto o) { handleAllocQubit(builder, o, tracker); })
+            .Case<qref::DeallocQubitOp>([&](auto o) { handleDeallocQubit(builder, o, tracker); })
+            .Case<qref::QuantumOperation>([&](auto o) { handleGate(builder, o, tracker); })
+            .Case<func::CallOp>([&](auto o) { handleCall(builder, o, tracker); })
+            .Case<qref::ComputationalBasisOp>([&](auto o) { handleCompbasis(builder, o, tracker); })
+            .Case<qref::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
+            .Case<qref::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
+            .Case<qref::MeasureOp>([&](auto o) { handleMeasure(builder, o, tracker); })
+            .Case<mbqc::RefMeasureInBasisOp>(
+                [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
+            .Case<pbc::RefPPMeasurementOp>([&](auto o) { handlePPM(builder, o, tracker); })
+            .Case<qref::AdjointOp>([&](auto o) { handleAdjoint(builder, o, tracker); })
+            .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
+            .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
+            .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker); })
+            .Case<scf::WhileOp>([&](auto o) { handleWhile(builder, o, tracker); })
+            .Case<mbqc::RefGraphStatePrepOp>(
+                [&](auto o) { handleGraphStatePrep(builder, o, tracker); })
+            .Default([](Operation *) {});
     });
 }
 
@@ -1778,10 +1768,11 @@ struct ValueSemanticsConversionPass
         IRRewriter builder(ctx);
 
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
-            if (!llvm::all_of(getOp->getUsers(),
-                              llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
-                                            qref::ComputationalBasisOp, qref::NamedObsOp,
-                                            qref::HermitianOp, mbqc::RefMeasureInBasisOp>)) {
+            if (!llvm::all_of(
+                    getOp->getUsers(),
+                    llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
+                                  qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp,
+                                  mbqc::RefMeasureInBasisOp, pbc::RefPPMeasurementOp>)) {
                 getOp.emitOpError(
                     "qref.get operations can only be used by qref dialect gate operations");
                 return WalkResult::interrupt();
