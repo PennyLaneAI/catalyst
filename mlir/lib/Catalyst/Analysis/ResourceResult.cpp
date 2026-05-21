@@ -74,9 +74,6 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
         }
     }
 
-    if (deviceName.empty() && !other.deviceName.empty()) {
-        deviceName = other.deviceName;
-    }
     numAllocQubits = applyMerge(numAllocQubits, other.numAllocQubits, method);
     numArgQubits = applyMerge(numArgQubits, other.numArgQubits, method);
 
@@ -163,7 +160,9 @@ std::string ResourceResult::toJson(int indent) const
     root["num_arg_qubits"] = numArgQubits;
     root["device_name"] = deviceName;
     root["has_branches"] = hasBranches;
-    root["has_dyn_loop"] = hasDynLoop;
+    if (autoQubitManagement.has_value()) {
+        root["auto_qubit_management"] = *autoQubitManagement;
+    }
 
     llvm::json::Value jsonValue(std::move(root));
     std::string result;

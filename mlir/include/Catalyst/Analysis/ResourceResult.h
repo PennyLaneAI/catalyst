@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <optional>
 #include <utility>
 
 #include "llvm/ADT/DenseMap.h"
@@ -62,6 +63,11 @@ struct ResourceResult {
 
     // whether any loop has a trip count that could not be statically resolved
     bool hasDynLoop = false;
+
+    // Set when quantum.device is present: true if {auto_qubit_management} is
+    // active (register grows dynamically on quantum.extract), false if not.
+    // nullopt means no quantum.device in this function.
+    std::optional<bool> autoQubitManagement;
 
     // merge another ResourceResult into this one
     void mergeWith(const ResourceResult &other, MergeMethod method = MergeMethod::Sum);

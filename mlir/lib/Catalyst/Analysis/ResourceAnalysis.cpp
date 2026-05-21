@@ -456,8 +456,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
     // Metadata: device init
     if (auto deviceOp = dyn_cast<quantum::DeviceInitOp>(op)) {
-        // Extract device name from the op
         result.deviceName = deviceOp.getDeviceName().str();
+        result.autoQubitManagement = deviceOp.getAutoQubitManagement();
         return;
     }
 

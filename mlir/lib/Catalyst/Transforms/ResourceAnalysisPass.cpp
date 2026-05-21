@@ -160,7 +160,9 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         funcObj["device_name"] = result.deviceName;
         funcObj["qnode"] = result.isQnode;
         funcObj["has_branches"] = result.hasBranches;
-        funcObj["has_dyn_loop"] = result.hasDynLoop;
+        if (result.autoQubitManagement.has_value()) {
+            funcObj["auto_qubit_management"] = *result.autoQubitManagement;
+        }
 
         return funcObj;
     }

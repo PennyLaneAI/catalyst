@@ -102,14 +102,13 @@ func.func @static_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
 
 // Input-driven dynamic for loop: the upper bound is a func.func block
 // argument, so the body is lifted into "dyn_for_loop_1" and the parent
-// records var_function_calls + has_dyn_loop=true.
+// records var_function_calls (hasDynLoop is tracked internally, not emitted).
 
 // CHECK-LABEL: "dyn_for_loop_1": {
 // CHECK: "operations"
 // CHECK-DAG: "PauliX(1)": 1
 
 // CHECK-LABEL: "dynamic_for_loop": {
-// CHECK: "has_dyn_loop": true
 // CHECK: "operations": {}
 // CHECK: "var_function_calls"
 // CHECK: "dyn_for_loop_1"
@@ -226,13 +225,11 @@ func.func @static_for_with_call_in_loop(%arg0: !quantum.bit) -> !quantum.bit {
 // CHECK: "operations": {}
 
 // CHECK-LABEL: "nested_inner_loop_helper": {
-// CHECK: "has_dyn_loop": true
 // CHECK: "operations": {}
 // CHECK: "var_function_calls"
 // CHECK: "dyn_for_loop_1": "{{0x[0-9a-f]+}}"
 
 // CHECK-LABEL: "outer_dyn_loop_calls_nested_helper": {
-// CHECK: "has_dyn_loop": true
 // CHECK: "operations": {}
 // CHECK: "var_function_calls"
 // CHECK: "dyn_for_loop_2": "{{0x[0-9a-f]+}}"
@@ -760,4 +757,42 @@ func.func private @my_helper(%arg0: !quantum.bit) -> !quantum.bit {
 func.func @recursive(%arg0: !quantum.bit) -> !quantum.bit {
     %out = func.call @recursive(%arg0) : (!quantum.bit) -> !quantum.bit
     return %out : !quantum.bit
+}
+
+// -----
+
+// auto_qubit_management flag is reported in the result.
+// The function uses {auto_qubit_management} on the device, so the flag is true.
+
+// CHECK-LABEL: "auto_qm_flag_set"
+// CHECK:   "auto_qubit_management": true
+// CHECK:   "device_name": "NullQubit"
+func.func @auto_qm_flag_set() {
+    %c0_i64 = arith.constant 0 : i64
+    quantum.device shots(%c0_i64) ["librtd_null_qubit.so", "NullQubit", "{}"] {auto_qubit_management}
+    %0 = quantum.alloc( 0) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out = quantum.custom "Hadamard"() %1 : !quantum.bit
+    %2 = quantum.insert %0[ 0], %out : !quantum.reg, !quantum.bit
+    quantum.dealloc %2 : !quantum.reg
+    quantum.device_release
+    return
+}
+
+// -----
+
+// quantum.device present but without auto_qubit_management: flag is false.
+
+// CHECK-LABEL: "auto_qm_flag_unset"
+// CHECK:   "auto_qubit_management": false
+func.func @auto_qm_flag_unset() {
+    %c0_i64 = arith.constant 0 : i64
+    quantum.device shots(%c0_i64) ["librtd_null_qubit.so", "NullQubit", "{}"]
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %q = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out = quantum.custom "Hadamard"() %q : !quantum.bit
+    %r = quantum.insert %0[ 0], %out : !quantum.reg, !quantum.bit
+    quantum.dealloc %r : !quantum.reg
+    quantum.device_release
+    return
 }
