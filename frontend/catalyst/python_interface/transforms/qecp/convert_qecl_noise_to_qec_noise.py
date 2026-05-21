@@ -25,7 +25,6 @@ from xdsl.dialects import arith, builtin, func, scf, tensor
 from xdsl.dialects.builtin import IndexType
 from xdsl.ir import Block, Region
 from xdsl.rewriter import InsertPoint
-from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsPass
 
 from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
@@ -63,12 +62,6 @@ class ConvertQECLNoiseOpToQECPNoisePattern(
         rewriter: pattern_rewriter.PatternRewriter,
         /,
     ):  # pylint: disable=missing-function-docstring
-        k = op.in_codeblock.type.k.value.data
-
-        in_block_cast = builtin.UnrealizedConversionCastOp.get(
-            (op.in_codeblock,), (qecp.PhysicalCodeblockType(k, self._n),)
-        )
-        rewriter.insert_op(in_block_cast, InsertPoint.before(op))
 
         # Create random qubit indices and rotation parameters for error injection, which are
         # generated randomly from the python random module.
@@ -106,7 +99,7 @@ class ConvertQECLNoiseOpToQECPNoisePattern(
         callee = builtin.SymbolRefAttr(self.noise_subroutine.sym_name)
 
         arguments = [
-            in_block_cast.results[0],
+            op.in_codeblock,
             qubit_indices_constantop.results[0],
             rotation_params_constantop.results[0],
         ]
@@ -114,11 +107,7 @@ class ConvertQECLNoiseOpToQECPNoisePattern(
         return_types = self.noise_subroutine.function_type.outputs.data
         callOp = func.CallOp(callee, arguments, return_types)
         rewriter.insert_op(callOp, InsertPoint.before(op))
-        cast_op = builtin.UnrealizedConversionCastOp.get(
-            (callOp.results[0],), (op.out_codeblock.type,)
-        )
-        rewriter.insert_op(cast_op, InsertPoint.before(op))
-        rewriter.replace_all_uses_with(op.out_codeblock, cast_op.results[0])
+        rewriter.replace_all_uses_with(op.out_codeblock, callOp.results[0])
         rewriter.erase_op(op)
 
 
@@ -275,9 +264,6 @@ class ConvertQECLNoiseOpToQECPNoisePass(passes.ModulePass):
             ConvertQECLNoiseOpToQECPNoisePattern(noise_subroutine, self.n, self.number_errors),
             apply_recursively=False,
         ).rewrite_module(op)
-
-        # Pass to reconcile unrealized casts after the conversion.
-        ReconcileUnrealizedCastsPass().apply(_ctx, op)
 
 
 # TODOs: Add integration tests for the following line once the quantum-to-qecl pass is in.

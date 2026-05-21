@@ -598,7 +598,9 @@ class TestCond:
             return res
 
         if capture_mode:
-            with pytest.raises(ValueError, match="Mismatch in output abstract values"):
+            with pytest.raises(
+                ValueError, match="Mismatch in number of output variables in false branch"
+            ):
                 qjit(g, capture=capture_mode)
         else:
             with pytest.raises(
@@ -612,7 +614,9 @@ class TestCond:
             return res
 
         if capture_mode:
-            with pytest.raises(ValueError, match="Mismatch in output abstract values"):
+            with pytest.raises(
+                ValueError, match="Mismatch in number of output variables in elif branch"
+            ):
                 qjit(h, capture=capture_mode)
         else:
             with pytest.raises(
