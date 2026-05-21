@@ -67,10 +67,6 @@ from catalyst.jax_primitives import (
 )
 from catalyst.utils.exceptions import CompileError
 
-from .qubit_handler import (
-    get_in_qubit_values,
-)
-
 measurement_map = {
     qp.measurements.SampleMP: sample_p,
     qp.measurements.ExpectationMP: expval_p,
