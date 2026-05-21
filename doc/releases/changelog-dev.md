@@ -46,6 +46,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
+  [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
+
 * Fixed ``KeyError`` in autograph when using ``qp.prod`` as a decorator with PennyLane >= 0.45.
   [(#2844)](https://github.com/PennyLaneAI/catalyst/pull/2844)
 
