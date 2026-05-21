@@ -1501,9 +1501,7 @@ def ppm_specs(fn, *, only_disjoint_qubit: bool = False):
         # add ppm-spec pass at the end to existing pipeline
         _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
         # check if ppm-specs is already in the pass list
-        ppm_specs_pass = (
-            "ppm-specs{disjoint-qubit=true}" if only_disjoint_qubit else "ppm-specs"
-        )
+        ppm_specs_pass = "ppm-specs{disjoint-qubit=true}" if only_disjoint_qubit else "ppm-specs"
         pass_list[:] = [p for p in pass_list if not p.startswith("ppm-specs")]
         if ppm_specs_pass not in pass_list:  # pragma: nocover
             pass_list.append(ppm_specs_pass)

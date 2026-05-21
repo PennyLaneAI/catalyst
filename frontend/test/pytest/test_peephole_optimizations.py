@@ -267,8 +267,8 @@ def test_convert_clifford_to_ppr_only_disjoint_qubit():
     assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
     assert ppm_specs_output["f_0"]["depth"] == 7
     assert ppm_specs_output["f_0"]["depth_type"] == 1
-    
-    
+
+
 def test_commute_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -649,6 +649,7 @@ class TestPPMSpecsErrors:
                 return qp.probs()
 
             ppm_specs(jit_circuit)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
