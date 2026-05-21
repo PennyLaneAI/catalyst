@@ -18,8 +18,6 @@
 
 namespace QuantumPythonCallbacks {
 
-using PyWires = std::vector<int>;
-
 void registerPythonDecompCallback();
 
 } // namespace QuantumPythonCallbacks
