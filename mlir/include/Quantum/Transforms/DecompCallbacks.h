@@ -21,7 +21,6 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-
 using namespace mlir;
 
 namespace catalyst::quantum {
@@ -29,10 +28,10 @@ namespace catalyst::quantum {
 class DecompCallback {
   public:
     virtual ~DecompCallback() = default;
-    virtual mlir::OwningOpRef<mlir::func::FuncOp>
-    lowerPauliRot(mlir::MLIRContext *ctx, double theta,
-                  const std::string &pauliWord,
-                  llvm::ArrayRef<int> wires) = 0;
+    virtual mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRot(mlir::MLIRContext *ctx,
+                                                                double theta,
+                                                                const std::string &pauliWord,
+                                                                llvm::ArrayRef<int> wires) = 0;
 };
 
 void registerDecompCallback(std::unique_ptr<DecompCallback>);

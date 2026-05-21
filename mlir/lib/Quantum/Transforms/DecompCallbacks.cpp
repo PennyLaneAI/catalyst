@@ -16,14 +16,13 @@
 
 namespace catalyst::quantum {
 namespace {
-std::unique_ptr<DecompCallback> &registry() {
+std::unique_ptr<DecompCallback> &registry()
+{
     static std::unique_ptr<DecompCallback> instance;
     return instance;
 }
 } // namespace
 
-void registerDecompCallback(std::unique_ptr<DecompCallback> cb) {
-    registry() = std::move(cb);
-}
+void registerDecompCallback(std::unique_ptr<DecompCallback> cb) { registry() = std::move(cb); }
 DecompCallback *getDecompCallback() { return registry().get(); }
 } // namespace catalyst::quantum

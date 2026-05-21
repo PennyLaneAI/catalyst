@@ -51,9 +51,8 @@ struct InstantiateDecompRulesPass
 
         auto *cb = getDecompCallback();
         if (!cb) {
-            module.emitError(
-                "graph-decomposition needs a PauliRot callback; "
-                "rebuild Catalyst with -DCATALYST_ENABLE_PYTHON_CALLBACKS=ON");
+            module.emitError("graph-decomposition needs a PauliRot callback; "
+                             "rebuild Catalyst with -DCATALYST_ENABLE_PYTHON_CALLBACKS=ON");
             return signalPassFailure();
         }
 

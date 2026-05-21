@@ -14,12 +14,13 @@
 
 #pragma once
 
-#include "pybind11/embed.h"
-#include "pybind11/gil.h"
 #include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
+
+#include "pybind11/embed.h"
+#include "pybind11/gil.h"
 
 namespace py = pybind11;
 
@@ -44,15 +45,17 @@ class PyInterpreterGuard {
   public:
     static PyInterpreterGuard &ensure();
 
-    template <class T>
-    decltype(auto) withGil(T &&func) {
+    template <class T> decltype(auto) withGil(T &&func)
+    {
         static thread_local int depth = 0;
         if (depth > 0) {
-            throw QPCError(
-                "Recursive call to withGil detected.");
+            throw QPCError("Recursive call to withGil detected.");
         }
         ++depth;
-        struct DepthGuard { int &d; ~DepthGuard() { --d; } } guard{depth};
+        struct DepthGuard {
+            int &d;
+            ~DepthGuard() { --d; }
+        } guard{depth};
 
         py::gil_scoped_acquire acquire;
         try {

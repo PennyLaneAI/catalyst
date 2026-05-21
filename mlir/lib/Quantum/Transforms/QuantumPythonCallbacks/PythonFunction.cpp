@@ -21,6 +21,7 @@
 #include "pybind11/stl.h" // for automatic vector + variant conversion
 
 #include "Quantum/Transforms/DecompCallbacks.h"
+
 #include "PythonDriverUtils.hpp"
 
 namespace py = pybind11;
@@ -29,10 +30,10 @@ namespace {
 
 class PythonDecompCallback : public catalyst::quantum::DecompCallback {
   public:
-    mlir::OwningOpRef<mlir::func::FuncOp>
-    lowerPauliRot(mlir::MLIRContext *ctx, double theta,
-                  const std::string &pauliWord,
-                  llvm::ArrayRef<int> wires) override {
+    mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRot(mlir::MLIRContext *ctx, double theta,
+                                                        const std::string &pauliWord,
+                                                        llvm::ArrayRef<int> wires) override
+    {
         // std::string result = tracePauliRotDecomp(theta, pauliWord, wires);
 
         std::string mlirText = QuantumPythonCallbacks::PyInterpreterGuard::ensure().withGil([&] {
@@ -47,7 +48,8 @@ class PythonDecompCallback : public catalyst::quantum::DecompCallback {
                 return pythonResult.cast<std::string>();
             }
             catch (const py::error_already_set &error) {
-                throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord, error.what());
+                throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
+                                                           error.what());
             }
         });
 
@@ -77,7 +79,6 @@ class PythonDecompCallback : public catalyst::quantum::DecompCallback {
 
 } // namespace
 
-
 namespace QuantumPythonCallbacks {
 
 // hmmm. we still need to export a symbol for the driver!
@@ -85,9 +86,9 @@ namespace QuantumPythonCallbacks {
 // in the callback implementation file which would trigger the
 // interpreter initialization
 // TODO(Ali): re-think this part.
-void registerPythonDecompCallback() {
-    catalyst::quantum::registerDecompCallback(
-        std::make_unique<PythonDecompCallback>());
+void registerPythonDecompCallback()
+{
+    catalyst::quantum::registerDecompCallback(std::make_unique<PythonDecompCallback>());
 }
 
 } // namespace QuantumPythonCallbacks
