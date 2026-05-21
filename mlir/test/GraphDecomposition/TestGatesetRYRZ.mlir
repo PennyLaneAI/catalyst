@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,RZ=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RY=1.0,RZ=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
 func.func public @circuit() attributes {quantum.node} {
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -22,6 +22,6 @@ func.func public @circuit() attributes {quantum.node} {
     quantum.dealloc %2 : !quantum.reg
     // CHECK-NOT: Hadamard
     // CHECK-DAG: RZ
-    // CHECK-DAG: RX
+    // CHECK-DAG: RY
     return
 }

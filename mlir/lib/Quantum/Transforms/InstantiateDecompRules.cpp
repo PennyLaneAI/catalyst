@@ -53,7 +53,7 @@ struct InstantiateDecompRulesPass
         if (!cb) {
             module.emitError(
                 "graph-decomposition needs a PauliRot callback; "
-                "rebuild Catalyst with -DENABLE_PYTHON_CALLBACKS=ON");
+                "rebuild Catalyst with -DCATALYST_ENABLE_PYTHON_CALLBACKS=ON");
             return signalPassFailure();
         }
 

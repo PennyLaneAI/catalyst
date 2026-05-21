@@ -102,7 +102,7 @@ add_mlir_library(CatalystCompilerDriver
 add_subdirectory(../Quantum/Transforms/QuantumPythonCallbacks
                  ${CMAKE_BINARY_DIR}/QuantumPythonCallbacksBuild)
 
-if (ENABLE_PYTHON_CALLBACKS)
+if (CATALYST_ENABLE_PYTHON_CALLBACKS)
     target_link_libraries(CatalystCompilerDriver PRIVATE QuantumPythonCallbacks)
     target_compile_definitions(CatalystCompilerDriver PRIVATE
         CATALYST_ENABLE_PYTHON_CALLBACKS)

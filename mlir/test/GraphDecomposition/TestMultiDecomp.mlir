@@ -12,18 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Test that decomposition chooses cheapest decomposition path
+// RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes FIRST
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,RY=1.0,RZ=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
-
+// RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"},graph-decomposition{gate-set=RZ=1.0,RY=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes SECOND
 
 func.func @circuit() -> !quantum.bit {
-    %0 = quantum.alloc(1) : !quantum.reg
+    %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-    // CHECK-NOT: Hadamard
-    // CHECK-DAG: RZ
-    // CHECK-DAG: RY
-    // CHECK-DAG: gphase
-    %qout = quantum.custom "Hadamard"() %q : !quantum.bit
+    // FIRST-NOT: PauliX
+    // FIRST: RX
+
+    // SECOND-NOT: PauliX
+    // SECOND-NOT: RX
+    // SECOND: RZ
+    // SECOND: RY
+    // SECOND: RZ
+    %qout = quantum.custom "PauliX"() %q : !quantum.bit
     return %qout : !quantum.bit
 }
+

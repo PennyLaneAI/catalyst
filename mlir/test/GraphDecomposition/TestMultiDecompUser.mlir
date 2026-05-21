@@ -12,22 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes FIRST
-
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"},graph-decomposition{gate-set=RZ=1.0,RY=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes SECOND
+// RUN: quantum-opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=Hadamard=1.0 fixed-decomps=PauliX=x_to_h bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=PauliX=1.0 fixed-decomps=Hadamard=h_to_x bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=Hadamard=1.0 fixed-decomps=PauliX=x_to_h bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes TRIPLE
 
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-    // FIRST-NOT: PauliX
-    // FIRST: RX
-
-    // SECOND-NOT: PauliX
-    // SECOND-NOT: RX
-    // SECOND: RZ
-    // SECOND: RY
-    // SECOND: RZ
+    // TRIPLE-NOT PauliX
+    // TRIPLE: Hadamard
     %qout = quantum.custom "PauliX"() %q : !quantum.bit
     return %qout : !quantum.bit
 }
 
+func.func @h_to_x(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="Hadamard"} {
+    %q1 = quantum.custom "PauliX"() %q : !quantum.bit
+    return %q1 : !quantum.bit
+}
+
+func.func @x_to_h(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="PauliX"} {
+    %q1 = quantum.custom "Hadamard"() %q : !quantum.bit
+    return %q1 : !quantum.bit
+}

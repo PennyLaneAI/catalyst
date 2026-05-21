@@ -1,5 +1,6 @@
-option(ENABLE_PYTHON_CALLBACKS "Build Python callback plugin" ON)
-if (NOT ENABLE_PYTHON_CALLBACKS)
+option(CATALYST_ENABLE_PYTHON_CALLBACKS
+       "Build the embedded-interpreter callback plugin (PauliRot graph-decomposition)" ON)
+if (NOT CATALYST_ENABLE_PYTHON_CALLBACKS)
     return()
 endif()
 

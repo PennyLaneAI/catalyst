@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: not --crash catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=PauliX=1.0 bytecode-rules="%BYTECODE_PATH"})' %s 2>&1 | FileCheck %s
+// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,RZ=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
-func.func @circuit(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
-    %pi = arith.constant 3.14 : f64
-    %out:3 = quantum.paulirot ["X", "Z", "Y"](%pi) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK: GraphSolverFailedError
-    // CHECK: Decomposition rule not found for operator 'paulirot
+func.func public @circuit() attributes {quantum.node} {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
+    %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    quantum.dealloc %2 : !quantum.reg
+    // CHECK-NOT: Hadamard
+    // CHECK-DAG: RZ
+    // CHECK-DAG: RX
     return
 }
