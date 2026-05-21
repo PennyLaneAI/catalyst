@@ -1436,6 +1436,9 @@ def ppm_specs(fn, *, only_disjoint_qubit: bool = False):
     - Max weight for pi/2 PPRs
     - Number of logical qubits
     - Number of PPMs
+    - ``depth``: number of PBC layers
+    - ``depth_type``: ``0`` if commuting ops on overlapping qubits may share a layer;
+      ``1`` if only ops with disjoint qubit support may share a layer
 
     .. note::
 
@@ -1462,44 +1465,29 @@ def ppm_specs(fn, *, only_disjoint_qubit: bool = False):
 
         import pennylane as qp
         import catalyst
+        from catalyst.passes import ppm_specs, to_ppr
 
-        p = [("my_pipe", ["quantum-compilation-stage"])]
-        device = qp.device("lightning.qubit", wires=2)
-
-        @qp.qjit(pipelines=p, target="mlir")
-        @catalyst.passes.ppm_compilation
-        @qp.qnode(device)
-        def circuit():
+        @qp.qjit(target="mlir")
+        @to_ppr
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def f():
             qp.H(0)
-            qp.CNOT([0,1])
+            qp.S(1)
+            qp.T(0)
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.Z(0))
 
-            @catalyst.for_loop(0,10,1)
-            def loop(i):
-                qp.T(1)
+        print(ppm_specs(f))
+        print(ppm_specs(f, only_disjoint_qubit=True))
 
-            loop()
-            return catalyst.measure(0), catalyst.measure(1)
-
-        ppm_specs = catalyst.passes.ppm_specs(circuit)
-        print(ppm_specs)
-
-    Example PPM Specs:
+    Example output:
 
     .. code-block:: pycon
 
-        . . .
-        {'circuit_0':
-            {
-                'depth_pi2_ppr': 7,
-                'depth_ppm': 15,
-                'logical_qubits': 2,
-                'max_weight_pi2': 2,
-                'num_of_ppm': 24,
-                'pi2_ppr': 16
-            }
-        }
-        . . .
-
+        {'f_0': {'depth': 4, 'depth_type': 0, 'logical_qubits': 2, 'max_weight_pi4': 2,
+                 'max_weight_pi8': 1, 'pi4_ppr': 7, 'pi8_ppr': 1}}
+        {'f_0': {'depth': 7, 'depth_type': 1, 'logical_qubits': 2, 'max_weight_pi4': 2,
+                 'max_weight_pi8': 1, 'pi4_ppr': 7, 'pi8_ppr': 1}}
     """
 
     if fn.mlir_module is not None:

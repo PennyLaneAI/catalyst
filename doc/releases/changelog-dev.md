@@ -26,6 +26,14 @@
   overlapping qubits may still be merged into one layer.
   [(#2858)](https://github.com/PennyLaneAI/catalyst/pull/2858)
 
+* The :func:`~.passes.ppm_specs` now report circuit depth as ``depth``
+  (layer count) and ``depth_type`` (``0`` = commuting ops on overlapping qubits may share a
+  layer; ``1`` = only ops with disjoint qubit support may share a layer). The Python API accepts
+  ``only_disjoint_qubit=True`` to run ``ppm-specs{disjoint-qubit=true}``. AOT ``ppm_specs`` no
+  longer requires an explicit pipeline and no longer mixes MLIR into the JSON output.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
