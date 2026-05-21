@@ -536,6 +536,51 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     let hasVerifier = 1;
 }
 
+def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
+                                             AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "A generalized quantum operation with arbitrary input signature.";
+    let description = [{
+
+    }];
+
+    let arguments = (ins
+        StringProp:$op_name,
+        Variadic<AnyType>:$params,
+
+        // traditional qubit specification
+        Variadic<QubitType>:$in_qubits,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values,
+
+        // alternative spec for acting on a dynamic number of qubits
+        Optional<QuregType>:$in_qreg,
+        Variadic<1DTensorOf<[I64]>>:$arr_qubit_indices,
+        Optional<1DTensorOf<[I64]>>:$arr_ctrl_indices,
+        Optional<1DTensorOf<[I1]>>:$arr_ctrl_values,
+
+        // additional functionality provided by quantum.operator, being last allows the builder
+        // to use default values in the signature, so that these args are truly optional
+        UnitProp:$adjoint,
+        DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
+        DefaultValuedOptionalAttr<I64DictAttr, "{}">:$param_map,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits,
+        Optional<QuregType>:$out_qreg
+    );
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getParams();
+        }
+    }];
+
+    let hasVerifier = 1;
+}
+
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
                                          AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply a Pauli Product Rotation";
@@ -737,33 +782,6 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect
     }];
 
     let hasVerifier = 1;
-}
-
-// -----
-
-def TemplateOp : Quantum_Op<"template", [NoMemoryEffect, AttrSizedOperandSegments, AllTypesMatch<["in_qreg", "out_qreg"]>]> {
-
-    let summary = "Operation to represent quantum gates with arbitrary signatures";
-    let description = [{}];
-
-    let arguments = (ins
-        StrAttr:$template_name,
-        Variadic<AnyType>:$inputs,
-        QuregType:$in_qreg,
-        Variadic<1DTensorOf<[I64]>>:$qubit_inds,
-        Optional<1DTensorOf<[I64]>>:$in_ctrl_inds,
-        Optional<1DTensorOf<[I1]>>:$in_ctrl_vals,
-        UnitAttr:$adjoint,
-        OptionalAttr<DictionaryAttr>:$param_map,
-        DictionaryAttr:$in_qubits_map,
-        OptionalAttr<DictionaryAttr>:$static_data
-    );
-
-    let results = (outs
-        QuregType:$out_qreg
-    );
-
-    let hasCustomAssemblyFormat = 1;
 }
 
 // -----

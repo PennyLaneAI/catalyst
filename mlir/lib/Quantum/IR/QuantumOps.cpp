@@ -16,6 +16,7 @@
 
 #include <optional>
 #include <type_traits>
+#include <vector>
 
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -209,6 +210,119 @@ LogicalResult CustomOp::verify()
     if (getInQubits().size() == 0) {
         return emitOpError("expected op to have at least one qubit");
     }
+    return success();
+}
+
+LogicalResult OperatorOp::verify()
+{
+    const bool hasQregInput = static_cast<bool>(getInQreg());
+    const bool hasQregOutput = static_cast<bool>(getOutQreg());
+    const bool hasQregMode = hasQregInput || hasQregOutput;
+
+    const bool hasQubitInput = !getInQubits().empty();
+    const bool hasQubitOutput = !getOutQubits().empty();
+    const bool hasQubitMode = hasQubitInput || hasQubitOutput;
+
+    // Exactly one mode must be used: explicit qubits or qreg-based addressing.
+    if (hasQregMode == hasQubitMode) {
+        return emitOpError() << "must use either qubits or registers, but not both";
+    }
+
+    if (hasQregInput != hasQregOutput) {
+        return emitOpError() << "in_qreg and out_qreg must either both be present or absent";
+    }
+
+    if (getInQubits().size() != getOutQubits().size()) {
+        return emitOpError() << "number of input qubits (" << getInQubits().size()
+                             << ") and output qubits (" << getOutQubits().size()
+                             << ") must be the same";
+    }
+
+    const bool hasQubitControls =
+        !getInCtrlQubits().empty() || !getInCtrlValues().empty() || !getOutCtrlQubits().empty();
+    const bool hasQregControls =
+        static_cast<bool>(getArrCtrlIndices()) || static_cast<bool>(getArrCtrlValues());
+
+    if (hasQubitControls && hasQregControls) {
+        return emitOpError()
+               << "cannot mix qubit controls (in_ctrl_qubits/in_ctrl_values/out_ctrl_qubits) "
+               << "with register controls (arr_ctrl_indices/arr_ctrl_values)";
+    }
+
+    if (getInCtrlQubits().size() != getOutCtrlQubits().size()) {
+        return emitOpError() << "number of input control qubits (" << getInCtrlQubits().size()
+                             << ") and output control qubits (" << getOutCtrlQubits().size()
+                             << ") must be the same";
+    }
+
+    if (getInCtrlQubits().size() != getInCtrlValues().size()) {
+        return emitOpError() << "number of input control qubits (" << getInCtrlQubits().size()
+                             << ") and control values (" << getInCtrlValues().size()
+                             << ") must be the same";
+    }
+
+    if (static_cast<bool>(getArrCtrlIndices()) != static_cast<bool>(getArrCtrlValues())) {
+        return emitOpError()
+               << "arr_ctrl_indices and arr_ctrl_values must either both be present or both absent";
+    }
+
+    if (hasQregControls) {
+        auto ctrlIndType = cast<ShapedType>(getArrCtrlIndices().getType());
+        auto ctrlValType = cast<ShapedType>(getArrCtrlValues().getType());
+        if (ctrlIndType.getShape()[0] != ctrlValType.getShape()[0]) {
+            return emitOpError() << "number of input control qubits (" << ctrlIndType.getShape()[0]
+                                 << ") and control values (" << ctrlValType.getShape()[0]
+                                 << ") must be the same";
+        }
+    }
+
+    if (getParamMapAttr() && getParamMap().size() != getParams().size()) {
+        return emitOpError() << "param_map must cover all params when provided: expected "
+                             << getParams().size() << " entries, got " << getParamMap().size();
+    }
+
+    auto qubitMap = getQubitMap();
+    if (qubitMap) {
+        if (hasQregMode) {
+            if (getQubitMapAttr() && qubitMap.size() != getArrQubitIndices().size()) {
+                return emitOpError()
+                       << "qubit_map must cover all index arrays when provided: expected "
+                       << getArrQubitIndices().size() << " entries, got " << qubitMap.size();
+            }
+            for (NamedAttribute namedAttr : qubitMap) {
+                auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
+                if (denseArray.size() != 1) {
+                    return emitOpError() << "each qubit_map entry can only contain one index "
+                                            "in register mode";
+                }
+            }
+        }
+        else {
+            const size_t numInputQubits = getInQubits().size();
+            std::vector<bool> coveredQubits(numInputQubits, false);
+            size_t coveredCount = 0;
+            for (NamedAttribute namedAttr : qubitMap) {
+                auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
+                for (int64_t idx : denseArray.asArrayRef()) {
+                    if (idx < 0 || idx >= static_cast<int64_t>(numInputQubits)) {
+                        return emitOpError()
+                               << "qubit_map index is out of bounds with respect to qubits: " << idx
+                               << " is not in [0, " << numInputQubits << ")";
+                    }
+                    if (!coveredQubits[static_cast<size_t>(idx)]) {
+                        coveredQubits[static_cast<size_t>(idx)] = true;
+                        ++coveredCount;
+                    }
+                }
+            }
+            if (getQubitMapAttr() && coveredCount != numInputQubits) {
+                return emitOpError()
+                       << "qubit_map must cover all qubit values in qubit mode: expected "
+                       << numInputQubits << ", got " << coveredCount;
+            }
+        }
+    }
+
     return success();
 }
 
@@ -565,228 +679,6 @@ LogicalResult AdjointOp::verify()
                 "Adjoint op operand types must be the same as the argument types on its block");
         }
     }
-
-    return success();
-}
-
-// -----
-
-void TemplateOp::print(OpAsmPrinter &p)
-{
-    // 1. Template Name
-    p << " ";
-    p.printAttribute(getTemplateNameAttr());
-
-    // 2. Variadic Inputs: (%arg0 : type, ...)
-    p << "(";
-    llvm::interleaveComma(llvm::zip(getInputs(), getInputs().getTypes()), p,
-                          [&](auto pair) { p << std::get<0>(pair) << " : " << std::get<1>(pair); });
-    p << ")";
-
-    p.increaseIndent();
-    p.printNewline();
-
-    // 3. qreg and qubit_inds
-    p << "in_qreg (" << getInQreg() << ") qubit_inds (";
-    llvm::interleaveComma(llvm::zip(getQubitInds(), getQubitInds().getTypes()), p,
-                          [&](auto pair) { p << std::get<0>(pair) << " : " << std::get<1>(pair); });
-    p << ")";
-
-    // 4. Conditional Line: adjoint, ctrls, ctrl_vals
-    bool hasAdjoint = getAdjoint();
-    bool hasCtrls = getInCtrlInds() != nullptr;
-    bool hasCtrlVals = getInCtrlVals() != nullptr;
-
-    if (hasAdjoint || hasCtrls || hasCtrlVals) {
-        p.printNewline();
-        if (hasAdjoint)
-            p << "adjoint";
-        if (hasCtrls) {
-            if (hasAdjoint)
-                p << " ";
-            p << "ctrls (" << getInCtrlInds() << " : " << getInCtrlInds().getType() << ")";
-        }
-        if (hasCtrlVals) {
-            if (hasAdjoint || hasCtrls)
-                p << " ";
-            p << "ctrl_vals (" << getInCtrlVals() << " : " << getInCtrlVals().getType() << ")";
-        }
-    }
-
-    // 5. Results
-    p.printNewline();
-    p << "-> " << getOutQreg().getType();
-
-    // 6. Indented Properties
-    if (auto paramMap = getParamMap()) {
-        p.printNewline();
-        p << "param_map = " << paramMap;
-    }
-
-    p.printNewline();
-    p << "in_qubits_map = " << getInQubitsMap();
-
-    if (auto staticData = getStaticData()) {
-        p.printNewline();
-        p << "static_data = " << staticData;
-    }
-
-    // 7. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {
-        "template_name", "param_map", "in_qubits_map", "static_data",
-        "operandSegmentSizes", "adjoint"
-    };
-
-    // Check if there's anything left to print
-    bool hasExtraAttrs = false;
-    for (auto attr : getOperation()->getAttrs()) {
-        if (!llvm::is_contained(elidedAttrs, attr.getName().getValue())) {
-            hasExtraAttrs = true;
-            break;
-        }
-    }
-
-    if (hasExtraAttrs) {
-        p.printNewline();
-        p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
-    }
-
-    p.decreaseIndent();
-}
-
-ParseResult TemplateOp::parse(OpAsmParser &parser, OperationState &result)
-{
-    // 1. Parse template Name
-    StringAttr templateName;
-    if (parser.parseAttribute(templateName, "template_name", result.attributes))
-        return failure();
-
-    // 2. Parse Variadic Inputs
-    SmallVector<OpAsmParser::UnresolvedOperand> inputs;
-    SmallVector<Type> inputTypes;
-    auto parseInputAndType = [&]() -> ParseResult {
-        OpAsmParser::UnresolvedOperand operand;
-        Type type;
-        if (parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type))
-            return failure();
-        inputs.push_back(operand);
-        inputTypes.push_back(type);
-        return success();
-    };
-
-    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseInputAndType))
-        return failure();
-
-    // 3. Parse single qreg
-    OpAsmParser::UnresolvedOperand inQreg;
-    if (parser.parseKeyword("in_qreg") || parser.parseLParen() || parser.parseOperand(inQreg) ||
-        parser.parseRParen())
-        return failure();
-
-    // 4. Parse qubit_inds
-    SmallVector<OpAsmParser::UnresolvedOperand> qubitInds;
-    SmallVector<Type> qubitIndTypes;
-    auto parseQubitAndType = [&]() -> ParseResult {
-        OpAsmParser::UnresolvedOperand operand;
-        Type type;
-        if (parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type))
-            return failure();
-        qubitInds.push_back(operand);
-        qubitIndTypes.push_back(type);
-        return success();
-    };
-
-    if (parser.parseKeyword("qubit_inds") ||
-        parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseQubitAndType))
-        return failure();
-
-    // 5. Parse Adjoint, Ctrls, and Ctrl Vals (All Optional)
-    if (succeeded(parser.parseOptionalKeyword("adjoint"))) {
-        result.addAttribute("adjoint", parser.getBuilder().getUnitAttr());
-    }
-
-    OpAsmParser::UnresolvedOperand ctrlInds;
-    Type ctrlIndsType;
-    bool hasCtrls = false;
-    if (succeeded(parser.parseOptionalKeyword("ctrls"))) {
-        hasCtrls = true;
-        if (parser.parseLParen() || parser.parseOperand(ctrlInds) || parser.parseColon() ||
-            parser.parseType(ctrlIndsType) || parser.parseRParen())
-            return failure();
-    }
-
-    OpAsmParser::UnresolvedOperand ctrlVals;
-    Type ctrlValsType;
-    bool hasCtrlVals = false;
-    if (succeeded(parser.parseOptionalKeyword("ctrl_vals"))) {
-        hasCtrlVals = true;
-        if (parser.parseLParen() || parser.parseOperand(ctrlVals) || parser.parseColon() ||
-            parser.parseType(ctrlValsType) || parser.parseRParen())
-            return failure();
-    }
-
-    // 6. Resolve all Operands
-    Type inQregType = QuregType::get(parser.getContext());
-    if (parser.resolveOperands(inputs, inputTypes, parser.getCurrentLocation(), result.operands) ||
-        parser.resolveOperand(inQreg, inQregType, result.operands) ||
-        parser.resolveOperands(qubitInds, qubitIndTypes, parser.getCurrentLocation(),
-                               result.operands))
-        return failure();
-
-    if (hasCtrls) {
-        if (parser.resolveOperand(ctrlInds, ctrlIndsType, result.operands))
-            return failure();
-    }
-    if (hasCtrlVals) {
-        if (parser.resolveOperand(ctrlVals, ctrlValsType, result.operands))
-            return failure();
-    }
-
-    // 7. Set AttrSizedSegments
-    // Use the generated getter here too!
-    result.addAttribute("operandSegmentSizes",
-        parser.getBuilder().getDenseI32ArrayAttr({
-            static_cast<int32_t>(inputs.size()),
-            1, // in_qreg is strictly 1
-            static_cast<int32_t>(qubitInds.size()),
-            hasCtrls ? 1 : 0,   // 0 or 1
-            hasCtrlVals ? 1 : 0 // 0 or 1
-        }));
-
-    // 8. Parse Return Types
-    if (parser.parseArrow())
-        return failure();
-
-    Type outQregType;
-    if (parser.parseType(outQregType))
-        return failure();
-
-    result.addTypes(outQregType);
-
-    // 9. Parse Indented Properties
-    DictionaryAttr inQubitsMap;
-
-    // Parse optional param_map
-    if (succeeded(parser.parseOptionalKeyword("param_map"))) {
-        DictionaryAttr paramMap;
-        if (parser.parseEqual() || parser.parseAttribute(paramMap, "param_map", result.attributes))
-            return failure();
-    }
-
-    if (parser.parseKeyword("in_qubits_map") || parser.parseEqual() ||
-        parser.parseAttribute(inQubitsMap, "in_qubits_map", result.attributes))
-        return failure();
-
-    // Parse optional static_data
-    if (succeeded(parser.parseOptionalKeyword("static_data"))) {
-        DictionaryAttr staticData;
-        if (parser.parseEqual() || parser.parseAttribute(staticData, "static_data", result.attributes))
-            return failure();
-    }
-
-    // 10. Parse Attribute Dictionary
-    if (parser.parseOptionalAttrDict(result.attributes))
-        return failure();
 
     return success();
 }
