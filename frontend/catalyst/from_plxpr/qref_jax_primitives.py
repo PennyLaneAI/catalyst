@@ -37,6 +37,8 @@ from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
     AbstractObs,
+    MeasurementPlane,
+    _measurement_plane_attribute,
     _named_obs_attribute,
     extract_scalar,
     safe_cast_to_f64,
@@ -55,6 +57,7 @@ with Patcher(
         ),
     ),
 ):
+    from mlir_quantum.dialects.mbqc import RefMeasureInBasisOp
     from mlir_quantum.dialects.qref import (
         AdjointOp,
         AllocOp,
@@ -154,6 +157,7 @@ qref_pauli_rot_p.multiple_results = True
 qref_unitary_p = Primitive("qref_unitary")
 qref_unitary_p.multiple_results = True
 qref_measure_p = Primitive("qref_measure")
+qref_measure_in_basis_p = Primitive("qref_measure_in_basis")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
@@ -620,6 +624,59 @@ def _qref_measure_lowering(
 
 
 #
+# arbitrary-basis measurements
+#
+@qref_measure_in_basis_p.def_abstract_eval
+def _qref_measure_in_basis_abstract_eval(
+    angle: float, qubit, plane: MeasurementPlane, postselect: int = None
+):
+    assert isinstance(qubit, QrefQubit)
+    return ShapedArray((), bool)
+
+
+def _qref_measure_in_basis_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    angle: float,
+    qubit: ir.Value,
+    plane: MeasurementPlane,
+    postselect: int = None,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    assert ir.OpaqueType.isinstance(qubit.type)
+    assert ir.OpaqueType(qubit.type).dialect_namespace == "qref"
+    assert ir.OpaqueType(qubit.type).data == "bit"
+
+    angle = safe_cast_to_f64(angle, "angle")
+    angle = extract_scalar(angle, "angle")
+
+    assert ir.F64Type.isinstance(
+        angle.type
+    ), "Only scalar double parameters are allowed for quantum gates!"
+
+    # Prepare postselect attribute
+    if postselect is not None:
+        i32_type = ir.IntegerType.get_signless(32, ctx)
+        postselect = ir.IntegerAttr.get(i32_type, postselect)
+
+    result_type = ir.IntegerType.get_signless(1)
+
+    result = RefMeasureInBasisOp(
+        result_type,
+        qubit,
+        plane=_measurement_plane_attribute(ctx, plane),
+        angle=angle,
+        postselect=postselect,
+    ).results[0]
+
+    result_from_elements_op = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_from_elements_op, result)
+
+    return (from_elements_op.results[0],)
+
+
+#
 # compbasis observable
 #
 @qref_compbasis_p.def_abstract_eval
@@ -718,6 +775,7 @@ CUSTOM_LOWERING_RULES = (
     (qref_pauli_rot_p, _qref_pauli_rot_lowering),
     (qref_unitary_p, _qref_unitary_lowering),
     (qref_measure_p, _qref_measure_lowering),
+    (qref_measure_in_basis_p, _qref_measure_in_basis_lowering),
     (qref_compbasis_p, _qref_compbasis_lowering),
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),

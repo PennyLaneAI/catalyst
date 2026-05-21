@@ -42,6 +42,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_get_p,
     qref_gphase_p,
     qref_hermitian_p,
+    qref_measure_in_basis_p,
     qref_measure_p,
     qref_namedobs_p,
     qref_pauli_rot_p,
@@ -58,7 +59,6 @@ from catalyst.jax_primitives import (
     expval_p,
     hamiltonian_p,
     mcmobs_p,
-    measure_in_basis_p,
     pauli_measure_p,
     probs_p,
     sample_p,
@@ -732,12 +732,11 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
             f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
         ) from e
 
-    in_qreg, in_wire = (
-        _[0] for _ in get_in_qubit_values([wire], self.qubit_index_recorder, self.init_qreg)
-    )
-    result, out_wire = measure_in_basis_p.bind(_angle, in_wire, plane=_plane, postselect=postselect)
-
-    in_qreg[in_qreg.global_index_to_local_index(wire)] = out_wire
+    if isinstance(wire, DynamicJaxprTracer) and isinstance(wire.val.aval, QrefQubit):
+        in_qubit = wire
+    else:
+        in_qubit = qref_get_p.bind(self.init_qreg, wire)
+    result = qref_measure_in_basis_p.bind(_angle, in_qubit, plane=_plane, postselect=postselect)
 
     return result
 
