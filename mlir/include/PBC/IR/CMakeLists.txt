@@ -4,7 +4,7 @@ add_mlir_doc(PBCDialect PBCDialect PBC/ -gen-dialect-doc -dialect pbc)
 add_mlir_doc(PBCOps PBCOps PBC/ -gen-op-doc)
 add_mlir_doc(PBCOpInterfaces PBCOpInterfaces PBC/ -gen-op-interface-docs)
 
-set(LLVM_TARGET_DEFINITIONS PBCOps.td)
+set(LLVM_TARGET_DEFINITIONS PBCAttrDefs.td)
 mlir_tablegen(PBCEnums.h.inc -gen-enum-decls)
 mlir_tablegen(PBCEnums.cpp.inc -gen-enum-defs)
 mlir_tablegen(PBCAttributes.h.inc -gen-attrdef-decls)

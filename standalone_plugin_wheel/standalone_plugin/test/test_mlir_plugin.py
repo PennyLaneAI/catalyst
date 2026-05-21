@@ -72,6 +72,26 @@ def test_standalone_plugin_no_preregistration():
 
 
 @pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
+def test_standalone_plugin_no_preregistration_run():
+    """Execute the standalone plugin"""
+
+    @apply_pass_plugin(plugin, "standalone-switch-bar-foo")
+    @qp.qnode(qp.device("lightning.qubit", wires=0))
+    def qnode():
+        return qp.state()
+
+    @qp.qjit
+    def module():
+        return qnode()
+
+    module()
+
+    # It would be nice if we were able to combine lit tests with
+    # pytest
+    assert "standalone-switch-bar-foo" in module.mlir
+
+
+@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
 def test_standalone_entry_point():
     """Generate MLIR for the standalone plugin via entry-point"""
 
