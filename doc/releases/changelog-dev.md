@@ -8,6 +8,8 @@
   [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
   [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
   [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
+  [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
+  [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
 
 
 <h3>Improvements 🛠</h3>
@@ -59,6 +61,9 @@
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
 
+* The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
+  [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
+
 * Part of the new, experimental QEC pipeline, the `convert-qecp-to-llvm` compiler pass has been
   added to lower operations and types in the QEC physical dialect to the LLVM dialect.
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
@@ -80,6 +85,13 @@
   `qecl.{extract_block, insert_block, measure, <gates>}`, and
   `qecp.{extract_block, insert_block, extract, insert}`.
   [(#2846)](https://github.com/PennyLaneAI/catalyst/pull/2846)
+
+* A new, experimental compiler pipeline `qec_pipeline` has been added to the `ftqc.pipelines` module.
+  [(#2852)](https://github.com/PennyLaneAI/catalyst/pull/2852)
+
+* The reference semantics MBQC operations have been moved from the `qref` dialect to the `mbqc`
+  dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
+  [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
 
 <h3>Documentation 📝</h3>
 
