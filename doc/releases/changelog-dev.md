@@ -23,6 +23,11 @@
   are simply removed.
   [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
 
+* The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
+  extracted from different quantum register SSA values, as long as all these quantum register values
+  trace back to the same allocation.
+  [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
