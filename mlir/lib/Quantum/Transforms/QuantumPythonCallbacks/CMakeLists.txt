@@ -1,3 +1,8 @@
+option(ENABLE_PYTHON_CALLBACKS "Build Python callback plugin" ON)
+if (NOT ENABLE_PYTHON_CALLBACKS)
+    return()
+endif()
+
 execute_process(
     COMMAND python3 -c "import pybind11; print(pybind11.get_cmake_dir())"
     OUTPUT_VARIABLE pybind11_DIR
@@ -13,13 +18,20 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
 add_mlir_library(QuantumPythonCallbacks STATIC
     PythonFunction.cpp
     PythonDriverUtils.cpp
+    LINK_LIBS PRIVATE
+        pybind11::embed
+        Python3::Python
+        MLIRIR
+        MLIRFuncDialect
+        MLIRParser
+        quantum-transforms # for DecompCallback
 )
 
-target_link_libraries(QuantumPythonCallbacks
-    PRIVATE
-    pybind11::embed
-    Python3::Python
-)
+# target_link_libraries(QuantumPythonCallbacks
+#     PRIVATE
+#     pybind11::embed
+#     Python3::Python
+# )
 
 target_include_directories(QuantumPythonCallbacks PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

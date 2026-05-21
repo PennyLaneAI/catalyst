@@ -48,6 +48,10 @@
 #include "QecPhysical/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 
+#ifdef CATALYST_ENABLE_PYTHON_CALLBACKS
+#include "QuantumPythonCallbacks/PythonFunction.hpp"
+#endif
+
 #include "RegisterAllPasses.h"
 
 using namespace catalyst;
@@ -57,6 +61,10 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
                                       mlir::DialectRegistry &registry)
 {
     using timer = catalyst::utils::Timer<>;
+
+    #ifdef CATALYST_ENABLE_PYTHON_CALLBACKS
+    QuantumPythonCallbacks::registerPythonDecompCallback();
+    #endif
 
     mlir::OpPrintingFlags opPrintingFlags{};
     if (options.useNameLocAsPrefix) {

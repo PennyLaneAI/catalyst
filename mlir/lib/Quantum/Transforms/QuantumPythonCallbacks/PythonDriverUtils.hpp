@@ -14,22 +14,16 @@
 
 #pragma once
 
+#include "pybind11/embed.h"
+#include "pybind11/gil.h"
+#include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
+namespace py = pybind11;
+
 namespace QuantumPythonCallbacks {
-
-class PyInterpreterGuard {
-  public:
-    static PyInterpreterGuard &ensure();
-
-  private:
-    PyInterpreterGuard();
-    ~PyInterpreterGuard() = default;
-
-    struct Impl;
-    std::unique_ptr<Impl> impl;
-};
 
 class QPCError : public std::runtime_error {
   public:
@@ -44,6 +38,40 @@ class TracingError : public QPCError {
                    moduleName + " with args " + args + ": " + error)
     {
     }
+};
+
+class PyInterpreterGuard {
+  public:
+    static PyInterpreterGuard &ensure();
+
+    template <class T>
+    decltype(auto) withGil(T &&func) {
+        static thread_local int depth = 0;
+        if (depth > 0) {
+            throw QPCError(
+                "Recursive call to withGil detected.");
+        }
+        ++depth;
+        struct DepthGuard { int &d; ~DepthGuard() { --d; } } guard{depth};
+
+        py::gil_scoped_acquire acquire;
+        try {
+            return std::invoke(std::forward<T>(func));
+        }
+        catch (const py::error_already_set &e) {
+            throw QPCError(e.what());
+        }
+    }
+
+    PyInterpreterGuard(const PyInterpreterGuard &) = delete;
+    PyInterpreterGuard &operator=(const PyInterpreterGuard &) = delete;
+
+  private:
+    PyInterpreterGuard();
+    ~PyInterpreterGuard() = default;
+
+    struct Impl;
+    std::unique_ptr<Impl> impl;
 };
 
 } // namespace QuantumPythonCallbacks

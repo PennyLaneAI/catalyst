@@ -1,7 +1,7 @@
 set(LIBRARY_NAME quantum-transforms)
 
 add_subdirectory(DecompGraphSolver)
-add_subdirectory(QuantumPythonCallbacks)
+# add_subdirectory(QuantumPythonCallbacks)
 
 file(GLOB SRC
     AdjointPatterns.cpp
@@ -9,6 +9,7 @@ file(GLOB SRC
     CancelInversesPatterns.cpp
     ConversionPatterns.cpp
     DecomposeLoweringPatterns.cpp
+    DecompCallbacks.cpp
     DisentangleCNOT.cpp
     DisentangleSWAP.cpp
     GridsynthPatterns.cpp
@@ -53,7 +54,6 @@ add_mlir_library(${LIBRARY_NAME} STATIC
     PRIVATE
     ${LIBS}
     $<TARGET_OBJECTS:decompsolver>
-    QuantumPythonCallbacks
     DEPENDS
     ${DEPENDS}
 )
@@ -63,5 +63,4 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            ${PROJECT_SOURCE_DIR}/include
                            ${CMAKE_BINARY_DIR}/include
                            DecompGraphSolver/
-                           QuantumPythonCallbacks/
                        )

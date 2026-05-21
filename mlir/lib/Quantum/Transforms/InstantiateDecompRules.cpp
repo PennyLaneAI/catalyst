@@ -13,16 +13,14 @@
 // limitations under the License.
 
 #include "llvm/ADT/StringSet.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Quantum/IR/QuantumOps.h"
-#include "QuantumPythonCallbacks/PythonDriverUtils.hpp"
-#include "QuantumPythonCallbacks/PythonFunction.hpp"
+#include "Quantum/Transforms/DecompCallbacks.h"
 
 using namespace mlir;
-
-namespace QPC = QuantumPythonCallbacks;
 
 namespace catalyst {
 namespace quantum {
@@ -36,7 +34,7 @@ struct InstantiateDecompRulesPass
 
     LogicalResult initialize([[maybe_unused]] MLIRContext *context) override
     {
-        QPC::PyInterpreterGuard::ensure();
+        // QPC::PyInterpreterGuard::ensure();
         return success();
     }
 
@@ -44,10 +42,22 @@ struct InstantiateDecompRulesPass
     {
         mlir::ModuleOp module = cast<mlir::ModuleOp>(getOperation());
 
-        llvm::StringSet<> addedWords;
-
         llvm::SmallVector<quantum::PauliRotOp> pauliRotOps;
         module.walk([&](quantum::PauliRotOp op) { pauliRotOps.push_back(op); });
+
+        if (pauliRotOps.empty()) {
+            return; // nothing to lower — callback not required
+        }
+
+        auto *cb = getDecompCallback();
+        if (!cb) {
+            module.emitError(
+                "graph-decomposition needs a PauliRot callback; "
+                "rebuild Catalyst with -DENABLE_PYTHON_CALLBACKS=ON");
+            return signalPassFailure();
+        }
+
+        llvm::StringSet<> addedWords;
 
         for (quantum::PauliRotOp pauliRot : pauliRotOps) {
             std::string pauliWord;
@@ -59,11 +69,10 @@ struct InstantiateDecompRulesPass
             }
             addedWords.insert(pauliWord);
 
-            QPC::PyWires wires(pauliRot.getInQubits().size());
+            llvm::SmallVector<int> wires(pauliRot.getInQubits().size());
             std::iota(wires.begin(), wires.end(), 0);
 
-            mlir::OwningOpRef<mlir::func::FuncOp> outOp =
-                QPC::lowerPauliRotDecomp(module, 0.2, pauliWord, wires);
+            auto outOp = cb->lowerPauliRot(&getContext(), 0.2, pauliWord, wires);
 
             if (!outOp) {
                 return signalPassFailure();

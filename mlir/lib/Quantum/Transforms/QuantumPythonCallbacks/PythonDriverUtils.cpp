@@ -16,8 +16,6 @@
 
 #include <optional>
 
-#include "pybind11/embed.h"
-
 constexpr const char *sitePackagesScript = R"(
 import os
 import sys
@@ -36,10 +34,9 @@ namespace py = pybind11;
 
 namespace QuantumPythonCallbacks {
 
-struct PyInterpreterGuard::Impl {
+struct __attribute__((visibility("hidden"))) PyInterpreterGuard::Impl {
     std::optional<py::scoped_interpreter> owned;
     std::optional<py::gil_scoped_release> release;
-    bool ownsInterpreter = false;
 };
 
 /**
@@ -66,7 +63,6 @@ PyInterpreterGuard::PyInterpreterGuard() : impl(std::make_unique<Impl>())
 {
     if (!Py_IsInitialized()) {
         impl->owned.emplace();
-        impl->ownsInterpreter = true;
         syncSitePackages();
         impl->release.emplace();
     }
