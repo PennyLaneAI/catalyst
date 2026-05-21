@@ -6,6 +6,10 @@
   from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
   [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
   [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
+  [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
+  [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
+  [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
+  [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
 
 
 <h3>Improvements 🛠</h3>
@@ -18,6 +22,11 @@
   that do not have any quantum values as arguments or results. Gates with null decomposition rules
   are simply removed.
   [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+
+* The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
+  extracted from different quantum register SSA values, as long as all these quantum register values
+  trace back to the same allocation.
+  [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
 
 <h3>Breaking changes 💔</h3>
 
@@ -62,10 +71,18 @@
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
 
+* The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
+  [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
+
 * Part of the new, experimental QEC pipeline, the `convert-qecp-to-llvm` compiler pass has been
   added to lower operations and types in the QEC physical dialect to the LLVM dialect.
   [(#2780)](https://github.com/PennyLaneAI/catalyst/pull/2780)
   [(#2772)](https://github.com/PennyLaneAI/catalyst/pull/2772)
+
+* The strategy to decode physical measurements in the `convert-qecl-to-qecp` pass has been updated
+  to perform the decoding directly in the IR rather than offloading to a pre-compiled runtime
+  function.
+  [(#2813)](https://github.com/PennyLaneAI/catalyst/pull/2813)
 
 * Resolved a bug in the QEC-cycle subroutine within the `convert-qecl-to-qecp` pass where the SSA
   values of the `scf.yield` op were incorrectly returned instead of the `scf.for` op results. Also,
@@ -78,6 +95,13 @@
   `qecl.{extract_block, insert_block, measure, <gates>}`, and
   `qecp.{extract_block, insert_block, extract, insert}`.
   [(#2846)](https://github.com/PennyLaneAI/catalyst/pull/2846)
+
+* A new, experimental compiler pipeline `qec_pipeline` has been added to the `ftqc.pipelines` module.
+  [(#2852)](https://github.com/PennyLaneAI/catalyst/pull/2852)
+
+* The reference semantics MBQC operations have been moved from the `qref` dialect to the `mbqc`
+  dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
+  [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
 
 <h3>Documentation 📝</h3>
 
