@@ -173,7 +173,7 @@ class LinkerDriver:
             "-lcustom_calls",
             "-lmlir_async_runtime",
             "-lrt_rsdecomp",
-            # "-lrt_decoder",  TODO: Re-enable when stringop-overflow warning on arm64 is resolved
+            "-lrt_decoder",
         ]
 
         rt_remote_so = "librt_remote" + file_extension
