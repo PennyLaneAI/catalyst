@@ -81,6 +81,19 @@ set(LIBS
     fmt::fmt
 )
 
+##############################
+## Quantum Python Callbacks ##
+##############################
+add_subdirectory(../Quantum/Transforms/QuantumPythonCallbacks
+                 ${CMAKE_BINARY_DIR}/QuantumPythonCallbacksBuild)
+
+# Apply at directory scope so the underlying obj.CatalystCompilerDriver object
+# library (which is where Main.cpp actually compiles) inherits the define.
+# target_compile_definitions on the static target DOES NOT propagate to it.
+if (CATALYST_ENABLE_PYTHON_CALLBACKS)
+    add_compile_definitions(CATALYST_ENABLE_PYTHON_CALLBACKS)
+endif()
+
 add_mlir_library(CatalystCompilerDriver
     Main.cpp
     CompilerDriver.cpp
@@ -95,17 +108,8 @@ add_mlir_library(CatalystCompilerDriver
     MLIRSupport
 )
 
-##############################
-## Quantum Python Callbacks ##
-##############################
-# TODO: move QuantumPythoncallbacks
-add_subdirectory(../Quantum/Transforms/QuantumPythonCallbacks
-                 ${CMAKE_BINARY_DIR}/QuantumPythonCallbacksBuild)
-
 if (CATALYST_ENABLE_PYTHON_CALLBACKS)
     target_link_libraries(CatalystCompilerDriver PRIVATE QuantumPythonCallbacks)
-    target_compile_definitions(CatalystCompilerDriver PRIVATE
-        CATALYST_ENABLE_PYTHON_CALLBACKS)
 endif()
 
 
