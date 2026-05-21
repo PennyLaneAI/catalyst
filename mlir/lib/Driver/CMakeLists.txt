@@ -87,13 +87,6 @@ set(LIBS
 add_subdirectory(../Quantum/Transforms/QuantumPythonCallbacks
                  ${CMAKE_BINARY_DIR}/QuantumPythonCallbacksBuild)
 
-# Apply at directory scope so the underlying obj.CatalystCompilerDriver object
-# library (which is where Main.cpp actually compiles) inherits the define.
-# target_compile_definitions on the static target DOES NOT propagate to it.
-if (CATALYST_ENABLE_PYTHON_CALLBACKS)
-    add_compile_definitions(CATALYST_ENABLE_PYTHON_CALLBACKS)
-endif()
-
 add_mlir_library(CatalystCompilerDriver
     Main.cpp
     CompilerDriver.cpp
@@ -109,10 +102,16 @@ add_mlir_library(CatalystCompilerDriver
 )
 
 if (CATALYST_ENABLE_PYTHON_CALLBACKS)
+    if (APPLE)
+        target_link_options(CatalystCompilerDriver PRIVATE
+            "LINKER:-force_load,$<TARGET_FILE:QuantumPythonCallbacks>")
+    else()
+        target_link_options(CatalystCompilerDriver PRIVATE
+            "LINKER:--whole-archive,$<TARGET_FILE:QuantumPythonCallbacks>,--no-whole-archive")
+    endif()
     target_link_libraries(CatalystCompilerDriver PRIVATE QuantumPythonCallbacks)
+    add_dependencies(CatalystCompilerDriver QuantumPythonCallbacks)
 endif()
-
-
 
 #########################################################
 ## importable module with default pipeline definitions ##

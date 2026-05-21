@@ -48,10 +48,6 @@
 #include "QecPhysical/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 
-#ifdef CATALYST_ENABLE_PYTHON_CALLBACKS
-#include "QuantumPythonCallbacks/PythonFunction.hpp"
-#endif
-
 #include "RegisterAllPasses.h"
 
 using namespace catalyst;

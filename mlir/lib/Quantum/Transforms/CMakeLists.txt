@@ -10,6 +10,7 @@ file(GLOB SRC
     ConversionPatterns.cpp
     DecomposeLoweringPatterns.cpp
     DecompCallbacks.cpp
+    DecompCallbacksLoader.cpp
     DisentangleCNOT.cpp
     DisentangleSWAP.cpp
     GridsynthPatterns.cpp

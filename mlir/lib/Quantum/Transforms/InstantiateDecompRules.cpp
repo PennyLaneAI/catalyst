@@ -19,6 +19,7 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/DecompCallbacks.h"
+#include "Quantum/Transforms/DecompCallbacksLoader.h"
 
 using namespace mlir;
 
@@ -51,8 +52,13 @@ struct InstantiateDecompRulesPass
 
         auto *cb = getDecompCallback();
         if (!cb) {
+            loadPythonCallbackPlugin();
+            cb = getDecompCallback();
+        }
+        if (!cb) {
             module.emitError("graph-decomposition needs a PauliRot callback; "
-                             "rebuild Catalyst with -DCATALYST_ENABLE_PYTHON_CALLBACKS=ON");
+                             "rebuild Catalyst with -DCATALYST_ENABLE_PYTHON_CALLBACKS=ON "
+                             "or ensure libQuantumPythonCallbacks is available to the driver");
             return signalPassFailure();
         }
 
