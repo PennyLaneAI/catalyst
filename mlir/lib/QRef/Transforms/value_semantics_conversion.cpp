@@ -186,7 +186,7 @@ void eraseAllRemainingAnchorRValues(func::FuncOp f)
                "qref.reg Values must have no uses after the semantic conversion");
         allocOp->erase();
     });
-    f.walk([&](qref::GraphStatePrepOp graphStatePrepOp) {
+    f.walk([&](mbqc::RefGraphStatePrepOp graphStatePrepOp) {
         assert(graphStatePrepOp.use_empty() &&
                "qref.reg Values must have no uses after the semantic conversion");
         graphStatePrepOp->erase();
@@ -1050,7 +1050,7 @@ void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTr
     builder.eraseOp(rMeasureOp);
 }
 
-void handleMeasureInBasis(IRRewriter &builder, qref::MeasureInBasisOp rMeasureInBasisOp,
+void handleMeasureInBasis(IRRewriter &builder, mbqc::RefMeasureInBasisOp rMeasureInBasisOp,
                           QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -1131,7 +1131,7 @@ void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
     builder.replaceOp(rHermitianOp, vHermitianOp);
 }
 
-void handleGraphStatePrep(IRRewriter &builder, qref::GraphStatePrepOp rGraphStatePrepOp,
+void handleGraphStatePrep(IRRewriter &builder, mbqc::RefGraphStatePrepOp rGraphStatePrepOp,
                           QubitValueTracker &tracker)
 {
     OpBuilder::InsertionGuard guard(builder);
@@ -1724,7 +1724,7 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
         else if (auto rMeasureOp = dyn_cast<qref::MeasureOp>(op)) {
             handleMeasure(builder, rMeasureOp, tracker);
         }
-        else if (auto rMeasureInBasisOp = dyn_cast<qref::MeasureInBasisOp>(op)) {
+        else if (auto rMeasureInBasisOp = dyn_cast<mbqc::RefMeasureInBasisOp>(op)) {
             handleMeasureInBasis(builder, rMeasureInBasisOp, tracker);
         }
         else if (auto rPPMOp = dyn_cast<pbc::RefPPMeasurementOp>(op)) {
@@ -1745,7 +1745,7 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
         else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
             handleWhile(builder, whileOp, tracker);
         }
-        else if (auto rGraphStatePrepOp = dyn_cast<qref::GraphStatePrepOp>(op)) {
+        else if (auto rGraphStatePrepOp = dyn_cast<mbqc::RefGraphStatePrepOp>(op)) {
             handleGraphStatePrep(builder, rGraphStatePrepOp, tracker);
         }
     });
@@ -1803,7 +1803,7 @@ struct ValueSemanticsConversionPass
                     getOp->getUsers(),
                     llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
                                   qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp,
-                                  qref::MeasureInBasisOp, pbc::RefPPMeasurementOp>)) {
+                                  mbqc::RefMeasureInBasisOp, pbc::RefPPMeasurementOp>)) {
                 getOp.emitOpError(
                     "qref.get operations can only be used by qref dialect gate operations");
                 return WalkResult::interrupt();
