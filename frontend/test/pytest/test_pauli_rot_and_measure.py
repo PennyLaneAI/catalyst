@@ -268,8 +268,7 @@ def test_legacy_pauli_measure_wires_length_mismatch():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     with pytest.raises(
-        ValueError,
-        match=r"The number of wires must be equal to the length of the Pauli word"
+        ValueError, match=r"The number of wires must be equal to the length of the Pauli word"
     ):
 
         @qjit(pipelines=pipe, target="mlir", capture=False)
