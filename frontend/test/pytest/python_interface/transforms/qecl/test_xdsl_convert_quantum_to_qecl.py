@@ -654,11 +654,21 @@ class TestGatePattern:
                 %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
                 return
             }
-            // CHECK: func.func private @apply_T([[codeblock:%.+]]: !qecl.codeblock<1>)
+            // CHECK: func.func private @apply_T([[in_codeblock:%.+]]: !qecl.codeblock<1>)
+            // CHECK-NEXT: [[magic_cb:%.+]] = qecl.fabricate[magic] : !qecl.codeblock<1>
+            // CHECK-NEXT: [[magic_cb2:%.+]], [[in_codeblock2:%.+]] = qecl.cnot [[magic_cb]][0], [[in_codeblock]][0]
+            // CHECK-NEXT: [[mres:%.+]], [[in_codeblock3:%.+]] = qecl.measure [[in_codeblock2]][0]
+            // CHECK-NEXT: qecl.dealloc_cb [[in_codeblock3]]
+            // CHECK-NEXT: [[out_codeblock:%.+]] = scf.if [[mres]] -> (!qecl.codeblock<1>)
+            // CHECK-NEXT: [[s_corrected_cb:%.+]] = qecl.s [[magic_cb2]][0]
+            // CHECK-NEXT: [[corrected_cb:%.+]] = qecl.x [[s_corrected_cb]]
+            // CHECK-NEXT: scf.yield [[corrected_cb]]
+            // CHECK-NEXT: else
+            // CHECK-NEXT: scf.yield [[magic_cb2]]
+            // CHECK: func.return [[out_codeblock]]
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
-        # ToDo: make check for apply_T subroutine more complete
 
     def test_gate_cnot_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that CNOT gates (`quantum.custom "CNOT"() ops) are converted to their corresponding
