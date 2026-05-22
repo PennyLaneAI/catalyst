@@ -566,9 +566,9 @@ class AdjointGenerator {
 
     void visitOperation(scf::WhileOp whileOp, OpBuilder &builder)
     {
-        std::optional<Value> yieldedQureg =
-            getQuantumReg(whileOp.getAfter().front().getTerminator()->getOperands());
-        if (!yieldedQureg.has_value()) {
+        SmallVector<Value> yieldedQValues =
+            getQuantumValues(whileOp.getAfter().front().getTerminator()->getOperands());
+        if (yieldedQValues.empty()) {
             // This operation is purely classical
             return;
         }
@@ -578,23 +578,37 @@ class AdjointGenerator {
         Value c0 = index::ConstantOp::create(builder, whileOp.getLoc(), 0);
         Value c1 = index::ConstantOp::create(builder, whileOp.getLoc(), 1);
 
-        Value iterArgInit = remappedValues.lookup(getQuantumReg(whileOp.getResults()).value());
+        SmallVector<Value> iterArgsInit;
+        for (auto v : getQuantumValues(whileOp.getResults())) {
+            iterArgsInit.push_back(remappedValues.lookup(v));
+        }
+
         auto replacedWhile = scf::ForOp::create(
             builder, whileOp.getLoc(), /*start=*/c0, /*stop=*/numIterations, /*step=*/c1,
-            iterArgInit,
+            iterArgsInit,
             /*bodyBuilder=*/
             [&](OpBuilder &bodyBuilder, Location loc, Value iv, ValueRange iterArgs) {
                 OpBuilder::InsertionGuard insertionGuard(builder);
                 builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
 
-                remappedValues.map(yieldedQureg.value(), iterArgs[0]);
+                for (auto [qvalue, iterArg] : llvm::zip_equal(yieldedQValues, iterArgs)) {
+                    remappedValues.map(qvalue, iterArg);
+                }
+
                 generateImpl(whileOp.getAfter(), builder);
-                scf::YieldOp::create(
-                    builder, loc,
-                    remappedValues.lookup(
-                        getQuantumReg(whileOp.getAfter().front().getArguments()).value()));
+
+                SmallVector<Value> yields;
+                for (auto v : getQuantumValues(whileOp.getAfter().front().getArguments())) {
+                    yields.push_back(remappedValues.lookup(v));
+                }
+
+                scf::YieldOp::create(builder, loc, yields);
             });
-        remappedValues.map(getQuantumReg(whileOp.getInits()).value(), replacedWhile.getResult(0));
+
+        for (auto [newWhileResult, initArg] :
+             llvm::zip_equal(replacedWhile.getResults(), getQuantumValues(whileOp.getInits()))) {
+            remappedValues.map(initArg, newWhileResult);
+        }
     }
 
     void visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder)
