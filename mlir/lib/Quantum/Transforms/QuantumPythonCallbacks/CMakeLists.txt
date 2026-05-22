@@ -12,25 +12,23 @@ execute_process(
 
 find_package(pybind11 REQUIRED)
 
-# Development.Module supplies Python.h and extension-module support. We
+# Development.SABIModule supplies Python.h and extension-module support. We
 # deliberately do NOT request Development.Embed, which would also require a
 # libpython linker-name file that manylinux images do not ship.
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development.SABIModule)
 
 add_mlir_library(QuantumPythonCallbacks MODULE
     PythonFunction.cpp
     PythonDriverUtils.cpp
     LINK_LIBS PRIVATE
-        pybind11::module   # headers + extension-module flags; NO libpython link
+        pybind11::module    # headers + extension-module flags; NO libpython link
+        Python3::SABIModule
         MLIRIR
         MLIRFuncDialect
         MLIRParser
-        quantum-transforms # for DecompCallback
+        quantum-transforms  # for DecompCallback
 )
 
-# Leave libpython symbols (Py_Initialize, PyGILState_Ensure, ...) undefined at
-# link time. The dynamic loader will resolve them against whichever libpython
-# the loader has dlopen'd into the process by the time this plugin is loaded.
 if (APPLE)
     target_link_options(QuantumPythonCallbacks PRIVATE
         "LINKER:-undefined,dynamic_lookup")
