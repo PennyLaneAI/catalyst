@@ -10,13 +10,14 @@ execute_process(
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-if (STATIC_LINK_PYTHON)
-    set(Python3_USE_STATIC_LIBS ON) # needed for manylinux wheels
-endif()
+# Ali: we no longer need this
+# if (STATIC_LINK_PYTHON)
+#     set(Python3_USE_STATIC_LIBS ON) # needed for manylinux wheels
+# endif()
 find_package(pybind11 REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
 
-add_mlir_library(QuantumPythonCallbacks STATIC
+add_mlir_library(QuantumPythonCallbacks MODULE
     PythonFunction.cpp
     PythonDriverUtils.cpp
     LINK_LIBS PRIVATE
@@ -38,5 +39,13 @@ target_include_directories(QuantumPythonCallbacks PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-set_source_files_properties(PythonDriverUtils.cpp PythonFunction.cpp PROPERTIES COMPILE_FLAGS "-fexceptions -frtti -Wno-covered-switch-default")
+set_target_properties(QuantumPythonCallbacks PROPERTIES
+    PREFIX "lib"
+    POSITION_INDEPENDENT_CODE ON
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+)
+
+set_source_files_properties(PythonDriverUtils.cpp PythonFunction.cpp
+    PROPERTIES COMPILE_FLAGS "-fexceptions -frtti -Wno-covered-switch-default")
+
 set_property(TARGET QuantumPythonCallbacks PROPERTY POSITION_INDEPENDENT_CODE ON)

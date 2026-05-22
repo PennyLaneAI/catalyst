@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "llvm/ADT/StringSet.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"

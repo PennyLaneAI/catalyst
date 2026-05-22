@@ -36,6 +36,8 @@ class PythonDecompCallback : public catalyst::quantum::DecompCallback {
     {
         // std::string result = tracePauliRotDecomp(theta, pauliWord, wires);
 
+        std::vector<int> wiresVec(wires.begin(), wires.end());
+
         std::string mlirText = QuantumPythonCallbacks::PyInterpreterGuard::ensure().withGil([&] {
             py::gil_scoped_acquire acquire;
             const char *moduleName = "catalyst.python_callbacks";
@@ -44,7 +46,7 @@ class PythonDecompCallback : public catalyst::quantum::DecompCallback {
             try {
                 py::module_ wrapperModule = py::module_::import(moduleName);
                 py::object wrapperFunction = wrapperModule.attr(functionName);
-                py::object pythonResult = wrapperFunction(theta, pauliWord, wires);
+                py::object pythonResult = wrapperFunction(theta, pauliWord, wiresVec);
                 return pythonResult.cast<std::string>();
             }
             catch (const py::error_already_set &error) {
@@ -79,16 +81,9 @@ class PythonDecompCallback : public catalyst::quantum::DecompCallback {
 
 } // namespace
 
-namespace QuantumPythonCallbacks {
-
-// hmmm. we still need to export a symbol for the driver!
-// But my original idea here is to avoid the static initializer
-// in the callback implementation file which would trigger the
-// interpreter initialization
-// TODO(Ali): re-think this part.
-void registerPythonDecompCallback()
+// The default visibility ensures it's in the .so dynamic symbol
+// table even under -fvisibility=hidden. We apparently need this too.
+extern "C" __attribute__((visibility("default"))) void registerPythonDecompCallback()
 {
     catalyst::quantum::registerDecompCallback(std::make_unique<PythonDecompCallback>());
 }
-
-} // namespace QuantumPythonCallbacks

@@ -14,10 +14,4 @@
 
 #pragma once
 
-#include <vector>
-
-namespace QuantumPythonCallbacks {
-
-void registerPythonDecompCallback();
-
-} // namespace QuantumPythonCallbacks
+extern "C" void registerPythonDecompCallback();
