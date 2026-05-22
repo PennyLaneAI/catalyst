@@ -15,12 +15,11 @@
 #define DEBUG_TYPE "adjoint"
 
 #include <algorithm>
-#include <iterator>
 #include <queue>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
@@ -30,6 +29,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/Value.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -164,6 +164,17 @@ class AdjointGenerator {
             }
         }
         return std::nullopt;
+    }
+
+    SmallVector<Value> getQuantumValues(ValueRange values)
+    {
+        SmallVector<Value> qvalues;
+        for (Value value : values) {
+            if (isa<quantum::QuregType, quantum::QubitType>(value.getType())) {
+                qvalues.push_back(value);
+            }
+        }
+        return qvalues;
     }
 
     void visitOperation(quantum::QuantumGate gate, OpBuilder &builder)
@@ -438,9 +449,9 @@ class AdjointGenerator {
 
     void visitOperation(scf::ForOp forOp, OpBuilder &builder)
     {
-        std::optional<Value> yieldedQureg =
-            getQuantumReg(forOp.getBody()->getTerminator()->getOperands());
-        if (!yieldedQureg.has_value()) {
+        SmallVector<Value> yieldedQValues =
+            getQuantumValues(forOp.getBody()->getTerminator()->getOperands());
+        if (yieldedQValues.empty()) {
             // This operation is purely classical
             return;
         }
@@ -452,20 +463,35 @@ class AdjointGenerator {
         Value stop = ListPopOp::create(builder, forOp.getLoc(), tape);
         Value start = ListPopOp::create(builder, forOp.getLoc(), tape);
 
-        Value reversedResult = remappedValues.lookup(getQuantumReg(forOp.getResults()).value());
+        SmallVector<Value> reversedResults;
+        for (auto v : getQuantumValues(forOp.getResults())) {
+            reversedResults.push_back(remappedValues.lookup(v));
+        }
+
         auto replacedFor = scf::ForOp::create(
-            builder, forOp.getLoc(), start, stop, step, /*iterArgsInit=*/reversedResult,
+            builder, forOp.getLoc(), start, stop, step, /*iterArgsInit=*/reversedResults,
             [&](OpBuilder &bodyBuilder, Location loc, Value iv, ValueRange iterArgs) {
                 OpBuilder::InsertionGuard insertionGuard(builder);
                 builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
 
-                remappedValues.map(yieldedQureg.value(), iterArgs[0]);
+                for (auto [qvalue, iterArg] : llvm::zip_equal(yieldedQValues, iterArgs)) {
+                    remappedValues.map(qvalue, iterArg);
+                }
+
                 generateImpl(forOp.getBodyRegion(), builder);
-                scf::YieldOp::create(
-                    builder, loc,
-                    remappedValues.lookup(getQuantumReg(forOp.getRegionIterArgs()).value()));
+
+                SmallVector<Value> yields;
+                for (auto v : getQuantumValues(forOp.getRegionIterArgs())) {
+                    yields.push_back(remappedValues.lookup(v));
+                }
+
+                scf::YieldOp::create(builder, loc, yields);
             });
-        remappedValues.map(getQuantumReg(forOp.getInitArgs()).value(), replacedFor.getResult(0));
+
+        for (auto [newForResult, initArg] :
+             llvm::zip_equal(replacedFor.getResults(), getQuantumValues(forOp.getInitArgs()))) {
+            remappedValues.map(initArg, newForResult);
+        }
     }
 
     void visitOperation(scf::IfOp ifOp, OpBuilder &builder)
