@@ -651,13 +651,11 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
         with ImplicitBuilder(block):
             (in_codeblock,) = block.args
 
-            # allocate auxiliary codeblock
-            # this will be replaced with magic state fabrication op
-            aux_cb_register = qecl.AllocOp(qecl.LogicalHyperRegisterType(width=1, k=self.k))
-            extract_op = qecl.ExtractCodeblockOp(hyper_reg=aux_cb_register.results[0], idx=0)
-            magic_state_block = extract_op.results[0]
+            # fabricate aux codeblock in magic state
+            fabricate_op = qecl.FabricateOp("magic", qecl.LogicalCodeblockType(k=self.k))
+            magic_state_block = fabricate_op.results[0]
 
-            # apply cnot between aux block and data block
+            # apply cnot between aux codeblock and input data codeblock
             cnot_op = qecl.CnotOp(
                 in_ctrl_codeblock=magic_state_block,
                 idx_ctrl=0,
@@ -665,16 +663,16 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                 idx_trgt=0,
             )
             magic_state1, codeblock1 = cnot_op.results
+
+            # measure original data codeblock
             meas_op = qecl.MeasureOp(codeblock1, idx=0)
             mres, finished_codeblock = meas_op.results
 
-            # will be replaced with the dealloc op
-            insert_op = qecl.InsertCodeblockOp(
-                in_hyper_reg=aux_cb_register, idx=0, codeblock=finished_codeblock
-            )
-            qecl.DeallocOp(insert_op.results[0])
+            # dealloate the original data codeblock
+            # data is now on aux codeblock (up to a correction)
+            qecl.DeallocCodeblockOp(finished_codeblock)
 
-            # corrections
+            # apply corrections based on measurement outcome
             # if mres, apply S, if mres, apply X? ToDo: verify procedure
             if_apply_corr_op = scf.IfOp(
                 mres,
