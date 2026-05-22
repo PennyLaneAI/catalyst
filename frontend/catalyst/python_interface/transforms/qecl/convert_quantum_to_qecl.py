@@ -83,9 +83,9 @@ from typing import NoReturn, TypeGuard, cast
 
 from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, scf
-from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
-from xdsl.ir import Block, BlockArgument, Operation, SSAValue
+from xdsl.dialects import arith, builtin, func, scf
+from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType, SymbolRefAttr
+from xdsl.ir import Block, BlockArgument, Operation, Region, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -345,7 +345,9 @@ class DeallocOpConversion(RewritePattern):
 
 
 class CustomOpConversion(RewritePattern):
-    """Converts `quantum.custom` ops to equivalent `qecl.hadamard`, `qecl.s` and `qecl.cnot` ops.
+    """Converts `quantum.custom` ops for Clifford+T and Pauli gates to their equivalent `qecl` 
+    ops. The gates "S", "Hadamard", "CNOT", "PauliX", "PauliY", "PauliZ" and "Identity" have 
+    corresponding `qecl` operators. "T" gates are lowered to a subroutine, based on ToDo: CITE PAPER HERE.
 
     For now, we insert cycles of QEC after every gate operation.
 
@@ -367,6 +369,23 @@ class CustomOpConversion(RewritePattern):
         match gate_name:
             case "Identity" | "PauliX" | "PauliY" | "PauliZ" | "Hadamard" | "S":
                 ops_to_insert = self._get_qecl_ops_for_single_qubit_gate(op)
+
+            case "T":
+                qubit_owner_op = op.in_qubits[0].owner
+                if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
+                    _raise_failed_to_convert_op_compile_error(op)
+                ops_to_insert = (
+                    conv_cast_op := builtin.UnrealizedConversionCastOp.get(
+                        (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
+                    ),
+                    t_gate_subroutine := func.CallOp(
+                        callee=SymbolRefAttr("apply_T"),
+                        arguments=conv_cast_op.results[0],
+                        return_types=conv_cast_op.results[0].type,
+                    ),
+                    qec_cycle_op := qecl.QecCycleOp(in_codeblock=t_gate_subroutine.results[0]),
+                    _cast_to_qubit(qec_cycle_op.out_codeblock),
+                )
 
             case "CNOT":
                 assert len(op.in_qubits) == 2
@@ -403,11 +422,10 @@ class CustomOpConversion(RewritePattern):
                         trgt_conv_cast_op := _cast_to_qubit(trgt_qecl_cycle_op.out_codeblock),
                     )
                     new_results = (ctrl_conv_cast_op.results[0], trgt_conv_cast_op.results[0])
-
             case _:
                 raise CompileError(
                     f"Conversion of op '{op.name}' only supports gates 'Identity', 'PauliX', "
-                    f"'PauliY', 'PauliZ', 'Hadamard', 'S' and 'CNOT', but got '{gate_name}'"
+                    f"'PauliY', 'PauliZ', 'Hadamard', 'S', 'T' and 'CNOT', but got '{gate_name}'"
                 )
 
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
@@ -599,6 +617,11 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                 f"codeblock, k, is 1, but got k = {self.k}"
             )
 
+        module_block = op.regions[0].blocks.first
+        assert module_block is not None, "Module has no block"
+        t_subroutine = self.create_t_subroutine()
+        module_block.add_op(t_subroutine)
+
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
@@ -615,6 +638,74 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
         # Certain patterns leave behind `builtin.unrealized_conversion_cast` ops;
         # this pass removes them
         ReconcileUnrealizedCastsPass().apply(ctx, op)
+
+    def create_t_subroutine(self):
+        """ToDo: docstring"""
+
+        codeblock_type = qecl.LogicalCodeblockType(self.k)
+        input_types = (codeblock_type,)
+        output_types = (codeblock_type,)
+
+        block = Block(arg_types=input_types)
+
+        with ImplicitBuilder(block):
+            (in_codeblock,) = block.args
+
+            # allocate auxiliary codeblock
+            # this will be replaced with magic state fabrication op
+            aux_cb_register = qecl.AllocOp(qecl.LogicalHyperRegisterType(width=1, k=self.k))
+            extract_op = qecl.ExtractCodeblockOp(hyper_reg=aux_cb_register.results[0], idx=0)
+            magic_state_block = extract_op.results[0]
+
+            # apply cnot between aux block and data block
+            cnot_op = qecl.CnotOp(
+                in_ctrl_codeblock=magic_state_block,
+                idx_ctrl=0,
+                in_trgt_codeblock=in_codeblock,
+                idx_trgt=0,
+            )
+            magic_state1, codeblock1 = cnot_op.results
+            meas_op = qecl.MeasureOp(codeblock1, idx=0)
+            mres, finished_codeblock = meas_op.results
+
+            # will be replaced with the dealloc op
+            insert_op = qecl.InsertCodeblockOp(
+                in_hyper_reg=aux_cb_register, idx=0, codeblock=finished_codeblock
+            )
+            qecl.DeallocOp(insert_op.results[0])
+
+            # corrections
+            # if mres, apply S, if mres, apply X? ToDo: verify procedure
+            if_apply_corr_op = scf.IfOp(
+                mres,
+                return_types=(in_codeblock.type,),
+                true_region=Region(Block()),
+                false_region=Region(Block()),
+            )
+
+            with ImplicitBuilder(if_apply_corr_op.true_region):
+                # This branch is for the case where a correction is needed
+                corrected_cb1 = qecl.SOp(magic_state1, idx=0)
+                corr_cb_out = qecl.PauliXOp(corrected_cb1, idx=0)
+                scf.YieldOp(corr_cb_out)
+
+            with ImplicitBuilder(if_apply_corr_op.false_region):
+                # This branch is for the case where no correctable error was detected
+                scf.YieldOp(magic_state1)
+
+            # return the encoded codeblock
+            func.ReturnOp(
+                if_apply_corr_op.results[0],
+            )
+
+        funcOp = func.FuncOp(
+            name=f"apply_T",
+            function_type=(input_types, output_types),
+            visibility="private",
+            region=Region([block]),
+        )
+
+        return funcOp
 
 
 convert_quantum_to_qecl_pass = compiler_transform(ConvertQuantumToQecLogicalPass)

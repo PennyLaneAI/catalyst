@@ -633,6 +633,33 @@ class TestGatePattern:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_gate_t_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that T gates (`quantum.custom "T"() ops) are converted to their corresponding
+        `apply_T` subroutine for k = 1.
+        """
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+                // CHECK-NOT: builtin.unrealized_conversion_cast
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+                %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+                // CHECK: [[cb1:%.+]] = func.call @apply_T([[cb0]]) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+                %2 = quantum.custom "T"() %1 : !quantum.bit
+
+                // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+                // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+                %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+                return
+            }
+            // CHECK: func.func private @apply_T([[codeblock:%.+]]: !qecl.codeblock<1>)
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+        # ToDo: make check for apply_T subroutine more complete
+
     def test_gate_cnot_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that CNOT gates (`quantum.custom "CNOT"() ops) are converted to their corresponding
         `qecl.cnot` ops for k = 1.
