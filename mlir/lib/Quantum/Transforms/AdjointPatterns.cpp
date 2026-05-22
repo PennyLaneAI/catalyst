@@ -157,16 +157,6 @@ class AdjointGenerator {
         return dynamicWire;
     }
 
-    std::optional<Value> getQuantumReg(ValueRange values)
-    {
-        for (Value value : values) {
-            if (isa<quantum::QuregType>(value.getType())) {
-                return value;
-            }
-        }
-        return std::nullopt;
-    }
-
     SmallVector<Value> getQuantumValues(ValueRange values)
     {
         SmallVector<Value> qvalues;
