@@ -613,41 +613,58 @@ class AdjointGenerator {
 
     void visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder)
     {
-        std::optional<Value> qureg = getQuantumReg(switchOp.getResults());
-        if (!qureg.has_value()) {
+        SmallVector<Value> yieldedQValues = getQuantumValues(switchOp.getResults());
+        if (yieldedQValues.empty()) {
+            // This operation is purely classical
             return;
         }
 
         Value tape = cache.controlFlowTapes.at(switchOp.getOperation());
         Value index = ListPopOp::create(builder, switchOp.getLoc(), tape);
-        Value reversedResult = remappedValues.lookup(getQuantumReg(switchOp.getResults()).value());
 
-        auto findRootQuregInRegion = [&](Region &region) {
+        SmallVector<Value> reversedResults;
+        for (auto v : getQuantumValues(switchOp.getResults())) {
+            reversedResults.push_back(remappedValues.lookup(v));
+        }
+
+        auto findRootQvaluesInRegion = [&](Region &region) -> SetVector<Value> {
+            SetVector<Value> qvalues;
             for (Operation &innerOp : region.getOps()) {
                 for (Value operand : innerOp.getOperands()) {
-                    if (isa<quantum::QuregType>(operand.getType())) {
-                        return operand;
+                    bool isDefinedFromOutsideRegion =
+                        operand.getParentRegion()->isProperAncestor(&region);
+                    if (isa<quantum::QuregType, quantum::QubitType>(operand.getType()) &&
+                        isDefinedFromOutsideRegion) {
+                        qvalues.insert(operand);
                     }
                 }
             }
-            llvm_unreachable("failed to find qureg in scf.index_switch region");
+            assert(!qvalues.empty() && "failed to find quantum values in scf.index_switch region");
+            return qvalues;
         };
 
-        auto newSwitchOp = scf::IndexSwitchOp::create(builder, switchOp.getLoc(),
-                                                      TypeRange{reversedResult.getType()}, index,
-                                                      switchOp.getCases(), switchOp.getNumCases());
+        auto newSwitchOp =
+            scf::IndexSwitchOp::create(builder, switchOp.getLoc(), TypeRange{reversedResults},
+                                       index, switchOp.getCases(), switchOp.getNumCases());
 
         auto fillRegion = [&](Region &oldRegion, Region &newRegion) {
             OpBuilder::InsertionGuard guard(builder);
             newRegion.push_back(new Block());
             builder.setInsertionPointToStart(&newRegion.front());
 
-            std::optional<Value> yieldedQureg =
-                getQuantumReg(oldRegion.front().getTerminator()->getOperands());
-            remappedValues.map(yieldedQureg.value(), reversedResult);
+            for (auto [qvalue, reversedResult] :
+                 llvm::zip_equal(getQuantumValues(oldRegion.front().getTerminator()->getOperands()),
+                                 reversedResults)) {
+                remappedValues.map(qvalue, reversedResult);
+            }
+
             generateImpl(oldRegion, builder);
-            scf::YieldOp::create(builder, switchOp.getLoc(),
-                                 remappedValues.lookup(findRootQuregInRegion(oldRegion)));
+
+            SmallVector<Value> yields;
+            for (auto v : findRootQvaluesInRegion(oldRegion)) {
+                yields.push_back(remappedValues.lookup(v));
+            }
+            scf::YieldOp::create(builder, switchOp.getLoc(), yields);
         };
 
         // Case regions:
@@ -659,8 +676,10 @@ class AdjointGenerator {
         // Default region:
         fillRegion(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion());
 
-        Value startingQureg = findRootQuregInRegion(switchOp.getDefaultRegion());
-        remappedValues.map(startingQureg, newSwitchOp.getResult(0));
+        int res_idx = 0;
+        for (auto v : findRootQvaluesInRegion(switchOp.getDefaultRegion())) {
+            remappedValues.map(v, newSwitchOp.getResult(res_idx++));
+        }
     }
 
   private:
