@@ -241,6 +241,50 @@ def test_legacy_pauli_measure_lowering():
     assert "pbc.ppm" in optimized_ir
 
 
+def test_legacy_pauli_measure_postselect_unsupported():
+    """Test that postselection on catalyst.pauli_measure is not supported under qjit."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    with pytest.raises(
+        NotImplementedError,
+        match="Postselection on catalyst.pauli_measure is not supported under qjit.",
+    ):
+
+        @qjit(pipelines=pipe, target="mlir", capture=False)
+        def test_legacy_pauli_measure_postselect_unsupported_workflow():
+
+            @qp.qnode(qp.device("null.qubit", wires=1))
+            def f():
+                catalyst.pauli_measure(wires=[0], pauli_word="X", postselect=1)
+                return qp.state()
+
+            return f()
+
+        test_legacy_pauli_measure_postselect_unsupported_workflow()
+
+
+def test_legacy_pauli_measure_wires_length_mismatch():
+    """Test that the number of wires and pauli word length must match."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    with pytest.raises(
+        ValueError,
+        match=r"The number of wires must be equal to the length of the Pauli word"
+    ):
+
+        @qjit(pipelines=pipe, target="mlir", capture=False)
+        def test_legacy_pauli_measure_wires_length_mismatch_workflow():
+
+            @qp.qnode(qp.device("null.qubit", wires=2))
+            def f():
+                catalyst.pauli_measure(wires=[0], pauli_word="XY")
+                return qp.state()
+
+            return f()
+
+        test_legacy_pauli_measure_wires_length_mismatch_workflow()
+
+
 def test_legacy_cond_pauli_measure_result():
     """Test conditional on Pauli measurement result is lowered properly."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
