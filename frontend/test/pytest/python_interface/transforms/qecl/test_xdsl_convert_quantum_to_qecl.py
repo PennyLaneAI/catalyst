@@ -872,12 +872,14 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.qec
             # CHECK: qecl.hadamard {{%.+}}[0]
             # CHECK: qecl.qec
+            # CHECK: apply_T
             # CHECK: qecl.measure {{%.+}}[0]
             # CHECK: quantum.mcmobs
             # CHECK: quantum.sample
             # CHECK: qecl.insert_block
             # CHECK: qecl.dealloc
             qp.H(0)
+            qp.T(0)
             m0 = qp.measure(0)
             return qp.sample([m0])
 
