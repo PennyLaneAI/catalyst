@@ -10,10 +10,6 @@ execute_process(
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-# Ali: we no longer need this
-# if (STATIC_LINK_PYTHON)
-#     set(Python3_USE_STATIC_LIBS ON) # needed for manylinux wheels
-# endif()
 find_package(pybind11 REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
 
@@ -28,12 +24,6 @@ add_mlir_library(QuantumPythonCallbacks MODULE
         MLIRParser
         quantum-transforms # for DecompCallback
 )
-
-# target_link_libraries(QuantumPythonCallbacks
-#     PRIVATE
-#     pybind11::embed
-#     Python3::Python
-# )
 
 target_include_directories(QuantumPythonCallbacks PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

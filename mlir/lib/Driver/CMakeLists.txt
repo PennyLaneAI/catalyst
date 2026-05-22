@@ -102,14 +102,6 @@ add_mlir_library(CatalystCompilerDriver
 )
 
 if (CATALYST_ENABLE_PYTHON_CALLBACKS)
-    # if (APPLE)
-    #     target_link_options(CatalystCompilerDriver PRIVATE
-    #         "LINKER:-force_load,$<TARGET_FILE:QuantumPythonCallbacks>")
-    # else()
-    #     target_link_options(CatalystCompilerDriver PRIVATE
-    #         "LINKER:--whole-archive,$<TARGET_FILE:QuantumPythonCallbacks>,--no-whole-archive")
-    # endif()
-    # target_link_libraries(CatalystCompilerDriver PRIVATE QuantumPythonCallbacks)
     add_dependencies(CatalystCompilerDriver QuantumPythonCallbacks)
 endif()
 

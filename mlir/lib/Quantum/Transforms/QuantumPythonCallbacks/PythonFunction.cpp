@@ -18,7 +18,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Parser/Parser.h"
 #include "pybind11/pybind11.h"
-#include "pybind11/stl.h" // for automatic vector + variant conversion
+#include "pybind11/stl.h"
 
 #include "Quantum/Transforms/DecompCallbacks.h"
 
@@ -34,8 +34,6 @@ class PythonDecompCallback : public catalyst::quantum::DecompCallback {
                                                         const std::string &pauliWord,
                                                         llvm::ArrayRef<int> wires) override
     {
-        // std::string result = tracePauliRotDecomp(theta, pauliWord, wires);
-
         std::vector<int> wiresVec(wires.begin(), wires.end());
 
         std::string mlirText = QuantumPythonCallbacks::PyInterpreterGuard::ensure().withGil([&] {
