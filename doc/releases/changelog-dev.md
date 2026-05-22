@@ -46,6 +46,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
+  [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
+
 * Fixed ``KeyError`` in autograph when using ``qp.prod`` as a decorator with PennyLane >= 0.45.
   [(#2844)](https://github.com/PennyLaneAI/catalyst/pull/2844)
 
@@ -92,6 +95,15 @@
 * The reference semantics MBQC operations have been moved from the `qref` dialect to the `mbqc`
   dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
   [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
+
+* In order to support T gates in the experimental QEC pipeline, the following new operations have
+  been added:
+
+  - `qecl.fabricate`, which fabricates a logical codeblock in a specified initial state (typically a
+    magic state).
+    [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
+  - `qecl.dealloc_cb`, which deallocates a single logical codeblock.
+    [(#2866)](https://github.com/PennyLaneAI/catalyst/pull/2866)
 
 <h3>Documentation 📝</h3>
 
