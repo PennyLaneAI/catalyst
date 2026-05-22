@@ -11,19 +11,33 @@ execute_process(
 )
 
 find_package(pybind11 REQUIRED)
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
+
+# Development.Module supplies Python.h and extension-module support. We
+# deliberately do NOT request Development.Embed, which would also require a
+# libpython linker-name file that manylinux images do not ship.
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
 
 add_mlir_library(QuantumPythonCallbacks MODULE
     PythonFunction.cpp
     PythonDriverUtils.cpp
     LINK_LIBS PRIVATE
-        pybind11::embed
-        Python3::Python
+        pybind11::module   # headers + extension-module flags; NO libpython link
         MLIRIR
         MLIRFuncDialect
         MLIRParser
         quantum-transforms # for DecompCallback
 )
+
+# Leave libpython symbols (Py_Initialize, PyGILState_Ensure, ...) undefined at
+# link time. The dynamic loader will resolve them against whichever libpython
+# the loader has dlopen'd into the process by the time this plugin is loaded.
+if (APPLE)
+    target_link_options(QuantumPythonCallbacks PRIVATE
+        "LINKER:-undefined,dynamic_lookup")
+else()
+    target_link_options(QuantumPythonCallbacks PRIVATE
+        "LINKER:--allow-shlib-undefined")
+endif()
 
 target_include_directories(QuantumPythonCallbacks PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -38,4 +52,6 @@ set_target_properties(QuantumPythonCallbacks PROPERTIES
 set_source_files_properties(PythonDriverUtils.cpp PythonFunction.cpp
     PROPERTIES COMPILE_FLAGS "-fexceptions -frtti -Wno-covered-switch-default")
 
-set_property(TARGET QuantumPythonCallbacks PROPERTY POSITION_INDEPENDENT_CODE ON)
+# Install next to the catalyst binary
+install(TARGETS QuantumPythonCallbacks
+    LIBRARY DESTINATION lib)

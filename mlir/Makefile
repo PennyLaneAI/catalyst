@@ -15,7 +15,6 @@ ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 BUILD_TYPE ?= Release
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
-STATIC_LINK_PYTHON ?= OFF
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF
@@ -195,8 +194,7 @@ dialects:
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
-		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS) \
-		-DSTATIC_LINK_PYTHON=$(STATIC_LINK_PYTHON)
+		-DCATALYST_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server catalyst-cli check-unit-tests runner_tests_dgsolver
 

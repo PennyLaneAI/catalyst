@@ -23,7 +23,6 @@ ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 ENABLE_FLAKY ?= OFF
 XDSL_TESTS ?= ON
-STATIC_LINK_PYTHON ?= OFF
 BYTECODE_PATH ?= $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlirbc
 
 PLATFORM := $(shell uname -s)

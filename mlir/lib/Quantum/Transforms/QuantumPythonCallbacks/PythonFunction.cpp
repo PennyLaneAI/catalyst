@@ -16,6 +16,8 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Location.h"
 #include "mlir/Parser/Parser.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
@@ -33,6 +35,29 @@ class PythonDecompCallback : public catalyst::quantum::DecompCallback {
     mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRot(mlir::MLIRContext *ctx, double theta,
                                                         const std::string &pauliWord,
                                                         llvm::ArrayRef<int> wires) override
+    {
+        try {
+            return lowerPauliRotImpl(ctx, theta, pauliWord, wires);
+        }
+        catch (const std::exception &e) {
+            mlir::emitError(mlir::UnknownLoc::get(ctx))
+                << "PauliRot decomposition callback failed for pauli_word='" << pauliWord
+                << "': " << e.what();
+            return nullptr;
+        }
+        // FIXME(Ali): for debugging, we can remove it after testing
+        catch (...) {
+            mlir::emitError(mlir::UnknownLoc::get(ctx))
+                << "PauliRot decomposition callback failed for pauli_word='" << pauliWord
+                << "': unknown exception";
+            return nullptr;
+        }
+    }
+
+  private:
+    mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotImpl(mlir::MLIRContext *ctx, double theta,
+                                                            const std::string &pauliWord,
+                                                            llvm::ArrayRef<int> wires)
     {
         std::vector<int> wiresVec(wires.begin(), wires.end());
 

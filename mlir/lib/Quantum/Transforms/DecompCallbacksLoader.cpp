@@ -22,6 +22,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "Quantum/Transforms/DecompCallbacks.h"
 
@@ -69,20 +70,74 @@ std::string resolvePluginPath()
     return {};
 }
 
+// Ensure libpython is loaded into the process before the plugin .so is opened.
+bool tryLoadLibpython(llvm::StringRef where)
+{
+    if (where.empty()) {
+        return false;
+    }
+    std::string err;
+    auto h = llvm::sys::DynamicLibrary::getPermanentLibrary(where.str().c_str(), &err);
+    if (!h.isValid()) {
+        llvm::errs() << "[decomp-callbacks-loader] libpython dlopen of '" << where
+                     << "' failed: " << err << "\n";
+        return false;
+    }
+    // FIXME(Ali): remove this after testing
+    llvm::errs() << "[decomp-callbacks-loader] libpython loaded: " << where << "\n";
+    return true;
+}
+
+// Try, in order:
+//   1. $CATALYST_LIBPYTHON: explicit user override (any deployment)
+//   2. CATALYST_LIBPYTHON_PATH: absolute path the configure-time Python uses
+//   3. CATALYST_LIBPYTHON_SONAME: bare SONAME via the dynamic loader search (manylinux wheels)
+void ensureLibpythonLoaded()
+{
+    if (auto over = llvm::sys::Process::GetEnv("CATALYST_LIBPYTHON")) {
+        if (tryLoadLibpython(*over))
+            return;
+    }
+#ifdef CATALYST_LIBPYTHON_PATH
+    if (tryLoadLibpython(CATALYST_LIBPYTHON_PATH))
+        return;
+#endif
+#ifdef CATALYST_LIBPYTHON_SONAME
+    if (tryLoadLibpython(CATALYST_LIBPYTHON_SONAME))
+        return;
+#endif
+    llvm::errs() << "[decomp-callbacks-loader] no libpython candidate succeeded; "
+                    "the plugin dlopen will likely fail with undefined symbols\n";
+}
+
 RegisterFn loadAndResolve()
 {
     std::string path = resolvePluginPath();
     if (path.empty()) {
+        llvm::errs() << "[decomp-callbacks-loader] plugin path could not be resolved\n";
         return nullptr;
     }
+    // FIXME(Ali): remove this after testing
+    llvm::errs() << "[decomp-callbacks-loader] plugin resolved at: " << path << "\n";
+
+    ensureLibpythonLoaded();
 
     std::string err;
     auto lib = llvm::sys::DynamicLibrary::getPermanentLibrary(path.c_str(), &err);
     if (!lib.isValid()) {
+        llvm::errs() << "[decomp-callbacks-loader] dlopen('" << path << "') failed: " << err
+                     << "\n";
         return nullptr;
     }
 
-    return reinterpret_cast<RegisterFn>(lib.getAddressOfSymbol("registerPythonDecompCallback"));
+    auto *sym =
+        reinterpret_cast<RegisterFn>(lib.getAddressOfSymbol("registerPythonDecompCallback"));
+    if (!sym) {
+        llvm::errs() << "[decomp-callbacks-loader] dlopen succeeded but symbol "
+                        "'registerPythonDecompCallback' not found in '"
+                     << path << "'\n";
+    }
+    return sym;
 }
 
 } // namespace
