@@ -29,6 +29,13 @@ add_mlir_library(QuantumPythonCallbacks MODULE
         quantum-transforms  # for DecompCallback
 )
 
+# Restrict the plugin to the CPython Limited API matching the version in setup.py.
+target_compile_definitions(QuantumPythonCallbacks PRIVATE
+    Py_LIMITED_API=0x030C0000)
+
+# Leave libpython symbols (Py_Initialize, PyGILState_Ensure, ...) undefined at
+# link time. The dynamic loader will resolve them against whichever libpython
+# the loader has dlopen'd into the process by the time this plugin is loaded.
 if (APPLE)
     target_link_options(QuantumPythonCallbacks PRIVATE
         "LINKER:-undefined,dynamic_lookup")
