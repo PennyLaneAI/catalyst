@@ -649,7 +649,7 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
 
         This procedure is outlined in Nielsen & Chuang, (Section 10.6.2), and is as follows:
 
-            |magic_state> ──╭●───────SX─┤ output_state
+            |magic_state> ──╭●───────SX─┤ |output_state>
                             |        ║
             |input_state> ──╰X──┤↗├──║── deallocate
                                  ╚═══╝
