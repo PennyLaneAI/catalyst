@@ -422,6 +422,7 @@ class CustomOpConversion(RewritePattern):
                         trgt_conv_cast_op := _cast_to_qubit(trgt_qecl_cycle_op.out_codeblock),
                     )
                     new_results = (ctrl_conv_cast_op.results[0], trgt_conv_cast_op.results[0])
+
             case _:
                 raise CompileError(
                     f"Conversion of op '{op.name}' only supports gates 'Identity', 'PauliX', "
