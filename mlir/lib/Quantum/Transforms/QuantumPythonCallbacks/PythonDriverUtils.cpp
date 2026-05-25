@@ -80,8 +80,8 @@ PyInterpreterGuard::PyInterpreterGuard() : impl(std::make_unique<Impl>())
  */
 PyInterpreterGuard &PyInterpreterGuard::ensure()
 {
-    static PyInterpreterGuard inst;
-    return inst;
+    static PyInterpreterGuard *inst = new PyInterpreterGuard();
+    return *inst;
 }
 
 } // namespace QuantumPythonCallbacks

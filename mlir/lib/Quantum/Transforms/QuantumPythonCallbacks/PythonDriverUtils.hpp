@@ -71,7 +71,7 @@ class PyInterpreterGuard {
 
   private:
     PyInterpreterGuard();
-    ~PyInterpreterGuard() = default;
+    ~PyInterpreterGuard();
 
     struct Impl;
     std::unique_ptr<Impl> impl;
