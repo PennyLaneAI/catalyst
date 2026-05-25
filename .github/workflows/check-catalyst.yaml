@@ -447,7 +447,6 @@ jobs:
           quantum-build/python_packages/*
           quantum-build/lib/StandalonePlugin.so
           quantum-build/lib/default_pipelines.*
-          quantum-build/lib/libQuantumPythonCallbacks.*
         retention-days: 1
 
     - name: Cache CCache on main branch
