@@ -29,6 +29,7 @@ Known Limitations
 from dataclasses import dataclass
 from typing import cast
 
+from pennylane.exceptions import CompileError
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, scf
 from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, i64
@@ -336,6 +337,8 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                                 idx = resolve_constant_params(quantum_op.idx)
                             elif quantum_op.idx_attr is not None:
                                 idx = quantum_op.idx_attr.value.data
+                            else:
+                                raise CompileError("Expected an index on qecp.extract_codeblock op")
                             quantum_op.codeblock.replace_all_uses_with(regs[idx])
                         case qecp.InsertCodeblockOp():
                             qecp_ops_to_remove.append(quantum_op)
