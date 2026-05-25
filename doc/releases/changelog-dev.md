@@ -108,6 +108,13 @@
   dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
   [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
 
+* In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
+  operations have been added:
+
+  - `qecl.fabricate`, which fabricates a logical codeblock in a specified initial state (typically a
+    magic state).
+    [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
