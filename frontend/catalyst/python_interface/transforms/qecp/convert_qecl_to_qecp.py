@@ -28,9 +28,11 @@ The convert-qecl-to-qecp pass has the following known limitations:
   * Only logical Pauli Z observables (computational basis) are supported for lowering `qecl.measure`
     operations.
   * Support for control flow in the user program is not fully implemented or tested
-  * The generated QEC-cycles are not fault-tolerant - they don't account for potential errors in the syndrome qubits/measurements
+  * The generated QEC-cycles are not fault-tolerant - they don't account for potential errors in
+    the syndrome qubits/measurements
   * For terminal measurements, only sampling of MCMs is supported
-  * The encoding procedure to create the logical zero state in a codeblock is not optimized for efficiency
+  * The encoding procedure to create the logical zero state in a codeblock is not optimized for
+    efficiency
 """
 
 from collections.abc import Callable, Iterable
