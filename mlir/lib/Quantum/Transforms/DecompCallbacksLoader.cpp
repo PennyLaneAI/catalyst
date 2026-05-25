@@ -144,12 +144,12 @@ RegisterFn loadAndResolve()
 
 bool loadPythonCallbackPlugin()
 {
-    if (getDecompCallback()) {
+    if (getLowerPauliRot()) {
         return true;
     }
 
     if (resolutionAttempted.exchange(true)) {
-        return getDecompCallback() != nullptr;
+        return getLowerPauliRot() != nullptr;
     }
 
     RegisterFn reg = loadAndResolve();
@@ -158,7 +158,7 @@ bool loadPythonCallbackPlugin()
     }
 
     reg();
-    return getDecompCallback() != nullptr;
+    return getLowerPauliRot() != nullptr;
 }
 
 } // namespace catalyst::quantum

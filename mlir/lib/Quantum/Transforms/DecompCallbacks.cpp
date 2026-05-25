@@ -15,14 +15,16 @@
 #include "Quantum/Transforms/DecompCallbacks.h"
 
 namespace catalyst::quantum {
+
 namespace {
-std::unique_ptr<DecompCallback> &registry()
+LowerPauliRotFn &lowerPauliRotSlot()
 {
-    static std::unique_ptr<DecompCallback> instance;
-    return instance;
+    static LowerPauliRotFn fptr = nullptr;
+    return fptr;
 }
 } // namespace
 
-void registerDecompCallback(std::unique_ptr<DecompCallback> cb) { registry() = std::move(cb); }
-DecompCallback *getDecompCallback() { return registry().get(); }
+void registerLowerPauliRot(LowerPauliRotFn fn) { lowerPauliRotSlot() = fn; }
+LowerPauliRotFn getLowerPauliRot() { return lowerPauliRotSlot(); }
+
 } // namespace catalyst::quantum

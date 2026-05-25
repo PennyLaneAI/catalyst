@@ -14,27 +14,26 @@
 
 #pragma once
 
-#include <memory>
+#include <string>
 
-#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/IR/BuiltinTypes.h"
-
-using namespace mlir;
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OwningOpRef.h"
 
 namespace catalyst::quantum {
 
-class DecompCallback {
-  public:
-    virtual ~DecompCallback() = default;
-    virtual mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRot(mlir::MLIRContext *ctx,
-                                                                double theta,
-                                                                const std::string &pauliWord,
-                                                                llvm::ArrayRef<int> wires) = 0;
-};
+// One free function per quantum op whose decomposition requires runtime data.
+// The plugin registers a concrete implementation; quantum-transform passes
+// invoke it via the getter.
+// Note: nullptr = no implementation registered yet.
 
-void registerDecompCallback(std::unique_ptr<DecompCallback>);
-DecompCallback *getDecompCallback();
+using LowerPauliRotFn = mlir::OwningOpRef<mlir::func::FuncOp> (*)(mlir::MLIRContext *ctx,
+                                                                  double theta,
+                                                                  const std::string &pauliWord,
+                                                                  llvm::ArrayRef<int> wires);
+
+void registerLowerPauliRot(LowerPauliRotFn fn);
+LowerPauliRotFn getLowerPauliRot();
 
 } // namespace catalyst::quantum

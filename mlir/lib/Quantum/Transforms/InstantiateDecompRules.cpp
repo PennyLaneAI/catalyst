@@ -51,12 +51,12 @@ struct InstantiateDecompRulesPass
             return; // nothing to lower — callback not required
         }
 
-        auto *cb = getDecompCallback();
-        if (!cb) {
+        auto lowerPauliRot = getLowerPauliRot();
+        if (!lowerPauliRot) {
             loadPythonCallbackPlugin();
-            cb = getDecompCallback();
+            lowerPauliRot = getLowerPauliRot();
         }
-        if (!cb) {
+        if (!lowerPauliRot) {
             module.emitError("graph-decomposition needs a PauliRot callback; "
                              "rebuild Catalyst with -DCATALYST_ENABLE_PYTHON_CALLBACKS=ON "
                              "or ensure libQuantumPythonCallbacks is available to the driver");
@@ -78,7 +78,7 @@ struct InstantiateDecompRulesPass
             llvm::SmallVector<int> wires(pauliRot.getInQubits().size());
             std::iota(wires.begin(), wires.end(), 0);
 
-            auto outOp = cb->lowerPauliRot(&getContext(), 0.2, pauliWord, wires);
+            auto outOp = lowerPauliRot(&getContext(), 0.2, pauliWord, wires);
 
             if (!outOp) {
                 return signalPassFailure();
