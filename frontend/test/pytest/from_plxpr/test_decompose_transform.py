@@ -490,7 +490,7 @@ class TestGraphDecomposition:
         without_qjit = qnode()
 
         with_qjit = qp.qjit(
-            graph_decomposition(qnode, gate_set={qp.H, qp.RX, "multirz", qp.GlobalPhase})
+            graph_decomposition(qnode, gate_set={qp.H, qp.RX, qp.MultiRZ, qp.GlobalPhase})
         )()
 
         assert np.allclose(without_qjit, with_qjit)
