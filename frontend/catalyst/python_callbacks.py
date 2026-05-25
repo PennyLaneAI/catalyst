@@ -14,6 +14,7 @@
 
 """This module provides infrastructure for lowering decomposition rules using compiler callbacks."""
 
+import jax.numpy as jnp
 import pennylane as qp
 
 
@@ -21,15 +22,21 @@ def paulirot_callback_wrapper(theta, pauli_word, wires):
     """Wraps paulirot decomp rule to enable compile-time lowering."""
     # pylint: disable=protected-access
     device = qp.device("null.qubit", wires=len(wires))
-    qnode = qp.QNode(
-        qp.ops.qubit.parametric_ops_multi_qubit._pauli_rot_decomposition._impl,
-        device=device,
-    )
-    circuit = qp.qjit(
-        qnode,
+
+    @qp.qjit(
         target="mlir",
         capture=True,
         static_argnums=2,
     )
-    circuit(theta, wires, pauli_word)
+    @qp.qnode(device=device)
+    def circuit(theta, wires, pauli_word):
+        # declare subroutine
+        my_subroutine = qp.capture.subroutine(
+            qp.ops.qubit.parametric_ops_multi_qubit._pauli_rot_decomposition._impl, static_argnums=2
+        )
+
+        # call subroutine
+        my_subroutine(theta, wires, pauli_word)
+
+    circuit(theta, jnp.array(wires), pauli_word)
     return circuit.mlir
