@@ -12,26 +12,45 @@ execute_process(
 
 find_package(pybind11 REQUIRED)
 
-# Development.SABIModule supplies Python.h and extension-module support. We
-# deliberately do NOT request Development.Embed, which would also require a
-# libpython linker-name file that manylinux images do not ship.
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development.SABIModule)
+# Discover the active Python version
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+# Mirror setup.py
+if (Python3_VERSION VERSION_GREATER_EQUAL 3.12)
+    set(_QPC_PYTHON_COMPONENT "Development.SABIModule")
+    set(_QPC_PYTHON_TARGET Python3::SABIModule)
+    set(_QPC_USE_LIMITED_API ON)
+    message(STATUS
+        "QuantumPythonCallbacks: Python ${Python3_VERSION} -> Stable ABI build "
+        "(Py_LIMITED_API=0x030C0000, links Python3::SABIModule)")
+else()
+    set(_QPC_PYTHON_COMPONENT "Development.Module")
+    set(_QPC_PYTHON_TARGET Python3::Module)
+    set(_QPC_USE_LIMITED_API OFF)
+    message(STATUS
+        "QuantumPythonCallbacks: Python ${Python3_VERSION} -> non-SABI build "
+        "(plugin .so is tied to this Python's ABI)")
+endif()
+
+# Second find_package call accumulates the component selected above.
+find_package(Python3 REQUIRED COMPONENTS Interpreter ${_QPC_PYTHON_COMPONENT})
 
 add_mlir_library(QuantumPythonCallbacks MODULE
     PythonFunction.cpp
     PythonDriverUtils.cpp
     LINK_LIBS PRIVATE
         pybind11::module    # headers + extension-module flags; NO libpython link
-        Python3::SABIModule
+        ${_QPC_PYTHON_TARGET}
         MLIRIR
         MLIRFuncDialect
         MLIRParser
         quantum-transforms  # for DecompCallback
 )
 
-# Restrict the plugin to the CPython Limited API matching the version in setup.py.
-target_compile_definitions(QuantumPythonCallbacks PRIVATE
-    Py_LIMITED_API=0x030C0000)
+if (_QPC_USE_LIMITED_API)
+    target_compile_definitions(QuantumPythonCallbacks PRIVATE
+        Py_LIMITED_API=0x030C0000)
+endif()
 
 # Leave libpython symbols (Py_Initialize, PyGILState_Ensure, ...) undefined at
 # link time. The dynamic loader will resolve them against whichever libpython
