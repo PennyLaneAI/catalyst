@@ -34,9 +34,11 @@ from catalyst.api_extensions.quantum_operators import (
     HybridAdjoint,
     HybridCtrl,
     MidCircuitMeasure,
+    MidCircuitPauliMeasure,
     adjoint,
     ctrl,
     measure,
+    pauli_measure,
 )
 
 __all__ = (
@@ -55,6 +57,7 @@ __all__ = (
     "mitigate_with_zne",
     "vmap",
     "measure",
+    "pauli_measure",
     "adjoint",
     "ctrl",
 )

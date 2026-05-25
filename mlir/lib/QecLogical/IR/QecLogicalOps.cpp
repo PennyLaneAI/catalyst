@@ -92,6 +92,26 @@ LogicalResult InsertCodeblockOp::verify()
     return success();
 }
 
+LogicalResult FabricateOp::verify()
+{
+    auto initState = getInitState();
+    if (initState == LogicalCodeblockInitState::Zero) {
+        return emitOpError() << "cannot fabricate a codeblock in the logical 'zero' state, use '"
+                             << EncodeOp::getOperationName() << "' instead.";
+    }
+    return success();
+}
+
+LogicalResult EncodeOp::verify()
+{
+    auto initState = getInitState();
+    if (initState == LogicalCodeblockInitState::Magic) {
+        return emitOpError() << "cannot encode a logical codeblock to the magic state, use '"
+                             << FabricateOp::getOperationName() << "' instead.";
+    }
+    return success();
+}
+
 template <typename OpTy> static LogicalResult verifySingleQubitLogicalGateOp(OpTy op)
 {
     if (!(op.getIdx() || op.getIdxAttr().has_value())) {
