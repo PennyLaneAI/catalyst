@@ -18,6 +18,9 @@
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
 
+* PPRs and PPMs can now be lowered properly into MLIR directly in the non-capture workflow.
+  [(#2816)](https://github.com/PennyLaneAI/catalyst/pull/2816)
+
 * The `--decompose-lowering` pass can now handle null decomposition rules, which are rule functions
   that do not have any quantum values as arguments or results. Gates with null decomposition rules
   are simply removed.
