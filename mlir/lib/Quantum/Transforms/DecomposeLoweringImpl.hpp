@@ -15,9 +15,9 @@
 #include <algorithm> // std::move_backward
 #include <variant>
 
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -143,23 +143,78 @@ class BaseSignatureAnalyzer {
     // Public Methods (Identical to Original)
     operator bool() const { return isValid; }
 
+    // Returns true if lateQreg is a later qreg in an insert chain from earlyQreg
+    // Raise an error if both qregs are rooted at different allocations.
+    bool isDescendantQreg(Value lateQreg, Value earlyQreg, quantum::AllocOp earlyQregRootAlloc)
+    {
+        while (lateQreg != earlyQreg) {
+            if (auto insertOp = lateQreg.getDefiningOp<quantum::InsertOp>()) {
+                lateQreg = insertOp.getInQreg();
+            }
+            else if (auto adjointOp = lateQreg.getDefiningOp<quantum::AdjointOp>()) {
+                OpResult lateQregAsAdjointResult = cast<OpResult>(lateQreg);
+                lateQreg = adjointOp.getOperand(lateQregAsAdjointResult.getResultNumber());
+            }
+            else if (auto allocOp = lateQreg.getDefiningOp<quantum::AllocOp>()) {
+                assert(allocOp == earlyQregRootAlloc &&
+                       "The qreg of the input wires should be the same");
+                return false;
+            }
+            else {
+                llvm_unreachable("Encountered unknown operation. A quantum register value can only "
+                                 "be produced by alloc, insert and adjoint ops.");
+            }
+        }
+        return true;
+    }
+
     Value getUpdatedQreg(PatternRewriter &rewriter, Location loc)
     {
         // FIXME: This will cause an issue when the decomposition function has cross-qreg
         // inputs and outputs. Now, we just assume has only one qreg input, the global one exists.
         // raise an error if the qreg is not the same
-        Value qreg = signature.inWireIndices[0].getReg();
 
-        bool sameQreg = true;
+        // Collect all qregs from input wires
+        llvm::SetVector<Value> qregs;
         for (const auto &index : signature.inWireIndices) {
-            sameQreg &= index.getReg() == qreg;
+            qregs.insert(index.getReg());
         }
         for (const auto &index : signature.inCtrlWireIndices) {
-            sameQreg &= index.getReg() == qreg;
+            qregs.insert(index.getReg());
         }
 
-        assert(sameQreg && "The qreg of the input wires should be the same");
-        return qreg;
+        // Quick return if all qregs are the same
+        if (qregs.size() == 1) {
+            return qregs[0];
+        }
+
+        // Find the latest qreg in the insert chain
+        Value latestQreg = qregs[0];
+
+        quantum::AllocOp rootAllocOp;
+        Value allocFinder = latestQreg;
+        while (allocFinder) {
+            if (auto insertOp = allocFinder.getDefiningOp<quantum::InsertOp>()) {
+                allocFinder = insertOp.getInQreg();
+                continue;
+            }
+            else if (auto adjointOp = allocFinder.getDefiningOp<quantum::AdjointOp>()) {
+                OpResult lateQregAsAdjointResult = cast<OpResult>(allocFinder);
+                allocFinder = adjointOp.getOperand(lateQregAsAdjointResult.getResultNumber());
+                continue;
+            }
+            else if (auto allocOp = allocFinder.getDefiningOp<quantum::AllocOp>()) {
+                rootAllocOp = allocOp;
+                break;
+            }
+        }
+
+        for (Value qreg : qregs) {
+            if (isDescendantQreg(qreg, latestQreg, rootAllocOp)) {
+                latestQreg = qreg;
+            }
+        }
+        return latestQreg;
     }
 
     // Prepare the operands for calling the decomposition function

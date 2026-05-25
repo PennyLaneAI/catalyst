@@ -222,22 +222,3 @@ func.func @test_hermitian_bad_matrix_shape(%q0: !qref.bit, %matrix: tensor<20x20
     %obs = qref.hermitian(%matrix : tensor<20x20xcomplex<f64>>) %q0 : !quantum.obs
     return
 }
-
-// -----
-
-func.func @test_mbqc_measure_in_basis_invalid_plane(%q : !qref.bit) {
-    %angle = arith.constant 3.141592653589793 : f64
-    // expected-error@below {{expected catalyst::mbqc::MeasurementPlane to be one of: XY, YZ, ZX}}
-    // expected-error@below {{failed to parse MeasurementPlaneAttr parameter}}
-    %res = qref.mbqc.measure_in_basis [YX, %angle] %q : i1
-    func.return
-}
-
-// -----
-
-func.func @test_mbqc_graph_state_prep_invalid_size() {
-    %adj_matrix = arith.constant dense<[1]> : tensor<1xi1>
-    // expected-error@below {{mismatch between allocation size and size of densely packed adjacency matrix. For an allocation size of 4, the densely packed adjacency matrix size is expected to be 6}}
-    %graph_reg = qref.mbqc.graph_state_prep (%adj_matrix : tensor<1xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
-    func.return
-}

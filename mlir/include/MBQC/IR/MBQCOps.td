@@ -32,6 +32,8 @@ include "MBQC/IR/MBQCDialect.td"
 // MBQC dialect operations.
 //===----------------------------------------------------------------------===//
 
+include "MBQC/IR/MBQCRefOps.td"
+
 def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
     let summary = "A parametric single-qubit projective measurement in an arbitrary basis.";
     let description = [{
