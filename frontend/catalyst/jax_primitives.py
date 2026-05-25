@@ -1618,7 +1618,7 @@ def _pauli_rot_lowering(
 # pauli measure operation
 #
 @pauli_measure_p.def_abstract_eval
-def _pauli_measure_abstract_eval(*qubits, pauli_word=None, qubits_len=0, adjoint=False):
+def _pauli_measure_abstract_eval(*qubits, pauli_word=None, qubits_len=0):
     qubits = qubits[:qubits_len]
     assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
     # This corresponds to the measurement value and the qubits after the measurements
