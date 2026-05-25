@@ -713,7 +713,7 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
             )
 
         funcOp = func.FuncOp(
-            name=f"apply_T",
+            name="apply_T",
             function_type=(input_types, output_types),
             visibility="private",
             region=Region([block]),
