@@ -28,10 +28,12 @@
 #include "mlir/Pass/PassManager.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
+#include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
+#include "QuantumPythonCallbacks/PythonFunction.hpp"
 
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
@@ -41,6 +43,8 @@ using namespace mlir;
 using namespace catalyst::quantum;
 using namespace DecompGraph::Core;
 using namespace DecompGraph::Solver;
+
+namespace QPC = QuantumPythonCallbacks;
 
 namespace catalyst {
 namespace quantum {
@@ -54,7 +58,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ModuleOp module = getOperation();
 
         OpPassManager pm1("builtin.module");
-        pm1.addPass(createInstantiateDecompRulesPass());
+        pm1.addPass(createRegisterDecompRuleResourcePass());
 
         if (failed(runPipeline(pm1, module))) {
             return signalPassFailure();
@@ -275,6 +279,48 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
+    void loadPauliRotRules(llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &ruleRegistry)
+    {
+        mlir::ModuleOp module = getOperation();
+        MLIRContext *context = &getContext();
+
+        llvm::StringSet<> addedWords;
+
+        llvm::SmallVector<quantum::PauliRotOp> pauliRotOps;
+        module.walk([&](quantum::PauliRotOp op) { pauliRotOps.push_back(op); });
+
+        for (quantum::PauliRotOp pauliRot : pauliRotOps) {
+            std::string pauliWord;
+            for (auto pauliChar : pauliRot.getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue().str();
+            }
+            if (addedWords.contains(pauliWord)) {
+                continue;
+            }
+            addedWords.insert(pauliWord);
+
+            std::vector<int> wires(pauliRot.getInQubits().size());
+            std::iota(wires.begin(), wires.end(), 0);
+
+            mlir::OwningOpRef<mlir::func::FuncOp> outOp =
+                QPC::lowerPauliRotDecomp(context, 0.2, pauliWord, wires);
+
+            if (!outOp) {
+                return signalPassFailure();
+            }
+
+            outOp->setName((outOp->getName() + "_" + pauliWord).str()); // unique name per pauliword
+            outOp.get()->setAttr(
+                "target_gate", mlir::StringAttr::get(module.getContext(), "paulirot" + pauliWord));
+
+            auto resourceAnalysis = ResourceAnalysis(outOp->getOperation());
+            ResourceResult result = *resourceAnalysis.getResult(outOp->getName());
+            outOp.get()->setAttr("resources", buildResourceDict(context, result));
+
+            ruleRegistry.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(outOp.release()));
+        }
+    }
+
     void getOperators(std::vector<OperatorNode> &operators)
     {
         getOperation().walk([&](quantum::QuantumGate op) {
@@ -285,10 +331,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (auto customOp = llvm::dyn_cast<quantum::CustomOp>(op.getOperation())) {
                 node.name = customOp.getGateName().str();
             }
+            // Name handling for non-custom ops
             else {
                 std::string name = op->getName().stripDialect().str();
                 if (name == "gphase") {
                     name = "GlobalPhase";
+                }
+                else if (name == "paulirot") {
+                    name = "paulirot" + cast<quantum::PauliRotOp>(op.getOperation()).getPauliWord();
                 }
                 node.name = name;
             }
@@ -364,6 +414,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // Load rules from bytecode and user-defined passes
         loadBuiltInDecompositionRules(filename, graphRules);
+        loadPauliRotRules(graphRules);
         if (failed(loadUserDecompositionRules(userRuleNames, graphRules, userRules))) {
             return signalPassFailure();
         }

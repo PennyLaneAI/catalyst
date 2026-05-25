@@ -25,6 +25,6 @@ namespace QuantumPythonCallbacks {
 
 using PyWires = std::vector<int>;
 
-mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module, double theta,
+mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::MLIRContext *module, double theta,
                                                           std::string pauliWord, PyWires wires);
 } // namespace QuantumPythonCallbacks

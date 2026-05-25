@@ -43,14 +43,14 @@ std::string tracePauliRotDecomp(double theta, std::string pauliWord, PyWires wir
     }
 }
 
-mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::ModuleOp module, double theta,
+mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotDecomp(mlir::MLIRContext *context, double theta,
                                                           std::string pauliWord, PyWires wires)
 {
     std::string result = tracePauliRotDecomp(theta, pauliWord, wires);
 
     llvm::StringRef resultRef = result;
 
-    mlir::ParserConfig config = mlir::ParserConfig(module.getContext());
+    mlir::ParserConfig config = mlir::ParserConfig(context);
     auto moduleOp = mlir::parseSourceString(resultRef, config);
 
     if (!moduleOp) {
