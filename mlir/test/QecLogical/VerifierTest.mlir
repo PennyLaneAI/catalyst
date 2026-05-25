@@ -78,6 +78,22 @@ func.func @test_insert_type_mismatch(%r : !qecl.hyperreg<3 x 1>, %b : !qecl.code
 
 // -----
 
+func.func @test_fabricate_zero() {
+    // expected-error@below {{cannot fabricate a codeblock in the logical 'zero' state}}
+    %0 = qecl.fabricate [zero] : !qecl.codeblock<1>
+    func.return
+}
+
+// -----
+
+func.func @test_encode_magic(%arg0 : !qecl.codeblock<1>) {
+    // expected-error@below {{cannot encode a logical codeblock to the magic state}}
+    %0 = qecl.encode [magic] %arg0 : !qecl.codeblock<1>
+    func.return
+}
+
+// -----
+
 func.func @test_gate_op_index_out_of_bounds_identity(%b : !qecl.codeblock<1>) {
     // expected-error@below {{out-of-bounds index attribute}}
     %b1 = qecl.identity %b[1] : !qecl.codeblock<1>
