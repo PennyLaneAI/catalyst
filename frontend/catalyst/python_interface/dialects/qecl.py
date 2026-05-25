@@ -65,8 +65,8 @@ from xdsl.printer import Printer
 class LogicalCodeblockInitState(StrEnum):
     """Enum for logical codeblock initial state"""
 
-    Zero = "zero"
-    # Add other supported codeblock initial states here
+    Zero = "zero"  # |0⟩
+    Magic = "magic"  # |m⟩ = |0⟩ + e^{iπ/4}|1⟩  (Magic state)
 
 
 @irdl_attr_definition
@@ -309,6 +309,35 @@ class InsertCodeblockOp(IRDLOperation):
         super().__init__(
             operands=operands, properties=properties, result_types=(in_hyper_reg_type,)
         )
+
+
+@irdl_op_definition
+class FabricateOp(IRDLOperation):
+    """Fabricate a logical codeblock in a specified initial state."""
+
+    name = "qecl.fabricate"
+
+    assembly_format = """
+            `[` $init_state `]` attr-dict `:` type($out_codeblock)
+        """
+
+    init_state = prop_def(LogicalCodeblockInitStateAttr)
+
+    out_codeblock = result_def(base(LogicalCodeblockType))
+
+    def __init__(
+        self,
+        init_state: str | LogicalCodeblockInitStateAttr,
+        out_codeblock_type: LogicalCodeblockType,
+    ):
+        init_state_attr = (
+            init_state
+            if isinstance(init_state, LogicalCodeblockInitStateAttr)
+            else LogicalCodeblockInitStateAttr(init_state)
+        )
+        properties = {"init_state": init_state_attr}
+
+        super().__init__(result_types=(out_codeblock_type,), properties=properties)
 
 
 @irdl_op_definition
@@ -748,6 +777,7 @@ QecLogical = Dialect(
         DeallocOp,
         ExtractCodeblockOp,
         InsertCodeblockOp,
+        FabricateOp,
         EncodeOp,
         NoiseOp,
         QecCycleOp,

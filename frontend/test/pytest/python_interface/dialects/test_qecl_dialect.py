@@ -61,6 +61,7 @@ expected_ops_names = {
     "DeallocOp": "qecl.dealloc",
     "ExtractCodeblockOp": "qecl.extract_block",
     "InsertCodeblockOp": "qecl.insert_block",
+    "FabricateOp": "qecl.fabricate",
     "EncodeOp": "qecl.encode",
     "NoiseOp": "qecl.noise",
     "QecCycleOp": "qecl.qec",
@@ -194,6 +195,16 @@ class TestQecLogicalOps:
 
         assert_valid_idx_attr(insert_block_op, idx)
 
+    @pytest.mark.parametrize("init_state", ["magic", qecl.LogicalCodeblockInitStateAttr("magic")])
+    def test_qecl_op_constructor_fabricate(self, init_state):
+        """Test the constructor of the qecl.fabricate op."""
+        fabricate_op = qecl.FabricateOp(
+            init_state=init_state, out_codeblock_type=qecl.LogicalCodeblockType(k=self.k)
+        )
+        assert len(fabricate_op.result_types) == 1
+        assert isinstance(fabricate_op.result_types[0], qecl.LogicalCodeblockType)
+        assert fabricate_op.result_types[0].k == self.k
+
     @pytest.mark.parametrize("init_state", ["zero", qecl.LogicalCodeblockInitStateAttr("zero")])
     def test_qecl_op_constructor_encode(self, init_state):
         """Test the constructor of the qecl.encode op."""
@@ -300,6 +311,9 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: qecl.insert_block [[hyperreg]][{{\s*}}0], [[block0]] : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
     %hreg1 = qecl.insert_block %hyperreg[ 0], %block0 : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
+
+    // CHECK: [[magic:%.+]] = qecl.fabricate{{\s*}}[magic] : !qecl.codeblock<1>
+    %magic = qecl.fabricate [magic] : !qecl.codeblock<1>
 
     // CHECK: [[block1:%.+]] = qecl.encode{{\s*}}[zero] [[block0]] : !qecl.codeblock<1>
     %block1 = qecl.encode [zero] %block0 : !qecl.codeblock<1>
