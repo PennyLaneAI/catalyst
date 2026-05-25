@@ -47,7 +47,6 @@
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "QecPhysical/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "QuantumPythonCallbacks/PythonDriverUtils.hpp"
 
 #include "RegisterAllPasses.h"
 
@@ -59,8 +58,9 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
 {
     using timer = catalyst::utils::Timer<>;
 
-    // TODO: only initialize when a python callback pass is used
-    QuantumPythonCallbacks::PyInterpreterWrapper pythonInterpreter;
+#ifdef CATALYST_ENABLE_PYTHON_CALLBACKS
+    QuantumPythonCallbacks::registerPythonDecompCallback();
+#endif
 
     mlir::OpPrintingFlags opPrintingFlags{};
     if (options.useNameLocAsPrefix) {

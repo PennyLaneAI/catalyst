@@ -92,11 +92,10 @@ try:
     )
     llvm_config.with_environment("CATALYST_LIB_DIR", config.quantum_lib_dir, append_path=True)
 
-    # Define PYTHONPATH to include the dialect python bindings.
-    # From within a build target we have access to cmake variables configured in lit.site.cfg.py.in.
+    catalyst_frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     llvm_config.with_environment(
         "PYTHONPATH",
-        [config.mlir_bindings_dir],
+        [config.mlir_bindings_dir, catalyst_frontend_dir],
         append_path=True,
     )
 except AttributeError:

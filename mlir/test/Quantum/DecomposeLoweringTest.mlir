@@ -663,21 +663,21 @@ module @test_paulirot {
         %q2 = quantum.extract %inreg[ 2] : !quantum.reg -> !quantum.bit
         // CHECK-NOT: quantum.paulirot
         %out:3 = quantum.paulirot ["Z", "X", "Y"](%pi) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
-        
+
         // CHECK-DAG: Hadamard
         // CHECK-DAG: RX
-        
+
         // CHECK: multirz
-        
+
         // CHECK-DAG: Hadamard
         // CHECK-DAG: RX
         %reg2 = quantum.insert %inreg[ 0], %out#0 : !quantum.reg, !quantum.bit
         %reg3 = quantum.insert %reg2[ 1], %out#1 : !quantum.reg, !quantum.bit
         %reg4 = quantum.insert %reg2[ 2], %out#2 : !quantum.reg, !quantum.bit
         quantum.dealloc %reg4 : !quantum.reg
-        return 
+        return
     }
-    
+
     // CHECK-NOT: my_paulirot_decomp
     func.func private @my_paulirot_decomp(%inreg : !quantum.reg, %angle_tensor : tensor<f64>, %q_tensor : tensor<3xi64>) -> !quantum.reg attributes {target_gate = "paulirotZXY"} {
         %pi_by_2 = arith.constant 1.57 : f64

@@ -32,8 +32,9 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/DecompCallbacks.h"
+#include "Quantum/Transforms/DecompCallbacksLoader.h"
 #include "Quantum/Transforms/Passes.h"
-#include "QuantumPythonCallbacks/PythonFunction.hpp"
 
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
@@ -44,10 +45,9 @@ using namespace catalyst::quantum;
 using namespace DecompGraph::Core;
 using namespace DecompGraph::Solver;
 
-namespace QPC = QuantumPythonCallbacks;
-
 namespace catalyst {
 namespace quantum {
+
 #define GEN_PASS_DEF_GRAPHDECOMPOSITIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
@@ -55,6 +55,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
+        loadPythonCallbackPlugin();
+
         ModuleOp module = getOperation();
 
         OpPassManager pm1("builtin.module");
@@ -302,8 +304,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             std::vector<int> wires(pauliRot.getInQubits().size());
             std::iota(wires.begin(), wires.end(), 0);
 
-            mlir::OwningOpRef<mlir::func::FuncOp> outOp =
-                QPC::lowerPauliRotDecomp(context, 0.2, pauliWord, wires);
+            auto callbackFunction = getLowerPauliRot();
+
+            if (!callbackFunction) {
+                return signalPassFailure();
+            }
+
+            auto outOp = callbackFunction(context, 0.2, pauliWord, wires);
 
             if (!outOp) {
                 return signalPassFailure();

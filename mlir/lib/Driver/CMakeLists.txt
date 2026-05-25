@@ -81,6 +81,12 @@ set(LIBS
     fmt::fmt
 )
 
+##############################
+## Quantum Python Callbacks ##
+##############################
+add_subdirectory(../Quantum/Transforms/QuantumPythonCallbacks
+                 ${CMAKE_BINARY_DIR}/QuantumPythonCallbacksBuild)
+
 add_mlir_library(CatalystCompilerDriver
     Main.cpp
     CompilerDriver.cpp
@@ -95,9 +101,14 @@ add_mlir_library(CatalystCompilerDriver
     MLIRSupport
 )
 
+if (CATALYST_ENABLE_PYTHON_CALLBACKS)
+    add_dependencies(CatalystCompilerDriver QuantumPythonCallbacks)
+endif()
+
 #########################################################
 ## importable module with default pipeline definitions ##
 #########################################################
 
 add_subdirectory(DefaultPipelines)
-add_dependencies(CatalystCompilerDriver default_pipelines QuantumPythonCallbacks)
+add_dependencies(CatalystCompilerDriver default_pipelines)
+

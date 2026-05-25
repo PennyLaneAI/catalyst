@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RY=1.0,RZ=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+#include "Quantum/Transforms/DecompCallbacks.h"
 
-func.func public @circuit() attributes {quantum.node} {
-    %0 = quantum.alloc( 1) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
-    quantum.dealloc %2 : !quantum.reg
-    // CHECK-NOT: Hadamard
-    // CHECK-DAG: RZ
-    // CHECK-DAG: RY
-    return
+namespace catalyst::quantum {
+
+namespace {
+LowerPauliRotFn &lowerPauliRotSlot()
+{
+    static LowerPauliRotFn fptr = nullptr;
+    return fptr;
 }
+} // namespace
+
+void registerLowerPauliRot(LowerPauliRotFn fn) { lowerPauliRotSlot() = fn; }
+LowerPauliRotFn getLowerPauliRot() { return lowerPauliRotSlot(); }
+
+} // namespace catalyst::quantum
