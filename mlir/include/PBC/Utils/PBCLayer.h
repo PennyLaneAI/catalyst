@@ -44,6 +44,11 @@ class PBCLayerContext {
     // Allow move semantics
     PBCLayerContext(PBCLayerContext &&) = default;
     PBCLayerContext &operator=(PBCLayerContext &&) = default;
+
+    // Partition PBC ops into layer groups by disjoint-qubit and (optionally) commutation rules.
+    // Returns op lists only; operand/result bookkeeping is deferred until layer construction.
+    llvm::SmallVector<std::vector<PBCOpInterface>> groupLayers(mlir::Operation *root,
+                                                               bool onlyOnDisjointQubit = false);
 };
 
 class PBCLayer {
@@ -122,7 +127,7 @@ class PBCLayer {
     // 2. It does not have extract(insert) op before(after) existing ops
     // 3. It acts on disjoint qubits
     // 4. Or it commutes with all the ops in the layer
-    bool insert(PBCOpInterface op);
+    bool insert(PBCOpInterface op, bool onlyOnDisjointQubit = false);
 
     // Get the current context
     PBCLayerContext *getContext() const { return context; }
