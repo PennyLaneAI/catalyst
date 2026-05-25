@@ -547,10 +547,11 @@ class AdjointGenerator {
         SetVector<Value> startingThenQvalues = findOldestQvaluesInRegion(ifOp.getThenRegion());
         SetVector<Value> startingElseQvalues = findOldestQvaluesInRegion(ifOp.getElseRegion());
 
-        int res_idx = 0;
-        for (auto [t, e] : llvm::zip_equal(startingThenQvalues, startingElseQvalues)) {
+        for (auto [idx, pair] :
+             llvm::enumerate(llvm::zip_equal(startingThenQvalues, startingElseQvalues))) {
+            auto [t, e] = pair;
             assert(t == e && "Expected the same input quantum values for both scf.if branches");
-            remappedValues.map(t, reversedIf.getResult(res_idx++));
+            remappedValues.map(t, reversedIf.getResult(idx));
         }
     }
 
@@ -666,9 +667,9 @@ class AdjointGenerator {
         // Default region:
         fillRegion(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion());
 
-        int res_idx = 0;
-        for (auto v : findRootQvaluesInRegion(switchOp.getDefaultRegion())) {
-            remappedValues.map(v, newSwitchOp.getResult(res_idx++));
+        for (auto [idx, v] :
+             llvm::enumerate(findRootQvaluesInRegion(switchOp.getDefaultRegion()))) {
+            remappedValues.map(v, newSwitchOp.getResult(idx));
         }
     }
 
