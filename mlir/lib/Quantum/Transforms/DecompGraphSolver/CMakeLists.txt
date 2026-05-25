@@ -25,8 +25,8 @@ if (Boost_FOUND)
 else()
     message(STATUS "Boost >= ${MIN_BOOST_VERSION} not found on system. Fetching...")
 
-    # set(BOOST_INCLUDE_LIBRARIES graph)
-    # set(BOOST_ENABLE_CMAKE ON)
+    # Restrict Boost's CMake project to the minimal library set needed.
+    set(BOOST_INCLUDE_LIBRARIES graph CACHE STRING "")
 
     # Ensure BOOST_ENABLE_CMAKE is set BEFORE MakeAvailable
     set(BOOST_ENABLE_CMAKE ON CACHE BOOL "")
@@ -49,7 +49,7 @@ else()
             # Check if the target is an INTERFACE library
             get_target_property(target_type ${t_name} TYPE)
 
-            if (target_type STREQUAL "INTERFACE_LIBRARY")
+            if(target_type STREQUAL "INTERFACE_LIBRARY")
                 # For header-only targets, we set the options as INTERFACE
                 # so they apply to anyone who includes them (like your code)
                 target_compile_options(${t_name} INTERFACE -Wno-error -w)
@@ -72,7 +72,6 @@ target_link_libraries(decompsolver
 
 target_include_directories(decompsolver PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${Boost_INCLUDE_DIRS}
 )
 
 set_property(TARGET decompsolver PROPERTY POSITION_INDEPENDENT_CODE ON)
