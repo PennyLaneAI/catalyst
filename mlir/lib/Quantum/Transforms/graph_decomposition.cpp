@@ -57,15 +57,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     {
         loadPythonCallbackPlugin();
 
-        ModuleOp module = getOperation();
-
-        OpPassManager pm1("builtin.module");
-        pm1.addPass(createRegisterDecompRuleResourcePass());
-
-        if (failed(runPipeline(pm1, module))) {
-            return signalPassFailure();
-        }
-
         // Debugging output for command-line options
         LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");
         LLVM_DEBUG({
@@ -134,6 +125,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 4: Run decompose-lowering to apply the decomposition rules
+        ModuleOp module = getOperation();
         OpPassManager pm2("builtin.module");
         pm2.addPass(createDecomposeLoweringPass());
 
