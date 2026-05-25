@@ -813,6 +813,115 @@ class TestInvalidInputIR:
             run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
 
+# MARK: Control Flow Tests
+
+
+class TestControlFlow:
+    """Unit/integrations tests for input quantum-dialect programs that contain control-flow."""
+
+    def test_conditional_gate(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with an `scf.if` conditional, which applies gates conditional on
+        some input value.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program(%arg0: tensor<i1>) {
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            // CHECK: [[hreg0:%.+]] = qecl.insert_block
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: [[cond:%.+]] = tensor.extract
+            %extracted = tensor.extract %arg0[] : tensor<i1>
+
+            // CHECK: [[out_hreg:%.+]] = scf.if [[cond]] -> (!qecl.hyperreg<1 x 1>)
+            // CHECK:     qecl.extract_block [[hreg0]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     qecl.x
+            //   COM:     <qec cycle>
+            // CHECK:     [[hreg_true:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[hreg_true]] : !qecl.hyperreg<1 x 1>
+            // CHECK: else
+            // CHECK:     qecl.extract_block [[hreg0]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     qecl.z
+            //   COM:     <qec cycle>
+            // CHECK:     [[hreg_false:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[hreg_false]] : !qecl.hyperreg<1 x 1>
+            %1 = scf.if %extracted -> (!quantum.reg) {
+                %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %out_qubits = quantum.custom "PauliX"() %5 : !quantum.bit
+                %6 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+                scf.yield %6 : !quantum.reg
+            } else {
+                %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %out_qubits = quantum.custom "PauliZ"() %5 : !quantum.bit
+                %6 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+                scf.yield %6 : !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[out_hreg]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %1 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_conditional_measure(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with an `scf.if` conditional, which applies mid-circuit
+        measurements conditional on some input value. Note that both branches apply the same MCM,
+        but this is immaterial for the purposes of this test.
+
+        Importantly, this test checks that the lowering for `scf.if` ops that return both quantum
+        and classical types works as expected.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program(%arg0: tensor<i1>) {
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            // CHECK: [[hreg0:%.+]] = qecl.insert_block
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: [[cond:%.+]] = tensor.extract
+            %extracted = tensor.extract %arg0[] : tensor<i1>
+
+            // CHECK: [[mres:%.+]], [[out_hreg:%.+]] = scf.if [[cond]] -> (i1, !qecl.hyperreg<1 x 1>)
+            // CHECK:     qecl.extract_block [[hreg0]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     [[mres_true:%.+]], {{%.+}} = qecl.measure
+            //   COM:     <qec cycle>
+            // CHECK:     [[hreg_true:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[mres_true]], [[hreg_true]] : i1, !qecl.hyperreg<1 x 1>
+            // CHECK: else
+            // CHECK:     qecl.extract_block [[hreg0]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     [[mres_false:%.+]], {{%.+}} = qecl.measure
+            //   COM:     <qec cycle>
+            // CHECK:     [[hreg_false:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[mres_false]], [[hreg_false]] : i1, !qecl.hyperreg<1 x 1>
+            %1, %2 = scf.if %extracted -> (i1, !quantum.reg) {
+                %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %mres, %out_qubit = quantum.measure %5 : i1, !quantum.bit
+                %6 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+                scf.yield %mres, %6 : i1, !quantum.reg
+            } else {
+                %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %mres, %out_qubit = quantum.measure %5 : i1, !quantum.bit
+                %6 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+                scf.yield %mres, %6 : i1, !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[out_hreg]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %2 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+
 # MARK: Integration Tests
 
 

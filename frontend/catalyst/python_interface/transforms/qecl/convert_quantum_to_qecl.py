@@ -85,7 +85,7 @@ from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, scf
 from xdsl.dialects.builtin import IndexType, IntegerAttr, IntegerType
-from xdsl.ir import Block, BlockArgument, Operation, SSAValue
+from xdsl.ir import Attribute, Block, BlockArgument, Operation, OpResult, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -94,6 +94,7 @@ from xdsl.pattern_rewriter import (
     RewritePattern,
     op_type_rewrite_pattern,
 )
+from xdsl.rewriter import InsertPoint
 from xdsl.transforms.reconcile_unrealized_casts import ReconcileUnrealizedCastsPass
 
 from catalyst.python_interface.dialects import qecl, quantum
@@ -494,6 +495,144 @@ class MeasureOpConversion(RewritePattern):
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
 
 
+# MARK: SCF Yield Pattern
+
+
+class ScfYieldConversion(RewritePattern):
+    """Handles conversion of `scf.yield` ops."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: scf.YieldOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.yield` ops."""
+        new_yield_operands = []
+
+        for operand in op.operands:
+            operand_owner = operand.owner
+            if isinstance(operand.type, quantum.QuregType):
+                # Expect `!quantum.reg `types to be convertible to `!qecl.hyperreg` types
+                if not _is_type_convertible(operand_owner, qecl.LogicalHyperRegisterType):
+                    _raise_failed_to_convert_op_compile_error(op)
+
+                conv_cast_op = self._insert_conv_cast_op(operand_owner, rewriter)
+                new_yield_operands.append(conv_cast_op.results[0])
+                self._notify_parent_op_modified(op, rewriter)
+
+            elif isinstance(operand.type, quantum.QubitType):
+                # Expect `!quantum.bit` types to be convertible to `!qecl.codeblock` types
+                if not _is_type_convertible(operand_owner, qecl.LogicalCodeblockType):
+                    _raise_failed_to_convert_op_compile_error(op)
+
+                conv_cast_op = self._insert_conv_cast_op(operand_owner, rewriter)
+                new_yield_operands.append(conv_cast_op.results[0])
+                self._notify_parent_op_modified(op, rewriter)
+
+            else:
+                # Not a quantum type, no need to convert
+                new_yield_operands.append(operand)
+
+        # Update the yield op's operands
+        op.operands = new_yield_operands
+
+    @classmethod
+    def _insert_conv_cast_op(
+        cls, operand_owner: Operation, rewriter: PatternRewriter
+    ) -> builtin.UnrealizedConversionCastOp:
+        """Helper function to insert a `builtin.unrealized_conversion_cast` op after
+        `operand_owner`, which converts the result of `operand_owner` to the type of its operand.
+        """
+        conv_cast_op = builtin.UnrealizedConversionCastOp.get(
+            (operand_owner.results[0],), (operand_owner.operands[0].type,)
+        )
+
+        rewriter.insert_op(conv_cast_op, insertion_point=InsertPoint.after(operand_owner))
+
+        return conv_cast_op
+
+    @classmethod
+    def _notify_parent_op_modified(cls, op: scf.YieldOp, rewriter: PatternRewriter):
+        """Notify the rewriter that the parent op of the matched `scf.yield` op (typically another
+        `scf` op, like `scf.if`, `scf.for`, etc.) was modified (this triggers the rewrite pattern
+        for the parent op, which updates the return types(s) corresponding to the new yield types).
+        """
+        parent_op = op.parent_op()
+        assert parent_op is not None, "Op 'scf.yield': expected parent op, but found none"
+        rewriter.notify_op_modified(parent_op)
+
+
+# MARK: SCF If Pattern
+
+
+class ScfIfConversion(RewritePattern):
+    """Handles conversion of `scf.if` conditional ops."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: scf.IfOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.if` ops."""
+        yield_block = op.true_region.last_block
+        assert (
+            yield_block is not None
+        ), "Op 'scf.if': expected at least one block in `true_region`, but found none"
+
+        yield_op = yield_block.last_op
+        assert isinstance(yield_op, scf.YieldOp), (
+            f"Op 'scf.if': expected last op in `true_region` to be 'scf.yield', but got "
+            f"{type(yield_op).__name__}"
+        )
+
+        for i_res, result in enumerate(op.results):
+            # The yield operand that corresponds to the current 'scf.if' return value
+            yield_operand = yield_op.operands[i_res]
+
+            # If the result type of the 'scf.if' op is a `quantum` type, but the corresponding
+            # 'scf.yield' operand is not the same `quantum` type (i.e. because it has been converted
+            # to a `qecl` type), then we replace the result value with one that has the type of the
+            # yield operand. We also must insert unrealized_conversion_cast ops that convert the new
+            # result back to the `quantum` type so that subsequent, unconverted `quantum` ops still
+            # receive inputs of the correct type
+
+            for quantum_type in (quantum.QuregType, quantum.QubitType):
+                if isinstance(result.type, quantum_type) and not isinstance(
+                    yield_operand.type, quantum_type
+                ):
+                    self._convert_quantum_type_result(result, yield_operand, quantum_type, rewriter)
+                    break
+
+    @classmethod
+    def _convert_quantum_type_result(
+        cls,
+        result: OpResult,
+        yield_operand: SSAValue,
+        quantum_type: type[Attribute],
+        rewriter: PatternRewriter,
+    ):
+        """Helper function that converts `result` from a quantum-dialect type to the type of
+        `yield_operand`. See note in the match_and_rewrite() method above.
+        """
+        assert isinstance(
+            result.type, quantum_type
+        ), f"Expected `result` to have type '{quantum_type.name}'"
+
+        new_result = rewriter.replace_value_with_new_type(result, new_type=yield_operand.type)
+
+        # Cast back to `quantum` type for compatibility with subsequent `quantum` ops (to be
+        # resolved by other rewrite patterns).
+        match quantum_type:
+            case quantum.QuregType:
+                conv_cast_op = _cast_to_qureg(new_result)
+            case quantum.QubitType:
+                conv_cast_op = _cast_to_qubit(new_result)
+            case _:
+                assert False, (
+                    f"Expected either a '{quantum.QuregType()}' or '{quantum.QubitType()}' for "
+                    f"conversion, but got {type(quantum_type).__name__}"
+                )
+
+        rewriter.insert_op(conv_cast_op, InsertPoint.after(rewriter.current_operation))
+        rewriter.replace_uses_with_if(
+            new_result, conv_cast_op.results[0], lambda use: use.operation is not conv_cast_op
+        )
+
+
 # MARK: Helpers
 
 
@@ -608,6 +747,8 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                     DeallocOpConversion(),
                     CustomOpConversion(),
                     MeasureOpConversion(),
+                    ScfYieldConversion(),
+                    ScfIfConversion(),
                 ]
             )
         ).rewrite_module(op)
