@@ -110,6 +110,8 @@
   - `qecl.fabricate`, which fabricates a logical codeblock in a specified initial state (typically a
     magic state).
     [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
+  - `qecl.dealloc_cb`, which deallocates a single logical codeblock.
+    [(#2866)](https://github.com/PennyLaneAI/catalyst/pull/2866)
 
 <h3>Documentation 📝</h3>
 
