@@ -36,6 +36,10 @@
   trace back to the same allocation.
   [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
 
+* The `--adjoint-lowering` pass can now handle adjoint operations containing control flow operations
+  that have multiple quantum operands, of either quantum register or qubit type.
+  [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
