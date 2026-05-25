@@ -478,6 +478,23 @@ class TestGraphDecomposition:
 
             circuit()
 
+    def test_paulirot_python_decomp(self):
+        """Test that paulirot callbacks successfully decompose a circuit."""
+
+        def circuit():
+            qp.PauliRot(0.3, "YXZ", [0, 1, 2])
+            return qp.state()
+
+        qnode = qp.QNode(circuit, qp.device("null.qubit", wires=3))
+
+        without_qjit = qnode()
+
+        with_qjit = qp.qjit(
+            graph_decomposition(qnode, gate_set={qp.H, qp.RX, "multirz", qp.GlobalPhase})
+        )()
+
+        assert np.allclose(without_qjit, with_qjit)
+
 
 class TestPlxPRDecomposition:
     """Test the PLxPR-based graph-based decomposition integration with from_plxpr."""

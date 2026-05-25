@@ -651,3 +651,66 @@ module @qreg_at_not_first_arg {
     return %7 : !quantum.reg
   }
 }
+
+// -----
+
+module @test_paulirot {
+    func.func @test() attributes {quantum.node} {
+        %pi = arith.constant 3.1 : f64
+        %inreg = quantum.alloc( 3) : !quantum.reg
+        %q0 = quantum.extract %inreg[ 0] : !quantum.reg -> !quantum.bit
+        %q1 = quantum.extract %inreg[ 1] : !quantum.reg -> !quantum.bit
+        %q2 = quantum.extract %inreg[ 2] : !quantum.reg -> !quantum.bit
+        // CHECK-NOT: quantum.paulirot
+        %out:3 = quantum.paulirot ["Z", "X", "Y"](%pi) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+
+        // CHECK-DAG: Hadamard
+        // CHECK-DAG: RX
+
+        // CHECK: multirz
+
+        // CHECK-DAG: Hadamard
+        // CHECK-DAG: RX
+        %reg2 = quantum.insert %inreg[ 0], %out#0 : !quantum.reg, !quantum.bit
+        %reg3 = quantum.insert %reg2[ 1], %out#1 : !quantum.reg, !quantum.bit
+        %reg4 = quantum.insert %reg2[ 2], %out#2 : !quantum.reg, !quantum.bit
+        quantum.dealloc %reg4 : !quantum.reg
+        return
+    }
+
+    // CHECK-NOT: my_paulirot_decomp
+    func.func private @my_paulirot_decomp(%inreg : !quantum.reg, %angle_tensor : tensor<f64>, %q_tensor : tensor<3xi64>) -> !quantum.reg attributes {target_gate = "paulirotZXY"} {
+        %pi_by_2 = arith.constant 1.57 : f64
+        %m_pi_by_2 = arith.constant -1.57 : f64
+        %angle = tensor.extract %angle_tensor[] : tensor<f64>
+
+        %q0_slice = stablehlo.slice %q_tensor [0:1] : (tensor<3xi64>) -> tensor<1xi64>
+        %q1_slice = stablehlo.slice %q_tensor [1:2] : (tensor<3xi64>) -> tensor<1xi64>
+        %q2_slice = stablehlo.slice %q_tensor [2:3] : (tensor<3xi64>) -> tensor<1xi64>
+
+        %q0_tensor = stablehlo.reshape %q0_slice : (tensor<1xi64>) -> tensor<i64>
+        %q1_tensor = stablehlo.reshape %q1_slice : (tensor<1xi64>) -> tensor<i64>
+        %q2_tensor = stablehlo.reshape %q2_slice : (tensor<1xi64>) -> tensor<i64>
+
+        %q0_index = tensor.extract %q0_tensor[] : tensor<i64>
+        %q1_index = tensor.extract %q1_tensor[] : tensor<i64>
+        %q2_index = tensor.extract %q2_tensor[] : tensor<i64>
+
+        %q0 = quantum.extract %inreg[%q0_index] : !quantum.reg -> !quantum.bit
+        %q1 = quantum.extract %inreg[%q1_index] : !quantum.reg -> !quantum.bit
+        %q2 = quantum.extract %inreg[%q2_index] : !quantum.reg -> !quantum.bit
+
+        %h1_out = quantum.custom "Hadamard"() %q0 : !quantum.bit
+        %rx1_out = quantum.custom "RX"(%pi_by_2) %q1 : !quantum.bit
+        %mrz_out:3 = quantum.multirz(%angle) %h1_out, %rx1_out, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+
+        %h2_out = quantum.custom "Hadamard"() %mrz_out#0 : !quantum.bit
+        %rx2_out = quantum.custom "RX"(%m_pi_by_2) %mrz_out#1 : !quantum.bit
+
+        %reg2 = quantum.insert %inreg[0], %h2_out : !quantum.reg, !quantum.bit
+        %reg3 = quantum.insert %reg2[1], %rx2_out : !quantum.reg, !quantum.bit
+        %outreg = quantum.insert %reg3[2], %mrz_out#2 : !quantum.reg, !quantum.bit
+
+        return %outreg : !quantum.reg
+    }
+}
