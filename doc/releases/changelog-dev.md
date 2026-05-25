@@ -71,6 +71,7 @@
   transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
+  [(#2871)](https://github.com/PennyLaneAI/catalyst/pull/2871)
 
 * The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
   [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
@@ -110,6 +111,8 @@
   - `qecl.fabricate`, which fabricates a logical codeblock in a specified initial state (typically a
     magic state).
     [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
+
+
 
 <h3>Documentation 📝</h3>
 
