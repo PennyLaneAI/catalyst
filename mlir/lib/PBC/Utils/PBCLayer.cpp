@@ -139,10 +139,10 @@ FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onl
 
         flushLayer();
         FailureOr<int64_t> innerDepth = computeWorstCaseDepth(&region.front(), onlyOnDisjointQubit);
-
         if (failed(innerDepth)) {
             return failure();
         }
+
         depth += *innerDepth;
     }
 
