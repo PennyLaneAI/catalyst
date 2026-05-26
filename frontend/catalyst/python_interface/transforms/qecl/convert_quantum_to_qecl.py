@@ -247,7 +247,9 @@ class ExtractOpConversion(RewritePattern):
         # Recall that the `alloc` conversion pattern inserts a builtin.unrealized_conversion_cast
         # op immediately after the alloc that converts from qecl.hyperreg -> quantum.reg.
         qreg_owner_op = op.qreg.owner
-        if not _is_type_convertible(qreg_owner_op, qecl.LogicalHyperRegisterType):
+        if not _is_type_convertible(
+            qreg_owner_op, qecl.LogicalHyperRegisterType
+        ):  # pragma: no cover
             # TODO: We will need to also support the case where a quantum.extract op does not
             # immediately follow a `quantum.alloc` op, e.g. when a block takes in a register as an
             # argument, or if there is some other op that acts on the register in-between alloc and
@@ -292,7 +294,7 @@ class InsertOpConversion(RewritePattern):
         if not (
             _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType)
             and _is_type_convertible(in_qreg_owner_op, qecl.LogicalHyperRegisterType)
-        ):
+        ):  # pragma: no cover
             _raise_failed_to_convert_op_compile_error(op)
 
         # NOTE: As with extract ops, for now we assume k=1, so the quantum.insert index maps 1:1
@@ -330,7 +332,9 @@ class DeallocOpConversion(RewritePattern):
         """Rewrite pattern for `quantum.dealloc` ops."""
 
         qreg_owner_op = op.qreg.owner
-        if not _is_type_convertible(qreg_owner_op, qecl.LogicalHyperRegisterType):
+        if not _is_type_convertible(
+            qreg_owner_op, qecl.LogicalHyperRegisterType
+        ):  # pragma: no cover
             _raise_failed_to_convert_op_compile_error(op)
 
         ops_to_insert = (
@@ -377,7 +381,7 @@ class CustomOpConversion(RewritePattern):
                 if not (
                     _is_type_convertible(ctrl_qubit_owner_op, qecl.LogicalCodeblockType)
                     and _is_type_convertible(trgt_qubit_owner_op, qecl.LogicalCodeblockType)
-                ):
+                ):  # pragma: no cover
                     _raise_failed_to_convert_op_compile_error(op)
                 else:
                     ops_to_insert = (
@@ -422,7 +426,7 @@ class CustomOpConversion(RewritePattern):
         assert len(op.in_qubits) == 1
 
         qubit_owner_op = op.in_qubits[0].owner
-        if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
+        if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):  # pragma: no cover
             _raise_failed_to_convert_op_compile_error(op)
 
         conv_cast_op = builtin.UnrealizedConversionCastOp.get(
@@ -447,7 +451,7 @@ class CustomOpConversion(RewritePattern):
                 qecl_gate_op = qecl.SOp(
                     in_codeblock=conv_cast_op.results[0], idx=0, adjoint=adjoint
                 )
-            case _:
+            case _:  # pragma: no cover
                 assert False, (
                     f"Expected single-qubit gate from set {{'Identity', 'PauliX', 'PauliY', "
                     f"'PauliZ', 'Hadamard', 'S'}}, but got '{gate_name}'"
@@ -481,7 +485,7 @@ class MeasureOpConversion(RewritePattern):
         new_results = None
 
         qubit_owner_op = op.in_qubit.owner
-        if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
+        if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):  # pragma: no cover
             _raise_failed_to_convert_op_compile_error(op)
         else:
             ops_to_insert = (
@@ -511,7 +515,9 @@ class ScfYieldConversion(RewritePattern):
             operand_owner = operand.owner
             if isinstance(operand.type, quantum.QuregType):
                 # Expect `!quantum.reg `types to be convertible to `!qecl.hyperreg` types
-                if not _is_type_convertible(operand_owner, qecl.LogicalHyperRegisterType):
+                if not _is_type_convertible(
+                    operand_owner, qecl.LogicalHyperRegisterType
+                ):  # pragma: no cover
                     _raise_failed_to_convert_op_compile_error(op)
 
                 conv_cast_op = self._insert_conv_cast_op(operand_owner, rewriter)
@@ -520,7 +526,9 @@ class ScfYieldConversion(RewritePattern):
 
             elif isinstance(operand.type, quantum.QubitType):
                 # Expect `!quantum.bit` types to be convertible to `!qecl.codeblock` types
-                if not _is_type_convertible(operand_owner, qecl.LogicalCodeblockType):
+                if not _is_type_convertible(
+                    operand_owner, qecl.LogicalCodeblockType
+                ):  # pragma: no cover
                     _raise_failed_to_convert_op_compile_error(op)
 
                 conv_cast_op = self._insert_conv_cast_op(operand_owner, rewriter)
@@ -622,7 +630,7 @@ class ScfConversionPattern(RewritePattern):
                 conv_cast_op = _cast_to_qureg(new_result)
             case quantum.QubitType:
                 conv_cast_op = _cast_to_qubit(new_result)
-            case _:
+            case _:  # pragma: no cover
                 assert False, (
                     f"Expected either a '{quantum.QuregType()}' or '{quantum.QubitType()}' for "
                     f"conversion, but got {type(quantum_type).__name__}"
