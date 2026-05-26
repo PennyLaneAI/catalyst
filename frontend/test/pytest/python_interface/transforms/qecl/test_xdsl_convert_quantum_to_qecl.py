@@ -828,11 +828,13 @@ class TestControlFlow:
         // CHECK-LABEL: func.func @test_program(
         func.func @test_program(%arg0: tensor<i1>) {
             // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.extract_block>
+            //   COM: <qecl.encode>
             // CHECK: [[hreg0:%.+]] = qecl.insert_block
             %0 = quantum.alloc( 1) : !quantum.reg
 
             // CHECK: [[cond:%.+]] = tensor.extract
-            %extracted = tensor.extract %arg0[] : tensor<i1>
+            %cond = tensor.extract %arg0[] : tensor<i1>
 
             // CHECK: [[out_hreg:%.+]] = scf.if [[cond]] -> (!qecl.hyperreg<1 x 1>)
             // CHECK:     qecl.extract_block [[hreg0]][0]
@@ -848,7 +850,7 @@ class TestControlFlow:
             //   COM:     <qec cycle>
             // CHECK:     [[hreg_false:%.+]] = qecl.insert_block [[hreg0]][0]
             // CHECK:     scf.yield [[hreg_false]] : !qecl.hyperreg<1 x 1>
-            %1 = scf.if %extracted -> (!quantum.reg) {
+            %1 = scf.if %cond -> (!quantum.reg) {
                 %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
                 %out_qubits = quantum.custom "PauliX"() %5 : !quantum.bit
                 %6 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
@@ -868,6 +870,58 @@ class TestControlFlow:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_conditional_gate_without_register_packing(
+        self, run_filecheck, quantum_to_qecl_pipeline_k_1
+    ):
+        """Test a simple program with an `scf.if` conditional, which applies gates conditional on
+        some input value.
+
+        This program does not not pack qubits back into a register before entering the `scf.if`
+        region, which allows testing the case where the return type of the `scf.if` op is a
+        !quantum.bit in the input program, rather than a !quantum.reg.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program(%arg0: tensor<i1>) {
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.extract_block>
+            //   COM: <qecl.encode>
+            // CHECK: [[hreg0:%.+]] = qecl.insert_block
+            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]]
+            //   COM: <qec cycle>
+            // CHECK: [[cb1:%.+]] = qecl.x
+            // CHECK: [[cb2:%.+]] = qecl.qec
+            %0 = quantum.alloc( 1) : !quantum.reg
+            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+            %2 = quantum.custom "PauliX"() %1 : !quantum.bit
+
+            // CHECK: [[cond:%.+]] = tensor.extract
+            %cond = tensor.extract %arg0[] : tensor<i1>
+
+            // CHECK: [[out_cb:%.+]] = scf.if [[cond]] -> (!qecl.codeblock<1>)
+            // CHECK:     [[cb3:%.+]] = qecl.z [[cb2]]
+            // CHECK:     [[cb4:%.+]] = qecl.qec
+            // CHECK:     scf.yield [[cb4]] : !qecl.codeblock<1>
+            // CHECK: else
+            // CHECK:     scf.yield [[cb2]] : !qecl.codeblock<1>
+            %3 = scf.if %cond -> (!quantum.bit) {
+                %3 = quantum.custom "PauliZ"() %2 : !quantum.bit
+                scf.yield %3 : !quantum.bit
+            } else {
+                scf.yield %2 : !quantum.bit
+            }
+
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]]
+            // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
+            %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+            quantum.dealloc %4 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
     def test_conditional_measure(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test a simple program with an `scf.if` conditional, which applies mid-circuit
         measurements conditional on some input value. Note that both branches apply the same MCM,
@@ -881,6 +935,8 @@ class TestControlFlow:
         // CHECK-LABEL: func.func @test_program(
         func.func @test_program(%arg0: tensor<i1>) {
             // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.extract_block>
+            //   COM: <qecl.encode>
             // CHECK: [[hreg0:%.+]] = qecl.insert_block
             %0 = quantum.alloc( 1) : !quantum.reg
 
