@@ -33,7 +33,7 @@ The convert-qecl-to-qecp pass has the following known limitations:
   * For terminal measurements, only sampling of MCMs is supported
   * The encoding procedure to create the logical zero state in a codeblock is not optimized for
     efficiency
-  * Only thoroughly tested with the Steane code, but should be generalizable to other k=1 CSS 
+  * Only thoroughly tested with the Steane code, but should be generalizable to other k=1 CSS
     stabilizer codes.
 """
 
@@ -110,8 +110,8 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
         """Type conversion rewrite pattern for physical codeblock types."""
         if typ.k.value.data != self.qec_code.k:
             raise CompileError(
-                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; hyper-register has "
-                f"k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
+                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; hyper-register "
+                f"has k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
             )
 
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
