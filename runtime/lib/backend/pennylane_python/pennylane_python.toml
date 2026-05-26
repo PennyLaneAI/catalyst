@@ -1,0 +1,86 @@
+schema = 3
+
+# The PennyLane Python compatibility backend.
+#
+# This device configuration declares the maximal gate set that the Catalyst
+# runtime C API can express. At compile time, the Catalyst frontend intersects
+# this with the target Python device's actual capabilities (from its own TOML)
+# to determine the effective gate set. Any operations outside that intersection
+# are decomposed before lowering to LLVM IR.
+#
+# At runtime, the compiled binary calls into this C++ device backend, which
+# accumulates operations and delegates measurement execution to the Python
+# device via nanobind callback.
+
+[operators.gates]
+
+Identity = { properties = ["invertible", "controllable"] }
+PauliX = { properties = ["invertible", "controllable"] }
+PauliY = { properties = ["invertible", "controllable"] }
+PauliZ = { properties = ["invertible", "controllable"] }
+Hadamard = { properties = ["invertible", "controllable"] }
+S = { properties = ["invertible", "controllable"] }
+T = { properties = ["invertible", "controllable"] }
+SX = { properties = ["invertible", "controllable"] }
+CNOT = { properties = ["invertible", "controllable"] }
+CY = { properties = ["invertible", "controllable"] }
+CZ = { properties = ["invertible", "controllable"] }
+SWAP = { properties = ["invertible", "controllable"] }
+CSWAP = { properties = ["invertible", "controllable"] }
+Toffoli = { properties = ["invertible", "controllable"] }
+ISWAP = { properties = ["invertible", "controllable"] }
+PSWAP = { properties = ["invertible", "controllable"] }
+ECR = { properties = ["invertible", "controllable"] }
+PhaseShift = { properties = ["invertible", "controllable"] }
+ControlledPhaseShift = { properties = ["invertible", "controllable"] }
+RX = { properties = ["invertible", "controllable"] }
+RY = { properties = ["invertible", "controllable"] }
+RZ = { properties = ["invertible", "controllable"] }
+Rot = { properties = ["invertible", "controllable"] }
+CRX = { properties = ["invertible", "controllable"] }
+CRY = { properties = ["invertible", "controllable"] }
+CRZ = { properties = ["invertible", "controllable"] }
+CRot = { properties = ["invertible", "controllable"] }
+IsingXX = { properties = ["invertible", "controllable"] }
+IsingXY = { properties = ["invertible", "controllable"] }
+IsingYY = { properties = ["invertible", "controllable"] }
+IsingZZ = { properties = ["invertible", "controllable"] }
+SingleExcitation = { properties = ["invertible", "controllable"] }
+DoubleExcitation = { properties = ["invertible", "controllable"] }
+QubitUnitary = { properties = ["invertible", "controllable"] }
+MultiRZ = { properties = ["invertible", "controllable"] }
+GlobalPhase = { properties = ["invertible", "controllable"] }
+
+[operators.observables]
+
+PauliX = { }
+PauliY = { }
+PauliZ = { }
+Hadamard = { }
+Hermitian = { }
+Identity = { }
+Projector = { }
+SProd = { }
+Prod = { }
+Sum = { }
+Hamiltonian = { }
+
+[measurement_processes]
+
+ExpectationMP = { }
+VarianceMP = { }
+ProbabilityMP = { }
+StateMP = { conditions = ["analytic"] }
+SampleMP = { conditions = ["finiteshots"] }
+CountsMP = { conditions = ["finiteshots"] }
+
+[compilation]
+
+# Compatible with qjit
+qjit_compatible = true
+# Requires runtime code generation (tape is built at execution time)
+runtime_code_generation = true
+# Static qubit allocation only
+dynamic_qubit_management = false
+# MCM support depends on the underlying Python device; conservatively disabled
+supported_mcm_methods = [ ]

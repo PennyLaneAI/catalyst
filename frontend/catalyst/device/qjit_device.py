@@ -135,6 +135,7 @@ SUPPORTED_RT_DEVICES = {
     "null.qubit": ("NullQubit", "librtd_null_qubit"),
     "braket.aws.qubit": ("OpenQasmDevice", "librtd_openqasm"),
     "braket.local.qubit": ("OpenQasmDevice", "librtd_openqasm"),
+    "pennylane.python": ("PLPythonDevice", "librtd_pennylane_python"),
 }
 
 
@@ -153,6 +154,10 @@ class BackendInfo:
 def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
+
+    import pennylane as qp
+    from catalyst.utils.exceptions import CompileError
+    from catalyst.utils.runtime_environment import get_lib_path
 
     dname = device.name
     if isinstance(device, qp.devices.LegacyDeviceFacade):
@@ -178,7 +183,33 @@ def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
         # Support third party devices with `get_c_interface`
         device_name, device_lpath = device.get_c_interface()
     else:
-        raise CompileError(f"The {dname} device does not provide C interface for compilation.")
+        # === NEW FALLBACK: wrap any PennyLane device with the Python compat layer ===
+        # Instead of raising CompileError, we wrap the device automatically.
+        import warnings
+        warnings.warn(
+            f"Device '{dname}' does not provide a native C interface. "
+            f"Using the PennyLane Python compatibility layer (pennylane.python). "
+            f"This executes quantum instructions via Python callback and is slower "
+            f"than native backends.",
+            stacklevel=2,
+        )
+        device_name = "PLPythonDevice"
+        device_lpath = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        import platform, os
+        sys_platform = platform.system()
+        if sys_platform == "Linux":
+            device_lpath = os.path.join(device_lpath, "librtd_pennylane_python.so")
+        elif sys_platform == "Darwin":
+            device_lpath = os.path.join(device_lpath, "librtd_pennylane_python.dylib")
+        else:
+            raise NotImplementedError(f"Platform not supported: {sys_platform}")
+
+        # Pass device info as kwargs so the C++ runtime can reconstruct it
+        device_kwargs["pl_device_name"] = dname
+        device_kwargs["wires"] = str(len(device.wires))
+        device_kwargs["shots"] = str(device.shots.total_shots if device.shots else 0)
+
+
 
     if not pathlib.Path(device_lpath).is_file():
         raise CompileError(f"Device at {device_lpath} cannot be found!")

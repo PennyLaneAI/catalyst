@@ -1,6 +1,11 @@
 add_subdirectory(null_qubit)
 configure_file(null_qubit/null_qubit.toml null_qubit.toml)
 
+add_subdirectory(pennylane_python)
+configure_file(pennylane_python/pennylane_python.toml pennylane_python.toml)
+configure_file(pennylane_python/pennylane_python.toml default_qubit.toml)
+
+
 if(ENABLE_OQD)
 add_subdirectory(oqd)
 configure_file(oqd/oqd.toml oqd.toml)
@@ -11,3 +16,4 @@ add_subdirectory(openqasm)
 configure_file(openqasm/braket_local_qubit.toml braket_local_qubit.toml)
 configure_file(openqasm/braket_aws_qubit.toml braket_aws_qubit.toml)
 endif()
+
