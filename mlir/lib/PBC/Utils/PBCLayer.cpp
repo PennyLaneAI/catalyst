@@ -19,6 +19,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
+#include "Catalyst/Utils/SCFUtils.h"
 #include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Utils/PauliStringWrapper.h"
@@ -71,6 +72,21 @@ FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp swit
     return maxDepth;
 }
 
+FailureOr<int64_t> PBCLayerContext::forWorstCaseDepth(scf::ForOp forOp, bool onlyOnDisjointQubit)
+{
+    int64_t iterations = countStaticForOpIterations(forOp);
+    if (iterations == -1) {
+        return forOp.emitOpError(
+            "worst-case depth is not available when there are dynamically sized for loops");
+    }
+
+    FailureOr<int64_t> bodyDepth = computeWorstCaseDepth(forOp.getBody(), onlyOnDisjointQubit);
+    if (failed(bodyDepth)) {
+        return failure();
+    }
+    return iterations * (*bodyDepth);
+}
+
 FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onlyOnDisjointQubit)
 {
     int64_t depth = 0;
@@ -84,9 +100,9 @@ FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onl
     };
 
     for (Operation &op : *block) {
-        if (isa<scf::ForOp>(&op) || isa<scf::WhileOp>(&op)) {
+        if (isa<scf::WhileOp>(&op)) {
             return op.emitOpError(
-                "worst-case depth is not available when PBC ops are inside scf.for or scf.while");
+                "worst-case depth is not available when PBC ops are inside scf.while");
         }
         if (auto ifOp = dyn_cast<scf::IfOp>(&op)) {
             flushLayer();
@@ -105,6 +121,16 @@ FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onl
                 return failure();
             }
             depth += *branchDepth;
+            continue;
+        }
+
+        if (auto forOp = dyn_cast<scf::ForOp>(&op)) {
+            flushLayer();
+            FailureOr<int64_t> loopDepth = forWorstCaseDepth(forOp, onlyOnDisjointQubit);
+            if (failed(loopDepth)) {
+                return failure();
+            }
+            depth += *loopDepth;
             continue;
         }
 
