@@ -116,6 +116,10 @@
     [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
   - `qecl.dealloc_cb`, which deallocates a single logical codeblock.
     [(#2866)](https://github.com/PennyLaneAI/catalyst/pull/2866)
+  - `qecp.alloc_cb`, which allocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
 
 <h3>Documentation 📝</h3>
 
