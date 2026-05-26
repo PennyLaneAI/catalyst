@@ -84,20 +84,18 @@ FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onl
     };
 
     for (Operation &op : *block) {
+        if (isa<scf::ForOp>(&op) || isa<scf::WhileOp>(&op)) {
+            return op.emitOpError(
+                "worst-case depth is not available when PBC ops are inside scf.for or scf.while");
+        }
         if (auto ifOp = dyn_cast<scf::IfOp>(&op)) {
             flushLayer();
             FailureOr<int64_t> branchDepth = ifWorstCaseDepth(ifOp, onlyOnDisjointQubit);
             if (failed(branchDepth)) {
                 return failure();
             }
-
             depth += *branchDepth;
             continue;
-        }
-
-        if (isa<scf::ForOp>(&op) || isa<scf::WhileOp>(&op)) {
-            return op.emitOpError(
-                "worst-case depth is not available when PBC ops are inside scf.for or scf.while");
         }
 
         if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(&op)) {
