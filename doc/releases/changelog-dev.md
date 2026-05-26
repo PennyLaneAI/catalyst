@@ -43,7 +43,7 @@
   ``depth(region) = layers_outside_branch + Σ max(depth(branch_i))``. Previously branches
   were counted sequentially.
   [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
 
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values
