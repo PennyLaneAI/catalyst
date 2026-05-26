@@ -70,6 +70,8 @@ expected_ops_names = {
     "DeallocOp": "qecp.dealloc",
     "AllocAuxQubitOp": "qecp.alloc_aux",
     "DeallocAuxQubitOp": "qecp.dealloc_aux",
+    "AllocCodeblockOp": "qecp.alloc_cb",
+    "DeallocCodeblockOp": "qecp.dealloc_cb",
     "ExtractCodeblockOp": "qecp.extract_block",
     "InsertCodeblockOp": "qecp.insert_block",
     "ExtractQubitOp": "qecp.extract",
@@ -215,6 +217,17 @@ class TestQecPhysicalOps:
         """Test the constructor of the qecp.dealloc_aux op."""
         dealloc_aux_op = qecp.DeallocAuxQubitOp(self._get_qubit_aux_value())
         assert len(dealloc_aux_op.result_types) == 0
+
+    def test_qecp_op_constructor_alloc_cb(self):
+        """Test the constructor of the qecp.alloc_cb op."""
+        alloc_cb_op = qecp.AllocCodeblockOp(codeblock_type=qecp.PhysicalCodeblockType(k=1, n=7))
+        assert len(alloc_cb_op.result_types) == 1
+        assert isinstance(alloc_cb_op.result_types[0], qecp.PhysicalCodeblockType)
+
+    def test_qecp_op_constructor_dealloc_cb(self):
+        """Test the constructor of the qecp.dealloc_cb op."""
+        dealloc_cb_op = qecp.DeallocCodeblockOp(self._get_codeblock_value())
+        assert len(dealloc_cb_op.result_types) == 0
 
     @pytest.mark.parametrize(
         "idx", [0, IntegerAttr(0, IndexType()), IntegerAttr(0, i64), create_ssa_value(IndexType())]
@@ -474,6 +487,12 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: qecp.dealloc_aux [[q_aux1]] : !qecp.qubit<aux>
     qecp.dealloc_aux %q_aux1 : !qecp.qubit<aux>
+
+    // CHECK: [[cb0:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+    %cb0 = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+
+    // CHECK: qecp.dealloc_cb [[cb0]] : !qecp.codeblock<1 x 7>
+    qecp.dealloc_cb %cb0 : !qecp.codeblock<1 x 7>
 
     // CHECK: [[block0:%.+]] = qecp.extract_block [[hyperreg]][{{\s*}}0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
     %block0 = qecp.extract_block %hyperreg[ 0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
