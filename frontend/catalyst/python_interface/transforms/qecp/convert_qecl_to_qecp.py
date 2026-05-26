@@ -24,7 +24,7 @@ The convert-qecl-to-qecp pass has the following known limitations:
 
   * No support for QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
   * No support for non-CSS codes
-  * Only supports lowering of transversal operations
+  * Only supports lowering of transversal gates and measurements. Does not support non-Clifford gates.
   * Only logical Pauli Z observables (computational basis) are supported for lowering `qecl.measure`
     operations.
   * Support for control flow in the user program is not fully implemented or tested
