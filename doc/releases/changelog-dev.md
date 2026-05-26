@@ -122,7 +122,10 @@
   - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
 
+* The experimental QEC pipeline now supports the following control-flow operations:
 
+  - Conditionals (`scf.if`)
+    [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
 
 <h3>Documentation 📝</h3>
 
