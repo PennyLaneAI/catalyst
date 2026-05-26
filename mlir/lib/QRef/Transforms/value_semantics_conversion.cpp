@@ -28,6 +28,8 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/CallGraph.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Block.h"
@@ -41,6 +43,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/WalkResult.h"
 
+#include "Catalyst/IR/CatalystOps.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
@@ -894,6 +897,78 @@ struct SubroutineInfo {
     SetVector<Value> necessarySubroutineRValues;
     SmallVector<std::variant<unsigned, std::pair<unsigned, uint64_t>>> newArgsInfo;
 }; // struct SubroutineInfo
+
+void checkQubitCallArgAliasingPair(IRRewriter &builder, Value rQubit1, Value rQubit2)
+{
+    // Only potentially aliasing case is where both rQubits come from qref.get ops
+    // This is because those coming from single qubit allocations are guaranteed to be not aliasing
+    if (!isa_and_nonnull<qref::GetOp>(rQubit1.getDefiningOp()) ||
+        !isa_and_nonnull<qref::GetOp>(rQubit2.getDefiningOp())) {
+        return;
+    }
+
+    qref::GetOp getOp1 = cast<qref::GetOp>(rQubit1.getDefiningOp());
+    qref::GetOp getOp2 = cast<qref::GetOp>(rQubit2.getDefiningOp());
+    if (getOp1.getQreg() != getOp2.getQreg()) {
+        // Will definitely not alias if they come from different registers
+        return;
+    }
+
+    Location loc = getOp1.getLoc();
+    std::optional<uint64_t> staticIndex1 = getOp1.getIdxAttr();
+    std::optional<uint64_t> staticIndex2 = getOp2.getIdxAttr();
+    Value dynamicIndex1 = getOp1.getIdx();
+    Value dynamicIndex2 = getOp2.getIdx();
+
+    if (staticIndex1.has_value() && staticIndex2.has_value()) {
+        assert(staticIndex1.value() != staticIndex2.value() &&
+               "Can only call subroutines with non aliasing qubits");
+    }
+    else if (staticIndex1.has_value() && dynamicIndex2 != nullptr) {
+        auto idx =
+            arith::ConstantOp::create(builder, loc, dynamicIndex2.getType(),
+                                      IntegerAttr::get(builder.getI64Type(), staticIndex1.value()));
+
+        auto compNEQ = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne,
+                                             idx.getResult(), dynamicIndex2);
+        catalyst::AssertionOp::create(builder, loc, compNEQ.getResult(),
+                                      "Can only call subroutines with non aliasing qubits");
+    }
+    else if (staticIndex2.has_value() && dynamicIndex1 != nullptr) {
+        auto idx =
+            arith::ConstantOp::create(builder, loc, dynamicIndex1.getType(),
+                                      IntegerAttr::get(builder.getI64Type(), staticIndex2.value()));
+
+        auto compNEQ = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne,
+                                             idx.getResult(), dynamicIndex1);
+        catalyst::AssertionOp::create(builder, loc, compNEQ.getResult(),
+                                      "Can only call subroutines with non aliasing qubits");
+    }
+    else if (dynamicIndex1 != nullptr && dynamicIndex2 != nullptr) {
+        auto compNEQ = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne, dynamicIndex1,
+                                             dynamicIndex2);
+        catalyst::AssertionOp::create(builder, loc, compNEQ.getResult(),
+                                      "Can only call subroutines with non aliasing qubits");
+    }
+}
+
+void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(callOp);
+    SmallVector<Value> rQubitCallOperands;
+    for (Value callArg : callOp.getArgOperands()) {
+        if (isa<qref::QubitType>(callArg.getType())) {
+            rQubitCallOperands.push_back(callArg);
+        }
+    }
+
+    for (size_t i = 0; i < rQubitCallOperands.size(); i++) {
+        for (size_t j = i + 1; j < rQubitCallOperands.size(); j++) {
+            checkQubitCallArgAliasingPair(builder, rQubitCallOperands[i], rQubitCallOperands[j]);
+        }
+    }
+}
 
 void stageCallOpForConversion(IRRewriter &builder, func::CallOp callOp,
                               SubroutineInfo &subroutineInfo)
@@ -1826,6 +1901,7 @@ struct ValueSemanticsConversionPass
                 for (auto use : *uses) {
                     Operation *user = use.getUser();
                     if (auto callOp = dyn_cast<func::CallOp>(user)) {
+                        checkNoAliasingQubitsInCallOp(builder, callOp);
                         stageCallOpForConversion(builder, callOp, info);
                     }
                 }

@@ -21,7 +21,8 @@ def ValueSemanticsConversionPass : Pass<"convert-to-value-semantics"> {
     let summary = "Convert to value semantics quantum dialect";
 
     let dependentDialects = [
-       "catalyst::quantum::QuantumDialect"
+       "catalyst::quantum::QuantumDialect",
+       "catalyst::CatalystDialect"
     ];
 }
 
