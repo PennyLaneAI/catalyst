@@ -343,7 +343,7 @@ class DeallocOpConversion(RewritePattern):
 
 # MARK: Custom Op Pattern
 
-
+@dataclass
 class CustomOpConversion(RewritePattern):
     """Converts `quantum.custom` ops for Clifford+T and Pauli gates to their equivalent `qecl`
     ops. The gates "S", "Hadamard", "CNOT", "PauliX", "PauliY", "PauliZ" and "Identity" have
@@ -358,6 +358,8 @@ class CustomOpConversion(RewritePattern):
     operation to the codeblock at index 0. This simplification will need to be addressed when the
     quantum-to-qecl dialect conversion supports arbitrary values of k >= 1.
     """
+
+    t_subroutine: func.FuncOp
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: quantum.CustomOp, rewriter: PatternRewriter):
@@ -379,7 +381,7 @@ class CustomOpConversion(RewritePattern):
                         (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
                     ),
                     t_gate_subroutine := func.CallOp(
-                        callee=SymbolRefAttr("apply_T"),
+                        callee=SymbolRefAttr(self.t_subroutine.sym_name),
                         arguments=conv_cast_op.results[0],
                         return_types=conv_cast_op.results[0].type,
                     ),
@@ -630,7 +632,7 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                     ExtractOpConversion(),
                     InsertOpConversion(),
                     DeallocOpConversion(),
-                    CustomOpConversion(),
+                    CustomOpConversion(t_subroutine=t_subroutine),
                     MeasureOpConversion(),
                 ]
             )
