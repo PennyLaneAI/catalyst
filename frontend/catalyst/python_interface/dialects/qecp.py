@@ -365,6 +365,38 @@ class DeallocAuxQubitOp(IRDLOperation):
 
 
 @irdl_op_definition
+class AllocCodeblockOp(IRDLOperation):
+    """Allocate a single physical codeblock."""
+
+    name = "qecp.alloc_cb"
+
+    assembly_format = """
+            attr-dict `:` type($codeblock)
+        """
+
+    codeblock = result_def(base(PhysicalCodeblockType))
+
+    def __init__(self, codeblock_type: PhysicalCodeblockType):
+        super().__init__(result_types=(codeblock_type,))
+
+
+@irdl_op_definition
+class DeallocCodeblockOp(IRDLOperation):
+    """Deallocate a single physical codeblock."""
+
+    name = "qecp.dealloc_cb"
+
+    assembly_format = """
+            $codeblock attr-dict `:` type($codeblock)
+        """
+
+    codeblock = operand_def(base(PhysicalCodeblockType))
+
+    def __init__(self, codeblock: PhysicalCodeBlockSSAValue | Operation):
+        super().__init__(operands=(codeblock,))
+
+
+@irdl_op_definition
 class ExtractCodeblockOp(IRDLOperation):
     """Extract a physical codeblock value from a hyper-register."""
 
@@ -392,7 +424,7 @@ class ExtractCodeblockOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (hyper_reg, None)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (hyper_reg, idx)
             properties = {}
@@ -440,7 +472,7 @@ class InsertCodeblockOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (in_hyper_reg, None, codeblock)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (in_hyper_reg, idx, codeblock)
             properties = {}
@@ -485,7 +517,7 @@ class ExtractQubitOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (codeblock, None)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (codeblock, idx)
             properties = {}
@@ -537,7 +569,7 @@ class InsertQubitOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None, qubit)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (in_codeblock, idx, qubit)
             properties = {}
@@ -826,7 +858,7 @@ class DecodeEsmCssOp(IRDLOperation):
         esm: SSAValue[TensorType] | Operation,
         err_idx_type: TensorType,
     ):
-        operands = (tanner_graph, esm, None)
+        operands = (esm, tanner_graph, None)
         super().__init__(operands=operands, result_types=(err_idx_type,))
 
 
@@ -882,6 +914,8 @@ QecPhysical = Dialect(
         DeallocOp,
         AllocAuxQubitOp,
         DeallocAuxQubitOp,
+        AllocCodeblockOp,
+        DeallocCodeblockOp,
         ExtractCodeblockOp,
         InsertCodeblockOp,
         ExtractQubitOp,

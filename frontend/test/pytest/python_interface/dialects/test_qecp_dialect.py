@@ -28,11 +28,31 @@ from xdsl.dialects.builtin import (
     i32,
     i64,
 )
-from xdsl.ir import AttributeCovT, OpResult
+from xdsl.ir import AttributeCovT, Operation, OpResult, SSAValue
 
 from catalyst.python_interface.dialects import qecp
 
 pytestmark = pytest.mark.xdsl
+
+
+@pytest.fixture(scope="module", name="assert_valid_idx_attr")
+def fixture_assert_valid_idx_attr():
+    """Fixture factory that returns a function to validate the `idx_attr` attribute of an xDSL
+    operation.
+    """
+
+    def _validate_idx(op: Operation, idx: int | IntegerAttr | SSAValue):
+        idx_attr = op.properties.get("idx_attr")
+        if isinstance(idx, (int, IntegerAttr)):
+            assert idx_attr is not None
+            if isinstance(idx, int):
+                assert idx_attr == IntegerAttr(idx, IndexType())
+            elif isinstance(idx, IntegerAttr):
+                assert idx_attr == IntegerAttr(idx.value.data, IndexType())
+        else:
+            assert idx_attr is None
+
+    return _validate_idx
 
 
 # Test function taken from xdsl/utils/test_value.py
@@ -50,6 +70,8 @@ expected_ops_names = {
     "DeallocOp": "qecp.dealloc",
     "AllocAuxQubitOp": "qecp.alloc_aux",
     "DeallocAuxQubitOp": "qecp.dealloc_aux",
+    "AllocCodeblockOp": "qecp.alloc_cb",
+    "DeallocCodeblockOp": "qecp.dealloc_cb",
     "ExtractCodeblockOp": "qecp.extract_block",
     "InsertCodeblockOp": "qecp.insert_block",
     "ExtractQubitOp": "qecp.extract",
@@ -196,22 +218,43 @@ class TestQecPhysicalOps:
         dealloc_aux_op = qecp.DeallocAuxQubitOp(self._get_qubit_aux_value())
         assert len(dealloc_aux_op.result_types) == 0
 
+    def test_qecp_op_constructor_alloc_cb(self):
+        """Test the constructor of the qecp.alloc_cb op."""
+        alloc_cb_op = qecp.AllocCodeblockOp(codeblock_type=qecp.PhysicalCodeblockType(k=1, n=7))
+        assert len(alloc_cb_op.result_types) == 1
+        assert isinstance(alloc_cb_op.result_types[0], qecp.PhysicalCodeblockType)
+
+    def test_qecp_op_constructor_dealloc_cb(self):
+        """Test the constructor of the qecp.dealloc_cb op."""
+        dealloc_cb_op = qecp.DeallocCodeblockOp(self._get_codeblock_value())
+        assert len(dealloc_cb_op.result_types) == 0
+
     @pytest.mark.parametrize(
-        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+        "idx", [0, IntegerAttr(0, IndexType()), IntegerAttr(0, i64), create_ssa_value(IndexType())]
     )
-    def test_qecp_op_constructor_extract_block(self, idx):
-        """Test the constructor of the qecp.extract_block op."""
+    def test_qecp_op_constructor_extract_block(self, idx, assert_valid_idx_attr):
+        """Test the constructor of the qecp.extract_block op.
+
+        Also check that when the `idx` input is static that the `idx_attr` of the op always has type
+        `index`.
+        """
         extract_block_op = qecp.ExtractCodeblockOp(hyper_reg=self._get_hyper_reg_value(), idx=idx)
         assert len(extract_block_op.result_types) == 1
         assert isinstance(extract_block_op.result_types[0], qecp.PhysicalCodeblockType)
         assert extract_block_op.result_types[0].k == self.k
         assert extract_block_op.result_types[0].n == self.n
 
+        assert_valid_idx_attr(extract_block_op, idx)
+
     @pytest.mark.parametrize(
-        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+        "idx", [0, IntegerAttr(0, IndexType()), IntegerAttr(0, i64), create_ssa_value(IndexType())]
     )
-    def test_qecp_op_constructor_insert_block(self, idx):
-        """Test the constructor of the qecp.insert_block op."""
+    def test_qecp_op_constructor_insert_block(self, idx, assert_valid_idx_attr):
+        """Test the constructor of the qecp.insert_block op.
+
+        Also check that when the `idx` input is static that the `idx_attr` of the op always has type
+        `index`.
+        """
         insert_block_op = qecp.InsertCodeblockOp(
             in_hyper_reg=self._get_hyper_reg_value(), idx=idx, codeblock=self._get_codeblock_value()
         )
@@ -221,21 +264,33 @@ class TestQecPhysicalOps:
         assert insert_block_op.result_types[0].k == self.k
         assert insert_block_op.result_types[0].n == self.n
 
+        assert_valid_idx_attr(insert_block_op, idx)
+
     @pytest.mark.parametrize(
-        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+        "idx", [0, IntegerAttr(0, IndexType()), IntegerAttr(0, i64), create_ssa_value(IndexType())]
     )
-    def test_qecp_op_constructor_extract(self, idx):
-        """Test the constructor of the qecp.extract op."""
+    def test_qecp_op_constructor_extract(self, idx, assert_valid_idx_attr):
+        """Test the constructor of the qecp.extract op.
+
+        Also check that when the `idx` input is static that the `idx_attr` of the op always has type
+        `index`.
+        """
         extract_op = qecp.ExtractQubitOp(codeblock=self._get_codeblock_value(), idx=idx)
         assert len(extract_op.result_types) == 1
         assert isinstance(extract_op.result_types[0], qecp.QecPhysicalQubitType)
         assert extract_op.result_types[0].role.data == qecp.QecPhysicalQubitRole.Data
 
+        assert_valid_idx_attr(extract_op, idx)
+
     @pytest.mark.parametrize(
-        "idx", [0, IntegerAttr.from_index_int_value(0), create_ssa_value(IndexType())]
+        "idx", [0, IntegerAttr(0, IndexType()), IntegerAttr(0, i64), create_ssa_value(IndexType())]
     )
-    def test_qecp_op_constructor_insert(self, idx):
-        """Test the constructor of the qecp.insert op."""
+    def test_qecp_op_constructor_insert(self, idx, assert_valid_idx_attr):
+        """Test the constructor of the qecp.insert op.
+
+        Also check that when the `idx` input is static that the `idx_attr` of the op always has type
+        `index`.
+        """
         insert_op = qecp.InsertQubitOp(
             in_codeblock=self._get_codeblock_value(), idx=idx, qubit=self._get_qubit_data_value()
         )
@@ -243,6 +298,8 @@ class TestQecPhysicalOps:
         assert isinstance(insert_op.result_types[0], qecp.PhysicalCodeblockType)
         assert insert_op.result_types[0].k == self.k
         assert insert_op.result_types[0].n == self.n
+
+        assert_valid_idx_attr(insert_op, idx)
 
     @pytest.mark.parametrize("op", [qecp.IdentityOp, qecp.PauliXOp, qecp.PauliYOp, qecp.PauliZOp])
     @pytest.mark.parametrize(
@@ -383,8 +440,8 @@ class TestQecPhysicalOps:
             tanner_graph, esm, TensorType(IndexType(), shape=(2,))
         )
         assert len(decode_esm_css_op.operands) == 2
-        assert isinstance(decode_esm_css_op.operands[0].type, qecp.TannerGraphType)
-        assert isinstance(decode_esm_css_op.operands[1].type, TensorType)
+        assert isinstance(decode_esm_css_op.operands[0].type, TensorType)
+        assert isinstance(decode_esm_css_op.operands[1].type, qecp.TannerGraphType)
         assert len(decode_esm_css_op.result_types) == 1
         assert isinstance(decode_esm_css_op.result_types[0], TensorType)
 
@@ -430,6 +487,12 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: qecp.dealloc_aux [[q_aux1]] : !qecp.qubit<aux>
     qecp.dealloc_aux %q_aux1 : !qecp.qubit<aux>
+
+    // CHECK: [[cb0:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+    %cb0 = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+
+    // CHECK: qecp.dealloc_cb [[cb0]] : !qecp.codeblock<1 x 7>
+    qecp.dealloc_cb %cb0 : !qecp.codeblock<1 x 7>
 
     // CHECK: [[block0:%.+]] = qecp.extract_block [[hyperreg]][{{\s*}}0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
     %block0 = qecp.extract_block %hyperreg[ 0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
