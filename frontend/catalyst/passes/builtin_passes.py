@@ -24,7 +24,7 @@ from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_lib_path
 
 # pylint: disable=line-too-long, too-many-lines
 
@@ -1802,6 +1802,9 @@ def graph_decomposition_setup_inputs(
     alt_decomps: dict | None = None,
     bytecode_rules: str | None = None,
     _builtin_rule_path: Path = BYTECODE_FILE_PATH,
+    callback_plugin_path: Path = Path(
+        get_lib_path("callbacks_lib", "CATALYST_PYTHON_CALLBACK_PLUGIN")
+    ),
 ):  # pylint: disable=unused-argument
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
@@ -1902,6 +1905,7 @@ def graph_decomposition_setup_inputs(
     options: dict[str, dict | tuple | str] = {
         "gate_set": gate_set,
         "bytecode_rules": str(_builtin_rule_path),
+        "callback_plugin_path": str(callback_plugin_path),
     }
 
     if fixed_decomps:

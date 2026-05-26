@@ -45,12 +45,22 @@ constexpr const char *kPluginFileName = "libQuantumPythonCallbacks.so";
 
 // Resolve the plugin path. Search order:
 // 1. $CATALYST_PYTHON_CALLBACK_PLUGIN (explicit override).
-// 2. <exe_dir>/../lib/libQuantumPythonCallbacks.so (build & install)
-// 3. <exe_dir>/libQuantumPythonCallbacks.so (alongside)
-std::string resolvePluginPath()
+// 2. function parameter
+// 3. <exe_dir>/../lib/libQuantumPythonCallbacks.so (build & install)
+// 4. <exe_dir>/libQuantumPythonCallbacks.so (alongside)
+std::string resolvePluginPath(std::string callbackPluginPath)
 {
     if (auto override_ = llvm::sys::Process::GetEnv("CATALYST_PYTHON_CALLBACK_PLUGIN")) {
         return *override_;
+    }
+
+    llvm::SmallString<128> inputPath(callbackPluginPath);
+    if (llvm::sys::fs::exists(inputPath)) {
+        if (llvm::sys::fs::is_directory(inputPath)) {
+            llvm::sys::path::append(inputPath, kPluginFileName);
+        }
+        llvm::errs() << "found path from input, returning" << inputPath << "\n";
+        return std::string(inputPath);
     }
 
     std::string exe = llvm::sys::fs::getMainExecutable(nullptr, nullptr);
@@ -90,13 +100,17 @@ bool tryLoadLibpython(llvm::StringRef where)
 
 // Try, in order:
 //   1. $CATALYST_LIBPYTHON: explicit user override (any deployment)
-//   2. CATALYST_LIBPYTHON_PATH: absolute path the configure-time Python uses
-//   3. CATALYST_LIBPYTHON_SONAME: bare SONAME via the dynamic loader search (manylinux wheels)
-void ensureLibpythonLoaded()
+//   2. function Parameter
+//   3. CATALYST_LIBPYTHON_PATH: absolute path the configure-time Python uses
+//   4. CATALYST_LIBPYTHON_SONAME: bare SONAME via the dynamic loader search (manylinux wheels)
+void ensureLibpythonLoaded(std::string callbackPluginPath)
 {
     if (auto over = llvm::sys::Process::GetEnv("CATALYST_LIBPYTHON")) {
         if (tryLoadLibpython(*over))
             return;
+    }
+    if (tryLoadLibpython(callbackPluginPath)) {
+        return;
     }
 #ifdef CATALYST_LIBPYTHON_PATH
     if (tryLoadLibpython(CATALYST_LIBPYTHON_PATH))
@@ -110,9 +124,9 @@ void ensureLibpythonLoaded()
                     "the plugin dlopen will likely fail with undefined symbols\n";
 }
 
-RegisterFn loadAndResolve()
+RegisterFn loadAndResolve(std::string callbackPluginPath)
 {
-    std::string path = resolvePluginPath();
+    std::string path = resolvePluginPath(callbackPluginPath);
     if (path.empty()) {
         llvm::errs() << "[decomp-callbacks-loader] plugin path could not be resolved\n";
         return nullptr;
@@ -120,7 +134,7 @@ RegisterFn loadAndResolve()
     // FIXME(Ali): remove this after testing
     llvm::errs() << "[decomp-callbacks-loader] plugin resolved at: " << path << "\n";
 
-    ensureLibpythonLoaded();
+    ensureLibpythonLoaded(path);
 
     std::string err;
     auto lib = llvm::sys::DynamicLibrary::getPermanentLibrary(path.c_str(), &err);
@@ -142,7 +156,7 @@ RegisterFn loadAndResolve()
 
 } // namespace
 
-bool loadPythonCallbackPlugin()
+bool loadPythonCallbackPlugin(std::string callbackPluginPath)
 {
     if (getLowerPauliRot()) {
         return true;
@@ -152,7 +166,7 @@ bool loadPythonCallbackPlugin()
         return getLowerPauliRot() != nullptr;
     }
 
-    RegisterFn reg = loadAndResolve();
+    RegisterFn reg = loadAndResolve(callbackPluginPath);
     if (!reg) {
         return false;
     }

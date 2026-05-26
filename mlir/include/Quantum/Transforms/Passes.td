@@ -154,7 +154,13 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"bytecode-rules",
             /*Type*/"std::string",
             /*Default*/[{ "./frontend/catalyst/resources/decomposition_rules.mlirbc" }],
-            /*Description*/"A path to a bytecode file of compiled decomposition rules.">
+            /*Description*/"A path to a bytecode file of compiled decomposition rules.">,
+        Option<
+            /*C++ name*/"callbackPluginPath",
+            /*CLI name*/"callback-plugin-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "../lib/libQuantumPythonCallbacks.dylib" }],
+            /*Description*/"A path to the QuantumPythonCallbacks dynamic library.">
     ];
 
     let dependentDialects = [

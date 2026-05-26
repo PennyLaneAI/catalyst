@@ -14,8 +14,10 @@
 
 #pragma once
 
+#include <string>
+
 namespace catalyst::quantum {
 
-bool loadPythonCallbackPlugin();
+bool loadPythonCallbackPlugin(std::string callbackPluginPath);
 
 } // namespace catalyst::quantum

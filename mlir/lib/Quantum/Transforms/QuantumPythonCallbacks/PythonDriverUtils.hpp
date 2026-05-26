@@ -19,6 +19,7 @@
 #include <stdexcept>
 #include <string>
 
+// TODO: use nanobind
 #include "pybind11/embed.h"
 #include "pybind11/gil.h"
 

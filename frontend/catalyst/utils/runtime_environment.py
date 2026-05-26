@@ -36,6 +36,7 @@ DEFAULT_LIB_PATHS = {
     "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
     "oqc_runtime": os.path.join(package_root, "../../catalyst/third_party/oqc/src/build"),
     "oqd_runtime": os.path.join(package_root, "../../../runtime/build/lib"),
+    "callbacks_lib": os.path.join(package_root, "../../mlir/build/lib"),
 }
 
 DEFAULT_INCLUDE_PATHS = {
