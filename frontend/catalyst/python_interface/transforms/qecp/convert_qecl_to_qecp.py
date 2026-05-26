@@ -33,6 +33,8 @@ The convert-qecl-to-qecp pass has the following known limitations:
   * For terminal measurements, only sampling of MCMs is supported
   * The encoding procedure to create the logical zero state in a codeblock is not optimized for
     efficiency
+  * Only thoroughly tested with the Steane code, but should be generalizable to other k=1 CSS 
+    stabilizer codes.
 """
 
 from collections.abc import Callable, Iterable
