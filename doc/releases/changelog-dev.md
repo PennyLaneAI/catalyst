@@ -38,12 +38,11 @@
   longer requires an explicit pipeline and no longer mixes MLIR into the JSON output.
   [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
 
-* The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the **worst-case quantum
-  depth** across ``scf.if`` and ``scf.index_switch`` branches, and across statically bounded
-  ``scf.for`` loops: ``depth(region) = layers_outside_branch + Σ max(depth(branch_i))`` for 
-  branches and ``depth(scf.for) = N * depth(body)`` for static for loops. 
-  Previously branches were counted sequentially and any PBC op inside ``scf.for`` 
-  produced an error. ``scf.while`` and dynamically-bounded ``scf.for`` still produce an error.
+* The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the worst-case depth
+  across ``scf.if`` and ``scf.index_switch`` branches (taking the maximum over all branches)
+  and across statically-bounded ``scf.for`` loops (multiplied by the trip count).
+  Previously, branches were counted sequentially and PBC ops inside ``scf.for`` produced an
+  error. ``scf.while`` and dynamically-bounded ``scf.for`` still produce an error.
   [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
   [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
   [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
