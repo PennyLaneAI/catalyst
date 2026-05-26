@@ -26,8 +26,8 @@ include "QecLogical/IR/QecLogicalDialect.td"
 def LogicalCodeblockInitState : I32EnumAttr<"LogicalCodeblockInitState",
     "logical codeblock initial state",
     [
-        I32EnumAttrCase<"Zero", 0, "zero">  // |0⟩
-        // Add other supported codeblock initial states here
+        I32EnumAttrCase<"Zero",  0, "zero">,  // |0⟩
+        I32EnumAttrCase<"Magic", 1, "magic">  // |m⟩ = |0⟩ + e^{iπ/4}|1⟩  (Magic state)
     ]> {
     let cppNamespace = "catalyst::qecl";
     let genSpecializedAttr = 0;

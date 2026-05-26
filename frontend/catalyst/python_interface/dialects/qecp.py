@@ -365,6 +365,38 @@ class DeallocAuxQubitOp(IRDLOperation):
 
 
 @irdl_op_definition
+class AllocCodeblockOp(IRDLOperation):
+    """Allocate a single physical codeblock."""
+
+    name = "qecp.alloc_cb"
+
+    assembly_format = """
+            attr-dict `:` type($codeblock)
+        """
+
+    codeblock = result_def(base(PhysicalCodeblockType))
+
+    def __init__(self, codeblock_type: PhysicalCodeblockType):
+        super().__init__(result_types=(codeblock_type,))
+
+
+@irdl_op_definition
+class DeallocCodeblockOp(IRDLOperation):
+    """Deallocate a single physical codeblock."""
+
+    name = "qecp.dealloc_cb"
+
+    assembly_format = """
+            $codeblock attr-dict `:` type($codeblock)
+        """
+
+    codeblock = operand_def(base(PhysicalCodeblockType))
+
+    def __init__(self, codeblock: PhysicalCodeBlockSSAValue | Operation):
+        super().__init__(operands=(codeblock,))
+
+
+@irdl_op_definition
 class ExtractCodeblockOp(IRDLOperation):
     """Extract a physical codeblock value from a hyper-register."""
 
@@ -882,6 +914,8 @@ QecPhysical = Dialect(
         DeallocOp,
         AllocAuxQubitOp,
         DeallocAuxQubitOp,
+        AllocCodeblockOp,
+        DeallocCodeblockOp,
         ExtractCodeblockOp,
         InsertCodeblockOp,
         ExtractQubitOp,
