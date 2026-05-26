@@ -331,7 +331,7 @@ class CustomBuildExtMacos(UnifiedBuildExt):
         build_path = glob.glob(os.path.join("build", "**", library_name), recursive=True)
         lib_with_r_path = "@rpath/libcustom_calls.so"
 
-        original_path = frontend_path[0] if frontend_path else build_path[0]
+        original_path = build_path[0] if build_path else frontend_path[0]
 
         # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
         subprocess.run(
