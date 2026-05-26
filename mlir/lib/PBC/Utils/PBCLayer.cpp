@@ -49,6 +49,28 @@ FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp, bool onlyOn
     return std::max(*thenDepth, elseDepth);
 }
 
+FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp switchOp,
+                                                         bool onlyOnDisjointQubit)
+{
+    FailureOr<int64_t> defaultDepth =
+        computeWorstCaseDepth(&switchOp.getDefaultBlock(), onlyOnDisjointQubit);
+    if (failed(defaultDepth)) {
+        return failure();
+    }
+
+    int64_t maxDepth = *defaultDepth;
+
+    for (unsigned i = 0, n = switchOp.getNumCases(); i < n; ++i) {
+        FailureOr<int64_t> caseDepth =
+            computeWorstCaseDepth(&switchOp.getCaseBlock(i), onlyOnDisjointQubit);
+        if (failed(caseDepth)) {
+            return failure();
+        }
+        maxDepth = std::max(maxDepth, *caseDepth);
+    }
+    return maxDepth;
+}
+
 FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onlyOnDisjointQubit)
 {
     int64_t depth = 0;
@@ -78,9 +100,14 @@ FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onl
                 "worst-case depth is not available when PBC ops are inside scf.for or scf.while");
         }
 
-        if (isa<scf::IndexSwitchOp>(&op)) {
-            return op.emitOpError(
-                "worst-case depth is not available when PBC ops are inside scf.index_switch");
+        if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(&op)) {
+            flushLayer();
+            FailureOr<int64_t> branchDepth = switchWorstCaseDepth(switchOp, onlyOnDisjointQubit);
+            if (failed(branchDepth)) {
+                return failure();
+            }
+            depth += *branchDepth;
+            continue;
         }
 
         if (auto pbcOp = dyn_cast<PBCOpInterface>(&op)) {

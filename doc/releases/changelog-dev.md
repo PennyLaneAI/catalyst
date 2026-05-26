@@ -39,9 +39,11 @@
   [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
 
 * The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the **worst-case quantum
-  depth** across ``scf.if`` branches: ``depth(region) = layers_outside_if + Σ max(depth(then),
-  depth(else))``. Previously THEN and ELSE were counted sequentially.
+  depth** across ``scf.if`` and ``scf.index_switch`` branches:
+  ``depth(region) = layers_outside_branch + Σ max(depth(branch_i))``. Previously branches
+  were counted sequentially.
   [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
 
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values

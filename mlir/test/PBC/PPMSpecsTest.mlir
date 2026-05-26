@@ -574,6 +574,63 @@ func.func public @test_nested_if_worst_case_depth(%b0 : i1, %b1 : i1, %q0 : !qua
 
 // -----
 
+// scf.index_switch: depth = layers_outside + max(default, case_0, case_1, ...)
+// Outside = 1 PPM. default = 1 PPR. case 0 = 2 non-commuting PPRs (Z then X).
+// case 1 = 1 PPR. Expect depth = 1 + max(1, 2, 1) = 3.
+
+// CHECK-DAG: "test_switch_worst_case_depth"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_switch_worst_case_depth"
+// CHECK-DISJOINT-DAG: "depth": 3
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_switch_worst_case_depth(%arg : index, %q0 : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q0 : i1, !quantum.bit
+    %r = scf.index_switch %arg -> !quantum.bit
+    case 0 {
+        %a = pbc.ppr ["Z"](4) %out : !quantum.bit
+        %b = pbc.ppr ["X"](4) %a : !quantum.bit
+        scf.yield %b : !quantum.bit
+    }
+    case 1 {
+        %c = pbc.ppr ["Y"](4) %out : !quantum.bit
+        scf.yield %c : !quantum.bit
+    }
+    default {
+        %d = pbc.ppr ["X"](4) %out : !quantum.bit
+        scf.yield %d : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// scf.index_switch with default having a PPR and a case with 0 PBC ops.
+// Outside = 1 PPM. default = 1 PPR. case 0 = 0 layers. Expect depth = 1 + max(1, 0) = 2.
+
+// CHECK-DAG: "test_switch_default_only_branch_depth"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_switch_default_only_branch_depth"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_switch_default_only_branch_depth(%arg : index, %q : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q : i1, !quantum.bit
+    %r = scf.index_switch %arg -> !quantum.bit
+    case 0 {
+        scf.yield %out : !quantum.bit
+    }
+    default {
+        %d = pbc.ppr ["X"](4) %out : !quantum.bit
+        scf.yield %d : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
 // Counts are still emitted even when depth analysis fails (here, scf.for blocks depth).
 
 // CHECK-DAG: "static_for_loop"
@@ -669,18 +726,3 @@ func.func public @test_if_in_for_errors(%arg0: !quantum.bit) {
     return
 }
 
-// -----
-
-func.func public @test_index_switch_depth_error(%idx: index, %arg0: !quantum.bit) {
-    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.index_switch}}
-    %q = scf.index_switch %idx -> !quantum.bit
-    case 0 {
-        %p = pbc.ppr ["Z"](4) %arg0 : !quantum.bit
-        scf.yield %p : !quantum.bit
-    }
-    default {
-        scf.yield %arg0 : !quantum.bit
-    }
-
-    return
-}
