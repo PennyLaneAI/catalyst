@@ -249,7 +249,7 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                         qp.TemporaryAND,
                     ),
                 )
-            ):  # pragma: no cover
+            ):
                 # Note that the graph-decomposition returns abstracted rules
                 # for Adjoint and Controlled operations, so we skip them here.
                 # These abstracted rules cannot be captured and lowered.
