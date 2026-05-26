@@ -78,6 +78,7 @@ The convert-quantum-to-qecl pass does not support the following cases:
 """
 
 import math
+from abc import abstractmethod
 from dataclasses import dataclass
 from typing import NoReturn, TypeGuard, cast
 
@@ -559,36 +560,30 @@ class ScfYieldConversion(RewritePattern):
         rewriter.notify_op_modified(parent_op)
 
 
-# MARK: SCF If Pattern
+# MARK: SCF Base Pattern
 
 
-class ScfIfConversion(RewritePattern):
-    """Handles conversion of `scf.if` conditional ops."""
+class ScfConversionPattern(RewritePattern):
+    """Base class for conversion of `scf` ops (except `scf.yield`)."""
 
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: scf.IfOp, rewriter: PatternRewriter):
-        """Rewrite pattern for `scf.if` ops."""
-        yield_block = op.true_region.last_block
-        assert (
-            yield_block is not None
-        ), "Op 'scf.if': expected at least one block in `true_region`, but found none"
+    def match_and_rewrite(self, op: Operation, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf` ops.
 
-        yield_op = yield_block.last_op
-        assert isinstance(yield_op, scf.YieldOp), (
-            f"Op 'scf.if': expected last op in `true_region` to be 'scf.yield', but got "
-            f"{type(yield_op).__name__}"
-        )
+        Each subclass of `ScfConversionPattern` must implement its own `match_and_rewrite()` with
+        the `@op_type_rewrite_pattern` decorator and call `super().match_and_rewrite(...)`.
+        """
+        yield_op = self._get_yield_op(op)
 
         for i_res, result in enumerate(op.results):
-            # The yield operand that corresponds to the current 'scf.if' return value
+            # The yield operand that corresponds to the current scf op's return value
             yield_operand = yield_op.operands[i_res]
 
-            # If the result type of the 'scf.if' op is a `quantum` type, but the corresponding
+            # If the result type of an 'scf' op is a `quantum` type, but the corresponding
             # 'scf.yield' operand is not the same `quantum` type (i.e. because it has been converted
             # to a `qecl` type), then we replace the result value with one that has the type of the
             # yield operand. We also must insert unrealized_conversion_cast ops that convert the new
             # result back to the `quantum` type so that subsequent, unconverted `quantum` ops still
-            # receive inputs of the correct type
+            # receive inputs of the correct type.
 
             for quantum_type in (quantum.QuregType, quantum.QubitType):
                 if isinstance(result.type, quantum_type) and not isinstance(
@@ -596,6 +591,12 @@ class ScfIfConversion(RewritePattern):
                 ):
                     self._convert_quantum_type_result(result, yield_operand, quantum_type, rewriter)
                     break
+
+    @classmethod
+    @abstractmethod
+    def _get_yield_op(cls, op) -> scf.YieldOp:
+        """Abstract method that gets the `scf.yield` op from its parent scf `op`."""
+        ...
 
     @classmethod
     def _convert_quantum_type_result(
@@ -606,7 +607,7 @@ class ScfIfConversion(RewritePattern):
         rewriter: PatternRewriter,
     ):
         """Helper function that converts `result` from a quantum-dialect type to the type of
-        `yield_operand`. See note in the match_and_rewrite() method above.
+        `yield_operand`.
         """
         assert isinstance(
             result.type, quantum_type
@@ -631,6 +632,33 @@ class ScfIfConversion(RewritePattern):
         rewriter.replace_uses_with_if(
             new_result, conv_cast_op.results[0], lambda use: use.operation is not conv_cast_op
         )
+
+
+# MARK: SCF If Pattern
+
+
+class ScfIfConversion(ScfConversionPattern):
+    """Handles conversion of `scf.if` conditional ops."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: scf.IfOp, rewriter: PatternRewriter):
+        super().match_and_rewrite(op, rewriter)
+
+    @classmethod
+    def _get_yield_op(cls, op: scf.IfOp) -> scf.YieldOp:
+        """Get the `scf.yield` op from the `true` region of an `scf.if` op."""
+        yield_block = op.true_region.last_block
+        assert (
+            yield_block is not None
+        ), "Op 'scf.if': expected at least one block in `true_region`, but found none"
+
+        yield_op = yield_block.last_op
+        assert isinstance(yield_op, scf.YieldOp), (
+            f"Op 'scf.if': expected last op in `true_region` to be 'scf.yield', but got "
+            f"{type(yield_op).__name__}"
+        )
+
+        return yield_op
 
 
 # MARK: Helpers
