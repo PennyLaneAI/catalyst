@@ -147,22 +147,29 @@ auto PLPythonDevice::Expval(ObsIdType obsKey) -> double
 {
     RT_FAIL_IF(!obs_manager.isValidObservable(obsKey), "Invalid key for cached observables");
 
-    return runner->Expval(builder->toJSON(), obs_manager.toJSON(), serializeKwargs(device_kwargs),
-                          device_shots, static_cast<size_t>(obsKey));
+    std::string meas_json = "{\"type\":\"expval\",\"obs_idx\":" + std::to_string(obsKey) + "}";
+
+    auto &&res = runner->Execute(builder->toJSON(), obs_manager.toJSON(), meas_json,
+                                 serializeKwargs(device_kwargs), device_shots);
+    return res[0];
 }
 
 auto PLPythonDevice::Var(ObsIdType obsKey) -> double
 {
     RT_FAIL_IF(!obs_manager.isValidObservable(obsKey), "Invalid key for cached observables");
 
-    return runner->Var(builder->toJSON(), obs_manager.toJSON(), serializeKwargs(device_kwargs),
-                       device_shots, static_cast<size_t>(obsKey));
+    std::string meas_json = "{\"type\":\"var\",\"obs_idx\":" + std::to_string(obsKey) + "}";
+
+    auto &&res = runner->Execute(builder->toJSON(), obs_manager.toJSON(), meas_json,
+                                 serializeKwargs(device_kwargs), device_shots);
+    return res[0];
 }
 
 void PLPythonDevice::Probs(DataView<double, 1> &probs)
 {
-    auto &&dv_probs = runner->Probs(builder->toJSON(), obs_manager.toJSON(),
-                                    serializeKwargs(device_kwargs), device_shots, GetNumQubits());
+    std::string meas_json = "{\"type\":\"probs\"}";
+    auto &&dv_probs = runner->Execute(builder->toJSON(), obs_manager.toJSON(), meas_json,
+                                      serializeKwargs(device_kwargs), device_shots);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
@@ -173,8 +180,17 @@ void PLPythonDevice::PartialProbs(DataView<double, 1> &probs,
 {
     auto &&dev_wires = getDeviceWires(wires);
 
-    auto &&dv_probs = runner->PartialProbs(builder->toJSON(), obs_manager.toJSON(),
-                                           serializeKwargs(device_kwargs), device_shots, dev_wires);
+    std::ostringstream w_oss;
+    w_oss << "[";
+    for(size_t i = 0; i < dev_wires.size(); ++i) {
+        if(i > 0) w_oss << ",";
+        w_oss << dev_wires[i];
+    }
+    w_oss << "]";
+    std::string meas_json = "{\"type\":\"probs\",\"wires\":" + w_oss.str() + "}";
+
+    auto &&dv_probs = runner->Execute(builder->toJSON(), obs_manager.toJSON(), meas_json,
+                                      serializeKwargs(device_kwargs), device_shots);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
@@ -182,16 +198,17 @@ void PLPythonDevice::PartialProbs(DataView<double, 1> &probs,
 
 void PLPythonDevice::Sample(DataView<double, 2> &samples)
 {
-    auto &&li_samples = runner->Sample(builder->toJSON(), obs_manager.toJSON(),
-                                       serializeKwargs(device_kwargs), device_shots,
-                                       GetNumQubits());
+    std::string meas_json = "{\"type\":\"sample\"}";
+    auto &&li_samples = runner->Execute(builder->toJSON(), obs_manager.toJSON(), meas_json,
+                                        serializeKwargs(device_kwargs), device_shots);
+
     RT_FAIL_IF(samples.size() != li_samples.size(), "Invalid size for the pre-allocated samples");
 
     const size_t numQubits = GetNumQubits();
     auto samplesIter = samples.begin();
     for (size_t shot = 0; shot < device_shots; shot++) {
         for (size_t wire = 0; wire < numQubits; wire++) {
-            *(samplesIter++) = static_cast<double>(li_samples[shot * numQubits + wire]);
+            *(samplesIter++) = li_samples[shot * numQubits + wire];
         }
     }
 }
@@ -209,14 +226,23 @@ void PLPythonDevice::PartialSample(DataView<double, 2> &samples,
 
     auto &&dev_wires = getDeviceWires(wires);
 
-    // For partial samples, we sample all qubits then extract the desired wires
-    auto &&li_samples = runner->Sample(builder->toJSON(), obs_manager.toJSON(),
-                                       serializeKwargs(device_kwargs), device_shots, numQubits);
+    std::ostringstream w_oss;
+    w_oss << "[";
+    for(size_t i = 0; i < dev_wires.size(); ++i) {
+        if(i > 0) w_oss << ",";
+        w_oss << dev_wires[i];
+    }
+    w_oss << "]";
+    std::string meas_json = "{\"type\":\"sample\",\"wires\":" + w_oss.str() + "}";
+
+    // PennyLane will now only return samples for the target wires
+    auto &&li_samples = runner->Execute(builder->toJSON(), obs_manager.toJSON(), meas_json,
+                                        serializeKwargs(device_kwargs), device_shots);
 
     auto samplesIter = samples.begin();
     for (size_t shot = 0; shot < device_shots; shot++) {
-        for (auto wire : dev_wires) {
-            *(samplesIter++) = static_cast<double>(li_samples[shot * numQubits + wire]);
+        for (size_t w_idx = 0; w_idx < dev_wires.size(); w_idx++) {
+            *(samplesIter++) = li_samples[shot * dev_wires.size() + w_idx];
         }
     }
 }
@@ -229,8 +255,9 @@ void PLPythonDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
     RT_FAIL_IF(eigvals.size() != numElements || counts.size() != numElements,
                "Invalid size for the pre-allocated counts");
 
-    auto &&li_samples = runner->Sample(builder->toJSON(), obs_manager.toJSON(),
-                                       serializeKwargs(device_kwargs), device_shots, numQubits);
+    std::string meas_json = "{\"type\":\"sample\"}";
+    auto &&li_samples = runner->Execute(builder->toJSON(), obs_manager.toJSON(), meas_json,
+                                        serializeKwargs(device_kwargs), device_shots);
 
     std::iota(eigvals.begin(), eigvals.end(), 0);
     std::fill(counts.begin(), counts.end(), 0);
@@ -239,7 +266,7 @@ void PLPythonDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
         std::bitset<52> basisState;
         size_t idx = numQubits;
         for (size_t wire = 0; wire < numQubits; wire++) {
-            basisState[--idx] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = static_cast<size_t>(li_samples[shot * numQubits + wire]);
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
@@ -259,8 +286,17 @@ void PLPythonDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
 
     auto &&dev_wires = getDeviceWires(wires);
 
-    auto &&li_samples = runner->Sample(builder->toJSON(), obs_manager.toJSON(),
-                                       serializeKwargs(device_kwargs), device_shots, numQubits);
+    std::ostringstream w_oss;
+    w_oss << "[";
+    for(size_t i = 0; i < dev_wires.size(); ++i) {
+        if(i > 0) w_oss << ",";
+        w_oss << dev_wires[i];
+    }
+    w_oss << "]";
+    std::string meas_json = "{\"type\":\"sample\",\"wires\":" + w_oss.str() + "}";
+
+    auto &&li_samples = runner->Execute(builder->toJSON(), obs_manager.toJSON(), meas_json,
+                                        serializeKwargs(device_kwargs), device_shots);
 
     std::iota(eigvals.begin(), eigvals.end(), 0);
     std::fill(counts.begin(), counts.end(), 0);
@@ -268,8 +304,8 @@ void PLPythonDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
     for (size_t shot = 0; shot < device_shots; shot++) {
         std::bitset<52> basisState;
         size_t idx = dev_wires.size();
-        for (auto wire : dev_wires) {
-            basisState[--idx] = li_samples[shot * numQubits + wire];
+        for (size_t w_idx = 0; w_idx < dev_wires.size(); w_idx++) {
+            basisState[--idx] = static_cast<size_t>(li_samples[shot * dev_wires.size() + w_idx]);
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
@@ -277,10 +313,16 @@ void PLPythonDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
 
 void PLPythonDevice::State(DataView<std::complex<double>, 1> &state)
 {
-    auto &&dv_state = runner->State(builder->toJSON(), obs_manager.toJSON(),
-                                    serializeKwargs(device_kwargs), device_shots, GetNumQubits());
-    RT_FAIL_IF(state.size() != dv_state.size(), "Invalid size for the pre-allocated state vector");
-    std::move(dv_state.begin(), dv_state.end(), state.begin());
+    std::string meas_json = "{\"type\":\"state\"}";
+    auto &&dv_state = runner->Execute(builder->toJSON(), obs_manager.toJSON(), meas_json,
+                                      serializeKwargs(device_kwargs), device_shots);
+
+    RT_FAIL_IF(state.size() * 2 != dv_state.size(), "Invalid size for the pre-allocated state vector");
+
+    auto stateIter = state.begin();
+    for (size_t i = 0; i < dv_state.size(); i += 2) {
+        *(stateIter++) = std::complex<double>(dv_state[i], dv_state[i+1]);
+    }
 }
 
 } // namespace Catalyst::Runtime::Device

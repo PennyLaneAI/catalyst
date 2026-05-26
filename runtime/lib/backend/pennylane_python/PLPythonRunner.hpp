@@ -39,107 +39,16 @@ struct PLPythonRunner {
     explicit PLPythonRunner() = default;
     ~PLPythonRunner() = default;
 
-    /**
-     * @brief Execute tape and return probabilities on `num_qubits` wires.
-     */
-    [[nodiscard]] auto Probs(const std::string &tape_json, const std::string &obs_json,
-                             const std::string &device_kwargs, size_t shots,
-                             size_t num_qubits) const -> std::vector<double>
+    [[nodiscard]] auto Execute(const std::string &tape_json, const std::string &obs_json,
+                               const std::string &meas_json, const std::string &device_kwargs, 
+                               size_t shots) const -> std::vector<double>
     {
         DynamicLibraryLoader libLoader(PLPYTHON_PY);
-
-        using fn_t = void (*)(const char *, const char *, const char *, size_t, size_t, void *);
-        auto impl = libLoader.getSymbol<fn_t>("pl_probs");
+        using fn_t = void (*)(const char *, const char *, const char *, const char *, size_t, void *);
+        auto impl = libLoader.getSymbol<fn_t>("pl_execute");
 
         std::vector<double> result;
-        impl(tape_json.c_str(), obs_json.c_str(), device_kwargs.c_str(), shots, num_qubits,
-             &result);
-        return result;
-    }
-
-    /**
-     * @brief Execute tape and return partial probabilities on specified wires.
-     */
-    [[nodiscard]] auto PartialProbs(const std::string &tape_json, const std::string &obs_json,
-                                    const std::string &device_kwargs, size_t shots,
-                                    const std::vector<size_t> &wires) const -> std::vector<double>
-    {
-        DynamicLibraryLoader libLoader(PLPYTHON_PY);
-
-        using fn_t =
-            void (*)(const char *, const char *, const char *, size_t, const size_t *, size_t,
-                     void *);
-        auto impl = libLoader.getSymbol<fn_t>("pl_partial_probs");
-
-        std::vector<double> result;
-        impl(tape_json.c_str(), obs_json.c_str(), device_kwargs.c_str(), shots, wires.data(),
-             wires.size(), &result);
-        return result;
-    }
-
-    /**
-     * @brief Execute tape and return samples (shots x num_qubits flat array).
-     */
-    [[nodiscard]] auto Sample(const std::string &tape_json, const std::string &obs_json,
-                              const std::string &device_kwargs, size_t shots,
-                              size_t num_qubits) const -> std::vector<size_t>
-    {
-        DynamicLibraryLoader libLoader(PLPYTHON_PY);
-
-        using fn_t = void (*)(const char *, const char *, const char *, size_t, size_t, void *);
-        auto impl = libLoader.getSymbol<fn_t>("pl_sample");
-
-        std::vector<size_t> result;
-        impl(tape_json.c_str(), obs_json.c_str(), device_kwargs.c_str(), shots, num_qubits,
-             &result);
-        return result;
-    }
-
-    /**
-     * @brief Execute tape and return expectation value of observable at `obs_idx`.
-     */
-    [[nodiscard]] auto Expval(const std::string &tape_json, const std::string &obs_json,
-                              const std::string &device_kwargs, size_t shots,
-                              size_t obs_idx) const -> double
-    {
-        DynamicLibraryLoader libLoader(PLPYTHON_PY);
-
-        using fn_t = double (*)(const char *, const char *, const char *, size_t, size_t);
-        auto impl = libLoader.getSymbol<fn_t>("pl_expval");
-
-        return impl(tape_json.c_str(), obs_json.c_str(), device_kwargs.c_str(), shots, obs_idx);
-    }
-
-    /**
-     * @brief Execute tape and return variance of observable at `obs_idx`.
-     */
-    [[nodiscard]] auto Var(const std::string &tape_json, const std::string &obs_json,
-                           const std::string &device_kwargs, size_t shots,
-                           size_t obs_idx) const -> double
-    {
-        DynamicLibraryLoader libLoader(PLPYTHON_PY);
-
-        using fn_t = double (*)(const char *, const char *, const char *, size_t, size_t);
-        auto impl = libLoader.getSymbol<fn_t>("pl_var");
-
-        return impl(tape_json.c_str(), obs_json.c_str(), device_kwargs.c_str(), shots, obs_idx);
-    }
-
-    /**
-     * @brief Execute tape and return statevector.
-     */
-    [[nodiscard]] auto State(const std::string &tape_json, const std::string &obs_json,
-                             const std::string &device_kwargs, size_t shots,
-                             size_t num_qubits) const -> std::vector<std::complex<double>>
-    {
-        DynamicLibraryLoader libLoader(PLPYTHON_PY);
-
-        using fn_t = void (*)(const char *, const char *, const char *, size_t, size_t, void *);
-        auto impl = libLoader.getSymbol<fn_t>("pl_state");
-
-        std::vector<std::complex<double>> result;
-        impl(tape_json.c_str(), obs_json.c_str(), device_kwargs.c_str(), shots, num_qubits,
-             &result);
+        impl(tape_json.c_str(), obs_json.c_str(), meas_json.c_str(), device_kwargs.c_str(), shots, &result);
         return result;
     }
 };

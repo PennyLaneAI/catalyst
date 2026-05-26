@@ -17,6 +17,9 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 
 # pylint: disable=protected-access
 
+from catalyst.device.python_device import pycat_device
+from catalyst.device.qjit_device import SUPPORTED_RT_DEVICES
+
 import warnings
 from copy import copy
 from functools import partial
@@ -254,6 +257,19 @@ def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
+
+    if device.name not in SUPPORTED_RT_DEVICES and not hasattr(device, "get_c_interface"):
+
+        import warnings
+        warnings.warn(
+            f"Device '{device.name}' does not provide a native C interface. "
+            f"Using the PennyLane Python compatibility layer (pennylane.python). "
+            f"This executes quantum instructions via Python callback and is slower "
+            f"than native backends.",
+            stacklevel=2,
+        )
+
+        device = pycat_device(device)
 
     self.qubit_index_recorder = QubitIndexRecorder()
 

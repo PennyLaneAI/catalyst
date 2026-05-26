@@ -41,6 +41,7 @@ from pennylane.transforms import (
     split_to_single_terms,
 )
 
+from catalyst.device.python_device import pycat_device
 from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
@@ -182,37 +183,12 @@ def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
     elif hasattr(device, "get_c_interface"):
         # Support third party devices with `get_c_interface`
         device_name, device_lpath = device.get_c_interface()
-    else:
-        # === NEW FALLBACK: wrap any PennyLane device with the Python compat layer ===
-        # Instead of raising CompileError, we wrap the device automatically.
-        import warnings
-        warnings.warn(
-            f"Device '{dname}' does not provide a native C interface. "
-            f"Using the PennyLane Python compatibility layer (pennylane.python). "
-            f"This executes quantum instructions via Python callback and is slower "
-            f"than native backends.",
-            stacklevel=2,
-        )
-        device_name = "PLPythonDevice"
-        device_lpath = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        import platform, os
-        sys_platform = platform.system()
-        if sys_platform == "Linux":
-            device_lpath = os.path.join(device_lpath, "librtd_pennylane_python.so")
-        elif sys_platform == "Darwin":
-            device_lpath = os.path.join(device_lpath, "librtd_pennylane_python.dylib")
-        else:
-            raise NotImplementedError(f"Platform not supported: {sys_platform}")
-
-        # Pass device info as kwargs so the C++ runtime can reconstruct it
-        device_kwargs["pl_device_name"] = dname
-        device_kwargs["wires"] = str(len(device.wires))
-        device_kwargs["shots"] = str(device.shots.total_shots if device.shots else 0)
-
-
 
     if not pathlib.Path(device_lpath).is_file():
         raise CompileError(f"Device at {device_lpath} cannot be found!")
+
+    if getattr(device, "metaname", None) == "pycat_device":
+        device_kwargs = device.device_kwargs
 
     if dname == "braket.local.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
@@ -365,6 +341,20 @@ class QJITDevice(qp.devices.Device):
         check_device_wires(original_device.wires)
 
         super().__init__(wires=original_device.wires)
+
+
+        if original_device.name not in SUPPORTED_RT_DEVICES and not hasattr(original_device, "get_c_interface"):
+
+            import warnings
+            warnings.warn(
+                f"Device '{original_device.name}' does not provide a native C interface. "
+                f"Using the PennyLane Python compatibility layer (pennylane.python). "
+                f"This executes quantum instructions via Python callback and is slower "
+                f"than native backends.",
+                stacklevel=2,
+            )
+
+            original_device = pycat_device(original_device)
 
         # Capability loading
         # During initilization of QJITDevice, we just load the static toml device specs
