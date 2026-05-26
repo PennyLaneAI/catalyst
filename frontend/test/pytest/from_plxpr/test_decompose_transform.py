@@ -24,6 +24,7 @@ import numpy as np
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
+from pennylane.decomposition import controlled_resource_rep
 from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
@@ -1083,6 +1084,39 @@ class TestPlxPRDecomposition:
         r1, r2 = c()
         assert qp.math.allclose(r1, np.cos(0.5))
         assert qp.math.allclose(r2, np.cos(1.2))
+        qp.decomposition.disable_graph()
+
+    def test_symbolic_controlled_op_is_skipped(self):
+        """Symbolic Controlled ops produced by ``qml.ctrl`` must be skipped when
+        iterating the decomposition graph solution.
+        """
+        qp.decomposition.enable_graph()
+
+        def _resources():
+            return {
+                controlled_resource_rep(
+                    qp.BasisEmbedding, {"num_wires": 1}, num_control_wires=1
+                ): 1,
+                qp.resource_rep(qp.GlobalPhase): 1,
+            }
+
+        @qp.register_resources(_resources)
+        def my_rz(phi, wires):
+            qp.GlobalPhase(phi / 2)
+            qp.ctrl(qp.BasisEmbedding, control=wires)([1], wires=[1])
+
+        @qp.qjit(capture=True)
+        @qp.decompose(
+            gate_set={"CNOT", "PauliX", "GlobalPhase", "MultiControlledX"},
+            fixed_decomps={qp.RZ: my_rz},
+        )
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def f(phi):
+            qp.RZ(phi, 0)
+            return qp.state()
+
+        resources = qp.specs(f, level="device")(0.123).resources.gate_types
+        assert resources == {"BasisState": 1, "GlobalPhase": 1}
         qp.decomposition.disable_graph()
 
 

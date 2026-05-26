@@ -255,7 +255,7 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                 # These abstracted rules cannot be captured and lowered.
                 # We use MLIR AdjointOp and ControlledOp primitives
                 # to deal with decomposition of symbolic operations at PLxPR.
-                raise ValueError(f"Could not capture {op} without the number of wires.")
+                raise ValueError(f"Could not capture {op.op.name} without the number of wires.")
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
