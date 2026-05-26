@@ -8,6 +8,8 @@
   [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
   [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
   [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
+  [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
+  [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
 
 
 <h3>Improvements 🛠</h3>
@@ -16,10 +18,27 @@
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
 
+* PPRs and PPMs can now be lowered properly into MLIR directly in the non-capture workflow.
+  [(#2816)](https://github.com/PennyLaneAI/catalyst/pull/2816)
+
 * The `--decompose-lowering` pass can now handle null decomposition rules, which are rule functions
   that do not have any quantum values as arguments or results. Gates with null decomposition rules
   are simply removed.
   [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+
+* The ``--partition-layers`` pass now supports a ``disjoint-qubit`` option to group PBC ops
+  into the same layer only when they act on disjoint qubits. By default, commuting ops on
+  overlapping qubits may still be merged into one layer.
+  [(#2858)](https://github.com/PennyLaneAI/catalyst/pull/2858)
+
+* The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
+  extracted from different quantum register SSA values, as long as all these quantum register values
+  trace back to the same allocation.
+  [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
+
+* The `--adjoint-lowering` pass can now handle adjoint operations containing control flow operations
+  that have multiple quantum operands, of either quantum register or qubit type.
+  [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
 <h3>Breaking changes 💔</h3>
 
@@ -39,6 +58,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
+  [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
+
 * Fixed ``KeyError`` in autograph when using ``qp.prod`` as a decorator with PennyLane >= 0.45.
   [(#2844)](https://github.com/PennyLaneAI/catalyst/pull/2844)
 
@@ -53,6 +75,9 @@
   transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
+
+* The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
+  [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
 
 * Part of the new, experimental QEC pipeline, the `convert-qecp-to-llvm` compiler pass has been
   added to lower operations and types in the QEC physical dialect to the LLVM dialect.
@@ -76,6 +101,26 @@
   `qecp.{extract_block, insert_block, extract, insert}`.
   [(#2846)](https://github.com/PennyLaneAI/catalyst/pull/2846)
 
+* A new, experimental compiler pipeline `qec_pipeline` has been added to the `ftqc.pipelines` module.
+  [(#2852)](https://github.com/PennyLaneAI/catalyst/pull/2852)
+
+* The reference semantics MBQC operations have been moved from the `qref` dialect to the `mbqc`
+  dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
+  [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
+
+* In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
+  operations have been added:
+
+  - `qecl.fabricate`, which fabricates a logical codeblock in a specified initial state (typically a
+    magic state).
+    [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
+  - `qecl.dealloc_cb`, which deallocates a single logical codeblock.
+    [(#2866)](https://github.com/PennyLaneAI/catalyst/pull/2866)
+  - `qecp.alloc_cb`, which allocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
@@ -85,6 +130,7 @@ This release contains contributions from (in alphabetical order):
 Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
+Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,
