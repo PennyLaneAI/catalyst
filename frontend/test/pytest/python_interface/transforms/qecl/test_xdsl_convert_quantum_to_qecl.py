@@ -14,6 +14,8 @@
 
 """Test module for the convert-quantum-to-qecl dialect-conversion transform."""
 
+# pylint: disable=too-many-lines
+
 import pennylane as qp
 import pytest
 
