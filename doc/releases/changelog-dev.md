@@ -46,7 +46,7 @@
   produced an error. ``scf.while`` and dynamically-bounded ``scf.for`` still produce an error.
   [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
   [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
 
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values
