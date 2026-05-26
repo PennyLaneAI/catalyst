@@ -579,6 +579,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
     }];
 
     let hasVerifier = 1;
+    let hasCustomAssemblyFormat = 1;
 }
 
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,

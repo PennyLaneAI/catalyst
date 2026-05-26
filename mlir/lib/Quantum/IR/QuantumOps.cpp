@@ -682,3 +682,400 @@ LogicalResult AdjointOp::verify()
 
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// Quantum op printers/parsers.
+//===----------------------------------------------------------------------===//
+
+static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr)
+{
+    p << "[";
+    llvm::interleaveComma(attr.asArrayRef(), p, [&](int64_t value) { p << value; });
+    p << "]";
+}
+
+static void printDictionaryWithDenseI64Lists(OpAsmPrinter &p, DictionaryAttr dict)
+{
+    p << "{";
+    llvm::interleaveComma(dict, p, [&](NamedAttribute namedAttr) {
+        p.printKeywordOrString(namedAttr.getName().strref());
+        p << " = ";
+        if (auto denseArray = dyn_cast<DenseI64ArrayAttr>(namedAttr.getValue())) {
+            printDenseI64ArrayAsList(p, denseArray);
+        }
+        else {
+            p << namedAttr.getValue();
+        }
+    });
+    p << "}";
+}
+
+static void printDictionaryWithIntegerLiterals(OpAsmPrinter &p, DictionaryAttr dict)
+{
+    p << "{";
+    llvm::interleaveComma(dict, p, [&](NamedAttribute namedAttr) {
+        p.printKeywordOrString(namedAttr.getName().strref());
+        p << " = ";
+        if (auto intAttr = dyn_cast<IntegerAttr>(namedAttr.getValue())) {
+            p << intAttr.getInt();
+        }
+        else {
+            p << namedAttr.getValue();
+        }
+    });
+    p << "}";
+}
+
+void OperatorOp::print(OpAsmPrinter &p)
+{
+    // 1. Template Name
+    p << " \"" << getOpName() << "\"";
+
+    // 2. Variadic Inputs: (%arg0 : type, ...)
+    p << "(";
+    llvm::interleaveComma(llvm::zip(getParams(), getParams().getTypes()), p,
+                          [&](auto pair) { p << std::get<0>(pair) << ": " << std::get<1>(pair); });
+    p << ")";
+
+    // 3. Adjoint
+    if (getAdjoint()) {
+        p << " adj";
+    }
+
+    // 4. Qubits
+    if (!getInQubits().empty()) {
+        p << " qubits(" << getInQubits() << ")";
+    }
+
+    // 5. Attribute Dictionary
+    SmallVector<StringRef> elidedAttrs = {"static_data", "param_map", "qubit_map",
+                                          "operandSegmentSizes", "resultSegmentSizes"};
+    p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
+
+    p.increaseIndent();
+
+    // 6. Quantum register
+    if (getInQreg()) {
+        p.printNewline();
+        p << "quregs(" << getInQreg() << ") indices(";
+        llvm::interleaveComma(
+            llvm::zip(getArrQubitIndices(), getArrQubitIndices().getTypes()), p,
+            [&](auto pair) { p << std::get<0>(pair) << ": " << std::get<1>(pair); });
+        p << ")";
+    }
+
+    // 7. Control qubits
+    if (!getInCtrlQubits().empty()) {
+        p.printNewline();
+        p << "ctrls(" << getInCtrlQubits() << ") ";
+        p << "ctrl_vals(" << getInCtrlValues() << ")";
+    }
+    else if (getArrCtrlIndices()) {
+        p.printNewline();
+        p << "ctrls(" << getArrCtrlIndices() << ": " << getArrCtrlIndices().getType() << ") ";
+        p << "ctrl_vals(" << getArrCtrlValues() << ": " << getArrCtrlValues().getType() << ")";
+    }
+
+    // 8. Compilable static data
+    if (getStaticDataAttr()) {
+        p.printNewline();
+        p << "static_data = " << getStaticData();
+    }
+
+    // 9. Optional metadata
+    if (getParamMapAttr() || getParamMapAttr()) {
+        p.printNewline();
+    }
+    if (getParamMapAttr()) {
+        p << "param_map = ";
+        printDictionaryWithIntegerLiterals(p, getParamMap());
+    }
+    if (getParamMapAttr() && getParamMapAttr()) {
+        p << " ";
+    }
+    if (getQubitMapAttr()) {
+        p << "qubit_map = ";
+        printDictionaryWithDenseI64Lists(p, getQubitMap());
+    }
+
+    p.decreaseIndent();
+}
+
+static ParseResult parseOperandTypePair(OpAsmParser &parser,
+                                        OpAsmParser::UnresolvedOperand &operand, Type &type)
+{
+    return failure(parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type));
+}
+
+static ParseResult parseI64Dictionary(OpAsmParser &parser, Builder &builder, DictionaryAttr &dict)
+{
+    NamedAttrList attrs;
+    auto parseDictEntry = [&]() -> ParseResult {
+        StringRef key;
+        int64_t value = 0;
+        if (parser.parseKeyword(&key) || parser.parseEqual() || parser.parseInteger(value)) {
+            return failure();
+        }
+        attrs.append(builder.getStringAttr(key), builder.getI64IntegerAttr(value));
+        return success();
+    };
+
+    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Braces, parseDictEntry)) {
+        return failure();
+    }
+    dict = attrs.getDictionary(parser.getContext());
+    return success();
+}
+
+static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &builder,
+                                                DictionaryAttr &dict)
+{
+    NamedAttrList attrs;
+    auto parseDictEntry = [&]() -> ParseResult {
+        StringRef key;
+        SmallVector<int64_t> values;
+        auto parseArrayValue = [&]() -> ParseResult {
+            int64_t value = 0;
+            if (parser.parseInteger(value)) {
+                return failure();
+            }
+            values.push_back(value);
+            return success();
+        };
+
+        if (parser.parseKeyword(&key) || parser.parseEqual() ||
+            parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Square, parseArrayValue)) {
+            return failure();
+        }
+        attrs.append(builder.getStringAttr(key), builder.getDenseI64ArrayAttr(values));
+        return success();
+    };
+
+    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Braces, parseDictEntry)) {
+        return failure();
+    }
+    dict = attrs.getDictionary(parser.getContext());
+    return success();
+}
+
+ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
+{
+    Builder &builder = parser.getBuilder();
+    MLIRContext *ctx = parser.getContext();
+
+    // 1. Parse operation name string: "foo"
+    std::string opName;
+    if (parser.parseString(&opName)) {
+        return failure();
+    }
+    auto &opProperties = result.getOrAddProperties<OperatorOp::Properties>();
+    opProperties.setOpName(opName);
+
+    // 2. Parse variadic params: (%arg0: type, ...)
+    SmallVector<OpAsmParser::UnresolvedOperand> params;
+    SmallVector<Type> paramTypes;
+    auto parseParamAndType = [&]() -> ParseResult {
+        OpAsmParser::UnresolvedOperand operand;
+        Type type;
+        if (parseOperandTypePair(parser, operand, type)) {
+            return failure();
+        }
+        params.push_back(operand);
+        paramTypes.push_back(type);
+        return success();
+    };
+    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseParamAndType)) {
+        return failure();
+    }
+
+    // 3. Optional adjoint marker.
+    if (succeeded(parser.parseOptionalKeyword("adj"))) {
+        opProperties.setAdjoint(true);
+    }
+
+    SmallVector<OpAsmParser::UnresolvedOperand> inQubits;
+    SmallVector<OpAsmParser::UnresolvedOperand> inCtrlQubits;
+    SmallVector<OpAsmParser::UnresolvedOperand> inCtrlValues;
+    std::optional<OpAsmParser::UnresolvedOperand> inQreg;
+    SmallVector<OpAsmParser::UnresolvedOperand> arrQubitIndices;
+    SmallVector<Type> arrQubitIndexTypes;
+    std::optional<OpAsmParser::UnresolvedOperand> arrCtrlIndices;
+    std::optional<Type> arrCtrlIndicesType;
+    std::optional<OpAsmParser::UnresolvedOperand> arrCtrlValues;
+    std::optional<Type> arrCtrlValuesType;
+
+    // 4. Optional qubit section.
+    if (succeeded(parser.parseOptionalKeyword("qubits"))) {
+        auto parseQubitOperand = [&]() -> ParseResult {
+            OpAsmParser::UnresolvedOperand operand;
+            if (parser.parseOperand(operand)) {
+                return failure();
+            }
+            inQubits.push_back(operand);
+            return success();
+        };
+        if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseQubitOperand)) {
+            return failure();
+        }
+    }
+
+    // 5. Parse optional generic attr-dict that printer emits before trailing sections.
+    NamedAttrList genericAttrs;
+    if (parser.parseOptionalAttrDict(genericAttrs)) {
+        return failure();
+    }
+    result.addAttributes(genericAttrs);
+
+    // 6. Optional qreg section.
+    if (succeeded(parser.parseOptionalKeyword("quregs"))) {
+        OpAsmParser::UnresolvedOperand operand;
+        if (parser.parseLParen() || parser.parseOperand(operand) || parser.parseRParen()) {
+            return failure();
+        }
+        inQreg = operand;
+
+        auto parseIndexAndType = [&]() -> ParseResult {
+            OpAsmParser::UnresolvedOperand indexOperand;
+            Type indexType;
+            if (parseOperandTypePair(parser, indexOperand, indexType)) {
+                return failure();
+            }
+            arrQubitIndices.push_back(indexOperand);
+            arrQubitIndexTypes.push_back(indexType);
+            return success();
+        };
+        if (parser.parseKeyword("indices") ||
+            parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseIndexAndType)) {
+            return failure();
+        }
+    }
+
+    // 7. Optional controls section (qubit controls or register controls).
+    if (succeeded(parser.parseOptionalKeyword("ctrls"))) {
+        if (inQreg) {
+            OpAsmParser::UnresolvedOperand ctrlIndices;
+            Type ctrlIndicesTy;
+            if (parser.parseLParen() || parseOperandTypePair(parser, ctrlIndices, ctrlIndicesTy) ||
+                parser.parseRParen()) {
+                return failure();
+            }
+            arrCtrlIndices = ctrlIndices;
+            arrCtrlIndicesType = ctrlIndicesTy;
+
+            OpAsmParser::UnresolvedOperand ctrlValues;
+            Type ctrlValuesTy;
+            if (parser.parseKeyword("ctrl_vals") || parser.parseLParen() ||
+                parseOperandTypePair(parser, ctrlValues, ctrlValuesTy) || parser.parseRParen()) {
+                return failure();
+            }
+            arrCtrlValues = ctrlValues;
+            arrCtrlValuesType = ctrlValuesTy;
+        }
+        else {
+            auto parseCtrlQubit = [&]() -> ParseResult {
+                OpAsmParser::UnresolvedOperand operand;
+                if (parser.parseOperand(operand)) {
+                    return failure();
+                }
+                inCtrlQubits.push_back(operand);
+                return success();
+            };
+            if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseCtrlQubit) ||
+                parser.parseKeyword("ctrl_vals")) {
+                return failure();
+            }
+
+            auto parseCtrlValue = [&]() -> ParseResult {
+                OpAsmParser::UnresolvedOperand operand;
+                if (parser.parseOperand(operand)) {
+                    return failure();
+                }
+                inCtrlValues.push_back(operand);
+                return success();
+            };
+            if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseCtrlValue)) {
+                return failure();
+            }
+        }
+    }
+
+    // 8. Optional inherent metadata blocks.
+    while (true) {
+        if (succeeded(parser.parseOptionalKeyword("static_data"))) {
+            DictionaryAttr staticData;
+            if (parser.parseEqual() || parser.parseAttribute(staticData)) {
+                return failure();
+            }
+            result.addAttribute("static_data", staticData);
+            continue;
+        }
+        if (succeeded(parser.parseOptionalKeyword("param_map"))) {
+            DictionaryAttr paramMap;
+            if (parser.parseEqual() || parseI64Dictionary(parser, builder, paramMap)) {
+                return failure();
+            }
+            result.addAttribute("param_map", paramMap);
+            continue;
+        }
+        if (succeeded(parser.parseOptionalKeyword("qubit_map"))) {
+            DictionaryAttr qubitMap;
+            if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, qubitMap)) {
+                return failure();
+            }
+            result.addAttribute("qubit_map", qubitMap);
+            continue;
+        }
+        break;
+    }
+
+    // 9. Resolve operands in segment order.
+    if (parser.resolveOperands(params, paramTypes, parser.getCurrentLocation(), result.operands)) {
+        return failure();
+    }
+    if (parser.resolveOperands(inQubits, QubitType::get(ctx), result.operands)) {
+        return failure();
+    }
+    if (parser.resolveOperands(inCtrlQubits, QubitType::get(ctx), result.operands)) {
+        return failure();
+    }
+    if (parser.resolveOperands(inCtrlValues, builder.getI1Type(), result.operands)) {
+        return failure();
+    }
+    if (inQreg && parser.resolveOperand(*inQreg, QuregType::get(ctx), result.operands)) {
+        return failure();
+    }
+    if (parser.resolveOperands(arrQubitIndices, arrQubitIndexTypes, parser.getCurrentLocation(),
+                               result.operands)) {
+        return failure();
+    }
+    if (arrCtrlIndices &&
+        parser.resolveOperand(*arrCtrlIndices, *arrCtrlIndicesType, result.operands)) {
+        return failure();
+    }
+    if (arrCtrlValues &&
+        parser.resolveOperand(*arrCtrlValues, *arrCtrlValuesType, result.operands)) {
+        return failure();
+    }
+
+    // 10. Add inferred results in segment order.
+    result.addTypes(SmallVector<Type>(inQubits.size(), QubitType::get(ctx)));
+    result.addTypes(SmallVector<Type>(inCtrlQubits.size(), QubitType::get(ctx)));
+    if (inQreg) {
+        result.addTypes(QuregType::get(ctx));
+    }
+
+    // 11. Add explicit segment sizes.
+    result.addAttribute(
+        "operandSegmentSizes",
+        builder.getDenseI32ArrayAttr(
+            {static_cast<int32_t>(params.size()), static_cast<int32_t>(inQubits.size()),
+             static_cast<int32_t>(inCtrlQubits.size()), static_cast<int32_t>(inCtrlValues.size()),
+             inQreg ? 1 : 0, static_cast<int32_t>(arrQubitIndices.size()), arrCtrlIndices ? 1 : 0,
+             arrCtrlValues ? 1 : 0}));
+    result.addAttribute(
+        "resultSegmentSizes",
+        builder.getDenseI32ArrayAttr({static_cast<int32_t>(inQubits.size()),
+                                      static_cast<int32_t>(inCtrlQubits.size()), inQreg ? 1 : 0}));
+
+    return success();
+}
