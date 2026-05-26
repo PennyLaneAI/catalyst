@@ -1111,7 +1111,7 @@ class TestPlxPRDecomposition:
             return {qp.resource_rep(_UnknownOp): 1}
 
         @qp.register_resources(_rx_resources)
-        def _rx_decomp(phi, wires):
+        def _rx_decomp(_, wires):
             _UnknownOp(wires=wires)
 
         qp.decomposition.enable_graph()
