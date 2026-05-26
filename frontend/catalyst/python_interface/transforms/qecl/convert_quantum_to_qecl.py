@@ -673,6 +673,7 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
             magic_state_block = fabricate_op.results[0]
 
             # apply cnot between aux codeblock and input data codeblock
+            # hardcode idx=0 for now, based on the current assumption that k=1
             cnot_op = qecl.CnotOp(
                 in_ctrl_codeblock=magic_state_block,
                 idx_ctrl=0,
