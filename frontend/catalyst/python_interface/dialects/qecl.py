@@ -341,6 +341,22 @@ class FabricateOp(IRDLOperation):
 
 
 @irdl_op_definition
+class DeallocCodeblockOp(IRDLOperation):
+    """Deallocate a single logical codeblock."""
+
+    name = "qecl.dealloc_cb"
+
+    assembly_format = """
+            $codeblock attr-dict `:` type($codeblock)
+        """
+
+    codeblock = operand_def(base(LogicalCodeblockType))
+
+    def __init__(self, codeblock: LogicalCodeBlockSSAValue | Operation):
+        super().__init__(operands=(codeblock,))
+
+
+@irdl_op_definition
 class EncodeOp(IRDLOperation):
     """Encode a logical codeblock to the specified logical state."""
 
@@ -778,6 +794,7 @@ QecLogical = Dialect(
         ExtractCodeblockOp,
         InsertCodeblockOp,
         FabricateOp,
+        DeallocCodeblockOp,
         EncodeOp,
         NoiseOp,
         QecCycleOp,

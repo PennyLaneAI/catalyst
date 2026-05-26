@@ -36,6 +36,10 @@
   trace back to the same allocation.
   [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
 
+* The `--adjoint-lowering` pass can now handle adjoint operations containing control flow operations
+  that have multiple quantum operands, of either quantum register or qubit type.
+  [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -111,6 +115,12 @@
   - `qecl.fabricate`, which fabricates a logical codeblock in a specified initial state (typically a
     magic state).
     [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
+  - `qecl.dealloc_cb`, which deallocates a single logical codeblock.
+    [(#2866)](https://github.com/PennyLaneAI/catalyst/pull/2866)
+  - `qecp.alloc_cb`, which allocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
 
 
 

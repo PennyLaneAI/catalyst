@@ -139,6 +139,18 @@ def FabricateOp : QecLogical_Op<"fabricate"> {
     let hasVerifier = true;
 }
 
+def DeallocCodeblockOp : QecLogical_Op<"dealloc_cb"> {
+    let summary = "Deallocate a single logical codeblock.";
+
+    let arguments = (ins
+        LogicalCodeblockType:$codeblock
+    );
+
+    let assemblyFormat = [{
+        $codeblock attr-dict `:` qualified(type($codeblock))
+    }];
+}
+
 def EncodeOp : QecLogical_Op<"encode", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
     let summary = "Encode a logical codeblock to the specified logical state.";
 
