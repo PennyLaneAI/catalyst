@@ -237,14 +237,17 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                     requires_copy=requires_copy,
                     pauli_word=pauli_word,
                 )
-            elif not any(
-                keyword in getattr(op.op, "name", "")
-                for keyword in (
-                    "Adjoint",
-                    "Controlled",
-                    "TemporaryAND",
-                    "ChangeOpBasis",
-                    "Prod",
+            elif not (
+                (op_type := getattr(op.op, "op_type", None)) is not None
+                and issubclass(
+                    op_type,
+                    (
+                        qp.ops.Adjoint,
+                        qp.ops.Controlled,
+                        qp.ops.ChangeOpBasis,
+                        qp.ops.Prod,
+                        qp.TemporaryAND,
+                    ),
                 )
             ):  # pragma: no cover
                 # Note that the graph-decomposition returns abstracted rules
