@@ -1806,7 +1806,7 @@ def graph_decomposition_setup_inputs(
         get_lib_path("callbacks_lib", "CATALYST_PYTHON_CALLBACK_PLUGIN")
     ),
     libpython_path: Path | None = get_libpython_path(),
-):  # pylint: disable=unused-argument, too-many-arguments
+):  # pylint: disable=unused-argument, too-many-arguments, too-many-positional-arguments
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
     decomposition should be applied to the decorated QNode during :func:`~.qjit` compilation.
