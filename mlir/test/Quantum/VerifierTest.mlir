@@ -590,7 +590,7 @@ func.func @operator_custom_with_registers_and_controls(%r : !quantum.reg, %idx :
 // -----
 
 func.func @operator_qubits_with_maps(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %o0, %o1 = "quantum.operator"(%p0, %p1, %q0, %q1) <{op_name = "qubit_maps", param_map = {p0 = 0 : i64, p1 = 1 : i64}, qubit_map = {pair = array<i64: 0, 1>}, operandSegmentSizes = array<i32: 2, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (f64, i64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    %o0, %o1 = "quantum.operator"(%p0, %p1, %q0, %q1) <{op_name = "qubit_maps", param_map = {p0 = array<i64: 0>, p1 = array<i64: 1>}, qubit_map = {pair = array<i64: 0, 1>}, operandSegmentSizes = array<i32: 2, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (f64, i64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
     return
 }
 
@@ -598,7 +598,7 @@ func.func @operator_qubits_with_maps(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %
 
 func.func @operator_custom_qubits_with_maps(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
     %o0, %o1 = quantum.operator "custom_qubit_maps"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
-      param_map = {p0 = 0, p1 = 1}
+      param_map = {p0 = [0], p1 = [1]}
       qubit_map = {pair = [0, 1]}
     return
 }
@@ -606,7 +606,7 @@ func.func @operator_custom_qubits_with_maps(%p0 : f64, %p1 : i64, %q0 : !quantum
 // -----
 
 func.func @operator_registers_with_maps(%p0 : f64, %p1 : i64, %r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
-    %out = "quantum.operator"(%p0, %p1, %r, %idx0, %idx1) <{op_name = "reg_maps", param_map = {p0 = 0 : i64, p1 = 1 : i64}, qubit_map = {qi0 = array<i64: 0>, qi1 = array<i64: 2>}, operandSegmentSizes = array<i32: 2, 0, 0, 0, 0, 1, 2, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 1>}> : (f64, i64, !quantum.reg, tensor<2xi64>, tensor<1xi64>) -> !quantum.reg
+    %out = "quantum.operator"(%p0, %p1, %r, %idx0, %idx1) <{op_name = "reg_maps", param_map = {p0 = array<i64: 0>, p1 = array<i64: 1>}, qubit_map = {qi0 = array<i64: 0>, qi1 = array<i64: 2>}, operandSegmentSizes = array<i32: 2, 0, 0, 0, 0, 1, 2, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 1>}> : (f64, i64, !quantum.reg, tensor<2xi64>, tensor<1xi64>) -> !quantum.reg
     return
 }
 
@@ -615,8 +615,17 @@ func.func @operator_registers_with_maps(%p0 : f64, %p1 : i64, %r : !quantum.reg,
 func.func @operator_custom_registers_with_maps(%p0 : f64, %p1 : i64, %r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
     %out = quantum.operator "custom_reg_maps"(%p0 : f64, %p1 : i64)
       quregs(%r) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
-      param_map = {p0 = 0, p1 = 1}
+      param_map = {p0 = [0], p1 = [1]}
       qubit_map = {qi0 = [0], qi1 = [2]}
+    return
+}
+
+// -----
+
+func.func @operator_custom_multi_param_entry(%p0 : f64, %p1 : f64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %o0, %o1 = quantum.operator "custom_multi_param_entry"(%p0 : f64, %p1 : f64) qubits(%q0, %q1)
+      param_map = {angles = [0, 1]}
+      qubit_map = {pair = [0, 1]}
     return
 }
 
@@ -661,17 +670,17 @@ func.func @operator_custom_with_uid_and_forward(%fwd : i64, %q0 : !quantum.bit, 
 // -----
 
 func.func @operator_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
-    // expected-error@+1 {{param_map must cover all params when provided: expected 2 entries, got 1}}
-    %o0, %o1 = "quantum.operator"(%p0, %p1, %q0, %q1) <{op_name = "bad_param_map", param_map = {p0 = 0 : i64}, qubit_map = {}, operandSegmentSizes = array<i32: 2, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (f64, i64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
+    %o0, %o1 = "quantum.operator"(%p0, %p1, %q0, %q1) <{op_name = "bad_param_map", param_map = {p0 = array<i64: 0>}, qubit_map = {}, operandSegmentSizes = array<i32: 2, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (f64, i64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
     return
 }
 
 // -----
 
 func.func @operator_custom_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
-    // expected-error@+1 {{param_map must cover all params when provided: expected 2 entries, got 1}}
+    // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
     %o0, %o1 = quantum.operator "custom_bad_param_map"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
-      param_map = {p0 = 0}
+      param_map = {p0 = [0]}
       qubit_map = {}
     return
 }

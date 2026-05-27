@@ -565,7 +565,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
         OptionalProp<I64Prop>:$UID,
         DefaultValuedOptionalAttr<FunctionRefArrayAttr, "{}">:$decompositions,
         DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
-        DefaultValuedOptionalAttr<I64DictAttr, "{}">:$param_map,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
     );
 

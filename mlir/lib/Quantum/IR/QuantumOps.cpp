@@ -280,9 +280,28 @@ LogicalResult OperatorOp::verify()
         }
     }
 
-    if (getParamMapAttr() && getParamMap().size() != getParams().size()) {
-        return emitOpError() << "param_map must cover all params when provided: expected "
-                             << getParams().size() << " entries, got " << getParamMap().size();
+    if (getParamMapAttr()) {
+        const size_t numParams = getParams().size();
+        std::vector<bool> coveredParams(numParams, false);
+        size_t coveredCount = 0;
+        for (NamedAttribute namedAttr : getParamMap()) {
+            auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
+            for (int64_t idx : denseArray.asArrayRef()) {
+                if (idx < 0 || idx >= static_cast<int64_t>(numParams)) {
+                    return emitOpError() << "param_map index is out of bounds with respect to "
+                                            "params: "
+                                         << idx << " is not in [0, " << numParams << ")";
+                }
+                if (!coveredParams[static_cast<size_t>(idx)]) {
+                    coveredParams[static_cast<size_t>(idx)] = true;
+                    ++coveredCount;
+                }
+            }
+        }
+        if (coveredCount != numParams) {
+            return emitOpError() << "param_map must cover all params when provided: expected "
+                                 << numParams << ", got " << coveredCount;
+        }
     }
 
     auto qubitMap = getQubitMap();
@@ -780,22 +799,6 @@ static void printDictionaryWithDenseI64Lists(OpAsmPrinter &p, DictionaryAttr dic
     p << "}";
 }
 
-static void printDictionaryWithIntegerLiterals(OpAsmPrinter &p, DictionaryAttr dict)
-{
-    p << "{";
-    llvm::interleaveComma(dict, p, [&](NamedAttribute namedAttr) {
-        p.printKeywordOrString(namedAttr.getName().strref());
-        p << " = ";
-        if (auto intAttr = dyn_cast<IntegerAttr>(namedAttr.getValue())) {
-            p << intAttr.getInt();
-        }
-        else {
-            p << namedAttr.getValue();
-        }
-    });
-    p << "}";
-}
-
 void OperatorOp::print(OpAsmPrinter &p)
 {
     // 1. Template Name
@@ -874,14 +877,14 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 11. Optional metadata
-    if (getParamMapAttr() || getParamMapAttr()) {
+    if (getParamMapAttr() || getQubitMapAttr()) {
         p.printNewline();
     }
     if (getParamMapAttr()) {
         p << "param_map = ";
-        printDictionaryWithIntegerLiterals(p, getParamMap());
+        printDictionaryWithDenseI64Lists(p, getParamMap());
     }
-    if (getParamMapAttr() && getParamMapAttr()) {
+    if (getParamMapAttr() && getQubitMapAttr()) {
         p << " ";
     }
     if (getQubitMapAttr()) {
@@ -896,26 +899,6 @@ static ParseResult parseOperandTypePair(OpAsmParser &parser,
                                         OpAsmParser::UnresolvedOperand &operand, Type &type)
 {
     return failure(parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type));
-}
-
-static ParseResult parseI64Dictionary(OpAsmParser &parser, Builder &builder, DictionaryAttr &dict)
-{
-    NamedAttrList attrs;
-    auto parseDictEntry = [&]() -> ParseResult {
-        StringRef key;
-        int64_t value = 0;
-        if (parser.parseKeyword(&key) || parser.parseEqual() || parser.parseInteger(value)) {
-            return failure();
-        }
-        attrs.append(builder.getStringAttr(key), builder.getI64IntegerAttr(value));
-        return success();
-    };
-
-    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Braces, parseDictEntry)) {
-        return failure();
-    }
-    dict = attrs.getDictionary(parser.getContext());
-    return success();
 }
 
 static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &builder,
@@ -1138,7 +1121,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         }
         if (succeeded(parser.parseOptionalKeyword("param_map"))) {
             DictionaryAttr paramMap;
-            if (parser.parseEqual() || parseI64Dictionary(parser, builder, paramMap)) {
+            if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, paramMap)) {
                 return failure();
             }
             result.addAttribute("param_map", paramMap);
