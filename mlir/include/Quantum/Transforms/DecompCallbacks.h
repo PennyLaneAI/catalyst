@@ -36,4 +36,16 @@ using LowerPauliRotFn = mlir::OwningOpRef<mlir::func::FuncOp> (*)(mlir::MLIRCont
 void registerLowerPauliRot(LowerPauliRotFn fn);
 LowerPauliRotFn getLowerPauliRot();
 
+// TODO: User-provided stopping_condition predicate.
+// The frontend captures the
+// callable in a Python-side registry keyed by conditionId and
+// embeds the id in the pass-pipeline options.
+// The pass invokes this function
+// pointer per op-instance encountered during graph decomposition.
+using StoppingConditionFn = bool (*)(const char *conditionId, const char *opName,
+                                     llvm::ArrayRef<double> params, llvm::ArrayRef<int> wires);
+
+void registerStoppingCondition(StoppingConditionFn fn);
+StoppingConditionFn getStoppingCondition();
+
 } // namespace catalyst::quantum

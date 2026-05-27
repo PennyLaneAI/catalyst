@@ -123,6 +123,66 @@ mlir::OwningOpRef<mlir::func::FuncOp> pythonLowerPauliRot(mlir::MLIRContext *ctx
     }
 }
 
+////////////////////////////////////
+// stopping_condition callback
+/////////////////////////////////////
+
+// Pure tracing path: call the Python-side wrapper that looks up the user's
+// predicate by id and runs it.
+bool stoppingConditionImpl(const char *conditionId, const char *opName,
+                           llvm::ArrayRef<double> params, llvm::ArrayRef<int> wires)
+{
+    return QuantumPythonCallbacks::PyInterpreterGuard::ensure().withGil([&] {
+        const char *moduleName = "catalyst.python_callbacks";
+        const char *functionName = "stopping_condition_wrapper";
+
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "querying stopping_condition '" << conditionId
+                                << "' for op '" << opName << "'\n");
+
+        try {
+            nb::module_ wrapperModule = nb::module_::import_(moduleName);
+            nb::object wrapperFunction = wrapperModule.attr(functionName);
+
+            nb::list pyParams;
+            for (double p : params)
+                pyParams.append(p);
+            nb::list pyWires;
+            for (int w : wires)
+                pyWires.append(w);
+
+            nb::object result = wrapperFunction(conditionId, opName, pyParams, pyWires);
+            return nb::cast<bool>(result);
+        }
+        catch (const nb::python_error &error) {
+            throw QuantumPythonCallbacks::TracingError(moduleName, functionName, opName,
+                                                       error.what());
+        }
+    });
+}
+
+// Exception-safe entry point for the stopping_condition callback registry.
+bool pythonStoppingCondition(const char *conditionId, const char *opName,
+                             llvm::ArrayRef<double> params, llvm::ArrayRef<int> wires)
+{
+    try {
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "querying stopping_condition '" << conditionId
+                                << "' for op '" << opName << "'\n");
+        return stoppingConditionImpl(conditionId, opName, params, wires);
+    }
+    catch (const std::exception &e) {
+        mlir::emitError(mlir::UnknownLoc::get(ctx))
+            << "Stopping condition callback failed for condition '" << conditionId << "' and op '"
+            << opName << "': " << e.what();
+        return nullptr;
+    }
+    catch (...) {
+        mlir::emitError(mlir::UnknownLoc::get(ctx))
+            << "Stopping condition callback failed for condition '" << conditionId << "' and op '"
+            << opName << "': unknown exception";
+        return nullptr;
+    }
+}
+
 } // namespace
 
 // The default visibility keeps the symbol in the .so's dynamic table even under
@@ -130,4 +190,5 @@ mlir::OwningOpRef<mlir::func::FuncOp> pythonLowerPauliRot(mlir::MLIRContext *ctx
 extern "C" __attribute__((visibility("default"))) void registerPythonDecompCallback()
 {
     catalyst::quantum::registerLowerPauliRot(pythonLowerPauliRot);
+    catalyst::quantum::registerStoppingCondition(pythonStoppingCondition);
 }

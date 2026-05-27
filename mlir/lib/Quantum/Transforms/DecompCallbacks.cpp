@@ -22,9 +22,18 @@ LowerPauliRotFn &lowerPauliRotSlot()
     static LowerPauliRotFn fptr = nullptr;
     return fptr;
 }
+
+StoppingConditionFn &stoppingConditionSlot()
+{
+    static StoppingConditionFn fptr = nullptr;
+    return fptr;
+}
 } // namespace
 
 void registerLowerPauliRot(LowerPauliRotFn fn) { lowerPauliRotSlot() = fn; }
 LowerPauliRotFn getLowerPauliRot() { return lowerPauliRotSlot(); }
+
+void registerStoppingCondition(StoppingConditionFn fn) { stoppingConditionSlot() = fn; }
+StoppingConditionFn getStoppingCondition() { return stoppingConditionSlot(); }
 
 } // namespace catalyst::quantum
