@@ -302,6 +302,42 @@ LogicalResult DeallocAuxQubitOp::canonicalize(DeallocAuxQubitOp dealloc,
 }
 
 /**
+ * @brief Canonicalize single-physical-codeblock allocation op.
+ *
+ * Erase alloc_cb op if it has no uses.
+ */
+LogicalResult AllocCodeblockOp::canonicalize(AllocCodeblockOp alloc_cb,
+                                             mlir::PatternRewriter &rewriter)
+{
+    if (alloc_cb->use_empty()) {
+        rewriter.eraseOp(alloc_cb);
+        return success();
+    }
+
+    return failure();
+}
+
+/**
+ * @brief Canonicalize single-physical-codeblock deallocation op.
+ *
+ * Erase alloc_cb/dealloc_cb op pairs if allocated codeblock is immediately deallocated.
+ */
+LogicalResult DeallocCodeblockOp::canonicalize(DeallocCodeblockOp dealloc_cb,
+                                               mlir::PatternRewriter &rewriter)
+{
+    const auto qubit = dealloc_cb.getCodeblock();
+    if (auto alloc_cb = dyn_cast_if_present<AllocCodeblockOp>(qubit.getDefiningOp())) {
+        if (qubit.hasOneUse()) {
+            rewriter.eraseOp(dealloc_cb);
+            rewriter.eraseOp(alloc_cb);
+            return success();
+        }
+    }
+
+    return failure();
+}
+
+/**
  * @brief Canonicalize extract-codeblock op.
  *
  * Removes sequential insert-extract op pairs acting on the same index, e.g. handles the pattern:

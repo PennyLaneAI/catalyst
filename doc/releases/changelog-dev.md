@@ -36,6 +36,10 @@
   trace back to the same allocation.
   [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
 
+* The `--adjoint-lowering` pass can now handle adjoint operations containing control flow operations
+  that have multiple quantum operands, of either quantum register or qubit type.
+  [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -71,6 +75,7 @@
   transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
+  [(#2871)](https://github.com/PennyLaneAI/catalyst/pull/2871)
 
 * The experimental compiler pass `convert-quantum-to-qecl` has been extended to lower
   `quantum.custom "T"` gates to the `qecl` layer as a subroutine using a magic state.
@@ -116,6 +121,12 @@
     [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
   - `qecl.dealloc_cb`, which deallocates a single logical codeblock.
     [(#2866)](https://github.com/PennyLaneAI/catalyst/pull/2866)
+  - `qecp.alloc_cb`, which allocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+
+
 
 <h3>Documentation 📝</h3>
 
