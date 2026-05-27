@@ -79,6 +79,7 @@
   transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
+  [(#2871)](https://github.com/PennyLaneAI/catalyst/pull/2871)
 
 * The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
   [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
@@ -124,6 +125,8 @@
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
   - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+
+
 
 <h3>Documentation 📝</h3>
 
