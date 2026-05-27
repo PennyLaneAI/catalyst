@@ -101,13 +101,18 @@ bool tryLoadLibpython(llvm::StringRef where)
 
 // Try, in order:
 //   1. $CATALYST_LIBPYTHON: explicit user override (any deployment)
+//   2. function parameter
 //   3. CATALYST_LIBPYTHON_PATH: absolute path the configure-time Python uses
 //   4. CATALYST_LIBPYTHON_SONAME: bare SONAME via the dynamic loader search (manylinux wheels)
-void ensureLibpythonLoaded()
+void ensureLibpythonLoaded(std::string libpythonPath)
 {
     if (auto over = llvm::sys::Process::GetEnv("CATALYST_LIBPYTHON")) {
         if (tryLoadLibpython(*over))
             return;
+    }
+
+    if (tryLoadLibpython(libpythonPath)) {
+        return;
     }
 #ifdef CATALYST_LIBPYTHON_PATH
     if (tryLoadLibpython(CATALYST_LIBPYTHON_PATH))
@@ -121,7 +126,7 @@ void ensureLibpythonLoaded()
                     "the plugin dlopen will likely fail with undefined symbols\n";
 }
 
-RegisterFn loadAndResolve(std::string callbackPluginPath)
+RegisterFn loadAndResolve(std::string callbackPluginPath, std::string libpythonPath)
 {
     std::string path = resolvePluginPath(callbackPluginPath);
     if (path.empty()) {
@@ -131,7 +136,7 @@ RegisterFn loadAndResolve(std::string callbackPluginPath)
     // FIXME(Ali): remove this after testing
     llvm::errs() << "[decomp-callbacks-loader] plugin resolved at: " << path << "\n";
 
-    ensureLibpythonLoaded();
+    ensureLibpythonLoaded(libpythonPath);
 
     // Open your plugin with RTLD_GLOBAL so nanobind's internals
     // can map correctly to Python's runtime memory space
@@ -153,7 +158,7 @@ RegisterFn loadAndResolve(std::string callbackPluginPath)
 
 } // namespace
 
-bool loadPythonCallbackPlugin(std::string callbackPluginPath)
+bool loadPythonCallbackPlugin(std::string callbackPluginPath, std::string libpythonPath)
 {
     if (getLowerPauliRot()) {
         return true;
@@ -163,7 +168,7 @@ bool loadPythonCallbackPlugin(std::string callbackPluginPath)
         return getLowerPauliRot() != nullptr;
     }
 
-    RegisterFn reg = loadAndResolve(callbackPluginPath);
+    RegisterFn reg = loadAndResolve(callbackPluginPath, libpythonPath);
     if (!reg) {
         return false;
     }

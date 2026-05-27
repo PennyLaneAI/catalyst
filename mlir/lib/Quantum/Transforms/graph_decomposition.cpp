@@ -55,7 +55,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
-        loadPythonCallbackPlugin(callbackPluginPath);
+        loadPythonCallbackPlugin(callbackPluginPath, libpythonPath);
 
         // Debugging output for command-line options
         LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");

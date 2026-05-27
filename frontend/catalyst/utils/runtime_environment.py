@@ -54,6 +54,25 @@ BYTECODE_FILE_PATH = (
 )
 
 
+def get_libpython_path() -> Path | None:
+    """Return the path to the python shared library, or None if failed to find."""
+    # check if python was built statically, in which case the shared library does not exist
+    if not sysconfig.get_config_var("Py_ENABLE_SHARED"):
+        return None
+
+    libdir = sysconfig.get_config_var("LIBDIR")
+    ldlibrary = sysconfig.get_config_var("LDLIBRARY")
+
+    if libdir and ldlibrary:
+        path = Path(libdir) / ldlibrary
+        path.resolve()
+
+        if path.exists():
+            return path
+
+    return None
+
+
 def get_lib_path(project, env_var):
     """Get the library path."""
     if INSTALLED:

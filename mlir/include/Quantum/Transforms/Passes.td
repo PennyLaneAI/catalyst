@@ -160,7 +160,13 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"callback-plugin-path",
             /*Type*/"std::string",
             /*Default*/[{ "../lib/libQuantumPythonCallbacks.dylib" }],
-            /*Description*/"A path to the QuantumPythonCallbacks dynamic library.">
+            /*Description*/"A path to the QuantumPythonCallbacks dynamic library.">,
+        Option<
+            /*C++ name*/"libpythonPath",
+            /*CLI name*/"libpython-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the python shared library.">
     ];
 
     let dependentDialects = [

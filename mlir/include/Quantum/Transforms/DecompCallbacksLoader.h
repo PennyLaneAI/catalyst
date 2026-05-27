@@ -18,6 +18,6 @@
 
 namespace catalyst::quantum {
 
-bool loadPythonCallbackPlugin(std::string callbackPluginPath);
+bool loadPythonCallbackPlugin(std::string callbackPluginPath, std::string libpythonPath);
 
 } // namespace catalyst::quantum
