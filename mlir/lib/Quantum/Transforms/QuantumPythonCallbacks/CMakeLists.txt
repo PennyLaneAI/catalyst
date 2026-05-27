@@ -82,7 +82,6 @@ endif()
 if (APPLE)
     target_link_options(QuantumPythonCallbacks PRIVATE
         "LINKER:-undefined,dynamic_lookup"
-        "LINKER:-flat_namespace"
     )
 else()
     target_link_options(QuantumPythonCallbacks PRIVATE

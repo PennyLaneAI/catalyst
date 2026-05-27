@@ -63,12 +63,26 @@ def get_libpython_path() -> Path | None:
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
 
-    if libdir and ldlibrary:
-        path = Path(libdir) / ldlibrary
-        path.resolve()
+    if not (libdir and ldlibrary):
+        return None
 
-        if path.exists():
-            return path
+    # standard installation
+    ldlibrary_path = Path(libdir) / ldlibrary
+    if ldlibrary_path.exists():
+        return ldlibrary_path.resolve()
+
+    # check for macOS framework-style installation
+    if sys.platform == "darwin" and ldlibrary == "Python":
+        framework_path = Path(libdir).parent / "Python"
+        if framework_path.exists():
+            return framework_path.resolve()
+
+    # check Library
+    library = sysconfig.get_config_var("LIBRARY")
+    if library:
+        library_path = Path(libdir) / library
+        if library_path.exists():
+            return library_path.resolve()
 
     return None
 
