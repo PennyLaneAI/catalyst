@@ -776,10 +776,14 @@ def test_decomposition_inside_subroutine():
     def subroutine_circuit():
         # CHECK-DAG: [[FIRST_CONST:%.+]] = stablehlo.constant dense<5.000000e-01> : tensor<f64>
         # CHECK-DAG: [[SECOND_CONST:%.+]] = stablehlo.constant dense<1.200000e+00> : tensor<f64>
+        # CHECK-DAG: [[zero:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+        # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+        # CHECK-DAG: [[two:%.+]] = stablehlo.constant dense<2> : tensor<i64>
+        # CHECK-DAG: [[three:%.+]] = stablehlo.constant dense<3> : tensor<i64>
 
         # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @f([[QREG]], [[FIRST_CONST]], {{%.+}}) : (!quantum.reg, tensor<f64>, tensor<2xi64>) -> !quantum.reg
-        # CHECK: [[QREG_2:%.+]] = call @f([[QREG_1]], [[SECOND_CONST]], {{%.+}}) : (!quantum.reg, tensor<f64>, tensor<2xi64>) -> !quantum.reg
+        # CHECK: [[QREG_1:%.+]] = call @f([[QREG]], [[FIRST_CONST]], [[zero]], [[one]]) : (!quantum.reg, tensor<f64>, tensor<i64>, tensor<i64>) -> !quantum.reg
+        # CHECK: [[QREG_2:%.+]] = call @f([[QREG_1]], [[SECOND_CONST]], [[two]], [[three]]) : (!quantum.reg, tensor<f64>, tensor<i64>, tensor<i64>) -> !quantum.reg
 
         f(0.5, (0, 1))
         f(1.2, (2, 3))
