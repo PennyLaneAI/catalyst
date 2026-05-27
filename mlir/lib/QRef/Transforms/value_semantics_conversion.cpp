@@ -22,6 +22,7 @@
 #include <variant>
 #include <vector>
 
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -913,7 +914,7 @@ void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp)
     // The structure of `reg_to_indices` is a map whose keys are the source register
     // and the value is a pair of two sets, the first containing static indices, the second
     // containing dynamic indices
-    DenseMap<Value, std::pair<DenseSet<uint64_t>, DenseSet<Value>>> reg_to_indices;
+    llvm::MapVector<Value, std::pair<SetVector<uint64_t>, SetVector<Value>>> reg_to_indices;
     for (Value callArg : callOp.getArgOperands()) {
         if (isa<qref::QubitType>(callArg.getType()) &&
             isa_and_nonnull<qref::GetOp>(callArg.getDefiningOp())) {
@@ -923,22 +924,19 @@ void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp)
             Value dynamicIndex = getOp.getIdx();
             bool isStatic = staticIndex.has_value();
 
-            if (!reg_to_indices.contains(qreg)) {
-                if (isStatic) {
-                    reg_to_indices.insert({qreg, {{staticIndex.value()}, {}}});
+            if (isStatic) {
+                auto [it, inserted] = reg_to_indices.try_emplace(qreg);
+                if (inserted) {
+                    it->second.first.insert(staticIndex.value());
                 }
                 else {
-                    reg_to_indices.insert({qreg, {{}, {dynamicIndex}}});
+                    assert(!reg_to_indices[qreg].first.contains(staticIndex.value()) &&
+                           "Can only call subroutines with non aliasing qubits");
+                    reg_to_indices[qreg].first.insert(staticIndex.value());
                 }
-                continue;
-            }
-
-            if (isStatic) {
-                assert(!reg_to_indices[qreg].first.contains(staticIndex.value()) &&
-                       "Can only call subroutines with non aliasing qubits");
-                reg_to_indices[qreg].first.insert(staticIndex.value());
             }
             else {
+                reg_to_indices.try_emplace(qreg);
                 reg_to_indices[qreg].second.insert(dynamicIndex);
             }
         }

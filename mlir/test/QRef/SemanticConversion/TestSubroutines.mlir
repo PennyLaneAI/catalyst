@@ -484,15 +484,6 @@ func.func @main(%i: i64, %j: i64) -> () attributes {quantum.node} {
     // CHECK-DAG: [[one_left_shift_one:%.+]] = arith.constant 2 : i64
 
     // CHECK: [[i:%.+]] = arith.shli [[one]], %arg0 : i64
-    // CHECK: [[xor:%.+]] = arith.xori [[i]], [[one_left_shift_two]] : i64
-    // CHECK: [[num_ones:%.+]] = math.ctpop [[xor]] : i64
-    // CHECK: [[cmp:%.+]] = arith.cmpi eq, [[num_ones]], [[one_left_shift_one]] : i64
-    // CHECK: "catalyst.assert"([[cmp]]) <{error = "Can only call subroutines with non aliasing qubits"}> : (i1) -> ()
-    %r3 = qref.alloc(3) : !qref.reg<3>
-    %q3_2 = qref.get %r3[2] : !qref.reg<3> -> !qref.bit
-    %q3_i = qref.get %r3[%i] : !qref.reg<3>, i64 -> !qref.bit
-
-    // CHECK: [[i:%.+]] = arith.shli [[one]], %arg0 : i64
     // CHECK: [[xor:%.+]] = arith.xori [[i]], [[one_left_shift_one]] : i64
     // CHECK: [[j:%.+]] = arith.shli [[one]], %arg1 : i64
     // CHECK: [[xor_:%.+]] = arith.xori [[xor]], [[j]] : i64
@@ -503,6 +494,15 @@ func.func @main(%i: i64, %j: i64) -> () attributes {quantum.node} {
     %q2_1 = qref.get %r2[1] : !qref.reg<2> -> !qref.bit
     %q2_i = qref.get %r2[%i] : !qref.reg<2>, i64 -> !qref.bit
     %q2_j = qref.get %r2[%j] : !qref.reg<2>, i64 -> !qref.bit
+
+    // CHECK: [[i:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[xor:%.+]] = arith.xori [[i]], [[one_left_shift_two]] : i64
+    // CHECK: [[num_ones:%.+]] = math.ctpop [[xor]] : i64
+    // CHECK: [[cmp:%.+]] = arith.cmpi eq, [[num_ones]], [[one_left_shift_one]] : i64
+    // CHECK: "catalyst.assert"([[cmp]]) <{error = "Can only call subroutines with non aliasing qubits"}> : (i1) -> ()
+    %r3 = qref.alloc(3) : !qref.reg<3>
+    %q3_2 = qref.get %r3[2] : !qref.reg<3> -> !qref.bit
+    %q3_i = qref.get %r3[%i] : !qref.reg<3>, i64 -> !qref.bit
 
     // CHECK: call
     func.call @test_aliasing_qubit_args(%q2_1, %q2_i, %q2_j, %q3_2, %q3_i) : (!qref.bit, !qref.bit, !qref.bit, !qref.bit, !qref.bit) -> ()
