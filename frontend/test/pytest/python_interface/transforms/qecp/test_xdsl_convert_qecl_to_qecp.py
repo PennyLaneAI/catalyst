@@ -1028,6 +1028,7 @@ class TestQECPLoweringIntegration:
 
         @qp.qjit(capture=True, target="mlir")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
@@ -1075,6 +1076,7 @@ class TestQECPLoweringIntegration:
         @qp.qjit(target="mlir", capture=True)
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
+        @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
