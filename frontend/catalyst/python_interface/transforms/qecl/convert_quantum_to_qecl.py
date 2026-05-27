@@ -343,6 +343,7 @@ class DeallocOpConversion(RewritePattern):
 
 # MARK: Custom Op Pattern
 
+
 @dataclass
 class CustomOpConversion(RewritePattern):
     """Converts `quantum.custom` ops for Clifford+T and Pauli gates to their equivalent `qecl`
