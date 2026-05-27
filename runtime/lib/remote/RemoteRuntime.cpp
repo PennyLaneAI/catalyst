@@ -32,6 +32,14 @@ struct RemoteEntry {
     std::set<std::string> loaded_paths; // The paths of the binaries that are going to be loaded
                                         // into the remote session.
     std::mutex mu;                      // The mutex to protect the loaded paths.
+
+    ~RemoteEntry()
+    {
+        if (session) {
+            catalyst::remote::close(session);
+            session = nullptr;
+        }
+    }
 };
 
 std::mutex g_map_mu;

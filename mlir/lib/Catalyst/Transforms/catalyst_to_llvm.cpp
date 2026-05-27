@@ -755,19 +755,29 @@ struct RemoteLibCallOpPattern : public OpConversionPattern<CustomCallOp> {
         LLVM::LLVMFuncOp freeFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__remote__free_result", freeSig);
 
-        SmallVector<int64_t> offsets;
-        int64_t totalSize = 0;
-        for (Type ty : op.getOperandTypes()) {
-            int64_t n = primitiveByteSize(ty);
-            if (n < 0) {
-                return op->emitOpError("unsupported arg type for remote_lib_call: ")
-                       << ty << " (supports int/float/index/complex only)";
-            }
-            offsets.push_back(totalSize);
-            totalSize += n;
+        unsigned numInputs = op.getNumberOriginalArg().value_or(op.getNumOperands());
+        if (numInputs > op.getNumOperands()) {
+            return op->emitOpError("number_original_arg exceeds operand count");
         }
 
-        Type bufTy = LLVM::LLVMArrayType::get(i8Ty, totalSize > 0 ? totalSize : 1);
+        SmallVector<int64_t> inputOffsets;
+        int64_t totalInputBytes = 0;
+        for (unsigned i = 0; i < numInputs; ++i) {
+            int64_t argSize = memrefBufferBytes(op.getOperand(i).getType(), op);
+            if (argSize < 0) {
+                return failure();
+            }
+            inputOffsets.push_back(totalInputBytes);
+            totalInputBytes += argSize;
+        }
+        for (unsigned i = numInputs; i < op.getNumOperands(); ++i) {
+            // only verify the result types
+            if (memrefBufferBytes(op.getOperand(i).getType(), op) < 0) {
+                return failure();
+            }
+        }
+
+        Type bufTy = LLVM::LLVMArrayType::get(i8Ty, totalInputBytes > 0 ? totalInputBytes : 1);
 
         // Symbols
         Value addrPtr = getGlobalString(loc, rewriter, "remote_lib_addr_" + sym,
@@ -776,14 +786,21 @@ struct RemoteLibCallOpPattern : public OpConversionPattern<CustomCallOp> {
 
         // Alloca args buffer + store each arg.
         Value argsBuf = getStaticAlloca(loc, rewriter, bufTy, 1);
-        for (auto [llvmVal, off] : llvm::zip(adaptor.getOperands(), offsets)) {
-            Value slot = LLVM::GEPOp::create(rewriter, loc, ptrTy, bufTy, argsBuf,
-                                             ArrayRef<LLVM::GEPArg>{0, static_cast<int32_t>(off)},
-                                             LLVM::GEPNoWrapFlags::inbounds);
-            LLVM::StoreOp::create(rewriter, loc, llvmVal, slot);
+        for (unsigned i = 0; i < numInputs; ++i) {
+            auto memrefTy = cast<MemRefType>(op.getOperand(i).getType());
+            int64_t numBytes =
+                memrefTy.getNumElements() * primitiveByteSize(memrefTy.getElementType());
+            Value src = MemRefDescriptor(adaptor.getOperands()[i]).alignedPtr(rewriter, loc);
+            Value slot = LLVM::GEPOp::create(
+                rewriter, loc, ptrTy, bufTy, argsBuf,
+                ArrayRef<LLVM::GEPArg>{0, static_cast<int32_t>(inputOffsets[i])},
+                LLVM::GEPNoWrapFlags::inbounds);
+            Value sizeVal =
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numBytes));
+            LLVM::MemcpyOp::create(rewriter, loc, slot, src, sizeVal, /*isVolatile=*/false);
         }
         Value argsSize =
-            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(totalSize));
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(totalInputBytes));
 
         // Alloca result buffer + size.
         Value outBufSlot = getStaticAlloca(loc, rewriter, ptrTy, 1);
@@ -794,35 +811,51 @@ struct RemoteLibCallOpPattern : public OpConversionPattern<CustomCallOp> {
             rewriter, loc, callFn,
             ValueRange{addrPtr, symPtr, argsBuf, argsSize, outBufSlot, outSizeSlot});
 
-        // Decode return value (if any).
-        SmallVector<Value> returns;
-        Value outBuf;
-        if (!op.getResultTypes().empty()) {
-            if (op.getResultTypes().size() != 1) {
-                return op->emitOpError("remote_lib_call supports at most one result");
-            }
-            Type retTy = op.getResultTypes().front();
-            if (primitiveByteSize(retTy) < 0) {
-                return op->emitOpError("unsupported return type for remote_lib_call: ") << retTy;
-            }
-            Type retLLVMTy = getTypeConverter()->convertType(retTy);
-            outBuf = LLVM::LoadOp::create(rewriter, loc, ptrTy, outBufSlot);
-            Value rv = LLVM::LoadOp::create(rewriter, loc, retLLVMTy, outBuf);
-            returns.push_back(rv);
-        }
-        else {
-            outBuf = LLVM::LoadOp::create(rewriter, loc, ptrTy, outBufSlot);
+        Value outBuf = LLVM::LoadOp::create(rewriter, loc, ptrTy, outBufSlot);
+        int64_t outOffset = 0;
+        for (unsigned i = numInputs; i < op.getNumOperands(); ++i) {
+            auto memrefTy = cast<MemRefType>(op.getOperand(i).getType());
+            int64_t numBytes =
+                memrefTy.getNumElements() * primitiveByteSize(memrefTy.getElementType());
+            Value destPtr = MemRefDescriptor(adaptor.getOperands()[i]).alignedPtr(rewriter, loc);
+            Value src = LLVM::GEPOp::create(rewriter, loc, ptrTy, i8Ty, outBuf,
+                                            ArrayRef<LLVM::GEPArg>{static_cast<int32_t>(outOffset)},
+                                            LLVM::GEPNoWrapFlags::inbounds);
+            Value sizeVal =
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numBytes));
+            LLVM::MemcpyOp::create(rewriter, loc, destPtr, src, sizeVal, /*isVolatile=*/false);
+            outOffset += numBytes;
         }
 
         // Release the runtime-allocated result buffer.
         LLVM::CallOp::create(rewriter, loc, freeFn, ValueRange{outBuf});
-
-        rewriter.replaceOp(op, returns);
+        rewriter.eraseOp(op);
         return success();
     }
 
   private:
-    // Supported scalar byte sizes. Returns -1 for unsupported types.
+    // Get the memref buffer bytes.
+    static int64_t memrefBufferBytes(Type ty, Operation *op)
+    {
+        auto memrefTy = dyn_cast<MemRefType>(ty);
+        if (!memrefTy) {
+            op->emitOpError("remote_lib_call requires memref-typed operands; got ") << ty;
+            return -1;
+        }
+        if (!memrefTy.hasStaticShape()) {
+            op->emitOpError("remote_lib_call requires static-shape memref args; got ") << memrefTy;
+            return -1;
+        }
+        int64_t elemSz = primitiveByteSize(memrefTy.getElementType());
+        if (elemSz < 0) {
+            op->emitOpError("unsupported memref element type for remote_lib_call: ")
+                << memrefTy.getElementType();
+            return -1;
+        }
+        return memrefTy.getNumElements() * elemSz;
+    }
+
+    // Supported element-type byte sizes. Returns -1 for unsupported types.
     static int64_t primitiveByteSize(Type ty)
     {
         if (auto i = dyn_cast<IntegerType>(ty)) {
