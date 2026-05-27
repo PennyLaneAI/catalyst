@@ -126,6 +126,8 @@
 
   - Conditionals (`scf.if`)
     [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
+  - For loops (`scf.for`)
+    [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
 
 <h3>Documentation 📝</h3>
 
