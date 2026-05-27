@@ -688,6 +688,72 @@ LogicalResult AdjointOp::verify()
 }
 
 //===----------------------------------------------------------------------===//
+// Quantum op builders.
+//===----------------------------------------------------------------------===//
+
+void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
+                       ValueRange params, ValueRange in_qubits, ValueRange in_ctrl_qubits,
+                       ValueRange in_ctrl_values, ValueRange forward_args, bool adjoint,
+                       std::optional<int64_t> UID, ArrayAttr decompositions,
+                       DictionaryAttr static_data, DictionaryAttr param_map,
+                       DictionaryAttr qubit_map)
+{
+    SmallVector<Type> resultTypes;
+    TypeRange qubitTypes = TypeRange(in_qubits);
+    TypeRange ctrlQubitTypes = TypeRange(in_ctrl_qubits);
+    resultTypes.append(qubitTypes.begin(), qubitTypes.end());
+    resultTypes.append(ctrlQubitTypes.begin(), ctrlQubitTypes.end());
+
+    build(odsBuilder, odsState,
+          /*resultTypes=*/resultTypes,
+          /*op_name=*/op_name,
+          /*params=*/params,
+          /*forward_args=*/forward_args,
+          /*in_qubits=*/in_qubits,
+          /*in_ctrl_qubits=*/in_ctrl_qubits,
+          /*in_ctrl_values=*/in_ctrl_values,
+          /*in_qreg=*/Value(),
+          /*arr_qubit_indices=*/ValueRange(),
+          /*arr_ctrl_indices=*/Value(),
+          /*arr_ctrl_values=*/Value(),
+          /*adjoint=*/adjoint,
+          /*UID=*/UID,
+          /*decompositions=*/decompositions,
+          /*static_data=*/static_data,
+          /*param_map=*/param_map,
+          /*qubit_map=*/qubit_map);
+}
+
+void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
+                       ValueRange params, Value in_qreg, ValueRange arr_qubit_indices,
+                       Value arr_ctrl_indices, Value arr_ctrl_values, ValueRange forward_args,
+                       bool adjoint, std::optional<int64_t> UID, ArrayAttr decompositions,
+                       DictionaryAttr static_data, DictionaryAttr param_map,
+                       DictionaryAttr qubit_map)
+{
+    SmallVector<Type> resultTypes = {in_qreg.getType()};
+
+    build(odsBuilder, odsState,
+          /*resultTypes=*/resultTypes,
+          /*op_name=*/op_name,
+          /*params=*/params,
+          /*forward_args=*/forward_args,
+          /*in_qubits=*/ValueRange(),
+          /*in_ctrl_qubits=*/ValueRange(),
+          /*in_ctrl_values=*/ValueRange(),
+          /*in_qreg=*/in_qreg,
+          /*arr_qubit_indices=*/arr_qubit_indices,
+          /*arr_ctrl_indices=*/arr_ctrl_indices,
+          /*arr_ctrl_values=*/arr_ctrl_values,
+          /*adjoint=*/adjoint,
+          /*UID=*/UID,
+          /*decompositions=*/decompositions,
+          /*static_data=*/static_data,
+          /*param_map=*/param_map,
+          /*qubit_map=*/qubit_map);
+}
+
+//===----------------------------------------------------------------------===//
 // Quantum op printers/parsers.
 //===----------------------------------------------------------------------===//
 

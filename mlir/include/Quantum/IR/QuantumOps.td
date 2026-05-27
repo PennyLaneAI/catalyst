@@ -586,6 +586,40 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
 
     let hasVerifier = 1;
     let hasCustomAssemblyFormat = 1;
+
+    let builders = [
+        // qubit mode
+        OpBuilder<(ins
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::ValueRange":$in_qubits,
+            CArg<"mlir::ValueRange", "{}">:$in_ctrl_qubits,
+            CArg<"mlir::ValueRange", "{}">:$in_ctrl_values,
+            CArg<"mlir::ValueRange", "{}">:$forward_args,
+            CArg<"bool", "false">:$adjoint,
+            CArg<"std::optional<int64_t>", "std::nullopt">:$UID,
+            CArg<"mlir::ArrayAttr", "nullptr">:$decompositions,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>,
+        // qureg mode
+        OpBuilder<(ins
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::Value":$in_qreg,
+            "mlir::ValueRange":$arr_qubit_indices,
+            CArg<"mlir::Value", "mlir::Value()">:$arr_ctrl_indices,
+            CArg<"mlir::Value", "mlir::Value()">:$arr_ctrl_values,
+            CArg<"mlir::ValueRange", "{}">:$forward_args,
+            CArg<"bool", "false">:$adjoint,
+            CArg<"std::optional<int64_t>", "std::nullopt">:$UID,
+            CArg<"mlir::ArrayAttr", "nullptr">:$decompositions,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>
+    ];
 }
 
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
