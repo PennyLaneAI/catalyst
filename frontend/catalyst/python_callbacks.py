@@ -41,8 +41,3 @@ def paulirot_callback_wrapper(theta, pauli_word, wires):
 
     circuit(theta, jnp.array(wires), pauli_word)
     return str(circuit.mlir)
-
-
-def test_function():
-    print("running python...")
-    return "hello from python!"

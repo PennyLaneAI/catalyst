@@ -45,7 +45,6 @@ mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotImpl(mlir::MLIRContext *ctx, 
         const char *functionName = "paulirot_callback_wrapper";
 
         try {
-
             LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Importing the python module...\n");
             nb::module_ wrapperModule = nb::module_::import_(moduleName);
 
