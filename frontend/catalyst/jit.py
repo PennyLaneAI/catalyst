@@ -647,6 +647,20 @@ class QJIT(CatalystCallable):
             workspace=self.workspace,
         )
 
+    def tape(self, *args, **kwargs):
+        isQNode = isinstance(self.user_function, qp.QNode)
+
+        if not isQNode:
+            raise TypeError("Extracting tapes can only be applied to QNodes")
+
+        from catalyst.python_interface.tape_extract import tape_from_qjit
+
+        opts = copy.deepcopy(self.compile_options)
+        self.compile_options.static_argnums = tuple(range(len(args)))
+        self.jit_compile(args, **kwargs)
+        tape = tape_from_qjit(self, *args, **kwargs)
+        self.compile_options = opts
+        return tape
     @debug_logger
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
