@@ -160,7 +160,13 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"callback-plugin-path",
             /*Type*/"std::string",
             /*Default*/[{ "../lib/libQuantumPythonCallbacks.dylib" }],
-            /*Description*/"A path to the QuantumPythonCallbacks dynamic library.">
+            /*Description*/"A path to the QuantumPythonCallbacks dynamic library.">,
+        Option<
+            /*C++ name*/"stoppingConditionId",
+            /*CLI name*/"stopping-condition-id",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"UUID of a user-provided stopping_condition predicate registered in catalyst.python_callbacks._STOPPING_CONDITIONS..">,
     ];
 
     let dependentDialects = [

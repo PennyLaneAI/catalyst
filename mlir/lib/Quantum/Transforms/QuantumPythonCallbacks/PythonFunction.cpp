@@ -170,16 +170,15 @@ bool pythonStoppingCondition(const char *conditionId, const char *opName,
         return stoppingConditionImpl(conditionId, opName, params, wires);
     }
     catch (const std::exception &e) {
-        mlir::emitError(mlir::UnknownLoc::get(ctx))
-            << "Stopping condition callback failed for condition '" << conditionId << "' and op '"
-            << opName << "': " << e.what();
-        return nullptr;
+        // TODO revert to mlir::emitError
+        llvm::errs() << "Stopping condition callback failed for condition '" << conditionId
+                     << "' and op '" << opName << "': " << e.what() << "\n";
+        return false;
     }
     catch (...) {
-        mlir::emitError(mlir::UnknownLoc::get(ctx))
-            << "Stopping condition callback failed for condition '" << conditionId << "' and op '"
-            << opName << "': unknown exception";
-        return nullptr;
+        llvm::errs() << "Stopping condition callback failed for condition '" << conditionId
+                     << "' and op '" << opName << "': unknown exception\n";
+        return false;
     }
 }
 
