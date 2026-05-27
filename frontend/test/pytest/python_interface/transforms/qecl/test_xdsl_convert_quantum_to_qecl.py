@@ -980,7 +980,7 @@ class TestControlFlow:
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
     def test_for_loop_gate(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
-        """Test a single program with an `scf.for` loop, which applies gates on each iteration of
+        """Test a simple program with an `scf.for` loop, which applies gates on each iteration of
         the loop.
         """
         program = """
@@ -1026,7 +1026,7 @@ class TestControlFlow:
     def test_for_loop_gate_without_register_packing(
         self, run_filecheck, quantum_to_qecl_pipeline_k_1
     ):
-        """Test a single program with an `scf.for` loop, which applies gates on each iteration of
+        """Test a simple program with an `scf.for` loop, which applies gates on each iteration of
         the loop.
 
         This program does not not pack qubits back into a register before entering the `scf.for`
@@ -1070,6 +1070,57 @@ class TestControlFlow:
             // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
             %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
             quantum.dealloc %4 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_for_loop_gate_and_counter(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with an `scf.for` loop, which applies gates on each iteration of
+        the loop, as well as increments a counter variable in order to check that the lowering for
+        `scf.for` ops that return both quantum and classical types works as expected.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program() {
+            // CHECK: [[c1:%.+]] = arith.constant 1
+            // CHECK: [[c5:%.+]] = arith.constant 5
+            // CHECK: [[c0:%.+]] = arith.constant 0
+            %c1 = arith.constant 1 : index
+            %c5 = arith.constant 5 : index
+            %c0 = arith.constant 0 : index
+
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.extract_block>
+            //   COM: <qecl.encode>
+            // CHECK: [[hreg0:%.+]] = qecl.insert_block
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: [[c1_i64:%.+]] = arith.constant dense<1> : tensor<i64>
+            %c1_i64 = arith.constant dense<1> : tensor<i64>
+
+            //      CHECK: [[c_out:%.+]], [[hreg_out:%.+]] = scf.for %arg1 = %c0 to %c5 step %c1
+            // CHECK-SAME:         iter_args([[c_arg:%.+]] = [[c1_i64]], [[hreg_arg:%.+]] = [[hreg0]])
+            // CHECK-SAME:          -> (tensor<i64>, !qecl.hyperreg<1 x 1>)
+            //      CHECK:     [[hreg1:%.+]] = qecl.extract_block [[hreg_arg]][0]
+            //        COM:     <qec cycle>
+            //      CHECK:     qecl.x
+            //        COM:     <qec cycle>
+            //      CHECK:     [[counter:%.+]] = arith.addi [[c_arg]], [[c1_i64]] : tensor<i64>
+            //      CHECK:     [[hreg2:%.+]] = qecl.insert_block [[hreg_arg]][0]
+            //      CHECK:     scf.yield [[counter]], [[hreg2]] : tensor<i64>, !qecl.hyperreg<1 x 1>
+            %1, %2 = scf.for %arg1 = %c0 to %c5 step %c1 iter_args(%arg2 = %c1_i64, %arg3 = %0) -> (tensor<i64>, !quantum.reg) {
+                %3 = quantum.extract %arg3[ 0] : !quantum.reg -> !quantum.bit
+                %4 = quantum.custom "PauliX"() %3 : !quantum.bit
+                %5 = arith.addi %arg2, %c1_i64 : tensor<i64>
+                %6 = quantum.insert %arg3[ 0], %4 : !quantum.reg, !quantum.bit
+                scf.yield %5, %6 : tensor<i64>, !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[hreg_out]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %2 : !quantum.reg
             func.return
         }
         }
