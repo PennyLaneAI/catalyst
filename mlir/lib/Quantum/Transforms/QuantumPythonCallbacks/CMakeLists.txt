@@ -81,10 +81,13 @@ endif()
 # the loader has dlopen'd into the process by the time this plugin is loaded.
 if (APPLE)
     target_link_options(QuantumPythonCallbacks PRIVATE
-        "LINKER:-undefined,dynamic_lookup")
+        "LINKER:-undefined,dynamic_lookup"
+        "LINKER:-flat_namespace"
+    )
 else()
     target_link_options(QuantumPythonCallbacks PRIVATE
-        "LINKER:--allow-shlib-undefined")
+        "LINKER:--allow-shlib-undefined"
+    )
 endif()
 
 target_include_directories(QuantumPythonCallbacks PUBLIC
