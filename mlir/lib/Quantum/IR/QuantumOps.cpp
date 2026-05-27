@@ -238,6 +238,10 @@ LogicalResult OperatorOp::verify()
                              << ") must be the same";
     }
 
+    if (!getForwardArgs().empty() && !getUID()) {
+        return emitOpError() << "forward_args can only be present when UID is provided";
+    }
+
     const bool hasQubitControls =
         !getInCtrlQubits().empty() || !getInCtrlValues().empty() || !getOutCtrlQubits().empty();
     const bool hasQregControls =
@@ -748,13 +752,27 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 5. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {"static_data", "param_map", "qubit_map",
+    SmallVector<StringRef> elidedAttrs = {"decompositions",      "static_data",
+                                          "param_map",           "qubit_map",
                                           "operandSegmentSizes", "resultSegmentSizes"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
 
-    // 6. Quantum register
+    // 6. Python-only data
+    if (getUID()) {
+        p.printNewline();
+        p << "UID(" << *getUID() << ")";
+        if (!getForwardArgs().empty()) {
+            p << " forward(";
+            llvm::interleaveComma(
+                llvm::zip(getForwardArgs(), getForwardArgs().getTypes()), p,
+                [&](auto pair) { p << std::get<0>(pair) << ": " << std::get<1>(pair); });
+            p << ")";
+        }
+    }
+
+    // 7. Quantum register
     if (getInQreg()) {
         p.printNewline();
         p << "quregs(" << getInQreg() << ") indices(";
@@ -764,7 +782,7 @@ void OperatorOp::print(OpAsmPrinter &p)
         p << ")";
     }
 
-    // 7. Control qubits
+    // 8. Control qubits
     if (!getInCtrlQubits().empty()) {
         p.printNewline();
         p << "ctrls(" << getInCtrlQubits() << ") ";
@@ -776,13 +794,20 @@ void OperatorOp::print(OpAsmPrinter &p)
         p << "ctrl_vals(" << getArrCtrlValues() << ": " << getArrCtrlValues().getType() << ")";
     }
 
-    // 8. Compilable static data
+    // 9. Compilable static data
     if (getStaticDataAttr()) {
         p.printNewline();
         p << "static_data = " << getStaticData();
     }
 
-    // 9. Optional metadata
+    // 10. Decomposition
+    if (getDecompositionsAttr()) {
+        p.printNewline();
+        p << "decompositions = ";
+        p << getDecompositions();
+    }
+
+    // 11. Optional metadata
     if (getParamMapAttr() || getParamMapAttr()) {
         p.printNewline();
     }
@@ -894,6 +919,8 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
     }
 
     SmallVector<OpAsmParser::UnresolvedOperand> inQubits;
+    SmallVector<OpAsmParser::UnresolvedOperand> forwardArgs;
+    SmallVector<Type> forwardArgTypes;
     SmallVector<OpAsmParser::UnresolvedOperand> inCtrlQubits;
     SmallVector<OpAsmParser::UnresolvedOperand> inCtrlValues;
     std::optional<OpAsmParser::UnresolvedOperand> inQreg;
@@ -926,7 +953,33 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
     }
     result.addAttributes(genericAttrs);
 
-    // 6. Optional qreg section.
+    // 6. Optional Python-only metadata: UID(...) [forward(...)].
+    if (succeeded(parser.parseOptionalKeyword("UID"))) {
+        int64_t uid = 0;
+        if (parser.parseLParen() || parser.parseInteger(uid) || parser.parseRParen()) {
+            return failure();
+        }
+        opProperties.setUID(uid);
+
+        if (succeeded(parser.parseOptionalKeyword("forward"))) {
+            auto parseForwardArgAndType = [&]() -> ParseResult {
+                OpAsmParser::UnresolvedOperand operand;
+                Type type;
+                if (parseOperandTypePair(parser, operand, type)) {
+                    return failure();
+                }
+                forwardArgs.push_back(operand);
+                forwardArgTypes.push_back(type);
+                return success();
+            };
+            if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren,
+                                               parseForwardArgAndType)) {
+                return failure();
+            }
+        }
+    }
+
+    // 7. Optional qreg section.
     if (succeeded(parser.parseOptionalKeyword("quregs"))) {
         OpAsmParser::UnresolvedOperand operand;
         if (parser.parseLParen() || parser.parseOperand(operand) || parser.parseRParen()) {
@@ -950,7 +1003,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         }
     }
 
-    // 7. Optional controls section (qubit controls or register controls).
+    // 8. Optional controls section (qubit controls or register controls).
     if (succeeded(parser.parseOptionalKeyword("ctrls"))) {
         if (inQreg) {
             OpAsmParser::UnresolvedOperand ctrlIndices;
@@ -999,8 +1052,16 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         }
     }
 
-    // 8. Optional inherent metadata blocks.
+    // 9. Optional inherent metadata blocks.
     while (true) {
+        if (succeeded(parser.parseOptionalKeyword("decompositions"))) {
+            ArrayAttr decompositions;
+            if (parser.parseEqual() || parser.parseAttribute(decompositions)) {
+                return failure();
+            }
+            result.addAttribute("decompositions", decompositions);
+            continue;
+        }
         if (succeeded(parser.parseOptionalKeyword("static_data"))) {
             DictionaryAttr staticData;
             if (parser.parseEqual() || parser.parseAttribute(staticData)) {
@@ -1028,8 +1089,12 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         break;
     }
 
-    // 9. Resolve operands in segment order.
+    // 10. Resolve operands in segment order.
     if (parser.resolveOperands(params, paramTypes, parser.getCurrentLocation(), result.operands)) {
+        return failure();
+    }
+    if (parser.resolveOperands(forwardArgs, forwardArgTypes, parser.getCurrentLocation(),
+                               result.operands)) {
         return failure();
     }
     if (parser.resolveOperands(inQubits, QubitType::get(ctx), result.operands)) {
@@ -1057,20 +1122,21 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         return failure();
     }
 
-    // 10. Add inferred results in segment order.
+    // 11. Add inferred results in segment order.
     result.addTypes(SmallVector<Type>(inQubits.size(), QubitType::get(ctx)));
     result.addTypes(SmallVector<Type>(inCtrlQubits.size(), QubitType::get(ctx)));
     if (inQreg) {
         result.addTypes(QuregType::get(ctx));
     }
 
-    // 11. Add explicit segment sizes.
+    // 12. Add explicit segment sizes.
     result.addAttribute(
         "operandSegmentSizes",
         builder.getDenseI32ArrayAttr(
-            {static_cast<int32_t>(params.size()), static_cast<int32_t>(inQubits.size()),
-             static_cast<int32_t>(inCtrlQubits.size()), static_cast<int32_t>(inCtrlValues.size()),
-             inQreg ? 1 : 0, static_cast<int32_t>(arrQubitIndices.size()), arrCtrlIndices ? 1 : 0,
+            {static_cast<int32_t>(params.size()), static_cast<int32_t>(forwardArgs.size()),
+             static_cast<int32_t>(inQubits.size()), static_cast<int32_t>(inCtrlQubits.size()),
+             static_cast<int32_t>(inCtrlValues.size()), inQreg ? 1 : 0,
+             static_cast<int32_t>(arrQubitIndices.size()), arrCtrlIndices ? 1 : 0,
              arrCtrlValues ? 1 : 0}));
     result.addAttribute(
         "resultSegmentSizes",
