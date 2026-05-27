@@ -45,6 +45,11 @@ if (NOT TARGET ${NANOBIND_TARGET})
         -Wno-cast-qual
         -Wno-covered-switch-default
     )
+
+    # Ignore unknown flags on old versions of clang for macOS
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(${NANOBIND_TARGET} PRIVATE "-Wno-unknown-warning-option")
+    endif()
 endif()
 
 add_mlir_library(QuantumPythonCallbacks MODULE
@@ -58,6 +63,11 @@ add_mlir_library(QuantumPythonCallbacks MODULE
         MLIRParser
         quantum-transforms  # for DecompCallback
 )
+
+# Ignore unknown flags on old versions of clang for macOS
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(${NANOBIND_TARGET} PRIVATE "-Wno-unknown-warning-option")
+endif()
 
 target_compile_definitions(QuantumPythonCallbacks PRIVATE NB_DOMAIN=${MLIR_BINDINGS_PYTHON_NB_DOMAIN})
 
