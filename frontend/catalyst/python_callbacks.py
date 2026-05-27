@@ -21,6 +21,7 @@ import pennylane as qp
 def paulirot_callback_wrapper(theta, pauli_word, wires):
     """Wraps paulirot decomp rule to enable compile-time lowering."""
     # pylint: disable=protected-access
+    print("running paulirot callbacks...")
     device = qp.device("null.qubit", wires=len(wires))
 
     @qp.qjit(
@@ -39,4 +40,9 @@ def paulirot_callback_wrapper(theta, pauli_word, wires):
         my_subroutine(theta, wires, pauli_word)
 
     circuit(theta, jnp.array(wires), pauli_word)
-    return circuit.mlir
+    return str(circuit.mlir)
+
+
+def test_function():
+    print("running python...")
+    return "hello from python!"

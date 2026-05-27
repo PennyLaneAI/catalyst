@@ -16,7 +16,17 @@
 
 #include <optional>
 
-constexpr const char *sitePackagesScript = R"(
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+#include "nanobind/eval.h"
+#include "nanobind/nanobind.h"
+
+// TODO: sort this
+#include "Python.h"
+
+#define DEBUG_TYPE "[QPC] "
+
+constexpr const char sitePackagesScript[] = R"(
 import os
 import sys
 import site
@@ -30,13 +40,13 @@ if venv_path:
         site.addsitedir(site_packages)
 )";
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace QuantumPythonCallbacks {
 
 struct __attribute__((visibility("hidden"))) PyInterpreterGuard::Impl {
-    std::optional<py::scoped_interpreter> owned;
-    std::optional<py::gil_scoped_release> release;
+    bool createdInterpreter{false};
+    std::optional<nb::gil_scoped_release> release;
 };
 
 /**
@@ -45,12 +55,13 @@ struct __attribute__((visibility("hidden"))) PyInterpreterGuard::Impl {
  */
 void syncSitePackages()
 {
-    py::gil_scoped_acquire acquire;
-
     try {
-        py::exec(sitePackagesScript);
+        nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+
+        nb::exec(sitePackagesScript, scope);
     }
-    catch (const py::error_already_set &e) {
+    catch (const nb::python_error &e) {
+        llvm::errs() << "Failed to load site-packages: " << e.what();
         return;
     }
 }
@@ -61,13 +72,39 @@ void syncSitePackages()
  */
 PyInterpreterGuard::PyInterpreterGuard() : impl(std::make_unique<Impl>())
 {
+    LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Initializing interpreter...\n");
     if (!Py_IsInitialized()) {
-        impl->owned.emplace();
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE
+                                << "No existing interpreter found, embedding a new one...\n");
+        Py_Initialize();
+        impl->createdInterpreter = true;
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Embeded a new interpreter.\n");
+
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Syncing site-packages...\n");
         syncSitePackages();
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Site packages synced.\n");
+
         impl->release.emplace();
     }
-    // else the interpreter is already initialized (e.g. by qjit),
-    // so we do not take ownership or release the GIL
+    else {
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE
+                                << "Found existing interpreter, ensuring packages are synced...\n");
+        nb::gil_scoped_acquire acquire;
+        syncSitePackages();
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Site packages synced.\n");
+    }
+}
+
+/**
+ * @brief Destroy a PyInterpreterGuard, ensuring that the GIL is released and the interpreter is
+ * destroyed if it was created by the PyInterpreterGuard.
+ */
+PyInterpreterGuard::~PyInterpreterGuard()
+{
+    if (impl && impl->createdInterpreter) {
+        impl->release.reset();
+        Py_Finalize();
+    }
 }
 
 /**

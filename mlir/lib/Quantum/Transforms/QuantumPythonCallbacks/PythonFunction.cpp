@@ -14,19 +14,20 @@
 
 #include "PythonFunction.hpp"
 
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/Parser/Parser.h"
-#include "pybind11/pybind11.h"
-#include "pybind11/stl.h"
+#include "nanobind/nanobind.h"
 
 #include "Quantum/Transforms/DecompCallbacks.h"
 
 #include "PythonDriverUtils.hpp"
 
-namespace py = pybind11;
+#define DEBUG_TYPE "[QPC] "
+
+namespace nb = nanobind;
 
 namespace {
 
@@ -38,17 +39,42 @@ mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotImpl(mlir::MLIRContext *ctx, 
 
     // Invoke Python and parse the returned MLIR text.
     std::string mlirText = QuantumPythonCallbacks::PyInterpreterGuard::ensure().withGil([&] {
-        py::gil_scoped_acquire acquire;
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "lowering paulirot with pauliword " << pauliWord
+                                << "\n");
         const char *moduleName = "catalyst.python_callbacks";
         const char *functionName = "paulirot_callback_wrapper";
 
         try {
-            py::module_ wrapperModule = py::module_::import(moduleName);
-            py::object wrapperFunction = wrapperModule.attr(functionName);
-            py::object pythonResult = wrapperFunction(theta, pauliWord, wiresVec);
-            return pythonResult.cast<std::string>();
+
+            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Importing the python module...\n");
+            nb::module_ wrapperModule = nb::module_::import_(moduleName);
+
+            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Getting the python function...\n");
+            // nb::object wrapperFunction = wrapperModule.attr("test_function");
+            nb::object wrapperFunction = wrapperModule.attr(functionName);
+
+            nb::list pyWires;
+            for (int w : wires) {
+                pyWires.append(w);
+            }
+
+            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "executing python function...\n");
+            nb::object pythonResult = wrapperFunction(theta, pauliWord.c_str(), pyWires);
+
+            // LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Executing test function...\n");
+            // nb::object pythonResult = wrapperFunction();
+
+            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Got function output, casting...\n");
+
+            std::string output = nb::cast<const char *>(pythonResult);
+            // llvm::errs() << "[TEST OUTPUT] " << output << "\n";
+
+            return std::string(output);
+
+            // LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "casting result...\n");
+            // return nb::cast<std::string>(pythonResult);
         }
-        catch (const py::error_already_set &error) {
+        catch (const nb::python_error &error) {
             throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
                                                        error.what());
         }
@@ -79,6 +105,8 @@ mlir::OwningOpRef<mlir::func::FuncOp> pythonLowerPauliRot(mlir::MLIRContext *ctx
                                                           llvm::ArrayRef<int> wires)
 {
     try {
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "lowering paulirot with pauliword " << pauliWord
+                                << "\n");
         return lowerPauliRotImpl(ctx, theta, pauliWord, wires);
     }
     catch (const std::exception &e) {

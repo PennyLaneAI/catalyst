@@ -15,6 +15,7 @@
 #include "Quantum/Transforms/DecompCallbacksLoader.h"
 
 #include <atomic>
+#include <dlfcn.h>
 #include <string>
 
 #include "llvm/ADT/SmallString.h"
@@ -86,11 +87,11 @@ bool tryLoadLibpython(llvm::StringRef where)
     if (where.empty()) {
         return false;
     }
-    std::string err;
-    auto h = llvm::sys::DynamicLibrary::getPermanentLibrary(where.str().c_str(), &err);
-    if (!h.isValid()) {
-        llvm::errs() << "[decomp-callbacks-loader] libpython dlopen of '" << where
-                     << "' failed: " << err << "\n";
+
+    auto h = ::dlopen(where.str().c_str(), RTLD_GLOBAL | RTLD_LAZY);
+    if (!h) {
+        llvm::errs() << "[decomp-callbacks-loader] libpython dlopen failed: " << ::dlerror()
+                     << "\n";
         return false;
     }
     // FIXME(Ali): remove this after testing
@@ -100,17 +101,13 @@ bool tryLoadLibpython(llvm::StringRef where)
 
 // Try, in order:
 //   1. $CATALYST_LIBPYTHON: explicit user override (any deployment)
-//   2. function Parameter
 //   3. CATALYST_LIBPYTHON_PATH: absolute path the configure-time Python uses
 //   4. CATALYST_LIBPYTHON_SONAME: bare SONAME via the dynamic loader search (manylinux wheels)
-void ensureLibpythonLoaded(std::string callbackPluginPath)
+void ensureLibpythonLoaded()
 {
     if (auto over = llvm::sys::Process::GetEnv("CATALYST_LIBPYTHON")) {
         if (tryLoadLibpython(*over))
             return;
-    }
-    if (tryLoadLibpython(callbackPluginPath)) {
-        return;
     }
 #ifdef CATALYST_LIBPYTHON_PATH
     if (tryLoadLibpython(CATALYST_LIBPYTHON_PATH))
@@ -134,18 +131,18 @@ RegisterFn loadAndResolve(std::string callbackPluginPath)
     // FIXME(Ali): remove this after testing
     llvm::errs() << "[decomp-callbacks-loader] plugin resolved at: " << path << "\n";
 
-    ensureLibpythonLoaded(path);
+    ensureLibpythonLoaded();
 
-    std::string err;
-    auto lib = llvm::sys::DynamicLibrary::getPermanentLibrary(path.c_str(), &err);
-    if (!lib.isValid()) {
-        llvm::errs() << "[decomp-callbacks-loader] dlopen('" << path << "') failed: " << err
+    // Open your plugin with RTLD_GLOBAL so nanobind's internals
+    // can map correctly to Python's runtime memory space
+    void *libHandle = ::dlopen(path.c_str(), RTLD_GLOBAL | RTLD_LAZY);
+    if (!libHandle) {
+        llvm::errs() << "[decomp-callbacks-loader] dlopen('" << path << "') failed: " << ::dlerror()
                      << "\n";
         return nullptr;
     }
 
-    auto *sym =
-        reinterpret_cast<RegisterFn>(lib.getAddressOfSymbol("registerPythonDecompCallback"));
+    auto *sym = reinterpret_cast<RegisterFn>(::dlsym(libHandle, "registerPythonDecompCallback"));
     if (!sym) {
         llvm::errs() << "[decomp-callbacks-loader] dlopen succeeded but symbol "
                         "'registerPythonDecompCallback' not found in '"

@@ -19,11 +19,9 @@
 #include <stdexcept>
 #include <string>
 
-// TODO: use nanobind
-#include "pybind11/embed.h"
-#include "pybind11/gil.h"
+#include "nanobind/nanobind.h"
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace QuantumPythonCallbacks {
 
@@ -58,11 +56,11 @@ class PyInterpreterGuard {
             ~DepthGuard() { --d; }
         } guard{depth};
 
-        py::gil_scoped_acquire acquire;
+        nb::gil_scoped_acquire acquire;
         try {
             return std::invoke(std::forward<T>(func));
         }
-        catch (const py::error_already_set &e) {
+        catch (const nb::python_error &e) {
             throw QPCError(e.what());
         }
     }
