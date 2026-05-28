@@ -52,6 +52,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug in `DecompRuleInterpreter.cleanup` by replacing fragile string-based operator
+  checks with strict type-based checking.
+  [(#2873)](https://github.com/PennyLaneAI/catalyst/pull/2873)
+
 * Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
@@ -125,6 +129,8 @@
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
   - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.t`, which performs a T gate on a single physical qubit.
+    [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
 
 
@@ -134,6 +140,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
