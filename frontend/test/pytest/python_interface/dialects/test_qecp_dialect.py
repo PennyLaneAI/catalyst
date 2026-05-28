@@ -348,7 +348,6 @@ class TestQecPhysicalOps:
         assert len(t_op.result_types) == 1
         assert t_op.result_types[0] == qubit.type
 
-
     @pytest.mark.parametrize(
         "qubit",
         [
