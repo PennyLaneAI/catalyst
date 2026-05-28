@@ -14,6 +14,7 @@
 """
 Test that a RuntimeError thrown from the JIT'd setup function be caught by the wrapper.
 """
+
 import pytest
 from jax.interpreters.mlir import ir
 
