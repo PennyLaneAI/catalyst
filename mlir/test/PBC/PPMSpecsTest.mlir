@@ -330,7 +330,7 @@ func.func public @dynamic_for_loop_error(%arg0: !quantum.bit, %c: index) {
 
     %q = scf.for %iter = %c0 to %c step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
       %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
-      // expected-error@above {{PPM statistics is not available when there are dynamically sized for loops.}}
+      // expected-error@above {{PBC statistics is not available when there are dynamically sized for loops.}}
       %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
       scf.yield %out_qubits_1 : !quantum.bit
     }
@@ -347,7 +347,7 @@ func.func public @while_error(%arg0: !quantum.bit, %b: i1) {
     } do {
         ^bb0(%in_qubit: !quantum.bit):
         %out_qubits = pbc.ppr ["Z"](4) %in_qubit : !quantum.bit
-        // expected-error@above {{PPR statistics is not available when there are while loops.}}
+        // expected-error@above {{PBC statistics is not available when there are while loops.}}
         scf.yield %out_qubits : !quantum.bit
     }
 
