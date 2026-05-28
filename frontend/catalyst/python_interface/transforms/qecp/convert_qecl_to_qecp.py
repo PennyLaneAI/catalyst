@@ -743,6 +743,63 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         )
 
         return funcOp
+    
+
+    # MARK: Magic state subroutine
+
+
+    def create_fabricate_magic_subroutine(self) -> func.FuncOp:
+        """Create a subroutine that allocates a codeblock and encodes it in the magic state for
+        the QEC code (based on the tanner graph), and returns the encoded codeblock. This is a
+        non-fault tolerant encoding intended for use on a simulator, and not a distillation process 
+        for generating a magic state from many noisy copies.
+
+        The encoding process involves putting the initial QEC physical qubit in the desired state, 
+        and then using the same encoding procedure used for encoding the zero state, following the 
+        example shown in arXiv: 0905.2794, Section VIII.A.
+
+        The subroutine allocates auxiliary qubits for use in encoding based on the number of
+        rows in the X tanner graph, and deallocates them once encoding is complete.
+
+        Note that this method does not insert the subroutine into the module op. Instead it returns
+        the built func.FuncOp object that can then be subsequently inserted where desired.
+        """
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+        input_types = ()
+        output_types = (codeblock_type,)
+
+        block = Block(arg_types=input_types)
+        tanner_x, tanner_z = self.insert_tanner_graph_ops_into_block(block)
+
+        with ImplicitBuilder(block):
+            codeblock = qecp.AllocCodeblockOp(codeblock_type=qecp.PhysicalCodeblockType)
+
+            # apply H and T to the first qubit
+            # ToDo: does it matter which one I apply it to? If so, can I deduce the correct answer from the matrix for the tanner graph? Experiment in a notebook.
+            initial_qubit = qecp.ExtractQubitOp(codeblock, 0)
+            physical_h = qecp.HadamardOp(initial_qubit)
+            # ToDo: add T to qecp physical dialect
+            # physical_t = qecp.
+            codeblock = qecp.InsertQubitOp(codeblock, 0)
+
+            # Apply X checks + Z correction pattern
+            x_out_codeblock = self._qec_cycle_css_pattern(codeblock, CheckType.X, tanner_x)
+
+            # Apply Z checks + X correction pattern
+            z_out_codeblock = self._qec_cycle_css_pattern(x_out_codeblock, CheckType.Z, tanner_z)
+
+            # return the encoded codeblock
+            func.ReturnOp(z_out_codeblock)
+
+        funcOp = func.FuncOp(
+            name=f"fabricate_magic_state_{self.qec_code.name}",
+            function_type=(input_types, output_types),
+            visibility="private",
+            region=Region([block]),
+        )
+
+        return funcOp
+
 
     # MARK: 1Q gate subroutines
 
