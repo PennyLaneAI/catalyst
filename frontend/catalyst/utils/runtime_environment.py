@@ -18,6 +18,7 @@ Utility code for keeping paths
 
 import os
 import os.path
+import platform
 import sys
 import sysconfig
 from pathlib import Path
@@ -54,7 +55,7 @@ BYTECODE_FILE_PATH = (
 )
 
 
-def get_libpython_path() -> Path | str:
+def get_libpython_path() -> str:
     """Return the path to the python shared library, or emptystring if failed to find."""
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
@@ -62,24 +63,22 @@ def get_libpython_path() -> Path | str:
     instsoname = sysconfig.get_config_var("INSTSONAME")
 
     # macOS framework-style installations
-    if framework_prefix:
-        candidate = Path(framework_prefix) / Path(ldlibrary)
+    if framework_prefix and ldlibrary:
+        candidate = (Path(framework_prefix) / Path(ldlibrary)).resolve()
         if candidate.exists():
-            return candidate
+            return str(candidate)
 
-    if not (libdir and ldlibrary):
-        return ""
-
-    # linux (and sometimes macOS) installation
+    # linux higher-specificity installation
     if libdir and instsoname:
-        candidate = Path(libdir) / Path(instsoname)
+        candidate = (Path(libdir) / Path(instsoname)).resolve()
         if candidate.exists():
-            return candidate
+            return str(candidate)
 
-    # standard installation python installation
-    candidate = Path(libdir) / Path(ldlibrary)
-    if candidate.exists():
-        return candidate
+    # standard python installation
+    if libdir and ldlibrary:
+        candidate = (Path(libdir) / Path(ldlibrary)).resolve()
+        if candidate.exists():
+            return str(candidate)
 
     return ""
 
