@@ -65,6 +65,7 @@ def get_libpython_path() -> Path | str:
     print("[CI-DEBUG] ldlibrary:", ldlibrary)
     print("[CI-DEBUG] framework_prefix:", framework_prefix)
 
+    # macOS framework-style installations
     if framework_prefix:
         print("[CI-DEBUG] found framework install:", Path(framework_prefix) / Path(ldlibrary))
         return Path(framework_prefix) / Path(ldlibrary)

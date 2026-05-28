@@ -127,6 +127,5 @@ print(full)
     endif()
     set_source_files_properties(DecompCallbacksLoader.cpp PROPERTIES
         COMPILE_DEFINITIONS "${_loader_defines}"
-        COMPILE_OPTIONS "-fexceptions"
     )
 endif()

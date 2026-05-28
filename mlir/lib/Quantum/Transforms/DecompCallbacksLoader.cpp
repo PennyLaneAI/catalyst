@@ -19,6 +19,7 @@
 #include <string>
 
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -60,7 +61,8 @@ std::string resolvePluginPath(std::string callbackPluginPath)
         if (llvm::sys::fs::is_directory(inputPath)) {
             llvm::sys::path::append(inputPath, kPluginFileName);
         }
-        llvm::errs() << "found path from input, returning" << inputPath << "\n";
+        LDBG(2) << "Found libQuantumPythonCallbacks path from function parameter:" << inputPath
+                << "\n";
         return std::string(inputPath);
     }
 
@@ -94,8 +96,7 @@ bool tryLoadLibpython(llvm::StringRef where)
                      << "\n";
         return false;
     }
-    // FIXME(Ali): remove this after testing
-    llvm::errs() << "[decomp-callbacks-loader] libpython loaded: " << where << "\n";
+    LDBG() << "[decomp-callbacks-loader] libpython loaded from: " << where << "\n";
     return true;
 }
 
@@ -108,32 +109,40 @@ void ensureLibpythonLoaded(std::string libpythonPath)
 {
     if (auto over = llvm::sys::Process::GetEnv("CATALYST_LIBPYTHON")) {
         if (tryLoadLibpython(*over))
-            llvm::errs() << "[CI-DEBUG] found python from envvar\n";
+            LDBG() << "Found python from CATALYST_LIBPYTHON environment variable:" << over;
         return;
     }
 
     if (tryLoadLibpython(libpythonPath)) {
-        llvm::errs() << "[CI-DEBUG] found python from input path: " << libpythonPath << "\n";
+        LDBG() << "Found python from input path: " << libpythonPath;
         return;
     }
 
-    throw std::runtime_error("Could not resolve libpython");
+#ifdef CATALYST_LIBPYTHON_PATH
+    if (tryLoadLibpython(CATALYST_LIBPYTHON_PATH))
+        return;
+#endif
+#ifdef CATALYST_LIBPYTHON_SONAME
+    if (tryLoadLibpython(CATALYST_LIBPYTHON_SONAME))
+        return;
+#endif
+    llvm::errs()
+        << "[decomp-callbacks-loader] libpython could not be resolved, the plugin will likely "
+           "fail with undefined symbols.\n";
 }
 
 RegisterFn loadAndResolve(std::string callbackPluginPath, std::string libpythonPath)
 {
     std::string path = resolvePluginPath(callbackPluginPath);
     if (path.empty()) {
-        llvm::errs() << "[decomp-callbacks-loader] plugin path could not be resolved\n";
+        llvm::errs() << "[decomp-callbacks-loader] The plugin path could not be resolved.\n";
         return nullptr;
     }
-    // FIXME(Ali): remove this after testing
-    llvm::errs() << "[decomp-callbacks-loader] plugin resolved at: " << path << "\n";
+    LDBG() << "[decomp-callbacks-loader] plugin resolved at: " << path << "\n";
 
     ensureLibpythonLoaded(libpythonPath);
 
-    // Open your plugin with RTLD_GLOBAL so nanobind's internals
-    // can map correctly to Python's runtime memory space
+    // Open with RTLD_GLOBAL so nanobind's internals map to Python's runtime memory space
     void *libHandle = ::dlopen(path.c_str(), RTLD_GLOBAL | RTLD_LAZY);
     if (!libHandle) {
         llvm::errs() << "[decomp-callbacks-loader] dlopen('" << path << "') failed: " << ::dlerror()
