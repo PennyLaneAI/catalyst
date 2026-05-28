@@ -40,6 +40,10 @@
   that have multiple quantum operands, of either quantum register or qubit type.
   [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
+* Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
+  to tracing errors.
+  [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
