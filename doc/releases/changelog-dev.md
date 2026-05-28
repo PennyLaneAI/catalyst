@@ -39,7 +39,7 @@
   [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
 
 * The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the **worst-case quantum
-  depth** across ``scf.if`` branches: ``depth(region) = layers_outside_if + Σ max(depth(then),
+  depth** across ``scf.if`` branches: ``depth(region) = layers_outside_if + max(depth(then),
   depth(else))``. Previously THEN and ELSE were counted sequentially.
   [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
 
