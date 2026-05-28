@@ -59,23 +59,16 @@ def get_libpython_path() -> str:
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
-    instsoname = sysconfig.get_config_var("INSTSONAME")
 
-    # macOS framework-style installations
+    # macOS framework installation
     if framework_prefix and ldlibrary:
-        candidate = (Path(framework_prefix) / Path(ldlibrary)).resolve()
+        candidate = Path(framework_prefix) / Path(ldlibrary)
         if candidate.exists():
             return str(candidate)
 
-    # linux higher-specificity installation
-    if libdir and instsoname:
-        candidate = (Path(libdir) / Path(instsoname)).resolve()
-        if candidate.exists():
-            return str(candidate)
-
-    # standard python installation
+    # standard installation
     if libdir and ldlibrary:
-        candidate = (Path(libdir) / Path(ldlibrary)).resolve()
+        candidate = Path(libdir) / ldlibrary
         if candidate.exists():
             return str(candidate)
 
