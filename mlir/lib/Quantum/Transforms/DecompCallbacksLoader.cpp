@@ -113,25 +113,11 @@ void ensureLibpythonLoaded(std::string libpythonPath)
     }
 
     if (tryLoadLibpython(libpythonPath)) {
-        llvm::errs() << "[CI-DEBUG] found python from input path" << libpythonPath << "\n";
+        llvm::errs() << "[CI-DEBUG] found python from input path: " << libpythonPath << "\n";
         return;
     }
-#ifdef CATALYST_LIBPYTHON_PATH
-    if (tryLoadLibpython(CATALYST_LIBPYTHON_PATH)) {
-        llvm::errs() << "[CI-DEBUG] found python from CATALYST_LIBPYTHON_PATH"
-                     << CATALYST_LIBPYTHON_PATH << "\n";
-        return;
-    }
-#endif
-#ifdef CATALYST_LIBPYTHON_SONAME
-    if (tryLoadLibpython(CATALYST_LIBPYTHON_SONAME)) {
-        llvm::errs() << "[CI-DEBUG] found python from CATALYST_LIBPYTHON_SONAME"
-                     << CATALYST_LIBPYTHON_SONAME << "\n";
-        return;
-    }
-#endif
-    llvm::errs() << "[decomp-callbacks-loader] no libpython candidate succeeded; "
-                    "the plugin dlopen will likely fail with undefined symbols\n";
+
+    throw std::runtime_error("Could not resolve libpython");
 }
 
 RegisterFn loadAndResolve(std::string callbackPluginPath, std::string libpythonPath)

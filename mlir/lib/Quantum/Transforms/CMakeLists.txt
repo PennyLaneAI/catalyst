@@ -126,5 +126,7 @@ print(full)
         list(APPEND _loader_defines "CATALYST_LIBPYTHON_PATH=\"${_libpython_path}\"")
     endif()
     set_source_files_properties(DecompCallbacksLoader.cpp PROPERTIES
-        COMPILE_DEFINITIONS "${_loader_defines}")
+        COMPILE_DEFINITIONS "${_loader_defines}"
+        COMPILE_OPTIONS "-fexceptions"
+    )
 endif()

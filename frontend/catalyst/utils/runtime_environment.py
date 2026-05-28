@@ -58,30 +58,34 @@ def get_libpython_path() -> Path | str:
     """Return the path to the python shared library, or emptystring if failed to find."""
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
+    library = sysconfig.get_config_var("LIBRARY")
+
+    print("[CI-DEBUG] libdir:", libdir)
+    print("[CI-DEBUG] ldlibrary:", ldlibrary)
+    print("[CI-DEBUG] library:", library)
 
     if not (libdir and ldlibrary):
-        print("frontend could not find libpython")
+        print("[CI-DEBUG] frontend could not find libpython")
         return ""
 
     # standard installation
     ldlibrary_path = Path(libdir) / ldlibrary
     if ldlibrary_path.exists():
-        print("found python at", ldlibrary_path.resolve(), "(standard installation)")
+        print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(standard installation)")
         return ldlibrary_path.resolve()
 
     # check for macOS framework-style installation
     if sys.platform == "darwin" and ldlibrary == "Python":
         framework_path = Path(libdir).parent / "Python"
         if framework_path.exists():
-            print("found python at", ldlibrary_path.resolve(), "(framework-style)")
+            print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(framework-style)")
             return framework_path.resolve()
 
     # check Library
-    library = sysconfig.get_config_var("LIBRARY")
     if library:
         library_path = Path(libdir) / library
         if library_path.exists():
-            print("found python at", ldlibrary_path.resolve(), "(library)")
+            print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(library)")
             return library_path.resolve()
 
     return ""
