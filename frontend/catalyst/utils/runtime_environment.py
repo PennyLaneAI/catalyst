@@ -63,8 +63,6 @@ def get_libpython_path() -> Path | None:
         return None
 
     # standard installation
-    print("libdir:", libdir)
-    print("ldlibrary:", ldlibrary)
     ldlibrary_path = Path(libdir) / ldlibrary
     if ldlibrary_path.exists():
         return ldlibrary_path.resolve()
