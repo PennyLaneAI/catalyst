@@ -60,6 +60,7 @@ def get_libpython_path() -> Path | str:
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
 
+    # TODO: prefer INSTSONAME for linux
     print("[CI-DEBUG] libdir:", libdir)
     print("[CI-DEBUG] ldlibrary:", ldlibrary)
     print("[CI-DEBUG] framework_prefix:", framework_prefix)
@@ -77,13 +78,6 @@ def get_libpython_path() -> Path | str:
     if ldlibrary_path.exists():
         print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(standard installation)")
         return ldlibrary_path.resolve()
-
-    # check for macOS framework-style installation
-    if sys.platform == "darwin" and ldlibrary == "Python":
-        framework_path = Path(libdir).parent / "Python"
-        if framework_path.exists():
-            print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(framework-style)")
-            return framework_path.resolve()
 
     return ""
 

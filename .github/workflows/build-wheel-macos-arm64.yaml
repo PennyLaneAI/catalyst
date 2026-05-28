@@ -495,11 +495,6 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
 
-    - name: SSH debug
-      uses: owenthereal/action-upterm@v1
-      with:
-        limit-access-to-users: kipawaa,dime10
-
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
