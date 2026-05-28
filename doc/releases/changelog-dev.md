@@ -126,6 +126,9 @@
   - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
 
+* More conservative casting to tracer arrays in conditionals to preserve constant (static) values
+  better. This can be useful for optimizations that depend on values being static.
+  [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
 
 
 <h3>Documentation 📝</h3>
