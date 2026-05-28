@@ -18,7 +18,6 @@ Utility code for keeping paths
 
 import os
 import os.path
-import platform
 import sys
 import sysconfig
 from pathlib import Path
