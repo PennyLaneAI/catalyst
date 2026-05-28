@@ -1502,7 +1502,7 @@ def ppm_specs(fn, *, only_disjoint_qubit: bool = False):
         _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
         # check if ppm-specs is already in the pass list
         ppm_specs_pass = "ppm-specs{disjoint-qubit=true}" if only_disjoint_qubit else "ppm-specs"
-        pass_list[:] = [p for p in pass_list if not p.startswith("ppm-specs")]  + [ppm_specs_pass]
+        pass_list[:] = [p for p in pass_list if not p.startswith("ppm-specs")] + [ppm_specs_pass]
 
         new_options = _options_to_cli_flags(new_options)
         # redirect output to devnull to avoid printing the MLIR
