@@ -54,23 +54,26 @@ BYTECODE_FILE_PATH = (
 )
 
 
-def get_libpython_path() -> Path | None:
-    """Return the path to the python shared library, or None if failed to find."""
+def get_libpython_path() -> Path | str:
+    """Return the path to the python shared library, or emptystring if failed to find."""
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
 
     if not (libdir and ldlibrary):
-        return None
+        print("frontend could not find libpython")
+        return ""
 
     # standard installation
     ldlibrary_path = Path(libdir) / ldlibrary
     if ldlibrary_path.exists():
+        print("found python at", ldlibrary_path.resolve(), "(standard installation)")
         return ldlibrary_path.resolve()
 
     # check for macOS framework-style installation
     if sys.platform == "darwin" and ldlibrary == "Python":
         framework_path = Path(libdir).parent / "Python"
         if framework_path.exists():
+            print("found python at", ldlibrary_path.resolve(), "(framework-style)")
             return framework_path.resolve()
 
     # check Library
@@ -78,9 +81,10 @@ def get_libpython_path() -> Path | None:
     if library:
         library_path = Path(libdir) / library
         if library_path.exists():
+            print("found python at", ldlibrary_path.resolve(), "(library)")
             return library_path.resolve()
 
-    return None
+    return ""
 
 
 def get_lib_path(project, env_var):

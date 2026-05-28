@@ -1802,10 +1802,8 @@ def graph_decomposition_setup_inputs(
     alt_decomps: dict | None = None,
     bytecode_rules: str | None = None,
     _builtin_rule_path: Path = BYTECODE_FILE_PATH,
-    callback_plugin_path: Path = Path(
-        get_lib_path("callbacks_lib", "CATALYST_PYTHON_CALLBACK_PLUGIN")
-    ),
-    libpython_path: Path | None = get_libpython_path(),
+    callback_plugin_path: Path | None = None,
+    libpython_path: Path | None = None,
 ):  # pylint: disable=unused-argument, too-many-arguments, too-many-positional-arguments
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
@@ -1905,8 +1903,12 @@ def graph_decomposition_setup_inputs(
     options: dict[str, dict | tuple | str] = {
         "gate_set": gate_set,
         "bytecode_rules": str(_builtin_rule_path),
-        "callback_plugin_path": str(callback_plugin_path),
-        "libpython_path": str(libpython_path) if libpython_path else "",
+        "callback_plugin_path": (
+            str(callback_plugin_path)
+            if callback_plugin_path
+            else get_lib_path("callbacks_lib", "CATALYST_PYTHON_CALLBACK_PLUGIN")
+        ),
+        "libpython_path": str(libpython_path) if libpython_path else str(get_libpython_path()),
     }
 
     if fixed_decomps:
