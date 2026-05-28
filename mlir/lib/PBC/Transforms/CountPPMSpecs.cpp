@@ -61,7 +61,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     LogicalResult countPPM(pbc::PPMeasurementOp op, PPMSpecsType &PPMSpecs)
     {
         if (isOpInWhileOp(op)) {
-            return op->emitOpError("PPM statistics is not available when there are while loops.");
+            return op->emitOpError("PBC statistics is not available when there are while loops.");
         }
 
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
@@ -73,7 +73,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         int64_t forLoopMultiplier = countStaticForloopIterations(op);
         if (forLoopMultiplier == -1) {
             return op->emitOpError(
-                "PPM statistics is not available when there are dynamically sized for loops.");
+                "PBC statistics is not available when there are dynamically sized for loops.");
         }
         PPMSpecs[parentFuncOp.getName()]["num_of_ppm"] += forLoopMultiplier;
         return success();
@@ -83,7 +83,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
                            llvm::BumpPtrAllocator &stringAllocator)
     {
         if (isOpInWhileOp(op)) {
-            return op->emitOpError("PPR statistics is not available when there are while loops.");
+            return op->emitOpError("PBC statistics is not available when there are while loops.");
         }
 
         int8_t rotationKind = op.getRotationKind();
@@ -103,7 +103,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         int64_t forLoopMultiplier = countStaticForloopIterations(op);
         if (forLoopMultiplier == -1) {
             return op->emitOpError(
-                "PPM statistics is not available when there are dynamically sized for loops.");
+                "PBC statistics is not available when there are dynamically sized for loops.");
         }
         PPMSpecs[funcName][numRotationKindKey] += forLoopMultiplier;
 
