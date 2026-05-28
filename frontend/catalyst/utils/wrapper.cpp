@@ -234,8 +234,7 @@ nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::ob
     return returns;
 }
 
-template <typename FnPtr>
-static FnPtr extract_fn_ptr(nb::object fn_obj)
+template <typename FnPtr> static FnPtr extract_fn_ptr(nb::object fn_obj)
 {
     auto ctypes = nb::module_::import_("ctypes");
     return *reinterpret_cast<FnPtr *>(nb::cast<size_t>(ctypes.attr("addressof")(fn_obj)));
