@@ -40,6 +40,9 @@
   that have multiple quantum operands, of either quantum register or qubit type.
   [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
+* The `--decompose-lowering` pass now supports `quantum.paulirot` operators.
+  [(#2893)](https://github.com/PennyLaneAI/catalyst/pull/2893)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
