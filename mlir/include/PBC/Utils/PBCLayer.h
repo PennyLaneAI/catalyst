@@ -51,8 +51,9 @@ class PBCLayerContext {
     llvm::SmallVector<std::vector<PBCOpInterface>> groupLayers(mlir::Operation *root,
                                                                bool onlyOnDisjointQubit = false);
 
-    // Worst-case PBC layer depth across `scf.if` branches within `block`
-    // (typically a function body's entry block). `scf.for` / `scf.while` are not supported yet.
+    // Worst-case PBC layer depth within `block` (typically a function body's entry block).
+    // Handles `scf.if` (max of branches), `scf.index_switch` (max of cases), and static
+    // `scf.for` (trip count × body depth). `scf.while` and dynamic `scf.for` are not supported.
     mlir::FailureOr<int64_t> computeWorstCaseDepth(mlir::Block *block,
                                                    bool onlyOnDisjointQubit = false);
 
