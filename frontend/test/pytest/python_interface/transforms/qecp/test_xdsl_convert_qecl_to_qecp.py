@@ -569,7 +569,7 @@ class TestQecCycleLowering:
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
 
-# MARK: TestLoweringMeasure
+# MARK: Measure
 
 
 class TestLoweringMeasure:
@@ -1015,18 +1015,61 @@ class TestLoweringTransversalGates:
         run_filecheck(program, pipeline)
 
 
-# MARK: Integration Tests with Noise
+# MARK: Integration
 
 
-# We can remove this xfail and warning filter once `convert_qecl_to_qecp_pass` is complete
-@pytest.mark.xfail(reason="The `convert_qecl_to_qecp_pass` is incomplete")
-@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
-class TestQECLNoiseLoweringPassIntegration:
-    """Integration lit tests for the convert-qecl-noise-to-qecp-noise pass"""
+class TestQECPLoweringIntegration:
+    """Integration lit tests for convert-qecl-to-qecp"""
 
-    # pylint: disable=line-too-long
+    def test_circuit_ghz_to_qecp(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl and convert-qecl-to-qecp pass together on a
+        GHZ circuit."""
+        dev = qp.device("null.qubit", wires=3)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def circuit():
+            # CHECK: qecp.alloc() : !qecp.hyperreg<3 x 1 x 7>
+            # CHECK: scf.for {{.*}} {
+            # CHECK:   qecp.extract_block
+            # CHECK:   func.call @encode_zero_Steane
+            # CHECK:   qecp.insert_block
+            # CHECK:   scf.yield
+            # CHECK: }
+            # CHECK: qecp.extract_block
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @hadamard_Steane
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: qecp.extract_block
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @cnot_Steane
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: qecp.extract_block
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @cnot_Steane
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @measure_transversal_Steane
+            # CHECK: func.call @measure_transversal_Steane
+            # CHECK: func.call @measure_transversal_Steane
+            # CHECK: quantum.mcmobs
+            # CHECK: quantum.sample
+            # CHECK: qecp.insert_block
+            # CHECK: qecp.dealloc
+            qp.H(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            m2 = qp.measure(2)
+            return qp.sample([m0, m1, m2])
+
+        run_filecheck_qjit(circuit)
+
     def test_convert_qecl_noise_to_qecp_noise_pass_integration(self, run_filecheck_qjit):
-        """Test the convert-qecl-noise-to-qecp-noise pass on the simplest possible, non-trivial circuit."""
+        """Test integration of the convert-qecl-noise-to-qecp-noise pass on the simplest possible,
+        non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
         @qp.qjit(target="mlir", capture=True)
@@ -1035,20 +1078,18 @@ class TestQECLNoiseLoweringPassIntegration:
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
-            # CHECK: builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
+            # CHECK: func.call @encode_zero_Steane
             # CHECK: arith.constant dense
             # CHECK: arith.constant dense
             # CHECK: func.call @noise_subroutine_code
-            # CHECK: builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
-            # CHECK: qecl.qec
-            # CHECK: qecl.hadamard
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @hadamard_Steane
             qp.H(0)
-            # CHECK: builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
             # CHECK: arith.constant dense
             # CHECK: arith.constant dense
             # CHECK: func.call @noise_subroutine_code
-            # CHECK: builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
-            # CHECK: qecl.qec
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @measure_transversal_Steane
             m0 = qp.measure(0)
             return qp.sample([m0])
 
