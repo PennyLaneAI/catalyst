@@ -79,7 +79,7 @@
 * Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
   after a PBC op but read from a register not updated by that op. Layer grouping now checks
   data dependencies through insert to extract chains instead of textual op ordering.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
 
 <h3>Internal changes ⚙️</h3>
 
