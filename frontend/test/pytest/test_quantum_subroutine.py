@@ -164,7 +164,7 @@ class TestSubroutineClass:
 
         @partial(qp.templates.Subroutine, wire_argnames="register")
         def f(register):
-            @qp.for_loop(len(register))
+            @qp.for_loop(register.shape[0])
             def l(i):
                 qp.X(register[i])
 
