@@ -14,17 +14,116 @@
 
 #include "PBC/Utils/PBCLayer.h"
 
+#include <algorithm>
+
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h" // for quantum.extract op
 
-using namespace catalyst::pbc;
+using namespace mlir;
 
 namespace catalyst {
 namespace pbc {
+
+FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp, bool onlyOnDisjointQubit)
+{
+    FailureOr<int64_t> thenDepth =
+        computeWorstCaseDepth(&ifOp.getThenRegion().front(), onlyOnDisjointQubit);
+    if (failed(thenDepth)) {
+        return failure();
+    }
+
+    int64_t elseDepth = 0;
+    if (!ifOp.getElseRegion().empty()) {
+        FailureOr<int64_t> elseD =
+            computeWorstCaseDepth(&ifOp.getElseRegion().front(), onlyOnDisjointQubit);
+        if (failed(elseD)) {
+            return failure();
+        }
+        elseDepth = *elseD;
+    }
+    return std::max(*thenDepth, elseDepth);
+}
+
+FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onlyOnDisjointQubit)
+{
+    int64_t depth = 0;
+    PBCLayer layer(this);
+
+    auto flushLayer = [&]() {
+        if (!layer.empty()) {
+            depth += 1;
+            layer = PBCLayer(this);
+        }
+    };
+
+    for (Operation &op : *block) {
+        if (auto ifOp = dyn_cast<scf::IfOp>(&op)) {
+            flushLayer();
+            FailureOr<int64_t> branchDepth = ifWorstCaseDepth(ifOp, onlyOnDisjointQubit);
+            if (failed(branchDepth)) {
+                return failure();
+            }
+
+            depth += *branchDepth;
+            continue;
+        }
+
+        if (isa<scf::ForOp>(&op) || isa<scf::WhileOp>(&op)) {
+            return op.emitOpError(
+                "worst-case depth is not available when PBC ops are inside scf.for or scf.while");
+        }
+
+        if (isa<scf::IndexSwitchOp>(&op)) {
+            return op.emitOpError(
+                "worst-case depth is not available when PBC ops are inside scf.index_switch");
+        }
+
+        if (auto pbcOp = dyn_cast<PBCOpInterface>(&op)) {
+            if (!layer.insert(pbcOp, onlyOnDisjointQubit)) {
+                flushLayer();
+                bool inserted = layer.insert(pbcOp, onlyOnDisjointQubit);
+                assert(inserted && "PBCLayer::insert must accept any op into an empty layer");
+            }
+            continue;
+        }
+
+        // plain ops
+        if (op.getNumRegions() == 0) {
+            continue;
+        }
+
+        // multi-region ops
+        if (op.getNumRegions() != 1) {
+            return op.emitOpError(
+                "worst-case depth cannot analyze operations with multiple regions");
+        }
+
+        // Recurse into the op's single-block region body (e.g. quantum.adjoint)
+        Region &region = op.getRegion(0);
+        if (region.empty()) {
+            continue;
+        }
+        if (!region.hasOneBlock()) {
+            return op.emitOpError("worst-case depth cannot analyze regions with multiple blocks");
+        }
+
+        flushLayer();
+        FailureOr<int64_t> innerDepth = computeWorstCaseDepth(&region.front(), onlyOnDisjointQubit);
+
+        if (failed(innerDepth)) {
+            return failure();
+        }
+        depth += *innerDepth;
+    }
+
+    flushLayer();
+    return depth;
+}
 
 // Partition PBC ops into layer groups using commutation/disjoint-qubit rules.
 // Only op membership is recorded; operand/result bookkeeping is deferred until

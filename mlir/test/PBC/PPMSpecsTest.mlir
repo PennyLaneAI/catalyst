@@ -324,108 +324,15 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
 
 // -----
 
-//CHECK: {
-//CHECK:     "static_for_loop": {
-//CHECK:         "max_weight_pi4": 1,
-//CHECK:         "num_of_ppm": 5,
-//CHECK:         "pi4_ppr": 5
-//CHECK:     }
-//CHECK: }
-func.func public @static_for_loop(%arg0: !quantum.bit) {
-    %c5 = arith.constant 5 : index
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-
-    %q = scf.for %iter = %c0 to %c5 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
-      %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
-      %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
-      scf.yield %out_qubits_1 : !quantum.bit
-    }
-
-    return
-}
-
-// -----
-
-//CHECK: {
-//CHECK:     "static_for_loop_bigstep": {
-//CHECK:         "max_weight_pi4": 1,
-//CHECK:         "num_of_ppm": 3,
-//CHECK:         "pi4_ppr": 3
-//CHECK:     }
-//CHECK: }
-func.func public @static_for_loop_bigstep(%arg0: !quantum.bit) {
-    %c5 = arith.constant 5 : index
-    %c0 = arith.constant 0 : index
-    %c2 = arith.constant 2 : index
-    // COM: should be 3 iterations (0,2,4)
-
-    %q = scf.for %iter = %c0 to %c5 step %c2 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
-      %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
-      %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
-      scf.yield %out_qubits_1 : !quantum.bit
-    }
-
-    return
-}
-
-// -----
-
-//CHECK: {
-//CHECK:     "static_for_loop_nested": {
-//CHECK:         "max_weight_pi4": 1,
-//CHECK:         "max_weight_pi8": 1,
-//CHECK:         "num_of_ppm": 30,
-//CHECK:         "pi4_ppr": 30,
-//CHECK:         "pi8_ppr": 6
-//CHECK:     }
-//CHECK: }
-func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
-    %c5 = arith.constant 5 : index
-    %c6 = arith.constant 6 : index
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-
-    %q = scf.for %iter = %c0 to %c6 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
-
-        %q_inner = scf.for %iter_inner = %c0 to %c5 step %c1 iter_args(%arg1_inner = %arg1) -> (!quantum.bit) {
-          %out_qubits_inner = pbc.ppr ["Z"](4) %arg1_inner : !quantum.bit
-          %mres, %out_qubits_inner_1 = pbc.ppm ["Z"] %out_qubits_inner : i1, !quantum.bit
-          scf.yield %out_qubits_inner_1 : !quantum.bit
-        }
-
-        %out_qubits = pbc.ppr ["Z"](8) %q_inner : !quantum.bit
-        scf.yield %out_qubits : !quantum.bit
-    }
-
-    return
-}
-
-// -----
-
 func.func public @dynamic_for_loop_error(%arg0: !quantum.bit, %c: index) {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
 
     %q = scf.for %iter = %c0 to %c step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
       %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
-      // expected-error@above {{PPM statistics is not available when there are dynamically sized for loops.}}
+      // expected-error@above {{PBC statistics is not available when there are dynamically sized for loops.}}
       %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
       scf.yield %out_qubits_1 : !quantum.bit
-    }
-
-    return
-}
-
-// -----
-
-func.func public @cond_error(%arg0: !quantum.bit, %b: i1) {
-    %out_qubits = scf.if %b -> !quantum.bit {
-        %out_qubits_t = pbc.ppr ["Z"](4) %arg0 : !quantum.bit
-        // expected-error@above {{PPM statistics is not available when there are conditionals or while loops.}}
-        scf.yield %out_qubits_t : !quantum.bit
-    } else {
-        scf.yield %arg0 : !quantum.bit
     }
 
     return
@@ -440,7 +347,7 @@ func.func public @while_error(%arg0: !quantum.bit, %b: i1) {
     } do {
         ^bb0(%in_qubit: !quantum.bit):
         %out_qubits = pbc.ppr ["Z"](4) %in_qubit : !quantum.bit
-        // expected-error@above {{PPM statistics is not available when there are conditionals or while loops.}}
+        // expected-error@above {{PBC statistics is not available when there are while loops.}}
         scf.yield %out_qubits : !quantum.bit
     }
 
@@ -549,4 +456,231 @@ func.func @test_disjoint_qubit_specs(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %
     %m4, %4:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] %2#0, %2#1, %3#0, %3#1, %1 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 
     func.return
+}
+
+// -----
+
+// CHECK-DAG: "test_if_worst_case_depth"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_if_worst_case_depth"
+// CHECK-DISJOINT-DAG: "depth": 3
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_if_worst_case_depth(%b : i1, %q0 : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q0 : i1, !quantum.bit
+    %r = scf.if %b -> (!quantum.bit) {
+        %a = pbc.ppr ["Z"](4) %out : !quantum.bit
+        %p2 = pbc.ppr ["X"](4) %a : !quantum.bit
+        scf.yield %p2 : !quantum.bit
+    } else {
+        %c = pbc.ppr ["Y"](4) %out : !quantum.bit
+        scf.yield %c : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// CHECK-DAG: "test_if_balanced_branches"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_if_balanced_branches"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_if_balanced_branches(%b : i1, %q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit) {
+    %m, %out:3 = pbc.ppm ["X", "X", "Y"] %q0, %q1, %q2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %r:2 = scf.if %b -> (!quantum.bit, !quantum.bit) {
+        %a:2 = pbc.ppr ["Y", "X"](4) %out#0, %out#1 : !quantum.bit, !quantum.bit
+        scf.yield %a#0, %a#1 : !quantum.bit, !quantum.bit
+    } else {
+        %c:2 = pbc.ppr ["X", "X"](4) %out#0, %out#1 : !quantum.bit, !quantum.bit
+        scf.yield %c#0, %c#1 : !quantum.bit, !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// CHECK-DAG: "test_if_no_else_branch_depth"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_if_no_else_branch_depth"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_if_no_else_branch_depth(%b : i1, %q : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q : i1, !quantum.bit
+    %r = scf.if %b -> (!quantum.bit) {
+        %p = pbc.ppr ["X"](4) %out : !quantum.bit
+        scf.yield %p : !quantum.bit
+    } else {
+        scf.yield %out : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// An scf.if barrier must prevent merging adjacent PBC ops on the
+// same qubit into one layer. Expect 3 layers: PPR | max(if) | PPR (= 1 + 1 + 1).
+
+// CHECK-DAG: "test_if_adjacent_ppr_barrier"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_if_adjacent_ppr_barrier"
+// CHECK-DISJOINT-DAG: "depth": 3
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_if_adjacent_ppr_barrier(%b : i1, %q : !quantum.bit) {
+    %before = pbc.ppr ["Z"](4) %q : !quantum.bit
+    %r = scf.if %b -> (!quantum.bit) {
+        %inner = pbc.ppr ["X"](4) %before : !quantum.bit
+        scf.yield %inner : !quantum.bit
+    } else {
+        scf.yield %before : !quantum.bit
+    }
+    %after = pbc.ppr ["Z"](4) %r : !quantum.bit
+    func.return
+}
+
+// -----
+
+// CHECK-DAG: "test_nested_if_worst_case_depth"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_nested_if_worst_case_depth"
+// CHECK-DISJOINT-DAG: "depth": 3
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_nested_if_worst_case_depth(%b0 : i1, %b1 : i1, %q0 : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q0 : i1, !quantum.bit
+    %u = scf.if %b0 -> (!quantum.bit) {
+        %v = scf.if %b1 -> (!quantum.bit) {
+            %x = pbc.ppr ["Z"](4) %out : !quantum.bit
+            %y = pbc.ppr ["X"](4) %x : !quantum.bit
+            scf.yield %y : !quantum.bit
+        } else {
+            %z = pbc.ppr ["Y"](4) %out : !quantum.bit
+            scf.yield %z : !quantum.bit
+        }
+        scf.yield %v : !quantum.bit
+    } else {
+        scf.yield %out : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// Counts are still emitted even when depth analysis fails (here, scf.for blocks depth).
+
+// CHECK-DAG: "static_for_loop"
+// CHECK-DAG: "max_weight_pi4": 1
+// CHECK-DAG: "num_of_ppm": 5
+// CHECK-DAG: "pi4_ppr": 5
+func.func public @static_for_loop(%arg0: !quantum.bit) {
+    %c5 = arith.constant 5 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.for or scf.while}}
+    %q = scf.for %iter = %c0 to %c5 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+      %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+      %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
+      scf.yield %out_qubits_1 : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+// CHECK-DAG: "static_for_loop_bigstep"
+// CHECK-DAG: "max_weight_pi4": 1
+// CHECK-DAG: "num_of_ppm": 3
+// CHECK-DAG: "pi4_ppr": 3
+func.func public @static_for_loop_bigstep(%arg0: !quantum.bit) {
+    %c5 = arith.constant 5 : index
+    %c0 = arith.constant 0 : index
+    %c2 = arith.constant 2 : index
+    // COM: should be 3 iterations (0,2,4)
+
+    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.for or scf.while}}
+    %q = scf.for %iter = %c0 to %c5 step %c2 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+      %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+      %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
+      scf.yield %out_qubits_1 : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+// CHECK-DAG: "static_for_loop_nested"
+// CHECK-DAG: "max_weight_pi4": 1
+// CHECK-DAG: "max_weight_pi8": 1
+// CHECK-DAG: "num_of_ppm": 30
+// CHECK-DAG: "pi4_ppr": 30
+// CHECK-DAG: "pi8_ppr": 6
+func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
+    %c5 = arith.constant 5 : index
+    %c6 = arith.constant 6 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.for or scf.while}}
+    %q = scf.for %iter = %c0 to %c6 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+
+        %q_inner = scf.for %iter_inner = %c0 to %c5 step %c1 iter_args(%arg1_inner = %arg1) -> (!quantum.bit) {
+          %out_qubits_inner = pbc.ppr ["Z"](4) %arg1_inner : !quantum.bit
+          %mres, %out_qubits_inner_1 = pbc.ppm ["Z"] %out_qubits_inner : i1, !quantum.bit
+          scf.yield %out_qubits_inner_1 : !quantum.bit
+        }
+
+        %out_qubits = pbc.ppr ["Z"](8) %q_inner : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+func.func public @test_if_in_for_errors(%arg0: !quantum.bit) {
+    %c0 = arith.constant 0 : index
+    %c2 = arith.constant 2 : index
+    %c1 = arith.constant 1 : index
+    %cond = arith.constant 0 : i1
+
+    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.for or scf.while}}
+    %q = scf.for %iter = %c0 to %c2 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+      %r = scf.if %cond -> (!quantum.bit) {
+        %p = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+        scf.yield %p : !quantum.bit
+      } else {
+        scf.yield %arg1 : !quantum.bit
+      }
+      scf.yield %r : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+func.func public @test_index_switch_depth_error(%idx: index, %arg0: !quantum.bit) {
+    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.index_switch}}
+    %q = scf.index_switch %idx -> !quantum.bit
+    case 0 {
+        %p = pbc.ppr ["Z"](4) %arg0 : !quantum.bit
+        scf.yield %p : !quantum.bit
+    }
+    default {
+        scf.yield %arg0 : !quantum.bit
+    }
+
+    return
 }

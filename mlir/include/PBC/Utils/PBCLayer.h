@@ -15,6 +15,7 @@
 #pragma once
 
 #include "llvm/ADT/SetVector.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "PBC/IR/PBCDialect.h"
 #include "PBC/IR/PBCOpInterfaces.h"
@@ -49,6 +50,15 @@ class PBCLayerContext {
     // Returns op lists only; operand/result bookkeeping is deferred until layer construction.
     llvm::SmallVector<std::vector<PBCOpInterface>> groupLayers(mlir::Operation *root,
                                                                bool onlyOnDisjointQubit = false);
+
+    // Worst-case PBC layer depth across `scf.if` branches within `block`
+    // (typically a function body's entry block). `scf.for` / `scf.while` are not supported yet.
+    mlir::FailureOr<int64_t> computeWorstCaseDepth(mlir::Block *block,
+                                                   bool onlyOnDisjointQubit = false);
+
+  private:
+    // Worst-case depth of an `scf.if`: `max(depth(then), depth(else))`
+    mlir::FailureOr<int64_t> ifWorstCaseDepth(mlir::scf::IfOp ifOp, bool onlyOnDisjointQubit);
 };
 
 class PBCLayer {

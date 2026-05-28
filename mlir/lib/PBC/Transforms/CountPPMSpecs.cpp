@@ -43,9 +43,9 @@ namespace pbc {
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {
     using CountPPMSpecsPassBase::CountPPMSpecsPassBase;
 
-    LogicalResult
-    countLogicalQubit(Operation *op,
-                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs)
+    using PPMSpecsType = llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>>;
+
+    LogicalResult countLogicalQubit(Operation *op, PPMSpecsType &PPMSpecs)
     {
         uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
 
@@ -58,12 +58,10 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
-    LogicalResult countPPM(pbc::PPMeasurementOp op,
-                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs)
+    LogicalResult countPPM(pbc::PPMeasurementOp op, PPMSpecsType &PPMSpecs)
     {
-        if (isOpInIfOp(op) || isOpInWhileOp(op)) {
-            return op->emitOpError(
-                "PPM statistics is not available when there are conditionals or while loops.");
+        if (isOpInWhileOp(op)) {
+            return op->emitOpError("PBC statistics is not available when there are while loops.");
         }
 
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
@@ -75,19 +73,17 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         int64_t forLoopMultiplier = countStaticForloopIterations(op);
         if (forLoopMultiplier == -1) {
             return op->emitOpError(
-                "PPM statistics is not available when there are dynamically sized for loops.");
+                "PBC statistics is not available when there are dynamically sized for loops.");
         }
         PPMSpecs[parentFuncOp.getName()]["num_of_ppm"] += forLoopMultiplier;
         return success();
     }
 
-    LogicalResult countPPR(pbc::PPRotationOp op,
-                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs,
+    LogicalResult countPPR(pbc::PPRotationOp op, PPMSpecsType &PPMSpecs,
                            llvm::BumpPtrAllocator &stringAllocator)
     {
-        if (isOpInIfOp(op) || isOpInWhileOp(op)) {
-            return op->emitOpError(
-                "PPM statistics is not available when there are conditionals or while loops.");
+        if (isOpInWhileOp(op)) {
+            return op->emitOpError("PBC statistics is not available when there are while loops.");
         }
 
         int8_t rotationKind = op.getRotationKind();
@@ -107,7 +103,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         int64_t forLoopMultiplier = countStaticForloopIterations(op);
         if (forLoopMultiplier == -1) {
             return op->emitOpError(
-                "PPM statistics is not available when there are dynamically sized for loops.");
+                "PBC statistics is not available when there are dynamically sized for loops.");
         }
         PPMSpecs[funcName][numRotationKindKey] += forLoopMultiplier;
 
@@ -117,10 +113,47 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
+    // Worst-case PBC layer depth for a single function, treating scf.if as
+    // a barrier whose contribution is `max(depth(then), depth(else))`.
+    // depth_type:
+    //   depth-0: any commuting PPMs may share a layer, even on overlapping qubits.
+    //   depth-1: only PPMs on non-overlapping qubits may share a layer.
+    LogicalResult computeFuncDepth(func::FuncOp funcOp, bool onlyDisjointQubit,
+                                   PPMSpecsType &PPMSpecs)
+    {
+        if (!funcOp.getBody()
+                 .walk([&](PBCOpInterface) { return WalkResult::interrupt(); })
+                 .wasInterrupted()) {
+            return success();
+        }
+
+        PBCLayerContext layerContext;
+        FailureOr<int64_t> depth =
+            layerContext.computeWorstCaseDepth(&funcOp.getBody().front(), onlyDisjointQubit);
+        if (failed(depth)) {
+            return failure();
+        }
+
+        StringRef funcName = funcOp.getName();
+        PPMSpecs[funcName]["depth_type"] = onlyDisjointQubit ? 1 : 0;
+        PPMSpecs[funcName]["depth"] = static_cast<int>(*depth);
+        return success();
+    }
+
+    LogicalResult computeAllFuncDepth(bool onlyDisjointQubit, PPMSpecsType &PPMSpecs)
+    {
+        WalkResult wr = getOperation()->walk([&](func::FuncOp funcOp) {
+            return failed(computeFuncDepth(funcOp, onlyDisjointQubit, PPMSpecs))
+                       ? WalkResult::interrupt()
+                       : WalkResult::advance();
+        });
+        return wr.wasInterrupted() ? failure() : success();
+    }
+
     LogicalResult printSpecs(bool onlyDisjointQubit)
     {
         llvm::BumpPtrAllocator stringAllocator;
-        llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs;
+        PPMSpecsType PPMSpecs;
 
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         WalkResult wr = getOperation()->walk([&](Operation *op) {
@@ -158,32 +191,14 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             return failure();
         }
 
-        // Count depth using the same layer grouping as partition-layers.
-        PBCLayerContext layerContext;
-        auto groupLayers = layerContext.groupLayers(getOperation(), onlyDisjointQubit);
-
-        if (!groupLayers.empty() && !groupLayers.front().empty()) {
-            auto funcOp =
-                groupLayers.front().front().getOperation()->getParentOfType<func::FuncOp>();
-            if (!funcOp) {
-                return groupLayers.front().front().emitOpError(
-                    "expected PBC op to be nested in func.func");
-            }
-            StringRef funcName = funcOp.getName();
-
-            // depth_type:
-            // depth-0: Depth calculated by allowing any commuting logical PPMs to be computed
-            // together, even with overlapping support.
-            // depth-1: Depth calculated by allowing only PPMs with non-overlapping support to be
-            // computed together.
-            PPMSpecs[funcName]["depth_type"] = onlyDisjointQubit ? 1 : 0;
-            PPMSpecs[funcName]["depth"] = groupLayers.size();
-        }
+        // Compute depth, but still emit JSON even if depth analysis fails for some
+        // functions (counts may have succeeded). Pass failure is reported at the end.
+        LogicalResult depthResult = computeAllFuncDepth(onlyDisjointQubit, PPMSpecs);
 
         json PPMSpecsJson = PPMSpecs;
         llvm::outs() << PPMSpecsJson.dump(4)
                      << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
-        return success();
+        return depthResult;
     }
 
     void runOnOperation() final
