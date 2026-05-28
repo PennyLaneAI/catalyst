@@ -38,7 +38,6 @@ int __catalyst__remote__call_wrapper(const char *addr, const char *symbol, const
 void __catalyst__remote__free_result(void *buf);
 
 int __catalyst__remote__close();
-const char *__catalyst__remote__last_error();
 
 #ifdef __cplusplus
 } // extern "C"

@@ -10,8 +10,7 @@ llvm_map_components_to_libnames(_remote_llvm_libs
 )
 
 #  catalyst_remote_session
-
-add_library(catalyst_remote_session STATIC RemoteSession.cpp)
+add_library(catalyst_remote_session SHARED RemoteSession.cpp)
 
 target_include_directories(catalyst_remote_session
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
@@ -22,6 +21,7 @@ target_include_directories(catalyst_remote_session SYSTEM PRIVATE
 )
 
 target_link_libraries(catalyst_remote_session PRIVATE
+    rt_capi
     ${_remote_llvm_libs}
     pthread
     ${CMAKE_DL_LIBS}
@@ -30,6 +30,12 @@ target_link_libraries(catalyst_remote_session PRIVATE
 target_compile_options(catalyst_remote_session PRIVATE -fno-rtti)
 
 set_property(TARGET catalyst_remote_session PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+if(NOT APPLE)
+    set_property(TARGET catalyst_remote_session APPEND PROPERTY BUILD_RPATH $ORIGIN)
+else()
+    set_property(TARGET catalyst_remote_session APPEND PROPERTY BUILD_RPATH @loader_path)
+endif()
 
 # rt_remote
 
