@@ -470,34 +470,44 @@ func.func @caller(%r: !qref.reg<1>) {
 // -----
 
 
-func.func @test_aliasing_qubit_args(%q1: !qref.bit, %q2: !qref.bit) -> () {
-    qref.custom "CNOT"() %q1, %q2 : !qref.bit, !qref.bit
+func.func @test_aliasing_qubit_args(%q1: !qref.bit, %q2: !qref.bit, %q3: !qref.bit, %q4: !qref.bit, %q5: !qref.bit) -> () {
+    qref.custom "gate"() %q1, %q2, %q3, %q4, %q5 : !qref.bit, !qref.bit, !qref.bit, !qref.bit, !qref.bit
     return
 }
 
 func.func @main(%i: i64, %j: i64) -> () attributes {quantum.node} {
+    // COM: canonicalization propagates static left shifts into compile-time constants
+    // COM: 2 is from 1<<1, 4 is from 1<<2
+    // CHECK-DAG: [[one_left_shift_two:%.+]] = arith.constant 4 : i64
+    // CHECK-DAG: [[three:%.+]] = arith.constant 3 : i64
+    // CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
+    // CHECK-DAG: [[one_left_shift_one:%.+]] = arith.constant 2 : i64
+
+    // CHECK: [[i:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[xor:%.+]] = arith.xori [[i]], [[one_left_shift_one]] : i64
+    // CHECK: [[j:%.+]] = arith.shli [[one]], %arg1 : i64
+    // CHECK: [[xor_:%.+]] = arith.xori [[xor]], [[j]] : i64
+    // CHECK: [[num_ones:%.+]] = math.ctpop [[xor_]] : i64
+    // CHECK: [[cmp:%.+]] = arith.cmpi eq, [[num_ones]], [[three]] : i64
+    // CHECK: "catalyst.assert"([[cmp]]) <{error = "Can only call subroutines with non aliasing qubits"}> : (i1) -> ()
     %r2 = qref.alloc(2) : !qref.reg<2>
+    %q2_1 = qref.get %r2[1] : !qref.reg<2> -> !qref.bit
+    %q2_i = qref.get %r2[%i] : !qref.reg<2>, i64 -> !qref.bit
+    %q2_j = qref.get %r2[%j] : !qref.reg<2>, i64 -> !qref.bit
 
-    %q0 = qref.get %r2[0] : !qref.reg<2> -> !qref.bit
-    %qi = qref.get %r2[%i] : !qref.reg<2>, i64 -> !qref.bit
-    %qj = qref.get %r2[%j] : !qref.reg<2>, i64 -> !qref.bit
+    // CHECK: [[i:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[xor:%.+]] = arith.xori [[i]], [[one_left_shift_two]] : i64
+    // CHECK: [[num_ones:%.+]] = math.ctpop [[xor]] : i64
+    // CHECK: [[cmp:%.+]] = arith.cmpi eq, [[num_ones]], [[one_left_shift_one]] : i64
+    // CHECK: "catalyst.assert"([[cmp]]) <{error = "Can only call subroutines with non aliasing qubits"}> : (i1) -> ()
+    %r3 = qref.alloc(3) : !qref.reg<3>
+    %q3_2 = qref.get %r3[2] : !qref.reg<3> -> !qref.bit
+    %q3_i = qref.get %r3[%i] : !qref.reg<3>, i64 -> !qref.bit
 
-    // CHECK: [[zero:%.+]] = arith.constant 0 : i64
-    // CHECK: [[cmp:%.+]] = arith.cmpi ne, %arg0, [[zero]] : i64
-    // CHECK: "catalyst.assert"([[cmp]]) <{error = "Can only call subroutines with non aliasing qubits"}>
     // CHECK: call
-    func.call @test_aliasing_qubit_args(%q0, %qi) : (!qref.bit, !qref.bit) -> ()
-
-    // CHECK: [[cmp:%.+]] = arith.cmpi ne, %arg0, [[zero]] : i64
-    // CHECK: "catalyst.assert"([[cmp]]) <{error = "Can only call subroutines with non aliasing qubits"}>
-    // CHECK: call
-    func.call @test_aliasing_qubit_args(%qi, %q0) : (!qref.bit, !qref.bit) -> ()
-
-    // CHECK: [[cmp:%.+]] = arith.cmpi ne, %arg0, %arg1 : i64
-    // CHECK: "catalyst.assert"([[cmp]]) <{error = "Can only call subroutines with non aliasing qubits"}>
-    // CHECK: call
-    func.call @test_aliasing_qubit_args(%qi, %qj) : (!qref.bit, !qref.bit) -> ()
+    func.call @test_aliasing_qubit_args(%q2_1, %q2_i, %q2_j, %q3_2, %q3_i) : (!qref.bit, !qref.bit, !qref.bit, !qref.bit, !qref.bit) -> ()
 
     qref.dealloc %r2 : !qref.reg<2>
+    qref.dealloc %r3 : !qref.reg<3>
     return
 }
