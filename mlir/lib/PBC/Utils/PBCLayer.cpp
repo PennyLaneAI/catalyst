@@ -19,6 +19,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
+#include "Catalyst/Utils/SCFUtils.h"
 #include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Utils/PauliStringWrapper.h"
@@ -49,6 +50,43 @@ FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp, bool onlyOn
     return std::max(*thenDepth, elseDepth);
 }
 
+FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp switchOp,
+                                                         bool onlyOnDisjointQubit)
+{
+    FailureOr<int64_t> defaultDepth =
+        computeWorstCaseDepth(&switchOp.getDefaultBlock(), onlyOnDisjointQubit);
+    if (failed(defaultDepth)) {
+        return failure();
+    }
+
+    int64_t maxDepth = *defaultDepth;
+
+    for (unsigned i = 0, n = switchOp.getNumCases(); i < n; ++i) {
+        FailureOr<int64_t> caseDepth =
+            computeWorstCaseDepth(&switchOp.getCaseBlock(i), onlyOnDisjointQubit);
+        if (failed(caseDepth)) {
+            return failure();
+        }
+        maxDepth = std::max(maxDepth, *caseDepth);
+    }
+    return maxDepth;
+}
+
+FailureOr<int64_t> PBCLayerContext::forWorstCaseDepth(scf::ForOp forOp, bool onlyOnDisjointQubit)
+{
+    int64_t iterations = countStaticForOpIterations(forOp);
+    if (iterations == -1) {
+        return forOp.emitOpError(
+            "worst-case depth is not available when there are dynamically sized for loops");
+    }
+
+    FailureOr<int64_t> bodyDepth = computeWorstCaseDepth(forOp.getBody(), onlyOnDisjointQubit);
+    if (failed(bodyDepth)) {
+        return failure();
+    }
+    return iterations * (*bodyDepth);
+}
+
 FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onlyOnDisjointQubit)
 {
     int64_t depth = 0;
@@ -62,25 +100,38 @@ FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onl
     };
 
     for (Operation &op : *block) {
+        if (isa<scf::WhileOp>(&op)) {
+            return op.emitOpError(
+                "worst-case depth is not available when PBC ops are inside scf.while");
+        }
         if (auto ifOp = dyn_cast<scf::IfOp>(&op)) {
             flushLayer();
             FailureOr<int64_t> branchDepth = ifWorstCaseDepth(ifOp, onlyOnDisjointQubit);
             if (failed(branchDepth)) {
                 return failure();
             }
-
             depth += *branchDepth;
             continue;
         }
 
-        if (isa<scf::ForOp>(&op) || isa<scf::WhileOp>(&op)) {
-            return op.emitOpError(
-                "worst-case depth is not available when PBC ops are inside scf.for or scf.while");
+        if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(&op)) {
+            flushLayer();
+            FailureOr<int64_t> branchDepth = switchWorstCaseDepth(switchOp, onlyOnDisjointQubit);
+            if (failed(branchDepth)) {
+                return failure();
+            }
+            depth += *branchDepth;
+            continue;
         }
 
-        if (isa<scf::IndexSwitchOp>(&op)) {
-            return op.emitOpError(
-                "worst-case depth is not available when PBC ops are inside scf.index_switch");
+        if (auto forOp = dyn_cast<scf::ForOp>(&op)) {
+            flushLayer();
+            FailureOr<int64_t> loopDepth = forWorstCaseDepth(forOp, onlyOnDisjointQubit);
+            if (failed(loopDepth)) {
+                return failure();
+            }
+            depth += *loopDepth;
+            continue;
         }
 
         if (auto pbcOp = dyn_cast<PBCOpInterface>(&op)) {
@@ -114,10 +165,10 @@ FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onl
 
         flushLayer();
         FailureOr<int64_t> innerDepth = computeWorstCaseDepth(&region.front(), onlyOnDisjointQubit);
-
         if (failed(innerDepth)) {
             return failure();
         }
+
         depth += *innerDepth;
     }
 

@@ -59,6 +59,13 @@ class PBCLayerContext {
   private:
     // Worst-case depth of an `scf.if`: `max(depth(then), depth(else))`
     mlir::FailureOr<int64_t> ifWorstCaseDepth(mlir::scf::IfOp ifOp, bool onlyOnDisjointQubit);
+
+    // Worst-case depth of an `scf.index_switch`: `max(depth(default), depth(case_i))`
+    mlir::FailureOr<int64_t> switchWorstCaseDepth(mlir::scf::IndexSwitchOp switchOp,
+                                                  bool onlyOnDisjointQubit);
+    // Worst-case depth of a static `scf.for`: `N * depth(body)`.
+    // Returns failure if the trip count is dynamic.
+    mlir::FailureOr<int64_t> forWorstCaseDepth(mlir::scf::ForOp forOp, bool onlyOnDisjointQubit);
 };
 
 class PBCLayer {

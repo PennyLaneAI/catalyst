@@ -61,7 +61,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     LogicalResult countPPM(pbc::PPMeasurementOp op, PPMSpecsType &PPMSpecs)
     {
         if (isOpInWhileOp(op)) {
-            return op->emitOpError("PBC statistics is not available when there are while loops.");
+            return op->emitOpError("PPM statistics is not available when there are while loops.");
         }
 
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
