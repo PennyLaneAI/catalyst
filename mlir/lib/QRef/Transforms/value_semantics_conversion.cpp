@@ -924,19 +924,16 @@ void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp)
             Value dynamicIndex = getOp.getIdx();
             bool isStatic = staticIndex.has_value();
 
+            auto [_, inserted] = reg_to_indices.try_emplace(qreg);
             if (isStatic) {
-                auto [it, inserted] = reg_to_indices.try_emplace(qreg);
-                if (inserted) {
-                    it->second.first.insert(staticIndex.value());
-                }
-                else {
+                if (!inserted) {
+                    // qreg already exists, static index must be new
                     assert(!reg_to_indices[qreg].first.contains(staticIndex.value()) &&
                            "Can only call subroutines with non aliasing qubits");
-                    reg_to_indices[qreg].first.insert(staticIndex.value());
                 }
+                reg_to_indices[qreg].first.insert(staticIndex.value());
             }
             else {
-                reg_to_indices.try_emplace(qreg);
                 reg_to_indices[qreg].second.insert(dynamicIndex);
             }
         }
