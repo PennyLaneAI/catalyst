@@ -82,3 +82,15 @@ func.func public @wrapper(%x: memref<3x?x?xf64>) -> memref<3x?x?xf64> attributes
 }
 
 
+// -----
+
+// Test that transformation supports mixed return results.
+func.func public @mixed_return(%r: i64) -> (memref<1xf64>, i64) attributes {llvm.emit_c_interface} {
+  %0 = arith.constant 0.0 : f64
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<1xf64>
+  %c0 = arith.constant 0 : index
+  memref.store %0, %alloc[%c0] : memref<1xf64>
+  // CHECK: [[res:%.+]] = scf.if
+  // CHECK: return [[res]], [[arg]] : memref<1xf64>, i64
+  func.return %alloc, %r : memref<1xf64>, i64
+}
