@@ -605,8 +605,8 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[mres0:%.+]], [[qd10:%.+]] = qecp.measure [[qd9]] : i1, !qecp.qubit<data>
     // CHECK: [[mres1:%.+]], [[qa10:%.+]] = qecp.measure [[qa9]] : i1, !qecp.qubit<aux>
-    %mres0, %qd10 = qecp.measure %qd9 : i1, !qecp.qubit<data>
-    %mres1, %qa10 = qecp.measure %qa9 : i1, !qecp.qubit<aux>
+    %mres0, %qd13 = qecp.measure %qd9 : i1, !qecp.qubit<data>
+    %mres1, %qa13 = qecp.measure %qa9 : i1, !qecp.qubit<aux>
 
     // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
