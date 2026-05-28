@@ -75,6 +75,10 @@ class PBCLayer {
     // Cached canonical entry qubit set for the layer
     llvm::DenseSet<mlir::Value> layerEntryQubits;
 
+    // Cached set of all SSA results from layer ops.
+    // It's used to detect insert-then-extract dependencies without rescanning the layer.
+    llvm::DenseSet<mlir::Value> layerOpResults;
+
     // Per-layer deterministic mapping from any seen qubit SSA value to its
     // canonical entry (the block argument it originated from in this layer)
     llvm::DenseMap<mlir::Value, mlir::Value> localQubitToEntry;
@@ -89,6 +93,9 @@ class PBCLayer {
     mlir::Value resolveEntry(mlir::Value v) const;
 
     void updateResultAndOperand(PBCOpInterface op);
+
+    // True if following value's SSA producers backward reaches any result from an op in this layer.
+    bool dependsOnLayerOps(mlir::Value value) const;
 
   public:
     LayerOp layerOp;
@@ -130,17 +137,15 @@ class PBCLayer {
     // Check if the op is in the same block as the layer
     bool isSameBlock(PBCOpInterface op) const;
 
-    // Extract ops defining operands must be before existing ops;
-    // no insert users before existing ops
-    bool extractsAreBeforeExistingOps(PBCOpInterface op) const;
-    bool insertsAreAfterExistingOps(PBCOpInterface op) const;
+    // True if `op` consumes a qubit extracted from a register updated by a layer op.
+    bool extractOperandsDependOnLayerOps(PBCOpInterface op) const;
 
     // Directly insert an op to the layer without checking commutation
     void insertToLayer(PBCOpInterface op);
 
     // Op can be inserted into the layer if:
     // 1. It is in the same block
-    // 2. It does not have extract(insert) op before(after) existing ops
+    // 2. No extract operand reads a register updated by a layer op
     // 3. It acts on disjoint qubits
     // 4. Or it commutes with all the ops in the layer
     bool insert(PBCOpInterface op, bool onlyOnDisjointQubit = false);

@@ -741,3 +741,61 @@ func.func public @test_if_in_for_depth(%arg0: !quantum.bit) {
     return
 }
 
+// -----
+
+// A quantum.extract for PPR2's qubit 3 appears textually after PPR1, but it is
+// data-independent of PPR1 (extracted directly from the register, not from any
+// insert chain that touches PPR1's outputs). Both PPRs commute on the shared
+// qubits (X X X on {0,1,2} vs X X Y on {1,2,3}), so they belong to the same
+// layer: depth must be 1, not 2.
+
+// CHECK-DAG: "test_independent_extract_between_pprs"
+// CHECK-DAG: "depth": 1
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_independent_extract_between_pprs"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_independent_extract_between_pprs() {
+    %0 = quantum.alloc(4) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[2] : !quantum.reg -> !quantum.bit
+    %4:3 = pbc.ppr ["X", "X", "X"](4) %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
+    %5 = quantum.extract %0[3] : !quantum.reg -> !quantum.bit
+    %6:3 = pbc.ppr ["X", "X", "Y"](4) %4#1, %4#2, %5 : !quantum.bit, !quantum.bit, !quantum.bit
+    %7 = quantum.insert %0[0], %4#0 : !quantum.reg, !quantum.bit
+    %8 = quantum.insert %7[1], %6#0 : !quantum.reg, !quantum.bit
+    %9 = quantum.insert %8[2], %6#1 : !quantum.reg, !quantum.bit
+    %10 = quantum.insert %9[3], %6#2 : !quantum.reg, !quantum.bit
+    quantum.dealloc %10 : !quantum.reg
+    return
+}
+
+// -----
+
+// PPR2's qubit is re-extracted from a register after PPR1's result was inserted
+// back into that register. The SSA values differ, so the disjoint/commute checks
+// alone would merge them, but the physical qubit is the same and PPR1 must
+// execute before PPR2. The data-dependency check on the extract's register
+// operand catches this and forces two layers: depth = 2.
+
+// CHECK-DAG: "test_reextract_must_split_layer"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_reextract_must_split_layer"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_reextract_must_split_layer() {
+    %0 = quantum.alloc(1) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %2 = pbc.ppr ["X"](4) %1 : !quantum.bit
+    %3 = quantum.insert %0[0], %2 : !quantum.reg, !quantum.bit
+    %4 = quantum.extract %3[0] : !quantum.reg -> !quantum.bit
+    %5 = pbc.ppr ["X"](4) %4 : !quantum.bit
+    %6 = quantum.insert %3[0], %5 : !quantum.reg, !quantum.bit
+    quantum.dealloc %6 : !quantum.reg
+    return
+}
+
