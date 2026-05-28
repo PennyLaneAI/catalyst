@@ -56,6 +56,11 @@
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
+* Fixed a bug where the non-memref return operands were silently dropped in the `--cp-global-memref`
+  pass, producing invalid IR. The pass now handles functions that return a mix of memref and
+  non-memref values.
+  [(#2887)](https://github.com/PennyLaneAI/catalyst/pull/2887)
+
 <h3>Internal changes ⚙️</h3>
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
