@@ -40,7 +40,7 @@
 
 * The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the **worst-case quantum
   depth** across ``scf.if`` and ``scf.index_switch`` branches:
-  ``depth(region) = layers_outside_branch + Σ max(depth(branch_i))``. Previously branches
+  ``depth(region) = layers_outside_branch + max(depth(branch_i))``. Previously branches
   were counted sequentially.
   [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
   [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
