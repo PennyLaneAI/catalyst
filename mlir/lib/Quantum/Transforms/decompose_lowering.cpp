@@ -142,9 +142,9 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
     // Remove unused arguments on a decomposition function
     // This is because we have some assumptions on the decomp funcs' signature structure
-    void removeUnusedFuncArgs(func::FuncOp f){
-        f.front().eraseArguments(
-            [](BlockArgument arg) { return arg.use_empty(); });
+    void removeUnusedFuncArgs(func::FuncOp f)
+    {
+        f.front().eraseArguments([](BlockArgument arg) { return arg.use_empty(); });
 
         f.setFunctionType(FunctionType::get(f->getContext(), f.front().getArgumentTypes(),
                                             f.front().getTerminator()->getOperandTypes()));
