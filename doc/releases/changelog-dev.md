@@ -52,6 +52,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug in `DecompRuleInterpreter.cleanup` by replacing fragile string-based operator
+  checks with strict type-based checking.
+  [(#2873)](https://github.com/PennyLaneAI/catalyst/pull/2873)
+
 * Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
@@ -85,6 +89,7 @@
   transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
+  [(#2871)](https://github.com/PennyLaneAI/catalyst/pull/2871)
 
 * The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
   [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
@@ -126,6 +131,12 @@
     [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
   - `qecl.dealloc_cb`, which deallocates a single logical codeblock.
     [(#2866)](https://github.com/PennyLaneAI/catalyst/pull/2866)
+  - `qecp.alloc_cb`, which allocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+
+
 
 <h3>Documentation 📝</h3>
 
@@ -133,6 +144,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,

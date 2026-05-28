@@ -22,7 +22,8 @@ def ValueSemanticsConversionPass : Pass<"convert-to-value-semantics"> {
 
     let dependentDialects = [
        "catalyst::quantum::QuantumDialect",
-       "catalyst::CatalystDialect"
+       "catalyst::CatalystDialect",
+       "math::MathDialect"
     ];
 }
 
