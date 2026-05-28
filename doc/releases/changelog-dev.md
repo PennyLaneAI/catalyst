@@ -125,6 +125,8 @@
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
   - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.t`, which performs a T gate on a single physical qubit.
+    [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
 
 
