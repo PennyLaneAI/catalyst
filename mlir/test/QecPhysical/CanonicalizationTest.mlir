@@ -100,6 +100,49 @@ func.func @test_alloc_dealloc_aux_no_fold() {
 
 // -----
 
+// CHECK-LABEL: test_alloc_cb_dce
+func.func @test_alloc_cb_dce() {
+    // CHECK-NOT: qecp.alloc_cb
+    %cb = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+    return
+}
+
+// -----
+
+// CHECK-LABEL: test_alloc_cb_no_cse
+func.func @test_alloc_cb_no_cse() -> (!qecp.codeblock<1 x 7>, !qecp.codeblock<1 x 7>) {
+    // CHECK: qecp.alloc_cb
+    // CHECK-NEXT: qecp.alloc_cb
+    %cb1 = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+    %cb2 = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+    return %cb1, %cb2 : !qecp.codeblock<1 x 7>, !qecp.codeblock<1 x 7>
+}
+
+// -----
+
+// CHECK-LABEL: test_alloc_dealloc_cb_fold
+func.func @test_alloc_dealloc_cb_fold() {
+    // CHECK-NOT: qecp.alloc_cb
+    // CHECK-NOT: qecp.dealloc_cb
+    %cb = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+    qecp.dealloc_cb %cb : !qecp.codeblock<1 x 7>
+    return
+}
+
+// -----
+
+// CHECK-LABEL: test_alloc_dealloc_cb_no_fold
+func.func @test_alloc_dealloc_cb_no_fold() {
+    // CHECK: qecp.alloc_cb
+    // CHECK: qecp.dealloc_cb
+    %cb0 = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+    %cb1 = "test.op"(%cb0) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+    qecp.dealloc_cb %cb1 : !qecp.codeblock<1 x 7>
+    return
+}
+
+// -----
+
 // CHECK-LABEL: test_extract_insert_block_dce
 func.func @test_extract_insert_block_dce(%i : index) -> !qecp.hyperreg<3 x 1 x 7> {
     // CHECK: [[r0:%.+]] = "test.op"() : () -> !qecp.hyperreg<3 x 1 x 7>

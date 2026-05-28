@@ -22,6 +22,7 @@
 #include <variant>
 #include <vector>
 
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -31,6 +32,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/MLIRContext.h"
@@ -898,75 +900,86 @@ struct SubroutineInfo {
     SmallVector<std::variant<unsigned, std::pair<unsigned, uint64_t>>> newArgsInfo;
 }; // struct SubroutineInfo
 
-void checkQubitCallArgAliasingPair(IRRewriter &builder, Value rQubit1, Value rQubit2)
+void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp)
 {
     // Only potentially aliasing case is where both rQubits come from qref.get ops
     // This is because those coming from single qubit allocations are guaranteed to be not aliasing
-    if (!isa_and_nonnull<qref::GetOp>(rQubit1.getDefiningOp()) ||
-        !isa_and_nonnull<qref::GetOp>(rQubit2.getDefiningOp())) {
-        return;
-    }
-
-    qref::GetOp getOp1 = cast<qref::GetOp>(rQubit1.getDefiningOp());
-    qref::GetOp getOp2 = cast<qref::GetOp>(rQubit2.getDefiningOp());
-    if (getOp1.getQreg() != getOp2.getQreg()) {
-        // Will definitely not alias if they come from different registers
-        return;
-    }
-
-    Location loc = getOp1.getLoc();
-    std::optional<uint64_t> staticIndex1 = getOp1.getIdxAttr();
-    std::optional<uint64_t> staticIndex2 = getOp2.getIdxAttr();
-    Value dynamicIndex1 = getOp1.getIdx();
-    Value dynamicIndex2 = getOp2.getIdx();
-
-    if (staticIndex1.has_value() && staticIndex2.has_value()) {
-        assert(staticIndex1.value() != staticIndex2.value() &&
-               "Can only call subroutines with non aliasing qubits");
-    }
-    else if (staticIndex1.has_value() && dynamicIndex2 != nullptr) {
-        auto idx =
-            arith::ConstantOp::create(builder, loc, dynamicIndex2.getType(),
-                                      IntegerAttr::get(builder.getI64Type(), staticIndex1.value()));
-
-        auto compNEQ = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne,
-                                             idx.getResult(), dynamicIndex2);
-        catalyst::AssertionOp::create(builder, loc, compNEQ.getResult(),
-                                      "Can only call subroutines with non aliasing qubits");
-    }
-    else if (staticIndex2.has_value() && dynamicIndex1 != nullptr) {
-        auto idx =
-            arith::ConstantOp::create(builder, loc, dynamicIndex1.getType(),
-                                      IntegerAttr::get(builder.getI64Type(), staticIndex2.value()));
-
-        auto compNEQ = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne,
-                                             idx.getResult(), dynamicIndex1);
-        catalyst::AssertionOp::create(builder, loc, compNEQ.getResult(),
-                                      "Can only call subroutines with non aliasing qubits");
-    }
-    else if (dynamicIndex1 != nullptr && dynamicIndex2 != nullptr) {
-        auto compNEQ = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne, dynamicIndex1,
-                                             dynamicIndex2);
-        catalyst::AssertionOp::create(builder, loc, compNEQ.getResult(),
-                                      "Can only call subroutines with non aliasing qubits");
-    }
-}
-
-void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp)
-{
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(callOp);
-    SmallVector<Value> rQubitCallOperands;
+    Location loc = callOp.getLoc();
+    Type i64Type = builder.getI64Type();
+
+    // Group all rQubits from get ops based on source registers
+    // Within each register group, we must assert that all indices are different
+    // The structure of `reg_to_indices` is a map whose keys are the source register
+    // and the value is a pair of two sets, the first containing static indices, the second
+    // containing dynamic indices
+    llvm::MapVector<Value, std::pair<SetVector<uint64_t>, SetVector<Value>>> reg_to_indices;
     for (Value callArg : callOp.getArgOperands()) {
-        if (isa<qref::QubitType>(callArg.getType())) {
-            rQubitCallOperands.push_back(callArg);
+        if (isa<qref::QubitType>(callArg.getType()) &&
+            isa_and_nonnull<qref::GetOp>(callArg.getDefiningOp())) {
+            qref::GetOp getOp = cast<qref::GetOp>(callArg.getDefiningOp());
+            Value qreg = getOp.getQreg();
+            std::optional<uint64_t> staticIndex = getOp.getIdxAttr();
+            Value dynamicIndex = getOp.getIdx();
+            bool isStatic = staticIndex.has_value();
+
+            auto [_, inserted] = reg_to_indices.try_emplace(qreg);
+            if (isStatic) {
+                if (!inserted) {
+                    // qreg already exists, static index must be new
+                    assert(!reg_to_indices[qreg].first.contains(staticIndex.value()) &&
+                           "Can only call subroutines with non aliasing qubits");
+                }
+                reg_to_indices[qreg].first.insert(staticIndex.value());
+            }
+            else {
+                reg_to_indices[qreg].second.insert(dynamicIndex);
+            }
         }
     }
 
-    for (size_t i = 0; i < rQubitCallOperands.size(); i++) {
-        for (size_t j = i + 1; j < rQubitCallOperands.size(); j++) {
-            checkQubitCallArgAliasingPair(builder, rQubitCallOperands[i], rQubitCallOperands[j]);
+    // For each qreg, must runtime assert that the dynamic indices are all different
+    for (auto [qreg, indexSets] : reg_to_indices) {
+        if (indexSets.second.empty()) {
+            // All indices are static, already checked above in the pass
+            // No need to assert in runtime
+            return;
         }
+
+        uint64_t num_qubit_operands = indexSets.first.size() + indexSets.second.size();
+        auto expectedNumOnes = arith::ConstantOp::create(
+            builder, loc, i64Type, IntegerAttr::get(i64Type, num_qubit_operands));
+
+        auto accumulator = arith::ConstantOp::create(builder, loc, builder.getI64Type(),
+                                                     IntegerAttr::get(i64Type, 0));
+        Operation *loopUpdater = accumulator;
+        for (uint64_t staticIndex : indexSets.first) {
+            auto one =
+                arith::ConstantOp::create(builder, loc, i64Type, IntegerAttr::get(i64Type, 1));
+            auto shiftSize = arith::ConstantOp::create(
+                builder, loc, i64Type, builder.getIntegerAttr(i64Type, staticIndex));
+            auto shiftedOne =
+                arith::ShLIOp::create(builder, loc, one.getResult(), shiftSize.getResult());
+            auto xorOp = arith::XOrIOp::create(builder, loc, loopUpdater->getResult(0),
+                                               shiftedOne.getResult());
+            loopUpdater = xorOp;
+        }
+
+        for (Value dynamicIndex : indexSets.second) {
+            auto one =
+                arith::ConstantOp::create(builder, loc, i64Type, IntegerAttr::get(i64Type, 1));
+            auto shiftedOne = arith::ShLIOp::create(builder, loc, one.getResult(), dynamicIndex);
+            auto xorOp = arith::XOrIOp::create(builder, loc, loopUpdater->getResult(0),
+                                               shiftedOne.getResult());
+            loopUpdater = xorOp;
+        }
+
+        auto numOneBits = math::CtPopOp::create(builder, loc, i64Type, loopUpdater->getResult(0));
+        auto compOp = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::eq,
+                                            numOneBits.getResult(), expectedNumOnes.getResult());
+        catalyst::AssertionOp::create(builder, loc, compOp.getResult(),
+                                      "Can only call subroutines with non aliasing qubits");
     }
 }
 
