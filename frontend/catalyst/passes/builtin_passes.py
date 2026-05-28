@@ -1906,7 +1906,7 @@ def graph_decomposition_setup_inputs(
         "gate_set": gate_set,
         "bytecode_rules": str(_builtin_rule_path),
         "callback_plugin_path": str(callback_plugin_path),
-        "libpython_path": str(libpython_path),
+        "libpython_path": str(libpython_path) if libpython_path else "",
     }
 
     if fixed_decomps:
