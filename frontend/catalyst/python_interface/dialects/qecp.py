@@ -683,6 +683,13 @@ class SOp(SingleQubitPhysicalGateOp):
 
 
 @irdl_op_definition
+class TOp(SingleQubitPhysicalGateOp):
+    """A physical T gate operation."""
+
+    name = "qecp.t"
+
+
+@irdl_op_definition
 class CnotOp(IRDLOperation):
     """A physical CNOT gate operation."""
 
