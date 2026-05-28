@@ -59,26 +59,27 @@ def get_libpython_path() -> Path | str:
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
-
-    # TODO: prefer INSTSONAME for linux
-    print("[CI-DEBUG] libdir:", libdir)
-    print("[CI-DEBUG] ldlibrary:", ldlibrary)
-    print("[CI-DEBUG] framework_prefix:", framework_prefix)
+    instsoname = sysconfig.get_config_var("INSTSONAME")
 
     # macOS framework-style installations
     if framework_prefix:
-        print("[CI-DEBUG] found framework install:", Path(framework_prefix) / Path(ldlibrary))
-        return Path(framework_prefix) / Path(ldlibrary)
+        candidate = Path(framework_prefix) / Path(ldlibrary)
+        if candidate.exists():
+            return candidate
 
     if not (libdir and ldlibrary):
-        print("[CI-DEBUG] frontend could not find libpython")
         return ""
 
-    # standard installation
-    ldlibrary_path = Path(libdir) / ldlibrary
-    if ldlibrary_path.exists():
-        print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(standard installation)")
-        return ldlibrary_path.resolve()
+    # linux (and sometimes macOS) installation
+    if libdir and instsoname:
+        candidate = Path(libdir) / Path(instsoname)
+        if candidate.exists():
+            return candidate
+
+    # standard installation python installation
+    candidate = Path(libdir) / Path(ldlibrary)
+    if candidate.exists():
+        return candidate
 
     return ""
 
