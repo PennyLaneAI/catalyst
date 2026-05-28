@@ -58,11 +58,15 @@ def get_libpython_path() -> Path | str:
     """Return the path to the python shared library, or emptystring if failed to find."""
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
-    library = sysconfig.get_config_var("LIBRARY")
+    framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
 
     print("[CI-DEBUG] libdir:", libdir)
     print("[CI-DEBUG] ldlibrary:", ldlibrary)
-    print("[CI-DEBUG] library:", library)
+    print("[CI-DEBUG] framework_prefix:", framework_prefix)
+
+    if framework_prefix:
+        print("[CI-DEBUG] found framework install:", Path(framework_prefix) / Path(ldlibrary))
+        return Path(framework_prefix) / Path(ldlibrary)
 
     if not (libdir and ldlibrary):
         print("[CI-DEBUG] frontend could not find libpython")
@@ -80,13 +84,6 @@ def get_libpython_path() -> Path | str:
         if framework_path.exists():
             print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(framework-style)")
             return framework_path.resolve()
-
-    # check Library
-    if library:
-        library_path = Path(libdir) / library
-        if library_path.exists():
-            print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(library)")
-            return library_path.resolve()
 
     return ""
 
