@@ -631,9 +631,12 @@ func.func public @test_switch_default_only_branch_depth(%arg : index, %q : !quan
 
 // -----
 
-// Counts are still emitted even when depth analysis fails (here, scf.for blocks depth).
+// Static for-loop: depth = N * depth(body). Z-axis PPR + Z-axis PPM commute,
+// so each iteration is a single layer.
 
 // CHECK-DAG: "static_for_loop"
+// CHECK-DAG: "depth": 5
+// CHECK-DAG: "depth_type": 0
 // CHECK-DAG: "max_weight_pi4": 1
 // CHECK-DAG: "num_of_ppm": 5
 // CHECK-DAG: "pi4_ppr": 5
@@ -642,7 +645,6 @@ func.func public @static_for_loop(%arg0: !quantum.bit) {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
 
-    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.for or scf.while}}
     %q = scf.for %iter = %c0 to %c5 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
       %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
       %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
@@ -655,6 +657,8 @@ func.func public @static_for_loop(%arg0: !quantum.bit) {
 // -----
 
 // CHECK-DAG: "static_for_loop_bigstep"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
 // CHECK-DAG: "max_weight_pi4": 1
 // CHECK-DAG: "num_of_ppm": 3
 // CHECK-DAG: "pi4_ppr": 3
@@ -664,7 +668,6 @@ func.func public @static_for_loop_bigstep(%arg0: !quantum.bit) {
     %c2 = arith.constant 2 : index
     // COM: should be 3 iterations (0,2,4)
 
-    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.for or scf.while}}
     %q = scf.for %iter = %c0 to %c5 step %c2 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
       %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
       %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
@@ -676,7 +679,15 @@ func.func public @static_for_loop_bigstep(%arg0: !quantum.bit) {
 
 // -----
 
+// Nested static for-loop. Inner body = 1 layer (Z PPR + Z PPM commute).
+// Inner depth = 5 * 1 = 5. Outer body = inner (5) + 1 outer Z PPR (commutes with the
+// final Z PPM in the inner body? no, inner body was yielded; outer PPR is on the yielded
+// qubit -> a fresh layer after the loop). Outer body depth = 5 + 1 = 6.
+// Outer total = 6 * 6 = 36.
+
 // CHECK-DAG: "static_for_loop_nested"
+// CHECK-DAG: "depth": 36
+// CHECK-DAG: "depth_type": 0
 // CHECK-DAG: "max_weight_pi4": 1
 // CHECK-DAG: "max_weight_pi8": 1
 // CHECK-DAG: "num_of_ppm": 30
@@ -688,7 +699,6 @@ func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
 
-    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.for or scf.while}}
     %q = scf.for %iter = %c0 to %c6 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
 
         %q_inner = scf.for %iter_inner = %c0 to %c5 step %c1 iter_args(%arg1_inner = %arg1) -> (!quantum.bit) {
@@ -706,13 +716,18 @@ func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
 
 // -----
 
-func.func public @test_if_in_for_errors(%arg0: !quantum.bit) {
+// scf.if inside scf.for: outer trip count 2, inner body = scf.if (max(then, else) = 1).
+// Outer body depth = 1. Outer total = 2 * 1 = 2.
+
+// CHECK-DAG: "test_if_in_for_depth"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+func.func public @test_if_in_for_depth(%arg0: !quantum.bit) {
     %c0 = arith.constant 0 : index
     %c2 = arith.constant 2 : index
     %c1 = arith.constant 1 : index
     %cond = arith.constant 0 : i1
 
-    // expected-error@+1 {{worst-case depth is not available when PBC ops are inside scf.for or scf.while}}
     %q = scf.for %iter = %c0 to %c2 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
       %r = scf.if %cond -> (!quantum.bit) {
         %p = pbc.ppr ["Z"](4) %arg1 : !quantum.bit

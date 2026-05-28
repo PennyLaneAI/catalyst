@@ -38,12 +38,14 @@
   longer requires an explicit pipeline and no longer mixes MLIR into the JSON output.
   [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
 
-* The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the **worst-case quantum
-  depth** across ``scf.if`` and ``scf.index_switch`` branches:
-  ``depth(region) = layers_outside_branch + max(depth(branch_i))``. Previously branches
-  were counted sequentially.
+* The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the worst-case depth
+  across ``scf.if`` and ``scf.index_switch`` branches (taking the maximum over all branches)
+  and across statically-bounded ``scf.for`` loops (multiplied by the trip count).
+  Previously, branches were counted sequentially and PBC ops inside ``scf.for`` produced an
+  error. ``scf.while`` and dynamically-bounded ``scf.for`` still produce an error.
   [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
   [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
+  [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
 
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values
