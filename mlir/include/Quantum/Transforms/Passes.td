@@ -147,19 +147,19 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"alt-decomps",
             /*Type*/"std::string",
             /*Description*/
-            "Maps an operator to a `|` separated list of alternative decomposition "
-            "rules that will be considered alongside any built-in rules for the operator.">,
+            "Maps an operator to a list of alternative decomposition rules that will be considered"
+            " alongside any built-in rules for the operator.">,
         Option<
             /*C++ name*/"bytecodeRulesFile",
             /*CLI name*/"bytecode-rules",
             /*Type*/"std::string",
-            /*Default*/[{ "./frontend/catalyst/resources/decomposition_rules.mlirbc" }],
+            /*Default*/[{ "" }],
             /*Description*/"A path to a bytecode file of compiled decomposition rules.">,
         Option<
             /*C++ name*/"callbackPluginPath",
             /*CLI name*/"callback-plugin-path",
             /*Type*/"std::string",
-            /*Default*/[{ "../lib/libQuantumPythonCallbacks.dylib" }],
+            /*Default*/[{ "" }],
             /*Description*/"A path to the QuantumPythonCallbacks dynamic library.">,
         Option<
             /*C++ name*/"libpythonPath",
