@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Test that a RuntimeError thrown from the JIT'd setup function be caught by the wrapper.
+"""
 import pytest
 from jax.interpreters.mlir import ir
 
@@ -40,7 +43,9 @@ func.func @setup() -> () {{
     monkeypatch.setattr(gen_mlir, "gen_setup", patched_gen_setup)
 
 
-def test_setup_failure_surfaces_as_runtime_error(gen_setup_with_failing_assert):
+def test_setup_failure_surfaces_as_runtime_error(
+    gen_setup_with_failing_assert,
+):  # pylint: disable=redefined-outer-name,unused-argument
     """Test that a RuntimeError thrown from the JIT'd setup function be caught by the wrapper."""
 
     @qjit
