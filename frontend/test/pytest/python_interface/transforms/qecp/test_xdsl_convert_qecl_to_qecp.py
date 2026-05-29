@@ -1015,6 +1015,38 @@ class TestLoweringTransversalGates:
         run_filecheck(program, pipeline)
 
 
+# Mark: ApplyT
+
+class TestLoweringApplyT:
+
+    def test_apply_t_toy_code(self, run_filecheck):
+        pass
+        #ToDo
+
+    def test_apply_t_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test that the apply_T subroutine is lowered as expected for the Steane code.
+        """
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+                // CHECK: [[cb1:%.+]] = func.call @apply_T([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                %2 = func.call @apply_T(%0) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                return
+            }
+            //      CHECK: func.func private @apply_T([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
+            func.func private @apply_T(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
+                %1 = qecl.fabricate[magic] : !qecl.codeblock<1>
+                qecl.dealloc_cb %0 : !qecl.codeblock<1>
+                func.return %1 : !qecl.codeblock<1>
+            }
+        }
+        """
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+        raise RuntimeError()
+
 # MARK: Integration
 
 
@@ -1028,7 +1060,6 @@ class TestQECPLoweringIntegration:
 
         @qp.qjit(capture=True, target="mlir")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
-        @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
@@ -1076,7 +1107,6 @@ class TestQECPLoweringIntegration:
         @qp.qjit(target="mlir", capture=True)
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
-        @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
