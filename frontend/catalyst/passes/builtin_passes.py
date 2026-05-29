@@ -1424,7 +1424,7 @@ ppm_compilation = qp.transform(
 )
 
 
-def ppm_specs(fn, *, only_disjoint_qubit: bool = False):
+def ppm_specs(fn, only_disjoint_qubit: bool = False):
     r"""This function returns following Pauli product rotation (PPR) and Pauli product measurement (PPM)
     specs in a dictionary:
 
