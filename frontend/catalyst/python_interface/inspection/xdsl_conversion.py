@@ -56,13 +56,13 @@ from catalyst.python_interface.dialects.quantum import (
 from catalyst.utils.patching import Patcher
 
 if TYPE_CHECKING:
-    from jaxlib.mlir._mlir_libs._mlir.ir import Module
     from pennylane.measurements import MeasurementProcess
     from pennylane.workflow.qnode import QNode
 
 has_jax = True
 try:
     import jax
+    from jaxlib.mlir._mlir_libs._mlir.ir import Module
 except ImportError:
     has_jax = False
 
@@ -106,22 +106,28 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
     if (mlir_module := getattr(workflow, "mlir_module", None)) is not None:
         value_semantics_mlir = _quantum_opt_stderr(
             '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+            "--mlir-print-op-generic",
             stdin=str(mlir_module),
         )
-        return value_semantics_mlir
+    else:
+        if (jaxpr := getattr(workflow, "jaxpr", None)) is None:
+            jaxpr, *_ = workflow.capture(args, **kwargs)
 
-    if (jaxpr := getattr(workflow, "jaxpr", None)) is None:
-        jaxpr, *_ = workflow.capture(args, **kwargs)
+        with Patcher((workflow, "jaxpr", jaxpr)):
+            mlir_module = workflow.generate_ir()
 
-    with Patcher((workflow, "jaxpr", jaxpr)):
-        mlir_module = workflow.generate_ir()
+        value_semantics_mlir = _quantum_opt_stderr(
+            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+            "--mlir-print-op-generic",
+            stdin=str(mlir_module),
+        )
 
-    value_semantics_mlir = _quantum_opt_stderr(
-        '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
-        stdin=str(mlir_module),
-    )
-
-    return value_semantics_mlir
+    # Parse generic format value semantics mlir to a module object
+    context = mlir_module.context
+    context.allow_unregistered_dialects = True
+    with context:
+        value_semantics_mlir_module = Module.parse(value_semantics_mlir)
+    return value_semantics_mlir_module
 
 
 from_str_to_PL_gate = {
