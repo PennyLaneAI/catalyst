@@ -1,4 +1,4 @@
-#include <ostream>
+// #include <ostream>
 #include <vector>
 #include "AffineTransform.h"
 
@@ -19,7 +19,7 @@ AffineTransform AffineTransform::identity(size_t n) {
 /*.................
     Operators:
 ...................*/
-std::ostream& operator<<(std::ostream& os, const AffineTransform& trans) {
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const AffineTransform& trans) {
     for (auto it = trans.exprMatrix.begin(); it != trans.exprMatrix.end(); it++) {
         os << *it << '\n';
     }

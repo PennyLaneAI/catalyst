@@ -10,6 +10,7 @@
 #include "Quantum/IR/QuantumOps.h"
 
 #include "SymbolicAnalysis/SymbolicCircuit.h"
+// #include "SymbolicAnalysis/Term.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -27,6 +28,17 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 
     void runOnOperation() override {
         llvm::errs() << "Hello phase-folding world!\n";
+
+        SymbolicCircuit circ = SymbolicCircuit(2);
+        llvm::errs() << circ << "\n";
+
+        int l = 1;
+
+        circ.applyGateCNOT(1, 2);
+        llvm::errs() << circ << "\n";
+
+        circ.applyGateRZ(2, l++);
+        llvm::errs() << circ << "\n";
 
     }
 };

@@ -1,4 +1,4 @@
-#include <ostream>
+// #include <ostream>
 #include "Term.h"
 
 /*.................
@@ -21,7 +21,7 @@ Term Term::operator+(const Term& rhs) const {
     return res;
 }
 
-std::ostream& operator<<(std::ostream& os, const Term& term) {
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Term& term) {
     if (!term.gateRefPol_0.empty()) {
         os << "(";
         for (const GateID& gate : term.gateRefPol_0) {

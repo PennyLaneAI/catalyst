@@ -1,10 +1,12 @@
 #pragma once
 
-#include <iosfwd>
+// #include <iosfwd>
 #include <vector>
 #include <string>
 #include <utility>
 #include <functional>
+
+#include "llvm/Support/raw_ostream.h"
 
 class Parity {
 public:
@@ -27,7 +29,7 @@ public:
     Parity operator+(const Parity& rhs) const;   // XOR
 
     friend struct std::hash<Parity>;
-    friend std::ostream& operator<<(std::ostream& os, const Parity& par);
+    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Parity& par);
 
     // Checks & Inspections
     [[nodiscard]] bool isIdenticalWith(const Parity& rhs) const;

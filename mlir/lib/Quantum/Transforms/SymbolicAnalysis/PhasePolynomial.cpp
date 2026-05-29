@@ -1,4 +1,4 @@
-#include <ostream>
+// #include <ostream>
 #include "PhasePolynomial.h"
 
 /*.................
@@ -20,7 +20,7 @@ PhasePolynomial PhasePolynomial::operator+(const PhasePolynomial& rhs) const {
     return res;
 }
 
-std::ostream& operator<<(std::ostream& os, const PhasePolynomial& pp) {
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const PhasePolynomial& pp) {
     for (const auto& [key, value] : pp.poly) {
         os << key << " -> " << value << "\n";
     }

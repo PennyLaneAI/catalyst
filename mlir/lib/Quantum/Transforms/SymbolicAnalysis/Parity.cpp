@@ -1,4 +1,4 @@
-#include <ostream>
+// #include <ostream>
 #include <vector>
 #include <cassert>
 #include "Parity.h"
@@ -72,7 +72,7 @@ Parity Parity::operator+(const Parity& rhs) const {
     return res;
 }
 
-std::ostream& operator<<(std::ostream& os, const Parity& par) {
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Parity& par) {
     os << par.getLinearPartString() << " " << par.getAffineValue();
     os << "  (" << par.algebraicView() << ")";
     return os;

@@ -1,10 +1,12 @@
 #pragma once
 
-#include <iosfwd>
+// #include <iosfwd>
 #include <unordered_map>
 #include <utility>
 #include "Parity.h"
 #include "Term.h"
+
+#include "llvm/Support/raw_ostream.h"
 
 struct PhasePolynomial {
     std::unordered_map<Parity, Term> poly;   // dense_map in mlir
@@ -19,7 +21,7 @@ struct PhasePolynomial {
     PhasePolynomial& operator+=(const PhasePolynomial& rhs);
     PhasePolynomial operator+(const PhasePolynomial& rhs) const;
 
-    friend std::ostream& operator<<(std::ostream& os, const PhasePolynomial& pp);
+    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const PhasePolynomial& pp);
 
     // Methods
     void insertTerm(const Parity& parity, const Term& term);

@@ -1,9 +1,11 @@
 #pragma once
 
-#include <iosfwd>
+// #include <iosfwd>
 #include <utility>
 #include "PhasePolynomial.h"
 #include "AffineTransform.h"
+
+#include "llvm/Support/raw_ostream.h"
 
 // PathSum?
 struct SymbolicCircuit {    // indices are 1-based
@@ -22,7 +24,7 @@ struct SymbolicCircuit {    // indices are 1-based
         phasePoly(std::move(phasePoly)), affTrans(std::move(affTrans)) {}
 
     // Operators
-    friend std::ostream& operator<<(std::ostream& os, const SymbolicCircuit& circ);
+    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SymbolicCircuit& circ);
 
     // Gate Applications
     void applyGateRZ(const int qubitIndex, const GateID gateId);

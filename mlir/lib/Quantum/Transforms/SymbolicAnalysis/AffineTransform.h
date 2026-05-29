@@ -1,11 +1,13 @@
 #pragma once
 
-#include <iosfwd>
+// #include <iosfwd>
 #include <vector>
 #include <string_view>
 #include <utility>
 #include <cassert>
 #include "Parity.h"
+
+#include "llvm/Support/raw_ostream.h"
 
 class AffineTransform {
 public:
@@ -18,7 +20,7 @@ public:
     static AffineTransform identity(size_t n);
 
     // Operators
-    friend std::ostream& operator<<(std::ostream& os, const AffineTransform& trans);
+    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const AffineTransform& trans);
 
     // Getters
     [[nodiscard]] size_t getRowNum() const;

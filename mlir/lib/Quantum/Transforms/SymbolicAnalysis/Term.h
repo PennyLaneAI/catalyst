@@ -1,8 +1,10 @@
 #pragma once
 
-#include <iosfwd>
+// #include <iosfwd>
 #include <vector>
 #include <utility>
+
+#include "llvm/Support/raw_ostream.h"
 
 using GateID = int; // pointer to gates in catalyst! UID in Catalyst or needs a preprocessing for putting this location enumerators. (It's Loc in feynman and l in thesis)
 
@@ -24,5 +26,5 @@ struct Term {
     Term& operator+=(const Term& rhs);
     Term operator+(const Term& rhs) const;
 
-    friend std::ostream& operator<<(std::ostream& os, const Term& term);
+    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Term& term);
 };
