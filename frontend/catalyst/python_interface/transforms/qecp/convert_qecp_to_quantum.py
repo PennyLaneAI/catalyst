@@ -286,6 +286,7 @@ class UnrollEncodeLoop(RewritePattern):
 
 # MARK: Conversion Pass
 
+
 @dataclass(frozen=True)
 class ConvertQecPhysicalToQuantumPass(ModulePass):
     """
