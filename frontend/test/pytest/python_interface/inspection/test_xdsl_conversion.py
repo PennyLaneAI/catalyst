@@ -15,6 +15,7 @@
 
 import pennylane as qp
 import pytest
+from jaxlib.mlir._mlir_libs._mlir.ir import Module
 
 from catalyst.python_interface.inspection.xdsl_conversion import get_mlir_module
 
@@ -35,7 +36,7 @@ class TestGetMLIRModule:
             return qp.expval(qp.Z(0))
 
         module = get_mlir_module(my_workflow, (), {})
-        assert isinstance(module, str)
+        assert isinstance(module, Module)
 
     def test_standard_circuit_with_args_kwargs(self):
         """Tests a standard circuit with args and kwargs."""
@@ -48,7 +49,7 @@ class TestGetMLIRModule:
             return qp.expval(qp.Z(0))
 
         module = get_mlir_module(my_workflow, (3.14,), {"wires": [0]})
-        assert isinstance(module, str)
+        assert isinstance(module, Module)
 
     def test_circuit_with_no_return(self):
         """Tests a standard circuit with no return."""
@@ -60,7 +61,7 @@ class TestGetMLIRModule:
             qp.X(wire)
 
         module = get_mlir_module(my_workflow, (1,), {})
-        assert isinstance(module, str)
+        assert isinstance(module, Module)
 
     def test_compile_options_not_mutated(self):
         """Ensures that the QJIT'd qnode's compile options are not mutable."""
