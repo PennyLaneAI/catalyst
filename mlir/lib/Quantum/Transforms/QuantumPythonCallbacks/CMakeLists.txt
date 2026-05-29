@@ -70,7 +70,7 @@ target_include_directories(QuantumPythonCallbacks PUBLIC
 
 set_target_properties(QuantumPythonCallbacks PROPERTIES
     PREFIX "lib"
-    LIBRARY_OUTPUT_DIRECTORY "${MLIR_BINARY_DIR}/lib"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
 # Install next to the catalyst binary
