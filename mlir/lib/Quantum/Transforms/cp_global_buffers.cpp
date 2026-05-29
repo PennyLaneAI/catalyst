@@ -112,9 +112,9 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
  */
 void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewriter)
 {
-    if (getReturnMemRefs(op).empty())
+    if (getReturnMemRefs(op).empty()) {
         return;
-
+    }
     auto operands = op.getOperands();
 
     LLVMTypeConverter typeConverter(rewriter.getContext());
