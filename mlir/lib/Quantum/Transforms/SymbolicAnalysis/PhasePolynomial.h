@@ -1,0 +1,26 @@
+#pragma once
+
+#include <iosfwd>
+#include <unordered_map>
+#include <utility>
+#include "Parity.h"
+#include "Term.h"
+
+struct PhasePolynomial {
+    std::unordered_map<Parity, Term> poly;   // dense_map in mlir
+    // bots are not seperated and duplicate!
+
+    // Constructors
+    PhasePolynomial() = default;
+    PhasePolynomial(std::unordered_map<Parity, Term> poly) :
+        poly(std::move(poly)) {}
+
+    // Operators
+    PhasePolynomial& operator+=(const PhasePolynomial& rhs);
+    PhasePolynomial operator+(const PhasePolynomial& rhs) const;
+
+    friend std::ostream& operator<<(std::ostream& os, const PhasePolynomial& pp);
+
+    // Methods
+    void insertTerm(const Parity& parity, const Term& term);
+};

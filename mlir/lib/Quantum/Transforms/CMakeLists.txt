@@ -30,6 +30,17 @@ file(GLOB SRC
     IonsDecompositionPatterns.cpp
     loop_boundary_optimization.cpp
     LoopBoundaryOptimizationPatterns.cpp
+    phase_folding.cpp
+    SymbolicAnalysis/Term.h
+    SymbolicAnalysis/Term.cpp
+    SymbolicAnalysis/Parity.h
+    SymbolicAnalysis/Parity.cpp
+    SymbolicAnalysis/PhasePolynomial.h
+    SymbolicAnalysis/PhasePolynomial.cpp
+    SymbolicAnalysis/AffineTransform.h
+    SymbolicAnalysis/AffineTransform.cpp
+    SymbolicAnalysis/SymbolicCircuit.h
+    SymbolicAnalysis/SymbolicCircuit.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

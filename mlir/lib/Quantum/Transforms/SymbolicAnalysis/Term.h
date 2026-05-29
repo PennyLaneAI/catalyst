@@ -1,0 +1,28 @@
+#pragma once
+
+#include <iosfwd>
+#include <vector>
+#include <utility>
+
+using GateID = int; // pointer to gates in catalyst! UID in Catalyst or needs a preprocessing for putting this location enumerators. (It's Loc in feynman and l in thesis)
+
+struct Term {
+    std::vector<GateID> gateRefPol_0;    // small_vector in mlir
+    std::vector<GateID> gateRefPol_1;
+
+    // Constructors
+    Term() = default;
+    Term(const GateID* gates_0, size_t n_0, const GateID* gates_1, size_t n_1) :
+        gateRefPol_0(gates_0, gates_0 + n_0), 
+        gateRefPol_1(gates_1, gates_1 + n_1) {}
+    Term(std::vector<GateID> v0, std::vector<GateID> v1) :
+        gateRefPol_0(std::move(v0)), gateRefPol_1(std::move(v1)) {}
+    Term(GateID gate, bool pol) 
+        { (pol ? gateRefPol_1 : gateRefPol_0).push_back(gate); }
+
+    // Operators
+    Term& operator+=(const Term& rhs);
+    Term operator+(const Term& rhs) const;
+
+    friend std::ostream& operator<<(std::ostream& os, const Term& term);
+};
