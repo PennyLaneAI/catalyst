@@ -32,7 +32,7 @@ from catalyst.python_interface.transforms.qecp import (
 from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 from catalyst.utils.exceptions import CompileError
 
-# pylint: disable=line-too-long
+# pylint: disable=line-too-long,too-many-lines
 
 
 pytestmark = pytest.mark.xdsl

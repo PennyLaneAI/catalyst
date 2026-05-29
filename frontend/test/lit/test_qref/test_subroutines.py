@@ -20,20 +20,22 @@ Unit tests for lowering subroutines to reference semantics MLIR during PLxPR con
 
 # pylint: disable=line-too-long
 
-import numpy as np
 import pennylane as qp
 
 
 @qp.capture.subroutine
-def basic_subroutine(x, y, wires):
+def basic_subroutine(x, y, wires):  # pylint: disable=missing-function-docstring
     qp.RX(x, wires=wires[0])
     qp.RY(y, wires=wires[1])
 
 
-# CHECK: func.func public @test_basic_subroutine(%arg0: tensor<i64>) -> tensor<f64>
+# CHECK: func.func public @test_basic_subroutine() -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
-def test_basic_subroutine(i: int):
+def test_basic_subroutine():
+    """
+    Test basic subroutine.
+    """
     # CHECK-DAG: [[zero:%.+]] = stablehlo.constant dense<0> : tensor<i64>
     # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
     # CHECK-DAG: [[two:%.+]] = stablehlo.constant dense<2> : tensor<i64>
@@ -67,16 +69,19 @@ print(test_basic_subroutine.mlir)
 
 
 @qp.capture.subroutine
-def subroutine_with_return(x, y, wires):
+def subroutine_with_return(x, y, wires):  # pylint: disable=missing-function-docstring
     qp.RX(x, wires=wires[0])
     qp.RY(y, wires=wires[1])
     return x + y
 
 
-# CHECK: func.func public @test_subroutine_with_return(%arg0: tensor<i64>) -> tensor<f64>
+# CHECK: func.func public @test_subroutine_with_return() -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
-def test_subroutine_with_return(i: int):
+def test_subroutine_with_return():
+    """
+    Test when subroutine returns (classical) outputs.
+    """
     # CHECK-DAG: [[zero:%.+]] = stablehlo.constant dense<0> : tensor<i64>
     # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
     # CHECK-DAG: [[point_one:%.+]] = stablehlo.constant dense<1.000000e-01> : tensor<f64>
@@ -112,15 +117,18 @@ print(test_subroutine_with_return.mlir)
 
 
 @qp.capture.subroutine
-def subroutine_with_allocation(wires):
+def subroutine_with_allocation(wires):  # pylint: disable=missing-function-docstring
     with qp.allocate(1) as q:
         qp.Toffoli(wires=[q[0], *wires])
 
 
-# CHECK: func.func public @test_subroutine_with_allocation(%arg0: tensor<i64>) -> tensor<f64>
+# CHECK: func.func public @test_subroutine_with_allocation() -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
-def test_subroutine_with_allocation(i: int):
+def test_subroutine_with_allocation():
+    """
+    Test subroutines with qubit allocation.
+    """
     # CHECK-DAG: [[zero:%.+]] = stablehlo.constant dense<0> : tensor<i64>
     # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
 

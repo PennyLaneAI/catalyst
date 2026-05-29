@@ -307,7 +307,8 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
         TODO: We might come back to update the logic below to support 1-logical qubit circuits,
         where there is no ForOp encoding loop in the IR.
         """
-        # Step 1: Unroll encoding loops and ensure the quantum.node op body contains no nested regions.
+        # Step 1: Unroll encoding loops and ensure the quantum.node op body contains no
+        # nested regions.
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [UnrollEncodeLoop()],

@@ -31,7 +31,7 @@ from catalyst.python_interface.parser import QuantumParser
 from catalyst.python_interface.pass_api import ApplyTransformSequencePass
 
 
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods, protected-access
 class Compiler:
     """Compiler namespace"""
 
