@@ -39,11 +39,9 @@ std::atomic<bool> resolutionAttempted{false};
 
 using RegisterFn = void (*)();
 
-#if defined(__APPLE__)
-constexpr const char *kPluginFileName = "libQuantumPythonCallbacks.dylib";
-#else
-constexpr const char *kPluginFileName = "libQuantumPythonCallbacks.so";
-#endif
+static const std::vector<std::string> kAlternativePluginNames = {
+    "libQuantumPythonCallbacks.so", "libQuantumPythonCallbacks.dylib",
+    "libQuantumPythonCallbacks.abi3.so", "libQuantumPythonCallbacks.abi3.dylib"};
 
 // Resolve the plugin path. Search order:
 // 1. $CATALYST_PYTHON_CALLBACK_PLUGIN (explicit override).
@@ -56,14 +54,30 @@ std::string resolvePluginPath(std::string callbackPluginPath)
         return *override_;
     }
 
-    llvm::SmallString<128> inputPath(callbackPluginPath);
-    if (llvm::sys::fs::exists(inputPath)) {
-        if (llvm::sys::fs::is_directory(inputPath)) {
-            llvm::sys::path::append(inputPath, kPluginFileName);
+    auto checkCandidate = [](llvm::SmallString<256> &path) -> std::string {
+        if (!llvm::sys::fs::exists(path)) {
+            return {};
         }
-        LDBG(2) << "Found libQuantumPythonCallbacks path from function parameter:" << inputPath
+
+        if (llvm::sys::fs::is_directory(path)) {
+            for (const auto &name : kAlternativePluginNames) {
+                llvm::SmallString<256> candidate(path);
+                llvm::sys::path::append(candidate, name);
+                if (llvm::sys::fs::exists(candidate)) {
+                    return std::string(candidate);
+                }
+            }
+            return {};
+        }
+        return std::string(path);
+    };
+
+    llvm::SmallString<256> inputPath(callbackPluginPath);
+    std::string result = checkCandidate(inputPath);
+    if (!result.empty()) {
+        LDBG(2) << "Found libQuantumPythonCallbacks path from function parameter:" << result
                 << "\n";
-        return std::string(inputPath);
+        return result;
     }
 
     std::string exe = llvm::sys::fs::getMainExecutable(nullptr, nullptr);
@@ -74,10 +88,11 @@ std::string resolvePluginPath(std::string callbackPluginPath)
     llvm::sys::path::remove_filename(exeDir);
 
     for (llvm::StringRef rel : {"../lib", "."}) {
-        llvm::SmallString<256> candidate(exeDir);
-        llvm::sys::path::append(candidate, rel, kPluginFileName);
-        if (llvm::sys::fs::exists(candidate)) {
-            return std::string(candidate);
+        llvm::SmallString<256> base(exeDir);
+        llvm::sys::path::append(base, rel);
+        result = checkCandidate(base);
+        if (!result.empty()) {
+            return result;
         }
     }
     return {};
@@ -104,7 +119,8 @@ bool tryLoadLibpython(llvm::StringRef where)
 //   1. $CATALYST_LIBPYTHON: explicit user override (any deployment)
 //   2. function parameter
 //   3. CATALYST_LIBPYTHON_PATH: absolute path the configure-time Python uses
-//   4. CATALYST_LIBPYTHON_SONAME: bare SONAME via the dynamic loader search (manylinux wheels)
+//   4. CATALYST_LIBPYTHON_SONAME: bare SONAME via the dynamic loader search
+//   (manylinux wheels)
 void ensureLibpythonLoaded(std::string libpythonPath)
 {
     if (auto over = llvm::sys::Process::GetEnv("CATALYST_LIBPYTHON")) {
@@ -126,9 +142,9 @@ void ensureLibpythonLoaded(std::string libpythonPath)
     if (tryLoadLibpython(CATALYST_LIBPYTHON_SONAME))
         return;
 #endif
-    llvm::errs()
-        << "[decomp-callbacks-loader] libpython could not be resolved, the plugin will likely "
-           "fail with undefined symbols.\n";
+    llvm::errs() << "[decomp-callbacks-loader] libpython could not be resolved, "
+                    "the plugin will likely "
+                    "fail with undefined symbols.\n";
 }
 
 RegisterFn loadAndResolve(std::string callbackPluginPath, std::string libpythonPath)
@@ -142,7 +158,8 @@ RegisterFn loadAndResolve(std::string callbackPluginPath, std::string libpythonP
 
     ensureLibpythonLoaded(libpythonPath);
 
-    // Open with RTLD_GLOBAL so nanobind's internals map to Python's runtime memory space
+    // Open with RTLD_GLOBAL so nanobind's internals map to Python's runtime
+    // memory space
     void *libHandle = ::dlopen(path.c_str(), RTLD_GLOBAL | RTLD_LAZY);
     if (!libHandle) {
         llvm::errs() << "[decomp-callbacks-loader] dlopen('" << path << "') failed: " << ::dlerror()
