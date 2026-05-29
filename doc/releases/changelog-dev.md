@@ -44,6 +44,9 @@
   to tracing errors.
   [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
 
+* Dynamically allocated wires can now be used in quantum adjoints.
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
