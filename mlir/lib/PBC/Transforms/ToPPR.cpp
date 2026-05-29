@@ -257,17 +257,14 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
     return success();
 }
 
-LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewriter)
+LogicalResult convertRotationLikeGate(Operation *op, Value angleValue, ArrayAttr pauliProduct,
+                                      ValueRange inQubits, bool isAdjoint,
+                                      ConversionPatternRewriter &rewriter)
 {
-    auto loc = op.getLoc();
+    Location loc = op->getLoc();
+    SmallVector<Type> outQubitTypes{inQubits.size(), QubitType::get(rewriter.getContext())};
 
-    auto angleValue = op.getAngle();
-    auto pauliProduct = op.getPauliProduct();
-    auto inQubits = op.getInQubits();
-    auto outQubitTypes = op.getOutQubits().getType();
-
-    auto angleOpt = resolveConstant(angleValue);
-
+    std::optional<double> angleOpt = resolveConstant(angleValue);
     if (angleOpt.has_value()) {
         constexpr double PI = llvm::numbers::pi;
         constexpr double SPECIFIC_ANGLES[6] = {PI / 2, PI / 4, PI / 8, -PI / 8, -PI / 4, -PI / 2};
@@ -277,25 +274,25 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
         // and we assume the angles have magnitudes on the order of pi.
         constexpr double TOLERANCE = 1e-12;
 
-        auto paulirot_angle = angleOpt.value();
-        auto ppr_angle = paulirot_angle / 2;
-
-        auto angle = std::fmod(ppr_angle, PI);
+        double pprAngle = angleOpt.value() / 2;
+        double angle = std::fmod(pprAngle, PI);
 
         if (std::abs(angle) < TOLERANCE || PI - std::abs(angle) < TOLERANCE) {
-            // If the angle is 0 or pi, we can just erase the PauliRotOp.
+            // If the angle is 0 or pi, we can just erase the operation.
             rewriter.replaceOp(op, inQubits);
             return success();
         }
 
-        for (auto [i, specific_angle] : llvm::enumerate(SPECIFIC_ANGLES)) {
-            if (std::abs(angle - specific_angle) < TOLERANCE) {
+        for (auto [i, specificAngle] : llvm::enumerate(SPECIFIC_ANGLES)) {
+            if (std::abs(angle - specificAngle) < TOLERANCE) {
                 int8_t rotationKind = SPECIFIC_DENOMINATORS[i];
-                if (op.getAdjoint()) {
+                if (isAdjoint) {
                     rotationKind = -rotationKind;
                 }
+
                 auto pprOp =
                     PPRotationOp::create(rewriter, loc, pauliProduct, rotationKind, inQubits);
+
                 rewriter.replaceOp(op, pprOp.getOutQubits());
                 return success();
             }
@@ -303,22 +300,21 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
     }
 
     // Angle is not static or not a multiple of π/8, consider this as an arbitrary angle PPR.
-    Value constResult;
-    if (op.getAdjoint()) {
-        constResult =
-            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(-2.0)).getResult();
-    }
-    else {
-        constResult =
-            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)).getResult();
-    }
-    auto result = arith::DivFOp::create(rewriter, loc, angleValue, constResult).getResult();
-    auto pprArbitraryOp =
-        PPRotationArbitraryOp::create(rewriter, loc, outQubitTypes, pauliProduct, result, inQubits);
+    Value denominator =
+        arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(isAdjoint ? -2.0 : 2.0));
+    auto arbitraryAngle = arith::DivFOp::create(rewriter, loc, angleValue, denominator).getResult();
+
+    auto pprArbitraryOp = PPRotationArbitraryOp::create(rewriter, loc, outQubitTypes, pauliProduct,
+                                                        arbitraryAngle, inQubits);
 
     rewriter.replaceOp(op, pprArbitraryOp.getOutQubits());
-
     return success();
+}
+
+LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewriter)
+{
+    return convertRotationLikeGate(op, op.getAngle(), op.getPauliProduct(), op.getInQubits(),
+                                   op.getAdjoint(), rewriter);
 }
 
 LogicalResult convertMeasureZ(MeasureOp op, ConversionPatternRewriter &rewriter)
@@ -340,8 +336,7 @@ struct PBCOpLowering : public ConversionPattern {
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final
     {
-        // cast to OriginOp
-        if (auto originOp = dyn_cast_or_null<CustomOp>(op)) {
+        if (auto originOp = dyn_cast<CustomOp>(op)) {
             switch (hashGate(originOp)) {
             case GateEnum::H:
                 return convertHGate(originOp, rewriter);
@@ -366,10 +361,10 @@ struct PBCOpLowering : public ConversionPattern {
             }
             }
         }
-        else if (auto originOp = dyn_cast_or_null<PauliRotOp>(op)) {
+        else if (auto originOp = dyn_cast<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
         }
-        else if (auto originOp = dyn_cast_or_null<MeasureOp>(op)) {
+        else if (auto originOp = dyn_cast<MeasureOp>(op)) {
             return convertMeasureZ(originOp, rewriter);
         }
         op->emitError("Unsupported operation. Supported operations: CustomOp, MeasureOp");
