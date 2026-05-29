@@ -57,6 +57,7 @@ from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 # yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
 # once JAX updates to a compatible MLIR version
 # pylint: disable=ungrouped-imports
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.utils.patching import Patcher
 
@@ -118,6 +119,7 @@ with Patcher(
         SetBasisStateOp,
         SetStateOp,
         StateOp,
+        TemplateOp,
         TensorOp,
         VarianceOp,
     )
@@ -356,6 +358,64 @@ measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
 decomprule_p = core.Primitive("decomposition_rule")
 decomprule_p.multiple_results = True
+template_p = Primitive("template")
+
+
+@template_p.def_impl
+def _template_impl(*args, template_name, dyn_argnames, wire_argnames, ctrl, adjoint, **kwargs):
+    raise ValueError("No impl.")
+
+
+@template_p.def_abstract_eval
+def _template_aval(*_, **__):
+    return AbstractQreg()
+
+
+def _template_lowering(
+    ctx, *args, template_name, dyn_argnames, wire_argnames, ctrl=False, adjoint=False, **kwargs
+):
+    inputs = args[: len(dyn_argnames)]
+    wire_args = args[len(dyn_argnames) : len(dyn_argnames) + len(wire_argnames)]
+
+    ctrl_inds = args[-3] if ctrl else None
+    ctrl_vals = args[-2] if ctrl else None
+    in_qreg = args[-1]
+
+    out_qreg_type = in_qreg.type
+
+    param_map = {}
+    for i, d in enumerate(dyn_argnames):
+        param_map[d] = (i,)
+
+    in_qubits_map = {}
+    for i, w in enumerate(wire_argnames):
+        in_qubits_map[w] = (i,)
+
+    static_data = {k: v for k, v in kwargs.items() if v is not None}
+
+    template_name = get_mlir_attribute_from_pyval(template_name)
+    param_map = get_mlir_attribute_from_pyval(param_map)
+    in_qubits_map = get_mlir_attribute_from_pyval(in_qubits_map)
+    static_data = get_mlir_attribute_from_pyval(static_data)
+
+    attrs = {}
+    if static_data:
+        attrs["static_data"] = static_data
+    if param_map:
+        attrs["param_map"] = param_map
+
+    return TemplateOp(
+        template_name=template_name,
+        inputs=inputs,
+        in_qreg=in_qreg,
+        qubit_inds=wire_args,
+        in_ctrl_inds=ctrl_inds,
+        in_ctrl_vals=ctrl_vals,
+        adjoint=adjoint,
+        in_qubits_map=in_qubits_map,
+        out_qreg=out_qreg_type,
+        **attrs,
+    ).results
 
 
 def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, op_type=None):
@@ -3044,10 +3104,13 @@ def subroutine_lowering(*args, **kwargs):
         retval = _pjit_lowering(*args, **kwargs)
     except NotImplementedError as e:
         if "MLIR translation rule for primitive" in str(e):
-            msg = str(e) + """
+            msg = (
+                str(e)
+                + """
                 This error sometimes occurs when using quantum operations
                 inside subroutines but calling them outside a qnode
             """
+            )
             raise NotImplementedError(msg) from e
         raise e
 
@@ -3109,6 +3172,7 @@ CUSTOM_LOWERING_RULES = (
     (quantum_subroutine_prim, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
     (decomprule_p, _decomposition_rule_lowering),
+    (template_p, _template_lowering),
 )
 
 
