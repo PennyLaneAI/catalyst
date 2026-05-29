@@ -95,7 +95,7 @@ func.func public @test_clifford_t_to_ppr_1() -> (tensor<i1>, tensor<i1>) {
 
 func.func @test_clifford_t_to_ppr_2(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     // expected-error @+1 {{failed to legalize operation 'quantum.custom' that was explicitly marked illegal}}
-    %0 = quantum.custom "SOME_UNKNOWN_GATE"() %q1 : !quantum.bit // expected-error @+0 {{Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, I, and CNOT}}
+    %0 = quantum.custom "SOME_UNKNOWN_GATE"() %q1 : !quantum.bit // expected-error @+0 {{Unsupported gate. Supported gates: }}
     %1 = quantum.custom "S"() %0 : !quantum.bit
     %2 = quantum.custom "T"() %1 : !quantum.bit
     %3:2 = quantum.custom "CNOT"() %2, %q2 : !quantum.bit, !quantum.bit
@@ -164,4 +164,73 @@ func.func @test_arbitrary_pauli_rot_to_ppr_2(%q1 : !quantum.bit, %q2 : !quantum.
     // CHECK-NOT: quantum.paulirot
     // CHECK-NOT: pbc.ppr.arbitrary
     func.return
+}
+
+// -----
+
+func.func @test_parametrized_gate_fixed_angles_to_ppr(%q0 : !quantum.bit, %q1 : !quantum.bit,%q2 : !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    %cst = stablehlo.constant dense<3.1415926535897931> : tensor<f64>
+    %theta = tensor.extract %cst[] : tensor<f64>
+    %rx = quantum.custom "RX"(%theta) %q0 : !quantum.bit
+    %ry = quantum.custom "RY"(%theta) %rx : !quantum.bit
+    %rz = quantum.custom "RZ"(%theta) %ry : !quantum.bit
+    %xx:2 = quantum.custom "IsingXX"(%theta) %rz, %q1 : !quantum.bit, !quantum.bit
+    %yy:2 = quantum.custom "IsingYY"(%theta) %xx#0, %xx#1 : !quantum.bit, !quantum.bit
+    %zz:2 = quantum.custom "IsingZZ"(%theta) %yy#0, %yy#1 : !quantum.bit, !quantum.bit
+    %mrz:3 = quantum.multirz(%theta) %zz#0, %zz#1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+    func.return %mrz#0, %mrz#1, %mrz#2 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK-NOT: quantum.custom
+    // CHECK: [[RX:%.+]] = pbc.ppr ["X"](2) [[q0:%.+]]
+    // CHECK: [[RY:%.+]] = pbc.ppr ["Y"](2) [[RX]]
+    // CHECK: [[RZ:%.+]] = pbc.ppr ["Z"](2) [[RY]]
+    // CHECK: [[XX:%.+]]:2 = pbc.ppr ["X", "X"](2) [[RZ]], [[q1:%.+]]
+    // CHECK: [[YY:%.+]]:2 = pbc.ppr ["Y", "Y"](2) [[XX]]#0, [[XX]]#1
+    // CHECK: [[ZZ:%.+]]:2 = pbc.ppr ["Z", "Z"](2) [[YY]]#0, [[YY]]#1
+    // CHECK: [[MRZ:%.+]]:3 = pbc.ppr ["Z", "Z", "Z"](2) [[ZZ]]#0, [[ZZ]]#1, [[q2:%.+]]
+}
+
+// -----
+
+func.func @test_parametrized_gate_arbitrary_angles_to_ppr(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+    %cst = stablehlo.constant dense<0.42> : tensor<f64>
+    %theta = tensor.extract %cst[] : tensor<f64>
+    %rx = quantum.custom "RX"(%theta) %q0 {adjoint} : !quantum.bit
+    %ry = quantum.custom "RY"(%theta) %rx : !quantum.bit
+    %rz = quantum.custom "RZ"(%theta) %ry : !quantum.bit
+    %xx:2 = quantum.custom "IsingXX"(%theta) %rz, %q1 : !quantum.bit, !quantum.bit
+    %yy:2 = quantum.custom "IsingYY"(%theta) %xx#0, %xx#1 : !quantum.bit, !quantum.bit
+    %zz:2 = quantum.custom "IsingZZ"(%theta) %yy#0, %yy#1 : !quantum.bit, !quantum.bit
+    %mrz:2 = quantum.multirz(%theta) %zz#0, %zz#1 : !quantum.bit, !quantum.bit
+    func.return %mrz#0, %mrz#1 : !quantum.bit, !quantum.bit
+
+    // CHECK-DAG: [[NEG:%.+]] = arith.constant -2.100000e-01 : f64
+    // CHECK-DAG: [[POS:%.+]] = arith.constant 2.100000e-01 : f64
+    // CHECK: [[RX:%.+]] = pbc.ppr.arbitrary ["X"]([[NEG]]) [[q0:%.+]]
+    // CHECK: [[RY:%.+]] = pbc.ppr.arbitrary ["Y"]([[POS]]) [[RX]]
+    // CHECK: [[RZ:%.+]] = pbc.ppr.arbitrary ["Z"]([[POS]]) [[RY]]
+    // CHECK: [[XX:%.+]]:2 = pbc.ppr.arbitrary ["X", "X"]([[POS]]) [[RZ]], [[q1:%.+]]
+    // CHECK: [[YY:%.+]]:2 = pbc.ppr.arbitrary ["Y", "Y"]([[POS]]) [[XX]]#0, [[XX]]#1
+    // CHECK: [[ZZ:%.+]]:2 = pbc.ppr.arbitrary ["Z", "Z"]([[POS]]) [[YY]]#0, [[YY]]#1
+    // CHECK: [[MRZ:%.+]]:2 = pbc.ppr.arbitrary ["Z", "Z"]([[POS]]) [[ZZ]]#0, [[ZZ]]#1
+}
+
+// -----
+
+func.func @test_parametrized_gate_identity_angle_elision_to_ppr(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+    %cst = stablehlo.constant dense<0.0> : tensor<f64>
+    %theta = tensor.extract %cst[] : tensor<f64>
+    %rx = quantum.custom "RX"(%theta) %q0 : !quantum.bit
+    %ry = quantum.custom "RY"(%theta) %rx : !quantum.bit
+    %rz = quantum.custom "RZ"(%theta) %ry : !quantum.bit
+    %xx:2 = quantum.custom "IsingXX"(%theta) %rz, %q1 : !quantum.bit, !quantum.bit
+    %yy:2 = quantum.custom "IsingYY"(%theta) %xx#0, %xx#1 : !quantum.bit, !quantum.bit
+    %zz:2 = quantum.custom "IsingZZ"(%theta) %yy#0, %yy#1 : !quantum.bit, !quantum.bit
+    %mrz:2 = quantum.multirz(%theta) %zz#0, %zz#1 : !quantum.bit, !quantum.bit
+    func.return %mrz#0, %mrz#1 : !quantum.bit, !quantum.bit
+
+    // CHECK-NOT: quantum.custom
+    // CHECK-NOT: quantum.multirz
+    // CHECK-NOT: pbc.ppr
+    // CHECK: return
 }
