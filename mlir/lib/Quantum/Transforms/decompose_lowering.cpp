@@ -47,6 +47,8 @@ namespace quantum {
 namespace DecompUtils {
 
 static constexpr StringRef target_gate_attr_name = "target_gate";
+static constexpr StringRef num_wires_attr_name = "num_wires";
+static constexpr StringRef pauli_word_attr_name = "pauli_word";
 static constexpr StringRef decomp_gateset_attr_name = "decomp_gateset";
 
 // Check if a function is a decomposition function
@@ -66,10 +68,18 @@ StringRef getTargetGateName(func::FuncOp func)
 
 uint64_t getNumWires(func::FuncOp func)
 {
-    if (auto num_wires_attr = func->getAttrOfType<IntegerAttr>("num_wires")) {
+    if (auto num_wires_attr = func->getAttrOfType<IntegerAttr>(num_wires_attr_name)) {
         return num_wires_attr.getValue().getZExtValue();
     }
     return 0;
+}
+
+StringRef getPauliWord(func::FuncOp func)
+{
+    if (auto pauli_word_attr = func->getAttrOfType<StringAttr>(pauli_word_attr_name)) {
+        return pauli_word_attr.getValue();
+    }
+    return StringRef{};
 }
 
 } // namespace DecompUtils
@@ -108,6 +118,16 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
                         targetOp.str() + "_" + std::to_string(DecompUtils::getNumWires(func));
 
                     decompositionRegistry[newTargetOpStr] = func;
+                }
+                else if (targetOp == "PauliRot") {
+                    // Create a new target op name with the number of wires and the Pauli word
+                    StringRef pauliWord = DecompUtils::getPauliWord(func);
+                    if (!pauliWord.empty()) {
+                        std::string newTargetOpStr =
+                            targetOp.str() + "_" + std::to_string(DecompUtils::getNumWires(func)) +
+                            "_" + pauliWord.str();
+                        decompositionRegistry[newTargetOpStr] = func;
+                    }
                 }
                 else {
                     decompositionRegistry[targetOp] = func;
