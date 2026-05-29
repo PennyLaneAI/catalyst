@@ -411,27 +411,19 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
                                    op.getAdjoint(), rewriter);
 }
 
-LogicalResult convertMeasureZ(MeasureOp op, ConversionPatternRewriter &rewriter)
-{
-    return convertMeasureOpToPPM(op, "Z", rewriter);
-}
-
 //===----------------------------------------------------------------------===//
 //                       PBC Lowering Patterns
 //===----------------------------------------------------------------------===//
 
-template <typename OriginOp, typename LoweredPBCOp>
-struct PBCOpLowering : public ConversionPattern {
-    PBCOpLowering(MLIRContext *context)
-        : ConversionPattern(OriginOp::getOperationName(), 1, context)
-    {
-    }
+struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
+    using OpInterfaceConversionPattern::OpInterfaceConversionPattern;
 
-    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+    LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final
     {
         StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, "
                                    "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
+        Operation *op = operation.getOperation();
 
         if (auto gateLikeOp = dyn_cast<QuantumGate>(op)) {
             if (!gateLikeOp.getCtrlQubitOperands().empty()) {
@@ -479,18 +471,20 @@ struct PBCOpLowering : public ConversionPattern {
         else if (auto originOp = dyn_cast<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
         }
-        else if (auto originOp = dyn_cast<MeasureOp>(op)) {
-            return convertMeasureZ(originOp, rewriter);
-        }
 
         return op->emitError("Unsupported operation for PBC conversion. " + supportedGates);
     }
 };
 
-using CustomOpLowering = PBCOpLowering<quantum::CustomOp, pbc::PPRotationOp>;
-using MultiRZOpLowering = PBCOpLowering<quantum::MultiRZOp, pbc::PPRotationOp>;
-using PauliRotOpLowering = PBCOpLowering<quantum::PauliRotOp, pbc::PPRotationOp>;
-using MeasureOpLowering = PBCOpLowering<quantum::MeasureOp, pbc::PPMeasurementOp>;
+struct PBCMeasureLowering : public OpConversionPattern<MeasureOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(MeasureOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const final
+    {
+        return convertMeasureOpToPPM(op, "Z", rewriter);
+    }
+};
 
 } // namespace
 
@@ -499,10 +493,8 @@ namespace pbc {
 
 void populateToPPRPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<CustomOpLowering>(patterns.getContext());
-    patterns.add<MultiRZOpLowering>(patterns.getContext());
-    patterns.add<PauliRotOpLowering>(patterns.getContext());
-    patterns.add<MeasureOpLowering>(patterns.getContext());
+    patterns.add<PBCGateLowering>(patterns.getContext());
+    patterns.add<PBCMeasureLowering>(patterns.getContext());
 }
 
 } // namespace pbc

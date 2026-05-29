@@ -115,6 +115,15 @@ func.func @test_controlled_gate_to_ppr_unsupported(%q0 : !quantum.bit, %q1 : !qu
 
 // -----
 
+func.func @test_unsupported_operation_to_ppr(%q : !quantum.bit,
+                                            %u : memref<2x2xcomplex<f64>>) {
+    // expected-error @+1 {{failed to legalize operation 'quantum.unitary' that was explicitly marked illegal}}
+    %out = quantum.unitary(%u : memref<2x2xcomplex<f64>>) %q : !quantum.bit // expected-error @+0 {{Unsupported operation for PBC conversion. Supported gates: }}
+    func.return
+}
+
+// -----
+
 func.func @test_clifford_t_to_ppr_3(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     %0 = quantum.custom "PauliX"() %q1 : !quantum.bit
     %1 = quantum.custom "PauliY"() %0 : !quantum.bit
