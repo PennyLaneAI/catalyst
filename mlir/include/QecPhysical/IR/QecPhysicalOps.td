@@ -278,6 +278,10 @@ def HadamardOp : SingleQubitPhysicalGate_Op<"hadamard", [AllTypesMatch<["in_qubi
     let summary = "A physical Hadamard gate operation.";
 }
 
+def TOp : SingleQubitPhysicalGate_Op<"t", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical T gate operation.";
+}
+
 def SOp : SingleQubitPhysicalGate_Op<"s", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     let summary = "A physical S (π/2 phase) gate operation.";
 }
