@@ -284,6 +284,8 @@ class UnrollEncodeLoop(RewritePattern):
                 rewriter.erase_op(op)
 
 
+# MARK: Conversion Pass
+
 @dataclass(frozen=True)
 class ConvertQecPhysicalToQuantumPass(ModulePass):
     """
@@ -335,8 +337,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                             quantum_op.codeblock.replace_all_uses_with(regs[idx])
                         case qecp.InsertCodeblockOp():
                             qecp_ops_to_remove.append(quantum_op)
-                            idx = resolve_constant_params(quantum_op.idx)
-                            dealloc = quantum.DeallocOp(regs[idx])
+                            dealloc = quantum.DeallocOp(quantum_op.codeblock)
                             rewriter.insert_op(dealloc)
                             quantum_op.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
                         case qecp.DeallocOp():
@@ -345,6 +346,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                 for quantum_op in reversed(qecp_ops_to_remove):
                     rewriter = PatternRewriter(quantum_op)
                     rewriter.erase_op(quantum_op)
+
                 # Remove dead code
                 region_dce(op_.body)
 
