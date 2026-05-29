@@ -814,9 +814,9 @@ class CondCallable:
                     pred = jnp.astype(pred, bool, copy=False)
                 else:
                     pred = bool(pred)
-            except TypeError as e:
+            except (TypeError, ValueError) as e:
                 raise TypeError(
-                    "Conditional predicates are required to be of bool, integer or float type"
+                    "Conditional predicates are required to be cast-able to bool."
                 ) from e
 
         return pred
