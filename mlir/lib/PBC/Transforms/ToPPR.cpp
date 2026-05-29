@@ -430,6 +430,15 @@ struct PBCOpLowering : public ConversionPattern {
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final
     {
+        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, "
+                                   "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
+
+        if (auto gateLikeOp = dyn_cast<QuantumGate>(op)) {
+            if (!gateLikeOp.getCtrlQubitOperands().empty()) {
+                return op->emitError("Unsupported controlled gate. " + supportedGates);
+            }
+        }
+
         if (auto originOp = dyn_cast<CustomOp>(op)) {
             switch (hashGate(originOp)) {
             case GateEnum::H:
@@ -460,12 +469,8 @@ struct PBCOpLowering : public ConversionPattern {
                 return convertIsingYYGate(originOp, rewriter);
             case GateEnum::IsingZZ:
                 return convertIsingZZGate(originOp, rewriter);
-            case GateEnum::Unknown: {
-                op->emitError(
-                    "Unsupported gate. Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, "
-                    "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.");
-                return failure();
-            }
+            case GateEnum::Unknown:
+                return op->emitError("Unsupported gate for PBC conversion. " + supportedGates);
             }
         }
         else if (auto originOp = dyn_cast<MultiRZOp>(op)) {
@@ -477,8 +482,8 @@ struct PBCOpLowering : public ConversionPattern {
         else if (auto originOp = dyn_cast<MeasureOp>(op)) {
             return convertMeasureZ(originOp, rewriter);
         }
-        op->emitError("Unsupported operation. Supported operations: CustomOp, MeasureOp");
-        return failure();
+
+        return op->emitError("Unsupported operation for PBC conversion. " + supportedGates);
     }
 };
 

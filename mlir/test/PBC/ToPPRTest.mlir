@@ -95,10 +95,21 @@ func.func public @test_clifford_t_to_ppr_1() -> (tensor<i1>, tensor<i1>) {
 
 func.func @test_clifford_t_to_ppr_2(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     // expected-error @+1 {{failed to legalize operation 'quantum.custom' that was explicitly marked illegal}}
-    %0 = quantum.custom "SOME_UNKNOWN_GATE"() %q1 : !quantum.bit // expected-error @+0 {{Unsupported gate. Supported gates: }}
+    %0 = quantum.custom "SOME_UNKNOWN_GATE"() %q1 : !quantum.bit // expected-error @+0 {{Unsupported gate for PBC conversion. Supported gates: }}
     %1 = quantum.custom "S"() %0 : !quantum.bit
     %2 = quantum.custom "T"() %1 : !quantum.bit
     %3:2 = quantum.custom "CNOT"() %2, %q2 : !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+func.func @test_controlled_gate_to_ppr_unsupported(%q0 : !quantum.bit, %q1 : !quantum.bit,
+                                                   %ctrlval : i1) {
+    %theta_t = stablehlo.constant dense<0.42> : tensor<f64>
+    %theta = tensor.extract %theta_t[] : tensor<f64>
+    // expected-error @+1 {{failed to legalize operation 'quantum.custom' that was explicitly marked illegal}}
+    %out_q, %out_ctrl = quantum.custom "RX"(%theta) %q0 ctrls (%q1) ctrlvals (%ctrlval) : !quantum.bit ctrls !quantum.bit // expected-error @+0 {{Unsupported controlled gate. Supported gates: }}
     func.return
 }
 
