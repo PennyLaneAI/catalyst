@@ -56,15 +56,13 @@ from catalyst.python_interface.dialects.quantum import (
 from catalyst.utils.patching import Patcher
 
 if TYPE_CHECKING:
-    from jaxlib.mlir._mlir_libs._mlir.ir import Module
     from pennylane.measurements import MeasurementProcess
     from pennylane.workflow.qnode import QNode
 
 has_jax = True
 try:
     import jax
-    from jax._src.interpreters import mlir as mlir_interpreter
-    from jax._src.lib.mlir import ir
+    from jaxlib.mlir._mlir_libs._mlir.ir import Module
 except ImportError:
     has_jax = False
 
@@ -125,12 +123,10 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
         )
 
     # Parse generic format value semantics mlir to a module object
-    context = ir.Context()
-    context.append_dialect_registry(mlir_interpreter.upstream_dialects)
-    context.load_all_available_dialects()
+    context = mlir_module.context
     context.allow_unregistered_dialects = True
-    with context, ir.Location.unknown():
-        value_semantics_mlir_module = ir.Module.parse(value_semantics_mlir)
+    with context:
+        value_semantics_mlir_module = Module.parse(value_semantics_mlir)
     return value_semantics_mlir_module
 
 
