@@ -1053,9 +1053,9 @@ class TestQECPLoweringIntegration:
             # CHECK: func.call @measure_transversal_Steane
             # CHECK: func.call @measure_transversal_Steane
             # CHECK: func.call @measure_transversal_Steane
+            # CHECK: qecp.insert_block
             # CHECK: quantum.mcmobs
             # CHECK: quantum.sample
-            # CHECK: qecp.insert_block
             # CHECK: qecp.dealloc
             qp.H(0)
             qp.CNOT([0, 1])

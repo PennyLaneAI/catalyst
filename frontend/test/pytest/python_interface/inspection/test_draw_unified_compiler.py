@@ -233,12 +233,12 @@ class TestDraw:
                 "1: ─╭○──┤  State\n2: ─├●──┤  State\n3: ─├○──┤  State\n0: ─╰RX─┤  State",
             ),
             (
-                lambda: qp.adjoint(qp.ctrl(qp.RX(0.1, 0), (1, 2, 3), control_values=(0, 1, 0))),
-                "1: ─╭○───┤  State\n2: ─├●───┤  State\n3: ─├○───┤  State\n0: ─╰RX†─┤  State",
+                lambda: qp.adjoint(qp.ctrl(qp.T(0), (1, 2, 3), control_values=(0, 1, 0))),
+                "1: ─╭○──┤  State\n2: ─├●──┤  State\n3: ─├○──┤  State\n0: ─╰T†─┤  State",
             ),
             (
-                lambda: qp.ctrl(qp.adjoint(qp.RX(0.1, 0)), (1, 2, 3), control_values=(0, 1, 0)),
-                "1: ─╭○───┤  State\n2: ─├●───┤  State\n3: ─├○───┤  State\n0: ─╰RX†─┤  State",
+                lambda: qp.ctrl(qp.adjoint(qp.T(0)), (1, 2, 3), control_values=(0, 1, 0)),
+                "1: ─╭○──┤  State\n2: ─├●──┤  State\n3: ─├○──┤  State\n0: ─╰T†─┤  State",
             ),
         ],
     )
@@ -671,8 +671,8 @@ class TestDrawGraph:
         @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
             qp.H(0)
-            qp.T(1)
             qp.H(0)
+            qp.T(1)
             qp.RX(0.1, wires=0)
             qp.RX(0.2, wires=0)
             return qp.expval(qp.X(0))
@@ -741,8 +741,8 @@ class TestDrawGraph:
         @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
             qp.H(0)
-            qp.T(1)
             qp.H(0)
+            qp.T(1)
             qp.RX(0.1, wires=0)
             qp.RX(0.2, wires=0)
             return qp.expval(qp.X(0))
