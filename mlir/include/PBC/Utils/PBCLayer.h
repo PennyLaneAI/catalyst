@@ -15,6 +15,7 @@
 #pragma once
 
 #include "llvm/ADT/SetVector.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "PBC/IR/PBCDialect.h"
 #include "PBC/IR/PBCOpInterfaces.h"
@@ -49,6 +50,23 @@ class PBCLayerContext {
     // Returns op lists only; operand/result bookkeeping is deferred until layer construction.
     llvm::SmallVector<std::vector<PBCOpInterface>> groupLayers(mlir::Operation *root,
                                                                bool onlyOnDisjointQubit = false);
+
+    // Worst-case PBC layer depth within `block` (typically a function body's entry block).
+    // Handles `scf.if` (max of branches), `scf.index_switch` (max of cases), and static
+    // `scf.for` (trip count × body depth). `scf.while` and dynamic `scf.for` are not supported.
+    mlir::FailureOr<int64_t> computeWorstCaseDepth(mlir::Block *block,
+                                                   bool onlyOnDisjointQubit = false);
+
+  private:
+    // Worst-case depth of an `scf.if`: `max(depth(then), depth(else))`
+    mlir::FailureOr<int64_t> ifWorstCaseDepth(mlir::scf::IfOp ifOp, bool onlyOnDisjointQubit);
+
+    // Worst-case depth of an `scf.index_switch`: `max(depth(default), depth(case_i))`
+    mlir::FailureOr<int64_t> switchWorstCaseDepth(mlir::scf::IndexSwitchOp switchOp,
+                                                  bool onlyOnDisjointQubit);
+    // Worst-case depth of a static `scf.for`: `N * depth(body)`.
+    // Returns failure if the trip count is dynamic.
+    mlir::FailureOr<int64_t> forWorstCaseDepth(mlir::scf::ForOp forOp, bool onlyOnDisjointQubit);
 };
 
 class PBCLayer {
