@@ -235,7 +235,7 @@ def test_convert_clifford_to_ppr():
     assert ppm_specs_output["f_0"]["max_weight_pi4"] == 2
     assert ppm_specs_output["f_0"]["pi8_ppr"] == 1
     assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
-    assert ppm_specs_output["f_0"]["depth"] == 4
+    assert ppm_specs_output["f_0"]["depth"] == 3
     assert ppm_specs_output["f_0"]["depth_type"] == 0
 
 
@@ -264,7 +264,7 @@ def test_convert_clifford_to_ppr_only_disjoint_qubit():
     assert ppm_specs_output["f_0"]["max_weight_pi4"] == 2
     assert ppm_specs_output["f_0"]["pi8_ppr"] == 1
     assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
-    assert ppm_specs_output["f_0"]["depth"] == 7
+    assert ppm_specs_output["f_0"]["depth"] == 6
     assert ppm_specs_output["f_0"]["depth_type"] == 1
 
 

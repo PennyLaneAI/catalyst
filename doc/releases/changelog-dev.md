@@ -80,6 +80,11 @@
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
+* Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
+  after a PBC op but read from a register not updated by that op. Layer grouping now checks
+  data dependencies through insert to extract chains instead of textual op ordering.
+  [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
+
 <h3>Internal changes ⚙️</h3>
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
