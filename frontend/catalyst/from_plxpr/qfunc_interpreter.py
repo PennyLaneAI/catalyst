@@ -35,6 +35,7 @@ from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_
 from pennylane.measurements import CountsMP
 
 from catalyst.from_plxpr.qref_jax_primitives import (
+    MeasurementPlane,
     QrefQubit,
     qref_alloc_p,
     qref_compbasis_p,
@@ -53,7 +54,6 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_unitary_p,
 )
 from catalyst.jax_primitives import (
-    MeasurementPlane,
     counts_p,
     decomprule_p,
     expval_p,

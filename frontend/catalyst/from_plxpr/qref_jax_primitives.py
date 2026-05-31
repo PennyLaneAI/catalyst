@@ -16,6 +16,8 @@
 of quantum operations, measurements, and observables to reference semantics JAXPR.
 """
 
+from enum import Enum
+
 from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue, ShapedArray
@@ -37,8 +39,6 @@ from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
     AbstractObs,
-    MeasurementPlane,
-    _measurement_plane_attribute,
     _named_obs_attribute,
     extract_scalar,
     safe_cast_to_f64,
@@ -135,6 +135,16 @@ def _qref_qreg_lowering(aval):
 #
 mlir.ir_type_handlers[QrefQubit] = _qref_qubit_lowering
 mlir.ir_type_handlers[QrefQreg] = _qref_qreg_lowering
+
+
+class MeasurementPlane(Enum):
+    """
+    Measurement planes for arbitrary-basis measurements in MBQC
+    """
+
+    XY = "XY"
+    YZ = "YZ"
+    ZX = "ZX"
 
 
 ##############
@@ -680,6 +690,15 @@ def _qref_measure_in_basis_abstract_eval(
 ):
     assert isinstance(qubit, QrefQubit)
     return ShapedArray((), bool)
+
+
+def _measurement_plane_attribute(ctx, plane: MeasurementPlane):
+    return ir.OpaqueAttr.get(
+        "mbqc",
+        ("measurement_plane " + MeasurementPlane(plane).name).encode("utf-8"),
+        ir.NoneType.get(ctx),
+        ctx,
+    )
 
 
 def _qref_measure_in_basis_lowering(
