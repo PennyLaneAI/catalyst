@@ -29,7 +29,6 @@ Known Limitations
 from dataclasses import dataclass
 from typing import cast
 
-from pennylane.exceptions import CompileError
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, scf
 from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, i64
