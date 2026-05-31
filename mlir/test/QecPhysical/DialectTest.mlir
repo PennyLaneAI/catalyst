@@ -177,6 +177,14 @@ func.func @test_gate_op_hadamard(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<
 
 // -----
 
+func.func @test_gate_op_t(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %0 = qecp.t %arg0 : !qecp.qubit<data>
+    %1 = qecp.t %arg1 : !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
 func.func @test_gate_op_s(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
     %0 = qecp.s %arg0 : !qecp.qubit<data>
     %1 = qecp.s %0 adj : !qecp.qubit<data>

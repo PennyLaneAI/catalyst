@@ -56,6 +56,10 @@
   that have multiple quantum operands, of either quantum register or qubit type.
   [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
+* Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
+  to tracing errors.
+  [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -102,6 +106,10 @@
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
   [(#2871)](https://github.com/PennyLaneAI/catalyst/pull/2871)
 
+* The experimental compiler pass `convert-quantum-to-qecl` has been extended to lower
+  `quantum.custom "T"` gates to the `qecl` layer as a subroutine using a magic state.
+  [(#2870)](https://github.com/PennyLaneAI/catalyst/pull/2870)
+
 * The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
   [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
 
@@ -146,6 +154,8 @@
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
   - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.t`, which performs a T gate on a single physical qubit.
+    [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
 
 
