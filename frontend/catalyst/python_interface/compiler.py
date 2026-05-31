@@ -77,16 +77,15 @@ class Compiler:
         pipeline = PassPipeline((ApplyTransformSequencePass(callback=callback),))
         pipeline.apply(ctx, xmod)
 
-        # JAX serialises void func.func ops with `res_attrs = []` in generic form
+        # JAX serializes void func.func ops with `res_attrs = []` in generic form
         # triggering an assertion in FuncToLLVM lowering.
-        # Remove empty arrays in-place so the generic printer omits them.
+        # Assert that the canonicalization above has removed these empty attributes
         for op in xmod.walk():
             if not isinstance(op, FuncOp):
                 continue
             for key in ("res_attrs", "arg_attrs"):
                 val = op.properties.get(key)
-                if isinstance(val, ArrayAttr) and len(val) == 0:
-                    del op.properties[key]
+                assert not (isinstance(val, ArrayAttr) and len(val) == 0)
         buffer = io.StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(xmod)
 
