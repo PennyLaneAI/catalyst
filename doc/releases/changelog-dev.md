@@ -31,6 +31,22 @@
   overlapping qubits may still be merged into one layer.
   [(#2858)](https://github.com/PennyLaneAI/catalyst/pull/2858)
 
+* The :func:`~.passes.ppm_specs` now report circuit depth as ``depth``
+  (layer count) and ``depth_type`` (``0`` = commuting ops on overlapping qubits may share a
+  layer; ``1`` = only ops with disjoint qubit support may share a layer). The Python API accepts
+  ``only_disjoint_qubit=True`` to run ``ppm-specs{disjoint-qubit=true}``. AOT ``ppm_specs`` no
+  longer requires an explicit pipeline and no longer mixes MLIR into the JSON output.
+  [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
+
+* The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the worst-case depth
+  across ``scf.if`` and ``scf.index_switch`` branches (taking the maximum over all branches)
+  and across statically-bounded ``scf.for`` loops (multiplied by the trip count).
+  Previously, branches were counted sequentially and PBC ops inside ``scf.for`` produced an
+  error. ``scf.while`` and dynamically-bounded ``scf.for`` still produce an error.
+  [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
+  [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
+  [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
+
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values
   trace back to the same allocation.
@@ -66,6 +82,11 @@
 * Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
+
+* Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
+  after a PBC op but read from a register not updated by that op. Layer grouping now checks
+  data dependencies through insert to extract chains instead of textual op ordering.
+  [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
 
 <h3>Internal changes ⚙️</h3>
 
