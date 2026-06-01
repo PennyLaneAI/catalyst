@@ -135,6 +135,8 @@ def PPMCompilationPass : Pass<"ppm-compilation"> {
 
 def CountPPMSpecsPass : Pass<"ppm-specs"> {
     let summary = "Count specs in Pauli Product Measurement operations.";
+
+    let options = [OnlyDisjointQubitOption];
 }
 
 def PartitionLayersPass : Pass<"partition-layers"> {
