@@ -70,6 +70,8 @@ expected_ops_names = {
     "DeallocOp": "qecp.dealloc",
     "AllocAuxQubitOp": "qecp.alloc_aux",
     "DeallocAuxQubitOp": "qecp.dealloc_aux",
+    "AllocCodeblockOp": "qecp.alloc_cb",
+    "DeallocCodeblockOp": "qecp.dealloc_cb",
     "ExtractCodeblockOp": "qecp.extract_block",
     "InsertCodeblockOp": "qecp.insert_block",
     "ExtractQubitOp": "qecp.extract",
@@ -80,6 +82,7 @@ expected_ops_names = {
     "PauliZOp": "qecp.z",
     "HadamardOp": "qecp.hadamard",
     "SOp": "qecp.s",
+    "TOp": "qecp.t",
     "RotOp": "qecp.rot",
     "CnotOp": "qecp.cnot",
     "MeasureOp": "qecp.measure",
@@ -216,6 +219,17 @@ class TestQecPhysicalOps:
         dealloc_aux_op = qecp.DeallocAuxQubitOp(self._get_qubit_aux_value())
         assert len(dealloc_aux_op.result_types) == 0
 
+    def test_qecp_op_constructor_alloc_cb(self):
+        """Test the constructor of the qecp.alloc_cb op."""
+        alloc_cb_op = qecp.AllocCodeblockOp(codeblock_type=qecp.PhysicalCodeblockType(k=1, n=7))
+        assert len(alloc_cb_op.result_types) == 1
+        assert isinstance(alloc_cb_op.result_types[0], qecp.PhysicalCodeblockType)
+
+    def test_qecp_op_constructor_dealloc_cb(self):
+        """Test the constructor of the qecp.dealloc_cb op."""
+        dealloc_cb_op = qecp.DeallocCodeblockOp(self._get_codeblock_value())
+        assert len(dealloc_cb_op.result_types) == 0
+
     @pytest.mark.parametrize(
         "idx", [0, IntegerAttr(0, IndexType()), IntegerAttr(0, i64), create_ssa_value(IndexType())]
     )
@@ -318,6 +332,21 @@ class TestQecPhysicalOps:
         assert hadamard_op.operand_types[0] == qubit.type
         assert len(hadamard_op.result_types) == 1
         assert hadamard_op.result_types[0] == qubit.type
+
+    @pytest.mark.parametrize(
+        "qubit",
+        [
+            create_ssa_value(qecp.QecPhysicalQubitType("data")),
+            create_ssa_value(qecp.QecPhysicalQubitType("aux")),
+        ],
+    )
+    def test_qecp_op_constructor_t(self, qubit):
+        """Test the constructor of the qecp.t op."""
+        t_op = qecp.TOp(qubit)
+        assert len(t_op.operands) == 1
+        assert t_op.operand_types[0] == qubit.type
+        assert len(t_op.result_types) == 1
+        assert t_op.result_types[0] == qubit.type
 
     @pytest.mark.parametrize(
         "qubit",
@@ -475,6 +504,12 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: qecp.dealloc_aux [[q_aux1]] : !qecp.qubit<aux>
     qecp.dealloc_aux %q_aux1 : !qecp.qubit<aux>
 
+    // CHECK: [[cb0:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+    %cb0 = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+
+    // CHECK: qecp.dealloc_cb [[cb0]] : !qecp.codeblock<1 x 7>
+    qecp.dealloc_cb %cb0 : !qecp.codeblock<1 x 7>
+
     // CHECK: [[block0:%.+]] = qecp.extract_block [[hyperreg]][{{\s*}}0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
     %block0 = qecp.extract_block %hyperreg[ 0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
 
@@ -516,26 +551,31 @@ def test_assembly_format(run_filecheck, pretty_print):
     %qd5 = qecp.hadamard %qd4 : !qecp.qubit<data>
     %qa5 = qecp.hadamard %qa4 : !qecp.qubit<aux>
 
-    // CHECK: [[qd6:%.+]] = qecp.s [[qd5]] : !qecp.qubit<data>
-    // CHECK: [[qa6:%.+]] = qecp.s [[qa5]] : !qecp.qubit<aux>
-    %qd6 = qecp.s %qd5 : !qecp.qubit<data>
-    %qa6 = qecp.s %qa5 : !qecp.qubit<aux>
+    // CHECK: [[qd6:%.+]] = qecp.t [[qd5]] : !qecp.qubit<data>
+    // CHECK: [[qa6:%.+]] = qecp.t [[qa5]] : !qecp.qubit<aux>
+    %qd6 = qecp.t %qd5 : !qecp.qubit<data>
+    %qa6 = qecp.t %qa5 : !qecp.qubit<aux>
 
-    // CHECK: [[qd7:%.+]] = qecp.s [[qd6]] adj : !qecp.qubit<data>
-    // CHECK: [[qa7:%.+]] = qecp.s [[qa6]] adj : !qecp.qubit<aux>
-    %qd7 = qecp.s %qd6 adj : !qecp.qubit<data>
-    %qa7 = qecp.s %qa6 adj : !qecp.qubit<aux>
+    // CHECK: [[qd7:%.+]] = qecp.s [[qd6]] : !qecp.qubit<data>
+    // CHECK: [[qa7:%.+]] = qecp.s [[qa6]] : !qecp.qubit<aux>
+    %qd7 = qecp.s %qd6 : !qecp.qubit<data>
+    %qa7 = qecp.s %qa6 : !qecp.qubit<aux>
+
+    // CHECK: [[qd8:%.+]] = qecp.s [[qd7]] adj : !qecp.qubit<data>
+    // CHECK: [[qa8:%.+]] = qecp.s [[qa7]] adj : !qecp.qubit<aux>
+    %qd8 = qecp.s %qd7 adj : !qecp.qubit<data>
+    %qa8 = qecp.s %qa7 adj : !qecp.qubit<aux>
 
     // CHECK: [[phi:%.+]] = "test.op"() : () -> f64
     // CHECK: [[theta:%.+]] = "test.op"() : () -> f64
     // CHECK: [[omega:%.+]] = "test.op"() : () -> f64
-    // CHECK: [[qd8:%.+]] = qecp.rot([[phi:%.+]], [[theta:%.+]], [[omega:%.+]]) [[qd7]] : !qecp.qubit<data>
-    // CHECK: [[qa8:%.+]] = qecp.rot([[phi:%.+]], [[theta:%.+]], [[omega:%.+]]) [[qa7]] : !qecp.qubit<aux>
+    // CHECK: [[qd9:%.+]] = qecp.rot([[phi:%.+]], [[theta:%.+]], [[omega:%.+]]) [[qd8]] : !qecp.qubit<data>
+    // CHECK: [[qa9:%.+]] = qecp.rot([[phi:%.+]], [[theta:%.+]], [[omega:%.+]]) [[qa8]] : !qecp.qubit<aux>
     %phi = "test.op"() : () -> f64
     %theta = "test.op"() : () -> f64
     %omega = "test.op"() : () -> f64
-    %qd8 = qecp.rot(%phi, %theta, %omega) %qd7 : !qecp.qubit<data>
-    %qa8 = qecp.rot(%phi, %theta, %omega) %qa7 : !qecp.qubit<aux>
+    %qd9 = qecp.rot(%phi, %theta, %omega) %qd8 : !qecp.qubit<data>
+    %qa9 = qecp.rot(%phi, %theta, %omega) %qa8 : !qecp.qubit<aux>
 
     // CHECK: [[qd10:%.+]] = "test.op"() : () -> !qecp.qubit<data>
     // CHECK: [[qd20:%.+]] = "test.op"() : () -> !qecp.qubit<data>
@@ -563,10 +603,10 @@ def test_assembly_format(run_filecheck, pretty_print):
     %row_idx = "test.op"() : () -> tensor<8xi32>
     %col_ptr = "test.op"() : () -> tensor<6xi32>
 
-    // CHECK: [[mres0:%.+]], [[qd9:%.+]] = qecp.measure [[qd8]] : i1, !qecp.qubit<data>
-    // CHECK: [[mres1:%.+]], [[qa9:%.+]] = qecp.measure [[qa8]] : i1, !qecp.qubit<aux>
-    %mres0, %qd9 = qecp.measure %qd8 : i1, !qecp.qubit<data>
-    %mres1, %qa9 = qecp.measure %qa8 : i1, !qecp.qubit<aux>
+    // CHECK: [[mres0:%.+]], [[qd10:%.+]] = qecp.measure [[qd9]] : i1, !qecp.qubit<data>
+    // CHECK: [[mres1:%.+]], [[qa10:%.+]] = qecp.measure [[qa9]] : i1, !qecp.qubit<aux>
+    %mres0, %qd13 = qecp.measure %qd9 : i1, !qecp.qubit<data>
+    %mres1, %qa13 = qecp.measure %qa9 : i1, !qecp.qubit<aux>
 
     // CHECK: [[tgraph:%.+]] = qecp.assemble_tanner [[row_idx]], [[col_ptr]] : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>
     %tgraph = qecp.assemble_tanner %row_idx, %col_ptr : tensor<8xi32>, tensor<6xi32> -> !qecp.tanner_graph<8, 6, i32>

@@ -241,6 +241,15 @@ def CrossCompileRemoteKernelsPass : Pass<"cross-compile-remote-kernels", "mlir::
             "Empty (default) lets the CPU choose its own feature set."
         >,
     ];
+
+def MarkEntryPointsPass : Pass<"mark-entry-points", "mlir::ModuleOp"> {
+    let summary = "Mark externally-callable entries on nested modules.";
+    let description = [{
+        Annotate functions inside any nested module whose name is reachable 
+        from outside that module with `catalyst.entry_point`.
+    }];
+
+    let dependentDialects = ["mlir::func::FuncDialect"];
 }
 
 def InlineNestedModulePass : Pass<"inline-nested-module"> {

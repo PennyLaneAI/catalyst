@@ -22,6 +22,48 @@
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
 
+* PPRs and PPMs can now be lowered properly into MLIR directly in the non-capture workflow.
+  [(#2816)](https://github.com/PennyLaneAI/catalyst/pull/2816)
+
+* The `--decompose-lowering` pass can now handle null decomposition rules, which are rule functions
+  that do not have any quantum values as arguments or results. Gates with null decomposition rules
+  are simply removed.
+  [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+
+* The ``--partition-layers`` pass now supports a ``disjoint-qubit`` option to group PBC ops
+  into the same layer only when they act on disjoint qubits. By default, commuting ops on
+  overlapping qubits may still be merged into one layer.
+  [(#2858)](https://github.com/PennyLaneAI/catalyst/pull/2858)
+
+* The :func:`~.passes.ppm_specs` now report circuit depth as ``depth``
+  (layer count) and ``depth_type`` (``0`` = commuting ops on overlapping qubits may share a
+  layer; ``1`` = only ops with disjoint qubit support may share a layer). The Python API accepts
+  ``only_disjoint_qubit=True`` to run ``ppm-specs{disjoint-qubit=true}``. AOT ``ppm_specs`` no
+  longer requires an explicit pipeline and no longer mixes MLIR into the JSON output.
+  [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
+
+* The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the worst-case depth
+  across ``scf.if`` and ``scf.index_switch`` branches (taking the maximum over all branches)
+  and across statically-bounded ``scf.for`` loops (multiplied by the trip count).
+  Previously, branches were counted sequentially and PBC ops inside ``scf.for`` produced an
+  error. ``scf.while`` and dynamically-bounded ``scf.for`` still produce an error.
+  [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
+  [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
+  [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
+
+* The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
+  extracted from different quantum register SSA values, as long as all these quantum register values
+  trace back to the same allocation.
+  [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
+
+* The `--adjoint-lowering` pass can now handle adjoint operations containing control flow operations
+  that have multiple quantum operands, of either quantum register or qubit type.
+  [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
+
+* Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
+  to tracing errors.
+  [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -34,11 +76,27 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug in `DecompRuleInterpreter.cleanup` by replacing fragile string-based operator
+  checks with strict type-based checking.
+  [(#2873)](https://github.com/PennyLaneAI/catalyst/pull/2873)
+
 * Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
+* Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
+  after a PBC op but read from a register not updated by that op. Layer grouping now checks
+  data dependencies through insert to extract chains instead of textual op ordering.
+  [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
+
 <h3>Internal changes ⚙️</h3>
+
+* A new compiler pass `mark-entry-points` has been added, which annotates externally-callable
+  entry functions with the `catalyst.entry_point` attribute.
+  [(#2899)](https://github.com/PennyLaneAI/catalyst/pull/2899)
+
+* Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
+  [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
 
 * Fixed ``KeyError`` in autograph when using ``qp.prod`` as a decorator with PennyLane >= 0.45.
   [(#2844)](https://github.com/PennyLaneAI/catalyst/pull/2844)
@@ -58,6 +116,11 @@
   transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
+  [(#2871)](https://github.com/PennyLaneAI/catalyst/pull/2871)
+
+* The experimental compiler pass `convert-quantum-to-qecl` has been extended to lower
+  `quantum.custom "T"` gates to the `qecl` layer as a subroutine using a magic state.
+  [(#2870)](https://github.com/PennyLaneAI/catalyst/pull/2870)
 
 * The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
   [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
@@ -91,15 +154,37 @@
   dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
   [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
 
+* In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
+  operations have been added:
+
+  - `qecl.fabricate`, which fabricates a logical codeblock in a specified initial state (typically a
+    magic state).
+    [(#2865)](https://github.com/PennyLaneAI/catalyst/pull/2865)
+  - `qecl.dealloc_cb`, which deallocates a single logical codeblock.
+    [(#2866)](https://github.com/PennyLaneAI/catalyst/pull/2866)
+  - `qecp.alloc_cb`, which allocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.dealloc_cb`, which deallocates a single physical codeblock.
+    [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
+  - `qecp.t`, which performs a T gate on a single physical qubit.
+    [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
+
+* More conservative casting to tracer arrays in conditionals to preserve constant (static) values
+  better. This can be useful for optimizations that depend on values being static.
+  [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
+
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
+Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,

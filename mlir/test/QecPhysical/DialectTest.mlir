@@ -123,6 +123,20 @@ func.func @test_dealloc_aux(%arg0 : !qecp.qubit<aux>) {
 
 // -----
 
+func.func @test_alloc_cb() {
+    %0 = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+    func.return
+}
+
+// -----
+
+func.func @test_dealloc_cb(%arg0 : !qecp.codeblock<1 x 7>) {
+    qecp.dealloc_cb %arg0 : !qecp.codeblock<1 x 7>
+    func.return
+}
+
+// -----
+
 func.func @test_gate_op_identity(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
     %0 = qecp.identity %arg0 : !qecp.qubit<data>
     %1 = qecp.identity %arg1 : !qecp.qubit<aux>
@@ -158,6 +172,14 @@ func.func @test_gate_op_pauli_z(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<a
 func.func @test_gate_op_hadamard(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
     %0 = qecp.hadamard %arg0 : !qecp.qubit<data>
     %1 = qecp.hadamard %arg1 : !qecp.qubit<aux>
+    func.return
+}
+
+// -----
+
+func.func @test_gate_op_t(%arg0 : !qecp.qubit<data>, %arg1 : !qecp.qubit<aux>) {
+    %0 = qecp.t %arg0 : !qecp.qubit<data>
+    %1 = qecp.t %arg1 : !qecp.qubit<aux>
     func.return
 }
 
