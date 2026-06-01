@@ -95,21 +95,31 @@ struct CrossCompileRemoteKernelsPass
                 return fn->hasAttr("qnode") && !fn->hasAttr("catalyst.remote_kernel");
             });
 
-        if (qnodes.empty()) {
+        bool hasPluginCalls = false;
+        host.walk([&](catalyst::CustomCallOp call) {
+            if (call.getCallTargetName() == "remote_lib_call") {
+                hasPluginCalls = true;
+                return WalkResult::interrupt();
+            }
+            return WalkResult::advance();
+        });
+
+        if (qnodes.empty() && !hasPluginCalls) {
             return;
         }
 
-        if (workspace.empty()) {
-            host.emitError("Missing `workspace` option for remote kernel cross-compilation");
-            return signalPassFailure();
-        }
+        if (!qnodes.empty()) {
+            if (workspace.empty()) {
+                host.emitError("Missing `workspace` option for remote kernel cross-compilation");
+                return signalPassFailure();
+            }
 
-        // For cross-compilation, we need to initialize the LLVM target registry.
-        llvm::InitializeAllTargetInfos();
-        llvm::InitializeAllTargets();
-        llvm::InitializeAllTargetMCs();
-        llvm::InitializeAllAsmParsers();
-        llvm::InitializeAllAsmPrinters();
+            llvm::InitializeAllTargetInfos();
+            llvm::InitializeAllTargets();
+            llvm::InitializeAllTargetMCs();
+            llvm::InitializeAllAsmParsers();
+            llvm::InitializeAllAsmPrinters();
+        }
 
         injectRemoteOpenIntoSetup(host);
 
@@ -254,8 +264,8 @@ struct CrossCompileRemoteKernelsPass
         std::unique_ptr<llvm::TargetMachine> targetMachine(llvmTarget->createTargetMachine(
             parsedTriple, cpu, features, opt, llvm::Reloc::Model::PIC_));
         if (!targetMachine) {
-            llvm::errs() << "Could not create TargetMachine for triple '" << target
-                         << "' cpu='" << cpu << "' features='" << features << "'\n";
+            llvm::errs() << "Could not create TargetMachine for triple '" << target << "' cpu='"
+                         << cpu << "' features='" << features << "'\n";
             return "";
         }
 
