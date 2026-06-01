@@ -832,21 +832,41 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         with ImplicitBuilder(block):
             codeblock = qecp.AllocCodeblockOp(codeblock_type=qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n))
 
+            #### ENCODE GROUND STATE ####
+
+            # allocate auxiliary qubits
+            aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
+            aux_qubits = [op.results[0] for op in aux_allocate_ops]
+
+            # apply X-check gate+measurement pattern
+            measure_ops, zero_codeblock = self.check_pattern(
+                aux_qubits, codeblock, check_type=CheckType.X
+            )
+
+            # ToDo: our noise model doesn't inject noise here, but we should really be doing 
+            # corrections here as well for a setup where noise is more ubiquitous
+
+            # deallocate the auxiliary qubits
+            for meas_op in measure_ops:
+                qecp.DeallocAuxQubitOp(meas_op.results[1])
+
+            #### PROJECT TO MAGIC STATE ####
+
             # apply H and T to the first qubit
             # ToDo: does it matter which one I apply it to? If so, can I deduce the correct answer from the matrix for the tanner graph? Experiment in a notebook.
-            initial_qubit = qecp.ExtractQubitOp(codeblock, 0)
+            initial_qubit = qecp.ExtractQubitOp(zero_codeblock, 0)
             physical_h = qecp.HadamardOp(initial_qubit)
             physical_t = qecp.TOp(physical_h.results[0])
-            codeblock = qecp.InsertQubitOp(codeblock, 0, physical_t.results[0])
+            prepped_codeblock = qecp.InsertQubitOp(zero_codeblock, 0, physical_t.results[0])
 
             # Apply X checks + Z correction pattern
-            x_out_codeblock = self._qec_cycle_css_pattern(codeblock, CheckType.X, tanner_x)
+            x_out_codeblock = self._qec_cycle_css_pattern(prepped_codeblock, CheckType.X, tanner_x)
 
             # Apply Z checks + X correction pattern
-            z_out_codeblock = self._qec_cycle_css_pattern(x_out_codeblock, CheckType.Z, tanner_z)
+            magic_state_codeblock = self._qec_cycle_css_pattern(x_out_codeblock, CheckType.Z, tanner_z)
 
             # return the encoded codeblock
-            func.ReturnOp(z_out_codeblock)
+            func.ReturnOp(magic_state_codeblock)
 
         funcOp = func.FuncOp(
             name=f"fabricate_magic_state_{self.qec_code.name}",
