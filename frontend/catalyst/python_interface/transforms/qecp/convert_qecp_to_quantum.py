@@ -18,10 +18,6 @@ This module contains the implementation of the xDSL convert-qecp-to-quantum dial
 
 Known Limitations
 -----------------
-
-  * The hyper-register lowering is experimental can only target programs with more than one logical
-    codeblock, where there is a loop for encoding each logical codeblock. It's sufficient for the
-    GHZ circuit. We might have to come back to this later.
   * The current hyper-register lowering implementation also does not support any control flow that
     iterates over hyper registers, except for the encoding loop.
 """
@@ -304,6 +300,7 @@ class UnrollEncodeLoop(RewritePattern):
 
 
 # MARK: Conversion Pass
+
 
 @dataclass(frozen=True)
 class ConvertQecPhysicalToQuantumPass(ModulePass):
