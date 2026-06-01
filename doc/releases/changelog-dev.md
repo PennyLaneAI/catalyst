@@ -87,6 +87,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* A new compiler pass `mark-entry-points` has been added, which annotates externally-callable
+  entry functions with the `catalyst.entry_point` attribute.
+  [(#2899)](https://github.com/PennyLaneAI/catalyst/pull/2899)
+
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
 
