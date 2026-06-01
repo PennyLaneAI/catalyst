@@ -62,8 +62,10 @@ def inject_functions(module, ctx, seed):
     """
     This function appends functions to the input module.
     """
-    # Add C interface for the quantum function.
-    module.body.operations[0].attributes["llvm.emit_c_interface"] = ir.UnitAttr.get(context=ctx)
+    # Add C interface for the quantum function and annonate it as the main entry_point.
+    mlir_qfunc = module.body.operations[0]
+    mlir_qfunc.attributes["catalyst.entry_point"] = ir.UnitAttr.get(context=ctx)
+    mlir_qfunc.attributes["llvm.emit_c_interface"] = ir.UnitAttr.get(context=ctx)
 
     setup_module = gen_setup(ctx, seed)
     setup_func = setup_module.body.operations[0]
@@ -73,5 +75,4 @@ def inject_functions(module, ctx, seed):
     teardown_func = teardown_module.body.operations[0]
     module.body.append(teardown_func)
 
-    mlir_qfunc = module.body.operations[0]
     assert isinstance(mlir_qfunc, FuncOp)
