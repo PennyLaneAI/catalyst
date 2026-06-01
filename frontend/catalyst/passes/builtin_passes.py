@@ -916,7 +916,7 @@ def to_ppr_setup_inputs():
         ``lightning.qubit`` or ``null.qubit`` (for mock-execution).
 
     Pauli gates are converted to :math:`\exp(-{iP\tfrac{\pi}{2}})`, Clifford gates to
-    :math:`\exp(-{iP\tfrac{\pi}{4}})`, and mon-Clifford gates to
+    :math:`\exp(-{iP\tfrac{\pi}{4}})`, and non-Clifford gates to
     :math:`\exp(-{iP\tfrac{\pi}{8}})`, where :math:`P` is a Pauli word.
 
     For more information on Pauli product measurements and Pauli product rotations, check out the
