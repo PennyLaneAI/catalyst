@@ -107,6 +107,50 @@ def InsertCodeblockOp : QecLogical_Op<"insert_block", [AllTypesMatch<["in_hyper_
     let hasFolder = 1;
 }
 
+def FabricateOp : QecLogical_Op<"fabricate"> {
+    let summary = "Fabricate a logical codeblock in a specified initial state.";
+
+    let description = [{
+        This operation represents the fabrication of a single logical codeblock in a specified
+        initial logical state. The process of "fabrication" is distinct from standard codeblock
+        allocation; specifically, it represents the retrieval of k logical qubits, which constitute
+        a single logical codeblock, from a qubit factory, where the target initial state is
+        typically expensive to produce.
+
+        This operation is most commonly used in the context of magic-state injection for the
+        application of T gates or π/8 Pauli-product rotations (PPR) in the Pauli-based computation
+        (PBC) framework. Consequently, this operation follows the naming conventions of the
+        `pbc.fabricate` operation for more seamless integration between the `pbc` and `qecl`
+        compilation layers.
+    }];
+
+    let arguments = (ins
+        LogicalCodeblockInitStateAttr:$init_state
+    );
+
+    let results = (outs
+        LogicalCodeblockType:$out_codeblock
+    );
+
+    let assemblyFormat = [{
+        `[` $init_state `]` attr-dict `:` qualified(type($out_codeblock))
+    }];
+
+    let hasVerifier = true;
+}
+
+def DeallocCodeblockOp : QecLogical_Op<"dealloc_cb"> {
+    let summary = "Deallocate a single logical codeblock.";
+
+    let arguments = (ins
+        LogicalCodeblockType:$codeblock
+    );
+
+    let assemblyFormat = [{
+        $codeblock attr-dict `:` qualified(type($codeblock))
+    }];
+}
+
 def EncodeOp : QecLogical_Op<"encode", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {
     let summary = "Encode a logical codeblock to the specified logical state.";
 
@@ -122,6 +166,8 @@ def EncodeOp : QecLogical_Op<"encode", [AllTypesMatch<["in_codeblock", "out_code
     let assemblyFormat = [{
         `[` $init_state `]` $in_codeblock attr-dict `:` qualified(type($in_codeblock))
     }];
+
+    let hasVerifier = true;
 }
 
 def NoiseOp : QecLogical_Op<"noise", [AllTypesMatch<["in_codeblock", "out_codeblock"]>]> {

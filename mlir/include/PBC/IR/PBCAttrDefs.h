@@ -14,14 +14,8 @@
 
 #pragma once
 
-#include "Types.h"
+#include "mlir/IR/Attributes.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void __catalyst__qecp__lut_decoder(TannerGraph_CSC_int32 *tanner, MemRefT_int8_1d *syndrome_res,
-                                   MemRefT_int64_1d *err_idx);
-#ifdef __cplusplus
-} // extern "C"
-#endif
+#include "PBC/IR/PBCEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "PBC/IR/PBCAttributes.h.inc"

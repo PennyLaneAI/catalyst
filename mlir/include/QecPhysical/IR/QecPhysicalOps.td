@@ -92,6 +92,34 @@ def DeallocAuxQubitOp : QecPhysical_Op<"dealloc_aux"> {
     let hasCanonicalizeMethod = 1;
 }
 
+def AllocCodeblockOp : QecPhysical_Op<"alloc_cb"> {
+    let summary = "Allocate a single physical codeblock.";
+
+    let results = (outs
+        PhysicalCodeblockType:$codeblock
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` qualified(type($codeblock))
+    }];
+
+    let hasCanonicalizeMethod = 1;
+}
+
+def DeallocCodeblockOp : QecPhysical_Op<"dealloc_cb"> {
+    let summary = "Deallocate a single physical codeblock.";
+
+    let arguments = (ins
+        PhysicalCodeblockType:$codeblock
+    );
+
+    let assemblyFormat = [{
+        $codeblock attr-dict `:` qualified(type($codeblock))
+    }];
+
+    let hasCanonicalizeMethod = 1;
+}
+
 def ExtractCodeblockOp : QecPhysical_Op<"extract_block"> {
     let summary = "Extract a physical codeblock value from a hyper-register.";
 
@@ -248,6 +276,10 @@ def PauliZOp : SingleQubitPhysicalGate_Op<"z", [AllTypesMatch<["in_qubit", "out_
 
 def HadamardOp : SingleQubitPhysicalGate_Op<"hadamard", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     let summary = "A physical Hadamard gate operation.";
+}
+
+def TOp : SingleQubitPhysicalGate_Op<"t", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A physical T gate operation.";
 }
 
 def SOp : SingleQubitPhysicalGate_Op<"s", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {

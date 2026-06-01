@@ -556,3 +556,48 @@ TEST_CASE("Test GraphSolver with empty decomposition rules", "[DecompGraph::Solv
     REQUIRE(chosen_rule.inputs.empty());
     REQUIRE(chosen_rule.totalCost == 0.0);
 }
+
+TEST_CASE("Test GraphSolver with PauliRot specialized by static argument pauli_word",
+          "[DecompGraph::Solver]")
+{
+    // Query: PauliRot[w:1][p:1][pauli_word:X] should match a rule whose output is
+    // PauliRot[w:-1][p:-1][pauli_word:X] (wildcards on wires/params, exact match on pauli_word).
+    const OperatorNode pauliRotQuery{"PauliRot", 1, 1, false, {{"pauli_word", "X"}}};
+    const OperatorNode pauliRotRuleOutput{"PauliRot", -1, -1, false, {{"pauli_word", "X"}}};
+    const OperatorNode hadamard{"Hadamard", 1, 0, false};
+    const OperatorNode multiRZ{"MultiRZ", 1, 1, false};
+
+    const WeightedGateset gateset{{{hadamard, 1.0}, {multiRZ, 1.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"_pauli_rot_decomposition_X", pauliRotRuleOutput, {{hadamard, 2}, {multiRZ, 1}}},
+    };
+
+    const DecompositionGraph graph({pauliRotQuery}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.find(pauliRotQuery) != result.end());
+    const auto &chosen = result.at(pauliRotQuery);
+    REQUIRE_FALSE(chosen.isBasis);
+    REQUIRE(chosen.ruleName == "_pauli_rot_decomposition_X");
+    REQUIRE(chosen.totalCost == 1.0 * 2 + 1.0 * 1);
+    REQUIRE(chosen.basisCounts.at(hadamard) == 2);
+    REQUIRE(chosen.basisCounts.at(multiRZ) == 1);
+
+    const OperatorNode pauliRotQueryY{"PauliRot", 1, 1, false, {{"pauli_word", "Y"}}};
+    REQUIRE_FALSE(pauliRotQuery == pauliRotQueryY);
+    REQUIRE(pauliRotQuery == pauliRotRuleOutput);
+}
+
+TEST_CASE("Test OperatorNode equality with staticNamedArgs", "[DecompGraph::Core]")
+{
+    const OperatorNode pauliRotX{"PauliRot", 1, 1, false, {{"pauli_word", "X"}}};
+    const OperatorNode pauliRotXWildcard{"PauliRot", -1, -1, false, {{"pauli_word", "X"}}};
+    const OperatorNode pauliRotY{"PauliRot", 1, 1, false, {{"pauli_word", "Y"}}};
+    const OperatorNode pauliRotNoArgs{"PauliRot", 1, 1, false};
+
+    REQUIRE(pauliRotX == pauliRotXWildcard);
+    REQUIRE_FALSE(pauliRotX == pauliRotY);
+    REQUIRE(pauliRotX == pauliRotNoArgs);
+}
