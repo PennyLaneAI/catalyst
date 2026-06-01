@@ -809,18 +809,18 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
     def create_fabricate_subroutine(self) -> func.FuncOp:
         """Create a subroutine that allocates a codeblock and encodes it in the magic state for
         the QEC code (based on the tanner graph), and returns the encoded codeblock. This is a
-        non-fault tolerant encoding intended for use on a simulator, and not a distillation process 
+        non-fault tolerant encoding intended for use on a simulator, and not a distillation process
         for generating a magic state from many noisy copies.
 
-        The encoding process involves putting the initial QEC physical qubit in the desired state, 
-        and then using the same encoding procedure used for encoding the zero state, following the 
-        example shown in arXiv: 0905.2794, Section VIII.A.
+        The encoding process involves putting the initial QEC physical qubit in the desired state
+        via application of a Hadamard and physical T gate, and then using the unitary encoding for 
+        the zero state create the desired state for the codeblock. This is not the same procedure 
+        as the syndrome-measurement based procedure for encoding the zero state; encoding via the 
+        syndrome-measurement procedure would force the input back into the code-space, and destroy 
+        our magic state.
 
-        The subroutine allocates auxiliary qubits for use in encoding based on the number of
-        rows in the X tanner graph, and deallocates them once encoding is complete.
-
-        Note that this method does not insert the subroutine into the module op. Instead it returns
-        the built func.FuncOp object that can then be subsequently inserted where desired.
+        Note that this method does not insert the subroutine into the module op. Instead it 
+        returns the built func.FuncOp object that can then be subsequently inserted where desired.
         """
         codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
         input_types = ()
@@ -832,41 +832,43 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         with ImplicitBuilder(block):
             codeblock = qecp.AllocCodeblockOp(codeblock_type=qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n))
 
-            #### ENCODE GROUND STATE ####
-
-            # allocate auxiliary qubits
-            aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
-            aux_qubits = [op.results[0] for op in aux_allocate_ops]
-
-            # apply X-check gate+measurement pattern
-            measure_ops, zero_codeblock = self.check_pattern(
-                aux_qubits, codeblock, check_type=CheckType.X
-            )
-
-            # ToDo: our noise model doesn't inject noise here, but we should really be doing 
-            # corrections here as well for a setup where noise is more ubiquitous
-
-            # deallocate the auxiliary qubits
-            for meas_op in measure_ops:
-                qecp.DeallocAuxQubitOp(meas_op.results[1])
-
-            #### PROJECT TO MAGIC STATE ####
+            #### INITIAL WIRE TO INPUT STATE ####
 
             # apply H and T to the first qubit
-            # ToDo: does it matter which one I apply it to? If so, can I deduce the correct answer from the matrix for the tanner graph? Experiment in a notebook.
-            initial_qubit = qecp.ExtractQubitOp(zero_codeblock, 0)
+            # ToDo: we need to correctly select the index for pulling out the initial qubit 
+            # hardcoding 7 for now because I believe its correct for our ordering of the Steane code, but it will (usually) be wrong for any other code
+            initial_qubit_index = 7
+            initial_qubit = qecp.ExtractQubitOp(codeblock, initial_qubit_index)
             physical_h = qecp.HadamardOp(initial_qubit)
             physical_t = qecp.TOp(physical_h.results[0])
-            prepped_codeblock = qecp.InsertQubitOp(zero_codeblock, 0, physical_t.results[0])
+            prepped_codeblock = qecp.InsertQubitOp(codeblock, initial_qubit_index, physical_t.results[0])
 
-            # Apply X checks + Z correction pattern
-            x_out_codeblock = self._qec_cycle_css_pattern(prepped_codeblock, CheckType.X, tanner_x)
+            #### UNITARY ZERO-ENCODING PROCEDURE ####
+            # ToDo: This is hardcoded to our current Steane code implementation for now, will extract to code definition so it can be generalized once its working
 
-            # Apply Z checks + X correction pattern
-            magic_state_codeblock = self._qec_cycle_css_pattern(x_out_codeblock, CheckType.Z, tanner_z)
+            extract_ops = [qecp.ExtractQubitOp(prepped_codeblock, i) for i in range(self.qec_code.n)]
+            aux_qubits = {i: ext_op.results[0] for i, ext_op in enumerate(extract_ops)}
+            
+            hadamards = (1, 2, 3)
+            cnot_pairs = ([1, 0], [2, 4], [6, 5], [2, 0], [3, 5], [6, 4], [2, 6], [3, 4], [1, 5], [1, 6], [3, 0])
+
+            for idx in hadamards:
+                h = qecp.HadamardOp(aux_qubits[idx])
+                aux_qubits[idx] = h.results[0]
+
+            for (ctrl_idx, trgt_idx) in cnot_pairs:
+                cnot_op = qecp.CnotOp(aux_qubits[ctrl_idx], aux_qubits[trgt_idx])
+                aux_qubits[ctrl_idx] = cnot_op.results[0]
+                aux_qubits[trgt_idx] = cnot_op.results[1]
+
+            # insert data qubits back into the codeblock
+            encoded_codeblock = prepped_codeblock
+            for i in range(self.qec_code.n):
+                insert_op = qecp.InsertQubitOp(encoded_codeblock, i, aux_qubits[i])
+                encoded_codeblock = insert_op.results[0]
 
             # return the encoded codeblock
-            func.ReturnOp(magic_state_codeblock)
+            func.ReturnOp(encoded_codeblock)
 
         funcOp = func.FuncOp(
             name=f"fabricate_magic_state_{self.qec_code.name}",
