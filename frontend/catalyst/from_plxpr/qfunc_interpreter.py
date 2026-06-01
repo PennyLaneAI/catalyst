@@ -24,7 +24,6 @@ import jax
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.sharding_impls import UNSPECIFIED
-from jax.interpreters.partial_eval import DynamicJaxprTracer
 from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
@@ -33,10 +32,10 @@ from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measu
 from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
+from pennylane.wires import AbstractQubit, is_abstract_qubit
 
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
-    QrefQubit,
     qref_alloc_p,
     qref_compbasis_p,
     qref_dealloc_p,
@@ -161,12 +160,12 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         in_qubits = []
         in_control_qubits = []
         for w in op.wires:
-            if isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit):
+            if is_abstract_qubit(w):
                 in_qubits.append(w)
             else:
                 in_qubits.append(qref_get_p.bind(self.init_qreg, w))
         for w in control_wires:
-            if isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit):
+            if is_abstract_qubit(w):
                 in_control_qubits.append(w)
             else:
                 in_control_qubits.append(qref_get_p.bind(self.init_qreg, w))
@@ -214,10 +213,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                         dynamically allocated wires are present in the program.
                         """))
 
-            if any(
-                isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit)
-                for w in measurement.wires
-            ):
+            if any(is_abstract_qubit(w) for w in measurement.wires):
                 raise CompileError(textwrap.dedent("""
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
@@ -497,7 +493,7 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
             converter(func_jaxpr, *args)
 
         new_in_avals = func_jaxpr.in_avals[:num_params] + [
-            QrefQubit() for _ in func_jaxpr.in_avals[num_params:]
+            AbstractQubit() for _ in func_jaxpr.in_avals[num_params:]
         ]
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*new_in_avals)
 
@@ -511,7 +507,7 @@ def handle_pauli_measure(self, *wires_inval, pauli_word, **params):
     """Handle the conversion from plxpr to Catalyst jaxpr for the PauliMeasure primitive"""
     in_qubits = []
     for w in wires_inval:
-        if isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit):
+        if is_abstract_qubit(w):
             in_qubits.append(w)
         else:
             in_qubits.append(qref_get_p.bind(self.init_qreg, w))
@@ -527,7 +523,7 @@ def handle_basis_state(self, *invals, n_wires):
     wires_inval = invals[1:]
     in_qubits = []
     for w in wires_inval:
-        if isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit):
+        if is_abstract_qubit(w):
             in_qubits.append(w)
         else:
             in_qubits.append(qref_get_p.bind(self.init_qreg, w))
@@ -545,7 +541,7 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
     wires_inval = invals[1:]
     in_qubits = []
     for w in wires_inval:
-        if isinstance(w, DynamicJaxprTracer) and isinstance(w.val.aval, QrefQubit):
+        if is_abstract_qubit(w):
             in_qubits.append(w)
         else:
             in_qubits.append(qref_get_p.bind(self.init_qreg, w))
@@ -574,7 +570,7 @@ def handle_state_prep(self, *invals, n_wires, **kwargs):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_measure_prim)
 def handle_measure(self, wire, reset, postselect):
     """Handle the conversion from plxpr to Catalyst jaxpr for the mid-circuit measure primitive."""
-    if isinstance(wire, DynamicJaxprTracer) and isinstance(wire.val.aval, QrefQubit):
+    if is_abstract_qubit(wire):
         in_qubit = wire
     else:
         in_qubit = qref_get_p.bind(self.init_qreg, wire)
@@ -613,7 +609,7 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
             f"Measurement plane must be one of {[plane.value for plane in MeasurementPlane]}"
         ) from e
 
-    if isinstance(wire, DynamicJaxprTracer) and isinstance(wire.val.aval, QrefQubit):
+    if is_abstract_qubit(wire):
         in_qubit = wire
     else:
         in_qubit = qref_get_p.bind(self.init_qreg, wire)

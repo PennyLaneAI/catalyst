@@ -29,6 +29,7 @@ from jaxlib.mlir.dialects.arith import (
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane.wires import AbstractQubit
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -87,20 +88,10 @@ with Patcher(
 #
 # qubit
 #
-class QrefQubit(AbstractValue):
-    """Abstract Qubit"""
-
-    hash_value = hash("QrefQubit")
-
-    def __eq__(self, other):
-        return isinstance(other, QrefQubit)
-
-    def __hash__(self):
-        return self.hash_value
 
 
-def _qref_qubit_lowering(aval):
-    assert isinstance(aval, QrefQubit)
+def _abstract_qubit_lowering(aval):
+    assert isinstance(aval, AbstractQubit)
     return ir.OpaqueType.get("qref", "bit")
 
 
@@ -133,7 +124,7 @@ def _qref_qreg_lowering(aval):
 #
 # registration
 #
-mlir.ir_type_handlers[QrefQubit] = _qref_qubit_lowering
+mlir.ir_type_handlers[AbstractQubit] = _abstract_qubit_lowering
 mlir.ir_type_handlers[QrefQreg] = _qref_qreg_lowering
 
 
@@ -229,7 +220,7 @@ def _qref_dealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
 @qref_get_p.def_abstract_eval
 def _qref_get_abstract_eval(qreg, qubit_idx):
     assert isinstance(qreg, QrefQreg), f"Expected QrefQreg, got {qreg}"
-    return QrefQubit()
+    return AbstractQubit()
 
 
 def _qref_get_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_idx: ir.Value):
@@ -301,7 +292,7 @@ def _qref_qinst_abstract_eval(
     qubits = qubits_or_params[:qubits_len]
     ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
     all_qubits = qubits + ctrl_qubits
-    assert all(isinstance(qubit, QrefQubit) for qubit in all_qubits[: qubits_len + ctrl_len])
+    assert all(isinstance(qubit, AbstractQubit) for qubit in all_qubits[: qubits_len + ctrl_len])
     return ()
 
 
@@ -394,9 +385,9 @@ def _qref_gphase_abstract_eval(*qubits_or_params, ctrl_len=0, adjoint=False):
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
     param = qubits_or_params[0]
-    assert not isinstance(param, QrefQubit)
+    assert not isinstance(param, AbstractQubit)
     ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
-    assert all(isinstance(qubit, QrefQubit) for qubit in ctrl_qubits[:ctrl_len])
+    assert all(isinstance(qubit, AbstractQubit) for qubit in ctrl_qubits[:ctrl_len])
     return ()
 
 
@@ -451,7 +442,7 @@ def _pauli_rot_abstract_eval(
     ctrl_qubits = qubits_and_ctrl_qubits[-2 * ctrl_len : -ctrl_len]
     ctrl_values = qubits_and_ctrl_qubits[-ctrl_len:]
     all_qubits = qubits + ctrl_qubits
-    assert all(isinstance(qubit, QrefQubit) for qubit in all_qubits)
+    assert all(isinstance(qubit, AbstractQubit) for qubit in all_qubits)
     return ()
 
 
@@ -509,7 +500,7 @@ def _qref_pauli_rot_lowering(
 @qref_pauli_measure_p.def_abstract_eval
 def _qref_pauli_measure_abstract_eval(*qubits, pauli_word=None, qubits_len=0, adjoint=False):
     qubits = qubits[:qubits_len]
-    assert all(isinstance(qubit, QrefQubit) for qubit in qubits)
+    assert all(isinstance(qubit, AbstractQubit) for qubit in qubits)
     return ShapedArray((), bool)
 
 
@@ -554,7 +545,7 @@ def _qref_pauli_measure_lowering(
 #
 @qref_unitary_p.def_abstract_eval
 def _qref_unitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
-    assert all(isinstance(qubit, QrefQubit) for qubit in qubits[: qubits_len + ctrl_len])
+    assert all(isinstance(qubit, AbstractQubit) for qubit in qubits[: qubits_len + ctrl_len])
     return ()
 
 
@@ -652,7 +643,7 @@ def _pl_adjoint_lowering(
 #
 @qref_measure_p.def_abstract_eval
 def _qref_measure_abstract_eval(qubit, postselect: int = None):
-    assert isinstance(qubit, QrefQubit)
+    assert isinstance(qubit, AbstractQubit)
     return ShapedArray((), bool)
 
 
@@ -688,7 +679,7 @@ def _qref_measure_lowering(
 def _qref_measure_in_basis_abstract_eval(
     angle: float, qubit, plane: MeasurementPlane, postselect: int = None
 ):
-    assert isinstance(qubit, QrefQubit)
+    assert isinstance(qubit, AbstractQubit)
     return ShapedArray((), bool)
 
 
@@ -754,8 +745,7 @@ def _qref_compbasis_abstract_eval(*qubits_or_qreg, qreg_available=False):
         return AbstractObs(qreg, qref_compbasis_p)
     else:
         qubits = qubits_or_qreg
-        for qubit in qubits:
-            assert isinstance(qubit, QrefQubit)
+        assert all(isinstance(qubit, AbstractQubit) for qubit in qubits)
         return AbstractObs(len(qubits), qref_compbasis_p)
 
 
@@ -790,7 +780,7 @@ def _qref_compbasis_lowering(
 # pylint: disable=unused-argument
 @qref_namedobs_p.def_abstract_eval
 def _qref_namedobs_abstract_eval(qubit, kind):
-    assert isinstance(qubit, QrefQubit)
+    assert isinstance(qubit, AbstractQubit)
     return AbstractObs()
 
 
@@ -814,8 +804,7 @@ def _qref_named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value,
 # pylint: disable=unused-argument
 @qref_hermitian_p.def_abstract_eval
 def _hermitian_abstract_eval(matrix, *qubits):
-    for q in qubits:
-        assert isinstance(q, QrefQubit)
+    assert all(isinstance(qubit, AbstractQubit) for qubit in qubits)
     return AbstractObs()
 
 
