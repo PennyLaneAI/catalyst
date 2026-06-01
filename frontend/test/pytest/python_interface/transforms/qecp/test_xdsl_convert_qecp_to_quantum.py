@@ -14,14 +14,24 @@
 
 """Tests for the convert-qecp-to-quantum xDSL dialect-conversion pass."""
 
+import numpy as np
+import pennylane as qp
 import pytest
 
+from catalyst.ftqc import qec_pipeline
 from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.dialects.quantum.attributes import QubitType
+from catalyst.python_interface.transforms.qecl import (
+    convert_quantum_to_qecl_pass,
+    inject_noise_to_qecl_pass,
+)
+from catalyst.python_interface.transforms.qecp import (
+    convert_qecl_to_qecp_pass,
+    convert_qecp_to_quantum_pass,
+)
 from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
     ConvertQecPhysicalToQuantumPass,
     QecPhysicalQubitTypeConversion,
-    convert_qecp_to_quantum_pass,
 )
 
 # pylint: disable=line-too-long
@@ -479,3 +489,140 @@ class TestSubroutineConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+class TestHyperRegisterLowering:
+    """Unit test for hyperreg related type and operations lowering."""
+
+    def test_hyperregister_lowering(self, run_filecheck):
+        """Test for hyperreg related type and operations lowering."""
+        program = """
+            builtin.module {
+            // CHECK-LABEL: @circuit()
+                func.func public @circuit() -> () attributes {quantum.node} {
+                    // CHECK-NOT: qecp
+                    // CHECK: [[reg0:%.+]] = quantum.alloc(7) : !quantum.reg
+                    // CHECK-NEXT: [[reg0:%.+]] = func.call @encode_zero_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: [[reg1:%.+]] = quantum.alloc(7) : !quantum.reg
+                    // CHECK-NEXT: [[reg1:%.+]] = func.call @encode_zero_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK: [[reg0:%.+]] = func.call @noise_subroutine_code_1x7x1([[reg0:%.+]]
+                    // CHECK-NEXT: [[reg0:%.+]] = func.call @qec_cycle_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: [[reg0:%.+]] = func.call @hadamard_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: [[reg1:%.+]] = func.call @hadamard_Steane([[reg1:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: quantum.dealloc [[reg0:%.+]] : !quantum.reg
+                    // CHECK-NEXT: quantum.dealloc [[reg1:%.+]] : !quantum.reg
+                    // CHECK-NEXT: quantum.device_release
+                    %0 = qecp.alloc() : !qecp.hyperreg<2 x 1 x 7>
+                    %1 = arith.constant 0 : index
+                    %2 = arith.constant 2 : index
+                    %3 = arith.constant 1 : index
+                    %4 = scf.for %5 = %1 to %2 step %3 iter_args(%6 = %0) -> (!qecp.hyperreg<2 x 1 x 7>) {
+                        %7 = qecp.extract_block %6[%5] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                        %8 = func.call @encode_zero_Steane(%7) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                        %9 = qecp.insert_block %6[%5], %8 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+                        scf.yield %9 : !qecp.hyperreg<2 x 1 x 7>
+                    }
+                    %10 = qecp.extract_block %4[%1] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                    %11 = arith.constant dense<3> : tensor<1xi64>
+                    %12 = arith.constant dense<[[0.43044512331253226, 5.1170870161571145, 1.9497439782412309]]> : tensor<1x3xf64>
+                    %13 = func.call @noise_subroutine_code_1x7x1(%10, %11, %12) : (!qecp.codeblock<1 x 7>, tensor<1xi64>, tensor<1x3xf64>) -> !qecp.codeblock<1 x 7>
+                    %14 = func.call @qec_cycle_Steane(%13) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    %15 = func.call @hadamard_Steane(%14) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    %16 = qecp.extract_block %4[%3] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                    %17 = func.call @hadamard_Steane(%16) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    %18 = qecp.insert_block %4[%1], %15 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+                    %19 = qecp.insert_block %4[%3], %17 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+                    qecp.dealloc %19 : !qecp.hyperreg<2 x 1 x 7>
+                    quantum.device_release
+                    func.return
+                }
+            }
+            func.func private @encode_zero_Steane(%6: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            func.func private @noise_subroutine_code_1x7x1(%6: !qecp.codeblock<1 x 7>, %7: tensor<1xi64>, %8: tensor<1x3xf64>) -> !qecp.codeblock<1 x 7>
+            func.func private @qec_cycle_Steane(%6: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            func.func private @hadamard_Steane(%6: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+@pytest.mark.slow
+class TestQECPassIntegration:
+    """Integration lit tests for the all qec-related pass"""
+
+    # pylint: disable=line-too-long
+    def test_qec_pass_ghz_lightning_integration(self, run_filecheck_qjit):
+        """Integration tests for lowering a 3-logical qubit GHZ circuit on lightning.qubit."""
+        dev = qp.device("lightning.qubit", wires=3)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            # CHECK-NOT: qecp.alloc
+            # CHECK-NOT: qecp.dealloc
+            # CHECK-NOT: qecp.alloc_aux
+            # CHECK-NOT: qecp.dealloc_aux
+            # CHECK-NOT: qecp.extract_block
+            # CHECK-NOT: qecp.insert_block
+            # CHECK-NOT: qecp.insert
+            # CHECK-NOT: qecp.extract
+            # CHECK-NOT: qecp.measure
+            # CHECK-NOT: qecp.identity
+            # CHECK-NOT: qecp.x
+            # CHECK-NOT: qecp.y
+            # CHECK-NOT: qecp.z
+            # CHECK-NOT: qecp.rot
+            # CHECK-NOT: qecp.hadamard
+            # CHECK-NOT: qecp.s
+            # CHECK-NOT: qecp.cnot
+            # CHECK: quantum.alloc
+            # CHECK: quantum.dealloc
+            # CHECK: quantum.extract
+            # CHECK: quantum.insert
+            # CHECK: quantum.bit
+            # CHECK: quantum.reg
+            # CHECK: qecp.assemble_tanner
+            # CHECK: qecp.decode_esm_css
+            # CHECK: quantum.custom "Hadamard"
+            # CHECK: quantum.custom "CNOT"
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            m2 = qp.measure(2)
+            return qp.sample([m0, m1, m2])
+
+        run_filecheck_qjit(ghz)
+        samples = np.atleast_2d(np.asarray(ghz()))
+        allowed_outcomes = ([0, 0, 0], [1, 1, 1])
+        for sample in samples:
+            assert any(np.array_equal(sample, allowed) for allowed in allowed_outcomes)
+
+    def test_qec_pass_ghz_nullqubit_integration(self):
+        """Integration tests for lowering a 3-logical qubit GHZ circuit on null.qubit."""
+        dev = qp.device("null.qubit", wires=3)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            m2 = qp.measure(2)
+            return qp.sample([m0, m1, m2])
+
+        ghz()

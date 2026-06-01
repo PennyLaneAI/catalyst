@@ -41,6 +41,12 @@ namespace DecompGraph::Core {
  * can be combined and decomposed to achieve the desired target gateset while optimizing for
  * resource usage.
  *
+ * Optionally, an operator may carry a set of static named arguments (e.g.,
+ * `{"pauli_word": "X"}` for `PauliRot`) that further specialize the operator.
+ * When non-empty, static arguments participate in equality
+ * comparisons so that rules guarded on a specific value only
+ * match operator queries that carry the same value.
+ *
  * TODO: Fix the equality with wildcards for numWires and numParams
  * when adding support for operators with dynamic numbers of wires/params.
  */
@@ -49,6 +55,9 @@ struct OperatorNode {
     int numWires{-1};
     int numParams{-1};
     bool adjoint{false};
+
+    // Optional static arguments for operators that require additional data.
+    std::unordered_map<std::string, std::string> staticNamedArgs{};
 
     bool operator==(const OperatorNode &other) const
     {
@@ -59,7 +68,14 @@ struct OperatorNode {
         const bool default_params =
             (numParams == -1 || other.numParams == -1 || numParams == other.numParams);
 
-        return name == other.name && default_wires && default_params && adjoint == other.adjoint;
+        // Static arguments are optional: if either side has no static args, they
+        // are treated as matching (wildcard). When both sides provide entries, the maps must
+        // be equal element-wise for the operators to be considered equivalent.
+        const bool static_args_match = staticNamedArgs.empty() || other.staticNamedArgs.empty() ||
+                                       staticNamedArgs == other.staticNamedArgs;
+
+        return name == other.name && default_wires && default_params && adjoint == other.adjoint &&
+               static_args_match;
     }
     bool operator!=(const OperatorNode &other) const { return !(*this == other); }
 };

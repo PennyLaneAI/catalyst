@@ -20,11 +20,21 @@ To apply this pass, the QEC code must be know.
 Known Limitations
 -----------------
 
-The convert-qecl-to-qecp pass does not support the following cases:
+The convert-qecl-to-qecp pass has the following known limitations:
 
-  * QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
+  * No support for QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
+  * No support for non-CSS codes
+  * Only supports lowering of transversal gates and measurements. Does not support non-Clifford gates.
   * Only logical Pauli Z observables (computational basis) are supported for lowering `qecl.measure`
     operations.
+  * Support for control flow in the user program is not fully implemented or tested
+  * The generated QEC-cycles are not fault-tolerant - they don't account for potential errors in
+    the syndrome qubits/measurements
+  * For terminal measurements, only sampling of MCMs is supported
+  * The encoding procedure to create the logical zero state in a codeblock is not optimized for
+    efficiency
+  * Only thoroughly tested with the Steane code, but should be generalizable to other k=1 CSS
+    stabilizer codes.
 """
 
 from collections.abc import Callable, Iterable
@@ -100,8 +110,8 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
         """Type conversion rewrite pattern for physical codeblock types."""
         if typ.k.value.data != self.qec_code.k:
             raise CompileError(
-                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; hyper-register has "
-                f"k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
+                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; hyper-register "
+                f"has k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
             )
 
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
@@ -402,14 +412,12 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         module_block = op.regions[0].blocks.first
         assert module_block is not None, "Module has no block"
 
-        tanner_x, tanner_z = self.insert_tanner_graph_ops_into_block(module_block)
-
         # Insert subroutines that implement the QEC protocols
-        encode_funcop = self.create_encode_subroutine()
-        module_block.add_op(encode_funcop)
+        encode_subroutine = self.create_encode_subroutine()
+        module_block.add_op(encode_subroutine)
 
-        qec_cycle_funcop = self.create_qec_cycle_subroutine(tanner_x=tanner_x, tanner_z=tanner_z)
-        module_block.add_op(qec_cycle_funcop)
+        qec_cycle_subroutine = self.create_qec_cycle_subroutine()
+        module_block.add_op(qec_cycle_subroutine)
 
         measure_subroutine = self.create_measure_subroutine()
         module_block.add_op(measure_subroutine)
@@ -417,6 +425,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         physical_meas_decode_subroutine = self.create_physical_meas_decode_subroutine()
         module_block.add_op(physical_meas_decode_subroutine)
 
+        # 1Q gate and 2Q gate subroutines are returned as dicts storing
+        # {"gate_name": subroutine_funcop}
         transversal_gate_subroutines = (
             self.create_transversal_1Qgate_subroutines()
             | self.create_transversal_2Qgate_subroutines()
@@ -433,9 +443,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     DeallocationConversion(),
                     InsertBlockConversion(),
                     ExtractBlockConversion(),
-                    EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_funcop),
+                    EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_subroutine),
                     QecCycleOpConversion(
-                        qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_funcop
+                        qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_subroutine
                     ),
                     MeasureOpConversion(
                         qec_code=self.qec_code,
@@ -449,6 +459,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 ]
             )
         ).rewrite_module(op)
+
+    # MARK: Insert tanner graphs
 
     def insert_tanner_graph_ops_into_block(
         self, block: Block
@@ -522,8 +534,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return assemble_x_tanner_op.tanner_graph, assemble_z_tanner_op.tanner_graph
 
+    # MARK: Measure subroutine
+
     def create_measure_subroutine(self) -> func.FuncOp:
-        """Create the subroutine that performs the transversal measurement of a physical codeblock.
+        """Create the subroutine that performs the transversal measurement of a physical codeblock
+        in the computational basis. All qubits in the codeblock are measured directly.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
@@ -601,9 +616,17 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return measure_subroutine
 
+    # MARK: Meas_decode subroutine
+
     def create_physical_meas_decode_subroutine(self) -> func.FuncOp:
         """Create the subroutine that performs the physical-measurement decoding of a transversal
-        measurement and returns the corresponding k logical measurement outcomes.
+        measurement in the computational basis, and returns the corresponding k logical measurement
+        outcomes.
+
+        The logical measurement outcome is determined by a parity check of the physical measurements
+        corresponding to the indices of the PauliZ operation - i.e. for a code where a transversal
+        Z gate is applied on indices [1, 2, 4], a logical Z measurement is determined by a parity
+        check of physical measurements at indices [1, 2, 4] of the codeblock.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
@@ -672,6 +695,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return physical_meas_decode_subroutine
 
+    # MARK: Encode subroutine
+
     def create_encode_subroutine(self) -> func.FuncOp:
         """Create a subroutine that takes in a codeblock, encodes it in the zero state for
         the QEC code (based on the tanner graph), and returns the encoded codeblock. This
@@ -719,11 +744,18 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return funcOp
 
+    # MARK: 1Q gate subroutines
+
     def create_transversal_1Qgate_subroutines(self) -> dict[str, func.FuncOp]:
         """Create the subroutines that performs transversal 1-qubit gates on a physical codeblock.
 
+        The subroutines are built based on the gate and codeblock indices defined in the specified
+        ``QecCode``. For example, a code that specifies ``{"x": (qecp.PauliXOp, [2, 3])}`` as a
+        transversal gate will lower ``qecl.x`` to ``qecp.x`` at indices 2 and 3. The `qecp.identity`
+        operator is applied at all other indices in the codeblock.
+
         Note that this method does not insert the subroutine into the module op. Instead it returns
-        a dict of built func.FuncOp objects that can then be subsequently inserted where desired.
+        a dict containing func.FuncOp objects that can then be subsequently inserted where desired.
         """
         subroutines = {}
         single_qubit_gates = self.qec_code.transversal_1q_gates
@@ -773,11 +805,16 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return subroutines
 
+    # MARK: 2Q gate subroutines
+
     def create_transversal_2Qgate_subroutines(self) -> dict[str, func.FuncOp]:
-        """Create the subroutinew that performs transversal 2-qubit gates on a physical codeblock.
+        """Create the subroutines that perform transversal 2-qubit gates on a physical codeblock.
+
+        This implementation assumes the gate is applied transversally between all corresponding
+        qubit pairs in the two codeblocks.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
-        a dict of built func.FuncOp objects that can then be subsequently inserted where desired.
+        a dict containing func.FuncOp objects that can then be subsequently inserted where desired.
         """
         subroutines = {}
 
@@ -834,6 +871,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             subroutines[gate_name] = funcOp
 
         return subroutines
+
+    # MARK: Check pattern
 
     def check_pattern(
         self,
@@ -932,14 +971,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return tanner_graph, cnot_fn
 
-    def create_qec_cycle_subroutine(
-        self, tanner_x: qecp.TannerGraphSSAValue, tanner_z: qecp.TannerGraphSSAValue
-    ) -> func.FuncOp:
+    # MARK: QEC cycle subroutine
+
+    def create_qec_cycle_subroutine(self) -> func.FuncOp:
         """Create a subroutine that performs a cycle of QEC on an input physical codeblock.
 
         The generated subroutine assumes a CSS QEC code and performs separate X and Z corrections,
-        as defined by the input X and Z Tanner graphs, `tanner_x` and `tanner_z`. Recall that
-        X-Tanner graphs define the X stabilizer components of the code, which are used to identify Z
+        as defined by this pass's X and Z Tanner graph data for the code. Recall that X-Tanner
+        graphs define the X stabilizer components of the code, which are used to identify Z
         errors, and conversely Z-Tanner graphs define the Z stabilizer components of the code, which
         are used to identify X errors.
 
@@ -950,6 +989,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         the detected error(s) occurred. It then iterates over these codeblock indices, applies the
         respective correction, and finally returns the updated physical codeblock SSA value.
 
+        Tanner graph SSA values are produced by ``qecp.assemble_tanner`` at the start of this
+        function's entry block so the subroutine body remains isolated from the enclosing module
+        (MLIR functions are isolated from above).
+
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
         """
@@ -959,6 +1002,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         output_types = (codeblock_type,)
 
         block = Block(arg_types=input_types)
+        tanner_x, tanner_z = self.insert_tanner_graph_ops_into_block(block)
 
         with ImplicitBuilder(block):
             in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
@@ -1091,7 +1135,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         assert False, f"Unknown CheckType: '{check_type}'"
 
                 insert_err_qubit_op = qecp.InsertQubitOp(
-                    in_codeblock=post_check_codeblock, idx=err_idx, qubit=corr_qubit_op.out_qubit
+                    in_codeblock=codeblock, idx=err_idx, qubit=corr_qubit_op.out_qubit
                 )
 
                 scf.YieldOp(insert_err_qubit_op.out_codeblock)
@@ -1104,7 +1148,6 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
             scf.YieldOp(out_codeblock)
 
-        # Return updated codeblock SSA value
         return for_each_err_idx_op.results[0]
 
 

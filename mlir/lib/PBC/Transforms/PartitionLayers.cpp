@@ -98,20 +98,6 @@ void constructLayer(PBCLayer &layer, IRRewriter &writer)
     eraseUnusedOps(layer, writer);
 }
 
-bool isParentLayerOp(PBCOpInterface op)
-{
-    // Skip ops nested inside an existing pbc.layer region
-    auto parentOp = op->getParentOp();
-    while (parentOp != nullptr) {
-        if (isa<LayerOp>(parentOp))
-            return true;
-
-        parentOp = parentOp->getParentOp();
-    }
-
-    return false;
-}
-
 struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayersPass> {
     using PartitionLayersPassBase::PartitionLayersPassBase;
 
@@ -120,30 +106,13 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
         MLIRContext *context = &getContext();
         mlir::IRRewriter writer(context);
 
-        // Create per-pass context for layer construction
         PBCLayerContext layerContext;
-        PBCLayer currentLayer(&layerContext);
+        auto groupLayers = layerContext.groupLayers(getOperation(), onlyDisjointQubit);
 
-        // Accumulate consecutive PBC ops into a layer
-        getOperation()->walk([&](PBCOpInterface op) {
-            // Skip ops nested inside an existing pbc.layer region
-            if (isParentLayerOp(op))
-                return WalkResult::skip();
-
-            // Try to insert the op into the current layer
-            if (currentLayer.insert(op))
-                return WalkResult::skip();
-
-            constructLayer(currentLayer, writer);
-
-            // Start a new layer and insert the op
-            currentLayer = PBCLayer(&layerContext);
-            currentLayer.insert(op);
-
-            return WalkResult::advance();
-        });
-
-        constructLayer(currentLayer, writer);
+        for (const auto &layer : groupLayers) {
+            PBCLayer pbc_layer(&layerContext, layer);
+            constructLayer(pbc_layer, writer);
+        }
     };
 };
 

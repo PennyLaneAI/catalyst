@@ -25,6 +25,7 @@
 #include "mlir/IR/Value.h"
 
 #include "MBQC/IR/MBQCOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 
@@ -55,6 +56,7 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
 void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTracker &tracker);
 void handleMeasureInBasis(IRRewriter &builder, mbqc::RefMeasureInBasisOp rMeasureInBasisOp,
                           QubitValueTracker &tracker);
+void handlePPM(IRRewriter &builder, pbc::RefPPMeasurementOp rPPMOp, QubitValueTracker &tracker);
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker);
 void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
                      QubitValueTracker &tracker);

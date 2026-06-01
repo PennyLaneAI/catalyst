@@ -441,6 +441,10 @@ class TestTannerGraphInsertion:
         program = """
         // CHECK-LABEL: test_module
         builtin.module @test_module {
+        func.func @test_program()  {
+            return
+        }
+        // CHECK-LABEL: func.func private @qec_cycle_Steane
         //      CHECK: [[row_idx_x:%.+]] = arith.constant
         // CHECK-SAME:   dense<[7, 7, 8, 7, 8, 9, 7, 9, 8, 8, 9, 9, 0, 1, 2, 3, 1, 2, 4, 5, 2, 3, 5, 6]> : tensor<24xi32>
         //      CHECK: [[col_ptr_x:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
@@ -451,10 +455,6 @@ class TestTannerGraphInsertion:
         //      CHECK: [[col_ptr_z:%.+]] = arith.constant dense<[0, 1, 3, 6, 8, 9, 11, 12, 16, 20, 24]> : tensor<11xi32>
         //      CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner [[row_idx_z]], [[col_ptr_z]] :
         // CHECK-SAME:   tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
-        // CHECK-LABEL: test_program
-        func.func @test_program()  {
-            return
-        }
         }
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
@@ -473,8 +473,6 @@ class TestQecCycleLowering:
         program = """
         // CHECK-LABEL: test_module
         builtin.module @test_module {
-        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
-        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}} -> !qecp.tanner_graph<24, 11, i32>
         // CHECK-LABEL: test_program
         func.func @test_program()  {
             // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
@@ -485,6 +483,8 @@ class TestQecCycleLowering:
             return
         }
         // CHECK-LABEL: qec_cycle_Steane([[cb0:%.+]]: !qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+        // CHECK: [[tanner_x:%.+]] = qecp.assemble_tanner {{.+}}, {{.+}} : tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
+        // CHECK: [[tanner_z:%.+]] = qecp.assemble_tanner {{.+}}, {{.+}} : tensor<24xi32>, tensor<11xi32> -> !qecp.tanner_graph<24, 11, i32>
 
         // COM: The block below takes results of X checks and performs Z corrections
         // CHECK: qecp.alloc_aux : !qecp.qubit<aux>
@@ -507,7 +507,7 @@ class TestQecCycleLowering:
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
-        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_x]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[tanner_x]] : !qecp.tanner_graph<24, 11, i32>) [[esm]] : tensor<3xi1> -> tensor<1xindex>
         // CHECK: [[lb:%.+]] = arith.constant 0 : index
         // CHECK: [[ub:%.+]] = arith.constant 1 : index
         // CHECK: [[st:%.+]] = arith.constant 1 : index
@@ -519,7 +519,7 @@ class TestQecCycleLowering:
         // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
         // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
         // CHECK:     [[q1:%.+]] = qecp.z [[q0]] : !qecp.qubit<data>
-        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb_arg]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
         // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
         // CHECK:   } else {
         // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
@@ -544,7 +544,7 @@ class TestQecCycleLowering:
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: qecp.dealloc_aux {{.*}} : !qecp.qubit<aux>
         // CHECK: [[esm:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
-        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[esm]] : tensor<3xi1>) [[tanner_z]] : !qecp.tanner_graph<24, 11, i32> -> tensor<1xindex>
+        // CHECK: [[idx_t:%.+]] = qecp.decode_esm_css([[tanner_z]] : !qecp.tanner_graph<24, 11, i32>) [[esm]] : tensor<3xi1>  -> tensor<1xindex>
         // CHECK: [[lb:%.+]] = arith.constant 0 : index
         // CHECK: [[ub:%.+]] = arith.constant 1 : index
         // CHECK: [[st:%.+]] = arith.constant 1 : index
@@ -556,7 +556,7 @@ class TestQecCycleLowering:
         // CHECK:   [[cond_out_cb:%.+]] = scf.if [[cond]]
         // CHECK:     [[q0:%.+]] = qecp.extract [[cb_arg]][[[err_idx]]] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
         // CHECK:     [[q1:%.+]] = qecp.x [[q0]] : !qecp.qubit<data>
-        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb0]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+        // CHECK:     [[cb_arg_1:%.+]] = qecp.insert [[cb_arg]][[[err_idx]]], [[q1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
         // CHECK:     scf.yield [[cb_arg_1]] : !qecp.codeblock<1 x 7>
         // CHECK:   } else {
         // CHECK:     scf.yield [[cb_arg]] : !qecp.codeblock<1 x 7>
@@ -569,7 +569,7 @@ class TestQecCycleLowering:
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
 
-# MARK: TestLoweringMeasure
+# MARK: Measure
 
 
 class TestLoweringMeasure:
@@ -1015,40 +1015,83 @@ class TestLoweringTransversalGates:
         run_filecheck(program, pipeline)
 
 
-# MARK: Integration Tests with Noise
+# MARK: Integration
 
 
-# We can remove this xfail and warning filter once `convert_qecl_to_qecp_pass` is complete
-@pytest.mark.xfail(reason="The `convert_qecl_to_qecp_pass` is incomplete")
-@pytest.mark.filterwarnings("ignore:Unable to remove cast UnrealizedConversionCastOp")
-class TestQECLNoiseLoweringPassIntegration:
-    """Integration lit tests for the convert-qecl-noise-to-qecp-noise pass"""
+class TestQECPLoweringIntegration:
+    """Integration lit tests for convert-qecl-to-qecp"""
 
-    # pylint: disable=line-too-long
+    def test_circuit_ghz_to_qecp(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl and convert-qecl-to-qecp pass together on a
+        GHZ circuit."""
+        dev = qp.device("null.qubit", wires=3)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def circuit():
+            # CHECK: qecp.alloc() : !qecp.hyperreg<3 x 1 x 7>
+            # CHECK: scf.for {{.*}} {
+            # CHECK:   qecp.extract_block
+            # CHECK:   func.call @encode_zero_Steane
+            # CHECK:   qecp.insert_block
+            # CHECK:   scf.yield
+            # CHECK: }
+            # CHECK: qecp.extract_block
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @hadamard_Steane
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: qecp.extract_block
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @cnot_Steane
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: qecp.extract_block
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @cnot_Steane
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @measure_transversal_Steane
+            # CHECK: func.call @measure_transversal_Steane
+            # CHECK: func.call @measure_transversal_Steane
+            # CHECK: quantum.mcmobs
+            # CHECK: quantum.sample
+            # CHECK: qecp.insert_block
+            # CHECK: qecp.dealloc
+            qp.H(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            m2 = qp.measure(2)
+            return qp.sample([m0, m1, m2])
+
+        run_filecheck_qjit(circuit)
+
     def test_convert_qecl_noise_to_qecp_noise_pass_integration(self, run_filecheck_qjit):
-        """Test the convert-qecl-noise-to-qecp-noise pass on the simplest possible, non-trivial circuit."""
+        """Test integration of the convert-qecl-noise-to-qecp-noise pass on the simplest possible,
+        non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
         @qp.qjit(target="mlir", capture=True)
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
+        @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
-            # CHECK: builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
+            # CHECK: func.call @encode_zero_Steane
             # CHECK: arith.constant dense
             # CHECK: arith.constant dense
             # CHECK: func.call @noise_subroutine_code
-            # CHECK: builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
-            # CHECK: qecl.qec
-            # CHECK: qecl.hadamard
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @hadamard_Steane
             qp.H(0)
-            # CHECK: builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecl.codeblock<1> to !qecp.codeblock<1 x 7>
             # CHECK: arith.constant dense
             # CHECK: arith.constant dense
             # CHECK: func.call @noise_subroutine_code
-            # CHECK: builtin.unrealized_conversion_cast [[codeblock:%.*]] : !qecp.codeblock<1 x 7> to !qecl.codeblock<1>
-            # CHECK: qecl.qec
+            # CHECK: func.call @qec_cycle_Steane
+            # CHECK: func.call @measure_transversal_Steane
             m0 = qp.measure(0)
             return qp.sample([m0])
 

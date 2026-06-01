@@ -14,7 +14,6 @@
 
 #define DEBUG_TYPE "ppm-specs"
 
-#include <algorithm>
 #include <string>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -44,9 +43,9 @@ namespace pbc {
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {
     using CountPPMSpecsPassBase::CountPPMSpecsPassBase;
 
-    LogicalResult
-    countLogicalQubit(Operation *op,
-                      llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs)
+    using PPMSpecsType = llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>>;
+
+    LogicalResult countLogicalQubit(Operation *op, PPMSpecsType &PPMSpecs)
     {
         uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
 
@@ -59,12 +58,10 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
-    LogicalResult countPPM(pbc::PPMeasurementOp op,
-                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs)
+    LogicalResult countPPM(pbc::PPMeasurementOp op, PPMSpecsType &PPMSpecs)
     {
-        if (isOpInIfOp(op) || isOpInWhileOp(op)) {
-            return op->emitOpError(
-                "PPM statistics is not available when there are conditionals or while loops.");
+        if (isOpInWhileOp(op)) {
+            return op->emitOpError("PPM statistics is not available when there are while loops.");
         }
 
         auto parentFuncOp = op->getParentOfType<func::FuncOp>();
@@ -76,19 +73,17 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         int64_t forLoopMultiplier = countStaticForloopIterations(op);
         if (forLoopMultiplier == -1) {
             return op->emitOpError(
-                "PPM statistics is not available when there are dynamically sized for loops.");
+                "PBC statistics is not available when there are dynamically sized for loops.");
         }
         PPMSpecs[parentFuncOp.getName()]["num_of_ppm"] += forLoopMultiplier;
         return success();
     }
 
-    LogicalResult countPPR(pbc::PPRotationOp op,
-                           llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs,
+    LogicalResult countPPR(pbc::PPRotationOp op, PPMSpecsType &PPMSpecs,
                            llvm::BumpPtrAllocator &stringAllocator)
     {
-        if (isOpInIfOp(op) || isOpInWhileOp(op)) {
-            return op->emitOpError(
-                "PPM statistics is not available when there are conditionals or while loops.");
+        if (isOpInWhileOp(op)) {
+            return op->emitOpError("PBC statistics is not available when there are while loops.");
         }
 
         int8_t rotationKind = op.getRotationKind();
@@ -108,7 +103,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         int64_t forLoopMultiplier = countStaticForloopIterations(op);
         if (forLoopMultiplier == -1) {
             return op->emitOpError(
-                "PPM statistics is not available when there are dynamically sized for loops.");
+                "PBC statistics is not available when there are dynamically sized for loops.");
         }
         PPMSpecs[funcName][numRotationKindKey] += forLoopMultiplier;
 
@@ -118,80 +113,50 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
-    bool commuteToLayer(PBCOpInterface rhsOp, PBCLayer &lhsLayer)
+    // Worst-case PBC layer depth for a single function, treating scf.if as
+    // a barrier whose contribution is `max(depth(then), depth(else))`.
+    // depth_type:
+    //   depth-0: any commuting PPMs may share a layer, even on overlapping qubits.
+    //   depth-1: only PPMs on non-overlapping qubits may share a layer.
+    LogicalResult computeFuncDepth(func::FuncOp funcOp, bool onlyDisjointQubit,
+                                   PPMSpecsType &PPMSpecs)
     {
-        for (auto lhsOp : lhsLayer.getOps()) {
-            if (!commutes(rhsOp, lhsOp)) {
-                return false;
-            }
+        if (!funcOp.getBody()
+                 .walk([&](PBCOpInterface) { return WalkResult::interrupt(); })
+                 .wasInterrupted()) {
+            return success();
         }
-        return true;
-    }
-
-    bool isPPR(PBCOpInterface op) { return isa<pbc::PPRotationOp>(op); }
-    bool isPPM(PBCOpInterface op) { return isa<pbc::PPMeasurementOp>(op); }
-
-    // Check if two ops have the same rotation kind.
-    bool equalTypes(PBCOpInterface lhsOp, PBCOpInterface rhsOp)
-    {
-        return (isPPR(lhsOp) == isPPR(rhsOp) || isPPM(lhsOp) == isPPM(rhsOp));
-    }
-
-    // Add op to current layer if it commutes with the last op in the layer and has the same type.
-    bool canAddToCurrentLayer(PBCOpInterface op, PBCLayer &currentLayer)
-    {
-        if (currentLayer.empty())
-            return true;
-
-        auto lastOp = currentLayer.getOps().back();
-        return equalTypes(lastOp, op) && commuteToLayer(op, currentLayer);
-    }
-
-    void countDepths(std::vector<PBCLayer> &layers,
-                     llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> &PPMSpecs,
-                     llvm::BumpPtrAllocator &stringAllocator)
-    {
-        for (auto &layer : layers) {
-            assert(!layer.empty() && "Layer is empty");
-
-            auto op = layer.getOps().back();
-            auto parentFuncOp = op->getParentOfType<func::FuncOp>();
-            StringRef funcName = parentFuncOp.getName();
-            llvm::StringSaver saver(stringAllocator);
-
-            StringRef key;
-            if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
-                key = saver.save("depth_pi" + std::to_string(std::abs(pprOp.getRotationKind())) +
-                                 "_ppr");
-            }
-            else {
-                key = saver.save("depth_ppm");
-            }
-
-            PPMSpecs[funcName][key]++;
-        }
-    }
-
-    LogicalResult printSpecs()
-    {
-        llvm::BumpPtrAllocator stringAllocator;
-        llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>> PPMSpecs;
 
         PBCLayerContext layerContext;
-        PBCLayer currentLayer(&layerContext);
-        std::vector<PBCLayer> layers;
+        FailureOr<int64_t> depth =
+            layerContext.computeWorstCaseDepth(&funcOp.getBody().front(), onlyDisjointQubit);
+        if (failed(depth)) {
+            return failure();
+        }
+
+        StringRef funcName = funcOp.getName();
+        PPMSpecs[funcName]["depth_type"] = onlyDisjointQubit ? 1 : 0;
+        PPMSpecs[funcName]["depth"] = static_cast<int>(*depth);
+        return success();
+    }
+
+    LogicalResult computeAllFuncDepth(bool onlyDisjointQubit, PPMSpecsType &PPMSpecs)
+    {
+        WalkResult wr = getOperation()->walk([&](func::FuncOp funcOp) {
+            return failed(computeFuncDepth(funcOp, onlyDisjointQubit, PPMSpecs))
+                       ? WalkResult::interrupt()
+                       : WalkResult::advance();
+        });
+        return wr.wasInterrupted() ? failure() : success();
+    }
+
+    LogicalResult printSpecs(bool onlyDisjointQubit)
+    {
+        llvm::BumpPtrAllocator stringAllocator;
+        PPMSpecsType PPMSpecs;
 
         // Walk over all operations in the IR (could be ModuleOp or FuncOp)
         WalkResult wr = getOperation()->walk([&](Operation *op) {
-            // Count Depth
-            if (auto pbcOp = dyn_cast<PBCOpInterface>(op)) {
-                if (!canAddToCurrentLayer(pbcOp, currentLayer)) {
-                    layers.emplace_back(std::move(currentLayer));
-                    currentLayer = PBCLayer(&layerContext);
-                }
-                currentLayer.insertToLayer(pbcOp);
-            }
-
             // Count Logical Qubit
             if (isa<quantum::AllocOp>(op)) {
                 if (failed(countLogicalQubit(op, PPMSpecs))) {
@@ -226,22 +191,19 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             return failure();
         }
 
-        // Add the last layer if it is not empty.
-        if (!currentLayer.empty()) {
-            layers.emplace_back(std::move(currentLayer));
-        }
-
-        countDepths(layers, PPMSpecs, stringAllocator);
+        // Compute depth, but still emit JSON even if depth analysis fails for some
+        // functions (counts may have succeeded). Pass failure is reported at the end.
+        LogicalResult depthResult = computeAllFuncDepth(onlyDisjointQubit, PPMSpecs);
 
         json PPMSpecsJson = PPMSpecs;
         llvm::outs() << PPMSpecsJson.dump(4)
                      << "\n"; // dump(4) makes an indent with 4 spaces when printing JSON
-        return success();
+        return depthResult;
     }
 
     void runOnOperation() final
     {
-        if (failed(printSpecs())) {
+        if (failed(printSpecs(onlyDisjointQubit))) {
             signalPassFailure();
         }
     }
