@@ -93,6 +93,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Additional integration tests have been added for ``qp.specs``.
+  [(#2900)](https://github.com/PennyLaneAI/catalyst/pull/2900)
+
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
 
@@ -179,4 +182,5 @@ Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
