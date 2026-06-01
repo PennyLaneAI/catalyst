@@ -9,7 +9,13 @@ FetchContent_Declare(stim
 # Set a more portable vectorization instruction set than whatever is available on the build machine.
 set(SIMD_WIDTH 128)
 
-FetchContent_MakeAvailable(stim)
+# We only need `libstim`, so avoid unnecessary package probes in Stim's CMake config.
+block()
+  set(CMAKE_DISABLE_FIND_PACKAGE_GTest TRUE)
+  set(CMAKE_DISABLE_FIND_PACKAGE_Python TRUE)
+  set(CMAKE_DISABLE_FIND_PACKAGE_pybind11 TRUE)
+  FetchContent_MakeAvailable(stim)
+endblock()
 
 # Ignore all warnings from Stim library sources.
 target_compile_options(libstim PRIVATE -w)
@@ -27,4 +33,4 @@ target_compile_options(PBCUtils PRIVATE
     -fexceptions     # Enable exceptions
 )
 
-target_link_libraries(PBCUtils PRIVATE libstim ExternalStablehloLib)
+target_link_libraries(PBCUtils PRIVATE libstim ExternalStablehloLib MLIRSCFDialect)

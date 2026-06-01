@@ -173,6 +173,7 @@ class LinkerDriver:
             "-lcustom_calls",
             "-lmlir_async_runtime",
             "-lrt_rsdecomp",
+            "-lrt_decoder",
         ]
 
         rt_remote_so = "librt_remote" + file_extension
