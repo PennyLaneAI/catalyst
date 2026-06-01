@@ -161,6 +161,9 @@
   better. This can be useful for optimizations that depend on values being static.
   [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
 
+* Following deprecation of ``Operator.single_qubit_rot_angles`` in PennyLane, update a test case
+  to use the new ``qp.single_qubit_zyz_angles(op)`` instead.
+  [(#2860)](https://github.com/PennyLaneAI/catalyst/pull/2860)
 
 <h3>Documentation 📝</h3>
 
@@ -169,6 +172,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Astral Cai,
 Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
