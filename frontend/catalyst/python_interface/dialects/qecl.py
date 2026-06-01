@@ -65,8 +65,8 @@ from xdsl.printer import Printer
 class LogicalCodeblockInitState(StrEnum):
     """Enum for logical codeblock initial state"""
 
-    Zero = "zero"
-    # Add other supported codeblock initial states here
+    Zero = "zero"  # |0⟩
+    Magic = "magic"  # |m⟩ = |0⟩ + e^{iπ/4}|1⟩  (Magic state)
 
 
 @irdl_attr_definition
@@ -251,7 +251,7 @@ class ExtractCodeblockOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (hyper_reg, None)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (hyper_reg, idx)
             properties = {}
@@ -299,7 +299,7 @@ class InsertCodeblockOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (in_hyper_reg, None, codeblock)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (in_hyper_reg, idx, codeblock)
             properties = {}
@@ -309,6 +309,51 @@ class InsertCodeblockOp(IRDLOperation):
         super().__init__(
             operands=operands, properties=properties, result_types=(in_hyper_reg_type,)
         )
+
+
+@irdl_op_definition
+class FabricateOp(IRDLOperation):
+    """Fabricate a logical codeblock in a specified initial state."""
+
+    name = "qecl.fabricate"
+
+    assembly_format = """
+            `[` $init_state `]` attr-dict `:` type($out_codeblock)
+        """
+
+    init_state = prop_def(LogicalCodeblockInitStateAttr)
+
+    out_codeblock = result_def(base(LogicalCodeblockType))
+
+    def __init__(
+        self,
+        init_state: str | LogicalCodeblockInitStateAttr,
+        out_codeblock_type: LogicalCodeblockType,
+    ):
+        init_state_attr = (
+            init_state
+            if isinstance(init_state, LogicalCodeblockInitStateAttr)
+            else LogicalCodeblockInitStateAttr(init_state)
+        )
+        properties = {"init_state": init_state_attr}
+
+        super().__init__(result_types=(out_codeblock_type,), properties=properties)
+
+
+@irdl_op_definition
+class DeallocCodeblockOp(IRDLOperation):
+    """Deallocate a single logical codeblock."""
+
+    name = "qecl.dealloc_cb"
+
+    assembly_format = """
+            $codeblock attr-dict `:` type($codeblock)
+        """
+
+    codeblock = operand_def(base(LogicalCodeblockType))
+
+    def __init__(self, codeblock: LogicalCodeBlockSSAValue | Operation):
+        super().__init__(operands=(codeblock,))
 
 
 @irdl_op_definition
@@ -454,7 +499,7 @@ class SingleQubitLogicalGateOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None)
-            properties["idx_attr"] = idx
+            properties["idx_attr"] = IntegerAttr(idx.value.data, IndexType())
 
         else:
             operands = (in_codeblock, idx)
@@ -655,13 +700,16 @@ class CnotOp(IRDLOperation):
 
         if isinstance(idx_ctrl, IntegerAttr) and isinstance(idx_trgt, IntegerAttr):
             operands = (in_ctrl_codeblock, None, in_trgt_codeblock, None)
-            properties = {"idx_ctrl_attr": idx_ctrl, "idx_trgt_attr": idx_trgt}
+            properties = {
+                "idx_ctrl_attr": IntegerAttr(idx_ctrl.value.data, IndexType()),
+                "idx_trgt_attr": IntegerAttr(idx_trgt.value.data, IndexType()),
+            }
         elif isinstance(idx_ctrl, IntegerAttr):
             operands = (in_ctrl_codeblock, None, in_trgt_codeblock, idx_trgt)
-            properties = {"idx_ctrl_attr": idx_ctrl}
+            properties = {"idx_ctrl_attr": IntegerAttr(idx_ctrl.value.data, IndexType())}
         elif isinstance(idx_trgt, IntegerAttr):
             operands = (in_ctrl_codeblock, idx_ctrl, in_trgt_codeblock, None)
-            properties = {"idx_trgt_attr": idx_trgt}
+            properties = {"idx_trgt_attr": IntegerAttr(idx_trgt.value.data, IndexType())}
         else:
             operands = (in_ctrl_codeblock, idx_ctrl, in_trgt_codeblock, idx_trgt)
             properties = {}
@@ -725,7 +773,7 @@ class MeasureOp(IRDLOperation):
 
         if isinstance(idx, IntegerAttr):
             operands = (in_codeblock, None)
-            properties = {"idx_attr": idx}
+            properties = {"idx_attr": IntegerAttr(idx.value.data, IndexType())}
         else:
             operands = (in_codeblock, idx)
 
@@ -745,6 +793,8 @@ QecLogical = Dialect(
         DeallocOp,
         ExtractCodeblockOp,
         InsertCodeblockOp,
+        FabricateOp,
+        DeallocCodeblockOp,
         EncodeOp,
         NoiseOp,
         QecCycleOp,

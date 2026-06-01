@@ -15,12 +15,12 @@
 #define DEBUG_TYPE "adjoint"
 
 #include <algorithm>
-#include <iterator>
 #include <queue>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
+#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
@@ -30,6 +30,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/Value.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -156,14 +157,15 @@ class AdjointGenerator {
         return dynamicWire;
     }
 
-    std::optional<Value> getQuantumReg(ValueRange values)
+    SmallVector<Value> getQuantumValues(ValueRange values)
     {
+        SmallVector<Value> qvalues;
         for (Value value : values) {
-            if (isa<quantum::QuregType>(value.getType())) {
-                return value;
+            if (isa<quantum::QuregType, quantum::QubitType>(value.getType())) {
+                qvalues.push_back(value);
             }
         }
-        return std::nullopt;
+        return qvalues;
     }
 
     void visitOperation(quantum::QuantumGate gate, OpBuilder &builder)
@@ -438,9 +440,9 @@ class AdjointGenerator {
 
     void visitOperation(scf::ForOp forOp, OpBuilder &builder)
     {
-        std::optional<Value> yieldedQureg =
-            getQuantumReg(forOp.getBody()->getTerminator()->getOperands());
-        if (!yieldedQureg.has_value()) {
+        SmallVector<Value> yieldedQValues =
+            getQuantumValues(forOp.getBody()->getTerminator()->getOperands());
+        if (yieldedQValues.empty()) {
             // This operation is purely classical
             return;
         }
@@ -452,26 +454,41 @@ class AdjointGenerator {
         Value stop = ListPopOp::create(builder, forOp.getLoc(), tape);
         Value start = ListPopOp::create(builder, forOp.getLoc(), tape);
 
-        Value reversedResult = remappedValues.lookup(getQuantumReg(forOp.getResults()).value());
+        SmallVector<Value> reversedResults;
+        for (auto v : getQuantumValues(forOp.getResults())) {
+            reversedResults.push_back(remappedValues.lookup(v));
+        }
+
         auto replacedFor = scf::ForOp::create(
-            builder, forOp.getLoc(), start, stop, step, /*iterArgsInit=*/reversedResult,
+            builder, forOp.getLoc(), start, stop, step, /*iterArgsInit=*/reversedResults,
             [&](OpBuilder &bodyBuilder, Location loc, Value iv, ValueRange iterArgs) {
                 OpBuilder::InsertionGuard insertionGuard(builder);
                 builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
 
-                remappedValues.map(yieldedQureg.value(), iterArgs[0]);
+                for (auto [qvalue, iterArg] : llvm::zip_equal(yieldedQValues, iterArgs)) {
+                    remappedValues.map(qvalue, iterArg);
+                }
+
                 generateImpl(forOp.getBodyRegion(), builder);
-                scf::YieldOp::create(
-                    builder, loc,
-                    remappedValues.lookup(getQuantumReg(forOp.getRegionIterArgs()).value()));
+
+                SmallVector<Value> yields;
+                for (auto v : getQuantumValues(forOp.getRegionIterArgs())) {
+                    yields.push_back(remappedValues.lookup(v));
+                }
+
+                scf::YieldOp::create(builder, loc, yields);
             });
-        remappedValues.map(getQuantumReg(forOp.getInitArgs()).value(), replacedFor.getResult(0));
+
+        for (auto [newForResult, initArg] :
+             llvm::zip_equal(replacedFor.getResults(), getQuantumValues(forOp.getInitArgs()))) {
+            remappedValues.map(initArg, newForResult);
+        }
     }
 
     void visitOperation(scf::IfOp ifOp, OpBuilder &builder)
     {
-        std::optional<Value> qureg = getQuantumReg(ifOp.getResults());
-        if (!qureg.has_value()) {
+        SmallVector<Value> yieldedQValues = getQuantumValues(ifOp.getResults());
+        if (yieldedQValues.empty()) {
             // This operation is purely classical
             return;
         }
@@ -479,48 +496,70 @@ class AdjointGenerator {
         Value tape = cache.controlFlowTapes.at(ifOp);
         Value condition = ListPopOp::create(builder, ifOp.getLoc(), tape);
         condition = index::CastSOp::create(builder, ifOp.getLoc(), builder.getI1Type(), condition);
-        Value reversedResult = remappedValues.lookup(getQuantumReg(ifOp.getResults()).value());
 
-        // The quantum register is captured from outside rather than passed in through a
+        SmallVector<Value> reversedResults;
+        for (auto v : getQuantumValues(ifOp.getResults())) {
+            reversedResults.push_back(remappedValues.lookup(v));
+        }
+
+        // The quantum values are captured from outside rather than passed in through a
         // basic block argument. We thus need to traverse the region to look for it.
-        auto findOldestQuregInRegion = [&](Region &region) {
+        auto findOldestQvaluesInRegion = [&](Region &region) -> SetVector<Value> {
+            SetVector<Value> qvalues;
             for (Operation &innerOp : region.getOps()) {
                 for (Value operand : innerOp.getOperands()) {
-                    if (isa<quantum::QuregType>(operand.getType())) {
-                        return operand;
+                    bool isDefinedFromOutsideRegion =
+                        operand.getParentRegion()->isProperAncestor(&region);
+                    if (isa<quantum::QuregType, quantum::QubitType>(operand.getType()) &&
+                        isDefinedFromOutsideRegion) {
+                        qvalues.insert(operand);
                     }
                 }
             }
-            llvm_unreachable("failed to find qureg in scf.if region");
+            assert(!qvalues.empty() && "failed to find quantum values in scf.if region");
+            return qvalues;
         };
+
         auto getRegionBuilder = [&](Region &oldRegion) {
             return [&](OpBuilder &bodyBuilder, Location loc) {
                 OpBuilder::InsertionGuard insertionGuard(builder);
                 builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
 
-                std::optional<Value> yieldedQureg =
-                    getQuantumReg(oldRegion.front().getTerminator()->getOperands());
-                remappedValues.map(yieldedQureg.value(), reversedResult);
+                for (auto [qvalue, reversedResult] : llvm::zip_equal(
+                         getQuantumValues(oldRegion.front().getTerminator()->getOperands()),
+                         reversedResults)) {
+                    remappedValues.map(qvalue, reversedResult);
+                }
+
                 generateImpl(oldRegion, builder);
-                scf::YieldOp::create(builder, loc,
-                                     remappedValues.lookup(findOldestQuregInRegion(oldRegion)));
+
+                SmallVector<Value> yields;
+                for (auto v : findOldestQvaluesInRegion(oldRegion)) {
+                    yields.push_back(remappedValues.lookup(v));
+                }
+                scf::YieldOp::create(builder, loc, yields);
             };
         };
         auto reversedIf = scf::IfOp::create(builder, ifOp.getLoc(), condition,
                                             getRegionBuilder(ifOp.getThenRegion()),
                                             getRegionBuilder(ifOp.getElseRegion()));
-        Value startingThenQureg = findOldestQuregInRegion(ifOp.getThenRegion());
-        Value startingElseQureg = findOldestQuregInRegion(ifOp.getElseRegion());
-        assert(startingThenQureg == startingElseQureg &&
-               "Expected the same input register for both scf.if branches");
-        remappedValues.map(startingThenQureg, reversedIf.getResult(0));
+
+        SetVector<Value> startingThenQvalues = findOldestQvaluesInRegion(ifOp.getThenRegion());
+        SetVector<Value> startingElseQvalues = findOldestQvaluesInRegion(ifOp.getElseRegion());
+
+        for (auto [idx, pair] :
+             llvm::enumerate(llvm::zip_equal(startingThenQvalues, startingElseQvalues))) {
+            auto [t, e] = pair;
+            assert(t == e && "Expected the same input quantum values for both scf.if branches");
+            remappedValues.map(t, reversedIf.getResult(idx));
+        }
     }
 
     void visitOperation(scf::WhileOp whileOp, OpBuilder &builder)
     {
-        std::optional<Value> yieldedQureg =
-            getQuantumReg(whileOp.getAfter().front().getTerminator()->getOperands());
-        if (!yieldedQureg.has_value()) {
+        SmallVector<Value> yieldedQValues =
+            getQuantumValues(whileOp.getAfter().front().getTerminator()->getOperands());
+        if (yieldedQValues.empty()) {
             // This operation is purely classical
             return;
         }
@@ -530,62 +569,93 @@ class AdjointGenerator {
         Value c0 = index::ConstantOp::create(builder, whileOp.getLoc(), 0);
         Value c1 = index::ConstantOp::create(builder, whileOp.getLoc(), 1);
 
-        Value iterArgInit = remappedValues.lookup(getQuantumReg(whileOp.getResults()).value());
+        SmallVector<Value> iterArgsInit;
+        for (auto v : getQuantumValues(whileOp.getResults())) {
+            iterArgsInit.push_back(remappedValues.lookup(v));
+        }
+
         auto replacedWhile = scf::ForOp::create(
             builder, whileOp.getLoc(), /*start=*/c0, /*stop=*/numIterations, /*step=*/c1,
-            iterArgInit,
+            iterArgsInit,
             /*bodyBuilder=*/
             [&](OpBuilder &bodyBuilder, Location loc, Value iv, ValueRange iterArgs) {
                 OpBuilder::InsertionGuard insertionGuard(builder);
                 builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
 
-                remappedValues.map(yieldedQureg.value(), iterArgs[0]);
+                for (auto [qvalue, iterArg] : llvm::zip_equal(yieldedQValues, iterArgs)) {
+                    remappedValues.map(qvalue, iterArg);
+                }
+
                 generateImpl(whileOp.getAfter(), builder);
-                scf::YieldOp::create(
-                    builder, loc,
-                    remappedValues.lookup(
-                        getQuantumReg(whileOp.getAfter().front().getArguments()).value()));
+
+                SmallVector<Value> yields;
+                for (auto v : getQuantumValues(whileOp.getAfter().front().getArguments())) {
+                    yields.push_back(remappedValues.lookup(v));
+                }
+
+                scf::YieldOp::create(builder, loc, yields);
             });
-        remappedValues.map(getQuantumReg(whileOp.getInits()).value(), replacedWhile.getResult(0));
+
+        for (auto [newWhileResult, initArg] :
+             llvm::zip_equal(replacedWhile.getResults(), getQuantumValues(whileOp.getInits()))) {
+            remappedValues.map(initArg, newWhileResult);
+        }
     }
 
     void visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder)
     {
-        std::optional<Value> qureg = getQuantumReg(switchOp.getResults());
-        if (!qureg.has_value()) {
+        SmallVector<Value> yieldedQValues = getQuantumValues(switchOp.getResults());
+        if (yieldedQValues.empty()) {
+            // This operation is purely classical
             return;
         }
 
         Value tape = cache.controlFlowTapes.at(switchOp.getOperation());
         Value index = ListPopOp::create(builder, switchOp.getLoc(), tape);
-        Value reversedResult = remappedValues.lookup(getQuantumReg(switchOp.getResults()).value());
 
-        auto findRootQuregInRegion = [&](Region &region) {
+        SmallVector<Value> reversedResults;
+        for (auto v : getQuantumValues(switchOp.getResults())) {
+            reversedResults.push_back(remappedValues.lookup(v));
+        }
+
+        auto findRootQvaluesInRegion = [&](Region &region) -> SetVector<Value> {
+            SetVector<Value> qvalues;
             for (Operation &innerOp : region.getOps()) {
                 for (Value operand : innerOp.getOperands()) {
-                    if (isa<quantum::QuregType>(operand.getType())) {
-                        return operand;
+                    bool isDefinedFromOutsideRegion =
+                        operand.getParentRegion()->isProperAncestor(&region);
+                    if (isa<quantum::QuregType, quantum::QubitType>(operand.getType()) &&
+                        isDefinedFromOutsideRegion) {
+                        qvalues.insert(operand);
                     }
                 }
             }
-            llvm_unreachable("failed to find qureg in scf.index_switch region");
+            assert(!qvalues.empty() && "failed to find quantum values in scf.index_switch region");
+            return qvalues;
         };
 
-        auto newSwitchOp = scf::IndexSwitchOp::create(builder, switchOp.getLoc(),
-                                                      TypeRange{reversedResult.getType()}, index,
-                                                      switchOp.getCases(), switchOp.getNumCases());
+        auto newSwitchOp =
+            scf::IndexSwitchOp::create(builder, switchOp.getLoc(), TypeRange{reversedResults},
+                                       index, switchOp.getCases(), switchOp.getNumCases());
 
         auto fillRegion = [&](Region &oldRegion, Region &newRegion) {
             OpBuilder::InsertionGuard guard(builder);
             newRegion.push_back(new Block());
             builder.setInsertionPointToStart(&newRegion.front());
 
-            std::optional<Value> yieldedQureg =
-                getQuantumReg(oldRegion.front().getTerminator()->getOperands());
-            remappedValues.map(yieldedQureg.value(), reversedResult);
+            for (auto [qvalue, reversedResult] :
+                 llvm::zip_equal(getQuantumValues(oldRegion.front().getTerminator()->getOperands()),
+                                 reversedResults)) {
+                remappedValues.map(qvalue, reversedResult);
+            }
+
             generateImpl(oldRegion, builder);
-            scf::YieldOp::create(builder, switchOp.getLoc(),
-                                 remappedValues.lookup(findRootQuregInRegion(oldRegion)));
+
+            SmallVector<Value> yields;
+            for (auto v : findRootQvaluesInRegion(oldRegion)) {
+                yields.push_back(remappedValues.lookup(v));
+            }
+            scf::YieldOp::create(builder, switchOp.getLoc(), yields);
         };
 
         // Case regions:
@@ -597,8 +667,10 @@ class AdjointGenerator {
         // Default region:
         fillRegion(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion());
 
-        Value startingQureg = findRootQuregInRegion(switchOp.getDefaultRegion());
-        remappedValues.map(startingQureg, newSwitchOp.getResult(0));
+        for (auto [idx, v] :
+             llvm::enumerate(findRootQvaluesInRegion(switchOp.getDefaultRegion()))) {
+            remappedValues.map(v, newSwitchOp.getResult(idx));
+        }
     }
 
   private:
