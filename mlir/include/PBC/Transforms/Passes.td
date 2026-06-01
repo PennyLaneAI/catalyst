@@ -67,6 +67,14 @@ def AvoidYMeasureOption : Option<
     /*default=*/"false",
     "Avoid Pauli-Y measurements for Clifford rotations. Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly), a Y state is used instead (requires Y state preparation).">;
 
+def OnlyDisjointQubitOption : Option<
+    /*C++ var name=*/"onlyDisjointQubit",
+    /*CLI arg name=*/"disjoint-qubit",
+    /*type=*/"bool",
+    /*default=*/"false",
+    "Group ops into the same layer only when they act on disjoint qubits. "
+    "By default, commuting ops on overlapping qubits may also be merged into one layer.">;
+
 //===----------------------------------------------------------------------===//
 //                               Passes
 //===----------------------------------------------------------------------===//
@@ -127,10 +135,14 @@ def PPMCompilationPass : Pass<"ppm-compilation"> {
 
 def CountPPMSpecsPass : Pass<"ppm-specs"> {
     let summary = "Count specs in Pauli Product Measurement operations.";
+
+    let options = [OnlyDisjointQubitOption];
 }
 
 def PartitionLayersPass : Pass<"partition-layers"> {
     let summary = "Partition layers of Pauli Product Measurement operations.";
+
+    let options = [OnlyDisjointQubitOption];
 }
 
 def TLayerReductionPass : Pass<"reduce-t-depth"> {

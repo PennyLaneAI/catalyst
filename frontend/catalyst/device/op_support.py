@@ -22,7 +22,7 @@ import pennylane as qp
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.operation import Operation, Operator
 
-from catalyst.api_extensions import MidCircuitMeasure
+from catalyst.api_extensions import MidCircuitMeasure, MidCircuitPauliMeasure
 from catalyst.jax_tracer import HybridOp
 from catalyst.utils.exceptions import DifferentiableCompileError
 
@@ -150,7 +150,7 @@ def is_differentiable(
     if grad_method is None:
         return True  # If no gradient method specified, operation is considered differentiable
 
-    if isinstance(op, MidCircuitMeasure):
+    if isinstance(op, (MidCircuitMeasure, MidCircuitPauliMeasure)):
         raise DifferentiableCompileError(f"{op.name} is not allowed in gradients")
 
     # Note: Ops with constant parameters generally need not be differentiated. However, the Catalyst
