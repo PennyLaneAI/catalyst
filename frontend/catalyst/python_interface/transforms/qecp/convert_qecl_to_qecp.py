@@ -836,8 +836,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
             # apply H and T to the first qubit
             # ToDo: we need to correctly select the index for pulling out the initial qubit 
-            # hardcoding 7 for now because I believe its correct for our ordering of the Steane code, but it will (usually) be wrong for any other code
-            initial_qubit_index = 7
+            # hardcoding 6 for now because I believe its correct for our ordering of the Steane code, but it will (usually) be wrong for any other code
+            initial_qubit_index = 6
             initial_qubit = qecp.ExtractQubitOp(codeblock, initial_qubit_index)
             physical_h = qecp.HadamardOp(initial_qubit)
             physical_t = qecp.TOp(physical_h.results[0])
