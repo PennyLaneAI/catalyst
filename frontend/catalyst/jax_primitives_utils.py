@@ -27,7 +27,7 @@ from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, Name
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 from pennylane.transforms.core import BoundTransform
 
-from catalyst.api_extensions.target import get_target
+from catalyst.api_extensions.target import get_dispatch, get_target
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.passes import PassPlugin
 
@@ -247,11 +247,15 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
 
     name = "module_" + callable_.__name__
     target = get_target(callable_.device)
+    dispatch = get_dispatch(callable_.device)
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         if target is not None:
             fields = {k: v for k, v in dataclasses.asdict(target).items() if v is not None}
             module.operation.attributes["catalyst.target"] = get_mlir_attribute_from_pyval(fields)
+        if dispatch is not None:
+            fields = {k: v for k, v in dataclasses.asdict(dispatch).items() if v is not None}
+            module.operation.attributes["catalyst.dispatch"] = get_mlir_attribute_from_pyval(fields)
         transform_module_lowering(ctx, pipelines)
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines)
