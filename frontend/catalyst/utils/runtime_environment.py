@@ -92,7 +92,11 @@ def get_lib_path(project, env_var):
     ).resolve()  # pragma: no cover
     if candidate.exists():
         if project == "callbacks_lib":
-            print(f"[CI-DEBUG] found libQPC at {candidate} ({'INSTALLED' if INSTALLED else 'DEV'})")
+            for file in candidate.iterdir():
+                if file.name.startswith("libQuantumPythonCallbacks"):
+                    print(
+                        f"[CI-DEBUG] found libQPC at {file} ({'INSTALLED' if INSTALLED else 'DEV'})"
+                    )
         return str(candidate)
     print(f"[CI-DEBUG] did not find libQPC from frontend ({'INSTALLED' if INSTALLED else 'DEV'})")
 

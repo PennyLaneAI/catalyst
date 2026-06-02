@@ -40,8 +40,13 @@ std::atomic<bool> resolutionAttempted{false};
 using RegisterFn = void (*)();
 
 static const std::vector<std::string> kAlternativePluginNames = {
-    "libQuantumPythonCallbacks.so", "libQuantumPythonCallbacks.dylib",
-    "libQuantumPythonCallbacks.abi3.so", "libQuantumPythonCallbacks.abi3.dylib"};
+    "libQuantumPythonCallbacks.so",
+    "libQuantumPythonCallbacks.abi3.so",
+    "libQuantumPythonCallbacks.cpython-311-darwin.so",
+    "libQuantumPythonCallbacks.dylib",
+    "libQuantumPythonCallbacks.abi3.dylib",
+    "libQuantumPythonCallbacks.cpython-311-aarch64-linux-gnu.so",
+};
 
 // Resolve the plugin path. Search order:
 // 1. $CATALYST_PYTHON_CALLBACK_PLUGIN (explicit override).
