@@ -16,13 +16,11 @@
 
 #include <optional>
 
+#include "Python.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "nanobind/eval.h"
 #include "nanobind/nanobind.h"
-
-// TODO: sort this
-#include "Python.h"
 
 #define DEBUG_TYPE "[QPC] "
 

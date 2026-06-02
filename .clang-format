@@ -18,7 +18,7 @@ IncludeCategories:
     Priority: 1
 
   # Dependencies
-  - Regex:    '^(")(llvm|Enzyme|absl|boost|catch2|gmock|gtest|jax_cpu_lapack_kernels|mlir|nanobind|nlohmann|numpy|pybind11|stablehlo|stim|toml\+\+|xla)(.*)\.([hcp]+)(")$'
+  - Regex:    '^(")(llvm|Enzyme|absl|boost|catch2|gmock|gtest|jax_cpu_lapack_kernels|mlir|nanobind|nlohmann|numpy|pybind11|stablehlo|stim|toml\+\+|xla|Python)(\/.*)?\.([hcp]+)(")$'
     Priority: 2
 
   # Local headers
