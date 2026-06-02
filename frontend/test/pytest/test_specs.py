@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 from jax import numpy as jnp
 from pennylane.measurements import Shots
-from pennylane.resource import CircuitSpecs, SpecsResources
+from pennylane.resource import CircuitSpecs, SpecsResources, SymbolicSpecsResources
 
 import catalyst
 from catalyst import qjit
@@ -969,6 +969,10 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+
+class TestSpecsWithPPR:
+    """Tests for using qp.specs with PPRs"""
+
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
@@ -1028,22 +1032,185 @@ class TestPassByPassSpecs:
         actual = qp.specs(circ, level=2)()
         check_specs_same(actual, expected)
 
-    def test_loop_warning(self):
-        """Test that a warning is raised when dynamic loops are present in the circuit,
-        as resource counting may be inaccurate."""
 
-        @qp.qjit(autograph=True)
-        @qp.qnode(qp.device("null.qubit", wires=1))
+class TestSymbolicSpecs:
+    """Tests for using qp.specs with dynamic loops whose bounds are not known at compile time"""
+
+    def test_dynamic_loop(self, capture_mode):
+        """Test specs with a dynamic loop that can't be resolved at compile time"""
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(x):
+            qp.Hadamard(0)
+            qp.PauliX(0)
             for _ in range(x):
                 qp.PauliX(0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(
-            UserWarning,
-            match="Specs was unable to determine the number of loop iterations.",
-        ):
-            qp.specs(circuit, level=0)(5)
+        s = qp.specs(circuit, level=0)(5)
+        assert s.level == "Before MLIR Passes"
+        assert s.device_name == "lightning.qubit"
+        res = s.resources
+        assert isinstance(res, SymbolicSpecsResources)
+        assert len(res.vars) == 1
+
+        concrete_res = res.subs({var: 5 for var in res.vars})
+        assert isinstance(concrete_res, SpecsResources)
+
+        expected_res = SpecsResources(
+            gate_types={"Hadamard": 1, "PauliX": 6},
+            gate_sizes={1: 7},
+            measurements={"expval(PauliX)": 1},
+            num_allocs=1,
+        )
+        check_specs_resources_same(concrete_res, expected_res)
+
+    def test_dynamic_loop_and_static_loop(self, capture_mode):
+        """
+        Test specs with a dynamic loop that can't be resolved at compile time and
+        a static loop nested inside it
+        """
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qp.Hadamard(0)
+            qp.PauliX(0)
+            for _ in range(x):
+                qp.PauliX(0)
+                for _ in range(3):
+                    qp.PauliY(0)
+                for _ in range(5):
+                    qp.PauliZ(0)
+
+            return qp.expval(qp.PauliX(0))
+
+        s = qp.specs(circuit, level=0)(5)
+        assert s.level == "Before MLIR Passes"
+        assert s.device_name == "lightning.qubit"
+
+        res = s.resources
+        assert isinstance(res, SymbolicSpecsResources)
+        assert len(res.vars) == 1
+
+        concrete_res = res.subs({var: 5 for var in res.vars})
+        assert isinstance(concrete_res, SpecsResources)
+
+        expected_res = SpecsResources(
+            gate_types={"Hadamard": 1, "PauliX": 6, "PauliY": 15, "PauliZ": 25},
+            gate_sizes={1: 47},
+            measurements={"expval(PauliX)": 1},
+            num_allocs=1,
+        )
+        check_specs_resources_same(concrete_res, expected_res)
+
+    def test_dynamic_loop_and_static_loop2(self, capture_mode):
+        """
+        Test specs with a static loop and a dynamic loop that can't be resolved at compile time
+        nested inside it
+        """
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qp.Hadamard(0)
+            qp.PauliX(0)
+            for _ in range(3):
+                qp.PauliZ(0)
+                for _ in range(x):
+                    qp.PauliX(0)
+
+            return qp.expval(qp.PauliX(0))
+
+        s = qp.specs(circuit, level=0)(5)
+        assert s.level == "Before MLIR Passes"
+        assert s.device_name == "lightning.qubit"
+
+        res = s.resources
+        assert isinstance(res, SymbolicSpecsResources)
+        assert len(res.vars) == 1
+
+        concrete_res = res.subs({var: 5 for var in res.vars})
+        assert isinstance(concrete_res, SpecsResources)
+
+        expected_res = SpecsResources(
+            gate_types={"Hadamard": 1, "PauliX": 16, "PauliZ": 3},
+            gate_sizes={1: 20},
+            measurements={"expval(PauliX)": 1},
+            num_allocs=1,
+        )
+        check_specs_resources_same(concrete_res, expected_res)
+
+    def test_nested_dynamic_loop(self, capture_mode):
+        """Test specs with a nested dynamic loops that can't be resolved at compile time"""
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x, y):
+            qp.Hadamard(0)
+            for _ in range(x):
+                qp.PauliX(0)
+                for _ in range(y):
+                    qp.Hadamard(0)
+            return qp.expval(qp.PauliX(0))
+
+        s = qp.specs(circuit, level=0)(5, 3)
+        assert s.level == "Before MLIR Passes"
+        assert s.device_name == "lightning.qubit"
+        res = s.resources
+        assert isinstance(res, SymbolicSpecsResources)
+        assert len(res.vars) == 2
+
+        for n in [2, 3]:
+            concrete_res = res.subs({var: n for var in res.vars})
+            assert isinstance(concrete_res, SpecsResources)
+            expected_res = SpecsResources(
+                gate_types={"Hadamard": 1 + n * n, "PauliX": n},
+                gate_sizes={1: 1 + n * n + n},
+                measurements={"expval(PauliX)": 1},
+                num_allocs=1,
+            )
+            check_specs_resources_same(concrete_res, expected_res)
+
+    def test_dynamic_loops_multi_level(self, capture_mode):
+        """Test smulti-level specs with dynamic loops"""
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x, y):
+            qp.Hadamard(0)
+            for _ in range(x):
+                qp.Hadamard(0)
+                qp.PauliX(0)
+                for _ in range(y):
+                    qp.Hadamard(0)
+            return qp.expval(qp.PauliX(0))
+
+        s = qp.specs(circuit, level="all")(3, 5)
+        assert s.level == {0: "Before MLIR Passes", 1: "cancel-inverses"}
+        assert s.device_name == "lightning.qubit"
+        all_res = s.resources
+
+        assert isinstance(all_res, dict)
+        for res in all_res.values():
+            assert isinstance(res, SymbolicSpecsResources)
+            assert len(res.vars) == 2
+
+        for n in [2, 3]:
+            for res in all_res.values():
+                concrete_res = res.subs({var: n for var in res.vars})
+
+                check_specs_resources_same(
+                    concrete_res,
+                    SpecsResources(
+                        gate_types={"Hadamard": n * n + n + 1, "PauliX": n},
+                        gate_sizes={1: n * n + 2 * n + 1},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=1,
+                    ),
+                )
 
 
 @pytest.mark.skip  # FIXME: Remove in followup PR
