@@ -46,6 +46,7 @@ static const std::vector<std::string> kAlternativePluginNames = {
     "libQuantumPythonCallbacks.dylib",
     "libQuantumPythonCallbacks.abi3.dylib",
     "libQuantumPythonCallbacks.cpython-311-aarch64-linux-gnu.so",
+    "libQuantumPythonCallbacks.cpython-311-x86_64-linux-gnu.so",
 };
 
 // Resolve the plugin path. Search order:
