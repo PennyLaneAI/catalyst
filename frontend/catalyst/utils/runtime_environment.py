@@ -36,7 +36,7 @@ DEFAULT_LIB_PATHS = {
     "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
     "oqc_runtime": os.path.join(package_root, "../../catalyst/third_party/oqc/src/build"),
     "oqd_runtime": os.path.join(package_root, "../../../runtime/build/lib"),
-    "callbacks_lib": os.path.join(package_root, "../../../mlir/build/lib"),
+    "callbacks_lib": os.path.join(package_root, "../../mlir/build/lib"),
 }
 
 DEFAULT_INCLUDE_PATHS = {
@@ -54,23 +54,31 @@ BYTECODE_FILE_PATH = (
 )
 
 
-def get_libpython_path() -> str:
+def get_libpython_path() -> Path | str:
     """Return the path to the python shared library, or emptystring if failed to find."""
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
 
-    # macOS framework installation
-    if framework_prefix and ldlibrary:
-        candidate = Path(framework_prefix) / Path(ldlibrary)
-        if candidate.exists():
-            return str(candidate)
+    # TODO: prefer INSTSONAME for linux
+    print("[CI-DEBUG] libdir:", libdir)
+    print("[CI-DEBUG] ldlibrary:", ldlibrary)
+    print("[CI-DEBUG] framework_prefix:", framework_prefix)
+
+    # macOS framework-style installations
+    if framework_prefix:
+        print("[CI-DEBUG] found framework install:", Path(framework_prefix) / Path(ldlibrary))
+        return Path(framework_prefix) / Path(ldlibrary)
+
+    if not (libdir and ldlibrary):
+        print("[CI-DEBUG] frontend could not find libpython")
+        return ""
 
     # standard installation
-    if libdir and ldlibrary:
-        candidate = Path(libdir) / ldlibrary
-        if candidate.exists():
-            return str(candidate)
+    ldlibrary_path = Path(libdir) / ldlibrary
+    if ldlibrary_path.exists():
+        print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(standard installation)")
+        return ldlibrary_path.resolve()
 
     return ""
 
