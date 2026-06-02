@@ -971,6 +971,7 @@ class TestPassByPassSpecs:
 
 
 class TestSpecsWithPPR:
+    """Tests for using qp.specs with PPRs"""
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
@@ -1032,6 +1033,7 @@ class TestSpecsWithPPR:
 
 
 class TestSymbolicSpecs:
+    """Tests for using qp.specs with dynamic loops whose bounds are not known at compile time"""
     def test_dynamic_loop(self, capture_mode):
         """Test specs with a dynamic loop that can't be resolved at compile time"""
 
@@ -1063,7 +1065,10 @@ class TestSymbolicSpecs:
         check_specs_resources_same(concrete_res, expected_res)
 
     def test_dynamic_loop_and_static_loop(self, capture_mode):
-        """Test specs with a nested static loop and a dynamic loop that can't be resolved at compile time"""
+        """
+        Test specs with a dynamic loop that can't be resolved at compile time and
+        a static loop nested inside it
+        """
 
         @qp.qjit(autograph=True, capture=capture_mode)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
@@ -1099,7 +1104,10 @@ class TestSymbolicSpecs:
         check_specs_resources_same(concrete_res, expected_res)
 
     def test_dynamic_loop_and_static_loop2(self, capture_mode):
-        """Test specs with a nested static loop and a dynamic loop that can't be resolved at compile time"""
+        """
+        Test specs with a static loop and a dynamic loop that can't be resolved at compile time
+        nested inside it
+        """
 
         @qp.qjit(autograph=True, capture=capture_mode)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
