@@ -15,7 +15,7 @@
 This module tests the decompose transformation.
 """
 
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines, too-many-public-methods
 
 from contextlib import nullcontext as does_not_raise
 from functools import partial
@@ -24,6 +24,7 @@ import numpy as np
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
+from pennylane.decomposition import controlled_resource_rep
 from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
@@ -1100,6 +1101,88 @@ class TestPlxPRDecomposition:
         r1, r2 = c()
         assert qp.math.allclose(r1, np.cos(0.5))
         assert qp.math.allclose(r2, np.cos(1.2))
+        qp.decomposition.disable_graph()
+
+    def test_unknown_op_in_solution_raises(self):
+        """An op that ends up in the decomposition graph solution but is
+        neither in the captured circuit nor in ``COMPILER_OPS_FOR_DECOMPOSITION``
+        and is not a symbolic op must raise a clear ValueError so the user knows the
+        wire count cannot be inferred.
+        """
+
+        class _UnknownOp(qp.operation.Operation):
+            num_wires = 1
+            num_params = 0
+            name = "_UnknownOp"
+
+        def _unknown_resources():
+            return {qp.resource_rep(qp.PauliX): 1}
+
+        @qp.register_resources(_unknown_resources)
+        def _unknown_decomp(wires):
+            qp.PauliX(wires)
+
+        qp.add_decomps(_UnknownOp, _unknown_decomp)
+
+        def _rx_resources():
+            return {qp.resource_rep(_UnknownOp): 1}
+
+        @qp.register_resources(_rx_resources)
+        def _rx_decomp(_, wires):
+            _UnknownOp(wires=wires)
+
+        qp.decomposition.enable_graph()
+
+        @qp.qjit(capture=True)
+        @qp.decompose(
+            gate_set={"PauliX"},
+            fixed_decomps={qp.RX: _rx_decomp},
+        )
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def f(phi):
+            qp.RX(phi, 0)
+            return qp.state()
+
+        try:
+            with pytest.raises(
+                ValueError,
+                match=r"Could not capture _UnknownOp without the number of wires\.",
+            ):
+                f(0.5)
+        finally:
+            qp.decomposition.disable_graph()
+
+    def test_symbolic_controlled_op_is_skipped(self):
+        """Symbolic Controlled ops produced by ``qml.ctrl`` must be skipped when
+        iterating the decomposition graph solution.
+        """
+        qp.decomposition.enable_graph()
+
+        def _resources():
+            return {
+                controlled_resource_rep(
+                    qp.BasisEmbedding, {"num_wires": 1}, num_control_wires=1
+                ): 1,
+                qp.resource_rep(qp.GlobalPhase): 1,
+            }
+
+        @qp.register_resources(_resources)
+        def my_rz(phi, wires):
+            qp.GlobalPhase(phi / 2)
+            qp.ctrl(qp.BasisEmbedding, control=wires)([1], wires=[1])
+
+        @qp.qjit(capture=True)
+        @qp.decompose(
+            gate_set={"CNOT", "PauliX", "GlobalPhase", "MultiControlledX"},
+            fixed_decomps={qp.RZ: my_rz},
+        )
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def f(phi):
+            qp.RZ(phi, 0)
+            return qp.state()
+
+        resources = qp.specs(f, level="device")(0.123).resources.gate_types
+        assert resources == {"BasisState": 1, "GlobalPhase": 1}
         qp.decomposition.disable_graph()
 
 

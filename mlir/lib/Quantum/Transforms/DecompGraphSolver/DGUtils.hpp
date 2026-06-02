@@ -20,6 +20,7 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -38,6 +39,17 @@ static inline auto print_op(const OperatorNode &op) -> std::string
     oss << "[p:" << op.numParams << "]";
     if (op.adjoint) {
         oss << "[adj]";
+    }
+    if (!op.staticNamedArgs.empty()) {
+        std::vector<std::string> keys;
+        keys.reserve(op.staticNamedArgs.size());
+        for (const auto &[k, _] : op.staticNamedArgs) {
+            keys.push_back(k);
+        }
+        std::sort(keys.begin(), keys.end());
+        for (const auto &k : keys) {
+            oss << "[" << k << ":" << op.staticNamedArgs.at(k) << "]";
+        }
     }
     return oss.str();
 }
