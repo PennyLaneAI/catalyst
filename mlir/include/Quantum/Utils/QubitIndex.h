@@ -16,8 +16,12 @@
 
 #include <variant>
 
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Value.h"
+
+#include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/QuantumOps.h"
 
 namespace catalyst {
 namespace quantum {
@@ -76,6 +80,55 @@ class QubitIndex {
         return isAttr() ? std::get<mlir::IntegerAttr>(index) : nullptr;
     }
 };
+
+/// Trace a qubit SSA value back to the quantum.extract that produced it and
+/// return the corresponding QubitIndex (with the originating qreg).
+///
+/// The walk follows the def chain backward through:
+///   - quantum.extract  -> terminate, build QubitIndex from its index operand
+///                         (dynamic Value or static IntegerAttr) and its qreg
+///   - QuantumGate ops  -> step to the qubit operand at the same result position
+///   - quantum.measure  -> step to the input qubit
+///
+/// Returns an invalid (default-constructed) QubitIndex if the chain ends in
+/// some other defining op or a block argument.
+inline QubitIndex getExtractIndex(mlir::Value qubit)
+{
+    while (qubit) {
+        if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
+            if (mlir::Value idx = extractOp.getIdx()) {
+                return QubitIndex(idx, extractOp.getQreg());
+            }
+            if (mlir::IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
+                return QubitIndex(idxAttr, extractOp.getQreg());
+            }
+        }
+
+        if (auto gate = mlir::dyn_cast_or_null<quantum::QuantumGate>(qubit.getDefiningOp())) {
+            auto qubitOperands = gate.getQubitOperands();
+            auto qubitResults = gate.getQubitResults();
+            auto it =
+                llvm::find_if(qubitResults, [&](mlir::Value result) { return result == qubit; });
+
+            if (it != qubitResults.end()) {
+                size_t resultIndex = std::distance(qubitResults.begin(), it);
+                if (resultIndex < qubitOperands.size()) {
+                    qubit = qubitOperands[resultIndex];
+                    continue;
+                }
+            }
+        }
+        else if (auto measureOp =
+                     mlir::dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
+            qubit = measureOp.getInQubit();
+            continue;
+        }
+
+        break;
+    }
+
+    return QubitIndex();
+}
 
 } // namespace quantum
 } // namespace catalyst
