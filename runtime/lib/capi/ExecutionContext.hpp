@@ -83,9 +83,6 @@ class SharedLibraryManager final {
 #ifdef __APPLE__
         auto rtld_flags = RTLD_LAZY;
         constexpr const char *dl_ext = ".dylib";
-#elif defined(_WIN32)
-        auto rtld_flags = RTLD_LAZY;
-        constexpr const char *dl_ext = ".dll";
 #else
         // Closing the dynamic library of Lightning simulators with dlclose() where OpenMP
         // directives (in Lightning simulators) are in use would raise memory segfaults.
