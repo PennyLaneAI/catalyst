@@ -94,6 +94,7 @@ def get_lib_path(project, env_var):
         if project == "callbacks_lib":
             print(f"[CI-DEBUG] found libQPC at {candidate} ({'INSTALLED' if INSTALLED else 'DEV'})")
         return str(candidate)
+    print(f"[CI-DEBUG] did not find libQPC from frontend ({'INSTALLED' if INSTALLED else 'DEV'})")
 
 
 def get_include_path():

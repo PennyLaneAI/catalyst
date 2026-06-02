@@ -70,6 +70,7 @@ target_include_directories(QuantumPythonCallbacks PUBLIC
 
 set_target_properties(QuantumPythonCallbacks PROPERTIES
     PREFIX "lib"
+    POSITION_INDEPENDENT_CODE ON
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
