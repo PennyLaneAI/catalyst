@@ -46,16 +46,32 @@ class TestCondToJaxpr:
         """Check the JAXPR of simple conditional function."""
         # pylint: disable=line-too-long
 
-        expected = dedent("""
-            { lambda ; a:i64[]. let
-                b:bool[] = eq a 5:i64[]
-                c:i64[] = cond[
-                  branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
-                                 { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
-                  num_implicit_outputs=0
-                ] b a a
-              in (c,) }
-            """)
+        if capture_mode:
+            # In capture mode, the PL cond primitive is used directly, instead of the catalyst cond
+            expected = dedent("""
+                { lambda ; a:i64[]. let
+                    b:bool[] = eq a 5:i64[]
+                    c:i64[] = cond[
+                    args_slice=(4, None, None)
+                    consts_slices=((2, 3, None), (3, 4, None))
+                    jaxpr_branches=(
+                        { lambda d:i64[]; . let e:i64[] = integer_pow[y=2] d in (e,) }
+                        { lambda f:i64[]; . let g:i64[] = integer_pow[y=3] f in (g,) }
+                    )
+                    ] b True:bool[] a a
+                in (c,) }
+                """)
+        else:
+            expected = dedent("""
+                { lambda ; a:i64[]. let
+                    b:bool[] = eq a 5:i64[]
+                    c:i64[] = cond[
+                    branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
+                                    { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+                    num_implicit_outputs=0
+                    ] b a a
+                in (c,) }
+                """)
 
         @qjit(capture=capture_mode)
         def circuit(n: int):
