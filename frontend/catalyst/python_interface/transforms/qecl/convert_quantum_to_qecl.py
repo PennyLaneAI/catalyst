@@ -74,7 +74,7 @@ The convert-quantum-to-qecl pass does not support the following cases:
   * `quantum.alloc` ops with a dynamic number of qubits.
   * Programs with non-Clifford gates; specifically any gates other than I, X, Y, Z, Hadamard, S or
     CNOT.
-  * Programs with control-flow operations (scf.for, scf.if, etc.).
+  * Programs with control-flow operations other than `scf.for` and `scf.if`.
 """
 
 import math
