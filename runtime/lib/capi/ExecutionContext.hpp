@@ -16,6 +16,7 @@
 
 #include <cstdio>
 #include <dlfcn.h>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -88,6 +89,22 @@ class SharedLibraryManager final {
 #endif
 
         _handler = dlopen(filename.c_str(), rtld_flags);
+        if (!_handler) {
+            // fall back to the base name of the library if the full path is not found
+            // this is useful for remote devices, where the library is not in the same path as 
+            // the executable. The lib will be provided by the remote device via
+            // LD_LIBRARY_PATH environment variable.
+            std::string name = std::filesystem::path(filename).filename().string();
+            auto dot = name.find_last_of('.');
+            std::string stem = (dot == std::string::npos) ? name : name.substr(0, dot);
+
+            for (const auto &ext : {".so", ".dylib", ".dll"}) {
+                _handler = dlopen((stem + ext).c_str(), rtld_flags);
+                if (_handler) {
+                    break;
+                }
+            }
+        }
         RT_FAIL_IF(!_handler, dlerror());
     }
 

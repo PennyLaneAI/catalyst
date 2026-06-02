@@ -186,8 +186,13 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
 
     if (runLLC && (inType == InputType::LLVMIR)) {
         mlir::TimingScope llcTiming = timing.nest("llc");
+        // Set the target triple for the object file emission.
+        std::string requestedTripleStr = options.targetTriple.empty()
+                                             ? llvm::sys::getDefaultTargetTriple()
+                                             : options.targetTriple;
+
         // Set data layout before LLVM passes or the default one is used.
-        llvm::Triple targetTriple{llvm::sys::getDefaultTargetTriple()};
+        llvm::Triple targetTriple{requestedTripleStr};
 
         llvm::InitializeAllTargetInfos();
         llvm::InitializeAllTargets();
@@ -197,6 +202,11 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
 
         std::string err;
         auto target = llvm::TargetRegistry::lookupTarget(targetTriple, err);
+        if (!target) {
+            llvm::errs() << "Target triple '" << requestedTripleStr
+                         << "' not registered in this LLVM build: " << err << "\n";
+            return llvm::failure();
+        }
         llvm::TargetOptions opt;
         const char *cpu = "generic";
         const char *features = "";
@@ -345,6 +355,11 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     cl::opt<bool> DumpModuleScope("dump-module-scope",
                                   cl::desc("Print the whole module in intermediate files"),
                                   cl::init(true), cl::cat(CatalystCat));
+    cl::opt<std::string> TargetTriple(
+        "target-triple",
+        cl::desc("Override the LLVM target triple used for object emission "
+                 "(e.g. x86_64-linux-gnu, aarch64-linux-gnu). Defaults to the host's triple."),
+        cl::init(""), cl::cat(CatalystCat));
 
     // Create dialect registry
     mlir::DialectRegistry registry;
@@ -411,7 +426,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .checkpointStage = CheckpointStage,
                             .loweringAction = LoweringAction,
                             .dumpPassPipeline = DumpPassPipeline,
-                            .shouldEmitBytecode = config.shouldEmitBytecode()};
+                            .shouldEmitBytecode = config.shouldEmitBytecode(),
+                            .targetTriple = TargetTriple};
 
     mlir::LogicalResult result = QuantumDriverMain(options, *output, registry);
 

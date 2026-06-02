@@ -113,6 +113,10 @@ struct CompilerOptions {
     bool dumpPassPipeline;
     /// If true, the compiler will write bytecode rather than text.
     bool shouldEmitBytecode;
+    /// LLVM target triple for object emission. Used for cross-arch compilation when the
+    /// compiled kernel will be JIT-linked into a remote executor whose arch. differs from 
+    /// the build host's.
+    std::string targetTriple;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const;

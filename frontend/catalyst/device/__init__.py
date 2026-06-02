@@ -22,10 +22,12 @@ from catalyst.device.qjit_device import (
     extract_backend_info,
     get_device_capabilities,
 )
+from catalyst.device.remote_device import RemoteDevice
 
 __all__ = (
     "QJITDevice",
     "BackendInfo",
     "extract_backend_info",
     "get_device_capabilities",
+    "RemoteDevice",
 )

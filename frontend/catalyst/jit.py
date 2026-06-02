@@ -576,6 +576,7 @@ class QJIT(CatalystCallable):
 
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
+        self._propagate_remote_device_options(fn)
 
         # If static_argnames are present, convert them to static_argnums
         if compile_options.static_argnames is not None:
@@ -593,6 +594,18 @@ class QJIT(CatalystCallable):
             self.aot_compile()
 
         super().__init__("user_function")
+
+    def _propagate_remote_device_options(self, fn):
+        """Propagate remote device options to the compile options"""
+        dev = getattr(fn, "device", None)
+        if dev is None:
+            return
+        address = getattr(dev, "catalyst_remote_address", None)
+        arch = getattr(dev, "catalyst_remote_arch", None)
+        if address and not self.compile_options.remote:
+            self.compile_options.remote = address
+        if arch and not self.compile_options.target_triple:
+            self.compile_options.target_triple = arch
 
     def _get_effective_capture_mode(self):
         """Calculate the effective capture mode for this QJIT instance.

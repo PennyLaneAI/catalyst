@@ -104,7 +104,11 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
 
     auto ctypes = nb::module_::import_("ctypes");
     using f_ptr_t = bool (*)(void *);
-    f_ptr_t f_transfer_ptr = *((f_ptr_t *)nb::cast<size_t>(ctypes.attr("addressof")(transfer)));
+
+    // `transfer` may be None for the remote execution
+    bool has_transfer = !transfer.is_none();
+    f_ptr_t f_transfer_ptr =
+        has_transfer ? *((f_ptr_t *)nb::cast<size_t>(ctypes.attr("addressof")(transfer))) : nullptr;
 
     /* Data from the result description */
     auto ranks = result_desc.attr("_ranks_");
@@ -123,7 +127,7 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
 
         struct memref_beginning_t *memref =
             reinterpret_cast<struct memref_beginning_t *>(memref_i_beginning);
-        bool is_in_rt_heap = f_transfer_ptr(memref->allocated);
+        bool is_in_rt_heap = has_transfer ? f_transfer_ptr(memref->allocated) : true;
 
         if (!is_in_rt_heap) {
             // This case is guaranteed by the compiler to be the following:
@@ -236,7 +240,7 @@ NB_MODULE(wrapper, m)
     // We have to annotate all the arguments to `wrap` to allow `result_desc` to be None
     // See https://nanobind.readthedocs.io/en/latest/functions.html#none-arguments
     m.def("wrap", &wrap, "A wrapper function.", nb::arg("func"), nb::arg("py_args"),
-          nb::arg("result_desc").none(), nb::arg("transfer"), nb::arg("numpy_arrays"));
+          nb::arg("result_desc").none(), nb::arg("transfer").none(), nb::arg("numpy_arrays"));
     int retval = _import_array();
     bool success = retval >= 0;
     if (!success) {
