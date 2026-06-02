@@ -542,6 +542,9 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
             // the root so the flat call inserted by NestedToFlatCallPattern is visible.
             if (emitDecls && isa<func::FuncOp>(nested) && nested->getParentOp() != symbolTable) {
                 auto func = cast<func::FuncOp>(nested);
+                // The host only calls entry points; helpers stay internal to the object.
+                if (!func->hasAttr("catalyst.entry_point"))
+                    return WalkResult::advance();
                 StringRef name = func.getName();
                 if (!rootSymbols.insert(name).second)
                     return WalkResult::advance();
