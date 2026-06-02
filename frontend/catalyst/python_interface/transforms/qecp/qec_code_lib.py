@@ -47,7 +47,7 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         },
         {
             "hadamard_indices": (1, 2, 3),
-            "cnot_indicies": (
+            "cnot_indices": (
                 [1, 0],
                 [2, 4],
                 [6, 5],
