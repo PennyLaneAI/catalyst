@@ -1897,7 +1897,7 @@ def graph_decomposition_setup_inputs(
     libQPC_path = ""
     if callback_plugin_path:
         libQPC_path = str(callback_plugin_path)
-    elif libpath := get_lib_path("callbacks_lib", "CATALYST_LIB_DIR"):
+    elif libpath := get_lib_path("callbacks_lib", "CATALYST_LIB_DIR"):  # pragma: no cover
         libQPC_path = libpath
 
     options: dict[str, dict | tuple | str] = {

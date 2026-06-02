@@ -54,8 +54,8 @@ BYTECODE_FILE_PATH = (
 )
 
 
-def get_libpython_path() -> Path | str:
-    """Return the path to the python shared library, or emptystring if failed to find."""
+def get_libpython_path() -> Path | str:  # pragma: no cover
+    """Return the path to the python shared library, or empty string if failed to find."""
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
