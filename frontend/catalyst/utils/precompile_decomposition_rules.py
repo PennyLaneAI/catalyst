@@ -224,6 +224,9 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
 
     bytecode = _quantum_opt(
         "--emit-bytecode",
+        "--canonicalize",
+        "--convert-to-value-semantics",
+        "--canonicalize",
         "--register-decomp-rule-resource",
         stdin=mlir_rules.encode("utf-8"),
         text=None,

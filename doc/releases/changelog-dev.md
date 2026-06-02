@@ -67,6 +67,12 @@
   to tracing errors.
   [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
 
+* Dynamically allocated wires can now be used in quantum adjoints.
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+
+* Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -93,6 +99,18 @@
   [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
 
 <h3>Internal changes ⚙️</h3>
+
+* The frontend now generates MLIR in reference semantics when capture is enabled.
+  [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
+  [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
+  [(#2672)](https://github.com/PennyLaneAI/catalyst/pull/2672)
+  [(#2694)](https://github.com/PennyLaneAI/catalyst/pull/2694)
+  [(#2717)](https://github.com/PennyLaneAI/catalyst/pull/2717)
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+  [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
+  [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
+  [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
