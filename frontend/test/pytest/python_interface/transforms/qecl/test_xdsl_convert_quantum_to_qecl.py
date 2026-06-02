@@ -57,10 +57,15 @@ class TestAllocPattern:
         """
         program = """
         func.func @test_program() {
-            // CHECK: [[hreg10:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
-            // CHECK: [[cb10:%.+]] = qecl.extract_block [[hreg10]][0]
-            // CHECK: [[cb11:%.+]] = qecl.encode[zero] [[cb10]]
-            // CHECK: [[hreg11:%.+]] = qecl.insert_block [[hreg10]][0], [[cb11]]
+// CHECK: [[hreg10:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            // CHECK: [[lb:%.+]] = arith.constant 0 : index
+            // CHECK: [[ub:%.+]] = arith.constant 1 : index
+            // CHECK: [[step:%.+]] = arith.constant 1 : index
+            // CHECK: [[hreg11:%.+]] = scf.for [[idx:%.+]] = [[lb]] to [[ub]] step [[step]] iter_args([[hreg1arg:%.+]] = [[hreg10]])
+            // CHECK:     [[cb10:%.+]] = qecl.extract_block [[hreg1arg]][[[idx]]]
+            // CHECK:     [[cb11:%.+]] = qecl.encode[zero] [[cb10]]
+            // CHECK:     [[hreg12:%.+]] = qecl.insert_block [[hreg1arg]][[[idx]]], [[cb11]]
+            // CHECK:     scf.yield [[hreg12]]
             // CHECK-NOT: quantum.alloc
             %0 = quantum.alloc(1) : !quantum.reg
 
@@ -102,11 +107,17 @@ class TestAllocPattern:
         program = """
         func.func @test_program() {
             // CHECK: [[hreg0:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
-            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0]
-            // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]]
-            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[cb1]]
+            // CHECK: [[lb:%.+]] = arith.constant 0 : index
+            // CHECK: [[ub:%.+]] = arith.constant 1 : index
+            // CHECK: [[step:%.+]] = arith.constant 1 : index
+            // CHECK: [[hreg1:%.+]] = scf.for [[idx:%.+]] = [[lb]] to [[ub]] step [[step]] iter_args([[hregarg:%.+]] = [[hreg0]])
+            // CHECK:     [[cb0:%.+]] = qecl.extract_block [[hregarg]][[[idx]]]
+            // CHECK:     [[cb1:%.+]] = qecl.encode[zero] [[cb0]]
+            // CHECK:     [[hreg_out:%.+]] = qecl.insert_block [[hregarg]][[[idx]]], [[cb1]]
+            // CHECK:     scf.yield [[hreg_out]]
+            // CHECK: }
             // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[hreg1]] : !qecl.hyperreg<1 x 1> to !quantum.reg
-            // CHECK: "test.op"([[conv_cast]]) : (!quantum.reg) -> !quantum.reg
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.reg) -> !quantum.reg            
             // CHECK-NOT: quantum.alloc
             %0 = quantum.alloc(1) : !quantum.reg
             %1 = "test.op"(%0) : (!quantum.reg) -> !quantum.reg
@@ -865,9 +876,12 @@ class TestQuantumToQecLogicalPassIntegration:
         @qp.qnode(dev, shots=1)
         def circuit():
             # CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            # CHECK: qecl.extract_block {{%.+}}[0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
-            # CHECK: qecl.encode[zero]
-            # CHECK: qecl.insert_block {{%.+}}[0], {{%.+}}
+            # CHECK: scf.for {{.*}} {
+            # CHECK:   qecl.extract_block
+            # CHECK:   qecl.encode[zero]
+            # CHECK:   qecl.insert_block
+            # CHECK:   scf.yield
+            # CHECK: }
             # CHECK: qecl.extract_block
             # CHECK: qecl.qec
             # CHECK: qecl.hadamard {{%.+}}[0]

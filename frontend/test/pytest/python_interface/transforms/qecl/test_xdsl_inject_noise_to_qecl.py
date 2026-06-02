@@ -65,9 +65,12 @@ class TestInjectNoiseToQECLPassIntegration:
         @qp.qnode(dev, shots=1)
         def circuit():
             # CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            # CHECK: qecl.extract_block {{%.+}}[0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
-            # CHECK: qecl.encode[zero]
-            # CHECK: qecl.insert_block {{%.+}}[0], {{%.+}}
+            # CHECK: scf.for {{.*}} {
+            # CHECK:   qecl.extract_block
+            # CHECK:   qecl.encode[zero]
+            # CHECK:   qecl.insert_block
+            # CHECK:   scf.yield
+            # CHECK: }
             # CHECK: qecl.extract_block
             # CHECK: qecl.noise
             # CHECK: qecl.qec
