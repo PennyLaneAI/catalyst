@@ -1900,14 +1900,16 @@ def graph_decomposition_setup_inputs(
     else:
         gate_set = {to_name(op): float(cost) for op, cost in gate_set.items()}
 
+    libQPC_path = ""
+    if callback_plugin_path:
+        libQPC_path = str(callback_plugin_path)
+    elif libpath := get_lib_path("callbacks_lib", "CATALYST_PYTHON_CALLBACK_PLUGIN"):
+        libQPC_path = libpath
+
     options: dict[str, dict | tuple | str] = {
         "gate_set": gate_set,
         "bytecode_rules": str(_builtin_rule_path),
-        "callback_plugin_path": (
-            str(callback_plugin_path)
-            if callback_plugin_path
-            else get_lib_path("callbacks_lib", "CATALYST_PYTHON_CALLBACK_PLUGIN")
-        ),
+        "callback_plugin_path": libQPC_path,
         "libpython_path": str(libpython_path) if libpython_path else str(get_libpython_path()),
     }
 

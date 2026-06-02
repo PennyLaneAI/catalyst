@@ -36,7 +36,7 @@ DEFAULT_LIB_PATHS = {
     "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
     "oqc_runtime": os.path.join(package_root, "../../catalyst/third_party/oqc/src/build"),
     "oqd_runtime": os.path.join(package_root, "../../../runtime/build/lib"),
-    "callbacks_lib": os.path.join(package_root, "../../mlir/build/lib"),
+    "callbacks_lib": os.path.join(package_root, "../../../mlir/build/lib"),
 }
 
 DEFAULT_INCLUDE_PATHS = {
@@ -85,9 +85,15 @@ def get_libpython_path() -> Path | str:
 
 def get_lib_path(project, env_var):
     """Get the library path."""
-    if INSTALLED:
-        return os.path.join(package_root, "..", "lib")  # pragma: no cover
-    return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
+    candidate = Path(
+        os.path.join(package_root, "..", "lib")
+        if INSTALLED
+        else os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
+    ).resolve()  # pragma: no cover
+    if candidate.exists():
+        if project == "callbacks_lib":
+            print(f"[CI-DEBUG] found libQPC at {candidate} ({'INSTALLED' if INSTALLED else 'DEV'})")
+        return str(candidate)
 
 
 def get_include_path():
