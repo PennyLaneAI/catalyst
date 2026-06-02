@@ -478,6 +478,23 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
             return failure();
         }
         catalyst::utils::LinesCount::call(moduleOp);
+
+        // Cross-compile catalyst.target nested modules to standalone objects after
+        // gradient lowering and before host bufferization.
+        if (pipeline.getName() == "GradientLoweringStage" && !options.workspace.empty()) {
+            Pipeline cctPipeline;
+            cctPipeline.setName("CrossCompileTargets");
+            std::string dumpIntermediate = options.keepIntermediate ? "true" : "false";
+            cctPipeline.setPasses({"cross-compile-targets{workspace=" + options.workspace.str() +
+                                   " dump-intermediate=" + dumpIntermediate + "}"});
+            if (failed(catalyst::utils::Timer<>::timer(
+                    catalyst::driver::runPipeline, cctPipeline.getName(),
+                    /* add_endl */ false, pm, options, output, cctPipeline,
+                    /* clHasManualPipeline */ true, moduleOp))) {
+                return failure();
+            }
+            catalyst::utils::LinesCount::call(moduleOp);
+        }
     }
     return success();
 }
