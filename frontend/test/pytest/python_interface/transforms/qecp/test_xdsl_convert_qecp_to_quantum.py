@@ -545,6 +545,9 @@ class TestHyperRegisterLowering:
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
 
+# MARK: Integration tests
+
+
 @pytest.mark.slow
 class TestQECPassIntegration:
     """Integration lit tests for the all qec-related pass"""
@@ -624,3 +627,38 @@ class TestQECPassIntegration:
             return qp.sample([m0, m1, m2])
 
         ghz()
+
+    @pytest.mark.parametrize("n, diagonalizing_gates, expected_res, shots", [(1, [qp.H], 0.707, 1000), (1, [qp.Z, qp.S, qp.H], 0.707, 1000), (2, [qp.H], 0, 1000), (2, [qp.Z, qp.S, qp.H], 1, 100)])
+    def test_T_gate_integration(self, n, diagonalizing_gates, expected_res, shots, run_filecheck_qjit):
+        """Integration test for T gates."""
+
+        dev = qp.device("lightning.qubit", wires=1)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            # CHECK: quantum.alloc
+            # CHECK: func.call @apply_T
+            # CHECK: fabricate_magic_state_Steane
+            # CHECK: qecp.assemble_tanner
+            # CHECK: qecp.decode_esm_css
+            # CHECK: quantum.custom "Hadamard"
+            qp.Hadamard(0)
+            for _ in range(n):
+                qp.T(0)
+            for op in diagonalizing_gates:
+                op(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        run_filecheck_qjit(circ)
+        samples = circ()
+        eigenvalues = [-1 if s else 1 for s in samples]
+        assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.05)
+
+
