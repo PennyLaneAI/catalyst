@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tag a PennyLane device as a separate cross-compilation target.
+"""Tag a PennyLane device as a separate cross-compilation target, optionally remote.
 """
 
 from dataclasses import dataclass
@@ -21,6 +21,7 @@ from typing import Optional
 import pennylane as qp
 
 _TARGET_ATTR = "_catalyst_target"
+_DISPATCH_ATTR = "_catalyst_dispatch"
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,17 @@ class Target:
     backend: Optional[str] = None
     pipeline: Optional[str] = None
     triple: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class RemoteDispatch:
+    """Remote dispatch spec attached to a device by :func:`remote`.
+
+    Args:
+        address: Executor address, e.g. ``"127.0.0.1:1373"``.
+    """
+
+    address: str
 
 
 def target(
@@ -64,6 +76,32 @@ def target(
     return device
 
 
+def remote(device, *, address: str):
+    """Mark a :func:`target` device for remote dispatch and return it.
+
+    Stamps ``catalyst.dispatch = {address}`` so the ``dispatch-remote-targets`` pass ships the
+    compiled object to ``address`` and rewrites host-side calls to it into remote calls. Wrap the
+    device with :func:`target` first to set cross-compilation options; a default target is applied
+    if it has none.
+
+    Args:
+        device: A PennyLane device.
+        address: Executor address the object is shipped to and called on, e.g. ``"127.0.0.1:1373"``.
+
+    Returns:
+        The same device, now also tagged for remote dispatch.
+    """
+    if get_target(device) is None:
+        target(device)
+    setattr(device, _DISPATCH_ATTR, RemoteDispatch(address=address))
+    return device
+
+
 def get_target(device) -> Optional[Target]:
-    """Return the :class:`Target` previously attached via :func:`target`, or ``None``."""
+    """Return the :class:`Target` previously attached via :func:`target`/:func:`remote`, or ``None``."""
     return getattr(device, _TARGET_ATTR, None)
+
+
+def get_dispatch(device) -> Optional[RemoteDispatch]:
+    """Return the :class:`RemoteDispatch` attached via :func:`remote`, or ``None``."""
+    return getattr(device, _DISPATCH_ATTR, None)
