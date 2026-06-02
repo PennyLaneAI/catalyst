@@ -703,41 +703,26 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        file_content = None
-        for dirpath, _, filenames in os.walk(str(workspace)):
-            filenames = [f for f in filenames if f.endswith(".mlir") or f.endswith(".ll")]
-            if not filenames:
-                break
-            filenames_no_ext = [os.path.splitext(f)[0] for f in filenames]
-            if pipeline == "mlir":
-                # Sort files and pick the first one
-                selected_file = [
-                    sorted(filenames)[0],
-                ]
-            elif pipeline == "last":
-                # Sort files and pick the last one
-                selected_file = [
-                    sorted(filenames)[-1],
-                ]
-            else:
-                selected_file = [
-                    f
-                    for f, name_no_ext in zip(filenames, filenames_no_ext)
-                    if pipeline in name_no_ext
-                ]
-            if len(selected_file) != 1:
-                msg = f"Attempting to get output for pipeline: {pipeline},"
-                msg += " but no or more than one file was found.\n"
-                raise CompileError(msg)
-            filename = selected_file[0]
-
-            full_path = os.path.join(dirpath, filename)
-            with open(full_path, "r", encoding="utf-8") as file:
-                file_content = file.read()
-
-        if file_content is None:
+        workspace = str(workspace)
+        filenames = [f for f in os.listdir(workspace) if f.endswith(".mlir") or f.endswith(".ll")]
+        if not filenames:
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"
             raise CompileError(msg)
-        return file_content
+
+        if pipeline == "mlir":
+            # Sort files and pick the first one
+            selected_file = [sorted(filenames)[0]]
+        elif pipeline == "last":
+            # Sort files and pick the last one
+            selected_file = [sorted(filenames)[-1]]
+        else:
+            selected_file = [f for f in filenames if pipeline in os.path.splitext(f)[0]]
+        if len(selected_file) != 1:
+            msg = f"Attempting to get output for pipeline: {pipeline},"
+            msg += " but no or more than one file was found.\n"
+            raise CompileError(msg)
+
+        with open(os.path.join(workspace, selected_file[0]), "r", encoding="utf-8") as file:
+            return file.read()
