@@ -57,6 +57,7 @@ target_sources(runner_tests_qir_runtime PRIVATE
     Test_DataView.cpp
     Test_NullQubit.cpp
     Test_ResourceTracker.cpp
+    Test_SharedLibraryManager.cpp
 )
 
 # For tests we do require libpython in order to embed a Python interpreter.
@@ -65,6 +66,19 @@ target_link_libraries(runner_tests_qir_runtime PRIVATE
     pybind11::embed
     catalyst_runtime_testing
     rtd_null_qubit
+)
+
+# Test_SharedLibraryManager dlopens
+if(NOT APPLE)
+    set_property(TARGET runner_tests_qir_runtime APPEND PROPERTY BUILD_RPATH $ORIGIN)
+    set_property(TARGET runner_tests_qir_runtime APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
+else()
+    set_property(TARGET runner_tests_qir_runtime APPEND PROPERTY BUILD_RPATH @loader_path)
+    set_property(TARGET runner_tests_qir_runtime APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
+endif()
+
+target_compile_definitions(runner_tests_qir_runtime PRIVATE
+    RTD_NULL_QUBIT_LIB="$<TARGET_FILE:rtd_null_qubit>"
 )
 
 catch_discover_tests(runner_tests_qir_runtime)
