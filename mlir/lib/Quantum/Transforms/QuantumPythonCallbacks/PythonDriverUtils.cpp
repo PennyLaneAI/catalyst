@@ -72,10 +72,10 @@ PyInterpreterGuard::PyInterpreterGuard() : impl(std::make_unique<Impl>())
     LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Initializing interpreter...\n");
     if (!Py_IsInitialized()) {
         LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE
-                                << "No existing interpreter found, embedding a new one...\n");
+                                << "No existing interpreter found, spawning a new one...\n");
         Py_Initialize();
         impl->createdInterpreter = true;
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Embeded a new interpreter.\n");
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Spawning a new interpreter.\n");
 
         LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Syncing site-packages...\n");
         syncSitePackages();

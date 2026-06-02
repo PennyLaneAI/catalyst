@@ -39,17 +39,16 @@ mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotImpl(mlir::MLIRContext *ctx, 
 
     // Invoke Python and parse the returned MLIR text.
     std::string mlirText = QuantumPythonCallbacks::PyInterpreterGuard::ensure().withGil([&] {
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "lowering paulirot with pauliword " << pauliWord
-                                << "\n");
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Lowering decomp rule for paulirot with pauliword "
+                                << pauliWord << "\n");
         const char *moduleName = "catalyst.python_callbacks";
         const char *functionName = "paulirot_callback_wrapper";
 
         try {
-            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Importing the python module...\n");
+            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Importing python module " << moduleName);
             nb::module_ wrapperModule = nb::module_::import_(moduleName);
 
-            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Getting the python function...\n");
-            // nb::object wrapperFunction = wrapperModule.attr("test_function");
+            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Getting python function " << functionName);
             nb::object wrapperFunction = wrapperModule.attr(functionName);
 
             nb::list pyWires;
@@ -57,21 +56,12 @@ mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotImpl(mlir::MLIRContext *ctx, 
                 pyWires.append(w);
             }
 
-            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "executing python function...\n");
+            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Executing " << functionName);
             nb::object pythonResult = wrapperFunction(theta, pauliWord.c_str(), pyWires);
 
-            // LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Executing test function...\n");
-            // nb::object pythonResult = wrapperFunction();
-
-            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Got function output, casting...\n");
-
             std::string output = nb::cast<const char *>(pythonResult);
-            // llvm::errs() << "[TEST OUTPUT] " << output << "\n";
 
             return std::string(output);
-
-            // LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "casting result...\n");
-            // return nb::cast<std::string>(pythonResult);
         }
         catch (const nb::python_error &error) {
             throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
