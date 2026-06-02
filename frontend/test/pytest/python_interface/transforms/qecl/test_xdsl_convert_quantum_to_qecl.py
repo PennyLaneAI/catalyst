@@ -635,6 +635,43 @@ class TestGatePattern:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_gate_t_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that T gates (`quantum.custom "T"() ops) are converted to their corresponding
+        `apply_T` subroutine for k = 1.
+        """
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+                // CHECK-NOT: builtin.unrealized_conversion_cast
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+                %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+                // CHECK: [[cb1:%.+]] = func.call @apply_T([[cb0]]) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+                %2 = quantum.custom "T"() %1 : !quantum.bit
+
+                // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+                // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+                %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+                return
+            }
+            //      CHECK: func.func private @apply_T([[in_codeblock:%.+]]: !qecl.codeblock<1>)
+            // CHECK-NEXT: [[magic_cb:%.+]] = qecl.fabricate[magic] : !qecl.codeblock<1>
+            // CHECK-NEXT: [[magic_cb2:%.+]], [[in_codeblock2:%.+]] = qecl.cnot [[magic_cb]][0], [[in_codeblock]][0]
+            // CHECK-NEXT: [[mres:%.+]], [[in_codeblock3:%.+]] = qecl.measure [[in_codeblock2]][0]
+            // CHECK-NEXT: qecl.dealloc_cb [[in_codeblock3]]
+            // CHECK-NEXT: [[out_codeblock:%.+]] = scf.if [[mres]] -> (!qecl.codeblock<1>)
+            // CHECK-NEXT:     [[s_corrected_cb:%.+]] = qecl.s [[magic_cb2]][0]
+            // CHECK-NEXT:     [[corrected_cb:%.+]] = qecl.x [[s_corrected_cb]]
+            // CHECK-NEXT:     scf.yield [[corrected_cb]]
+            // CHECK-NEXT: else
+            // CHECK-NEXT:     scf.yield [[magic_cb2]]
+            //      CHECK: func.return [[out_codeblock]]
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
     def test_gate_cnot_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that CNOT gates (`quantum.custom "CNOT"() ops) are converted to their corresponding
         `qecl.cnot` ops for k = 1.
@@ -1002,12 +1039,14 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.qec
             # CHECK: qecl.hadamard {{%.+}}[0]
             # CHECK: qecl.qec
+            # CHECK: apply_T
             # CHECK: qecl.measure {{%.+}}[0]
             # CHECK: quantum.mcmobs
             # CHECK: quantum.sample
             # CHECK: qecl.insert_block
             # CHECK: qecl.dealloc
             qp.H(0)
+            qp.T(0)
             m0 = qp.measure(0)
             return qp.sample([m0])
 
