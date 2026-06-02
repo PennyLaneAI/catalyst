@@ -60,24 +60,16 @@ def get_libpython_path() -> Path | str:
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
 
-    # TODO: prefer INSTSONAME for linux
-    print("[CI-DEBUG] libdir:", libdir)
-    print("[CI-DEBUG] ldlibrary:", ldlibrary)
-    print("[CI-DEBUG] framework_prefix:", framework_prefix)
-
     # macOS framework-style installations
     if framework_prefix:
-        print("[CI-DEBUG] found framework install:", Path(framework_prefix) / Path(ldlibrary))
         return Path(framework_prefix) / Path(ldlibrary)
 
     if not (libdir and ldlibrary):
-        print("[CI-DEBUG] frontend could not find libpython")
         return ""
 
     # standard installation
     ldlibrary_path = Path(libdir) / ldlibrary
     if ldlibrary_path.exists():
-        print("[CI-DEBUG] found python at", ldlibrary_path.resolve(), "(standard installation)")
         return ldlibrary_path.resolve()
 
     return ""
@@ -85,20 +77,9 @@ def get_libpython_path() -> Path | str:
 
 def get_lib_path(project, env_var):
     """Get the library path."""
-    candidate = Path(
-        os.path.join(package_root, "..", "lib")
-        if INSTALLED
-        else os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
-    ).resolve()  # pragma: no cover
-    if candidate.exists():
-        if project == "callbacks_lib":
-            for file in candidate.iterdir():
-                if file.name.startswith("libQuantumPythonCallbacks"):
-                    print(
-                        f"[CI-DEBUG] found libQPC at {file} ({'INSTALLED' if INSTALLED else 'DEV'})"
-                    )
-        return str(candidate)
-    print(f"[CI-DEBUG] did not find libQPC from frontend ({'INSTALLED' if INSTALLED else 'DEV'})")
+    if INSTALLED:
+        return os.path.join(package_root, "..", "lib")  # pragma: no cover
+    return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
 def get_include_path():
