@@ -152,6 +152,45 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
 
 // -----
 
+// Reverse for-loop bounds lowered via subi + ceildivsi (PennyLane for_loop
+// start/stop/step pattern). Trip count = ceildivsi(subi(-1, 9), -1) = 10.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "operations"
+// CHECK-DAG: "PauliX(1)": 1
+
+// CHECK-LABEL: "reverse_for_loop_ceildivsi": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 10
+// CHECK: "operations": {}
+func.func @reverse_for_loop_ceildivsi(%arg0: !quantum.reg) -> !quantum.reg {
+    %c9_i64 = arith.constant 9 : i64
+    %cm1_i64 = arith.constant -1 : i64
+    %c0_i64 = arith.constant 0 : i64
+    %c1_i64 = arith.constant 1 : i64
+    %start = arith.index_cast %c9_i64 : i64 to index
+    %stop = arith.index_cast %cm1_i64 : i64 to index
+    %neg_step = arith.index_cast %cm1_i64 : i64 to index
+    %lb = arith.index_cast %c0_i64 : i64 to index
+    %step = arith.index_cast %c1_i64 : i64 to index
+    %range = arith.subi %stop, %start : index
+    %ub = arith.ceildivsi %range, %neg_step : index
+
+    %r = scf.for %iter = %lb to %ub step %step iter_args(%reg = %arg0) -> (!quantum.reg) {
+        %idx = arith.muli %iter, %neg_step : index
+        %wire = arith.addi %start, %idx : index
+        %wire_i64 = arith.index_cast %wire : index to i64
+        %q = quantum.extract %reg[%wire_i64] : !quantum.reg -> !quantum.bit
+        %out = quantum.custom "PauliX"() %q : !quantum.bit
+        %reg1 = quantum.insert %reg[%wire_i64], %out : !quantum.reg, !quantum.bit
+        scf.yield %reg1 : !quantum.reg
+    }
+
+    return %r : !quantum.reg
+}
+
+// -----
+
 // For loop with indirect bounds resolvable through index_cast + addi.
 // Trip count = 7 -> static lift.
 

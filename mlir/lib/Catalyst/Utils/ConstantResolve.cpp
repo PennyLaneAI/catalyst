@@ -24,6 +24,22 @@ using namespace mlir;
 
 namespace catalyst {
 
+/// Signed ceiling division matching `arith.ceildivsi` constant folding.
+/// Returns nullopt on division by zero.
+static std::optional<int64_t> ceilDivSI(int64_t a, int64_t b)
+{
+    if (b == 0) {
+        return std::nullopt;
+    }
+    int64_t quotient = a / b;
+    int64_t remainder = a % b;
+    bool sameSign = (a > 0) == (b > 0);
+    if (remainder != 0 && sameSign) {
+        return quotient + 1;
+    }
+    return quotient;
+}
+
 /// Extract a double from a constant-like Attribute.
 static std::optional<double> attrToDouble(Attribute attr)
 {
@@ -49,7 +65,7 @@ static std::optional<double> attrToDouble(Attribute attr)
 std::optional<double> resolveConstantArithmetic(Value val, Operation *op)
 {
     // arith integer binary ops
-    if (isa<arith::AddIOp, arith::SubIOp, arith::MulIOp>(op)) {
+    if (isa<arith::AddIOp, arith::SubIOp, arith::MulIOp, arith::CeilDivSIOp>(op)) {
         auto lhs = resolveConstant(op->getOperand(0));
         auto rhs = resolveConstant(op->getOperand(1));
         if (!lhs || !rhs) {
@@ -60,6 +76,13 @@ std::optional<double> resolveConstantArithmetic(Value val, Operation *op)
         }
         if (isa<arith::SubIOp>(op) || isa<arith::SubFOp>(op)) {
             return *lhs - *rhs;
+        }
+        if (isa<arith::CeilDivSIOp>(op)) {
+            auto result = ceilDivSI(static_cast<int64_t>(*lhs), static_cast<int64_t>(*rhs));
+            if (!result) {
+                return std::nullopt;
+            }
+            return static_cast<double>(*result);
         }
         return *lhs * *rhs;
     }
