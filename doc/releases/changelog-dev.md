@@ -63,6 +63,9 @@
 * Dynamically allocated wires can now be used in quantum adjoints.
   [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
 
+* Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
