@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Optional
 
 import jax.numpy as jnp
 
@@ -75,6 +76,29 @@ def declare(name: str, artifact: str, outputs) -> KernelDescriptor:
         artifact=artifact,
         output_spec=_to_hashable(outputs),
     )
+
+
+def define(builder, *, name: Optional[str] = None, outputs):
+    """Build a kernel with ``builder`` and declare it, as a single decorator.
+
+    Args:
+        builder: A backend-specific object implementing ``build(kernel_fn, *, name) -> path``, 
+            where ``path`` points to a shared library exporting ``name`` with the 
+            :func:`runtime_call` ABI.
+        name: Symbol the artifact must export. Defaults to ``kernel_fn.__name__``;
+            passed to both ``builder.build`` and :func:`declare`.
+        outputs: :class:`jax.ShapeDtypeStruct` or tuple of them, forwarded to :func:`declare`.
+
+    Returns:
+        KernelDescriptor: the declared kernel.
+    """
+
+    def wrap(kernel_fn):
+        sym = name or getattr(kernel_fn, "__name__", None)
+        artifact = builder.build(kernel_fn, name=sym)
+        return declare(sym, artifact=str(artifact), outputs=outputs)
+
+    return wrap
 
 
 def runtime_call(kernel_descriptor, *args):
