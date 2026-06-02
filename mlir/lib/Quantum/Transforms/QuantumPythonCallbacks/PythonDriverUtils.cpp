@@ -48,8 +48,7 @@ struct __attribute__((visibility("hidden"))) PyInterpreterGuard::Impl {
 };
 
 /**
- * @brief Execute a function while holding the GIL,
- * ensuring the interpreter is initialized.
+ * @brief Ensure that site-packages are synced for the spawned interpreter.
  */
 void syncSitePackages()
 {
