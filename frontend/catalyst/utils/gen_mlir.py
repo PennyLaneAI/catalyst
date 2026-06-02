@@ -75,4 +75,3 @@ def inject_functions(module, ctx, seed):
     teardown_module = gen_teardown(ctx)
     teardown_func = teardown_module.body.operations[0]
     module.body.append(teardown_func)
-
