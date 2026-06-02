@@ -99,8 +99,8 @@ class SharedLibraryManager final {
             return;
         }
 
-        // dlerror() is destructive: it returns the pending error and clears the
-        // state. Capture it into a local before any further use.
+        // dlerror() is destructive: it returns the pending error and clears the state. Capture it
+        // into a local before any further use.
         const char *primary_dlerror = dlerror();
         std::string primary_error = primary_dlerror ? primary_dlerror : "unknown dlopen error";
         auto basename = std::filesystem::path(filename).filename().string();
