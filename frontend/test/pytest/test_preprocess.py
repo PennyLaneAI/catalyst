@@ -516,8 +516,7 @@ class TestPreprocessHybridOp:
             qp.RX(1.23, wires=0)
             qp.measure(0)
 
-        ops, measurements = qp.queuing.process_queue(q)
-        tape = qp.tape.QuantumScript(ops, measurements)
+        tape = qp.tape.QuantumScript.from_queue(q)
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
         setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
@@ -537,8 +536,7 @@ class TestPreprocessHybridOp:
             qp.RX(1.23, wires=0)
             qp.measure(0)
 
-        ops, measurements = qp.queuing.process_queue(q)
-        subtape = qp.tape.QuantumScript(ops, measurements)
+        subtape = qp.tape.QuantumScript.from_queue(q)
 
         region = HybridOpRegion([], subtape, [], [])
         region.trace = None
