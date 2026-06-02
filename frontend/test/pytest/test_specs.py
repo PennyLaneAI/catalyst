@@ -969,6 +969,8 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+
+class TestSpecsWithPPR:
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
@@ -1028,7 +1030,11 @@ class TestPassByPassSpecs:
         actual = qp.specs(circ, level=2)()
         check_specs_same(actual, expected)
 
+
+class TestSymbolicSpecs:
     def test_dynamic_loop(self, capture_mode):
+        """Test specs with a dynamic loop that can't be resolved at compile time"""
+
         @qp.qjit(autograph=True, capture=capture_mode)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(x):
@@ -1057,6 +1063,8 @@ class TestPassByPassSpecs:
         check_specs_resources_same(concrete_res, expected_res)
 
     def test_dynamic_loop_and_static_loop(self, capture_mode):
+        """Test specs with a nested static loop and a dynamic loop that can't be resolved at compile time"""
+
         @qp.qjit(autograph=True, capture=capture_mode)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(x):
@@ -1091,6 +1099,8 @@ class TestPassByPassSpecs:
         check_specs_resources_same(concrete_res, expected_res)
 
     def test_dynamic_loop_and_static_loop2(self, capture_mode):
+        """Test specs with a nested static loop and a dynamic loop that can't be resolved at compile time"""
+
         @qp.qjit(autograph=True, capture=capture_mode)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(x):
@@ -1123,6 +1133,8 @@ class TestPassByPassSpecs:
         check_specs_resources_same(concrete_res, expected_res)
 
     def test_nested_dynamic_loop(self, capture_mode):
+        """Test specs with a nested dynamic loops that can't be resolved at compile time"""
+
         @qp.qjit(autograph=True, capture=capture_mode)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(x, y):
@@ -1152,6 +1164,8 @@ class TestPassByPassSpecs:
             check_specs_resources_same(concrete_res, expected_res)
 
     def test_dynamic_loops_multi_level(self, capture_mode):
+        """Test smulti-level specs with dynamic loops"""
+
         @qp.qjit(autograph=True, capture=capture_mode)
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("lightning.qubit", wires=1))
