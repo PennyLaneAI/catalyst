@@ -13,6 +13,7 @@ file(GLOB SRC
     DetensorizeSCFPass.cpp
     disable_assertion.cpp
     DisableAssertionPatterns.cpp
+    DispatchRemoteTargets.cpp
     EmptyPass.cpp
     GEPInboundsPass.cpp
     GEPInboundsPatterns.cpp
