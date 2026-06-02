@@ -972,6 +972,7 @@ class TestPassByPassSpecs:
 
 class TestSpecsWithPPR:
     """Tests for using qp.specs with PPRs"""
+
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
@@ -1034,6 +1035,7 @@ class TestSpecsWithPPR:
 
 class TestSymbolicSpecs:
     """Tests for using qp.specs with dynamic loops whose bounds are not known at compile time"""
+
     def test_dynamic_loop(self, capture_mode):
         """Test specs with a dynamic loop that can't be resolved at compile time"""
 
