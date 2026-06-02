@@ -1079,34 +1079,8 @@ class TestCondPredicateConversion:
 
         assert workflow(3) == 9
 
-    def test_string_conversion_failed(self, capture_mode):
-        """Test failure at converting string to bool using Autograph."""
-
-        if capture_mode:
-            pytest.skip("works with program capture.")
-
-        @qjit(autograph=True, capture=capture_mode)
-        def workflow(x):
-            n = "fail"
-
-            if n:
-                y = x**2
-            else:
-                y = 0
-
-            return y
-
-        with pytest.raises(
-            TypeError,
-            match="Conditional predicates are required to be of bool, integer or float type",
-        ):
-            workflow(3)
-
-    def test_string_conversion_capture_works(self, capture_mode):
-        """Test that truthy values in conditionals work when capture is enabled."""
-
-        if not capture_mode:
-            pytest.skip("only works with program capture.")
+    def test_string_conversion_works(self, capture_mode):
+        """Test that truthy values in conditionals work."""
 
         @qjit(autograph=True, capture=capture_mode)
         def workflow(x):

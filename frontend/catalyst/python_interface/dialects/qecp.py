@@ -683,6 +683,16 @@ class SOp(SingleQubitPhysicalGateOp):
 
 
 @irdl_op_definition
+class TOp(SingleQubitPhysicalGateOp):
+    """A physical T gate operation."""
+
+    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
+        super().__init__(in_qubit)
+
+    name = "qecp.t"
+
+
+@irdl_op_definition
 class CnotOp(IRDLOperation):
     """A physical CNOT gate operation."""
 
@@ -925,6 +935,7 @@ QecPhysical = Dialect(
         PauliYOp,
         PauliZOp,
         HadamardOp,
+        TOp,
         RotOp,
         SOp,
         CnotOp,
