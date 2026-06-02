@@ -178,6 +178,7 @@ def CrossCompileTargetsPass : Pass<"cross-compile-targets", "mlir::ModuleOp"> {
             "driver from `keep_intermediate`."
         >,
     ];
+}
 
 def MarkEntryPointsPass : Pass<"mark-entry-points", "mlir::ModuleOp"> {
     let summary = "Mark externally-callable entries on nested modules.";
