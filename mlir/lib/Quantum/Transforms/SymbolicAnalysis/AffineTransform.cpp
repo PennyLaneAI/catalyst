@@ -47,3 +47,17 @@ void AffineTransform::addRowWithParity(size_t row, const Parity& parity) {
 void AffineTransform::addRows(size_t sourceRow, size_t targetRow) {    // E_i,j
     getRowRef(targetRow) += getRow(sourceRow);
 }
+
+// TODO: Test
+void AffineTransform::swapRows(size_t row1, size_t row2) {
+    std::swap(getRowRef(row1), getRowRef(row2));
+}
+
+void AffineTransform::extendTo(size_t newRowNum) {
+    if (newRowNum > getRowNum()) {
+        exprMatrix.reserve(newRowNum);
+        for (size_t i = getRowNum() + 1; i <= newRowNum; i++) {
+            exprMatrix.push_back(Parity::eVec(newRowNum, i));
+        }
+    }   // it might be more efficient to resize to newRowNum, and then just turn the eVec bits on for the new rows.
+}
