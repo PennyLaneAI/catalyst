@@ -333,6 +333,25 @@ def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
     }];
 }
 
+def DispatchRemoteTargetsPass : Pass<"dispatch-remote-targets", "mlir::ModuleOp"> {
+    let summary = "Ship cross-compiled catalyst.target modules to a remote executor.";
+    let description = [{
+        For every `builtin.module` carrying a `catalyst.dispatch` attribute and the 
+        `catalyst.object_file` path, this pass will perform the following:
+
+        1. Injects `remote_open` into `setup()` (once per unique address) and `remote_send_binary`
+           into `setup()`.
+        2. Replaces every host-side `func.call` to the module's entry functions with a
+           `catalyst.custom_call fn("remote_call")` carrying the object path, address, and callee.
+        3. Injects `remote_close` into `teardown()` once any session was opened.
+        4. Erases the bodyless external declarations and the nested module from the host.
+
+        The pass is a no-op when no `catalyst.dispatch` modules are present.
+    }];
+
+    let dependentDialects = ["catalyst::CatalystDialect", "mlir::func::FuncDialect"];
+}
+
 def EmptyPass : Pass<"empty"> {
     let summary = "Empty pass that does nothing.";
 
