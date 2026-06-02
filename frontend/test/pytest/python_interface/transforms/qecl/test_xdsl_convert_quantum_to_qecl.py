@@ -57,7 +57,7 @@ class TestAllocPattern:
         """
         program = """
         func.func @test_program() {
-// CHECK: [[hreg10:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            // CHECK: [[hreg10:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
             // CHECK: [[lb:%.+]] = arith.constant 0 : index
             // CHECK: [[ub:%.+]] = arith.constant 1 : index
             // CHECK: [[step:%.+]] = arith.constant 1 : index
@@ -117,7 +117,7 @@ class TestAllocPattern:
             // CHECK:     scf.yield [[hreg_out]]
             // CHECK: }
             // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[hreg1]] : !qecl.hyperreg<1 x 1> to !quantum.reg
-            // CHECK: "test.op"([[conv_cast]]) : (!quantum.reg) -> !quantum.reg            
+            // CHECK: "test.op"([[conv_cast]]) : (!quantum.reg) -> !quantum.reg
             // CHECK-NOT: quantum.alloc
             %0 = quantum.alloc(1) : !quantum.reg
             %1 = "test.op"(%0) : (!quantum.reg) -> !quantum.reg
