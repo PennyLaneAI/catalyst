@@ -39,6 +39,9 @@ const PipelineList pipelineList{
       "split-multiple-tapes",
       // Run the transform sequence defined in the MLIR module
       "builtin.module(apply-transform-sequence)",
+      // Stamp catalyst.entry_point on host-called functions inside every
+      // nested module.
+      "mark-entry-points",
       // Nested modules are something that will be used in the future
       // for making device-specific transformations.
       // Since at the moment, nothing in the runtime is using them
