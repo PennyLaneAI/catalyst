@@ -547,24 +547,20 @@ class TestParitySynthIntegration:
             qp.CNOT((w1, 0))
 
             # Purely static wire section
-            # Note how the classical processing is in original order
-            # while the quantum instructions are scrambled in order
             # CHECK: [[phi_1:%.+]] = tensor.extract %arg0
             # CHECK: [[phi_2:%.+]] = tensor.extract %arg0
-            # CHECK: [[phi_3:%.+]] = tensor.extract %arg0
-            # CHECK: [[omega_1:%.+]] = tensor.extract %arg1
-            # CHECK: [[omega_2:%.+]] = tensor.extract %arg1
             # CHECK: quantum.custom "RZ"([[phi_1]])
             # CHECK: quantum.custom "RZ"([[phi_2]])
-            # CHECK: quantum.custom "RZ"([[omega_1]])
-            # CHECK: quantum.custom "RZ"([[omega_2]])
             # CHECK: quantum.custom "CNOT"()
+            # CHECK: [[phi_3:%.+]] = tensor.extract %arg0
             # CHECK: quantum.custom "CNOT"()
             # CHECK: quantum.custom "RZ"([[phi_3]])
             # CHECK: quantum.custom "CNOT"()
             # CHECK: quantum.custom "CNOT"()
-            # This last CNOT is inserted by rowcol
-            # CHECK: quantum.custom "CNOT"()
+            # CHECK: [[omega_1:%.+]] = tensor.extract %arg1
+            # CHECK: quantum.custom "RZ"([[omega_1]])
+            # CHECK: [[omega_2:%.+]] = tensor.extract %arg1
+            # CHECK: quantum.custom "RZ"([[omega_2]])
             qp.RZ(x, 0)
             qp.RZ(x, 1)
             qp.CNOT([0, 1])
@@ -616,38 +612,32 @@ class TestParitySynthIntegration:
             # Phase tensor
             # CHECK: func.func public @circuit([[FLOAT_ARG:%.+]]: tensor<f64>)
 
-            # Qubit extraction for wire 0
-            # CHECK: [[ZERO:%.+]] = stablehlo.constant dense<0> : tensor<i64>
-            # Ignore the first tensor.extract, that is for device allocation
-            # CHECK: tensor.extract [[ZERO]][] : tensor<i64>
-            # CHECK: [[Q0_IND:%.+]] = tensor.extract [[ZERO]][] : tensor<i64>
-            # CHECK-NEXT: [[Q0:%.+]] = quantum.extract {{%.+}}[[[Q0_IND]]]
+            # Qubit extractions
+            # CHECK: [[REG:%.+]] = quantum.alloc(2)
+            # CHECK: [[Q0:%.+]] = quantum.extract [[REG]][0]
+            # CHECK: [[Q1:%.+]] = quantum.extract [[REG]][1]
 
             # Phase extraction
             # CHECK: [[PHI:%.+]] = tensor.extract [[FLOAT_ARG]][] : tensor<f64>
 
             # Gates
             # CHECK-NOT: quantum.custom "CNOT"
-            # CHECK: quantum.custom "RZ"([[PHI]]) [[Q0]]
+            # CHECK: [[RZ:%.+]] = quantum.custom "RZ"([[PHI]]) [[Q0]]
             # CHECK-NOT: quantum.custom
             qp.CNOT((0, 1))
             qp.RZ(x, 0)
             qp.CNOT((0, 1))
 
             # CHECK: scf.for
+            # CHECK-SAME: iter_args([[Q0_LOOP:%.+]] = [[RZ]], [[Q1_LOOP:%.+]] = [[Q1]])
             @qp.for_loop(4)
             def loop_fn(_i):
-                # Qubit extraction for wire 0
-                # CHECK: [[ZERO_LOOP:%.+]] = stablehlo.constant dense<0> : tensor<i64>
-                # CHECK: [[Q0_IND_LOOP:%.+]] = tensor.extract [[ZERO_LOOP]][] : tensor<i64>
-                # CHECK-NEXT: [[Q0_LOOP:%.+]] = quantum.extract {{%.+}}[[[Q0_IND_LOOP]]]
-
                 # Phase extraction
                 # CHECK: [[PHI_LOOP:%.+]] = tensor.extract [[FLOAT_ARG]][] : tensor<f64>
 
                 # Gates
                 # CHECK-NOT: quantum.custom "CNOT"
-                # CHECK: quantum.custom "RZ"([[PHI_LOOP]]) [[Q0_LOOP]]
+                # CHECK: [[RZ_LOOP:%.+]] = quantum.custom "RZ"([[PHI_LOOP]]) [[Q0_LOOP]]
                 # CHECK-NOT: quantum.custom
                 qp.CNOT((0, 1))
                 qp.RZ(x, 0)
@@ -656,17 +646,12 @@ class TestParitySynthIntegration:
                 # CHECK: scf.if
                 @qp.cond(x > 2.5)
                 def cond_fn():
-                    # Qubit extraction for wire 0
-                    # CHECK: [[ZERO_IF:%.+]] = stablehlo.constant dense<0> : tensor<i64>
-                    # CHECK: [[Q0_IND_IF:%.+]] = tensor.extract [[ZERO_IF]][] : tensor<i64>
-                    # CHECK-NEXT: [[Q0_IF:%.+]] = quantum.extract {{%.+}}[[[Q0_IND_IF]]]
-
                     # Phase extraction
                     # CHECK: [[PHI_IF:%.+]] = tensor.extract [[FLOAT_ARG]][] : tensor<f64>
 
                     # Gates
                     # CHECK-NOT: quantum.custom "CNOT"
-                    # CHECK: quantum.custom "RZ"([[PHI_IF]]) [[Q0_IF]]
+                    # CHECK: quantum.custom "RZ"([[PHI_IF]]) [[RZ_LOOP]]
                     # CHECK-NOT: quantum.custom
                     qp.CNOT((0, 1))
                     qp.RZ(x, 0)

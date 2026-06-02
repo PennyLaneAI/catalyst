@@ -14,6 +14,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
+  instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
+  with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
+  identifier, and totals across the call graph are computed on demand.
+  [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
+
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
@@ -31,6 +37,22 @@
   overlapping qubits may still be merged into one layer.
   [(#2858)](https://github.com/PennyLaneAI/catalyst/pull/2858)
 
+* The :func:`~.passes.ppm_specs` now report circuit depth as ``depth``
+  (layer count) and ``depth_type`` (``0`` = commuting ops on overlapping qubits may share a
+  layer; ``1`` = only ops with disjoint qubit support may share a layer). The Python API accepts
+  ``only_disjoint_qubit=True`` to run ``ppm-specs{disjoint-qubit=true}``. AOT ``ppm_specs`` no
+  longer requires an explicit pipeline and no longer mixes MLIR into the JSON output.
+  [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
+
+* The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the worst-case depth
+  across ``scf.if`` and ``scf.index_switch`` branches (taking the maximum over all branches)
+  and across statically-bounded ``scf.for`` loops (multiplied by the trip count).
+  Previously, branches were counted sequentially and PBC ops inside ``scf.for`` produced an
+  error. ``scf.while`` and dynamically-bounded ``scf.for`` still produce an error.
+  [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
+  [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
+  [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
+
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values
   trace back to the same allocation.
@@ -43,6 +65,12 @@
 * Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
   to tracing errors.
   [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
+
+* Dynamically allocated wires can now be used in quantum adjoints.
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+
+* Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
 <h3>Breaking changes 💔</h3>
 
@@ -64,7 +92,24 @@
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
+* Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
+  after a PBC op but read from a register not updated by that op. Layer grouping now checks
+  data dependencies through insert to extract chains instead of textual op ordering.
+  [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
+
 <h3>Internal changes ⚙️</h3>
+
+* The frontend now generates MLIR in reference semantics when capture is enabled.
+  [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
+  [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
+  [(#2672)](https://github.com/PennyLaneAI/catalyst/pull/2672)
+  [(#2694)](https://github.com/PennyLaneAI/catalyst/pull/2694)
+  [(#2717)](https://github.com/PennyLaneAI/catalyst/pull/2717)
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+  [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
+  [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
+  [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -136,6 +181,9 @@
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
+* More conservative casting to tracer arrays in conditionals to preserve constant (static) values
+  better. This can be useful for optimizations that depend on values being static.
+  [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
 
 
 <h3>Documentation 📝</h3>

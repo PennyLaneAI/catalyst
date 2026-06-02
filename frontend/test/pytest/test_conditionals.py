@@ -46,16 +46,32 @@ class TestCondToJaxpr:
         """Check the JAXPR of simple conditional function."""
         # pylint: disable=line-too-long
 
-        expected = dedent("""
-            { lambda ; a:i64[]. let
-                b:bool[] = eq a 5:i64[]
-                c:i64[] = cond[
-                  branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
-                                 { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
-                  num_implicit_outputs=0
-                ] b a a
-              in (c,) }
-            """)
+        if capture_mode:
+            # In capture mode, the PL cond primitive is used directly, instead of the catalyst cond
+            expected = dedent("""
+                { lambda ; a:i64[]. let
+                    b:bool[] = eq a 5:i64[]
+                    c:i64[] = cond[
+                    args_slice=(4, None, None)
+                    consts_slices=((2, 3, None), (3, 4, None))
+                    jaxpr_branches=(
+                        { lambda d:i64[]; . let e:i64[] = integer_pow[y=2] d in (e,) }
+                        { lambda f:i64[]; . let g:i64[] = integer_pow[y=3] f in (g,) }
+                    )
+                    ] b True:bool[] a a
+                in (c,) }
+                """)
+        else:
+            expected = dedent("""
+                { lambda ; a:i64[]. let
+                    b:bool[] = eq a 5:i64[]
+                    c:i64[] = cond[
+                    branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
+                                    { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+                    num_implicit_outputs=0
+                    ] b a a
+                in (c,) }
+                """)
 
         @qjit(capture=capture_mode)
         def circuit(n: int):
@@ -1079,34 +1095,8 @@ class TestCondPredicateConversion:
 
         assert workflow(3) == 9
 
-    def test_string_conversion_failed(self, capture_mode):
-        """Test failure at converting string to bool using Autograph."""
-
-        if capture_mode:
-            pytest.skip("works with program capture.")
-
-        @qjit(autograph=True, capture=capture_mode)
-        def workflow(x):
-            n = "fail"
-
-            if n:
-                y = x**2
-            else:
-                y = 0
-
-            return y
-
-        with pytest.raises(
-            TypeError,
-            match="Conditional predicates are required to be of bool, integer or float type",
-        ):
-            workflow(3)
-
-    def test_string_conversion_capture_works(self, capture_mode):
-        """Test that truthy values in conditionals work when capture is enabled."""
-
-        if not capture_mode:
-            pytest.skip("only works with program capture.")
+    def test_string_conversion_works(self, capture_mode):
+        """Test that truthy values in conditionals work."""
 
         @qjit(autograph=True, capture=capture_mode)
         def workflow(x):

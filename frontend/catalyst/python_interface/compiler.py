@@ -26,11 +26,12 @@ from xdsl.dialects.func import FuncOp
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 
+import catalyst
 from catalyst.python_interface.parser import QuantumParser
 from catalyst.python_interface.pass_api import ApplyTransformSequencePass
 
 
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods, protected-access
 class Compiler:
     """Compiler namespace"""
 
@@ -60,24 +61,31 @@ class Compiler:
         else:
             gentxtmod = module
 
+        # convert qref to value semantics
+        value_semantics_mlir = (
+            catalyst.python_interface.inspection.xdsl_conversion._quantum_opt_stderr(
+                '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+                stdin=str(gentxtmod),
+            )
+        )
+
         # Parse and transform with xDSL
         ctx = xContext(allow_unregistered=True)
-        parser = QuantumParser(ctx, gentxtmod)
+        parser = QuantumParser(ctx, value_semantics_mlir)
         # xmod is modified in place
         xmod = parser.parse_module()
         pipeline = PassPipeline((ApplyTransformSequencePass(callback=callback),))
         pipeline.apply(ctx, xmod)
 
-        # JAX serialises void func.func ops with `res_attrs = []` in generic form
+        # JAX serializes void func.func ops with `res_attrs = []` in generic form
         # triggering an assertion in FuncToLLVM lowering.
-        # Remove empty arrays in-place so the generic printer omits them.
+        # Assert that the canonicalization above has removed these empty attributes
         for op in xmod.walk():
             if not isinstance(op, FuncOp):
                 continue
             for key in ("res_attrs", "arg_attrs"):
                 val = op.properties.get(key)
-                if isinstance(val, ArrayAttr) and len(val) == 0:
-                    del op.properties[key]
+                assert not (isinstance(val, ArrayAttr) and len(val) == 0)
         buffer = io.StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(xmod)
 
