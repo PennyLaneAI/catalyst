@@ -552,6 +552,13 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
                 decl.setPrivate();
                 if (auto targetAttr = nested->getParentOp()->getAttr("catalyst.target"))
                     decl->setAttr("catalyst.target", targetAttr);
+                // Mark tensor-typed arguments as read-only so one-shot-bufferize does not
+                // insert defensive copies at call sites of this external decl.
+                for (unsigned i = 0; i < decl.getNumArguments(); ++i) {
+                    if (isa<TensorType>(decl.getArgumentTypes()[i]))
+                        decl.setArgAttr(i, "bufferization.access",
+                                        StringAttr::get(context, "read"));
+                }
                 targetDeclarations.push_back(decl);
             }
             return WalkResult::advance();
