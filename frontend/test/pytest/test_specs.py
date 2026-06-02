@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1084,6 +1084,38 @@ class TestPassByPassSpecs:
         expected_res = SpecsResources(
             gate_types={"Hadamard": 1, "PauliX": 6, "PauliY": 15, "PauliZ": 25},
             gate_sizes={1: 47},
+            measurements={"expval(PauliX)": 1},
+            num_allocs=1,
+        )
+        check_specs_resources_same(concrete_res, expected_res)
+
+    def test_dynamic_loop_and_static_loop2(self, capture_mode):
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qp.Hadamard(0)
+            qp.PauliX(0)
+            for _ in range(3):
+                qp.PauliZ(0)
+                for _ in range(x):
+                    qp.PauliX(0)
+
+            return qp.expval(qp.PauliX(0))
+
+        s = qp.specs(circuit, level=0)(5)
+        assert s.level == "Before MLIR Passes"
+        assert s.device_name == "lightning.qubit"
+
+        res = s.resources
+        assert isinstance(res, SymbolicSpecsResources)
+        assert len(res.vars) == 1
+
+        concrete_res = res.subs({var: 5 for var in res.vars})
+        assert isinstance(concrete_res, SpecsResources)
+
+        expected_res = SpecsResources(
+            gate_types={"Hadamard": 1, "PauliX": 16, "PauliZ": 3},
+            gate_sizes={1: 20},
             measurements={"expval(PauliX)": 1},
             num_allocs=1,
         )
