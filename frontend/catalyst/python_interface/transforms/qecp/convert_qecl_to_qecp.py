@@ -375,6 +375,7 @@ class TransversalGateConversion(RewritePattern):
 
 # MARK: Apply_T Pattern
 
+
 @dataclass(frozen=True)
 class ApplyTConversion(RewritePattern):
     """Converts qecl.fabricate [magic] to the equivalent subroutine of qecp gates"""
@@ -407,7 +408,7 @@ class ApplyTConversion(RewritePattern):
                         f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                         f"lowering to a code with k={self.qec_code.k}"
                     )
-                
+
                 callee = builtin.SymbolRefAttr(self.fabricate_subroutine.sym_name)
                 return_types = self.fabricate_subroutine.function_type.outputs.data
                 callOp = func.CallOp(callee, arguments=(), return_types=return_types)
@@ -501,7 +502,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     InsertBlockConversion(),
                     ExtractBlockConversion(),
                     EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_subroutine),
-                    ApplyTConversion(qec_code=self.qec_code, fabricate_subroutine=fabricate_subroutine),
+                    ApplyTConversion(
+                        qec_code=self.qec_code, fabricate_subroutine=fabricate_subroutine
+                    ),
                     QecCycleOpConversion(
                         qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_subroutine
                     ),
@@ -801,10 +804,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         )
 
         return funcOp
-    
 
     # MARK: Fabricate subroutine
-
 
     def create_fabricate_subroutine(self) -> func.FuncOp:
         """Create a subroutine that allocates a codeblock and encodes it in the magic state for
@@ -813,58 +814,57 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         for generating a magic state from many noisy copies.
 
         The encoding process involves putting the initial QEC physical qubit in the desired state
-        via application of a Hadamard and physical T gate, and then using the unitary encoding for 
-        the zero state create the desired state for the codeblock. This is not the same procedure 
-        as the syndrome-measurement based procedure for encoding the zero state; encoding via the 
-        syndrome-measurement procedure would force the input back into the code-space, and destroy 
+        via application of a Hadamard and physical T gate, and then using the unitary encoding for
+        the zero state create the desired state for the codeblock. This is not the same procedure
+        as the syndrome-measurement based procedure for encoding the zero state; encoding via the
+        syndrome-measurement procedure would force the input back into the code-space, and destroy
         our magic state.
 
-        Note that this method does not insert the subroutine into the module op. Instead it 
+        Note that this method does not insert the subroutine into the module op. Instead it
         returns the built func.FuncOp object that can then be subsequently inserted where desired.
         """
+        unitary_encoding_info = self.qec_code.unitary_encoding
+
         codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
         input_types = ()
         output_types = (codeblock_type,)
 
         block = Block(arg_types=input_types)
-        tanner_x, tanner_z = self.insert_tanner_graph_ops_into_block(block)
 
         with ImplicitBuilder(block):
-            codeblock = qecp.AllocCodeblockOp(codeblock_type=qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n))
+            codeblock = qecp.AllocCodeblockOp(
+                codeblock_type=qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+            )
 
-            #### INITIAL WIRE TO INPUT STATE ####
+            # extract qubits
+            extract_ops = [
+                qecp.ExtractQubitOp(prepped_codeblock, i) for i in range(self.qec_code.n)
+            ]
+            magic_state_qubits = {i: ext_op.results[0] for i, ext_op in enumerate(extract_ops)}
 
-            # apply H and T to the first qubit
-            # ToDo: we need to correctly select the index for pulling out the initial qubit 
-            # hardcoding 6 for now because I believe its correct for our ordering of the Steane code, but it will (usually) be wrong for any other code
-            initial_qubit_index = 6
-            initial_qubit = qecp.ExtractQubitOp(codeblock, initial_qubit_index)
-            physical_h = qecp.HadamardOp(initial_qubit)
-            physical_t = qecp.TOp(physical_h.results[0])
-            prepped_codeblock = qecp.InsertQubitOp(codeblock, initial_qubit_index, physical_t.results[0])
+            # apply H and T to the state prep input qubit
+            state_prep_index = unitary_encoding_info["state_prep_index"]
+            h_op = qecp.HadamardOp(magic_state_qubits[state_prep_index])
+            t_op = qecp.TOp(h_op.results[0])
+            magic_state_qubits[state_prep_index] = t_op.results[0]
 
-            #### UNITARY ZERO-ENCODING PROCEDURE ####
-            # ToDo: This is hardcoded to our current Steane code implementation for now, will extract to code definition so it can be generalized once its working
-
-            extract_ops = [qecp.ExtractQubitOp(prepped_codeblock, i) for i in range(self.qec_code.n)]
-            aux_qubits = {i: ext_op.results[0] for i, ext_op in enumerate(extract_ops)}
-            
-            hadamards = (1, 2, 3)
-            cnot_pairs = ([1, 0], [2, 4], [6, 5], [2, 0], [3, 5], [6, 4], [2, 6], [3, 4], [1, 5], [1, 6], [3, 0])
+            # Perform unitary encoding circuit for the code
+            hadamards = unitary_encoding_info["hadamard_indices"]
+            cnot_pairs = unitary_encoding_info["cnot_indices"]
 
             for idx in hadamards:
-                h = qecp.HadamardOp(aux_qubits[idx])
-                aux_qubits[idx] = h.results[0]
+                h = qecp.HadamardOp(magic_state_qubits[idx])
+                magic_state_qubits[idx] = h.results[0]
 
-            for (ctrl_idx, trgt_idx) in cnot_pairs:
-                cnot_op = qecp.CnotOp(aux_qubits[ctrl_idx], aux_qubits[trgt_idx])
-                aux_qubits[ctrl_idx] = cnot_op.results[0]
-                aux_qubits[trgt_idx] = cnot_op.results[1]
+            for ctrl_idx, trgt_idx in cnot_pairs:
+                cnot_op = qecp.CnotOp(magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx])
+                magic_state_qubits[ctrl_idx] = cnot_op.results[0]
+                magic_state_qubits[trgt_idx] = cnot_op.results[1]
 
             # insert data qubits back into the codeblock
-            encoded_codeblock = prepped_codeblock
+            encoded_codeblock = codeblock
             for i in range(self.qec_code.n):
-                insert_op = qecp.InsertQubitOp(encoded_codeblock, i, aux_qubits[i])
+                insert_op = qecp.InsertQubitOp(encoded_codeblock, i, magic_state_qubits[i])
                 encoded_codeblock = insert_op.results[0]
 
             # return the encoded codeblock
@@ -878,7 +878,6 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         )
 
         return funcOp
-
 
     # MARK: 1Q gate subroutines
 
