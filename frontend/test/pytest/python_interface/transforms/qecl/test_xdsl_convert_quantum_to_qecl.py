@@ -1029,7 +1029,7 @@ class TestControlFlow:
         """Test a simple program with an `scf.for` loop, which applies gates on each iteration of
         the loop.
 
-        This program does not not pack qubits back into a register before entering the `scf.for`
+        This program does not pack qubits back into a register before entering the `scf.for`
         region, which allows testing the case where the return type of the `scf.for` op is a
         !quantum.bit in the input program, rather than a !quantum.reg.
         """
