@@ -39,7 +39,15 @@ else()
         SYSTEM # required to prevent deprecation warnings->errors on macOS
     )
 
-    FetchContent_MakeAvailable(Boost)
+    if (NOT Boost_FOUND)
+        FetchContent_MakeAvailable(Boost)
+        if (NOT Boost_INCLUDE_DIR)
+            set(Boost_INCLUDE_DIR "${boost_SOURCE_DIR}" CACHE PATH "" FORCE)
+        endif()
+    else()
+        FetchContent_MakeAvailable(Boost)
+    endif()
+
 
 
     set(BOOST_TARGETS boost_container boost_graph boost_core boost_assert boost_throw_exception boost_config)
