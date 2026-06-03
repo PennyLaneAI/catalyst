@@ -190,6 +190,7 @@
 * The experimental QEC pipeline now supports compilation and execution of circuits that only 
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
 * More conservative casting to tracer arrays in conditionals to preserve constant (static) values
   better. This can be useful for optimizations that depend on values being static.
   [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
