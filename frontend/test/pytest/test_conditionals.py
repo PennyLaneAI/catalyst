@@ -1120,5 +1120,74 @@ class TestCondPredicateConversion:
                 workflow(3)
 
 
+class TestStaticConditionalFolding:
+    """Test the global toggle that folds conditionals with constant predicates."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_toggle(self):
+        saved = catalyst.compile_without_static_conditionals
+        try:
+            yield
+        finally:
+            catalyst.compile_without_static_conditionals = saved
+
+    def test_toggle_default(self):
+        """Static conditionals are folded by default."""
+        assert catalyst.compile_without_static_conditionals is True
+
+    @pytest.mark.parametrize("predicate", [True, False])
+    def test_static_conditional_folded_by_default(self, predicate):
+        """A constant predicate is resolved at trace time, leaving no cond primitive."""
+
+        @qjit(target="mlir")
+        def circuit():
+            @catalyst_cond(predicate)
+            def branch():
+                return 1
+
+            @branch.otherwise
+            def branch():
+                return 2
+
+            return branch()
+
+        assert "cond" not in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
+
+    def test_static_conditional_not_folded_when_disabled(self):
+        """Disabling the toggle keeps the cond primitive even for a constant predicate."""
+        catalyst.compile_without_static_conditionals = False
+
+        @qjit(target="mlir")
+        def circuit():
+            @catalyst_cond(True)
+            def branch():
+                return 1
+
+            @branch.otherwise
+            def branch():
+                return 2
+
+            return branch()
+
+        assert "cond" in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
+
+    def test_dynamic_conditional_not_folded(self):
+        """A predicate depending on a traced argument is never folded."""
+
+        @qjit(target="mlir")
+        def circuit(n: int):
+            @catalyst_cond(n == 5)
+            def branch():
+                return n**2
+
+            @branch.otherwise
+            def branch():
+                return n**3
+
+            return branch()
+
+        assert "cond" in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
