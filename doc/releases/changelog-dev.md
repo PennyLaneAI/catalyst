@@ -97,6 +97,7 @@
   from the `qecp` to the `quantum` dialect. This bug prevented deallocation of unneeded registers 
   after magic state injection.
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
 * Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
   after a PBC op but read from a register not updated by that op. Layer grouping now checks
   data dependencies through insert to extract chains instead of textual op ordering.
