@@ -11,15 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Test the constraints defined within the xdsl_extras module."""
 
 import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position
 from xdsl.context import Context
 from xdsl.dialects import builtin, test
 from xdsl.dialects.builtin import MemRefType, TensorType, TupleType, i1, i32
@@ -41,6 +35,8 @@ from catalyst.python_interface.xdsl_extras import (
     NestedTupleOfConstraint,
     TensorConstraint,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 @pytest.fixture(scope="module", name="my_dialect")
@@ -530,3 +526,14 @@ class TestNestedTupleOfConstraint:
             VerifyException, match="tuple leaf 1 failed all allowed constraints: memref<2xi32>"
         ):
             self.constraint.verify(tup, ConstraintContext())
+
+    def test_nested_tuple_of_constraint_properties(self):
+        """Test that the properties of NestedTupleOfConstraint object are correct."""
+        assert self.constraint.mapping_type_vars({}) is self.constraint
+
+    def test_nested_tuple_of_constraint_invalid_attr(self):
+        """Test that NestedTupleOfConstraint raises an error if the attribute being
+        verified is not a TupleType."""
+        tensor = TensorType(i32, [2])
+        with pytest.raises(VerifyException, match="expected TupleType"):
+            self.constraint.verify(tensor, ConstraintContext())

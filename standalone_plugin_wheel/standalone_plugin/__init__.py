@@ -17,7 +17,7 @@
 import platform
 from pathlib import Path
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst.passes import PassPlugin
 
@@ -51,7 +51,7 @@ def SwitchBarToFoo(*flags, **valued_options):
         return pass_pipeline
 
     def decorator(qnode):
-        if not isinstance(qnode, qml.QNode):
+        if not isinstance(qnode, qp.QNode):
             # Technically, this apply pass is general enough that it can apply to
             # classical functions too. However, since we lack the current infrastructure
             # to denote a function, let's limit it to qnodes
@@ -64,7 +64,7 @@ def SwitchBarToFoo(*flags, **valued_options):
         return qnode_call
 
     # When the decorator is used without ()
-    if len(flags) == 1 and isinstance(flags[0], qml.QNode):
+    if len(flags) == 1 and isinstance(flags[0], qp.QNode):
         qnode = flags[0]
 
         def qnode_call(*args, **kwargs):

@@ -18,6 +18,7 @@
 include "mlir/IR/EnumAttr.td"
 
 include "Quantum/IR/QuantumDialect.td"
+include "Quantum/IR/QuantumTypes.td"
 include "PauliFrame/IR/PauliFrameDialect.td"
 
 //===----------------------------------------------------------------------===//

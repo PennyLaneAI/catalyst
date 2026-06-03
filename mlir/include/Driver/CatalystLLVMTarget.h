@@ -16,7 +16,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Module.h"
-
+#include "llvm/Target/TargetMachine.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Support/LogicalResult.h"
 

@@ -2,7 +2,7 @@
 
     from dataclasses import dataclass
 
-    import pennylane as qml
+    import pennylane as qp
     from catalyst.python_interface.conversion import xdsl_from_qjit
     from catalyst.python_interface.dialects.quantum import CustomOp, QubitType
 
@@ -10,20 +10,21 @@
     from xdsl.builder import ImplicitBuilder
     from xdsl.dialects import builtin, func
     from xdsl.ir import Block, Region
+    from xdsl.rewriter import InsertPoint
 
 Convert into xDSL module
 ========================
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=5)
+    dev = qp.device("lightning.qubit", wires=5)
 
     @xdsl_from_qjit
-    @qml.qjit(target="mlir")
-    @qml.qnode(dev)
+    @qp.qjit(target="mlir")
+    @qp.qnode(dev)
     def circuit(x):
-        qml.H(0)
-        return qml.expval(qml.Z(0))
+        qp.H(0)
+        return qp.expval(qp.Z(0))
 
 
 >>> qjit_mod = circuit(1.5)
@@ -137,7 +138,7 @@ Now, we write a pass to do the substitution
                 [customOp.in_qubits[0]],
                 self.subroutine.function_type.outputs.data,
             )
-            rewriter.insert_op_after_matched_op(callOp)
+            rewriter.insert_op(callOp, insertion_point=InsertPoint.after(customOp))
             rewriter.replace_all_uses_with(customOp.out_qubits[0], callOp.results[0])
             rewriter.erase_op(customOp)
 

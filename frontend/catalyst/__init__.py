@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ This package contains the Catalyst Python interface.
 # pylint: disable=wrong-import-position
 
 import sys
+from os import getenv
 from os.path import dirname
 
 import jaxlib as _jaxlib
@@ -76,6 +77,7 @@ from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
+from catalyst.python_interface.inspection.draw import draw_graph
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
@@ -95,12 +97,12 @@ when an object that can not be converted to a JAX array is indexed in a
 loop), and will raise a warning informing of the failure.
 
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f():
 ...     x = ["0.1", "0.2", "0.3"]
 ...     for i in range(3):
-...         qml.RX(float(x[i]), wires=i)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RX(float(x[i]), wires=i)
+...     return qp.expval(qp.PauliZ(0))
 Warning: Tracing of an AutoGraph converted for loop failed with an exception:
 ...
 If you intended for the conversion to happen, make sure that the (now dynamic)
@@ -112,12 +114,12 @@ Setting this variable to ``True`` will suppress warning messages:
 >>> catalyst.autograph_strict_conversion = False
 >>> catalyst.autograph_ignore_fallbacks = True
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f():
 ...     x = ["0.1", "0.2", "0.3"]
 ...     for i in range(3):
-...         qml.RX(float(x[i]), wires=i)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RX(float(x[i]), wires=i)
+...     return qp.expval(qp.PauliZ(0))
 >>> f()
 array(0.99500417)
 """
@@ -134,14 +136,14 @@ when an object that cannot be converted to a JAX array is indexed in a
 loop), and will automatically fallback to interpreting the control flow
 logic at compile-time via Python:
 
->>> dev = qml.device("lightning.qubit", wires=1)
+>>> dev = qp.device("lightning.qubit", wires=1)
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f():
 ...     params = ["0", "1", "2"]
 ...     for x in params:
-...         qml.RY(int(x) * jnp.pi / 4, wires=0)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RY(int(x) * jnp.pi / 4, wires=0)
+...     return qp.expval(qp.PauliZ(0))
 >>> f()
 array(-0.70710678)
 
@@ -150,18 +152,17 @@ to error rather than fallback when conversion fails:
 
 >>> catalyst.autograph_strict_conversion = True
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f():
 ...     params = ["0", "1", "2"]
 ...     for x in params:
-...         qml.RY(int(x) * jnp.pi / 4, wires=0)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RY(int(x) * jnp.pi / 4, wires=0)
+...     return qp.expval(qp.PauliZ(0))
 AutoGraphError: Could not convert the iteration target ['0', '1', '2'] to array
 while processing the following with AutoGraph:
   File "<ipython-input-44-dbae11e6d745>", line 7, in f
     for x in params:
 """
-
 
 __all__ = (
     "qjit",
@@ -175,6 +176,7 @@ __all__ = (
     "debug_assert",
     "CompileOptions",
     "debug",
+    "draw_graph",
     "passes",
     "pipeline",
     *_api_extension_list,

@@ -25,6 +25,10 @@ Contents
 This module contains out-of-tree dialect definitions for the MLIR compiler framework, and the
 directory structure generally follows the recommended practices from the upstream project:
 
+- `decomposition-rules <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/decomposition-rules>`_:
+    This contains the utilities for and results of pre-compiling the decomposition rules defined in 
+    PennyLane, for use with the graph decomposition system.
+
 - `include <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/include>`_:
     This contains declarative definitions of new IR objects such as custom dialects, types, and
     operations in the form of TableGen (``.td``) files. TableGen is a small language used by MLIR to

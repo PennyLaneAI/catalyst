@@ -16,6 +16,7 @@
 This module contains device stubs for the old and new PennyLane device API, which facilitate
 the application of decomposition and other device pre-processing routines.
 """
+
 import logging
 import os
 import pathlib
@@ -26,8 +27,9 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional
 
-import pennylane as qml
+import pennylane as qp
 from jax.interpreters.partial_eval import DynamicJaxprTracer
+from pennylane import CompilePipeline
 from pennylane.devices.capabilities import (
     DeviceCapabilities,
     ExecutionCondition,
@@ -38,7 +40,6 @@ from pennylane.transforms import (
     split_non_commuting,
     split_to_single_terms,
 )
-from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
     catalyst_decompose,
@@ -80,6 +81,8 @@ RUNTIME_OPERATIONS = [
     "DoubleExcitation",
     "ISWAP",
     "MultiRZ",
+    "PauliRot",
+    "PauliMeasure",
     "PauliX",
     "PauliY",
     "PauliZ",
@@ -147,12 +150,12 @@ class BackendInfo:
 
 # pylint: disable=too-many-branches
 @debug_logger
-def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
+def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
 
     dname = device.name
-    if isinstance(device, qml.devices.LegacyDeviceFacade):
+    if isinstance(device, qp.devices.LegacyDeviceFacade):
         dname = device.target_device.short_name  # pragma: no cover
 
     device_name = ""
@@ -237,27 +240,18 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         target_capabilities.measurement_processes, RUNTIME_MPS
     )
 
-    # Enable dynamic qubit allocation with qml.allocate and qml.deallocate
-    qjit_capabilities.operations.update(
-        {
-            "allocate": OperatorProperties(
-                invertible=False, controllable=False, differentiable=False
-            ),
-            "deallocate": OperatorProperties(
-                invertible=False, controllable=False, differentiable=False
-            ),
-        }
-    )
-
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
     qjit_capabilities.operations.update(
         {
-            "Cond": OperatorProperties(invertible=True, controllable=True, differentiable=True),
+            # CF inversion is only support via hybrid adjoint in the compiler, never via PL Operator
+            # adjoint, so we have to set this flag to False. Supported ops will be "decomposed" to
+            # hybrid adjoints automatically.
+            "Cond": OperatorProperties(invertible=False, controllable=True, differentiable=True),
             "WhileLoop": OperatorProperties(
-                invertible=True, controllable=True, differentiable=True
+                invertible=False, controllable=True, differentiable=True
             ),
-            "ForLoop": OperatorProperties(invertible=True, controllable=True, differentiable=True),
-            "Switch": OperatorProperties(invertible=True, controllable=True, differentiable=True),
+            "ForLoop": OperatorProperties(invertible=False, controllable=True, differentiable=True),
+            "Switch": OperatorProperties(invertible=False, controllable=True, differentiable=True),
         }
     )
 
@@ -266,6 +260,16 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         qjit_capabilities.operations.update(
             {
                 "MidCircuitMeasure": OperatorProperties(
+                    invertible=False, controllable=False, differentiable=False
+                )
+            }
+        )
+
+    # Optionally enable runtime-powered Pauli-product mid-circuit measurements
+    if "PauliMeasure" in target_capabilities.operations:
+        qjit_capabilities.operations.update(
+            {
+                "MidCircuitPauliMeasure": OperatorProperties(
                     invertible=False, controllable=False, differentiable=False
                 )
             }
@@ -300,7 +304,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
     return qjit_capabilities
 
 
-class QJITDevice(qml.devices.Device):
+class QJITDevice(qp.devices.Device):
     """QJIT device for the new device API.
     A device that interfaces the compilation pipeline of Pennylane programs.
     Args:
@@ -344,9 +348,7 @@ class QJITDevice(qml.devices.Device):
     @debug_logger
     def preprocess(
         self,
-        ctx,
-        execution_config: Optional[qml.devices.ExecutionConfig] = None,
-        shots=None,
+        execution_config: Optional[qp.devices.ExecutionConfig] = None,
     ):
         """This function defines the device transform program to be applied and an updated device
         configuration. The transform program will be created and applied to the tape before
@@ -355,12 +357,20 @@ class QJITDevice(qml.devices.Device):
 
         The final transforms verify that the resulting tape is supported.
 
+        Catalyst-specific parameters (``shots``) are passed via
+        ``execution_config.device_options`` using the key ``"catalyst_shots"``
+        , so that the method signature
+        stays compatible with the standard PennyLane ``Device.preprocess()``
+        interface.
+
         Args:
-            execution_config (Union[ExecutionConfig, Sequence[ExecutionConfig]]): A data structure
-                describing parameters of the execution.
+            execution_config (ExecutionConfig): A data structure describing
+                parameters of the execution.  Catalyst-specific data is
+                communicated via ``device_options`` keys prefixed with
+                ``catalyst_``.
 
         Returns:
-            TransformProgram: A transform program that when called returns QuantumTapes that can be
+            CompilePipeline: A compile pipeline that when called returns QuantumTapes that can be
                 compiled for the backend, and a postprocessing function to be called on the results
             ExecutionConfig: configuration with unset specifications filled in if relevant.
 
@@ -368,29 +378,34 @@ class QJITDevice(qml.devices.Device):
         which are created based on what is both compatible with Catalyst and what is supported the
         backend according to the backend TOML file).
         """
+        # pylint: disable=unused-argument
 
         if execution_config is None:
-            execution_config = qml.devices.ExecutionConfig()
-        _, config = self.original_device.preprocess(execution_config)
+            execution_config = qp.devices.ExecutionConfig()
 
-        program = TransformProgram()
+        # Extract catalyst-specific options from device_options
+        shots = execution_config.device_options.get("catalyst_shots")
+
+        # Strip catalyst-specific keys before forwarding to the original device,
+        # which may validate device_options and reject unknown keys.
+        clean_config = _strip_catalyst_options(execution_config)
+
+        _, config = self.original_device.preprocess(clean_config)
+
+        pipeline = CompilePipeline()
 
         # During preprocessing, we now have info on whether the user is requesting execution
         # with shots.
         # Note that this new set of capabilities are only temporarily needed for the computation
         # of the preprocessing transform program.
         shots_not_provided = (shots is None) or (
-            isinstance(shots, qml.measurements.shots.Shots) and shots.total_shots is None
+            isinstance(shots, qp.measurements.shots.Shots) and shots.total_shots is None
         )
         if shots_not_provided and _requires_shots(self.capabilities):
-            raise CompileError(
-                textwrap.dedent(
-                    f"""
+            raise CompileError(textwrap.dedent(f"""
                 {self.original_device.name} does not support analytical simulation.
                 Please supply the number of shots on the qnode.
-                """
-                )
-            )
+                """))
         capabilities = filter_device_capabilities_with_shots(
             capabilities=self.capabilities,
             shots_present=bool(shots),
@@ -401,21 +416,20 @@ class QJITDevice(qml.devices.Device):
         # measurement transformations, so must occur before decomposition
         measurement_transforms = self._measurement_transform_program(capabilities)
         config = replace(config, device_options=deepcopy(config.device_options))
-        program = program + measurement_transforms
+        pipeline += measurement_transforms
 
         # decomposition to supported ops/measurements
-        program.add_transform(
+        pipeline.add_transform(
             catalyst_decompose,
-            ctx=ctx,
             capabilities=capabilities,
             grad_method=config.gradient_method,
         )
 
         # Catalyst program verification and validation
-        program.add_transform(
+        pipeline.add_transform(
             verify_operations, grad_method=config.gradient_method, qjit_device=self
         )
-        program.add_transform(
+        pipeline.add_transform(
             validate_measurements,
             capabilities,
             self.original_device.name,
@@ -423,62 +437,62 @@ class QJITDevice(qml.devices.Device):
         )
 
         if config.gradient_method is not None:
-            program.add_transform(verify_no_state_variance_returns)
+            pipeline.add_transform(verify_no_state_variance_returns)
         if config.gradient_method == "adjoint":
-            program.add_transform(validate_observables_adjoint_diff, qjit_device=self)
+            pipeline.add_transform(validate_observables_adjoint_diff, qjit_device=self)
         elif config.gradient_method == "parameter-shift":
-            program.add_transform(validate_observables_parameter_shift)
+            pipeline.add_transform(validate_observables_parameter_shift)
 
-        return program, config
+        return pipeline, config
 
     def _measurement_transform_program(self, capabilities):
-        measurement_program = TransformProgram()
+        measurement_pipeline = CompilePipeline()
         if isinstance(self.original_device, SoftwareQQPP):
-            return measurement_program
+            return measurement_pipeline
 
         supports_sum_observables = "Sum" in capabilities.observables
         if capabilities.non_commuting_observables is False:
-            measurement_program.add_transform(split_non_commuting)
+            measurement_pipeline.add_transform(split_non_commuting)
         elif not supports_sum_observables:
-            measurement_program.add_transform(split_to_single_terms)
+            measurement_pipeline.add_transform(split_to_single_terms)
 
         # if no observables are supported, we apply a transform to convert *everything* to the
         # readout basis, using either sample or counts based on device specification
         if not capabilities.observables:
-            if not split_non_commuting in measurement_program:
+            if not split_non_commuting in measurement_pipeline:
                 # this *should* be redundant, a TOML that doesn't have observables should have
                 # a False non_commuting_observables flag, but we aren't enforcing that
-                measurement_program.add_transform(split_non_commuting)
+                measurement_pipeline.add_transform(split_non_commuting)
             if "SampleMP" in capabilities.measurement_processes:
-                measurement_program.add_transform(measurements_from_samples, self.wires)
+                measurement_pipeline.add_transform(measurements_from_samples, self.wires)
             elif "CountsMP" in capabilities.measurement_processes:
-                measurement_program.add_transform(measurements_from_counts, self.wires)
+                measurement_pipeline.add_transform(measurements_from_counts, self.wires)
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
 
         elif not capabilities.measurement_processes.keys() - {"CountsMP", "SampleMP"}:
             # ToDo: this branch should become unnecessary when selective conversion of
             # unsupported MPs is finished, see ToDo below
-            if not split_non_commuting in measurement_program:  # pragma: no branch
-                measurement_program.add_transform(split_non_commuting)
+            if not split_non_commuting in measurement_pipeline:  # pragma: no branch
+                measurement_pipeline.add_transform(split_non_commuting)
             mp_transform = (
                 measurements_from_samples
                 if "SampleMP" in capabilities.measurement_processes
                 else measurements_from_counts
             )
-            measurement_program.add_transform(mp_transform, self.wires)
+            measurement_pipeline.add_transform(mp_transform, self.wires)
 
         # if only some observables are supported, we try to diagonalize those that aren't
         elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(capabilities.observables):
-            if not split_non_commuting in measurement_program:
+            if not split_non_commuting in measurement_pipeline:
                 # the device might support non commuting measurements but not all the
                 # Pauli + Hadamard observables, so here it is needed
-                measurement_program.add_transform(split_non_commuting)
+                measurement_pipeline.add_transform(split_non_commuting)
             _obs_dict = {
-                "PauliX": qml.X,
-                "PauliY": qml.Y,
-                "PauliZ": qml.Z,
-                "Hadamard": qml.Hadamard,
+                "PauliX": qp.X,
+                "PauliY": qp.Y,
+                "PauliZ": qp.Z,
+                "Hadamard": qp.Hadamard,
             }
             # checking which base observables are unsupported and need to be diagonalized
             supported_observables = {"PauliX", "PauliY", "PauliZ", "Hadamard"}.intersection(
@@ -486,14 +500,14 @@ class QJITDevice(qml.devices.Device):
             )
             supported_observables = [_obs_dict[obs] for obs in supported_observables]
 
-            measurement_program.add_transform(
+            measurement_pipeline.add_transform(
                 diagonalize_measurements, supported_base_obs=supported_observables
             )
 
         # ToDo: if some measurement types are unsupported, convert the unsupported MPs to
         # samples or counts (without diagonalizing or modifying observables). See ToDo above.
 
-        return measurement_program
+        return measurement_pipeline
 
     def execute(self, circuits, execution_config):
         """
@@ -534,7 +548,7 @@ def _load_device_capabilities(device) -> DeviceCapabilities:
     else:
         # TODO: Remove this section when devices are guaranteed to have their own config file
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-        name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+        name = device.short_name if isinstance(device, qp.devices.LegacyDevice) else device.name
         # The toml files name convention we follow is to replace
         # the dots with underscores in the device short name.
         toml_file_name = name.replace(".", "_") + ".toml"
@@ -596,7 +610,7 @@ def get_device_capabilities(device, shots=False) -> DeviceCapabilities:
     )
 
 
-def is_dynamic_wires(wires: qml.wires.Wires):
+def is_dynamic_wires(wires: qp.wires.Wires):
     """
     Checks if a pennylane Wires object corresponds to a concrete number
     of wires or a dynamic number of wires.
@@ -621,7 +635,7 @@ def check_device_wires(wires):
     if len(wires) >= 2 or (not is_dynamic_wires(wires)):
         # A dynamic number of wires correspond to a single tracer for the number
         # Thus if more than one entry, must be static wires
-        assert isinstance(wires, qml.wires.Wires)
+        assert isinstance(wires, qp.wires.Wires)
 
         if not all(isinstance(wire, int) for wire in wires.labels):
             raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
@@ -645,3 +659,8 @@ def _requires_shots(capabilities):
         ExecutionCondition.FINITE_SHOTS_ONLY in MP_conditions
         for _, MP_conditions in capabilities.measurement_processes.items()
     )
+
+
+def _strip_catalyst_options(config):
+    clean = {k: v for k, v in config.device_options.items() if not k.startswith("catalyst_")}
+    return replace(config, device_options=clean)

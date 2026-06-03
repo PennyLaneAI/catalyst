@@ -38,25 +38,25 @@ To enable AutoGraph in Catalyst, simply pass ``autograph=True`` to the ``@qjit``
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=4)
+    dev = qp.device("lightning.qubit", wires=4)
 
     @qjit(autograph=True)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def cost(weights, data):
-        qml.AngleEmbedding(data, wires=range(4))
+        qp.AngleEmbedding(data, wires=range(4))
 
         for x in weights:
 
             for j, p in enumerate(x):
                 if p > 0:
-                    qml.RX(p, wires=j)
+                    qp.RX(p, wires=j)
                 elif p < 0:
-                    qml.RY(p, wires=j)
+                    qp.RY(p, wires=j)
 
             for j in range(4):
-                qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
+                qp.CNOT(wires=[j, jnp.mod((j + 1), 4)])
 
-        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
+        return qp.expval(qp.PauliZ(0) + qp.PauliZ(3))
 
 >>> weights = jnp.linspace(-1, 1, 20).reshape([5, 4])
 >>> data = jnp.ones([4])
@@ -69,9 +69,9 @@ AutoGraph, but instead using :func:`~.cond` and :func:`~.for_loop`:
 .. code-block:: python
 
     @qjit(autograph=False)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def cost(weights, data):
-        qml.AngleEmbedding(data, wires=range(4))
+        qp.AngleEmbedding(data, wires=range(4))
 
         def layer_loop(i):
             x = weights[i]
@@ -79,22 +79,22 @@ AutoGraph, but instead using :func:`~.cond` and :func:`~.for_loop`:
 
                 @cond(x[j] > 0)
                 def trainable_gate():
-                    qml.RX(x[j], wires=j)
+                    qp.RX(x[j], wires=j)
 
                 @trainable_gate.else_if(x[j] < 0)
                 def trainable_gate():
-                    qml.RY(x[j], wires=j)
+                    qp.RY(x[j], wires=j)
 
                 trainable_gate()
 
             def cnot_loop(j):
-                qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
+                qp.CNOT(wires=[j, jnp.mod((j + 1), 4)])
 
             for_loop(0, 4, 1)(wire_loop)()
             for_loop(0, 4, 1)(cnot_loop)()
 
         for_loop(0, jnp.shape(weights)[0], 1)(layer_loop)()
-        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
+        return qp.expval(qp.PauliZ(0) + qp.PauliZ(3))
 
 >>> cost(weights, data)
 Array(0.30455313, dtype=float64)
@@ -200,13 +200,13 @@ compile-time information:
 
 .. code-block:: python
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(switch: bool):
 
         if switch:
-            return qml.expval(qml.PauliY(0))
+            return qp.expval(qp.PauliY(0))
 
-        return qml.expval(qml.PauliZ(0))
+        return qp.expval(qp.PauliZ(0))
 
 >>> qjit(autograph=True)(f)
 TypeError: Conditional requires a consistent return structure across all branches!
@@ -362,15 +362,15 @@ fallback to Python, and the loop will be unrolled at compile-time:
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qp.device("lightning.qubit", wires=1)
 
     @qjit(autograph=True)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def f():
         params = ["0", "1", "2"]
         for x in params:
-            qml.RY(int(x) * jnp.pi / 4, wires=0)
-        return qml.expval(qml.PauliZ(0))
+            qp.RY(int(x) * jnp.pi / 4, wires=0)
+        return qp.expval(qp.PauliZ(0))
 
 >>> f()
 Array(-0.70710678, dtype=float64)
@@ -395,13 +395,13 @@ Indexing arrays within a for loop will generally work, but care must be taken.
 
 For example, using a for loop with static bounds to index a JAX array is straightforward:
 
->>> dev = qml.device("lightning.qubit", wires=3)
+>>> dev = qp.device("lightning.qubit", wires=3)
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f(x):
 ...     for i in range(3):
-...         qml.RX(x[i], wires=i)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RX(x[i], wires=i)
+...     return qp.expval(qp.PauliZ(0))
 >>> weights = jnp.array([0.1, 0.2, 0.3])
 >>> f(weights)
 Array(0.99500417, dtype=float64)
@@ -415,12 +415,12 @@ or dynamic variable, but an object that can be converted to a JAX array
 and fallback to Python to evaluate the loop at compile-time:
 
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f():
 ...     x = [0.1, 0.2, 0.3]
 ...     for i in range(3):
-...         qml.RX(x[i], wires=i)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RX(x[i], wires=i)
+...     return qp.expval(qp.PauliZ(0))
 Warning: If you intended for the conversion to happen, make sure that the(now dynamic) loop variable is not used in tracing-incompatible ways,
 for instance by indexing a Python list with it. In that case, the list should be wrapped into an array.
 To understand different types of JAX tracing errors, please refer to the guide at: https://jax.readthedocs.io/en/latest/errors.html
@@ -436,12 +436,12 @@ To allow AutoGraph conversion to work in this case, simply convert the list to
 a JAX array:
 
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f():
 ...     x = jnp.array([0.1, 0.2, 0.3])
 ...     for i in range(3):
-...         qml.RX(x[i], wires=i)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RX(x[i], wires=i)
+...     return qp.expval(qp.PauliZ(0))
 >>> f()
 Array(0.99500417, dtype=float64)
 
@@ -452,12 +452,12 @@ loop. However, AutoGraph will continue to fallback to Python for interpreting
 the for loop:
 
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f():
 ...     x = ["0.1", "0.2", "0.3"]
 ...     for i in range(3):
-...         qml.RX(float(x[i]), wires=i)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RX(float(x[i]), wires=i)
+...     return qp.expval(qp.PauliZ(0))
 Warning: If you intended for the conversion to happen, make sure that the(now dynamic) loop variable is not used in tracing-incompatible ways,
 for instance by indexing a Python list with it. In that case, the list should be wrapped into an array.
 To understand different types of JAX tracing errors, please refer to the guide at: https://jax.readthedocs.io/en/latest/errors.html
@@ -508,12 +508,12 @@ the size of the loop is set by a dynamic runtime variable) will also work, as lo
 as the object indexed is a JAX array:
 
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f(n):
 ...     x = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
 ...     for i in range(n):
-...         qml.RY(x[i], wires=0)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RY(x[i], wires=0)
+...     return qp.expval(qp.PauliZ(0))
 >>> f(2)
 Array(0.70710678, dtype=float64)
 >>> f(3)
@@ -527,12 +527,12 @@ In this case, AutoGraph will raise a warning, but the compilation of the functio
 will ultimately fail:
 
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f(n):
 ...     x = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
 ...     for i in range(n):
-...         qml.RY(x[i], wires=0)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RY(x[i], wires=0)
+...     return qp.expval(qp.PauliZ(0))
 TracerIntegerConversionError: The __index__() method was called on traced array with shape int64[].
 See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerIntegerConversionError
 
@@ -679,25 +679,25 @@ of multiple measurements. For example,
 
 .. code-block:: python
 
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qp.device("lightning.qubit", wires=2)
 
     @qjit(autograph=True)
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit():
-        qml.RX(0.1, wires=0)
-        qml.RY(0.5, wires=1)
+        qp.RX(0.1, wires=0)
+        qp.RY(0.5, wires=1)
 
         m1 = measure(0)
         m2 = measure(1)
 
         if m1 and not m2:
-            qml.Hadamard(wires=1)
+            qp.Hadamard(wires=1)
         elif m1 and m2:
-            qml.RX(0.5, wires=1)
+            qp.RX(0.5, wires=1)
         else:
-            qml.RY(0.5, wires=1)
+            qp.RY(0.5, wires=1)
 
-        return qml.expval(qml.PauliZ(1))
+        return qp.expval(qp.PauliZ(1))
 
 >>> circuit()
 Array(0.87758256, dtype=float64)
@@ -796,14 +796,14 @@ that all parts of our program control flow *are* being captured, we can set
 ``autograph_strict_conversion``:
 
 >>> catalyst.autograph_strict_conversion = True
->>> dev = qml.device("lightning.qubit", wires=1)
+>>> dev = qp.device("lightning.qubit", wires=1)
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f():
 ...     params = ["0", "1", "2"]
 ...     for x in params:
-...         qml.RY(int(x) * jnp.pi / 4, wires=0)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RY(int(x) * jnp.pi / 4, wires=0)
+...     return qp.expval(qp.PauliZ(0))
 AutoGraphError: Could not convert the iteration target ['0', '1', '2'] to array while processing the following with AutoGraph:
   File "<ipython-input-44-dbae11e6d745>", line 7, in f
     for x in params:
@@ -814,12 +814,12 @@ silence AutoGraph warnings; this can be done via ``autograph_ignore_fallbacks``:
 >>> catalyst.autograph_strict_conversion = False
 >>> catalyst.autograph_ignore_fallbacks = True
 >>> @qjit(autograph=True)
-... @qml.qnode(dev)
+... @qp.qnode(dev)
 ... def f():
 ...     x = ["0.1", "0.2", "0.3"]
 ...     for i in range(3):
-...         qml.RX(float(x[i]), wires=i)
-...     return qml.expval(qml.PauliZ(0))
+...         qp.RX(float(x[i]), wires=i)
+...     return qp.expval(qp.PauliZ(0))
 >>> f()
 Array(0.99500417, dtype=float64)
 
@@ -900,7 +900,7 @@ function with ``autograph=True``:
           num += 1. / fac
       return num
 
-    @qml.qjit(autograph=True)
+    @qp.qjit(autograph=True)
     def g(x: float, N: int):
 
       for i in range(N):
@@ -920,7 +920,7 @@ within a qjit-compiled function via the context manager syntax:
 
 .. code-block:: python
 
-    @qml.qjit(autograph=True)
+    @qp.qjit(autograph=True)
     def g(x: float, N: int):
 
       for i in range(N):
@@ -939,7 +939,7 @@ if defined within function ``g``:
 
 .. code-block:: python
 
-    @qml.qjit(autograph=True, static_argnums=1)
+    @qp.qjit(autograph=True, static_argnums=1)
     def g(x: float, N: int):
 
         def approximate_e(n):

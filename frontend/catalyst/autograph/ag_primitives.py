@@ -16,6 +16,7 @@
 This module provides the implementation of AutoGraph primitives in terms of traceable Catalyst
 functions. The purpose is to convert imperative style code to functional or graph-style code.
 """
+
 import copy
 import functools
 import inspect
@@ -26,7 +27,7 @@ from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from malt.core import config as ag_config
 from malt.impl import api as ag_api
 from malt.impl.api import converted_call as ag_converted_call
@@ -477,7 +478,7 @@ def get_source_code_info(tb_frame):
                 break
             if "self" in frame.frame.f_locals:
                 obj = frame.frame.f_locals["self"]
-                if isinstance(obj, qml.QNode):
+                if isinstance(obj, qp.QNode):
                     ag_source_map = obj.ag_source_map
                     break
                 if isinstance(obj, catalyst.QJIT):
@@ -509,7 +510,11 @@ def get_source_code_info(tb_frame):
 module_allowlist = (
     ag_config.DoNotConvert("pennylane"),
     ag_config.DoNotConvert("catalyst"),
+    ag_config.DoNotConvert("autoray"),
+    ag_config.DoNotConvert("numpy"),
     ag_config.DoNotConvert("optax"),
+    ag_config.DoNotConvert("pyscf"),
+    ag_config.DoNotConvert("tqdm"),
     ag_config.DoNotConvert("jax"),
     *ag_config.CONVERSION_RULES,
 )
@@ -528,15 +533,21 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # List of known wrapper functions that should be handled specially
         _known_wrapper_functions = (
             catalyst.adjoint,
-            qml.adjoint,
-            qml.prod,
+            qp.adjoint,
+            qp.prod,
             catalyst.ctrl,
-            qml.ctrl,
+            qp.ctrl,
+            qp.grad,
+            qp.jacobian,
+            qp.vjp,
+            qp.jvp,
             catalyst.grad,
             catalyst.value_and_grad,
             catalyst.jacobian,
             catalyst.vjp,
+            qp.vjp,
             catalyst.jvp,
+            qp.jvp,
             catalyst.vmap,
             catalyst.mitigate_with_zne,
         )
@@ -547,7 +558,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 raise ValueError(f"{fn.__name__} requires at least one argument")
 
             # If first argument is already an operator, pass it through directly
-            if isinstance(args[0], qml.operation.Operator):
+            if isinstance(args[0], qp.operation.Operator):
                 return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
             # Otherwise, handle the callable case
@@ -582,7 +593,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 
         # For QNode calls, since the class is not part of the Catalyst package, we manually add a
         # wrapper to correctly forward the quantum function call to autograph.
-        if isinstance(fn, qml.QNode):
+        if isinstance(fn, qp.QNode):
             pass_pipeline = kwargs.pop("pass_pipeline", []) if kwargs is not None else []
             new_kwargs = {"pass_pipeline": pass_pipeline} if pass_pipeline else {}
 
@@ -595,12 +606,12 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             new_qnode.func = qnode_call_wrapper
             return new_qnode(**new_kwargs)
 
-        # HOTFIX: Handle calls to functions that were decorated with "qml.prod"
+        # HOTFIX: Handle calls to functions that were decorated with "qp.prod"
         # These decorators return wrapper functions that call the original function without
         # autograph conversion. We detect these wrappers and unwrap them to convert the
         # original function with autograph.
         # TODO: remove once PL has dedicated way to propagate autograph through decorators
-        if hasattr(fn, "__wrapped__") and qml.prod.__module__ == fn.__module__:
+        if hasattr(fn, "__wrapped__") and qp.prod.__module__ == fn.__module__:
             original_fn = fn.__wrapped__
 
             # Extract decorator arguments from the closure
@@ -608,7 +619,6 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             # the same as the decorator arguments
             closure_vars = inspect.getclosurevars(fn)
             decorator_kwargs = {
-                "id": closure_vars.nonlocals["id"],
                 "lazy": closure_vars.nonlocals["lazy"],
             }
 
@@ -619,7 +629,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 )
 
             # Apply the decorator to the converted function and call it with the original kwargs
-            return qml.prod(converted_inner, **decorator_kwargs)(
+            return qp.prod(converted_inner, **decorator_kwargs)(
                 *args, **(kwargs if kwargs is not None else {})
             )
 
@@ -654,11 +664,11 @@ def set_item(target, i, x):
 
 
 def update_item_with_op(target, index, x, op):
-    """An implementation of the 'update_item_with_op' function from operator_update. The interface
-    is defined in operator_update.SingleIndexArrayOperatorUpdateTransformer, here we provide an
-    implementation in terms of Catalyst primitives. The idea is to accept an operator assignment
-    syntax for Jax arrays, to subsequently transform it under the hood into the set of 'at' and
-    operator calls that Autograph supports. E.g.:
+    """An implementation of the 'update_item_with_op' function for augmented assignments. Here we
+    provide an implementation in terms of Catalyst primitives. The idea is to accept an operator
+    assignment syntax for Jax arrays, to subsequently transform it under the hood into the set of
+    'at' and operator calls that Autograph supports. E.g.:
+
         target[i] **= x -> target = target.at[i].power(x)
 
     .. note::
@@ -667,9 +677,9 @@ def update_item_with_op(target, index, x, op):
         Autograph transformer. If you create a new transformer and want to support this feature,
         make sure you enable such option there as well.
     """
-    # Mapping of the gast attributes to the corresponding JAX operation
-    gast_op_map = {"mult": "multiply", "div": "divide", "add": "add", "sub": "add", "pow": "power"}
-    # Mapping of the gast attributes to the corresponding in-place operation
+    # Mapping of the ast attributes to the corresponding JAX operation
+    ast_op_map = {"mult": "multiply", "div": "divide", "add": "add", "sub": "add", "pow": "power"}
+    # Mapping of the ast attributes to the corresponding in-place operation
     inplace_operation_map = {
         "mult": "mul",
         "div": "truediv",
@@ -685,9 +695,9 @@ def update_item_with_op(target, index, x, op):
     # Otherwise, fallback to Python's default syntax.
     if isinstance(target, DynamicJaxprTracer):
         if isinstance(index, slice):
-            target = getattr(target.at[index.start : index.stop : index.step], gast_op_map[op])(x)
+            target = getattr(target.at[index.start : index.stop : index.step], ast_op_map[op])(x)
         else:
-            target = getattr(target.at[index], gast_op_map[op])(x)
+            target = getattr(target.at[index], ast_op_map[op])(x)
     else:
         # Use Python's in-place operator
         target[index] = getattr(operator, f"__i{inplace_operation_map[op]}__")(target[index], x)

@@ -61,7 +61,7 @@ you are encoutering issues, please consult the detailed guide
         | If not, you may receive ``'GLIBCXX_3.4.x' not found`` error when running ``make test``.
 
 
-      .. code-block:: console
+      .. code-block:: bash
 
         # Install common requirements
         sudo apt install clang lld ccache make
@@ -81,7 +81,7 @@ you are encoutering issues, please consult the detailed guide
 
    .. group-tab:: macOS
 
-      .. code-block:: console
+      .. code-block:: bash
 
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
@@ -292,12 +292,12 @@ To make Enzyme libraries discoverable to the compiler:
 
   export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
 
-To make required tools in ``llvm-project/build``, ``mlir-hlo/mhlo-build``, and
+To make required tools in ``llvm-project/build``, ``stablehlo/build``, and
 ``mlir/build`` discoverable to the compiler:
 
 .. code-block:: console
 
-  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
+  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/stablehlo/build/bin:$PWD/mlir/build/bin:$PATH"
 
 Tests
 ^^^^^
@@ -476,7 +476,7 @@ Essential Steps
 
 To activate the development environment, open a terminal and issue the following commands:
 
-.. code-block:: console
+.. code-block:: bash
 
   # Clone the Catalyst repository without submodules, as they are not needed for frontend
   # development

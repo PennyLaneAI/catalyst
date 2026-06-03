@@ -1,0 +1,801 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// RUN: quantum-opt --ppm-specs --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --ppm-specs=disjoint-qubit --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-DISJOINT
+
+//CHECK: {
+//CHECK:     "test_no_ppr_ppm": {
+//CHECK:         "logical_qubits": 2
+//CHECK:     }
+//CHECK: }
+func.func public @test_no_ppr_ppm() {
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "S"() %1 : !quantum.bit
+    %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits_0 = quantum.custom "Hadamard"() %2 : !quantum.bit
+    %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
+    %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
+    %3 = quantum.insert %0[ 0], %out_qubits_2#0 : !quantum.reg, !quantum.bit
+    %4 = quantum.insert %3[ 1], %out_qubits_2#1 : !quantum.reg, !quantum.bit
+    quantum.dealloc %4 : !quantum.reg
+    quantum.device_release
+    return
+}
+
+// -----
+
+//CHECK: {
+//CHECK:     "test_to_ppr": {
+//CHECK:         "logical_qubits": 2,
+//CHECK:         "max_weight_pi4": 2,
+//CHECK:         "max_weight_pi8": 1,
+//CHECK:         "pi4_ppr": 7,
+//CHECK:         "pi8_ppr": 1
+//CHECK:     }
+//CHECK: }
+func.func public @test_to_ppr() {
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %2 = pbc.ppr ["Z"](4) %1 : !quantum.bit
+    %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %4 = pbc.ppr ["Z"](4) %3 : !quantum.bit
+    %5 = pbc.ppr ["X"](4) %4 : !quantum.bit
+    %6 = pbc.ppr ["Z"](4) %5 : !quantum.bit
+    %7 = pbc.ppr ["Z"](8) %6 : !quantum.bit
+    %8:2 = pbc.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
+    %9 = pbc.ppr ["Z"](-4) %8#0 : !quantum.bit
+    %10 = pbc.ppr ["X"](-4) %8#1 : !quantum.bit
+    %11 = quantum.insert %0[ 0], %9 : !quantum.reg, !quantum.bit
+    %12 = quantum.insert %11[ 1], %10 : !quantum.reg, !quantum.bit
+    quantum.dealloc %12 : !quantum.reg
+    quantum.device_release
+    return
+}
+
+// -----
+
+//CHECK: {
+//CHECK:     "test_commute_ppr": {
+//CHECK:         "logical_qubits": 2,
+//CHECK:         "max_weight_pi4": 2,
+//CHECK:         "max_weight_pi8": 1,
+//CHECK:         "num_of_ppm": 2,
+//CHECK:         "pi4_ppr": 7,
+//CHECK:         "pi8_ppr": 1
+//CHECK:     }
+//CHECK: }
+func.func public @test_commute_ppr() {
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %2 = pbc.ppr ["Z"](4) %1 : !quantum.bit
+    %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %4 = pbc.ppr ["X"](8) %3 : !quantum.bit
+    quantum.device_release
+    %5 = pbc.ppr ["Z"](4) %4 : !quantum.bit
+    %6 = pbc.ppr ["X"](4) %5 : !quantum.bit
+    %7 = pbc.ppr ["Z"](4) %6 : !quantum.bit
+    %8:2 = pbc.ppr ["Z", "X"](4) %7, %2 : !quantum.bit, !quantum.bit
+    %9 = pbc.ppr ["Z"](-4) %8#0 : !quantum.bit
+    %10 = pbc.ppr ["X"](-4) %8#1 : !quantum.bit
+    %mres, %out_qubits = pbc.ppm ["Z"] %9 : i1, !quantum.bit
+    %from_elements = tensor.from_elements %mres : tensor<i1>
+    %mres_0, %out_qubits_1 = pbc.ppm ["Z"] %10 : i1, !quantum.bit
+    %from_elements_2 = tensor.from_elements %mres_0 : tensor<i1>
+    %11 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    %12 = quantum.insert %11[ 1], %out_qubits_1 : !quantum.reg, !quantum.bit
+    quantum.dealloc %12 : !quantum.reg
+    return
+}
+
+// -----
+
+//CHECK: {
+//CHECK:     "test_merge_ppr_ppm": {
+//CHECK:         "logical_qubits": 2,
+//CHECK:         "num_of_ppm": 2
+//CHECK:     }
+//CHECK: }
+func.func public @test_merge_ppr_ppm() {
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %mres, %out_qubits:2 = pbc.ppm ["Z", "X"] %2, %1 : i1, !quantum.bit, !quantum.bit
+    %from_elements = tensor.from_elements %mres : tensor<i1>
+    quantum.device_release
+    %mres_0, %out_qubits_1 = pbc.ppm ["X"] %out_qubits#1 : i1, !quantum.bit
+    %from_elements_2 = tensor.from_elements %mres_0 : tensor<i1>
+    %3 = quantum.insert %0[ 0], %out_qubits_1 : !quantum.reg, !quantum.bit
+    %4 = quantum.insert %3[ 1], %out_qubits#0 : !quantum.reg, !quantum.bit
+    quantum.dealloc %4 : !quantum.reg
+    return
+}
+
+// -----
+
+//CHECK: {
+//CHECK:     "test_ppr_to_ppm": {
+//CHECK:         "logical_qubits": 2,
+//CHECK:         "max_weight_pi2": 2,
+//CHECK:         "num_of_ppm": 19,
+//CHECK:         "pi2_ppr": 8
+//CHECK:     }
+//CHECK: }
+func.func public @test_ppr_to_ppm() {
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %2 = quantum.alloc_qb : !quantum.bit
+    %mres, %out_qubits:2 = pbc.ppm ["Z", "Y"] %1, %2 : i1, !quantum.bit, !quantum.bit
+    %mres_0, %out_qubits_1 = pbc.ppm ["X"] %out_qubits#1 : i1, !quantum.bit
+    %3 = arith.xori %mres, %mres_0 : i1
+    %4 = pbc.ppr ["Z"](2) %out_qubits#0 cond(%3) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_1 : !quantum.bit
+    %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %6 = quantum.alloc_qb : !quantum.bit
+    %mres_2, %out_qubits_3:2 = pbc.ppm ["Z", "Y"] %5, %6 : i1, !quantum.bit, !quantum.bit
+    %mres_4, %out_qubits_5 = pbc.ppm ["X"] %out_qubits_3#1 : i1, !quantum.bit
+    %7 = arith.xori %mres_2, %mres_4 : i1
+    %8 = pbc.ppr ["Z"](2) %out_qubits_3#0 cond(%7) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_5 : !quantum.bit
+    %9 = quantum.alloc_qb : !quantum.bit
+    %mres_6, %out_qubits_7:2 = pbc.ppm ["X", "Y"] %8, %9 : i1, !quantum.bit, !quantum.bit
+    %mres_8, %out_qubits_9 = pbc.ppm ["X"] %out_qubits_7#1 : i1, !quantum.bit
+    %10 = arith.xori %mres_6, %mres_8 : i1
+    %11 = pbc.ppr ["X"](2) %out_qubits_7#0 cond(%10) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_9 : !quantum.bit
+    %12 = quantum.alloc_qb : !quantum.bit
+    %mres_10, %out_qubits_11:2 = pbc.ppm ["Z", "Y"] %11, %12 : i1, !quantum.bit, !quantum.bit
+    %mres_12, %out_qubits_13 = pbc.ppm ["X"] %out_qubits_11#1 : i1, !quantum.bit
+    %13 = arith.xori %mres_10, %mres_12 : i1
+    %14 = pbc.ppr ["Z"](2) %out_qubits_11#0 cond(%13) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_13 : !quantum.bit
+    %15 = quantum.alloc_qb : !quantum.bit
+    %16 = pbc.fabricate magic : !quantum.bit
+    %mres_14, %out_qubits_15:2 = pbc.ppm ["Z", "Z"] %14, %16 : i1, !quantum.bit, !quantum.bit
+    %mres_16, %out_qubits_17:2 = pbc.ppm ["Z", "Y"] %out_qubits_15#1, %15 : i1, !quantum.bit, !quantum.bit
+    %mres_18, %out_qubits_19 = pbc.ppm ["X"] %out_qubits_17#0 : i1, !quantum.bit
+    %mres_20, %out_qubits_21 = pbc.select.ppm (%mres_14 ? ["X"] : ["Z"]) %out_qubits_17#1 : i1, !quantum.bit
+    %17 = arith.xori %mres_16, %mres_18 : i1
+    %18 = pbc.ppr ["Z"](2) %out_qubits_15#0 cond(%17) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_21 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_19 : !quantum.bit
+    %19 = quantum.alloc_qb : !quantum.bit
+    %mres_22, %out_qubits_23:3 = pbc.ppm ["Z", "X", "Y"] %18, %4, %19 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_24, %out_qubits_25 = pbc.ppm ["X"] %out_qubits_23#2 : i1, !quantum.bit
+    %20 = arith.xori %mres_22, %mres_24 : i1
+    %21:2 = pbc.ppr ["Z", "X"](2) %out_qubits_23#0, %out_qubits_23#1 cond(%20) : !quantum.bit, !quantum.bit
+    quantum.dealloc_qb %out_qubits_25 : !quantum.bit
+    %22 = quantum.alloc_qb : !quantum.bit
+    %mres_26, %out_qubits_27:2 = pbc.ppm ["Z", "Y"] %21#0, %22 : i1, !quantum.bit, !quantum.bit
+    %mres_28, %out_qubits_29 = pbc.ppm ["X"] %out_qubits_27#1 : i1, !quantum.bit
+    %23 = arith.xori %mres_26, %mres_28 : i1
+    %24 = pbc.ppr ["Z"](2) %out_qubits_27#0 cond(%23) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_29 : !quantum.bit
+    %25 = quantum.alloc_qb : !quantum.bit
+    %mres_30, %out_qubits_31:2 = pbc.ppm ["X", "Y"] %21#1, %25 : i1, !quantum.bit, !quantum.bit
+    %mres_32, %out_qubits_33 = pbc.ppm ["X"] %out_qubits_31#1 : i1, !quantum.bit
+    %26 = arith.xori %mres_30, %mres_32 : i1
+    %27 = pbc.ppr ["X"](2) %out_qubits_31#0 cond(%26) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_33 : !quantum.bit
+    %mres_34, %out_qubits_35 = pbc.ppm ["Z"] %24 : i1, !quantum.bit
+    %from_elements = tensor.from_elements %mres_34 : tensor<i1>
+    %mres_36, %out_qubits_37 = pbc.ppm ["Z"] %27 : i1, !quantum.bit
+    %from_elements_38 = tensor.from_elements %mres_36 : tensor<i1>
+    %28 = quantum.insert %0[ 0], %out_qubits_35 : !quantum.reg, !quantum.bit
+    %29 = quantum.insert %28[ 1], %out_qubits_37 : !quantum.reg, !quantum.bit
+    quantum.dealloc %29 : !quantum.reg
+    quantum.device_release
+    return
+}
+
+// -----
+
+//CHECK: {
+//CHECK:     "test_ppm_compilation_1": {
+//CHECK:         "logical_qubits": 2,
+//CHECK:         "max_weight_pi2": 2,
+//CHECK:         "num_of_ppm": 7,
+//CHECK:         "pi2_ppr": 2
+//CHECK:     },
+//CHECK:     "test_ppm_compilation_2": {
+//CHECK:         "logical_qubits": 2
+//CHECK:     }
+//CHECK: }
+func.func public @test_ppm_compilation_1() {
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %4 = quantum.extract %0[ 3] : !quantum.reg -> !quantum.bit
+    %5 = quantum.extract %0[ 4] : !quantum.reg -> !quantum.bit
+    %6 = quantum.extract %0[ 5] : !quantum.reg -> !quantum.bit
+    %7 = quantum.alloc_qb : !quantum.bit
+    %8 = pbc.fabricate  magic : !quantum.bit
+    %mres, %out_qubits:2 = pbc.ppm ["X", "Z"] %1, %8 : i1, !quantum.bit, !quantum.bit
+    %mres_0, %out_qubits_1:2 = pbc.ppm ["Z", "Y"] %out_qubits#1, %7 : i1, !quantum.bit, !quantum.bit
+    %mres_2, %out_qubits_3 = pbc.ppm ["X"] %out_qubits_1#0 : i1, !quantum.bit
+    %mres_4, %out_qubits_5 = pbc.select.ppm (%mres ? ["X"] : ["Z"]) %out_qubits_1#1 : i1, !quantum.bit
+    %9 = arith.xori %mres_0, %mres_2 : i1
+    %10 = pbc.ppr ["X"](2) %out_qubits#0 cond(%9) : !quantum.bit
+    quantum.dealloc_qb %out_qubits_5 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_3 : !quantum.bit
+    quantum.device_release
+    %11 = quantum.alloc_qb : !quantum.bit
+    %12 = pbc.fabricate  magic : !quantum.bit
+    %mres_6, %out_qubits_7:3 = pbc.ppm ["X", "Z", "Z"] %10, %2, %12 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_8, %out_qubits_9:2 = pbc.ppm ["Z", "Y"] %out_qubits_7#2, %11 : i1, !quantum.bit, !quantum.bit
+    %mres_10, %out_qubits_11 = pbc.ppm ["X"] %out_qubits_9#0 : i1, !quantum.bit
+    %mres_12, %out_qubits_13 = pbc.select.ppm (%mres_6 ? ["X"] : ["Z"]) %out_qubits_9#1 : i1, !quantum.bit
+    %13 = arith.xori %mres_8, %mres_10 : i1
+    %14:2 = pbc.ppr ["X", "Z"](2) %out_qubits_7#0, %out_qubits_7#1 cond(%13) : !quantum.bit, !quantum.bit
+    quantum.dealloc_qb %out_qubits_13 : !quantum.bit
+    quantum.dealloc_qb %out_qubits_11 : !quantum.bit
+    %mres_14, %out_qubits_15 = pbc.ppm ["X"] %14#0 : i1, !quantum.bit
+    %from_elements = tensor.from_elements %mres_14 : tensor<i1>
+    %15 = quantum.insert %0[ 0], %out_qubits_15 : !quantum.reg, !quantum.bit
+    %16 = quantum.insert %15[ 1], %14#1 : !quantum.reg, !quantum.bit
+    %17 = quantum.insert %16[ 2], %3 : !quantum.reg, !quantum.bit
+    %18 = quantum.insert %17[ 3], %4 : !quantum.reg, !quantum.bit
+    %19 = quantum.insert %18[ 4], %5 : !quantum.reg, !quantum.bit
+    %20 = quantum.insert %19[ 5], %6 : !quantum.reg, !quantum.bit
+    quantum.dealloc %20 : !quantum.reg
+    return
+}
+
+func.func public @test_ppm_compilation_2() {
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %4 = quantum.extract %0[ 3] : !quantum.reg -> !quantum.bit
+    %5 = quantum.extract %0[ 4] : !quantum.reg -> !quantum.bit
+    %6 = quantum.extract %0[ 5] : !quantum.reg -> !quantum.bit
+    quantum.device_release
+    %7 = quantum.insert %0[ 0], %1 : !quantum.reg, !quantum.bit
+    %8 = quantum.insert %7[ 1], %2 : !quantum.reg, !quantum.bit
+    %9 = quantum.insert %8[ 2], %3 : !quantum.reg, !quantum.bit
+    %10 = quantum.insert %9[ 3], %4 : !quantum.reg, !quantum.bit
+    %11 = quantum.insert %10[ 4], %5 : !quantum.reg, !quantum.bit
+    %12 = quantum.insert %11[ 5], %6 : !quantum.reg, !quantum.bit
+    quantum.dealloc %12 : !quantum.reg
+    return
+}
+
+// -----
+
+//CHECK: {
+//CHECK:     "game_of_surface_code": {
+//CHECK:         "max_weight_pi4": 2,
+//CHECK:         "max_weight_pi8": 4,
+//CHECK:         "num_of_ppm": 4,
+//CHECK:         "pi4_ppr": 17,
+//CHECK:         "pi8_ppr": 4
+//CHECK:     }
+//CHECK: }
+func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
+
+    %0 = pbc.ppr ["Z"](8) %arg0 : !quantum.bit
+    %1 = pbc.ppr ["Y"](-8) %arg3 : !quantum.bit
+    %2:2 = pbc.ppr ["Y", "X"](8) %arg2, %arg1 : !quantum.bit, !quantum.bit
+    %3:4 = pbc.ppr ["Z", "Z", "Y", "Z"](-8) %2#0, %2#1, %1, %0 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %4 = pbc.ppr ["X"](-4) %3#2 : !quantum.bit
+    %5:2 = pbc.ppr ["Z", "X"](4) %3#0, %3#1 : !quantum.bit, !quantum.bit
+    %6 = pbc.ppr ["X"](-4) %5#1 : !quantum.bit
+    %7:2 = pbc.ppr ["Z", "X"](4) %6, %3#3 : !quantum.bit, !quantum.bit
+    %8 = pbc.ppr ["Z"](-4) %7#0 : !quantum.bit
+    %9 = pbc.ppr ["Z"](4) %8 : !quantum.bit
+    %10 = pbc.ppr ["X"](4) %9 : !quantum.bit
+    %11 = pbc.ppr ["X"](-4) %7#1 : !quantum.bit
+    %12:2 = pbc.ppr ["Z", "X"](4) %4, %11 : !quantum.bit, !quantum.bit
+    %13 = pbc.ppr ["Z"](-4) %12#0 : !quantum.bit
+    %14 = pbc.ppr ["Z"](4) %13 : !quantum.bit
+    %15 = pbc.ppr ["X"](4) %14 : !quantum.bit
+    %16 = pbc.ppr ["X"](-4) %12#1 : !quantum.bit
+    %17 = pbc.ppr ["X"](-4) %16 : !quantum.bit
+    %18 = pbc.ppr ["Z"](-4) %5#0 : !quantum.bit
+    %19 = pbc.ppr ["X"](4) %18 : !quantum.bit
+    %20 = pbc.ppr ["X"](4) %19 : !quantum.bit
+
+    %mres_4, %out_qubit_4 = pbc.ppm ["Z"] %15 : i1, !quantum.bit
+    %mres_3, %out_qubit_3 = pbc.ppm ["Z"] %20 : i1, !quantum.bit
+    %mres_2, %out_qubit_2 = pbc.ppm ["Z"] %10 : i1, !quantum.bit
+    %mres_1, %out_qubit_1 = pbc.ppm ["Z"] %17 : i1, !quantum.bit
+    return
+}
+
+// -----
+
+func.func public @dynamic_for_loop_error(%arg0: !quantum.bit, %c: index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %c step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+      %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+      // expected-error@above {{PBC statistics is not available when there are dynamically sized for loops.}}
+      %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
+      scf.yield %out_qubits_1 : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+func.func public @while_error(%arg0: !quantum.bit, %b: i1) {
+
+    %q = scf.while (%in_qubit = %arg0) : (!quantum.bit) -> (!quantum.bit) {
+        scf.condition(%b) %in_qubit: !quantum.bit
+    } do {
+        ^bb0(%in_qubit: !quantum.bit):
+        %out_qubits = pbc.ppr ["Z"](4) %in_qubit : !quantum.bit
+        // expected-error@above {{PBC statistics is not available when there are while loops.}}
+        scf.yield %out_qubits : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+// CHECK: "game_of_surface_code_t_layers": {
+// CHECK:     "depth": 4,
+// CHECK:     "depth_type": 0,
+// CHECK:     "max_weight_pi8": 4,
+// CHECK:     "pi8_ppr": 6
+// CHECK: }
+func.func public @game_of_surface_code_t_layers(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
+
+    // layer 1
+    %0:4 = pbc.ppr ["I", "Z", "I", "I"](-8) %qr0, %qr1, %qr2, %qr3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 2
+    %1:4 = pbc.ppr ["X", "Y", "Z", "Y"](8) %0#0, %0#1, %0#2, %0#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %2:4 = pbc.ppr ["X", "I", "Y", "Z"](8) %1#0, %1#1, %1#2, %1#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 3
+    %3:4 = pbc.ppr ["X", "Z", "I", "X"](-8) %2#0, %2#1, %2#2, %2#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %4:4 = pbc.ppr ["X", "Z", "Y", "I"](8) %3#0, %3#1, %3#2, %3#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 4
+    %5:4 = pbc.ppr ["Y", "I", "Y", "Y"](8) %4#0, %4#1, %4#2, %4#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    func.return
+}
+
+// -----
+
+// CHECK: "game_of_surface_code_t_layers_no_identity": {
+// CHECK:     "depth": 4,
+// CHECK:     "depth_type": 0,
+// CHECK:     "max_weight_pi8": 4,
+// CHECK:     "pi8_ppr": 6
+// CHECK: }
+func.func public @game_of_surface_code_t_layers_no_identity(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit) {
+
+    // layer 1
+    %0 = pbc.ppr ["Z"](-8) %qr1 : !quantum.bit
+
+    // layer 2
+    %1:4 = pbc.ppr ["X", "Y", "Z", "Y"](8) %qr0, %0, %qr2, %qr3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %2:3 = pbc.ppr ["X", "Y", "Z"](8) %1#0, %1#2, %1#3 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 3
+    %3:3 = pbc.ppr ["X", "Z", "X"](-8) %2#0, %1#1, %2#2 : !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = pbc.ppr ["X", "Z", "Y"](8) %3#0, %3#1, %2#1 :  !quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 4
+    %5:3 = pbc.ppr ["Y", "Y", "Y"](8) %4#0, %4#2, %3#2 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    func.return
+}
+
+// -----
+
+// CHECK: "game_of_surface_code_t_layers_opt": {
+// CHECK:     "depth": 2,
+// CHECK:     "depth_type": 0,
+// CHECK:     "max_weight_pi8": 4,
+// CHECK:     "pi8_ppr": 6
+// CHECK: }
+func.func public @game_of_surface_code_t_layers_opt(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
+
+    %0:4 = pbc.ppr ["I", "Z", "I", "I"](-8) %arg0, %arg1, %arg2, %arg3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %1:4 = pbc.ppr ["X", "I", "Y", "Z"](8) %0#0, %0#1, %0#2, %0#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %2:4 = pbc.ppr ["X", "Z", "Y", "I"](8) %1#0, %1#1, %1#2, %1#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %3:4 = pbc.ppr ["X", "Y", "Z", "Y"](8) %2#0, %2#1, %2#2, %2#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %4:4 = pbc.ppr ["X", "Z", "I", "X"](-8) %3#0, %3#1, %3#2, %3#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %5:4 = pbc.ppr ["Y", "I", "Y", "Y"](8) %4#0, %4#1, %4#2, %4#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    return
+}
+
+// ----- 
+
+// CHECK: "test_disjoint_qubit_specs": {
+// CHECK:     "depth": 2,
+// CHECK:     "depth_type": 0,
+// CHECK:     "num_of_ppm": 5
+// CHECK: }
+
+// CHECK-DISJOINT: "test_disjoint_qubit_specs": {
+// CHECK-DISJOINT:     "depth": 4,
+// CHECK-DISJOINT:     "depth_type": 1,
+// CHECK-DISJOINT:     "num_of_ppm": 5
+// CHECK-DISJOINT: }
+func.func @test_disjoint_qubit_specs(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit, %qr3 : !quantum.bit, %qr4 : !quantum.bit, %qr5 : !quantum.bit) {
+    // CHECK: func.func @test_disjoint_qubit_specs([[qr0:%.+]]: !quantum.bit, [[qr1:%.+]]: !quantum.bit, [[qr2:%.+]]: !quantum.bit, [[qr3:%.+]]: !quantum.bit, [[qr4:%.+]]: !quantum.bit, [[qr5:%.+]]: !quantum.bit)
+
+    // PPM(["X", "X", "Y"]) Q0, Q1 ,Q2
+    // PPM(["Y"]) Q4
+    // PPM(["Y", "Z"]) Q0, Q1
+    // PPM(["Y", "X", "Y"]) Q2, Q3, Q4
+    // PPM(["Z", "X", "Y", "Y", "Y"]) Q0, Q1, Q2, Q3, Q4
+
+    %m0, %0:3 = pbc.ppm ["X", "X", "Y"] %qr0, %qr1, %qr2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %m2, %2:2 = pbc.ppm ["Y", "Z"] %0#0, %0#1 : i1, !quantum.bit, !quantum.bit
+    %m3, %3:3 = pbc.ppm ["Y", "X", "Y"] %0#2, %qr3, %qr4 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %m1, %1 = pbc.ppm ["Y"] %3#2 : i1, !quantum.bit
+    %m4, %4:5 = pbc.ppm ["Z", "X", "Y", "Y", "Y"] %2#0, %2#1, %3#0, %3#1, %1 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+
+    func.return
+}
+
+// -----
+
+// CHECK-DAG: "test_if_worst_case_depth"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_if_worst_case_depth"
+// CHECK-DISJOINT-DAG: "depth": 3
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_if_worst_case_depth(%b : i1, %q0 : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q0 : i1, !quantum.bit
+    %r = scf.if %b -> (!quantum.bit) {
+        %a = pbc.ppr ["Z"](4) %out : !quantum.bit
+        %p2 = pbc.ppr ["X"](4) %a : !quantum.bit
+        scf.yield %p2 : !quantum.bit
+    } else {
+        %c = pbc.ppr ["Y"](4) %out : !quantum.bit
+        scf.yield %c : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// CHECK-DAG: "test_if_balanced_branches"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_if_balanced_branches"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_if_balanced_branches(%b : i1, %q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit) {
+    %m, %out:3 = pbc.ppm ["X", "X", "Y"] %q0, %q1, %q2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %r:2 = scf.if %b -> (!quantum.bit, !quantum.bit) {
+        %a:2 = pbc.ppr ["Y", "X"](4) %out#0, %out#1 : !quantum.bit, !quantum.bit
+        scf.yield %a#0, %a#1 : !quantum.bit, !quantum.bit
+    } else {
+        %c:2 = pbc.ppr ["X", "X"](4) %out#0, %out#1 : !quantum.bit, !quantum.bit
+        scf.yield %c#0, %c#1 : !quantum.bit, !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// CHECK-DAG: "test_if_no_else_branch_depth"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_if_no_else_branch_depth"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_if_no_else_branch_depth(%b : i1, %q : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q : i1, !quantum.bit
+    %r = scf.if %b -> (!quantum.bit) {
+        %p = pbc.ppr ["X"](4) %out : !quantum.bit
+        scf.yield %p : !quantum.bit
+    } else {
+        scf.yield %out : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// An scf.if barrier must prevent merging adjacent PBC ops on the
+// same qubit into one layer. Expect 3 layers: PPR | max(if) | PPR (= 1 + 1 + 1).
+
+// CHECK-DAG: "test_if_adjacent_ppr_barrier"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_if_adjacent_ppr_barrier"
+// CHECK-DISJOINT-DAG: "depth": 3
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_if_adjacent_ppr_barrier(%b : i1, %q : !quantum.bit) {
+    %before = pbc.ppr ["Z"](4) %q : !quantum.bit
+    %r = scf.if %b -> (!quantum.bit) {
+        %inner = pbc.ppr ["X"](4) %before : !quantum.bit
+        scf.yield %inner : !quantum.bit
+    } else {
+        scf.yield %before : !quantum.bit
+    }
+    %after = pbc.ppr ["Z"](4) %r : !quantum.bit
+    func.return
+}
+
+// -----
+
+// CHECK-DAG: "test_nested_if_worst_case_depth"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_nested_if_worst_case_depth"
+// CHECK-DISJOINT-DAG: "depth": 3
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_nested_if_worst_case_depth(%b0 : i1, %b1 : i1, %q0 : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q0 : i1, !quantum.bit
+    %u = scf.if %b0 -> (!quantum.bit) {
+        %v = scf.if %b1 -> (!quantum.bit) {
+            %x = pbc.ppr ["Z"](4) %out : !quantum.bit
+            %y = pbc.ppr ["X"](4) %x : !quantum.bit
+            scf.yield %y : !quantum.bit
+        } else {
+            %z = pbc.ppr ["Y"](4) %out : !quantum.bit
+            scf.yield %z : !quantum.bit
+        }
+        scf.yield %v : !quantum.bit
+    } else {
+        scf.yield %out : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// scf.index_switch: depth = layers_outside + max(default, case_0, case_1, ...)
+// Outside = 1 PPM. default = 1 PPR. case 0 = 2 non-commuting PPRs (Z then X).
+// case 1 = 1 PPR. Expect depth = 1 + max(1, 2, 1) = 3.
+
+// CHECK-DAG: "test_switch_worst_case_depth"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_switch_worst_case_depth"
+// CHECK-DISJOINT-DAG: "depth": 3
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_switch_worst_case_depth(%arg : index, %q0 : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q0 : i1, !quantum.bit
+    %r = scf.index_switch %arg -> !quantum.bit
+    case 0 {
+        %a = pbc.ppr ["Z"](4) %out : !quantum.bit
+        %b = pbc.ppr ["X"](4) %a : !quantum.bit
+        scf.yield %b : !quantum.bit
+    }
+    case 1 {
+        %c = pbc.ppr ["Y"](4) %out : !quantum.bit
+        scf.yield %c : !quantum.bit
+    }
+    default {
+        %d = pbc.ppr ["X"](4) %out : !quantum.bit
+        scf.yield %d : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// scf.index_switch with default having a PPR and a case with 0 PBC ops.
+// Outside = 1 PPM. default = 1 PPR. case 0 = 0 layers. Expect depth = 1 + max(1, 0) = 2.
+
+// CHECK-DAG: "test_switch_default_only_branch_depth"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_switch_default_only_branch_depth"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_switch_default_only_branch_depth(%arg : index, %q : !quantum.bit) {
+    %m, %out = pbc.ppm ["Z"] %q : i1, !quantum.bit
+    %r = scf.index_switch %arg -> !quantum.bit
+    case 0 {
+        scf.yield %out : !quantum.bit
+    }
+    default {
+        %d = pbc.ppr ["X"](4) %out : !quantum.bit
+        scf.yield %d : !quantum.bit
+    }
+    func.return
+}
+
+// -----
+
+// Static for-loop: depth = N * depth(body). Z-axis PPR + Z-axis PPM commute,
+// so each iteration is a single layer.
+
+// CHECK-DAG: "static_for_loop"
+// CHECK-DAG: "depth": 5
+// CHECK-DAG: "depth_type": 0
+// CHECK-DAG: "max_weight_pi4": 1
+// CHECK-DAG: "num_of_ppm": 5
+// CHECK-DAG: "pi4_ppr": 5
+func.func public @static_for_loop(%arg0: !quantum.bit) {
+    %c5 = arith.constant 5 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %c5 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+      %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+      %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
+      scf.yield %out_qubits_1 : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+// CHECK-DAG: "static_for_loop_bigstep"
+// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth_type": 0
+// CHECK-DAG: "max_weight_pi4": 1
+// CHECK-DAG: "num_of_ppm": 3
+// CHECK-DAG: "pi4_ppr": 3
+func.func public @static_for_loop_bigstep(%arg0: !quantum.bit) {
+    %c5 = arith.constant 5 : index
+    %c0 = arith.constant 0 : index
+    %c2 = arith.constant 2 : index
+    // COM: should be 3 iterations (0,2,4)
+
+    %q = scf.for %iter = %c0 to %c5 step %c2 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+      %out_qubits = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+      %mres, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits : i1, !quantum.bit
+      scf.yield %out_qubits_1 : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+// Nested static for-loop. Inner body = 1 layer (Z PPR + Z PPM commute).
+// Inner depth = 5 * 1 = 5. Outer body = inner (5) + 1 outer Z PPR (commutes with the
+// final Z PPM in the inner body? no, inner body was yielded; outer PPR is on the yielded
+// qubit -> a fresh layer after the loop). Outer body depth = 5 + 1 = 6.
+// Outer total = 6 * 6 = 36.
+
+// CHECK-DAG: "static_for_loop_nested"
+// CHECK-DAG: "depth": 36
+// CHECK-DAG: "depth_type": 0
+// CHECK-DAG: "max_weight_pi4": 1
+// CHECK-DAG: "max_weight_pi8": 1
+// CHECK-DAG: "num_of_ppm": 30
+// CHECK-DAG: "pi4_ppr": 30
+// CHECK-DAG: "pi8_ppr": 6
+func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
+    %c5 = arith.constant 5 : index
+    %c6 = arith.constant 6 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %c6 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+
+        %q_inner = scf.for %iter_inner = %c0 to %c5 step %c1 iter_args(%arg1_inner = %arg1) -> (!quantum.bit) {
+          %out_qubits_inner = pbc.ppr ["Z"](4) %arg1_inner : !quantum.bit
+          %mres, %out_qubits_inner_1 = pbc.ppm ["Z"] %out_qubits_inner : i1, !quantum.bit
+          scf.yield %out_qubits_inner_1 : !quantum.bit
+        }
+
+        %out_qubits = pbc.ppr ["Z"](8) %q_inner : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+// scf.if inside scf.for: outer trip count 2, inner body = scf.if (max(then, else) = 1).
+// Outer body depth = 1. Outer total = 2 * 1 = 2.
+
+// CHECK-DAG: "test_if_in_for_depth"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+func.func public @test_if_in_for_depth(%arg0: !quantum.bit) {
+    %c0 = arith.constant 0 : index
+    %c2 = arith.constant 2 : index
+    %c1 = arith.constant 1 : index
+    %cond = arith.constant 0 : i1
+
+    %q = scf.for %iter = %c0 to %c2 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+      %r = scf.if %cond -> (!quantum.bit) {
+        %p = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+        scf.yield %p : !quantum.bit
+      } else {
+        scf.yield %arg1 : !quantum.bit
+      }
+      scf.yield %r : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+// A quantum.extract for PPR2's qubit 3 appears textually after PPR1, but it is
+// data-independent of PPR1 (extracted directly from the register, not from any
+// insert chain that touches PPR1's outputs). Both PPRs commute on the shared
+// qubits (X X X on {0,1,2} vs X X Y on {1,2,3}), so they belong to the same
+// layer: depth must be 1, not 2.
+
+// CHECK-DAG: "test_independent_extract_between_pprs"
+// CHECK-DAG: "depth": 1
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_independent_extract_between_pprs"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_independent_extract_between_pprs() {
+    %0 = quantum.alloc(4) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[2] : !quantum.reg -> !quantum.bit
+    %4:3 = pbc.ppr ["X", "X", "X"](4) %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
+    %5 = quantum.extract %0[3] : !quantum.reg -> !quantum.bit
+    %6:3 = pbc.ppr ["X", "X", "Y"](4) %4#1, %4#2, %5 : !quantum.bit, !quantum.bit, !quantum.bit
+    %7 = quantum.insert %0[0], %4#0 : !quantum.reg, !quantum.bit
+    %8 = quantum.insert %7[1], %6#0 : !quantum.reg, !quantum.bit
+    %9 = quantum.insert %8[2], %6#1 : !quantum.reg, !quantum.bit
+    %10 = quantum.insert %9[3], %6#2 : !quantum.reg, !quantum.bit
+    quantum.dealloc %10 : !quantum.reg
+    return
+}
+
+// -----
+
+// PPR2's qubit is re-extracted from a register after PPR1's result was inserted
+// back into that register. The SSA values differ, so the disjoint/commute checks
+// alone would merge them, but the physical qubit is the same and PPR1 must
+// execute before PPR2. The data-dependency check on the extract's register
+// operand catches this and forces two layers: depth = 2.
+
+// CHECK-DAG: "test_reextract_must_split_layer"
+// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth_type": 0
+
+// CHECK-DISJOINT-DAG: "test_reextract_must_split_layer"
+// CHECK-DISJOINT-DAG: "depth": 2
+// CHECK-DISJOINT-DAG: "depth_type": 1
+func.func public @test_reextract_must_split_layer() {
+    %0 = quantum.alloc(1) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %2 = pbc.ppr ["X"](4) %1 : !quantum.bit
+    %3 = quantum.insert %0[0], %2 : !quantum.reg, !quantum.bit
+    %4 = quantum.extract %3[0] : !quantum.reg -> !quantum.bit
+    %5 = pbc.ppr ["X"](4) %4 : !quantum.bit
+    %6 = quantum.insert %3[0], %5 : !quantum.reg, !quantum.bit
+    quantum.dealloc %6 : !quantum.reg
+    return
+}
+

@@ -459,3 +459,57 @@ func.func @measure(%arg0: f64) -> f64 {
 %f0 = arith.constant 0.0 : f64
 gradient.value_and_grad "fd" @measure(%f0) {resultSegmentSizes = array<i32: 1, 1>} : (f64) -> (f64, f64)
 
+// -----
+
+// Test value_and_grad with multiple args and selective diffArgIndices.
+// Differentiating only arg0 (tensor<3xf64>), not arg1 (tensor<2xf32>).
+// The gradient result type should match arg0's type.
+
+func.func private @multi_arg_diff_types(%arg0: tensor<3xf64>, %arg1: tensor<2xf32>) -> tensor<f64>
+
+%f0 = arith.constant 0.0 : f64
+%t0 = tensor.from_elements %f0, %f0, %f0 : tensor<3xf64>
+%f1 = arith.constant 0.0 : f32
+%t1 = tensor.from_elements %f1, %f1 : tensor<2xf32>
+
+// This should pass: gradient type tensor<3xf64> matches diffArg 0's type
+gradient.value_and_grad "fd" @multi_arg_diff_types(%t0, %t1) {diffArgIndices = dense<0> : tensor<1xi64>, resultSegmentSizes = array<i32: 1, 1>} : (tensor<3xf64>, tensor<2xf32>) -> (tensor<f64>, tensor<3xf64>)
+
+// -----
+
+// Test value_and_grad type mismatch error when gradient type doesn't match differentiated arg.
+
+func.func private @multi_arg_diff_types2(%arg0: tensor<3xf64>, %arg1: tensor<2xf32>) -> tensor<f64>
+
+%f0 = arith.constant 0.0 : f64
+%t0 = tensor.from_elements %f0, %f0, %f0 : tensor<3xf64>
+%f1 = arith.constant 0.0 : f32
+%t1 = tensor.from_elements %f1, %f1 : tensor<2xf32>
+
+// expected-error@+1 {{result types do not match gradient 0 (for arg 0) expected type 'tensor<3xf64>' but got 'tensor<2xf32>'}}
+gradient.value_and_grad "fd" @multi_arg_diff_types2(%t0, %t1) {diffArgIndices = dense<0> : tensor<1xi64>, resultSegmentSizes = array<i32: 1, 1>} : (tensor<3xf64>, tensor<2xf32>) -> (tensor<f64>, tensor<2xf32>)
+
+// -----
+
+func.func private @multi_diff_args(%arg0: tensor<3xf64>, %arg1: tensor<2xf64>) -> tensor<f64>
+
+%f0 = arith.constant 0.0 : f64
+%t0 = tensor.from_elements %f0, %f0, %f0 : tensor<3xf64>
+%t1 = tensor.from_elements %f0, %f0 : tensor<2xf64>
+
+// This should pass: 2 diff args -> 2 gradients, each matching its arg type
+gradient.value_and_grad "fd" @multi_diff_args(%t0, %t1) {diffArgIndices = dense<[0, 1]> : tensor<2xi64>, resultSegmentSizes = array<i32: 1, 2>} : (tensor<3xf64>, tensor<2xf64>) -> (tensor<f64>, tensor<3xf64>, tensor<2xf64>)
+
+// -----
+
+// Test value_and_grad differentiating only the second argument (not the first).
+
+func.func private @diff_second_arg(%arg0: tensor<3xf64>, %arg1: tensor<2xf64>) -> tensor<f64>
+
+%f0 = arith.constant 0.0 : f64
+%t0 = tensor.from_elements %f0, %f0, %f0 : tensor<3xf64>
+%t1 = tensor.from_elements %f0, %f0 : tensor<2xf64>
+
+// This should pass: differentiating arg1 only, gradient type is tensor<2xf64>
+gradient.value_and_grad "fd" @diff_second_arg(%t0, %t1) {diffArgIndices = dense<1> : tensor<1xi64>, resultSegmentSizes = array<i32: 1, 1>} : (tensor<3xf64>, tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
+

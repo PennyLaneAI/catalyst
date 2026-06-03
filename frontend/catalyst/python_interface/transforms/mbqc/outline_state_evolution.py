@@ -48,7 +48,7 @@ class OutlineStateEvolutionPass(passes.ModulePass):
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the outline-state-evolution pass."""
         for op_ in op.ops:
-            if isinstance(op_, func.FuncOp) and "qnode" in op_.attributes:
+            if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
                 rewriter = pattern_rewriter.PatternRewriter(op_)
                 OutlineStateEvolutionPattern().match_and_rewrite(op_, rewriter)
 
@@ -63,9 +63,9 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
     def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
         """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
         while (op := op.parent_op()) and not isinstance(op, builtin.ModuleOp):
-            pass
+            pass  # pragma: no cover
         if op is None:
-            raise RuntimeError(
+            raise RuntimeError(  # pragma: no cover
                 "The given qnode func is not nested within a builtin.module. Please ensure the "
                 "qnode func is defined in a builtin.module."
             )
@@ -91,10 +91,10 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
     ):
         """Transform a quantum function (qnode) to outline state evolution regions.
         This implementation assumes that there is only one `quantum.alloc` operation in
-        the func operations with a "qnode" attribute and all quantum operations are between
+        the func operations with a "quantum.node" attribute and all quantum operations are between
         the unique `quantum.alloc` operation and the terminal_boundary_op. All operations in between
         are to be moved to the newly created outline-state-evolution function operation."""
-        if "qnode" not in func_op.attributes:
+        if "quantum.node" not in func_op.attributes:
             return
 
         self.original_func_op = func_op
@@ -154,7 +154,7 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
         for qb, idx in list(qubit_to_reg_idx.items()):
             extract_op = quantum.ExtractOp(current_reg, idx)
             rewriter.insert_op(extract_op, insertion_point=insertion_point)
-            qb.replace_by_if(extract_op.qubit, lambda use: use.operation not in insert_ops)
+            qb.replace_uses_with_if(extract_op.qubit, lambda use: use.operation not in insert_ops)
             for use in qb.uses:
                 rewriter.notify_op_modified(use.operation)
             # update the qubit_to_reg_idx dict
@@ -207,7 +207,7 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
                         del qubit_to_reg_idx[qb]
                 case quantum.InsertOp():
                     if not terminal_op_in_reg:
-                        if op.idx_attr and qubit_to_reg_idx[op.qubit] is not op.idx_attr:
+                        if op.idx_attr and qubit_to_reg_idx[op.qubit] != op.idx_attr:
                             raise ValueError("op.qubit should be op.idx_attr.")
                         del qubit_to_reg_idx[op.qubit]
                         current_reg = op.out_qreg

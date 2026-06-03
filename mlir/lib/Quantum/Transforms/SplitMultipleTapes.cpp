@@ -18,7 +18,6 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -163,7 +162,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPoint(TapeOps.front());
         scf::ExecuteRegionOp executeRegionOp =
-            builder.create<scf::ExecuteRegionOp>(loc, ArrayRef(RetTypes));
+            scf::ExecuteRegionOp::create(builder, loc, ArrayRef(RetTypes));
 
         builder.setInsertionPointToStart(&executeRegionOp.getRegion().emplaceBlock());
         mlir::Block::iterator it = executeRegionOp.getRegion().front().end();
@@ -172,7 +171,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
 
         builder.setInsertionPointAfter(&executeRegionOp.getRegion().front().back());
-        scf::YieldOp y = builder.create<scf::YieldOp>(loc, ArrayRef(RetValues));
+        scf::YieldOp y = scf::YieldOp::create(builder, loc, ArrayRef(RetValues));
 
         return std::make_pair(executeRegionOp, y);
     } // wrapTapeOpsInSCFRegion()
@@ -264,7 +263,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         SmallVector<std::pair<func::FuncOp, unsigned int>> MultitapePrograms;
         module->walk([&](func::FuncOp func) {
             // Don't process functions that are not qnodes: they won't have tapes.
-            if (func->hasAttrOfType<UnitAttr>("qnode")) {
+            if (func->hasAttrOfType<UnitAttr>("quantum.node")) {
                 unsigned int howManyTapes = countTapes(func);
                 if (howManyTapes >= 2) {
                     MultitapePrograms.push_back(std::make_pair(func, howManyTapes));
@@ -324,6 +323,11 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
                 outlinedfunc->moveAfter(func);
                 outlinedfunc->setAttrs(OutlinedFuncAttrs);
             }
+
+            // The caller function is now a classical wrapper calling the outlined
+            // tape functions, so it must drop `quantum.node`
+            // (matches split_non_commuting and split_to_single_terms).
+            func->removeAttr("quantum.node");
         }
     } // runOnOperation()
 };

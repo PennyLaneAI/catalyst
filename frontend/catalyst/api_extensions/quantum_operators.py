@@ -25,12 +25,13 @@ from functools import partial
 from typing import Any, Callable, List, Optional, Union
 
 import jax
-import pennylane as qml
+import pennylane as qp
 from jax._src.source_info_util import current as current_source_info
 from jax._src.tree_util import tree_flatten
 from jax.api_util import debug_info
 from jax.core import get_aval
 from pennylane import QueuingManager
+from pennylane.decomposition.resources import resolve_work_wire_type
 from pennylane.operation import Operator
 from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op
@@ -45,7 +46,7 @@ from catalyst.jax_extras import (
     deduce_avals,
     new_inner_tracer,
 )
-from catalyst.jax_primitives import AbstractQreg, adjoint_p, measure_p
+from catalyst.jax_primitives import AbstractQreg, adjoint_p, measure_p, pauli_measure_p
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
@@ -67,7 +68,7 @@ def measure(
 
     .. important::
 
-        The :func:`qml.measure() <pennylane.measure>` function is **not** QJIT
+        The :func:`qp.measure() <pennylane.measure>` function is **not** QJIT
         compatible and :func:`catalyst.measure` from Catalyst should be used instead.
 
     Args:
@@ -94,19 +95,22 @@ def measure(
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=2)
+        import pennylane as qp
+        from catalyst import qjit, measure
+
+        dev = qp.device("lightning.qubit", wires=2)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(x: float):
-            qml.RX(x, wires=0)
+            qp.RX(x, wires=0)
             m1 = measure(wires=0)
 
-            qml.RX(m1 * jnp.pi, wires=1)
+            qp.RX(m1 * jnp.pi, wires=1)
             m2 = measure(wires=1)
 
-            qml.RZ(m2 * jnp.pi / 2, wires=0)
-            return qml.expval(qml.PauliZ(0)), m2
+            qp.RZ(m2 * jnp.pi / 2, wires=0)
+            return qp.expval(qp.PauliZ(0)), m2
 
     >>> circuit(0.43)
     [Array(1., dtype=float64), Array(False, dtype=bool)]
@@ -117,14 +121,14 @@ def measure(
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             m = measure(0, postselect=1)
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
     >>> circuit()
     Array(-1., dtype=float64)
@@ -133,21 +137,21 @@ def measure(
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             m = measure(0, reset=True)
-            return qml.expval(qml.PauliZ(0))
+            return qp.expval(qp.PauliZ(0))
 
     >>> circuit()
     Array(1., dtype=float64)
     """
     EvaluationContext.check_is_tracing("catalyst.measure can only be used from within @qjit.")
     EvaluationContext.check_is_quantum_tracing(
-        "catalyst.measure can only be used from within a qml.qnode."
+        "catalyst.measure can only be used from within a qp.qnode."
     )
     cur_trace = EvaluationContext.get_current_trace()
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
@@ -178,10 +182,64 @@ def measure(
 
         @cond(m)
         def reset_fn():
-            qml.PauliX(wires=wires)
+            qp.PauliX(wires=wires)
 
         reset_fn()
 
+    return m
+
+
+def pauli_measure(
+    pauli_word: str,
+    wires,
+    postselect: Optional[int] = None,
+) -> DynamicJaxprTracer:
+    r"""A :func:`qjit` compatible Pauli-product mid-circuit measurement for PennyLane/Catalyst.
+
+    .. important::
+
+        The :func:`qp.pauli_measure() <pennylane.pauli_measure>` function is **not** QJIT
+        compatible under the legacy tracing pathway; use :func:`catalyst.pauli_measure` instead.
+
+    Args:
+        pauli_word (str): The Pauli word (e.g. ``"XZ"``) acting on ``wires``.
+        wires (int or list[int]): Wire(s) the Pauli product applies to.
+        postselect (Optional[int]): Optional postselection (not yet supported in compilation).
+
+    Returns:
+        A JAX tracer for the classical measurement outcome (boolean).
+
+    Raises:
+        NotImplementedError: If ``postselect`` is set (not yet plumbed through MLIR).
+        ValueError: If the number of wires does not match the Pauli word length.
+    """
+    EvaluationContext.check_is_tracing("catalyst.pauli_measure can only be used from within @qjit.")
+    EvaluationContext.check_is_quantum_tracing(
+        "catalyst.pauli_measure can only be used from within a qp.qnode."
+    )
+
+    if postselect is not None:
+        raise NotImplementedError(
+            "Postselection on catalyst.pauli_measure is not supported under qjit."
+        )
+
+    cur_trace = EvaluationContext.get_current_trace()
+    wires_list = list(wires) if isinstance(wires, (list, tuple)) else [wires]
+    if len(pauli_word) != len(wires_list):
+        raise ValueError(
+            "The number of wires must be equal to the length of the Pauli word, "
+            f"got {len(wires_list)} and {len(pauli_word)}."
+        )
+
+    in_classical_tracers = wires_list.copy()
+    m = new_inner_tracer(cur_trace, get_aval(True))
+    MidCircuitPauliMeasure(
+        in_classical_tracers=in_classical_tracers,
+        out_classical_tracers=[m],
+        regions=[],
+        pauli_word=pauli_word,
+        postselect=postselect,
+    )
     return m
 
 
@@ -216,17 +274,20 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
     **Example 1 (basic usage)**
 
     .. code-block:: python
+        import pennylane as qp
+        import catalyst
+        from catalyst import qjit
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def workflow(theta, wires):
-            catalyst.adjoint(qml.RZ)(theta, wires=wires)
-            catalyst.adjoint(qml.RZ(theta, wires=wires))
+            catalyst.adjoint(qp.RZ)(theta, wires=wires)
+            catalyst.adjoint(qp.RZ(theta, wires=wires))
             def func():
-                qml.RX(theta, wires=wires)
-                qml.RY(theta, wires=wires)
+                qp.RX(theta, wires=wires)
+                qp.RY(theta, wires=wires)
             catalyst.adjoint(func)()
-            return qml.probs()
+            return qp.probs()
 
     >>> workflow(jnp.pi/2, wires=0)
     Array([0.5, 0.5], dtype=float64)
@@ -236,16 +297,16 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
     .. code-block:: python
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def workflow(theta, n, wires):
             def func():
                 @catalyst.for_loop(0, n, 1)
                 def loop_fn(i):
-                    qml.RX(theta, wires=wires)
+                    qp.RX(theta, wires=wires)
 
                 loop_fn()
             catalyst.adjoint(func)()
-            return qml.probs()
+            return qp.probs()
 
     >>> workflow(jnp.pi/2, 3, 0)
     [1.00000000e+00 7.39557099e-32]
@@ -262,9 +323,10 @@ def ctrl(
     control: List[Any],
     control_values: Optional[List[Any]] = None,
     work_wires: Optional[List[Any]] = None,
+    work_wire_type: str = "borrowed",
 ) -> Callable:
     """Create a method that applies a controlled version of the provided op. This function is the
-    Catalyst version of the ``qml.ctrl`` that supports Catalyst hybrid operations such as loops and
+    Catalyst version of the ``qp.ctrl`` that supports Catalyst hybrid operations such as loops and
     conditionals.
 
     Args:
@@ -274,6 +336,7 @@ def ctrl(
         control_values (List[bool], optional): The value(s) the control wire(s) should take.
             Integers other than 0 or 1 will be treated as ``int(bool(x))``.
         work_wires (Any): Any auxiliary wires that can be used in the decomposition
+        work_wire_type (str): The type of work wire(s), can be ``"zeroed"`` or ``"borrowed"``.
 
     Returns:
         (function or :class:`~.operation.Operator`): If an Operator is provided, returns a
@@ -287,24 +350,28 @@ def ctrl(
 
     .. code-block:: python
 
+        import pennylane as qp
+        import catalyst
+        from catalyst import qjit
+
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def workflow(theta, w, cw):
-            qml.Hadamard(wires=[0])
-            qml.Hadamard(wires=[1])
+            qp.Hadamard(wires=[0])
+            qp.Hadamard(wires=[1])
 
             def func(arg):
-              qml.RX(theta, wires=arg)
+              qp.RX(theta, wires=arg)
 
             @cond(theta > 0.0)
             def cond_fn():
-              qml.RY(theta, wires=w)
+              qp.RY(theta, wires=w)
 
             catalyst.ctrl(func, control=[cw])(w)
             catalyst.ctrl(cond_fn, control=[cw])()
-            catalyst.ctrl(qml.RZ, control=[cw])(theta, wires=w)
-            catalyst.ctrl(qml.RY(theta, wires=w), control=[cw])
-            return qml.probs()
+            catalyst.ctrl(qp.RZ, control=[cw])(theta, wires=w)
+            catalyst.ctrl(qp.RY(theta, wires=w), control=[cw])
+            return qp.probs()
 
     >>> workflow(jnp.pi/4, 1, 0)
     Array([0.25, 0.25, 0.03661165, 0.46338835], dtype=float64)
@@ -318,7 +385,13 @@ def ctrl(
             f"to the lenght of control ({len(control)})"
         )
 
-    res = CtrlCallable(f, control, control_values=control_values, work_wires=work_wires)
+    res = CtrlCallable(
+        f,
+        control,
+        control_values=control_values,
+        work_wires=work_wires,
+        work_wire_type=work_wire_type,
+    )
     return res() if isinstance(f, Operator) else res
 
 
@@ -334,11 +407,11 @@ class MidCircuitMeasure(HybridOp):
         in_classical_tracers,
         out_classical_tracers,
         regions: List[HybridOpRegion],
-        reset: bool = None,
-        postselect: int = None,
+        reset: bool | None = None,
+        postselect: int | None = None,
     ):
         HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
-        self._wires = qml.wires.Wires(in_classical_tracers)
+        self._wires = qp.wires.Wires(in_classical_tracers)
         self.reset = reset
         self.postselect = postselect
 
@@ -366,6 +439,46 @@ class MidCircuitMeasure(HybridOp):
         return hash(hsh + hash(self.out_classical_tracers[0]))
 
 
+class MidCircuitPauliMeasure(HybridOp):
+    """Operation representing a Pauli-product measurement."""
+
+    binder = pauli_measure_p.bind
+
+    # pylint: disable=too-many-positional-arguments too-many-arguments
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        pauli_word: str,
+        postselect: Optional[int] = None,
+    ):
+        HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
+        self._wires = qp.wires.Wires(in_classical_tracers)
+        self.pauli_word = pauli_word
+        self.postselect = postselect
+
+    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+        qubits = qrp.extract(self.wires)
+        out_qubits = self.bind_overwrite_classical_tracers(
+            trace,
+            in_expanded_tracers=qubits,
+            out_expanded_tracers=self.out_classical_tracers,
+            num_quantum_outs=len(qubits),
+            pauli_word=self.pauli_word,
+            qubits_len=len(qubits),
+        )
+        # Normalize to a list: bind_overwrite_classical_tracers returns a single tracer when
+        # num_quantum_outs == 1 (for backwards compatibility) and a list otherwise.
+        out_qubits_list = [out_qubits] if len(qubits) == 1 else list(out_qubits)
+        qrp.insert(self.wires, out_qubits_list)
+        return qrp
+
+    def __hash__(self):
+        hsh = super().__hash__()
+        return hash(hsh + hash(self.out_classical_tracers[0]))
+
+
 class AdjointCallable:
     """Callable wrapper to produce an adjoint instance."""
 
@@ -374,11 +487,11 @@ class AdjointCallable:
         self.lazy = lazy
 
         if isinstance(target, Operator):
-            # Case 1: User passed an already instantiated operation, e.g. adjoint(qml.Hadamard(0))
+            # Case 1: User passed an already instantiated operation, e.g. adjoint(qp.Hadamard(0))
             self.single_op = True
             self.instantiated = True
         elif isinstance(target, type) and issubclass(target, Operator):
-            # Case 2: User passed the constructor of an operation, e.g. adjoint(qml.Hadamard)(0)
+            # Case 2: User passed the constructor of an operation, e.g. adjoint(qp.Hadamard)(0)
             self.single_op = True
             self.instantiated = False
         elif isinstance(target, Callable):
@@ -389,25 +502,32 @@ class AdjointCallable:
             self.single_op = False
             self.instantiated = False
         else:
-            raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
-
-        if not self.lazy and not self.single_op:
-            # Supporting this for a qfunc is technically possible by invoking the decomposition on
-            # HybridAdjoint with laza=False, however one would need to outline the classical jaxpr
-            # into the outer scope, and possibly re-mapping tracers in the quantum operators,
-            # in order to avoid escaped tracers which indicate an invalid program.
-            raise ValueError(
-                "Eagerly computing the adjoint (lazy=False) is only supported on single operators."
-            )
+            raise ValueError(f"Expected a callable or a qp.Operator, not {target}")
 
     def __call__(self, *args, **kwargs):
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
             return create_adjoint_op(base_op, self.lazy)
 
+        if not self.lazy:
+            return self._expand_adjoint_callable(args, kwargs)
+
         tracing_artifacts = self.trace_body(args, kwargs)
         dbg = tracing_artifacts[3]
         return HybridAdjoint(*tracing_artifacts[0:3], debug_info=dbg)
+
+    def _expand_adjoint_callable(self, args, kwargs):
+        """Expand a callable into individual ops, then reverse and adjoint each one."""
+        with QueuingManager.stop_recording(), QuantumTape() as tape:
+            self.target(*args, **kwargs)
+
+        for op in reversed(tape.operations):
+            # For Adjoint of HybridAdjoint, we still create the HybridAdjoint of HybridAdjoint, so
+            # that the MLIR adjoint-lowering pass can handle the reversal.
+            if isinstance(op, HybridOp):
+                AdjointCallable(lambda bound_op=op: qp.apply(bound_op) and None, lazy=True)()
+            else:
+                create_adjoint_op(op, lazy=False)
 
     def trace_body(self, args, kwargs):
         """Generate a HybridOpRegion for use by Catalyst."""
@@ -456,7 +576,7 @@ class HybridAdjoint(HybridOp):
 
     binder = adjoint_p.bind
 
-    def trace_quantum(self, ctx, device, _trace, qrp) -> QRegPromise:
+    def trace_quantum(self, ctx, device, _trace, qrp, **kwargs) -> QRegPromise:
         op = self
         body_trace = op.regions[0].trace
         body_tape = op.regions[0].quantum_tape
@@ -473,7 +593,9 @@ class HybridAdjoint(HybridOp):
             qreg_in = _input_type_to_tracers(
                 partial(body_trace.new_arg, source_info=current_source_info()), [AbstractQreg()]
             )[0]
-            qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
+            qrp_out = trace_quantum_operations(
+                body_tape, device, qreg_in, ctx, body_trace, **kwargs
+            )
             qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = body_trace.frame.to_jaxpr2(
                 res_classical_tracers + [qreg_out], dbg
@@ -502,6 +624,10 @@ class HybridAdjoint(HybridOp):
         in reverse. Note that decomposition of control flow ops like for loops are only supported
         in the compiler."""
         assert len(self.regions) == 1, "Expected a single nested region for HybridAdjoint"
+        assert not any(
+            isinstance(op, HybridOp) and not isinstance(op, (HybridAdjoint, HybridCtrl))
+            for op in self.regions[0].quantum_tape.operations
+        ), "Cannot decompose Adjoint(HybridOp) in PennyLane"
 
         return [
             create_adjoint_op(op, lazy=True)
@@ -512,11 +638,13 @@ class HybridAdjoint(HybridOp):
 class CtrlCallable:
     """Callable wrapper to produce a ctrl instance."""
 
-    def __init__(self, target, control, control_values, work_wires):
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    def __init__(self, target, control, control_values, work_wires, work_wire_type="borrowed"):
         self.target = target
         self.control_wires = control
         self.control_values = control_values
         self.work_wires = work_wires
+        self.work_wire_type = work_wire_type
 
         if isinstance(target, Operator):
             # Case 1. Support an initialized operation as the base target
@@ -531,13 +659,17 @@ class CtrlCallable:
             self.single_op = False
             self.instantiated = False
         else:
-            raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
+            raise ValueError(f"Expected a callable or a qp.Operator, not {target}")
 
     def __call__(self, *args, **kwargs):
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
             return create_controlled_op(
-                base_op, self.control_wires, self.control_values, self.work_wires
+                base_op,
+                self.control_wires,
+                self.control_values,
+                self.work_wires,
+                work_wire_type=self.work_wire_type,
             )
 
         tracing_artifacts = self.trace_body(args, kwargs)
@@ -547,6 +679,7 @@ class CtrlCallable:
             control_wires=self.control_wires,
             control_values=self.control_values,
             work_wires=self.work_wires,
+            work_wire_type=self.work_wire_type,
         )
 
     def trace_body(self, args, kwargs):
@@ -578,9 +711,17 @@ class CtrlCallable:
 class HybridCtrl(HybridOp):
     """Catalyst quantum ctrl operation support for both operations and callables"""
 
-    def __init__(self, *tracing_artifacts, control_wires, control_values=None, work_wires=None):
-        self._control_wires = qml.wires.Wires(control_wires)
-        self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
+    def __init__(
+        self,
+        *tracing_artifacts,
+        control_wires,
+        control_values=None,
+        work_wires=None,
+        work_wire_type="borrowed",
+    ):
+        self._control_wires = qp.wires.Wires(control_wires)
+        self._work_wires = qp.wires.Wires([] if work_wires is None else work_wires)
+        self._work_wire_type = work_wire_type
         if control_values is None:
             self._control_values = [True] * len(self._control_wires)
         elif isinstance(control_values, (int, bool)):
@@ -589,14 +730,14 @@ class HybridCtrl(HybridOp):
             self._control_values = control_values
         super().__init__(*tracing_artifacts)
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+    def trace_quantum(self, ctx, device, trace, qrp, **kwargs) -> QRegPromise:
         raise NotImplementedError(
             "HybridCtrl does not support JAX quantum tracing"
         )  # pragma: no cover
 
     def decomposition(self):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
-        distributing the quantum control operaiton over the tape operations."""
+        distributing the quantum control operation over the tape operations."""
         assert len(self.regions) == 1, "HybridCtrl is expected to have one region"
 
         _check_no_measurements(self.regions[0].quantum_tape)
@@ -606,6 +747,7 @@ class HybridCtrl(HybridOp):
             self._control_wires,
             self._control_values,
             self._work_wires,
+            self._work_wire_type,
         )
 
     @property
@@ -634,6 +776,11 @@ class HybridCtrl(HybridOp):
         """Optional wires that can be used in the expansion of this op."""
         return self._work_wires
 
+    @property
+    def work_wire_type(self):
+        """The type of work wires provided"""
+        return self._work_wire_type
+
     def map_wires(self, wire_map):
         """Map wires to new wires according to wire_map"""
         new_ops = []
@@ -650,6 +797,7 @@ def ctrl_distribute(
     control_wires: List[Any],
     control_values: List[Any],
     work_wires: Optional[List[Any]] = None,
+    work_wire_type: str = "borrowed",
 ) -> QuantumTape:
     """Distribute the quantum control operation, described by ``control_wires`` and
     ``control_values``, over all the operations on the nested quantum tape.
@@ -672,16 +820,26 @@ def ctrl_distribute(
     for op in tape.operations:
         if has_nested_tapes(op):
             if isinstance(op, HybridCtrl):
+                # For nested HybridCtrl, resolve the combined work_wire_type first.
+                # This is the same as the logic in PennyLane:
+                # `pennylane/ops/op_math/controlled.py:create_controlled_op`
+                combined_work_wire_type = resolve_work_wire_type(
+                    qp.wires.Wires(work_wires) if work_wires is not None else qp.wires.Wires([]),
+                    work_wire_type,
+                    op.work_wires,
+                    op.work_wire_type,
+                )
                 nested_ops = ctrl_distribute(
                     op.regions[0].quantum_tape,
                     control_wires + op.control_wires,
                     control_values + op.control_values,
                     work_wires + op.work_wires,
+                    combined_work_wire_type,
                 )
                 new_ops.extend(nested_ops)
             else:
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
-                    # Re-enter a JAXPR frame but do not create a new one is none exists.
+                    # Re-enter a JAXPR frame but do not create a new one if none exists.
                     if cur_trace and region.trace:
                         trace_manager = EvaluationContext.frame_tracing_context(region.trace)
                     else:
@@ -689,19 +847,24 @@ def ctrl_distribute(
 
                     with trace_manager:
                         nested_ops = ctrl_distribute(
-                            region.quantum_tape, control_wires, control_values, work_wires
+                            region.quantum_tape,
+                            control_wires,
+                            control_values,
+                            work_wires,
+                            work_wire_type,
                         )
                         region.quantum_tape = QuantumTape(
                             nested_ops, region.quantum_tape.measurements
                         )
                 new_ops.append(op)
-        elif isinstance(op, qml.ops.Adjoint):
+        elif isinstance(op, qp.ops.Adjoint):
             # ctrl resolves faster for nested hybrid controls than create_controlled_op
             ctrl_op = ctrl(
                 copy.copy(op.base),
                 control=control_wires,
                 control_values=control_values,
                 work_wires=work_wires,
+                work_wire_type=work_wire_type,
             )
             new_ops.append(create_adjoint_op(ctrl_op, lazy=True))
         else:
@@ -710,6 +873,7 @@ def ctrl_distribute(
                 control=control_wires,
                 control_values=control_values,
                 work_wires=work_wires,
+                work_wire_type=work_wire_type,
             )
             new_ops.append(ctrl_op)
     return new_ops
@@ -726,7 +890,7 @@ def _check_no_measurements(tape: QuantumTape) -> None:
             for r in [r for r in op.regions if r.quantum_tape is not None]:
                 _check_no_measurements(r.quantum_tape)
         else:
-            if isinstance(op, MidCircuitMeasure):
+            if isinstance(op, (MidCircuitMeasure, MidCircuitPauliMeasure)):
                 raise ValueError(
                     "Mid-circuit measurements cannot be used "
                     "within an adjoint() or ctrl() region."

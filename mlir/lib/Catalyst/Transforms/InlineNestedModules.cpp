@@ -66,7 +66,6 @@
 #include <deque>
 
 #include "llvm/ADT/SmallSet.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -155,6 +154,8 @@ SymbolRefAttr getFullyQualifiedNameUntil(SymbolOpInterface symbol, const Operati
 }
 
 static constexpr llvm::StringRef fullyQualifiedNameAttr = "catalyst.fully_qualified_name";
+static constexpr llvm::StringRef quantumNodeAttr = "quantum.node";
+static constexpr llvm::StringRef legacyQNodeAttr = "qnode";
 
 struct AnnotateWithFullyQualifiedName : public OpInterfaceRewritePattern<SymbolOpInterface> {
     using OpInterfaceRewritePattern<SymbolOpInterface>::OpInterfaceRewritePattern;
@@ -414,11 +415,21 @@ struct CleanupPattern : public RewritePattern {
 
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
     {
-        auto hasQualifiedName = op->hasAttr(fullyQualifiedNameAttr);
-        if (!hasQualifiedName) {
+        bool hasQualifiedName = op->hasAttr(fullyQualifiedNameAttr);
+        bool hasQNodeAttr = op->hasAttr(quantumNodeAttr);
+        if (!hasQualifiedName && !hasQNodeAttr) {
             return failure();
         }
-        rewriter.modifyOpInPlace(op, [&] { op->removeAttr(fullyQualifiedNameAttr); });
+
+        rewriter.modifyOpInPlace(op, [&] {
+            if (hasQNodeAttr) {
+                op->removeAttr(quantumNodeAttr);
+                op->setAttr(legacyQNodeAttr, UnitAttr::get(op->getContext()));
+            }
+            if (hasQualifiedName) {
+                op->removeAttr(fullyQualifiedNameAttr);
+            }
+        });
 
         return success();
     }

@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/Utils/RemoveQuantum.h"
+
 #include <deque>
 
 #include "llvm/ADT/SmallPtrSet.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantum.h"
 
 using namespace mlir;
 
@@ -73,18 +73,18 @@ void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewrite
             if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
                 auto shape = tensorType.getShape();
                 auto elemType = tensorType.getElementType();
-                auto res = rewriter.create<tensor::EmptyOp>(loc, shape, elemType);
+                auto res = tensor::EmptyOp::create(rewriter, loc, shape, elemType);
                 results.push_back(res);
             }
             else {
                 if (type.isInteger()) {
-                    auto res = rewriter.create<arith::ConstantOp>(loc, type,
-                                                                  rewriter.getIntegerAttr(type, 0));
+                    auto res = arith::ConstantOp::create(rewriter, loc, type,
+                                                         rewriter.getIntegerAttr(type, 0));
                     results.push_back(res);
                 }
                 else if (type.isIntOrFloat()) {
-                    auto res = rewriter.create<arith::ConstantOp>(loc, type,
-                                                                  rewriter.getFloatAttr(type, 0.0));
+                    auto res = arith::ConstantOp::create(rewriter, loc, type,
+                                                         rewriter.getFloatAttr(type, 0.0));
                     results.push_back(res);
                 }
                 else {

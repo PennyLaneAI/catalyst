@@ -21,9 +21,10 @@ of gradients, jacobians, jacobian-vector products, and more.
 import copy
 import functools
 import numbers
-from typing import Callable, Iterable, List, Optional, Union
+from collections.abc import Callable, Sequence
 
 import jax
+import pennylane as qp
 from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from jax.api_util import debug_info
@@ -48,7 +49,7 @@ from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.types import get_shape
 
-Differentiable = Union[Function, QNode]
+Differentiable = Function | QNode
 
 
 ## API ##
@@ -102,14 +103,17 @@ def grad(fn=None, *, method=None, h=None, argnums=None):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        import pennylane as qp
+        from catalyst import qjit, grad
+
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
         def workflow(x):
-            @qml.qnode(dev)
+            @qp.qnode(dev)
             def circuit(x):
-                qml.RX(jnp.pi * x, wires=0)
-                return qml.expval(qml.PauliY(0))
+                qp.RX(jnp.pi * x, wires=0)
+                return qp.expval(qp.PauliY(0))
 
             g = grad(circuit)
             return g(x)
@@ -121,14 +125,14 @@ def grad(fn=None, *, method=None, h=None, argnums=None):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
         def grad_loss(theta):
-            @qml.qnode(dev, diff_method="adjoint")
+            @qp.qnode(dev, diff_method="adjoint")
             def circuit(theta):
-                qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
-                return qml.expval(qml.PauliZ(wires=0))
+                qp.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+                return qp.expval(qp.PauliZ(wires=0))
 
             def loss(theta):
                 return jnp.pi / jnp.tanh(circuit(theta))
@@ -142,19 +146,19 @@ def grad(fn=None, *, method=None, h=None, argnums=None):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
         def grad_loss(theta):
-            @qml.qnode(dev, diff_method="parameter-shift")
+            @qp.qnode(dev, diff_method="parameter-shift")
             def circuit_A(params):
-                qml.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
-                return qml.probs()
+                qp.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
+                return qp.probs()
 
-            @qml.qnode(dev, diff_method="adjoint")
+            @qp.qnode(dev, diff_method="adjoint")
             def circuit_B(params):
-                qml.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
-                return qml.expval(qml.PauliZ(wires=0))
+                qp.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
+                return qp.expval(qp.PauliZ(wires=0))
 
             def loss(params):
                 return jnp.prod(circuit_A(params)) + circuit_B(params)
@@ -241,14 +245,17 @@ def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        import pennylane as qp
+        from catalyst import qjit, value_and_grad
+
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
         def workflow(x):
-            @qml.qnode(dev)
+            @qp.qnode(dev)
             def circuit(x):
-                qml.RX(jnp.pi * x, wires=0)
-                return qml.expval(qml.PauliY(0))
+                qp.RX(jnp.pi * x, wires=0)
+                return qp.expval(qp.PauliY(0))
             return value_and_grad(circuit)(x)
 
     >>> workflow(0.2)
@@ -259,14 +266,14 @@ def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
         def value_and_grad_loss(theta):
-            @qml.qnode(dev, diff_method="adjoint")
+            @qp.qnode(dev, diff_method="adjoint")
             def circuit(theta):
-                qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
-                return qml.expval(qml.PauliZ(wires=0))
+                qp.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+                return qp.expval(qp.PauliZ(wires=0))
 
             def loss(theta):
                 return jnp.pi / jnp.tanh(circuit(theta))
@@ -345,15 +352,18 @@ def jacobian(fn=None, *, method=None, h=None, argnums=None):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=1)
+        import pennylane as qp
+        from catalyst import qjit, jacobian
+
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
         def workflow(x):
-            @qml.qnode(dev)
+            @qp.qnode(dev)
             def circuit(x):
-                qml.RX(jnp.pi * x[0], wires=0)
-                qml.RY(x[1], wires=0)
-                return qml.probs()
+                qp.RX(jnp.pi * x[0], wires=0)
+                qp.RY(x[1], wires=0)
+                return qp.probs()
 
             g = jacobian(circuit)
             return g(x)
@@ -425,11 +435,11 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
     .. code-block:: python
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit(n, params):
-            qml.RX(params[n, 0], wires=n)
-            qml.RY(params[n, 1], wires=n)
-            return qml.expval(qml.PauliZ(1))
+            qp.RX(params[n, 0], wires=n)
+            qp.RY(params[n, 1], wires=n)
+            return qp.expval(qp.PauliZ(1))
 
         @qjit
         def workflow(primals, tangents):
@@ -441,12 +451,12 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
     (Array(0.78766064, dtype=float64), Array(-0.7011436, dtype=float64))
     """
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+    def check_is_sequence(x, hint):
+        if not isinstance(x, Sequence):
+            raise ValueError(f"jvp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_iterable(params, "params")
-    check_is_iterable(tangents, "tangents")
+    check_is_sequence(params, "params")
+    check_is_sequence(tangents, "tangents")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -457,7 +467,7 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
 
         if len(tangents_flatten) != len(grad_params.expanded_argnums):
             raise TypeError(
-                "number of tangent and number of differentiable parameters in catalyst.jvp do not "
+                "number of tangents and number of differentiable parameters in catalyst.jvp do not "
                 "match; the number of parameters must be equal. "
                 f"Got {len(grad_params.expanded_argnums)} differentiable parameters and so expected "
                 f"as many tangents, but got {len(tangents_flatten)} instead."
@@ -546,13 +556,14 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
     (Array([0.09983342, 0.04      , 0.02      ], dtype=float64),
      (Array([-0.43750208,  0.07      ], dtype=float64),))
     """
+    if qp.capture.enabled():
+        return qp.vjp(f, params, cotangents, method=method, h=h, argnums=argnums)
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+    def check_is_Sequence(x, hint):
+        if not isinstance(x, Sequence):
+            raise ValueError(f"vjp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_iterable(params, "params")
-    check_is_iterable(cotangents, "cotangents")
+    check_is_Sequence(params, "params")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -564,7 +575,10 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
         grad_params = _check_grad_params(method, scalar_out, h, argnums, len(args_flatten), in_tree)
 
         args_argnums = tuple(params[i] for i in grad_params.argnums)
-        _, in_tree = tree_flatten(args_argnums)
+        if isinstance(argnums, int) or argnums is None:
+            _, in_tree = tree_flatten(0)
+        else:
+            _, in_tree = tree_flatten(args_argnums)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
@@ -718,8 +732,8 @@ class GradCallable(CatalystCallable):
 def _check_grad_params(
     method: str,
     scalar_out: bool,
-    h: Optional[float],
-    argnums: Optional[Union[int, List[int]]],
+    h: float | None,
+    argnums: int | list[int] | None,
     len_flatten_args: int,
     in_tree: PyTreeDef,
     with_value: bool = False,
@@ -746,7 +760,7 @@ def _check_grad_params(
     elif isinstance(argnums, list) and all(isinstance(i, int) for i in argnums):
         argnum_list = argnums
     else:
-        raise ValueError(f"argnums should be integer or a list of integers, not {argnums}")
+        raise ValueError(f"argnums should be an integer or a Sequence of integers, not {argnums}")
     # Compute the argnums of the pytree arg
     total_argnums = list(range(0, len_flatten_args))
     argnum_unflatten = tree_unflatten(in_tree, total_argnums)
@@ -894,10 +908,10 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
     ):
         raise DifferentiableCompileError(
             "The parameter-shift method can only be used for QNodes "
-            "which return either qml.expval or qml.probs."
+            "which return either qp.expval or qp.probs."
         )
 
     if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
         raise DifferentiableCompileError(
-            "The adjoint method can only be used for QNodes which return qml.expval."
+            "The adjoint method can only be used for QNodes which return qp.expval."
         )

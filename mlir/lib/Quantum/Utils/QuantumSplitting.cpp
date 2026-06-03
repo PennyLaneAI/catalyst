@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/Utils/QuantumSplitting.h"
+
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -22,9 +24,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "QEC/IR/QECOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/QuantumSplitting.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -88,14 +89,14 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     auto paramVectorType = ArrayListType::get(ctx, builder.getF64Type());
     auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto controlFlowTapeType = ArrayListType::get(ctx, builder.getIndexType());
-    auto paramVector = builder.create<ListInitOp>(loc, paramVectorType);
-    auto wireVector = builder.create<ListInitOp>(loc, wireVectorType);
+    auto paramVector = ListInitOp::create(builder, loc, paramVectorType);
+    auto wireVector = ListInitOp::create(builder, loc, wireVectorType);
 
     // Initialize the tapes that store the structure of control flow.
     DenseMap<Operation *, TypedValue<ArrayListType>> controlFlowTapes;
     region.walk([&](Operation *op) {
-        if (isa<scf::ForOp, scf::IfOp, scf::WhileOp>(op)) {
-            auto tape = builder.create<catalyst::ListInitOp>(loc, controlFlowTapeType);
+        if (isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
+            auto tape = catalyst::ListInitOp::create(builder, loc, controlFlowTapeType);
             controlFlowTapes.insert({op, tape});
         }
     });
@@ -105,10 +106,10 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
 
 void QuantumCache::emitDealloc(OpBuilder &builder, Location loc)
 {
-    builder.create<ListDeallocOp>(loc, paramVector);
-    builder.create<ListDeallocOp>(loc, wireVector);
+    ListDeallocOp::create(builder, loc, paramVector);
+    ListDeallocOp::create(builder, loc, wireVector);
     for (const auto &[_key, controlFlowTape] : controlFlowTapes) {
-        builder.create<ListDeallocOp>(loc, controlFlowTape);
+        ListDeallocOp::create(builder, loc, controlFlowTape);
     }
 }
 
@@ -124,7 +125,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         verifyTypeIsCacheable(paramType, op);
 
         if (paramType.isF64()) {
-            builder.create<ListPushOp>(loc, clonedParam, cache.paramVector);
+            ListPushOp::create(builder, loc, clonedParam, cache.paramVector);
             continue;
         }
 
@@ -139,14 +140,14 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
 
         auto aTensor = cast<RankedTensorType>(paramType);
         ArrayRef<int64_t> shape = aTensor.getShape();
-        Value c0 = builder.create<index::ConstantOp>(loc, 0);
-        Value c1 = builder.create<index::ConstantOp>(loc, 1);
+        Value c0 = index::ConstantOp::create(builder, loc, 0);
+        Value c1 = index::ConstantOp::create(builder, loc, 1);
         bool isDim0Static = ShapedType::kDynamic != shape[0];
         bool isDim1Static = ShapedType::kDynamic != shape[1];
-        Value dim0Length = isDim0Static ? (Value)builder.create<index::ConstantOp>(loc, shape[0])
-                                        : (Value)builder.create<tensor::DimOp>(loc, param, c0);
-        Value dim1Length = isDim1Static ? (Value)builder.create<index::ConstantOp>(loc, shape[1])
-                                        : (Value)builder.create<tensor::DimOp>(loc, param, c1);
+        Value dim0Length = isDim0Static ? (Value)index::ConstantOp::create(builder, loc, shape[0])
+                                        : (Value)tensor::DimOp::create(builder, loc, param, c0);
+        Value dim1Length = isDim1Static ? (Value)index::ConstantOp::create(builder, loc, shape[1])
+                                        : (Value)tensor::DimOp::create(builder, loc, param, c1);
 
         Value lowerBoundDim0 = c0;
         Value upperBoundDim0 = dim0Length;
@@ -157,27 +158,27 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         Value matrix = clonedParam;
 
         scf::ForOp iForLoop =
-            builder.create<scf::ForOp>(loc, lowerBoundDim0, upperBoundDim0, stepDim0);
+            scf::ForOp::create(builder, loc, lowerBoundDim0, upperBoundDim0, stepDim0);
         {
             OpBuilder::InsertionGuard afterIForLoop(builder);
             builder.setInsertionPointToStart(iForLoop.getBody());
             Value i_index = iForLoop.getInductionVar();
 
             scf::ForOp jForLoop =
-                builder.create<scf::ForOp>(loc, lowerBoundDim1, upperBoundDim1, stepDim1);
+                scf::ForOp::create(builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1);
             {
                 OpBuilder::InsertionGuard afterJForLoop(builder);
                 builder.setInsertionPointToStart(jForLoop.getBody());
                 Value j_index = jForLoop.getInductionVar();
                 SmallVector<Value> indices = {i_index, j_index};
-                Value element = builder.create<tensor::ExtractOp>(loc, matrix, indices);
+                Value element = tensor::ExtractOp::create(builder, loc, matrix, indices);
                 // element is complex!
                 // So we need to convert into {f64, f64}
-                Value real = builder.create<complex::ReOp>(loc, element);
-                Value imag = builder.create<complex::ImOp>(loc, element);
+                Value real = complex::ReOp::create(builder, loc, element);
+                Value imag = complex::ImOp::create(builder, loc, element);
                 // Again, take note of the order.
-                builder.create<ListPushOp>(loc, real, cache.paramVector);
-                builder.create<ListPushOp>(loc, imag, cache.paramVector);
+                ListPushOp::create(builder, loc, real, cache.paramVector);
+                ListPushOp::create(builder, loc, imag, cache.paramVector);
             }
         }
     }
@@ -205,7 +206,7 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         else if (isa<QuantumDialect>(op.getDialect())) {
             // Any quantum op other than a parametrized gate/insert/extract is ignored.
         }
-        else if (isa<qec::PPRotationOp>(op)) {
+        else if (isa<pbc::PPRotationOp>(op)) {
             // PPRs are ignored
         }
         else if (isClassicalSCFOp(op)) {
@@ -222,21 +223,19 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
             visitOperation(whileOp, builder);
         }
+        else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
+            visitOperation(switchOp, builder);
+        }
         else if (auto callOp = dyn_cast<func::CallOp>(op)) {
             auto results = callOp.getResultTypes();
-
-            bool multiReturns = results.size() > 1;
-
-            bool quantum = std::any_of(results.begin(), results.end(),
-                                       [](const auto &value) { return isa<QuregType>(value); });
+            bool quantum = std::any_of(results.begin(), results.end(), [](const auto &value) {
+                return isa<QuregType, QubitType>(value);
+            });
 
             // Classical call operations are cloned for the backward pass
             if (!quantum) {
                 builder.clone(op, oldToCloned);
             }
-
-            assert(!(quantum && multiReturns) && "Adjoint does not support functions with multiple "
-                                                 "returns that contain a quantum register.");
         }
         else {
             // Purely classical ops are deeply cloned as-is.
@@ -261,11 +260,11 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &buil
     // Store the start, stop, and step to this op's control flow tape.
     Value tape = cache.controlFlowTapes.at(forOp);
     for (Value param : {forOp.getLowerBound(), forOp.getUpperBound(), forOp.getStep()}) {
-        builder.create<ListPushOp>(forOp.getLoc(), oldToCloned.lookupOrDefault(param), tape);
+        ListPushOp::create(builder, forOp.getLoc(), oldToCloned.lookupOrDefault(param), tape);
     }
 
-    auto newForOp = builder.create<scf::ForOp>(
-        forOp.getLoc(), oldToCloned.lookupOrDefault(forOp.getLowerBound()),
+    auto newForOp = scf::ForOp::create(
+        builder, forOp.getLoc(), oldToCloned.lookupOrDefault(forOp.getLowerBound()),
         oldToCloned.lookupOrDefault(forOp.getUpperBound()),
         oldToCloned.lookupOrDefault(forOp.getStep()), classicalInits,
         [&](OpBuilder &builder, Location loc, Value inductionVar, ValueRange iterArgs) {
@@ -299,10 +298,10 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
     // Augment the classical loop by counting the number of iterations.
     auto counterType = MemRefType::get({}, builder.getIndexType());
     Location loc = whileOp.getLoc();
-    Value idx0 = builder.create<index::ConstantOp>(loc, 0);
-    Value idx1 = builder.create<index::ConstantOp>(loc, 1);
-    Value counter = builder.create<memref::AllocaOp>(loc, counterType);
-    builder.create<memref::StoreOp>(loc, idx0, counter);
+    Value idx0 = index::ConstantOp::create(builder, loc, 0);
+    Value idx1 = index::ConstantOp::create(builder, loc, 1);
+    Value counter = memref::AllocaOp::create(builder, loc, counterType);
+    memref::StoreOp::create(builder, loc, idx0, counter);
 
     auto getRegionBuilder = [&](Region &oldRegion, bool incrementCounter) {
         return [&, incrementCounter](OpBuilder &builder, Location loc, ValueRange newRegionArgs) {
@@ -311,9 +310,9 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
             }
 
             if (incrementCounter) {
-                Value countVal = builder.create<memref::LoadOp>(loc, counter);
-                countVal = builder.create<index::AddOp>(loc, countVal, idx1);
-                builder.create<memref::StoreOp>(loc, countVal, counter);
+                Value countVal = memref::LoadOp::create(builder, loc, counter);
+                countVal = index::AddOp::create(builder, loc, countVal, idx1);
+                memref::StoreOp::create(builder, loc, countVal, counter);
             }
 
             // Recursively clone the region
@@ -322,19 +321,69 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
         };
     };
 
-    auto newWhileOp = builder.create<scf::WhileOp>(
-        whileOp.getLoc(), classicalResultTypes, classicalInits,
-        getRegionBuilder(whileOp.getBefore(), /*incrementCounter=*/false),
-        // We only care about the number of times the "After" region executes. The frontend
-        // does not support putting quantum operations in the "Before" region, which only
-        // computes the iteration condition.
-        getRegionBuilder(whileOp.getAfter(), /*incrementCounter=*/true));
+    auto newWhileOp =
+        scf::WhileOp::create(builder, whileOp.getLoc(), classicalResultTypes, classicalInits,
+                             getRegionBuilder(whileOp.getBefore(), /*incrementCounter=*/false),
+                             // We only care about the number of times the "After" region executes.
+                             // The frontend does not support putting quantum operations in the
+                             // "Before" region, which only computes the iteration condition.
+                             getRegionBuilder(whileOp.getAfter(), /*incrementCounter=*/true));
 
     mapResults(whileOp, newWhileOp, argIdxMapping);
 
-    Value numIters = builder.create<memref::LoadOp>(whileOp.getLoc(), counter);
+    Value numIters = memref::LoadOp::create(builder, whileOp.getLoc(), counter);
     Value tape = cache.controlFlowTapes.at(whileOp);
-    builder.create<ListPushOp>(whileOp.getLoc(), numIters, tape);
+    ListPushOp::create(builder, whileOp.getLoc(), numIters, tape);
+}
+
+void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder)
+{
+    auto getRegionBuilder = [&](Region &oldRegion) {
+        return [&](OpBuilder &builder, Location loc) {
+            generate(oldRegion, builder);
+            cloneTerminatorClassicalOperands(oldRegion.front().getTerminator(), builder);
+        };
+    };
+    DenseMap<unsigned, unsigned> argIdxMapping;
+    populateArgIdxMapping(switchOp.getResultTypes(), argIdxMapping);
+
+    // Cache the switch index to the current control flow tape
+    Value arg = oldToCloned.lookupOrDefault(switchOp.getArg());
+    Value tape = cache.controlFlowTapes.at(switchOp.getOperation());
+    ListPushOp::create(builder, switchOp.getLoc(), oldToCloned.lookupOrDefault(switchOp.getArg()),
+                       tape);
+
+    SmallVector<Type> classicalResultTypes;
+    for (Type ty : switchOp.getResultTypes()) {
+        if (!isQuantumType(ty)) {
+            classicalResultTypes.push_back(ty);
+        }
+    }
+
+    auto newSwitchOp = scf::IndexSwitchOp::create(builder, switchOp.getLoc(), classicalResultTypes,
+                                                  arg, switchOp.getCases(), switchOp.getNumCases());
+
+    // Case and default regions are gotten by different APIs
+    // Here we handle them separately.
+
+    // Case regions:
+    for (auto [oldCaseRegion, newCaseRegion] :
+         llvm::zip_equal(switchOp.getCaseRegions(), newSwitchOp.getCaseRegions())) {
+        OpBuilder::InsertionGuard guard(builder);
+        newCaseRegion.push_back(new Block());
+        builder.setInsertionPointToStart(&newCaseRegion.front());
+        getRegionBuilder(oldCaseRegion)(builder, switchOp.getLoc());
+    }
+
+    // Default region:
+    {
+        OpBuilder::InsertionGuard guard(builder);
+        newSwitchOp.getDefaultRegion().push_back(new Block());
+        builder.setInsertionPointToStart(&newSwitchOp.getDefaultRegion().front());
+        getRegionBuilder(switchOp.getDefaultRegion())(builder, switchOp.getLoc());
+    }
+
+    mapResults(switchOp, newSwitchOp, argIdxMapping);
 }
 
 void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builder)
@@ -352,12 +401,12 @@ void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builde
     Value condition = oldToCloned.lookupOrDefault(ifOp.getCondition());
     Value tape = cache.controlFlowTapes.at(ifOp);
     Value castedCondition =
-        builder.create<index::CastSOp>(ifOp.getLoc(), builder.getIndexType(), condition);
-    builder.create<ListPushOp>(ifOp.getLoc(), castedCondition, tape);
+        index::CastSOp::create(builder, ifOp.getLoc(), builder.getIndexType(), condition);
+    ListPushOp::create(builder, ifOp.getLoc(), castedCondition, tape);
 
     auto newIfOp =
-        builder.create<scf::IfOp>(ifOp.getLoc(), condition, getRegionBuilder(ifOp.getThenRegion()),
-                                  getRegionBuilder(ifOp.getElseRegion()));
+        scf::IfOp::create(builder, ifOp.getLoc(), condition, getRegionBuilder(ifOp.getThenRegion()),
+                          getRegionBuilder(ifOp.getElseRegion()));
 
     mapResults(ifOp, newIfOp, argIdxMapping);
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --pass-pipeline="builtin.module(disentangle-SWAP)" --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --pass-pipeline="builtin.module(disentangle-swap)" --split-input-file --verify-diagnostics | FileCheck %s
 
 
 // Explicit unit tests for all SWAP disentangling table entries
@@ -108,7 +108,7 @@
     // CHECK: [[b1:%.+]] = quantum.custom "PauliX"() [[b0]] : !quantum.bit
     // CHECK: {{%.+}} = quantum.custom "CRZ"({{%.+}}) [[a1]], [[b1]] : !quantum.bit, !quantum.bit
 
-        
+
     %9:2 = quantum.custom "SWAP"() %ONE_0, %MINUS_1 : !quantum.bit, !quantum.bit
     %user_9:2 = quantum.custom "CRZ"(%cst) %9#0, %9#1 : !quantum.bit, !quantum.bit
     // CHECK-NOT: quantum.custom "SWAP"

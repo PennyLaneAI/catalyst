@@ -18,7 +18,7 @@ Automatic qubit management refers to when the user does not specify the total nu
 during device initialization.
 
 Note that, catalyst and pennylane handles device labels differently. For example, when a new label
-    qml.gate_or_measurement(wires=1000)
+    qp.gate_or_measurement(wires=1000)
 is encountered, core pennylane considers "1000" as a pure wire label, and interprets that as
 *one* new wire, with the label "1000". However in catalyst we do not associate wires with
 arbitrary labels and require wires to be continuous integers from zero, and we would interpret this
@@ -29,7 +29,7 @@ specified during device initialization, instead of non qjit runs.
 """
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 from jax import numpy as jnp
 
 from catalyst import jacobian, qjit
@@ -42,12 +42,12 @@ def test_partial_sample(backend):
     """
 
     def circuit():
-        qml.RX(0.0, wires=0)
-        return qml.sample(wires=[0, 2])
+        qp.RX(0.0, wires=0)
+        return qp.sample(wires=[0, 2])
 
     wires = [4, None]
-    devices = [qml.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
+    devices = [qp.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -59,12 +59,12 @@ def test_partial_counts(backend):
     """
 
     def circuit():
-        qml.RX(0.0, wires=0)
-        return qml.counts(wires=[0, 2])
+        qp.RX(0.0, wires=0)
+        return qp.counts(wires=[0, 2])
 
     wires = [4, None]
-    devices = [qml.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
+    devices = [qp.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert (ref[i].shape == observed[i].shape for i in (0, 1))
     assert np.allclose(ref, observed)
 
@@ -76,12 +76,12 @@ def test_partial_probs(backend):
     """
 
     def circuit():
-        qml.PauliX(wires=0)
-        return qml.probs(wires=[0, 2])
+        qp.PauliX(wires=0)
+        return qp.probs(wires=[0, 2])
 
     wires = [4, None]
-    devices = [qml.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
+    devices = [qp.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -93,12 +93,12 @@ def test_sample(backend):
     """
 
     def circuit():
-        qml.RX(0.0, wires=3)
-        return qml.sample()
+        qp.RX(0.0, wires=3)
+        return qp.sample()
 
     wires = [4, None]
-    devices = [qml.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
+    devices = [qp.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -110,12 +110,12 @@ def test_counts(backend):
     """
 
     def circuit():
-        qml.RX(0.0, wires=3)
-        return qml.counts()
+        qp.RX(0.0, wires=3)
+        return qp.counts()
 
     wires = [4, None]
-    devices = [qml.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.set_shots(qml.qnode(dev)(circuit), shots=10))() for dev in devices)
+    devices = [qp.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
     assert (ref[i].shape == observed[i].shape for i in (0, 1))
     assert np.allclose(ref, observed)
 
@@ -127,12 +127,12 @@ def test_probs(backend):
     """
 
     def circuit():
-        qml.PauliX(wires=3)
-        return qml.probs()
+        qp.PauliX(wires=3)
+        return qp.probs()
 
     wires = [4, None]
-    devices = [qml.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    devices = [qp.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qp.qnode(dev)(circuit))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -144,12 +144,12 @@ def test_state(backend):
     """
 
     def circuit():
-        qml.PauliX(wires=3)
-        return qml.state()
+        qp.PauliX(wires=3)
+        return qp.state()
 
     wires = [4, None]
-    devices = [qml.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
+    devices = [qp.device(backend, wires=wire) for wire in wires]
+    ref, observed = (qjit(qp.qnode(dev)(circuit))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -158,13 +158,13 @@ def test_gradient(backend):
     """
     Test that a circuit with automatic qubit management can be used with gradients.
     """
-    dev = qml.device(backend)
+    dev = qp.device(backend)
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(params):
-        qml.RX(params[0], wires=1)
-        qml.RY(params[1], wires=2)
-        return qml.expval(qml.PauliZ(0))
+        qp.RX(params[0], wires=1)
+        qp.RY(params[1], wires=2)
+        return qp.expval(qp.PauliZ(0))
 
     assert jnp.allclose(jacobian(circuit)(jnp.array([0.37, 0.42])), jnp.zeros(2))

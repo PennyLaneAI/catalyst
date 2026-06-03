@@ -14,9 +14,10 @@
 
 """Tests for the OQD device."""
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 
+from catalyst import qjit
 from catalyst.third_party.oqd import OQDDevice
 
 
@@ -32,7 +33,7 @@ class TestOQDDevice:
 
         assert device.openapl_file_name == "test_openapl_generation.json"
         assert device.backend == "default"
-        assert device.wires == qml.wires.Wires(range(0, 8))
+        assert device.wires == qp.wires.Wires(range(0, 8))
 
     def test_wrong_backend(self):
         """Test the backend check."""
@@ -49,14 +50,14 @@ class TestOQDDevice:
         """Test the device preprocessing"""
         dev = OQDDevice(backend="default", wires=8)
         tranform_program, _ = dev.preprocess()
-        assert tranform_program == qml.transforms.core.TransformProgram()
+        assert tranform_program == qp.CompilePipeline()
 
     def test_preprocess_with_config(self):
         """Test the device preprocessing by explicitly passing an execution config"""
         dev = OQDDevice(backend="default", wires=8)
-        execution_config = qml.devices.ExecutionConfig()
+        execution_config = qp.devices.ExecutionConfig()
         tranform_program, config = dev.preprocess(execution_config)
-        assert tranform_program == qml.transforms.core.TransformProgram()
+        assert tranform_program == qp.CompilePipeline()
         assert config == execution_config
 
     def test_get_c_interface(self):
@@ -64,6 +65,16 @@ class TestOQDDevice:
         dev = OQDDevice(backend="default", wires=8)
         name, _ = dev.get_c_interface()
         assert name == "oqd"
+
+    def test_unsupported_one_shot_device(self):
+        """Test unsupported device edge case."""
+
+        @qp.qnode(OQDDevice(backend="default", wires=1), shots=10, mcm_method="one-shot")
+        def circuit():
+            return qp.sample()
+
+        with pytest.raises(ValueError, match="'one-shot' is not supported in the chosen device"):
+            qjit(circuit)
 
 
 if __name__ == "__main__":

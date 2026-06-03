@@ -18,7 +18,7 @@ import json
 import os
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -32,41 +32,48 @@ OQD_PIPELINES = OQDDevicePipeline(
 )
 
 
+def _count_system_stats(data):
+    """Return (num_ions, num_levels, num_transitions) from the system section."""
+    ions = data.get("system", {}).get("ions", [])
+    num_levels = sum(len(ion.get("levels", [])) for ion in ions)
+    num_transitions = sum(len(ion.get("transitions", [])) for ion in ions)
+    return len(ions), num_levels, num_transitions
+
+
+def _count_pulse_stats(parallel_protocols):
+    """Return (num_beams, num_measure_pulses) across all ParallelProtocol entries."""
+    pulses = [p for pp in parallel_protocols for p in pp.get("sequence", [])]
+    num_measure_pulses = sum(1 for p in pulses if p.get("class_") == "MeasurePulse")
+    num_beams = sum(
+        1
+        for p in pulses
+        if p.get("beam", {}).get("class_") == "Beam" and p.get("class_") != "MeasurePulse"
+    )
+    return num_beams, num_measure_pulses
+
+
 def profile_openapl(file_path):
     """Parses an OpenAPL JSON file and extracts statistics."""
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    num_parallel_protocols = 0
-    num_beams = 0
-    num_transitions = 0
-    num_levels = 0
-    num_ions = 0
-    if "system" in data and "ions" in data["system"]:
-        for ion in data["system"]["ions"]:
-            if "levels" in ion:
-                for _ in ion["levels"]:
-                    num_levels += 1
-            if "transitions" in ion:
-                for _ in ion["transitions"]:
-                    num_transitions += 1
-            num_ions += 1
-    if "protocol" in data and "sequence" in data["protocol"]:
-        for item in data["protocol"]["sequence"]:
-            if item.get("class_") == "ParallelProtocol":
-                num_parallel_protocols += 1
-                if "sequence" in item:
-                    for sub_item in item["sequence"]:
-                        if "beam" in sub_item and sub_item["beam"].get("class_") == "Beam":
-                            num_beams += 1
-    stats = {
-        "num_parallel_protocols": num_parallel_protocols,
+    num_ions, num_levels, num_transitions = _count_system_stats(data)
+
+    parallel_protocols = [
+        item
+        for item in data.get("protocol", {}).get("sequence", [])
+        if item.get("class_") == "ParallelProtocol"
+    ]
+    num_beams, num_measure_pulses = _count_pulse_stats(parallel_protocols)
+
+    return {
+        "num_parallel_protocols": len(parallel_protocols),
         "num_beams": num_beams,
+        "num_measure_pulses": num_measure_pulses,
         "num_transitions": num_transitions,
         "num_levels": num_levels,
         "num_ions": num_ions,
     }
-    return stats
 
 
 def verify_json(correct_file_name, expected_file_name):
@@ -92,11 +99,11 @@ class TestTargetGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit(x):
-            qml.RX(x, wires=0)
-            return qml.counts(wires=0)
+            qp.RX(x, wires=0)
+            return qp.counts(wires=0)
 
         circuit(np.pi / 2)
 
@@ -108,11 +115,11 @@ class TestTargetGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit(x):
-            qml.RY(x, wires=0)
-            return qml.counts(wires=0)
+            qp.RY(x, wires=0)
+            return qp.counts(wires=0)
 
         circuit(np.pi / 2)
 
@@ -138,12 +145,12 @@ class TestChainedGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.RX(np.pi / 2, wires=0)
-            qml.RY(np.pi / 2, wires=0)
-            return qml.counts(wires=0)
+            qp.RX(np.pi / 2, wires=0)
+            qp.RY(np.pi / 2, wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -163,11 +170,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=2, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.CNOT(wires=[0, 1])
-            return qml.counts(wires=0)
+            qp.CNOT(wires=[0, 1])
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -179,11 +186,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.Hadamard(wires=0)
-            return qml.counts(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -199,11 +206,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.PauliZ(wires=0)
-            return qml.counts(wires=0)
+            qp.PauliZ(wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -219,11 +226,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.PhaseShift(np.pi / 4, wires=0)
-            return qml.counts(wires=0)
+            qp.PhaseShift(np.pi / 4, wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -239,11 +246,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.RZ(np.pi / 4, wires=0)
-            return qml.counts(wires=0)
+            qp.RZ(np.pi / 4, wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -259,11 +266,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.T(wires=0)
-            return qml.counts(wires=0)
+            qp.T(wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -279,11 +286,11 @@ class TestDecomposableGates:
         oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit():
-            qml.S(wires=0)
-            return qml.counts(wires=0)
+            qp.S(wires=0)
+            return qp.counts(wires=0)
 
         circuit()
 
@@ -304,21 +311,48 @@ class TestComplexCircuits:
         oqd_dev = OQDDevice(backend="default", wires=wires, openapl_file_name=tmp_openapl_file_name)
 
         @qjit(pipelines=OQD_PIPELINES)
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
         def circuit(basis_state):
-            qml.BasisState(basis_state, wires=range(wires))
-            qml.QFT(wires=range(wires))
-            return qml.counts(wires=0)
+            qp.BasisState(basis_state, wires=range(wires))
+            qp.QFT(wires=range(wires))
+            return qp.counts(wires=0)
 
         circuit(np.array([0, 1]))
 
         stats = profile_openapl(oqd_dev.openapl_file_name)
         assert stats["num_ions"] == 2
-        assert stats["num_parallel_protocols"] == 54
-        assert stats["num_beams"] == 128
+        assert stats["num_parallel_protocols"] == 42
+        assert stats["num_beams"] == 104
         assert stats["num_transitions"] == 8
         assert stats["num_levels"] == 8
+
+
+class TestMeasurement:
+    """Test OQD device OpenAPL generation for measurement."""
+
+    def test_measurement(self, tmp_openapl_file_name):
+        """Test OpenAPL generation for a mid-circuit measurement."""
+
+        oqd_dev = OQDDevice(backend="default", wires=1, openapl_file_name=tmp_openapl_file_name)
+
+        @qjit(pipelines=OQD_PIPELINES)
+        @qp.set_shots(4)
+        @qp.qnode(oqd_dev)
+        def circuit():
+            qp.RX(np.pi / 2, wires=0)
+            qp.measure(wires=0)
+            return qp.counts(wires=0)
+
+        circuit()
+
+        stats = profile_openapl(oqd_dev.openapl_file_name)
+        assert stats["num_ions"] == 1
+        assert stats["num_transitions"] == 4
+        assert stats["num_levels"] == 4
+        assert stats["num_parallel_protocols"] == 2
+        assert stats["num_beams"] == 2
+        assert stats["num_measure_pulses"] == 1
 
 
 if __name__ == "__main__":

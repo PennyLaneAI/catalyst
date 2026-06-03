@@ -14,7 +14,7 @@
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import cond, measure, qjit, while_loop
@@ -28,9 +28,9 @@ class TestWireTypes:
         """Test that wires can be a 32-bit integer."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=1))
         def circuit(w):
-            qml.PauliX(0)
+            qp.PauliX(0)
             return measure(w)
 
         assert circuit(jnp.array(0, dtype=dtype)) == 1
@@ -44,12 +44,12 @@ class TestBasicCircuits:
         """Test operations."""
 
         def circuit(arg0: float, arg1: int, arg2: int):
-            qml.RX(arg0, wires=[arg1])
-            qml.RX(arg0, wires=[arg2])
-            return qml.state()
+            qp.RX(arg0, wires=[arg1])
+            qp.RX(arg0, wires=[arg2])
+            return qp.state()
 
-        result = qjit(qml.qnode(qml.device(backend, wires=3))(circuit))(*args)
-        expected = qml.qnode(qml.device("default.qubit", wires=3))(circuit)(*args)
+        result = qjit(qp.qnode(qp.device(backend, wires=3))(circuit))(*args)
+        expected = qp.qnode(qp.device("default.qubit", wires=3))(circuit)(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
@@ -57,12 +57,12 @@ class TestBasicCircuits:
         """Test operations with computation."""
 
         def circuit(arg0: float, arg1: int, arg2: int):
-            qml.RX(arg0, wires=[arg1])
-            qml.RX(arg0, wires=[arg2 + 1])
-            return qml.state()
+            qp.RX(arg0, wires=[arg1])
+            qp.RX(arg0, wires=[arg2 + 1])
+            return qp.state()
 
-        result = qjit(qml.qnode(qml.device(backend, wires=3))(circuit))(*args)
-        expected = qml.qnode(qml.device("default.qubit", wires=3))(circuit)(*args)
+        result = qjit(qp.qnode(qp.device(backend, wires=3))(circuit))(*args)
+        expected = qp.qnode(qp.device("default.qubit", wires=3))(circuit)(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
@@ -70,15 +70,13 @@ class TestBasicCircuits:
         """Test measurements."""
 
         def circuit(arg0: float, w1: int, w2: int):
-            qml.RX(arg0, wires=w1)
-            return qml.sample(wires=w2)
+            qp.RX(arg0, wires=w1)
+            return qp.sample(wires=w2)
 
-        result = qjit(qml.set_shots(qml.qnode(qml.device(backend, wires=3))(circuit), shots=10))(
+        result = qjit(qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10))(*args)
+        expected = qp.set_shots(qp.qnode(qp.device("default.qubit", wires=3))(circuit), shots=10)(
             *args
         )
-        expected = qml.set_shots(
-            qml.qnode(qml.device("default.qubit", wires=3))(circuit), shots=10
-        )(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
@@ -86,15 +84,13 @@ class TestBasicCircuits:
         """Test measurements with computation."""
 
         def circuit(arg0: float, w1: int, w2: int):
-            qml.RX(arg0, wires=w1)
-            return qml.sample(wires=[w2 + 1])
+            qp.RX(arg0, wires=w1)
+            return qp.sample(wires=[w2 + 1])
 
-        result = qjit(qml.set_shots(qml.qnode(qml.device(backend, wires=3))(circuit), shots=10))(
+        result = qjit(qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10))(*args)
+        expected = qp.set_shots(qp.qnode(qp.device("default.qubit", wires=3))(circuit), shots=10)(
             *args
         )
-        expected = qml.set_shots(
-            qml.qnode(qml.device("default.qubit", wires=3))(circuit), shots=10
-        )(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[jnp.pi, 0, 1], [jnp.pi, 1, 0]])
@@ -102,7 +98,7 @@ class TestBasicCircuits:
         """Test observables."""
 
         def circuit(arg0: float, w1: int, w2: int):
-            qml.RX(arg0, wires=w1)
+            qp.RX(arg0, wires=w1)
             A = np.array(
                 [
                     [complex(2.0, 0.0), complex(1.0, 1.0), complex(9.0, 2.0), complex(0.0, 0.0)],
@@ -111,10 +107,10 @@ class TestBasicCircuits:
                     [complex(0.0, 0.0), complex(3.0, 2.0), complex(1.0, -7.0), complex(4.0, 0.0)],
                 ]
             )
-            return qml.expval(qml.Hermitian(A, wires=[w1, w2]))
+            return qp.expval(qp.Hermitian(A, wires=[w1, w2]))
 
-        result = qjit(qml.qnode(qml.device(backend, wires=2))(circuit))(*args)
-        expected = qml.qnode(qml.device("default.qubit", wires=2))(circuit)(*args)
+        result = qjit(qp.qnode(qp.device(backend, wires=2))(circuit))(*args)
+        expected = qp.qnode(qp.device("default.qubit", wires=2))(circuit)(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[jnp.pi, 0, 0]])
@@ -122,7 +118,7 @@ class TestBasicCircuits:
         """Test observables with computation."""
 
         def circuit(arg0: float, w1: int, w2: int):
-            qml.RX(arg0, wires=w1)
+            qp.RX(arg0, wires=w1)
             A = np.array(
                 [
                     [complex(2.0, 0.0), complex(1.0, 1.0), complex(9.0, 2.0), complex(0.0, 0.0)],
@@ -131,21 +127,21 @@ class TestBasicCircuits:
                     [complex(0.0, 0.0), complex(3.0, 2.0), complex(1.0, -7.0), complex(4.0, 0.0)],
                 ]
             )
-            return qml.expval(qml.Hermitian(A, wires=[w1 + 1, w2]))
+            return qp.expval(qp.Hermitian(A, wires=[w1 + 1, w2]))
 
-        result = qjit(qml.qnode(qml.device(backend, wires=2))(circuit))(*args)
-        expected = qml.qnode(qml.device("default.qubit", wires=2))(circuit)(*args)
+        result = qjit(qp.qnode(qp.device(backend, wires=2))(circuit))(*args)
+        expected = qp.qnode(qp.device("default.qubit", wires=2))(circuit)(*args)
         assert np.allclose(result, expected)
 
     def test_reinsertion_before_dynamic_wires(self, backend):
         """Test reinsertion before dynamic wires."""
 
-        @qml.qnode(qml.device(backend, wires=7))
+        @qp.qnode(qp.device(backend, wires=7))
         def circuit(qb):
             # Without reinsertion the Rot gate would be folded away as it produces a dangling qubit.
-            qml.Rot(0.3, 0.4, 0.5, wires=0)
-            qml.CNOT(wires=[qb, 2])
-            return qml.state()
+            qp.Rot(0.3, 0.4, 0.5, wires=0)
+            qp.CNOT(wires=[qb, 2])
+            return qp.state()
 
         dyn_qubit = 1
         result = qjit(circuit)(jnp.array(dyn_qubit))
@@ -164,7 +160,7 @@ class TestControlFlow:
         """Test conditional."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: int, y: int):
             @cond(x > 4)
             def cond_fn():
@@ -172,7 +168,7 @@ class TestControlFlow:
 
             @cond_fn.otherwise
             def else_fn():
-                qml.RX(jnp.pi, wires=y)
+                qp.RX(jnp.pi, wires=y)
 
             cond_fn()
             return measure(wires=x)
@@ -186,11 +182,11 @@ class TestControlFlow:
         """Test while loop with func arg wires."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2))
+        @qp.qnode(qp.device(backend, wires=2))
         def circuit(n: int, m: int):
             @while_loop(lambda v: v[0] < v[1])
             def loop(v):
-                qml.RX(jnp.pi, wires=m)
+                qp.RX(jnp.pi, wires=m)
                 return v[0] + 1, v[1]
 
             loop((0, n))
@@ -213,13 +209,13 @@ class TestControlFlow:
         """Test while loop with loop arg wires."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=5))
+        @qp.qnode(qp.device(backend, wires=5))
         def circuit(n: int, m: int):
-            qml.RX(jnp.pi, wires=0)
+            qp.RX(jnp.pi, wires=0)
 
             @while_loop(lambda v: v[0] < v[1])
             def loop(v):
-                qml.CNOT(wires=[0, v[0]])
+                qp.CNOT(wires=[0, v[0]])
                 return v[0] + 1, v[1]
 
             loop((1, n))

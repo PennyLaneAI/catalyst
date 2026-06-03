@@ -14,20 +14,21 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
+import numpy as np
+import pennylane as qp
 
 from catalyst import measure, qjit
 
 
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
+@qp.qnode(qp.device("lightning.qubit", wires=2))
 # CHECK-LABEL @f.jit
 def f(arg0: float, arg1: int, arg2: int):
     # CHECK:   [[reg0:%.+]] = quantum.alloc( 2)
     # CHECK:   [[w0_0:%.+]] = tensor.extract %arg1
     # CHECK:   [[q_w0_0:%.+]] = quantum.extract [[reg0]][[[w0_0]]]
     # CHECK:   [[q_w0_1:%.+]] = quantum.custom "RZ"({{%.+}}) [[q_w0_0]]
-    qml.RZ(arg0, wires=[arg1])
+    qp.RZ(arg0, wires=[arg1])
     # CHECK:   [[w0_1:%.+]] = tensor.extract %arg1
     # CHECK:   [[reg1:%.+]] = quantum.insert [[reg0]][[[w0_1]]], [[q_w0_1]]
     # CHECK:   [[w1_0:%.+]] = tensor.extract %arg2
@@ -42,3 +43,28 @@ def f(arg0: float, arg1: int, arg2: int):
 
 
 print(f.mlir)
+
+# -----
+
+
+@qjit(target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=2))
+# CHECK-LABEL: public @g()
+def g():
+    """
+    Test no extraneous insert ops.
+    """
+    wires = np.arange(2, dtype=int)
+
+    # CHECK: quantum.custom "PauliX"
+    qp.X(wires[0])
+
+    # CHECK-NOT: quantum.insert
+
+    # CHECK: quantum.custom "PauliY"
+    qp.Y(wires[1])
+
+    return
+
+
+print(g.mlir)

@@ -13,13 +13,7 @@
 # limitations under the License.
 """Unit test module for the graph state utils"""
 
-# pylint: disable=wrong-import-position
-
 import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 from pennylane.exceptions import CompileError
 
 from catalyst.python_interface.transforms.mbqc.graph_state_utils import (
@@ -29,6 +23,8 @@ from catalyst.python_interface.transforms.mbqc.graph_state_utils import (
     get_num_aux_wires,
     n_vertices_from_packed_adj_matrix,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 @pytest.fixture(scope="module", name="mbqc_single_qubit_graph")

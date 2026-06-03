@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum/IR/QuantumOps.h"
+#include "Gradient/Transforms/annotate_invalid_gradient_functions.h"
+
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -20,11 +21,11 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/annotate_invalid_gradient_functions.h"
-#include "stablehlo/dialect/StablehloOps.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -119,6 +120,11 @@ std::optional<FunctionOpInterface> getCallee(CallGraphNode::Edge edge, CallGraph
 
 bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &cg)
 {
+    if (!op.getCallableRegion()) {
+        // No need to annotate if the func has no callable regions
+        return false;
+    }
+
     Region &region = op->getRegion(0);
     CallGraphNode *node = cg.lookupNode(&region);
     assert(node && "An incorrect region was used to look up a node in the callgraph.");
@@ -135,12 +141,14 @@ bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &c
         // We can get better precision by using one of the many callgraph analyses.
         // See Sundaresan, Vijay, et al. "Practical virtual method call resolution for Java." ACM
         // SIGPLAN Notices 35.10 (2000): 264-280.
-        if (!maybeCallee)
+        if (!maybeCallee) {
             return true;
+        }
 
         FunctionOpInterface calleeOp = maybeCallee.value();
-        if (isAnnotated(calleeOp, attr))
+        if (isAnnotated(calleeOp, attr)) {
             return true;
+        }
     }
     return false;
 }

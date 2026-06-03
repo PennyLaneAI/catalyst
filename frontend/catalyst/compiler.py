@@ -14,6 +14,7 @@
 """This module contains functions for lowering, compiling, and linking
 MLIR/LLVM representations.
 """
+
 import glob
 import importlib
 import io
@@ -88,8 +89,9 @@ class LinkerDriver:
 
         # Adds RUNTIME_LIB_DIR to the Python system path to allow the catalyst_callback_registry
         # to be importable.
-        sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-        import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+        sys.path.append(rt_lib_path)
+        # pylint: disable=import-outside-toplevel
+        import catalyst_callback_registry as registry  # type: ignore[import-not-found]
 
         # We use MLIR's C runner utils library in the registry.
         # In order to be able to dlopen that library we need to know the path
@@ -170,6 +172,8 @@ class LinkerDriver:
             f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
+            "-lrt_rsdecomp",
+            "-lrt_decoder",
         ]
 
         # If OQD runtime capi is built, link to it as well
@@ -258,8 +262,11 @@ class LinkerDriver:
             fallback_compilers = LinkerDriver._default_fallback_compilers
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
             success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
+            if options.verbose:
+                print("Shared object linking successful", file=options.logfile)
             if success:
                 return outfile
+
         msg = f"Unable to link {infile}. Please check the output for any error messages. If no "
         msg += "compiler was found by Catalyst, please specify a compatible one via $CATALYST_CC."
         raise CompileError(msg)
@@ -284,7 +291,7 @@ def _get_catalyst_cli_cmd(*args, stdin=None):
     return cmd
 
 
-def _catalyst(*args, stdin=None):
+def _catalyst(*args, stdin=None, text=True):
     """Raw interface to catalyst
 
     echo ${stdin} | catalyst *args -
@@ -292,19 +299,19 @@ def _catalyst(*args, stdin=None):
     """
     cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
     try:
-        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=text)
         return result.stdout
     except subprocess.CalledProcessError as e:
         raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
 
-def _quantum_opt(*args, stdin=None):
+def _quantum_opt(*args, stdin=None, text=True):
     """Raw interface to quantum-opt
 
     echo ${stdin} | catalyst --tool=opt *args -
     catalyst --tool=opt *args
     """
-    return _catalyst(("--tool", "opt"), *args, stdin=stdin)
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text)
 
 
 def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
@@ -381,7 +388,11 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
 
 
 def to_mlir_opt(
-    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
+    *args,
+    stdin=None,
+    options: Optional[CompileOptions] = None,
+    using_python_compiler=False,
+    workspace=None,
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     # Check if we need to use the Python interface for xDSL passes
@@ -398,6 +409,8 @@ def to_mlir_opt(
         return _quantum_opt(*args, stdin=stdin)
 
     opts = _options_to_cli_flags(options)
+    if workspace is not None:
+        opts += [("--workspace", str(workspace))]
     return _quantum_opt(*opts, *args, stdin=stdin)
 
 
@@ -429,6 +442,7 @@ class Compiler:
         )
         return cmd
 
+    # pylint: disable=too-many-branches
     @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
@@ -448,9 +462,6 @@ class Compiler:
             workspace, Directory
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
-        assert (
-            self.options.lower_to_llvm
-        ), "lower_to_llvm must be set to True in order to compile to a shared object"
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
@@ -483,8 +494,11 @@ class Compiler:
         else:
             out_IR = None
 
-        output = LinkerDriver.run(output_object_name, options=self.options)
-        output_object_name = str(pathlib.Path(output).absolute())
+        if self.options.link:
+            output = LinkerDriver.run(output_object_name, options=self.options)
+            output = str(pathlib.Path(output).absolute())
+        else:
+            output = None
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
@@ -492,7 +506,7 @@ class Compiler:
         if os.path.exists(output_ir_name):
             os.remove(output_ir_name)
 
-        return output_object_name, out_IR
+        return output, out_IR
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.

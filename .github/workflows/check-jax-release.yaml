@@ -70,7 +70,7 @@ jobs:
       run: |
         make llvm
 
-    - name: Build MHLO
+    - name: Build StableHLO
       run: |
         make stablehlo
 

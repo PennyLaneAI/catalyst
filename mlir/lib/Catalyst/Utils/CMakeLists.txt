@@ -1,6 +1,7 @@
 add_mlir_library(MLIRCatalystUtils
     CallGraph.cpp
-    EnsureFunctionDeclaration.cpp
+    ConstantResolve.cpp
+    JSONUtils.cpp
     PrintVersion.cpp
     SCFUtils.cpp
     StaticAllocas.cpp

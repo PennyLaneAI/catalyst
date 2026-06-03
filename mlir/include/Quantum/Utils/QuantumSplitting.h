@@ -14,6 +14,13 @@
 
 #pragma once
 
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/IR/Value.h"
+
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/IR/CatalystOps.h"
+#include "Quantum/IR/QuantumInterfaces.h"
+
 namespace catalyst {
 namespace quantum {
 
@@ -54,6 +61,7 @@ class AugmentedCircuitGenerator {
     void visitOperation(mlir::scf::ForOp forOp, mlir::OpBuilder &builder);
     void visitOperation(mlir::scf::WhileOp forOp, mlir::OpBuilder &builder);
     void visitOperation(mlir::scf::IfOp forOp, mlir::OpBuilder &builder);
+    void visitOperation(mlir::scf::IndexSwitchOp indexSwitchOp, mlir::OpBuilder &builder);
 
     void cloneTerminatorClassicalOperands(mlir::Operation *terminator, mlir::OpBuilder &builder);
 
@@ -66,8 +74,8 @@ class AugmentedCircuitGenerator {
     template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, mlir::OpBuilder &builder)
     {
         if (!op.getIdxAttr().has_value()) {
-            builder.create<ListPushOp>(op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
-                                       cache.wireVector);
+            ListPushOp::create(builder, op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
+                               cache.wireVector);
         }
     }
 

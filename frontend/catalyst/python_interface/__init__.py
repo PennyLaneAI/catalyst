@@ -14,14 +14,14 @@
 """Unified Compiler API for integration of Catalyst with xDSL."""
 
 from .compiler import Compiler
-from .inspection import QMLCollector, mlir_specs
+from .inspection import QMLCollector
 from .parser import QuantumParser
-from .pass_api import compiler_transform
+from .pass_api import CompilationPass, compiler_transform
 
 __all__ = [
+    "CompilationPass",
     "Compiler",
     "compiler_transform",
     "QuantumParser",
     "QMLCollector",
-    "mlir_specs",
 ]

@@ -1,0 +1,2892 @@
+# Copyright 2025 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Unit tests for the ConstructCircuitDAG utility."""
+
+# pylint: disable=unused-argument, unused-variable, too-many-public-methods, too-many-lines
+
+import re
+from unittest.mock import MagicMock, Mock
+
+import jax
+import pennylane as qp
+import pytest
+from xdsl.dialects import builtin, func, test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir import Operation
+from xdsl.ir.core import Block, Region
+
+from catalyst import measure
+from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
+from catalyst.python_interface.inspection.construct_circuit_dag import (
+    ConstructCircuitDAG,
+    VisualizationError,
+    get_label,
+)
+from catalyst.python_interface.inspection.dag_builder import DAGBuilder
+
+pytestmark = pytest.mark.xdsl
+
+
+# pylint: disable=missing-function-docstring
+class FakeDAGBuilder(DAGBuilder):
+    """
+    A concrete implementation of DAGBuilder used ONLY for testing.
+    It stores all graph manipulation calls in data structures
+    for easy assertion of the final graph state.
+    """
+
+    def __init__(self):
+        self._nodes = {}
+        self._edges = {}
+        self._clusters = {}
+
+        self._node_counter = 0
+        self._cluster_counter = 0
+
+    def add_node(self, label, cluster_uid=None, **attrs) -> str:
+        uid = f"node{self._node_counter}"
+        self._node_counter += 1
+        self._nodes[uid] = {
+            "uid": uid,
+            "label": label,
+            "parent_cluster_uid": cluster_uid,
+            "attrs": attrs,
+        }
+
+        return uid
+
+    def add_edge(self, from_uid: str, to_uid: str, **attrs) -> None:
+        # O(1) look up
+        edge_key = (from_uid, to_uid)
+        self._edges[edge_key] = {
+            "attrs": attrs,
+        }
+
+    def add_cluster(
+        self,
+        label=None,
+        cluster_uid=None,
+        **attrs,
+    ) -> str:
+        uid = f"cluster{self._cluster_counter}"
+        self._cluster_counter += 1
+        self._clusters[uid] = {
+            "uid": uid,
+            "label": label,
+            "parent_cluster_uid": cluster_uid,
+            "attrs": attrs,
+        }
+        return uid
+
+    @property
+    def nodes(self):
+        return self._nodes
+
+    @property
+    def edges(self):
+        return self._edges
+
+    @property
+    def clusters(self):
+        return self._clusters
+
+    def to_file(self, output_filename):
+        pass
+
+    def to_string(self) -> str:
+        return "graph"
+
+
+def test_dependency_injection():
+    """Tests that relevant dependencies are injected."""
+
+    mock_dag_builder = Mock(DAGBuilder)
+    utility = ConstructCircuitDAG(mock_dag_builder)
+    assert utility.dag_builder is mock_dag_builder
+
+
+def test_does_not_mutate_module():
+    """Test that the module is not mutated."""
+
+    # Create module
+    op = test.TestOp()
+    block = Block(ops=[op])
+    region = Region(blocks=[block])
+    container_op = test.TestOp(regions=[region])
+    module_op = ModuleOp(ops=[container_op])
+
+    # Save state before
+    module_op_str_before = str(module_op)
+
+    # Process module
+    mock_dag_builder = Mock(DAGBuilder)
+    utility = ConstructCircuitDAG(mock_dag_builder)
+    utility.construct(module_op)
+
+    # Ensure not mutated
+    assert str(module_op) == module_op_str_before
+
+
+def assert_dag_structure(nodes, edges, expected_edges):
+    """
+    Validates graph structure using gate names instead of UIDs - this will make
+    the tests more agnostic to the order the operations appear in the IR which
+    is sensitive to how it was captured and lowered.
+
+    """
+    name_to_uid = {}
+
+    # Pattern explanation:
+    # 1. Look for <name> then capture everything up to a |
+    # 2. OR: if no <name> is found, capture the entire string
+    gate_pattern = re.compile(r"<name>\s+([^|]+)|(^[^|]+$)")
+
+    # NOTE: Specifically requires that all nodes (operators / measurements) are unique in the test
+    for uid, node_info in nodes.items():
+        label = node_info["label"]
+        match = gate_pattern.search(label)
+
+        if match:
+            # group(1) is the <name> match (e.g. X, H, Toffoli)
+            # group(2) is the standard string match (e.g. NullQubit)
+            gate_name = (match.group(1) or match.group(2)).strip()
+            name_to_uid[gate_name] = uid
+        else:
+            name_to_uid[label] = uid
+
+    assert len(edges) == len(
+        expected_edges
+    ), f"Expected {len(expected_edges)} edges, got {len(edges)}."
+
+    for edge in expected_edges:
+        start_name, end_name = edge[0], edge[1]
+        u_start = name_to_uid.get(start_name, start_name)
+        u_end = name_to_uid.get(end_name, end_name)
+
+        # Check connection
+        assert (
+            u_start,
+            u_end,
+        ) in edges, f"Missing expected edge {start_name} -> {end_name} ({u_start}, {u_end})."
+
+        # Check attrs
+        edge_attrs = {}
+        if len(edge) > 2:
+            edge_attrs: dict = edge[2]
+        if edge_attrs:
+            actual_edge_attrs = edges[(u_start, u_end)]["attrs"]
+            for attr_key, expected_val in edge_attrs.items():
+                actual_val = actual_edge_attrs.get(attr_key)
+                assert (
+                    actual_val == expected_val
+                ), f"Expected {attr_key}='{expected_val}', got '{actual_val}'."
+
+
+class TestFuncOpVisualization:
+    """Tests the visualization of FuncOps with bounding boxes"""
+
+    def test_external_empty_function_visualization_error(self):
+        """Regression test for #2541 issue."""
+
+        external_func = func.FuncOp.external("test_func", [], [])
+        module = builtin.ModuleOp(ops=[external_func])
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        expected_error = (
+            r"Calls to functions without a definition are not yet compatible.*test_func"
+        )
+        with pytest.raises(VisualizationError, match=expected_error):
+            utility.construct(module)
+
+    def test_standard_qnode(self, capture_mode):
+        """Tests that a standard QJIT'd QNode is visualized correctly"""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_clusters = utility.dag_builder.clusters
+
+        # Check nesting is correct
+        # graph
+        # └── qjit
+        #     └── my_workflow
+
+        # Check qjit is nested under graph
+        assert graph_clusters["cluster0"]["label"] == "qjit"
+        assert graph_clusters["cluster0"]["parent_cluster_uid"] is None
+
+        # Check that my_workflow is under qjit
+        assert graph_clusters["cluster1"]["label"] == "my_workflow"
+        assert graph_clusters["cluster1"]["parent_cluster_uid"] == "cluster0"
+
+    def test_nested_qnodes(self, capture_mode):
+        """Tests that nested QJIT'd QNodes are visualized correctly"""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qnode(dev)
+        def my_qnode2():
+            qp.X(0)
+
+        @qp.qnode(dev)
+        def my_qnode1():
+            qp.H(0)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        def my_workflow():
+            my_qnode1()
+            my_qnode2()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_clusters = utility.dag_builder.clusters
+
+        # Check nesting is correct
+        # graph
+        # └── qjit
+        #     ├── my_qnode1
+        #     └── my_qnode2
+
+        # Check qjit is under graph
+        assert graph_clusters["cluster0"]["label"] == "qjit"
+        assert graph_clusters["cluster0"]["parent_cluster_uid"] is None
+
+        # Check both qnodes are under my_workflow
+        assert graph_clusters["cluster1"]["label"] == "my_qnode1"
+        assert graph_clusters["cluster1"]["parent_cluster_uid"] == "cluster0"
+
+        assert graph_clusters["cluster2"]["label"] == "my_qnode2"
+        assert graph_clusters["cluster2"]["parent_cluster_uid"] == "cluster0"
+
+
+class TestDeviceNode:
+    """Tests that the device node is correctly visualized."""
+
+    def test_standard_qnode(self, capture_mode):
+        """Tests that a standard setup works."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_nodes = utility.dag_builder.nodes
+        graph_clusters = utility.dag_builder.clusters
+
+        # Check nesting is correct
+        # graph
+        # └── qjit
+        #     └── my_workflow: NullQubit
+
+        # Assert device node is inside my_workflow cluster
+        assert graph_clusters["cluster1"]["label"] == "my_workflow"
+        assert graph_nodes["node0"]["parent_cluster_uid"] == "cluster1"
+
+        # Assert label is as expected
+        assert graph_nodes["node0"]["label"] == "NullQubit"
+
+    def test_nested_qnodes(self, capture_mode):
+        """Tests that nested QJIT'd QNodes are visualized correctly"""
+
+        dev1 = qp.device("null.qubit", wires=1)
+        dev2 = qp.device("lightning.qubit", wires=1)
+
+        @qp.qnode(dev2)
+        def my_qnode2():
+            qp.X(0)
+
+        @qp.qnode(dev1)
+        def my_qnode1():
+            qp.H(0)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        def my_workflow():
+            my_qnode1()
+            my_qnode2()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_nodes = utility.dag_builder.nodes
+        graph_clusters = utility.dag_builder.clusters
+
+        # Check nesting is correct
+        # graph
+        # └── qjit
+        #     ├── my_qnode1: NullQubit
+        #     └── my_qnode2: LightningSimulator
+
+        # Assert lightning.qubit device node is inside my_qnode1 cluster
+        assert graph_clusters["cluster1"]["label"] == "my_qnode1"
+        assert graph_nodes["node0"]["parent_cluster_uid"] == "cluster1"
+
+        # Assert label is as expected
+        assert graph_nodes["node0"]["label"] == "NullQubit"
+
+        # Assert null qubit device node is inside my_qnode2 cluster
+        assert graph_clusters["cluster2"]["label"] == "my_qnode2"
+        # NOTE: node1 is the qp.H(0) in my_qnode1
+        assert graph_nodes["node2"]["parent_cluster_uid"] == "cluster2"
+
+        # Assert label is as expected
+        assert graph_nodes["node2"]["label"] == "LightningSimulator"
+
+
+class TestForOp:
+    """Tests that the for loop control flow can be visualized correctly."""
+
+    def test_basic_example(self, capture_mode):
+        """Tests that the for loop cluster can be visualized correctly."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            for i in range(3):
+                qp.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["label"] == "for loop"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+    def test_nested_loop(self, capture_mode):
+        """Tests that nested for loops are visualized correctly."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            for i in range(0, 5, 2):
+                for j in range(1, 6, 2):
+                    qp.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["label"] == "for loop"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster3"]["label"] == "for loop"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+
+
+class TestWhileOp:
+    """Tests that the while loop control flow can be visualized correctly."""
+
+    def test_basic_example(self, capture_mode):
+        """Test that the while loop is visualized correctly."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            counter = 0
+            while counter < 5:
+                qp.H(0)
+                counter += 1
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["label"] == "while loop"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+    def test_nested_loop(self, capture_mode):
+        """Tests that nested while loops are visualized correctly."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            outer_counter = 0
+            inner_counter = 0
+            while outer_counter < 5:
+                while inner_counter < 6:
+                    qp.H(0)
+                    inner_counter += 1
+                outer_counter += 1
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["label"] == "while loop"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster3"]["label"] == "while loop"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+
+
+class TestIfOp:
+    """Tests that the conditional control flow can be visualized correctly."""
+
+    def test_basic_example(self, capture_mode):
+        """Test that the conditional operation is visualized correctly."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x):
+            if x == 2:
+                qp.X(0)
+            else:
+                qp.Y(0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        # Check conditional is a cluster within cluster1 (my_workflow)
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+        # Check three clusters live within cluster2 (conditional)
+        assert clusters["cluster3"]["label"] == "if"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["label"] == "else"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+
+    def test_if_elif_else_conditional(self, capture_mode):
+        """Test that the conditional operation is visualized correctly."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x):
+            if x == 1:
+                qp.X(0)
+            elif x == 2:
+                qp.Y(0)
+            else:
+                qp.Z(0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        # Check conditional is a cluster within my_workflow
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+        # Check three clusters live within conditional
+        assert clusters["cluster3"]["label"] == "if"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["label"] == "elif"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["label"] == "else"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
+
+    def test_nested_conditionals(self, capture_mode):
+        """Tests that nested conditionals are visualized correctly."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x, y):
+            if x == 1:
+                if y == 2:
+                    qp.H(0)
+                else:
+                    qp.Z(0)
+                qp.X(0)
+            else:
+                qp.Z(0)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        # cluster2 -> conditional (1)
+        #   cluster3 -> if
+        #       cluster4 -> conditional ()
+        #           cluster5 -> if
+        #           cluster6 -> else
+        #   cluster7 -> else
+
+        # Check first conditional is a cluster within my_workflow
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+        # Check 'if' cluster of first conditional has another conditional
+        assert clusters["cluster3"]["label"] == "if"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+
+        # Second conditional
+        assert clusters["cluster4"]["label"] == "conditional"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster3"
+        # Check 'if' and 'else' in second conditional
+        assert clusters["cluster5"]["label"] == "if"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster4"
+        assert clusters["cluster6"]["label"] == "else"
+        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster4"
+
+        # Check nested if / else is within the first if cluster
+        assert clusters["cluster7"]["label"] == "else"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
+
+    def test_nested_conditionals_with_quantum_ops(self, capture_mode):
+        """Tests that nested conditionals are unflattend if quantum operations
+        are present"""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x):
+            if x == 1:
+                qp.X(0)
+            elif x == 2:
+                qp.Y(0)
+            else:
+                qp.Z(0)
+                if x == 3:
+                    qp.RX(0, 0)
+                elif x == 4:
+                    qp.RY(0, 0)
+                else:
+                    qp.RZ(0, 0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        #     node0 -> NullQubit
+        #     cluster2 -> conditional (1)
+        #       cluster3 -> if
+        #           node1 -> X(0)
+        #       cluster4 -> elif
+        #           node2 -> Y(0)
+        #       cluster5 -> else
+        #           node3 -> Z(0)
+        #           cluster6 -> conditional (2)
+        #               cluster7 -> if
+        #                    node4 -> RX(0,0)
+        #               cluster8 -> elif
+        #                    node5 -> RY(0,0)
+        #               cluster9 -> else
+        #                    node6 -> RZ(0,0)
+
+        # check outer conditional (1)
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster3"]["label"] == "if"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["label"] == "elif"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["label"] == "else"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
+
+        # Nested conditional (2) inside conditional (1)
+        assert clusters["cluster6"]["label"] == "conditional"
+        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
+        assert clusters["cluster7"]["label"] == "if"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster6"
+        assert clusters["cluster8"]["label"] == "elif"
+        assert clusters["cluster8"]["parent_cluster_uid"] == "cluster6"
+        assert clusters["cluster9"]["label"] == "else"
+        assert clusters["cluster9"]["parent_cluster_uid"] == "cluster6"
+
+    def test_nested_conditionals_with_nested_quantum_ops(self, capture_mode):
+        """Tests that nested conditionals are unflattend if quantum operations
+        are present but nested in other operations"""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x):
+            if x == 1:
+                qp.X(0)
+            elif x == 2:
+                qp.Y(0)
+            else:
+                for i in range(3):
+                    qp.Z(0)
+                if x == 3:
+                    qp.RX(0, 0)
+                elif x == 4:
+                    qp.RY(0, 0)
+                else:
+                    qp.RZ(0, 0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        #     node0 -> NullQubit
+        #     cluster2 -> conditional (1)
+        #       cluster3 -> if
+        #           node1 -> X(0)
+        #       cluster4 -> elif
+        #           node2 -> Y(0)
+        #       cluster5 -> else
+        #           cluster6 -> for loop
+        #               node3 -> Z(0)
+        #           cluster7 -> conditional (2)
+        #               cluster8 -> if
+        #                    node4 -> RX(0,0)
+        #               cluster9 -> elif
+        #                    node5 -> RY(0,0)
+        #               cluster10 -> else
+        #                    node6 -> RZ(0,0)
+
+        # check outer conditional (1)
+        assert clusters["cluster2"]["label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster3"]["label"] == "if"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["label"] == "elif"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["label"] == "else"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
+
+        # Nested conditional (2) inside conditional (1)
+        assert clusters["cluster6"]["label"] == "for loop"
+        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
+
+        assert clusters["cluster7"]["label"] == "conditional"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster5"
+        assert clusters["cluster8"]["label"] == "if"
+        assert clusters["cluster8"]["parent_cluster_uid"] == "cluster7"
+        assert clusters["cluster9"]["label"] == "elif"
+        assert clusters["cluster9"]["parent_cluster_uid"] == "cluster7"
+        assert clusters["cluster10"]["label"] == "else"
+        assert clusters["cluster10"]["parent_cluster_uid"] == "cluster7"
+
+
+class TestGetLabel:
+    """Tests the get_label utility."""
+
+    @pytest.mark.parametrize(
+        "op, label",
+        [
+            (qp.H(0), "<name> Hadamard|<wire> [0]"),
+            (
+                qp.QubitUnitary([[0, 1], [1, 0]], 0),
+                "<name> QubitUnitary|<wire> [0]",
+            ),
+            (qp.SWAP([0, 1]), "<name> SWAP|<wire> [0, 1]"),
+        ],
+    )
+    def test_standard_operator(self, op, label):
+        """Tests against an operator instance."""
+        assert get_label(op) == label
+
+    def test_global_phase_operator(self):
+        """Tests against a GlobalPhase operator instance."""
+        assert get_label(qp.GlobalPhase(0.5)) == "GlobalPhase"
+        assert (
+            get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> C(GlobalPhase)|<wire> [0]"
+        )
+        assert get_label(qp.adjoint(qp.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
+
+    @pytest.mark.parametrize(
+        "meas, label",
+        [
+            (qp.state(), "<name> state|<wire> all"),
+            (qp.expval(qp.Z(0)), "<name> expval(PauliZ)|<wire> [0]"),
+            (qp.var(qp.Z(0)), "<name> var(PauliZ)|<wire> [0]"),
+            (qp.probs(), "<name> probs|<wire> all"),
+            (qp.probs(wires=0), "<name> probs|<wire> [0]"),
+            (qp.probs(wires=[0, 1]), "<name> probs|<wire> [0, 1]"),
+            (qp.sample(), "<name> sample|<wire> all"),
+            (qp.sample(wires=0), "<name> sample|<wire> [0]"),
+            (qp.sample(wires=[0, 1]), "<name> sample|<wire> [0, 1]"),
+        ],
+    )
+    def test_standard_measurement(self, meas, label):
+        """Tests against an operator instance."""
+        assert get_label(meas) == label
+
+
+class TestCreateStaticOperatorNodes:
+    """Tests that operators with static parameters can be created and visualized as nodes."""
+
+    @pytest.mark.parametrize("dialect", ["quantum", "pbc", "mbqc"])
+    def test_unsupported_non_skipped_op_raises_visualization_error(self, dialect):
+        """Tests that an unknown non-skipped operator raises an error."""
+
+        unknown_op = MagicMock(spec=Operation)
+        unknown_op.dialect_name.return_value = dialect
+        unknown_op.name = f"{dialect}.fake_unsupported_nonskipped_op"
+        unknown_op.__class__ = type("FakeQuantumOp", (Operation,), {})
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        with pytest.raises(
+            VisualizationError, match=rf"{dialect}.fake_unsupported_nonskipped_op.*not supported"
+        ):
+            # pylint: disable=protected-access
+            utility._visit_operation(unknown_op)
+
+    def test_custom_op(self, capture_mode):
+        """Tests that the CustomOp operation node can be created and visualized."""
+
+        # Build module with only a CustomOp
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            qp.H(0)
+            qp.SWAP([0, 1])
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operators
+
+        # Make sure label has relevant info
+        assert nodes["node1"]["label"] == get_label(qp.H(0))
+        assert nodes["node2"]["label"] == get_label(qp.SWAP([0, 1]))
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {},
+            {"wires": 0},
+            {"wires": [0, 1]},
+        ],
+    )
+    def test_global_phase_op(self, kwargs, capture_mode):
+        """Test that GlobalPhase can be handled."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            qp.GlobalPhase(0.5, **kwargs)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + operator
+
+        # Compiler throws out the wires and they get converted to wires=[] no matter what
+        assert nodes["node1"]["label"] == "GlobalPhase"
+
+    def test_qubit_unitary_op(self, capture_mode):
+        """Test that QubitUnitary operations can be handled."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            qp.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)  # real
+            qp.QubitUnitary(jax.numpy.array([[1, 0], [0, 1j]]), wires=0)  # complex
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operators
+
+        assert nodes["node1"]["label"] == get_label(qp.QubitUnitary([[0, 1], [1, 0]], wires=0))
+        assert nodes["node2"]["label"] == get_label(qp.QubitUnitary([[1, 0], [0, 1j]], wires=0))
+
+    def test_multi_rz_op(self, capture_mode):
+        """Test that MultiRZ operations can be handled."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            qp.MultiRZ(0.5, wires=[0])
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == get_label(qp.MultiRZ(0.5, wires=[0]))
+
+    def test_projective_measurement_op(self, capture_mode):
+        """Test that projective measurements can be captured as nodes."""
+        dev = qp.device("null.qubit", wires=1)
+
+        if capture_mode:
+            fn = qp.measure
+        else:
+            fn = measure
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            fn(0)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == "<name> MidMeasureMP|<wire> [0]"
+
+    def test_ppm(self):
+        """Test that PPMs can be captured as nodes."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=True)
+        @qp.qnode(dev)
+        def my_circuit():
+            qp.pauli_measure("X", wires=[0])
+            qp.pauli_measure(pauli_word="XY", wires=[0, 1])
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == "<name> PPM-X|<wire> [0]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
+        assert nodes["node2"]["label"] == "<name> PPM-XY|<wire> [0, 1]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
+
+    @pytest.mark.parametrize("negative_angle", [True, False])
+    def test_ppr(self, negative_angle):
+        """Tests that a PPR node can be created."""
+        pipe = [("pipe", ["quantum-compilation-stage"])]
+
+        multiplier = -1 if negative_angle else 1
+
+        @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+        @qp.transform(pass_name="to-ppr")
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def cir():
+            qp.PauliRot(multiplier * jax.numpy.pi, pauli_word="YZ", wires=[0, 1])
+            qp.PauliRot(multiplier * jax.numpy.pi / 4, pauli_word="X", wires=[0])
+            qp.PauliRot(multiplier * jax.numpy.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+
+        module = parse_generic_to_xdsl_module(cir.mlir_opt)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 4  # Device node + operator
+
+        sign_str = "-" if negative_angle else ""
+        assert nodes["node1"]["label"] == f"<name> PPR-YZ ({sign_str}π/2)|<wire> [0, 1]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#D9D9D9"
+        assert nodes["node2"]["label"] == f"<name> PPR-X ({sign_str}π/8)|<wire> [0]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#E3FFA1"
+        assert nodes["node3"]["label"] == f"<name> PPR-XYZ ({sign_str}π/4)|<wire> [0, 1, 2]"
+        assert nodes["node3"]["attrs"]["fillcolor"] == "#F5BD70"
+
+    def test_ppr_arbitary(self):
+        """Tests that a PPR node can be created."""
+
+        pipe = [("pipe", ["quantum-compilation-stage"])]
+
+        @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+        @qp.transform(pass_name="to-ppr")
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def cir():
+            # NOTE: use angle != pi / <something>
+            # to get an pbc.ppr.arbitary in the IR
+            qp.PauliRot(1.0, pauli_word="X", wires=[0])
+            qp.PauliRot(1.0, pauli_word="XYZ", wires=[0, 1, 2])
+
+        module = parse_generic_to_xdsl_module(cir.mlir_opt)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == "<name> PPR-X (φ)|<wire> [0]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#E3FFA1"
+        assert nodes["node2"]["label"] == "<name> PPR-XYZ (φ)|<wire> [0, 1, 2]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#E3FFA1"
+
+    def test_pauli_rot(self):
+        """Tests that a PauliRot node can be created."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=True)
+        @qp.qnode(dev)
+        def my_circuit():
+            qp.PauliRot(0.5, "X", wires=0)
+            qp.PauliRot(1.5, "XYZ", wires=[0, 1, 2])
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == "<name> PauliRot|<wire> [0]"
+        assert nodes["node2"]["label"] == "<name> PauliRot|<wire> [0, 1, 2]"
+
+    def test_complex_measurements(self):
+        """Tests that complex measurements can be created."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, capture=True)
+        @qp.qnode(dev)
+        def my_workflow():
+            coeffs = [0.2, -0.543]
+            obs = [qp.X(0) @ qp.Z(1), qp.Z(0) @ qp.Hadamard(2)]
+            ham = qp.ops.LinearCombination(coeffs, obs)
+
+            return (
+                qp.expval(ham),
+                qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)),
+                qp.expval(2 * qp.X(0)),
+            )
+
+        module = my_workflow()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 4  # Device node + measurements
+
+        assert nodes["node1"]["label"] == "<name> expval(LinearCombination)|<wire> [0, 1, 2]"
+        assert nodes["node2"]["label"] == "<name> expval(Prod)|<wire> [0, 1]"
+        assert nodes["node3"]["label"] == "<name> expval(SProd)|<wire> [0]"
+
+    @pytest.mark.parametrize(
+        "param, wires",
+        (
+            (jax.numpy.array([1, 0]), [0]),
+            (jax.numpy.array([1, 0, 0, 0]), [0, 1]),
+            (jax.numpy.array([1, 0, 0, 0, 1, 0, 0, 0]), [0, 1, 2]),
+        ),
+    )
+    def test_state_prep(self, param, wires, capture_mode):
+        """Tests that state preparation operators can be captured as nodes."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            qp.StatePrep(param, wires=wires)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> StatePrep|<wire> {wires}"
+
+    @pytest.mark.parametrize(
+        "param, wires",
+        (
+            (jax.numpy.array([1]), [0]),
+            (jax.numpy.array([1, 0]), [0, 1]),
+            (jax.numpy.array([1, 0, 0]), [0, 1, 2]),
+        ),
+    )
+    def test_basis_state(self, param, wires, capture_mode):
+        """Tests that basis state operators can be captured as nodes."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            qp.BasisState(param, wires=wires)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> BasisState|<wire> {wires}"
+
+
+class TestCreateDynamicOperatorNodes:
+    """Tests that operator nodes with dynamic parameters or wires can be created and visualized."""
+
+    def test_static_dynamic_mix(self, capture_mode):
+        """Tests that static and dynamic wires can both be used."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit(x):
+            qp.SWAP([0, x])
+
+        args = (1,)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + SWAP
+
+        assert nodes["node1"]["label"] == "<name> SWAP|<wire> [0, arg0]"
+
+    def test_qnode_argument(self, capture_mode):
+        """Tests that qnode arguments can be used as wires."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit(x, y):
+            qp.H(x)
+            qp.X(y)
+
+        args = (1, 2)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + H + X
+
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
+        assert nodes["node2"]["label"] == "<name> PauliX|<wire> [arg1]"
+
+    def test_for_loop_variable(self, capture_mode):
+        """Tests that for loop iteration variables can be used as wires."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            for i in range(3):
+                qp.H(i)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + H
+
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
+
+    def test_while_loop_variable(self, capture_mode):
+        """Tests that while loop variables can be used as wires."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            counter = 0
+            while counter < 5:
+                qp.H(counter)
+                counter += 1
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + H
+
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
+
+    def test_conditional_variable(self, capture_mode):
+        """Tests that conditional variables can be used."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit(x, y):
+            if x == y:
+                qp.H(x)
+
+        args = (1, 2)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + H
+
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
+
+    def test_through_clusters(self, capture_mode):
+        """Tests that dynamic wire labels can be accessed through clusters."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit(x):
+            for i in range(3):
+                qp.H(x)
+                qp.X(i)
+
+        args = (1,)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + H + X
+
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
+        assert nodes["node2"]["label"] == "<name> PauliX|<wire> [arg1]"
+
+    def test_visualize_pythonic_operators(self, capture_mode):
+        """Tests that we can use operators like +,-,%"""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x):
+            qp.RX(x % 3, wires=x % 3)
+            qp.RY(x - 3, wires=x - 3)
+            qp.RZ(x + 3, wires=x + 3)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 4  # Device node + ops
+
+        assert nodes["node1"]["label"] == "<name> RX|<wire> [(arg0 % 3)]"
+        assert nodes["node2"]["label"] == "<name> RY|<wire> [(arg0 - 3)]"
+        assert nodes["node3"]["label"] == "<name> RZ|<wire> [(arg0 + 3)]"
+
+    def test_ppm_dynamic(self):
+        """Test that PPMs can be captured as nodes."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=True)
+        @qp.qnode(dev)
+        def my_circuit(x, y):
+            qp.pauli_measure("X", wires=[x])
+            qp.pauli_measure(pauli_word="XY", wires=[y, 0])
+
+        module = my_circuit(1, 2)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == "<name> PPM-X|<wire> [arg0]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
+        assert nodes["node2"]["label"] == "<name> PPM-XY|<wire> [arg1, 0]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
+
+
+class TestCreateStaticMeasurementNodes:
+    """Tests that measurements with static parameters can be created and visualized as nodes."""
+
+    def test_state_op(self, capture_mode):
+        """Test that qp.state can be handled."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            return qp.state()
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == get_label(qp.state())
+
+    @pytest.mark.parametrize("meas_fn", [qp.expval, qp.var])
+    def test_expval_var_measurement_op(self, meas_fn, capture_mode):
+        """Test that statistical measurement operators can be captured as nodes."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            return meas_fn(qp.Z(0))
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + measurement
+
+        assert nodes["node1"]["label"] == get_label(meas_fn(qp.Z(0)))
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {},
+            {"wires": 0},
+            {"wires": [0, 1]},
+        ],
+    )
+    def test_probs_measurement_op(self, kwargs, capture_mode):
+        """Tests that the probs measurement function can be captured as a node."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            return qp.probs(**kwargs)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + probs
+
+        assert nodes["node1"]["label"] == get_label(qp.probs(**kwargs))
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {},
+            {"wires": 0},
+            {"wires": [0, 1]},
+        ],
+    )
+    def test_valid_sample_measurement_op(self, kwargs, capture_mode):
+        """Tests that the sample measurement function can be captured as a node."""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.set_shots(10)
+        @qp.qnode(dev)
+        def my_circuit():
+            return qp.sample(**kwargs)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + sample
+
+        assert nodes["node1"]["label"] == get_label(qp.sample(**kwargs))
+
+
+class TestCreateDynamicMeasurementNodes:
+    """Tests that measurements on dynamic wires render correctly."""
+
+    def test_static_dynamic_mix(self, capture_mode):
+        """Tests that static and dynamic wires can both be used."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit(x):
+            return qp.probs(wires=[0, x])
+
+        args = (1,)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + probs
+
+        assert nodes["node1"]["label"] == "<name> probs|<wire> [0, arg0]"
+
+    def test_qnode_argument(self, capture_mode):
+        """Tests that qnode arguments can be used as wires."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.set_shots(10)
+        @qp.qnode(dev)
+        def my_circuit(x, y):
+            return (
+                qp.probs(wires=x),
+                qp.expval(qp.Z(x)),
+                qp.var(qp.X(y)),
+                qp.sample(wires=x),
+            )
+
+        args = (1, 2)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 5  # Device node + probs + expval + var + sample
+
+        assert nodes["node1"]["label"] == "<name> probs|<wire> [arg0]"
+        assert nodes["node2"]["label"] == "<name> expval(PauliZ)|<wire> [arg0]"
+        assert nodes["node3"]["label"] == "<name> var(PauliX)|<wire> [arg1]"
+        assert nodes["node4"]["label"] == "<name> sample|<wire> [arg0]"
+
+    def test_visualize_pythonic_operators_on_meas(self, capture_mode):
+        """Tests that we can use operators like +,-,%"""
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.set_shots(3)
+        @qp.qnode(dev)
+        def my_workflow(x):
+            return qp.probs(wires=[x % 3, x - 3, x + 3]), qp.sample(wires=[x % 3, x - 3, x + 3])
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + meas
+
+        assert nodes["node1"]["label"] == "<name> probs|<wire> [(arg0 % 3), (arg0 - 3), (arg0 + 3)]"
+        assert (
+            nodes["node2"]["label"] == "<name> sample|<wire> [(arg0 % 3), (arg0 - 3), (arg0 + 3)]"
+        )
+
+
+class TestOperatorConnectivity:
+    """Tests that operators are properly connected."""
+
+    def test_global_phase_connectivity(self, capture_mode):
+        """Tests the connectivity of the global phase operator."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_circuit():
+            qp.X(0)
+            qp.GlobalPhase(0.5)
+            qp.adjoint(qp.GlobalPhase(0.5))
+            qp.ctrl(qp.GlobalPhase, control=0)(0.5)
+            qp.Y(0)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # Ensure disjoint globalphase nodes show up
+        assert "GlobalPhase" in nodes["node2"]["label"]
+        assert "Adjoint(GlobalPhase)" in nodes["node3"]["label"]
+
+        # Ensure proper connectivity
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("PauliX", "C(GlobalPhase)"),
+            ("C(GlobalPhase)", "PauliY"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_static_connection_within_cluster(self, capture_mode):
+        """Tests that connections can be made within the same cluster."""
+
+        dev = qp.device("null.qubit", wires=3)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.X(0)
+            qp.Z(1)
+            qp.Y(0)
+            qp.H(1)
+            qp.S(1)
+            qp.T(2)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check edges
+        #           -> X -> Y
+        # NullQubit -> Z -> H -> S
+        #           -> T
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "PauliZ"),
+            ("NullQubit", "T"),
+            ("PauliX", "PauliY"),
+            ("PauliZ", "Hadamard"),
+            ("Hadamard", "S"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_static_connection_through_for_loop(self, capture_mode):
+        """Tests that connections can be made through a for loop cluster."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.X(0)
+            for i in range(3):
+                qp.Y(0)
+            qp.Z(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+
+        # Check edges
+        #                   for loop
+        # NullQubit -> X ----> Y ----> Z
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("PauliX", "PauliY"),
+            ("PauliY", "PauliZ"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_static_connection_through_while_loop(self, capture_mode):
+        """Tests that connections can be made through a while loop cluster."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            counter = 0
+            qp.X(0)
+            while counter < 5:
+                qp.Y(0)
+                counter += 1
+            qp.Z(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+
+        # Check edges
+        #                    while loop
+        # NullQubit -> X ------> Y ------> Z
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("PauliX", "PauliY"),
+            ("PauliY", "PauliZ"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_static_connection_through_conditional(self, capture_mode):
+        """Tests that connections through conditionals make sense."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x):
+            qp.X(0)
+            qp.T(1)
+            if x == 1:
+                qp.RX(0, 0)
+                qp.S(1)
+            elif x == 2:
+                qp.RY(0, 0)
+            else:
+                qp.RZ(0, 0)
+            qp.H(0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "T"),
+            ("T", "S"),
+            ("PauliX", "RX"),
+            ("PauliX", "RY"),
+            ("PauliX", "RZ"),
+            ("RX", "Hadamard"),
+            ("RY", "Hadamard"),
+            ("RZ", "Hadamard"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_static_connection_through_nested_conditional(self, capture_mode):
+        """Tests that connections through nested conditionals make sense."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x):
+            qp.X(0)
+            qp.T(1)
+            if x == 1:
+                if x == 3:
+                    qp.Y(1)
+                else:
+                    qp.Z(0)
+            else:
+                qp.RZ(0, 0)
+            qp.H(0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "T"),
+            ("T", "PauliY"),
+            ("PauliX", "Hadamard"),
+            ("PauliX", "RZ"),
+            ("PauliX", "PauliZ"),
+            ("RZ", "Hadamard"),
+            ("PauliZ", "Hadamard"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_multi_wire_connectivity(self, capture_mode):
+        """Ensures that multi wire connectivity holds."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.RX(0.1, 0)
+            qp.RY(0.2, 1)
+            qp.RZ(0.3, 2)
+            qp.CNOT(wires=[0, 1])
+            qp.Toffoli(wires=[1, 2, 0])
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "RX"),
+            ("NullQubit", "RY"),
+            ("NullQubit", "RZ"),
+            ("RX", "CNOT"),
+            ("RY", "CNOT"),
+            ("CNOT", "Toffoli"),
+            ("RZ", "Toffoli"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_dynamic_wire_connectivity(self, capture_mode):
+        """Tests standard scenario of interweaving static and dynamic operators."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x, y):
+            qp.X(0)
+            qp.Y(1)
+            qp.Z(2)
+            qp.H(x)
+            qp.S(0)
+            qp.T(2)
+            qp.RY(0, y)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "PauliY"),
+            ("NullQubit", "PauliZ"),
+            # choke into the dynamic hadamard
+            ("PauliX", "Hadamard", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("PauliZ", "Hadamard", {"style": "dashed"}),
+            # fan out to static ops
+            ("Hadamard", "S"),
+            ("Hadamard", "T"),
+            # choke again
+            ("S", "RY", {"style": "dashed"}),
+            ("T", "RY", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_first_operator_is_dynamic(self, capture_mode):
+        """Tests when the first operator is dynamic"""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x, y):
+            qp.H(x)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "Hadamard" in nodes["node1"]["label"]
+
+        # Check all edges
+        assert len(edges) == 1
+        assert ("node0", "node1") in edges
+
+    def test_double_choke(self, capture_mode):
+        """Tests when two dynamic operators are back to back"""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x, y):
+            qp.X(0)
+            qp.Y(x)
+            qp.Z(y)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliZ" in nodes["node3"]["label"]
+
+        # Check all edges
+        assert len(edges) == 3
+        assert ("node0", "node1") in edges
+        assert ("node1", "node2") in edges
+        assert ("node2", "node3") in edges
+        assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
+
+    def test_complex_connectivity_for_loop(self, capture_mode):
+        """Tests a complicated connectivity through a for loop."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(a, b):
+            qp.X(a)
+            for i in range(3):
+                qp.H(0)
+                qp.Y(i)
+            qp.S(0)
+            qp.Z(b)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "Hadamard"),
+            ("Hadamard", "PauliY", {"style": "dashed"}),
+            ("PauliY", "S"),
+            ("S", "PauliZ", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_while_loop(self, capture_mode):
+        """Tests a complicated connectivity through a while loop."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(a, b):
+            qp.X(a)
+            counter = 0
+            while counter < 5:
+                qp.H(0)
+                qp.Y(counter)
+                counter += 1
+            qp.S(0)
+            qp.Z(b)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "Hadamard"),
+            ("Hadamard", "PauliY", {"style": "dashed"}),
+            ("PauliY", "S"),
+            ("S", "PauliZ", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_basic_static_conditional(self, capture_mode):
+        """Tests a basic static example of a conditional."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(a):
+            if a == 2:
+                qp.X(0)
+            elif a == 3:
+                qp.Y(0)
+            else:
+                qp.Z(0)
+            qp.H(a)
+
+        module = my_workflow(1)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "PauliY"),
+            ("NullQubit", "PauliZ"),
+            ("PauliX", "Hadamard", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("PauliZ", "Hadamard", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_basic_static_conditional_in_between_dynamic(self, capture_mode):
+        """Tests a basic static example of a conditional."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(a, b):
+            qp.S(b)
+            if a == 2:
+                qp.X(0)
+            elif a == 3:
+                qp.Y(0)
+            else:
+                qp.Z(0)
+            qp.H(a)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "S", {"style": "dashed"}),
+            ("S", "PauliX"),
+            ("S", "PauliY"),
+            ("S", "PauliZ"),
+            ("PauliX", "Hadamard", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("PauliZ", "Hadamard", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_basic_dynamic_conditional(self, capture_mode):
+        """Tests a basic example of a conditional with dynamic wires."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(a, b, c):
+            qp.H(0)
+            if a == 2:
+                qp.X(a)
+            elif a == b:
+                qp.Y(c)
+            else:
+                qp.Z(c)
+            qp.S(0)
+
+        module = my_workflow(1, 2, 3)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "Hadamard"),
+            ("Hadamard", "PauliX", {"style": "dashed"}),
+            ("Hadamard", "PauliY", {"style": "dashed"}),
+            ("Hadamard", "PauliZ", {"style": "dashed"}),
+            ("PauliX", "S"),
+            ("PauliY", "S"),
+            ("PauliZ", "S"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_connectivity_through_simple_if(self, capture_mode):
+        """Tests that a simple if can be visualized."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(a):
+            qp.H(0)
+            if a == 2:
+                qp.X(a)
+                qp.Y(0)
+            qp.Z(0)
+
+        module = my_workflow(1)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "Hadamard"),
+            ("Hadamard", "PauliX", {"style": "dashed"}),
+            ("PauliX", "PauliY"),
+            ("PauliY", "PauliZ"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_if_elif_else(self, capture_mode):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(a, b, c):
+            qp.X(a)
+            if a == 2:
+                qp.H(0)
+                qp.Y(1)
+            elif a == b:
+                qp.T(c)
+            else:
+                qp.Z(b)
+            qp.S(0)
+            qp.RZ(0, b)
+
+        module = my_workflow(1, 2, 3)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "Hadamard"),
+            ("PauliX", "PauliY"),
+            ("PauliX", "T", {"style": "dashed"}),
+            ("PauliX", "PauliZ", {"style": "dashed"}),
+            ("Hadamard", "S"),
+            ("T", "S"),
+            ("PauliZ", "S"),
+            ("S", "RZ", {"style": "dashed"}),
+            ("PauliY", "RZ", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_nested_if_with_else(self, capture_mode):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(a, b):
+            qp.X(a)
+            qp.S(0)
+            if a == 2:
+                if b == 2:
+                    qp.RX(0, 0)
+            else:
+                qp.Y(0)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "S"),
+            ("S", "RX"),
+            ("S", "PauliY"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_nested_if(self, capture_mode):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(a, b):
+            qp.X(a)
+            if a == 2:
+                qp.H(0)
+                if b == 2:
+                    qp.RX(0, 0)
+                qp.Y(1)
+            qp.S(0)
+            return qp.probs()
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "Hadamard"),
+            ("Hadamard", "RX"),
+            ("RX", "S"),
+            ("PauliX", "PauliY"),
+            ("PauliY", "probs", {"style": "dashed"}),
+            ("S", "probs", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_conditional_inside_control_flow(self, capture_mode):
+        """Tests the interaction with conditional inside of control flow"""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(x, y):
+            qp.X(0)
+            qp.Y(1)
+            qp.H(x)
+
+            for i in range(3):
+                qp.S(0)
+                if i == 3:
+                    qp.T(0)
+
+            qp.RY(0, x)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "PauliY"),
+            ("PauliX", "Hadamard", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("Hadamard", "S"),
+            ("S", "T"),
+            ("T", "RY", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_conditional_dynamic_branching_static_node_after(
+        self, capture_mode
+    ):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(x, y):
+            if x == y:
+                qp.Y(0)
+            else:
+                qp.Z(x)
+            qp.H(0)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliY"),
+            ("NullQubit", "PauliZ", {"style": "dashed"}),
+            ("PauliY", "Hadamard"),
+            ("PauliZ", "Hadamard"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_conditional_dynamic_branching_static_and_dyn_node_after(
+        self, capture_mode
+    ):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(x, y):
+            if x == y:
+                qp.Y(0)
+            else:
+                qp.Z(x)
+            qp.H(0)
+            qp.X(x)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliY"),
+            ("NullQubit", "PauliZ", {"style": "dashed"}),
+            ("PauliY", "Hadamard"),
+            ("PauliZ", "Hadamard"),
+            ("Hadamard", "PauliX", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_conditional_dynamic_branching_no_node_before(self, capture_mode):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(x, y):
+            if x == y:
+                qp.Y(0)
+            else:
+                qp.Z(x)
+            qp.H(y)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliY"),
+            ("NullQubit", "PauliZ", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("PauliZ", "Hadamard", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_conditional_dynamic_branching(self, capture_mode):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def my_workflow(x, y):
+            qp.X(x)
+            if x == y:
+                qp.Y(0)
+            else:
+                qp.Z(x)
+            qp.H(y)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "PauliY"),
+            ("PauliX", "PauliZ", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("PauliZ", "Hadamard", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+
+class TestTerminalMeasurementConnectivity:
+    """Test that terminal measurements connect properly."""
+
+    @pytest.mark.parametrize("meas_fn", [qp.probs, qp.state])
+    def test_connect_all_wires(self, meas_fn, capture_mode):
+        """Tests connection to terminal measurements that operate on all wires."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.X(0)
+            qp.T(1)
+            return meas_fn()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "T" in nodes["node2"]["label"]
+        assert meas_fn.__name__ in nodes["node3"]["label"]
+
+        # Check all edges
+        assert len(edges) == 4
+        assert ("node0", "node1") in edges
+        assert ("node0", "node2") in edges
+        assert ("node1", "node3") in edges
+        assert ("node2", "node3") in edges
+
+    def test_connect_specific_wires(self, capture_mode):
+        """Tests connection to terminal measurements that operate on specific wires."""
+
+        dev = qp.device("null.qubit", wires=5)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.set_shots(10)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.X(0)
+            qp.Y(1)
+            qp.Z(2)
+            qp.H(3)
+            return (
+                qp.expval(qp.Z(0)),
+                qp.var(qp.Z(1)),
+                qp.probs(wires=[2]),
+                qp.sample(wires=[3]),
+            )
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliZ" in nodes["node3"]["label"]
+        assert "Hadamard" in nodes["node4"]["label"]
+        assert "expval" in nodes["node5"]["label"]
+        assert "var" in nodes["node6"]["label"]
+        assert "probs" in nodes["node7"]["label"]
+        assert "sample" in nodes["node8"]["label"]
+
+        # Check all edges
+        assert len(edges) == 8
+        assert ("node0", "node1") in edges
+        assert ("node0", "node2") in edges
+        assert ("node0", "node3") in edges
+        assert ("node0", "node4") in edges
+        assert ("node1", "node5") in edges
+        assert ("node2", "node6") in edges
+        assert ("node3", "node7") in edges
+        assert ("node4", "node8") in edges
+
+    def test_multi_wire_connectivity(self, capture_mode):
+        """Ensures that multi wire connectivity holds."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.X(0)
+            qp.Y(1)
+            return qp.probs(wires=[0, 1])
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "probs" in nodes["node3"]["label"]
+
+        # Check all edges
+        assert len(edges) == 4
+        assert ("node0", "node1") in edges
+        assert ("node0", "node2") in edges
+        assert ("node1", "node3") in edges
+        assert ("node2", "node3") in edges
+
+    def test_no_quantum_ops_before_measurement(self, capture_mode):
+        """Tests a workflow with no quantum operations."""
+
+        dev = qp.device("null.qubit", wires=2)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_empty_workflow():
+            return qp.expval(qp.Z(0))
+
+        module = my_empty_workflow()
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+
+        assert len(edges) == 1
+        # Node0 = NullQubit
+        assert ("node0", "node1") in edges
+
+    def test_terminal_measurement_after_static_dyn_op_mix(self, capture_mode):
+        """Tests that a terminal measurement on a mix of dynamic and static wires connects."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x, y):
+            qp.X(0)
+            qp.Y(x)
+            qp.Z(y)
+            return qp.probs(wires=[0, x])
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliZ" in nodes["node3"]["label"]
+        assert "probs" in nodes["node4"]["label"]
+
+        # Check all edges
+        assert len(edges) == 4
+        assert ("node0", "node1") in edges
+        assert ("node1", "node2") in edges
+        assert edges[("node1", "node2")]["attrs"]["style"] == "dashed"
+        assert ("node2", "node3") in edges
+        assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
+        assert ("node3", "node4") in edges
+
+    def test_terminal_measurement_static_dyn_mix(self, capture_mode):
+        """Tests that a terminal measurement on a mix of dynamic and static wires connects."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x, y):
+            qp.X(0)
+            qp.Y(0)
+            for i in range(3):
+                qp.H(i)
+            return qp.expval(qp.Z(x))
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "Hadamard" in nodes["node3"]["label"]
+        assert "expval(PauliZ)" in nodes["node4"]["label"]
+
+        # Check all edges
+        assert len(edges) == 4
+        assert ("node0", "node1") in edges
+        assert ("node1", "node2") in edges
+        assert ("node2", "node3") in edges
+        assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
+        assert ("node3", "node4") in edges
+        assert edges[("node3", "node4")]["attrs"]["style"] == "dashed"
+
+    def test_terminal_measurement_dyn_after_static(self, capture_mode):
+        """Tests that a terminal measurement on a mix of dynamic and static wires connects."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x, y):
+            qp.X(x)
+            qp.Y(0)
+            return qp.expval(qp.Z(y))
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "expval(PauliZ)" in nodes["node3"]["label"]
+
+        # Check all edges
+        assert len(edges) == 3
+        assert ("node0", "node1") in edges
+        assert ("node1", "node2") in edges
+        assert ("node2", "node3") in edges
+        assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
+
+    def test_no_term_meas_interconnectivity(self, capture_mode):
+        """Tests that terminal measurements don't connect amongst themselves."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow(x, y):
+            return qp.probs(), qp.expval(qp.Z(0)), qp.expval(qp.X(x))
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # Check all edges
+        # Node0 is NullQubit
+        assert len(edges) == 3
+        assert ("node0", "node1") in edges
+        assert edges[("node0", "node1")]["attrs"]["style"] == "dashed"
+        assert ("node0", "node2") in edges
+        assert ("node0", "node3") in edges
+        assert edges[("node0", "node3")]["attrs"]["style"] == "dashed"
+
+
+class TestCtrl:
+    """Tests that the ctrl transform is visualized correctly."""
+
+    def test_ctrl_function(self, capture_mode):
+        """Test that the ctrl of a function works."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        def op():
+            return qp.H(0)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.ctrl(op, control=1)()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert "CH" in nodes["node1"]["label"]
+        assert "[1, 0]" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+
+    def test_ctrl_operator_instance(self, capture_mode):
+        """Test that the ctrl of an operator instance works."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.ctrl(qp.H(0), control=1)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert "CH" in nodes["node1"]["label"]
+        assert "[1, 0]" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+
+    def test_ctrl_operator_type(self, capture_mode):
+        """Test that the ctrl of an operator instance works."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.ctrl(qp.H, control=1)(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert "CH" in nodes["node1"]["label"]
+        assert "[1, 0]" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+
+    def test_ctrl_operator_without_alias(self, capture_mode):
+        """Test that the ctrl of an operator instance that doesn't have an alias works."""
+
+        dev = qp.device("null.qubit", wires=2)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            # Use two control wires so we avoid the CH alias
+            qp.ctrl(qp.H(0), control=[1, 2])
+            qp.ctrl(qp.H, control=[1, 2])(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert "C(Hadamard)" in nodes["node1"]["label"]
+        assert "[1, 2, 0]" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+        assert "C(Hadamard)" in nodes["node2"]["label"]
+        assert "[1, 2, 0]" in nodes["node2"]["label"]
+        assert nodes["node2"]["parent_cluster_uid"] == "cluster1"
+
+
+class TestAdjoint:
+    """Tests that the ctrl transform is visualized correctly."""
+
+    def test_adjoint_function(self, capture_mode):
+        """Test that the adjoint of a function works."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        def op():
+            return qp.H(0)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.adjoint(op)()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        nodes = utility.dag_builder.nodes
+
+        assert len(nodes) == 2
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["label"] == "adjoint"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert "Hadamard" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
+
+    def test_adjoint_operator_instance(self, capture_mode):
+        """Test that the adjoint of an operator instance works."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.adjoint(qp.T(0))
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+
+        # Because it is an operator instance, no cluster needed
+        assert "Adjoint(T)" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+
+    def test_adjoint_operator_type(self, capture_mode):
+        """Test that the adjoint of an operator instance works."""
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qnode(dev)
+        def my_workflow():
+            qp.adjoint(qp.H)(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["label"] == "adjoint"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert "Hadamard" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

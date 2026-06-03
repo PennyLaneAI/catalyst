@@ -18,7 +18,7 @@
 // Native Gradients //
 //////////////////////
 
-func.func private @circuit.nodealloc(%arg0: f32) -> (!quantum.reg, f64)
+func.func private @circuit.nodealloc(%arg0: f32) -> (!quantum.reg)
 
 // CHECK-DAG:   llvm.func @__catalyst__rt__toggle_recorder(i1)
 // CHECK-DAG:   llvm.func @__catalyst__qis__Gradient(i64, ...)
@@ -29,7 +29,7 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
     // CHECK-DAG:   [[F:%.+]] = llvm.mlir.constant(false) : i1
 
     // CHECK:       llvm.call @__catalyst__rt__toggle_recorder([[T]]) : (i1) -> ()
-    // CHECK:       [[QREG_and_expval:%.+]]:2 = call @circuit.nodealloc(%arg0)
+    // CHECK:       [[QREG:%.+]] = call @circuit.nodealloc(%arg0)
     // CHECK:       llvm.call @__catalyst__rt__toggle_recorder([[F]])
 
     // CHECK-DAG:   [[C1:%.+]] = llvm.mlir.constant(1 : i64) : i64
@@ -38,7 +38,7 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
     // CHECK:       [[GRAD2:%.+]] = llvm.alloca [[C1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
 
     // CHECK:       llvm.call @__catalyst__qis__Gradient([[C2]], [[GRAD1]], [[GRAD2]])
-    // CHECK:       quantum.dealloc [[QREG_and_expval]]#0
+    // CHECK:       quantum.dealloc [[QREG]]
     %alloc0 = memref.alloc(%arg1) : memref<?xf64>
     %alloc1 = memref.alloc(%arg1) : memref<?xf64>
     gradient.adjoint @circuit.nodealloc(%arg0) size(%arg1) in(%alloc0, %alloc1 : memref<?xf64>, memref<?xf64>) : (f32) -> ()

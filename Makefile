@@ -22,6 +22,7 @@ TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 ENABLE_FLAKY ?= OFF
+XDSL_TESTS ?= ON
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -59,7 +60,11 @@ FLAKY :=
 ifeq ($(ENABLE_FLAKY),ON)
 FLAKY := --force-flaky --max-runs=5 --min-passes=5
 endif
-PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY)
+XDSL_MARKER :=
+ifeq ($(XDSL_TESTS),OFF)
+XDSL_MARKER := -m "not xdsl"
+endif
+PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY) $(XDSL_MARKER)
 
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
@@ -117,9 +122,10 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
+	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
 
-.PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
+.PHONY: mlir llvm stablehlo enzyme dialects runtime oqc builtin-decomp-rules
 mlir:
 	$(MAKE) -C mlir all
 
@@ -134,6 +140,10 @@ enzyme:
 
 dialects:
 	$(MAKE) -C mlir dialects
+
+builtin-decomp-rules: dialects runtime frontend
+	$(PYTHON) -m frontend.catalyst.utils.precompile_decomposition_rules
+
 
 .PHONY: dialect-docs
 dialect-docs:
@@ -210,18 +220,22 @@ wheel:
 	cp $(RT_BUILD_DIR)/lib/openqasm_python_module.so $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/liblapacke.* $(MK_DIR)/frontend/catalyst/lib || true  # optional
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/librt_rsdecomp.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/librt_decoder.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(OQC_BUILD_DIR)/librtd_oqc* $(MK_DIR)/frontend/catalyst/lib
 	cp $(OQC_BUILD_DIR)/oqc_python_module.so $(MK_DIR)/frontend/catalyst/lib
 	cp $(OQC_BUILD_DIR)/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_apfloat_wrappers.* $(MK_DIR)/frontend/catalyst/lib || true # optional
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/default_pipelines.* $(MK_DIR)/frontend/catalyst/lib
 
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	for file in gradient quantum _ods_common catalyst mbqc mitigation qec _transform; do \
+	for file in gradient qref quantum _ods_common catalyst mbqc mitigation pbc _transform; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
 	mkdir -p $(MK_DIR)/frontend/bin
@@ -246,9 +260,18 @@ wheel:
 		    cp $(COPY_FLAGS) $$file $$dest_dir; \
 	    done' sh {} +
 
+	$(PYTHON) -m pip wheel . -w bootstrap_dist --extra-index-url https://test.pypi.org/simple
+	$(PYTHON) -m pip install bootstrap_dist/*.whl
+
+	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
+
+	mkdir -p $(MK_DIR)/frontend/catalyst/resources
+	cp $$($(PYTHON) -c 'from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH; print(BYTECODE_FILE_PATH)') $(MK_DIR)/frontend/catalyst/resources/
+
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
 	rm -r $(MK_DIR)/build
+	rm -r $(MK_DIR)/bootstrap_dist
 	rm -r frontend/pennylane_catalyst.egg-info
 
 plugin-wheel: plugin
@@ -268,7 +291,9 @@ clean:
 	find frontend/catalyst -name "*.so" -not -path "*/third_party/*" -exec rm -v {} +
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
-	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/include $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/bin
+	rm -rf $(MK_DIR)/frontend/catalyst/include $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/bin
+	rm -rf $(MK_DIR)/frontend/catalyst/resources
+	rm -rf $(MK_DIR)/frontend/mlir_quantum
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks

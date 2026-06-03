@@ -15,19 +15,23 @@
 """
 Utility code for keeping paths
 """
+
 import os
 import os.path
 import sys
 import sysconfig
+from pathlib import Path
 
 from catalyst._configuration import INSTALLED
+from catalyst._revision import __revision__
+from catalyst._version import __version__
 
 package_root = os.path.join(os.path.dirname(__file__), "..")
 
 # Default paths to dep libraries
 DEFAULT_LIB_PATHS = {
     "llvm": os.path.join(package_root, "..", "..", "mlir", "llvm-project", "build", "lib"),
-    "dialects": os.path.join(package_root, "..", "..", "mlir", "build", "lib"),
+    "catalyst": os.path.join(package_root, "..", "..", "mlir", "build", "lib"),
     "runtime": os.path.join(package_root, "..", "..", "runtime", "build", "lib"),
     "enzyme": os.path.join(package_root, "..", "..", "mlir", "Enzyme", "build", "Enzyme"),
     "oqc_runtime": os.path.join(package_root, "third_party", "oqc", "src", "build"),
@@ -41,6 +45,12 @@ DEFAULT_INCLUDE_PATHS = {
 DEFAULT_BIN_PATHS = {
     "cli": os.path.join(package_root, "..", "..", "mlir", "build", "bin"),
 }
+
+BYTECODE_FILE_PATH = os.path.join(
+    package_root,
+    "resources",
+    "decomposition_rules_" + (__revision__ if __revision__ else __version__) + ".mlirbc",
+)
 
 
 def get_lib_path(project, env_var):

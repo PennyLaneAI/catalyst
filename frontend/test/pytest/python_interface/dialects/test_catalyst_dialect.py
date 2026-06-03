@@ -11,17 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit test module for the xDSL Catalyst dialect."""
 
 import pytest
 
-# pylint: disable=wrong-import-position
+from catalyst.python_interface.dialects import Catalyst
 
 pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-from catalyst.python_interface.dialects import Catalyst
 
 all_ops = list(Catalyst.operations)
 all_attrs = list(Catalyst.attributes)
@@ -72,9 +68,26 @@ def test_all_attributes_names(attr):
     assert attr.name == expected_name
 
 
-def test_assembly_format(run_filecheck):
+@pytest.mark.parametrize(
+    "pretty_print",
+    [
+        pytest.param(
+            True,
+            id="pretty_print",
+            marks=pytest.mark.xfail(reason="No assembly format for arraylist"),
+        ),
+        pytest.param(False, id="generic_print"),
+    ],
+)
+def test_assembly_format(run_filecheck, pretty_print):
     """Test the assembly format of the catalyst ops."""
     program = """
+    // Function to set up symbols for call-like operations
+    // CHECK: func.func public @[[TEST_FUNC:[a-z_]+]]() {
+    func.func public @test_func() {
+        func.return
+    }
+
     // CHECK: [[LIST:%.+]] = catalyst.list_init : !catalyst.arraylist<f64>
     %list = catalyst.list_init : !catalyst.arraylist<f64>
 
@@ -83,6 +96,9 @@ def test_assembly_format(run_filecheck):
 
     // CHECK: [[VAL:%.+]] = "test.op"() : () -> f64
     %val = "test.op"() : () -> f64
+
+    // CHECK: [[TENSOR_VAL:%.+]] = "test.op"() : () -> tensor<1xf64>
+    %tensor_val = "test.op"() : () -> tensor<1xf64>
 
     // CHECK: [[POP_RESULT:%.+]] = catalyst.list_pop [[LIST]] : !catalyst.arraylist<f64>
     %pop_result = catalyst.list_pop %list : !catalyst.arraylist<f64>
@@ -93,14 +109,14 @@ def test_assembly_format(run_filecheck):
     // CHECK: catalyst.list_dealloc [[LIST]] : !catalyst.arraylist<f64>
     catalyst.list_dealloc %list : !catalyst.arraylist<f64>
 
-    // CHECK: [[CUSTOM_RESULT:%.+]] = catalyst.custom_call fn("custom_function") ([[VAL]]) : (f64) -> f64
-    %custom_result = catalyst.custom_call fn("custom_function")(%val) : (f64) -> f64
+    // CHECK: [[CUSTOM_RESULT:%.+]] = catalyst.custom_call fn("[[TEST_FUNC]]") ([[VAL]]) : (f64) -> f64
+    %custom_result = catalyst.custom_call fn("test_func")(%val) : (f64) -> f64
 
-    // CHECK: [[KERNEL_RESULT:%.+]] = catalyst.launch_kernel @kernel_name([[VAL]]) : (f64) -> f64
-    %kernel_result = catalyst.launch_kernel @kernel_name(%val) : (f64) -> f64
+    // CHECK: [[KERNEL_RESULT:%.+]] = catalyst.launch_kernel @[[TEST_FUNC]]([[TENSOR_VAL]]) : (tensor<1xf64>) -> f64
+    %kernel_result = catalyst.launch_kernel @test_func(%tensor_val) : (tensor<1xf64>) -> f64
 
-    // CHECK: [[CALLBACK_RESULT:%.+]] = catalyst.callback_call @callback_func([[VAL]]) : (f64) -> f64
-    %callback_result = catalyst.callback_call @callback_func(%val) : (f64) -> f64
+    // CHECK: [[CALLBACK_RESULT:%.+]] = catalyst.callback_call @[[TEST_FUNC]]([[TENSOR_VAL]]) : (tensor<1xf64>) -> f64
+    %callback_result = catalyst.callback_call @test_func(%tensor_val) : (tensor<1xf64>) -> f64
     """
 
-    run_filecheck(program, roundtrip=True)
+    run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)

@@ -6,6 +6,8 @@
 
 oqd_config_schema = "v0.1"
 
+# Default measurement duration in seconds (for fluorescence detection)
+measurement_duration = 1e-4
 
 # Beams
 # A beam contains 4 properties that will be calibrated:
@@ -71,6 +73,13 @@ detuning = 208570342617843.53
 polarization = [0, 1, 0]
 wavevector = [1, 0, 0]
 
+# Detection beam for fluorescence measurement (mid-circuit measurement)
+[[detection_beam]]
+rabi = 62831853071.79586
+transition = "downstate_estate"
+detuning = 0.0
+polarization = [1, 0, 0]
+wavevector = [0, 1, 0]
 
 # Phonon modes
 # Each qubit has a phonon triplet (x,y,z)

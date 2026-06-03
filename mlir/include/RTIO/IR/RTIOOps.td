@@ -20,7 +20,7 @@ include "mlir/IR/BuiltinAttributes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "RTIO/IR/RTIODialect.td"
 
-def RTIOChannelOp : RTIO_Op<"channel"> {
+def RTIOChannelOp : RTIO_Op<"channel", [Pure]> {
     let summary = "Define a channel";
     let description = [{
         The channel's identity (kind, qualifiers, and channel id) is
@@ -51,7 +51,7 @@ def RTIOChannelOp : RTIO_Op<"channel"> {
     }];
 }
 
-def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
+def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel", [Pure]> {
     let summary = "Map a qubit to an RTIO channel";
     let description = [{
         It's a temporary operation that will be lowered to a static `rtio.channel` operation during
@@ -163,6 +163,52 @@ def RTIOSyncOp : RTIO_Op<"sync"> {
     let arguments = (ins Variadic<RTIOEventType>:$events);
     let results = (outs RTIOEventType:$sync_event);
     let assemblyFormat = "$events attr-dict `:` type($sync_event)";
+
+    let hasVerifier = 1;
+}
+
+def RTIORPCOp : RTIO_Op<"rpc"> {
+    let summary = "Invoke a host RPC function from the kernel";
+    let description = [{
+        Represents an outgoing RPC call from the kernel to the host.
+
+        Attributes:
+        - callee:    The symbolic name of the host-side callable to invoke.
+        - is_async:  If present the call is async.
+        - rpc_id:    A unique integer identifier for each RPC function.
+                     Every distinct RPC function must map to a unique rpc_id.
+                     This is used to identify which RPC function is being invoked when
+                     communicating with the server.
+
+        Example (sync, no args):
+        ```mlir
+        rtio.rpc @program_awg rpc_id(1)
+        ```
+
+        Example (sync, with args):
+        ```mlir
+        rtio.rpc @set_dataset rpc_id(2) (%key, %val : i64, f64)
+        ```
+
+        Example (sync, with return value):
+        ```mlir
+        %x = rtio.rpc @get_value rpc_id(3) -> i64
+        ```
+    }];
+
+    let arguments = (ins
+        SymbolRefAttr:$callee,
+        UnitAttr:$is_async,
+        OptionalAttr<I32Attr>:$rpc_id,
+        Variadic<AnyType>:$args
+    );
+
+    let results = (outs Variadic<AnyType>:$results);
+
+    let assemblyFormat = [{
+        $callee (`rpc_id` `(` $rpc_id^ `)`)? (`async` $is_async^)? (`(` $args^ `:` type($args) `)`)?
+        (`->` type($results)^)? attr-dict
+    }];
 
     let hasVerifier = 1;
 }

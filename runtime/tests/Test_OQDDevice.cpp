@@ -15,15 +15,13 @@
 #include <filesystem>
 #include <fstream>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
-#include <nlohmann/json.hpp>
-
-#include "RuntimeCAPI.h"
-#include "TestUtils.hpp"
+#include "catch2/catch_test_macros.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
+#include "nlohmann/json.hpp"
 
 #include "OQDDevice.hpp"
 #include "OQDRuntimeCAPI.h"
+#include "RuntimeCAPI.h"
 
 using namespace Catch::Matchers;
 using namespace Catalyst::Runtime::Device;
@@ -35,7 +33,10 @@ TEST_CASE("Test the OQDDevice constructor", "[oqd]")
     auto device = OQDDevice("{shots : 100}");
 
     REQUIRE_THROWS_WITH(device.GetNumQubits(), ContainsSubstring("unsupported by device"));
-    REQUIRE_THROWS_WITH(device.Measure(0), ContainsSubstring("unsupported by device"));
+    // Measure returns a false placeholder
+    Result res = device.Measure(0);
+    REQUIRE(res != nullptr);
+    REQUIRE(*res == false);
 }
 
 TEST_CASE("Test the OQDDevice qubit allocation and release", "[oqd]")

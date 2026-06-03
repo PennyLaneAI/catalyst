@@ -32,6 +32,10 @@ i32 = ir.IntegerType.get_signless(32, ctx)
 i16 = ir.IntegerType.get_signless(16, ctx)
 i8 = ir.IntegerType.get_signless(8, ctx)
 i1 = ir.IntegerType.get_signless(1, ctx)
+u64 = ir.IntegerType.get_unsigned(64, ctx)
+u32 = ir.IntegerType.get_unsigned(32, ctx)
+u16 = ir.IntegerType.get_unsigned(16, ctx)
+u8 = ir.IntegerType.get_unsigned(8, ctx)
 
 
 @pytest.mark.parametrize(
@@ -46,6 +50,10 @@ i1 = ir.IntegerType.get_signless(1, ctx)
         (np.dtype(np.int16), i16),
         (np.dtype(np.int32), i32),
         (np.dtype(np.int64), i64),
+        (np.dtype(np.uint8), u8),
+        (np.dtype(np.uint16), u16),
+        (np.dtype(np.uint32), u32),
+        (np.dtype(np.uint64), u64),
     ],
 )
 def test_convert_numpy_dtype_to_mlir(inp, exp):

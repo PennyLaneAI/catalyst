@@ -317,7 +317,7 @@ def expanded_fun(static_args, *args_expanded):
     [1] - https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/linear_util.py#L16
 
     """
-    (in_type, expansion_strategy) = static_args
+    in_type, expansion_strategy = static_args
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
     num_implicit_inputs = len([() for _, k in in_type if not k])
@@ -1004,7 +1004,7 @@ def uses_transform(qnode, transform_name):
         bool: True if `transform_name` is detected (and is only one if only_one=True),
               False otherwise
     """
-    transform_program = getattr(qnode, "transform_program", [])
-    transform_funcs = [transform_container.transform for transform_container in transform_program]
+    compile_pipeline = getattr(qnode, "compile_pipeline", [])
+    transform_funcs = [bound_transform.tape_transform for bound_transform in compile_pipeline]
 
     return any(transform_name in func.__name__ for func in transform_funcs)

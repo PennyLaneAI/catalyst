@@ -15,18 +15,20 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Tools/mlir-lsp-server/MlirLspServerMain.h"
+#include "stablehlo/dialect/Register.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
+#include "PBC/IR/PBCDialect.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
-#include "QEC/IR/QECDialect.h"
+#include "QRef/IR/QRefDialect.h"
+#include "QecLogical/IR/QecLogicalDialect.h"
+#include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
-
-#include "stablehlo/dialect/Register.h"
 
 int main(int argc, char **argv)
 {
@@ -34,13 +36,16 @@ int main(int argc, char **argv)
     mlir::registerAllDialects(registry);
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
-    registry.insert<catalyst::qec::QECDialect>();
+    registry.insert<catalyst::qref::QRefDialect>();
+    registry.insert<catalyst::pbc::PBCDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
     registry.insert<catalyst::mbqc::MBQCDialect>();
     registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<catalyst::pauli_frame::PauliFrameDialect>();
     registry.insert<catalyst::ion::IonDialect>();
     registry.insert<catalyst::rtio::RTIODialect>();
+    registry.insert<catalyst::qecl::QecLogicalDialect>();
+    registry.insert<catalyst::qecp::QecPhysicalDialect>();
 
     mlir::stablehlo::registerAllDialects(registry);
 

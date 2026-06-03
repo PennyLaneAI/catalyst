@@ -18,8 +18,8 @@ import os
 import platform
 from typing import Optional
 
+from pennylane import CompilePipeline
 from pennylane.devices import Device, ExecutionConfig
-from pennylane.transforms.core import TransformProgram
 
 try:
     from qcaas_client.client import OQCClient  # pylint: disable=unused-import
@@ -69,10 +69,10 @@ class OQCDevice(Device):
         if execution_config is None:
             execution_config = ExecutionConfig()
 
-        transform_program = TransformProgram()
+        compile_pipeline = CompilePipeline()
         # TODO: Add transforms (check wires, check shots, no sample, only commuting measurements,
         # measurement from counts)
-        return transform_program, execution_config
+        return compile_pipeline, execution_config
 
     def execute(self, circuits, execution_config):
         """Non-implemented python execution."""
@@ -92,9 +92,7 @@ def _check_envvar():
     email = os.getenv("OQC_EMAIL")
     password = os.getenv("OQC_PASSWORD")
     if not all((url, email, password)):
-        raise ValueError(
-            """
+        raise ValueError("""
             OQC credentials not found in environment variables.
             Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.
-            """
-        )
+            """)

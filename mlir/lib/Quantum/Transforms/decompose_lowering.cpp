@@ -16,13 +16,10 @@
 
 // When we read the decomposition rules module from file,
 // StablehloDialect may not be registered from start.
-#include "stablehlo/dialect/StablehloOps.h"
-
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -33,6 +30,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -102,6 +100,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     {
         module.walk([&](func::FuncOp func) {
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
+                removeUnusedFuncArgs(func);
                 if (targetOp == "MultiRZ") {
                     // Create a new target op name with the number of wires
                     // for MultiRZ, since it has multiple decomposition functions
@@ -139,6 +138,16 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             // No need to walk into the function body
             return WalkResult::skip();
         });
+    }
+
+    // Remove unused arguments on a decomposition function
+    // This is because we have some assumptions on the decomp funcs' signature structure
+    void removeUnusedFuncArgs(func::FuncOp f)
+    {
+        f.front().eraseArguments([](BlockArgument arg) { return arg.use_empty(); });
+
+        f.setFunctionType(FunctionType::get(f->getContext(), f.front().getArgumentTypes(),
+                                            f.front().getTerminator()->getOperandTypes()));
     }
 
     // Remove unused decomposition functions:

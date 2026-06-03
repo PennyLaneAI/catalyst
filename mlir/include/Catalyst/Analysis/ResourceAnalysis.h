@@ -1,0 +1,80 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#pragma once
+
+#include "llvm/ADT/StringMap.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Operation.h"
+
+#include "Catalyst/Analysis/ResourceResult.h"
+#include "PBC/IR/PBCOps.h"
+
+using namespace mlir;
+
+namespace catalyst {
+
+class ResourceAnalysis {
+  public:
+    // walk all func::FuncOps within the operation.
+    explicit ResourceAnalysis(ModuleOp moduleOp);
+
+    const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
+
+    const ResourceResult *getResult(llvm::StringRef funcName) const
+    {
+        auto it = funcResults.find(funcName);
+        if (it == funcResults.end()) {
+            return nullptr;
+        }
+        return &it->second;
+    }
+
+    // get the JIT entry function name (`llvm.emit_c_interface`), or first function
+    llvm::StringRef getEntryFunc() const { return entryFuncName; }
+
+    const ResourceResult *getFlattenedResource(llvm::StringRef funcName) const;
+
+  private:
+    // per-function resource counts
+    llvm::StringMap<ResourceResult> funcResults;
+
+    // Flattened totals per function; filled on first `getFlattenedResource` call.
+    mutable llvm::StringMap<ResourceResult> flattenedCache;
+
+    // name of the entry function
+    std::string entryFuncName;
+
+    // Counters for lifted-loop names (`for_loop_<N>` vs `dyn_for_loop_<N>`),
+    // so each prefix gets its own numbering sequence.
+    int64_t forLoopCounter = 0;
+    int64_t dynForLoopCounter = 0;
+
+    // `prefix` + counter; advance counter until the name is free in `funcResults`
+    std::string makeUniqueSyntheticName(llvm::StringRef prefix, int64_t &counter);
+
+    // analyze a region and accumulate results
+    void analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint);
+
+    void analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint);
+    void analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result, bool isAdjoint);
+    void analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint);
+    void analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result, bool isAdjoint);
+    void analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint);
+
+    // categorize and count a single operation
+    void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint);
+};
+
+} // namespace catalyst

@@ -352,11 +352,11 @@ See for example:
     from standalone import getStandalonePluginAbsolutePath
 
     @apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def qnode():
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     def module():
         return qnode()
 
@@ -403,11 +403,11 @@ After this, the user will be able to use your pass with the :func:`~.passes.appl
 .. code-block:: python
 
     @apply_pass("standalone.standalone-switch-bar-foo")
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def qnode():
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     def module():
         return qnode()
 
@@ -422,11 +422,11 @@ For example:
     from standalone import SwitchBarToFoo
 
     @SwitchBarToFoo
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
     def qnode():
-        return qml.state()
+        return qp.state()
 
-    @qml.qjit(target="mlir")
+    @qp.qjit(target="mlir")
     def module():
         return qnode()
 

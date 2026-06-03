@@ -28,13 +28,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import jax
 import jax._src.interpreters.partial_eval as pe
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 from jax._src.lax import lax
 from jax._src.lax.lax import _extract_tracers_dyn_shape
 from jax._src.pjit import jit_p
 from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
-from jax.core import get_aval
+from jax.core import Tracer, get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
@@ -49,7 +49,6 @@ from pennylane.measurements import (
 from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
-from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
@@ -99,6 +98,7 @@ from catalyst.jax_primitives import (
     hermitian_p,
     namedobs_p,
     num_qubits_p,
+    pauli_rot_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -162,7 +162,7 @@ def _make_execution_config(qnode):
     """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
 
-    execution_config = qml.devices.ExecutionConfig()
+    execution_config = qp.devices.ExecutionConfig()
     if qnode:
         execution_config = replace(execution_config, gradient_method=_in_gradient_tracing(qnode))
 
@@ -254,7 +254,7 @@ class Function:
         return tree_unflatten(out_tree, retval)
 
 
-KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
+KNOWN_NAMED_OBS = (qp.Identity, qp.PauliX, qp.PauliY, qp.PauliZ, qp.Hadamard)
 
 # Take care when adding primitives to this set in order to avoid introducing a quadratic number of
 # edges to the jaxpr equation graph in ``sort_eqns()``. Each equation with a primitive in this set
@@ -413,8 +413,8 @@ class QRegPromise:
         from cache"""
         # pylint: disable=consider-iterating-dictionary
         qrp = self
-        cached_tracers = {w for w in qrp.cache.keys() if not isinstance(w, int)}
-        requested_tracers = {w for w in wires if not isinstance(w, int)}
+        cached_tracers = {w for w in qrp.cache.keys() if isinstance(w, Tracer)}
+        requested_tracers = {w for w in wires if isinstance(w, Tracer)}
         if cached_tracers != requested_tracers:
             qrp.actualize()
         qubits = []
@@ -529,8 +529,9 @@ class HybridOp(Operator):
         _trace: DynamicJaxprTrace,
         in_expanded_tracers,
         out_expanded_tracers,
+        num_quantum_outs: int = 1,
         **kwargs,
-    ) -> DynamicJaxprTracer:
+    ) -> Union[DynamicJaxprTracer, List[DynamicJaxprTracer]]:
         """Binds the JAX primitive but override the returned classical tracers with the already
         existing output tracers, stored in the operations since the classical tracing stage.
         User-defined transformations might have changed them by the time this function is called.
@@ -538,17 +539,19 @@ class HybridOp(Operator):
         as-is.
         """
         assert self.binder is not None, "HybridOp should set a binder"
+        assert num_quantum_outs >= 1, "num_quantum_outs must be at least 1"
 
         # Here, we are binding any of the possible hybrid ops.
         # which includes: for_loop, while_loop, cond, measure.
         # This will place an equation at the very end of the current list of equations.
-        out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
+        bind_outs = self.binder(*in_expanded_tracers, **kwargs)
+        out_quantum_tracers = list(bind_outs[-num_quantum_outs:])
 
         trace = EvaluationContext.get_current_trace()
         eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
         frame = trace.frame
 
-        assert len(eqn.outvars[:-1]) == len(
+        assert len(eqn.outvars[:-num_quantum_outs]) == len(
             out_expanded_tracers
         ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
 
@@ -619,7 +622,7 @@ class HybridOp(Operator):
         # Now, the output variables can be considered as part of the current frame.
         # This allows us to avoid importing all equations again next time.
         jaxpr_variables.update(eqn.outvars)
-        return out_quantum_tracer
+        return out_quantum_tracers[0] if num_quantum_outs == 1 else out_quantum_tracers
 
     @debug_logger
     def trace_quantum(
@@ -730,16 +733,16 @@ def lower_jaxpr_to_mlir(jaxpr, func_name, arg_names):
 
 
 def trace_state_prep(op, qrp):
-    """Trace qml.StatePrep
+    """Trace qp.StatePrep
 
     Args:
         op: StatePrep op being traced
         qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
 
     Postcondition:
-        qrp is updated to hold the output qubits from qml.StatePrep
+        qrp is updated to hold the output qubits from qp.StatePrep
     """
-    assert isinstance(op, qml.StatePrep), "qml.StatePrep expected"
+    assert isinstance(op, qp.StatePrep), "qp.StatePrep expected"
 
     qubits = qrp.extract(op.wires)
     partial_sv = op.parameters[0]
@@ -756,14 +759,14 @@ def trace_state_prep(op, qrp):
 
 
 def trace_basis_state(op, qrp):
-    """Trace qml.BasisState
+    """Trace qp.BasisState
     Args:
-        op: qml.BasisState op being traced
+        op: qp.BasisState op being traced
         qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
     Postcondition:
-        qrp is updated to hold the output qubits from qml.StatePrep
+        qrp is updated to hold the output qubits from qp.StatePrep
     """
-    assert isinstance(op, qml.BasisState), "qml.BasisState expected"
+    assert isinstance(op, qp.BasisState), "qp.BasisState expected"
 
     qubits = qrp.extract(op.wires)
     basis_state = jax.lax.convert_element_type(op.parameters[0], jnp.dtype(jnp.bool))
@@ -777,9 +780,9 @@ def trace_snapshot_op(
     qrp: QRegPromise,
     out_snapshot_tracer: List[DynamicJaxprTracer],
 ) -> None:
-    """Trace StateMP passed inside qml.Snapshot
+    """Trace StateMP passed inside qp.Snapshot
     Args:
-        op: qml.Snapshot being traced.
+        op: qp.Snapshot being traced.
         device: PennyLane quantum device.
         qrp: QRegPromise object holding the JAX tracer representing the quantum register's state.
         out_snapshot_tracer: list to store JAX classical qnode snapshot results.
@@ -802,7 +805,7 @@ def trace_snapshot_op(
         out_snapshot_tracer.append(result)
     else:
         raise NotImplementedError(
-            "qml.Snapshot() only supports qml.state() when used from within Catalyst,"
+            "qp.Snapshot() only supports qp.state() when used from within Catalyst,"
             f" but encountered {type(op.hyperparameters['measurement'])}"
         )
 
@@ -815,7 +818,7 @@ def trace_quantum_operations(
     qreg: DynamicJaxprTracer,
     ctx,
     trace: DynamicJaxprTrace,
-    mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
+    mcm_config: qp.devices.MCMConfig = qp.devices.MCMConfig(),
     out_snapshot_tracer=None,
 ) -> QRegPromise:
     """Recursively trace ``quantum_tape``'s operations containing both PennyLane original and
@@ -869,7 +872,7 @@ def trace_quantum_operations(
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
-        elif isinstance(op, qml.GlobalPhase):
+        elif isinstance(op, qp.GlobalPhase):
             controlled_qubits = qrp.extract(controlled_wires)
             qubits2 = gphase_p.bind(
                 *[*op.parameters, *controlled_qubits, *controlled_values],
@@ -877,12 +880,28 @@ def trace_quantum_operations(
                 adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
-        elif isinstance(op, qml.StatePrep):
+        elif isinstance(op, qp.StatePrep):
             trace_state_prep(op, qrp)
-        elif isinstance(op, qml.BasisState):
+        elif isinstance(op, qp.BasisState):
             trace_basis_state(op, qrp)
-        elif isinstance(op, qml.Snapshot):
+        elif isinstance(op, qp.Snapshot):
             trace_snapshot_op(op, device, qrp, out_snapshot_tracer)
+        elif isinstance(op, qp.PauliRot):
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            qubits2 = pauli_rot_p.bind(
+                *qubits,
+                *op.parameters,
+                *controlled_qubits,
+                *controlled_values,
+                pauli_word=op.hyperparameters["pauli_word"],
+                qubits_len=len(qubits),
+                params_len=len(op.parameters),
+                ctrl_len=len(controlled_wires),
+                adjoint=adjoint,
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -893,7 +912,7 @@ def trace_quantum_operations(
             # supporting general PL operations in Catalyst.
             params = (
                 op.parameters + [op.hyperparameters["dimension"][0]]
-                if isinstance(op, qml.PCPhase)
+                if isinstance(op, qp.PCPhase)
                 else op.parameters
             )
 
@@ -911,7 +930,7 @@ def trace_quantum_operations(
 
     qrp = QRegPromise(qreg)
 
-    if isinstance(device, qml.devices.LegacyDevice):
+    if isinstance(device, qp.devices.LegacyDevice):
         # Old device API expands tapes here. Note: this way some ops might bypass the verification.
         # We decided to ignore this since we are aiming new device API.
         ops = device.expand_fn(quantum_tape).operations
@@ -921,11 +940,12 @@ def trace_quantum_operations(
     for op in ops:
         qrp2 = None
         if isinstance(op, HybridOp):
-            kwargs = (
-                {"postselect_mode": mcm_config.postselect_mode}
-                if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure)
-                else {}
-            )
+            if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure):
+                kwargs = {"postselect_mode": mcm_config.postselect_mode}
+            elif isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitPauliMeasure):
+                kwargs = {}
+            else:
+                kwargs = {"mcm_config": mcm_config}  # propagate
             qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
@@ -939,18 +959,31 @@ def trace_quantum_operations(
     return qrp
 
 
+def insert_observable_wires_into_cache(qrp, wires, qubits):
+    """
+    When there are multiple observables (compbasis, named or Hermitian), they could be on the same
+    wire.
+    qrp.insert ensures the extracted wires are added to cache, however this call is only
+    allowed on wires that aren't already in the cache.
+    """
+    for w, q in zip(wires, qubits, strict=True):
+        if w not in qrp.cache:
+            qrp.insert([w], [q])
+
+
+# pylint: disable=too-many-branches
 @debug_logger
 def trace_observables(
     obs: Optional[Operator],
     qrp: QRegPromise,
-    m_wires: Optional[qml.wires.Wires],
+    m_wires: Optional[qp.wires.Wires],
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
     Args:
         obs (Operator): an observable operator
         qrp (QRegPromise): Quantum register tracer with cached qubits
-        m_wires (Optional[qml.wires.Wires]): the default wires to use for this measurement process
+        m_wires (Optional[qp.wires.Wires]): the default wires to use for this measurement process
 
     Returns:
         out_classical_tracers: a list of classical tracers corresponding to the measured values.
@@ -968,24 +1001,34 @@ def trace_observables(
         else:
             qubits = qrp.extract(wires, allow_reuse=True)
             obs_tracers = compbasis_p.bind(*qubits)
+            insert_observable_wires_into_cache(qrp, wires, qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
-        qubits = qrp.extract(wires, allow_reuse=True)
+        # The MLIR NamedObs operation only takes in a single qubit value, instead of a variadic
+        # range.
+        # This is fine for most named observables, but qp.Identity can take in multiple wires
+        # While the current logic here assumes there is only one wire on the observable, this
+        # won't actually lead to wrong execution results, since the only exception is the identity
+        # But of course we should fix this at some time.
+        # TODO: make the NamedObs op take in multiple qubit values
+        qubits = qrp.extract([wires[0]], allow_reuse=True)
         obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
-    elif isinstance(obs, qml.Hermitian):
+        insert_observable_wires_into_cache(qrp, [wires[0]], [qubits[0]])
+    elif isinstance(obs, qp.Hermitian):
         # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
-    elif isinstance(obs, qml.ops.op_math.Prod):
+        insert_observable_wires_into_cache(qrp, wires, qubits)
+    elif isinstance(obs, qp.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
-    elif isinstance(obs, qml.ops.LinearCombination):
+    elif isinstance(obs, qp.ops.LinearCombination):
         coeffs, observables = obs.terms()
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in observables]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(coeffs), *nested_obs)
-    elif isinstance(obs, qml.ops.op_math.Sum):
+    elif isinstance(obs, qp.ops.op_math.Sum):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
-    elif isinstance(obs, qml.ops.op_math.SProd):
+    elif isinstance(obs, qp.ops.op_math.SProd):
         coeffs, terms = obs.terms()
         coeffs = jax.numpy.array(coeffs)
         nested_obs = []
@@ -1054,7 +1097,7 @@ def trace_quantum_measurements(
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
-    mcm_config: qml.devices.MCMConfig,
+    mcm_config: qp.devices.MCMConfig,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
     """Trace quantum measurements. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
@@ -1081,8 +1124,8 @@ def trace_quantum_measurements(
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
             if shots_obj.has_partitioned_shots and not isinstance(output, SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {type(output).__name__} does not support shot-vectors. "
-                    "Use qml.sample() instead."
+                    f"The {type(output).__name__} measurement process does not support "
+                    "shot-vectors. Please consider using qp.sample() instead."
                 )
 
             if device.wires is None:
@@ -1112,10 +1155,10 @@ def trace_quantum_measurements(
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(
-                        "qml.sample cannot work with shots=None. "
+                        "qp.sample cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
-                if output.mv is not None:  # qml.sample(m)
+                if output.mv is not None:  # qp.sample(m)
                     out_classical_tracers.append(output.mv)
                 else:
                     shape = (shots, nqubits)
@@ -1162,7 +1205,7 @@ def trace_quantum_measurements(
             elif type(output) is CountsMP:
                 if shots is None:  # needed for old device API only
                     raise ValueError(
-                        "qml.counts cannot work with shots=None. "
+                        "qp.counts cannot work with shots=None. "
                         "Please specify a finite number of shots."
                     )
 
@@ -1292,7 +1335,7 @@ def apply_transforms(
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
     params = tape.get_parameters(trainable_only=False)
-    tape.trainable_params = qml.math.get_trainable_indices(params)
+    tape.trainable_params = qp.math.get_trainable_indices(params)
 
     if qnode_program.is_informative:
         msg = "Catalyst does not support informative transforms."
@@ -1313,7 +1356,8 @@ def apply_transforms(
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
         with_measurement_from_counts_or_samples = any(
-            "measurements_from_counts" in (transform_str := str(getattr(qnode, "transform", "")))
+            "measurements_from_counts"
+            in (transform_str := str(getattr(qnode, "tape_transform", "")))
             or "measurements_from_samples" in transform_str
             for qnode in qnode_program
         )
@@ -1455,7 +1499,7 @@ def _construct_output_with_classical_values(
     classical_return_indices = []
     num_mcm = num_midcircuit_measurement(tape)
     for i, value in enumerate(return_values_flat):
-        if not isinstance(value, qml.measurements.MeasurementProcess):
+        if not isinstance(value, qp.measurements.MeasurementProcess):
             classical_values.append(value)
             classical_return_indices.append(i)
     output = classical_values + tape.measurements
@@ -1472,7 +1516,6 @@ def _trace_classical_phase(
     *,
     static_argnums,
     debug_info,
-    ctx,
 ) -> ClassicalTraceResult:
     """Perform classical tracing phase of quantum function compilation.
 
@@ -1484,7 +1527,6 @@ def _trace_classical_phase(
         qnode: Quantum node containing transforms
         static_argnums: Static argument numbers
         debug_info: Debug information
-        ctx: Evaluation context
 
     Returns:
         ClassicalTraceResult: Results for quantum tracing phase
@@ -1507,8 +1549,8 @@ def _trace_classical_phase(
         # Therefore we need to compute the tree with measurements as leaves and it comes
         # with an extra computational cost
 
-        if any(isinstance(wire, qml.wires.DynamicWire) for wire in quantum_tape.wires):
-            msg = "qml.allocate() is only supported with program capture enabled."
+        if any(isinstance(wire, qp.wires.DynamicWire) for wire in quantum_tape.wires):
+            msg = "qp.allocate() with qjit is only supported with program capture enabled."
             raise CompileError(msg)
 
         # 1. Recompute the original return
@@ -1516,19 +1558,24 @@ def _trace_classical_phase(
             return_values = tree_unflatten(out_tree_promise(), return_values_flat)
 
         def is_leaf(obj):
-            return isinstance(obj, qml.measurements.MeasurementProcess)
+            return isinstance(obj, qp.measurements.MeasurementProcess)
 
         # 2. Create a new tree that has measurements as leaves
         return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
             return_values, is_leaf=is_leaf
         )
-        if isinstance(device, qml.devices.Device):
+        if isinstance(device, qp.devices.Device):
             config = _make_execution_config(qnode)
-            device_program, config = device.preprocess(ctx, execution_config=config, shots=shots)
+            # Pass catalyst-specific params via device_options so that
+            # QJITDevice.preprocess() has a standard PennyLane signature.
+            device_options = dict(config.device_options)
+            device_options["catalyst_shots"] = shots
+            config = replace(config, device_options=device_options)
+            device_program, config = device.preprocess(config)
         else:
-            device_program = TransformProgram()
+            device_program = qp.CompilePipeline()
 
-        qnode_program = qnode.transform_program if qnode else TransformProgram()
+        qnode_program = qnode.compile_pipeline if qnode else qp.CompilePipeline()
 
         tapes, post_processing, tracing_mode = apply_transforms(
             qnode_program,
@@ -1666,7 +1713,7 @@ def _trace_quantum_step(
             )
             classical_return_indices.extend(cls_ret_indices)
 
-            mcm_config = qml.devices.MCMConfig(
+            mcm_config = qp.devices.MCMConfig(
                 postselect_mode=qnode.execute_kwargs["postselect_mode"],
                 mcm_method=qnode.execute_kwargs["mcm_method"],
             )
@@ -1739,7 +1786,6 @@ def trace_quantum_function(
             qnode,
             static_argnums=static_argnums,
             debug_info=debug_info,
-            ctx=ctx,
         )
 
         # (2) - Quantum tracing

@@ -17,7 +17,7 @@ Unit tests for pipeline options and utility functions.
 """
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -48,15 +48,15 @@ class TestDefaultPipeline:
         and the compilation of the same circuit with the compilation pipeline explicitly set using
         ``default_pipeline()`` yield the same IR representation both before and after optimization.
         """
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(angle: float):
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            qml.RX(angle, wires=0)
-            qml.RX(angle / 2, wires=0)
-            return qml.state()
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            qp.RX(angle, wires=0)
+            qp.RX(angle / 2, wires=0)
+            return qp.state()
 
         circuit_ref = qjit(circuit, target="mlir")
         circuit_default_pipeline = qjit(circuit, target="mlir", pipelines=default_pipeline())
@@ -68,15 +68,15 @@ class TestDefaultPipeline:
         """Test that the execution of a qjit-compiled circuit with all default compiler options and
         the execution of the same circuit with the compilation pipeline explicitly set using
         ``default_pipeline()`` yield the same results."""
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev)
+        @qp.qnode(dev)
         def circuit(angle: float):
-            qml.Hadamard(wires=0)
-            qml.Hadamard(wires=0)
-            qml.RX(angle, wires=0)
-            qml.RX(angle / 2, wires=0)
-            return qml.state()
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            qp.RX(angle, wires=0)
+            qp.RX(angle / 2, wires=0)
+            return qp.state()
 
         circuit_ref = qjit(circuit)
         circuit_default_pipeline = qjit(circuit, pipelines=default_pipeline())

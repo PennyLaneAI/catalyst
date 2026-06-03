@@ -14,10 +14,9 @@
 
 #pragma once
 
-using namespace mlir;
+#include "mlir/IR/DialectRegistry.h"
 
 namespace catalyst {
-
 namespace gradient {
 
 void registerBufferizableOpInterfaceExternalModels(mlir::DialectRegistry &registry);

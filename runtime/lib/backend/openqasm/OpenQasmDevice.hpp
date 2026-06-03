@@ -17,20 +17,17 @@
 #define __device_openqasm
 
 #include <algorithm>
-#include <bitset>
 #include <memory>
-#include <numeric>
 #include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "QuantumDevice.hpp"
-#include "QubitManager.hpp"
-
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
 #include "OpenQasmRunner.hpp"
+#include "QuantumDevice.hpp"
+#include "QubitManager.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
@@ -107,8 +104,8 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
     void NamedOperation(const std::string &, const std::vector<double> &,
                         const std::vector<QubitIdType> &, bool = false,
-                        const std::vector<QubitIdType> & = {},
-                        const std::vector<bool> & = {}) override;
+                        const std::vector<QubitIdType> & = {}, const std::vector<bool> & = {},
+                        const std::vector<std::string> & = {}) override;
     void MatrixOperation(const std::vector<std::complex<double>> &,
                          const std::vector<QubitIdType> &, bool = false,
                          const std::vector<QubitIdType> & = {},

@@ -17,42 +17,6 @@
 
 include "mlir/IR/OpBase.td"
 
-def QuantumRegion : OpInterface<"QuantumRegion"> {
-    let description = [{
-        This interface provides a generic way to interact with instructions that are
-        considered quantum regions. These are characterized by operating on a single
-        qubit register, and returning a new register value.
-    }];
-
-    let cppNamespace = "::catalyst::quantum";
-
-    let methods = [
-        InterfaceMethod<
-            "Return the quantum register operand.",
-            "mlir::Value", "getRegisterOperand", (ins), /*methodBody=*/[{
-                return $_op->getOperand(0);
-            }]
-        >,
-        InterfaceMethod<
-            "Return the quantum register result.",
-            "mlir::Value", "getRegisterResult", (ins), /*methodBody=*/[{
-                return $_op->getResult(0);
-            }]
-        >,
-    ];
-
-    let verify = [{
-
-        if ($_op->getNumOperands() != 1)
-            return $_op->emitOpError("must have exactly one operand (quantum register)");
-
-        if ($_op->getNumResults() != 1)
-            return $_op->emitOpError("must have exactly one result (quantum register)");
-
-        return mlir::success();
-    }];
-}
-
 def QuantumOperation : OpInterface<"QuantumOperation"> {
     let description = [{
         This interface provides a generic way to interact with instructions that are
@@ -225,6 +189,16 @@ def MeasurementProcess : OpInterface<"MeasurementProcess"> {
     }];
 
     let cppNamespace = "::catalyst::quantum";
+
+    let methods = [
+        InterfaceMethod<
+            "Return the observable",
+            "mlir::Value", "getObs", (ins), /*methodBody=*/[{}],
+            /*defaultImplementation=*/[{
+                return $_op.getObs();
+            }]
+        >,
+    ];
 }
 
 #endif // QUANTUM_INTERFACES

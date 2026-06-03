@@ -14,10 +14,8 @@
 
 """Integration tests for the runtime assertion feature."""
 
-import re
-
 import jax.numpy as jnp
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -31,11 +29,11 @@ class TestShotVector:
         """Test shot-vector as parameter with single sample measurment"""
 
         @qjit
-        @qml.set_shots(shots)
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qp.set_shots(shots)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
-            qml.Hadamard(0)
-            return qml.sample()
+            qp.Hadamard(0)
+            return qp.sample()
 
         assert type(circuit()) == tuple
         assert len(circuit()) == 4
@@ -46,25 +44,25 @@ class TestShotVector:
     def test_multiple_sample_measurement(self, shots, mcm_method):
         """Test shot-vector with mulitple samples measurment"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.set_shots(shots)
-        @qml.qnode(dev, mcm_method=mcm_method)
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method=mcm_method)
         def circuit_list():
-            qml.Hadamard(0)
-            return [qml.sample(), qml.sample()]
+            qp.Hadamard(0)
+            return [qp.sample(), qp.sample()]
 
         assert len(circuit_list()) == 2
         assert jnp.array(circuit_list()[0]).shape == (4, 3, 1)
         assert jnp.array(circuit_list()[1]).shape == (4, 3, 1)
 
         @qjit
-        @qml.set_shots(shots)
-        @qml.qnode(dev, mcm_method=mcm_method)
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method=mcm_method)
         def circuit_dict():
-            qml.X(0)
-            return {"first": qml.sample(), "second": qml.sample()}
+            qp.X(0)
+            return {"first": qp.sample(), "second": qp.sample()}
 
         assert list(circuit_dict().keys()) == ["first", "second"]
         assert jnp.array(circuit_dict()["first"]).shape == (4, 3, 1)
@@ -75,14 +73,14 @@ class TestShotVector:
         # pylint: disable=unsubscriptable-object
         """Test shot-vector with mixes shots and without copies"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.set_shots(((20, 5), 100, (101, 2)))
-        @qml.qnode(dev, mcm_method=mcm_method)
+        @qp.set_shots(((20, 5), 100, (101, 2)))
+        @qp.qnode(dev, mcm_method=mcm_method)
         def circuit():
-            qml.Hadamard(0)
-            return qml.sample()
+            qp.Hadamard(0)
+            return qp.sample()
 
         assert type(circuit()) == tuple
         assert len(circuit()) == 8
@@ -96,50 +94,48 @@ class TestShotVector:
     @pytest.mark.parametrize(
         "measurement",
         [
-            (lambda wires: qml.expval(qml.Z(wires)), "ExpectationMP"),
-            (lambda wires: qml.var(qml.Z(wires)), "VarianceMP"),
-            (lambda wires: qml.probs(wires=wires), "ProbabilityMP"),
+            (lambda wires: qp.expval(qp.Z(wires)), "ExpectationMP"),
+            (lambda wires: qp.var(qp.Z(wires)), "VarianceMP"),
+            (lambda wires: qp.probs(wires=wires), "ProbabilityMP"),
         ],
     )
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
     def test_shot_vector_with_different_measurement(self, measurement, mcm_method):
-        """Test a NotImplementedError is raised when using a shot-vector with a measurement that is not qml.sample()"""
+        """Test a NotImplementedError is raised when using a shot-vector with a measurement that is not qp.sample()"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
-        @qml.set_shots(((3, 4)))
-        @qml.qnode(dev, mcm_method=mcm_method)
+        @qp.set_shots(((3, 4)))
+        @qp.qnode(dev, mcm_method=mcm_method)
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             return measurement[0](0)
 
         if measurement[1] == "VarianceMP" and mcm_method == "one-shot":
             with pytest.raises(
-                TypeError,
-                match=re.escape("qml.var(obs) cannot be returned when `mcm_method='one-shot'`"),
+                NotImplementedError, match=r".*\.var\(\) cannot be used on observables"
             ):
                 qjit(circuit)()
         else:
             with pytest.raises(
-                NotImplementedError,
-                match=re.compile(f"Measurement {measurement[1]} does not support shot-vectors"),
+                NotImplementedError, match="measurement process does not support shot-vectors"
             ):
                 qjit(circuit)()
 
     def test_shot_vector_with_complex_container_sample(self):
         """Test shot-vector with complex container sample"""
 
-        dev = qml.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=1)
 
         @qjit
-        @qml.set_shots(((3, 4),))
-        @qml.qnode(dev, mcm_method="single-branch-statistics")
+        @qp.set_shots(((3, 4),))
+        @qp.qnode(dev, mcm_method="single-branch-statistics")
         def circuit():
-            qml.Hadamard(0)
+            qp.Hadamard(0)
             return {
-                "first": qml.sample(),
-                "second": [100, qml.sample()],
-                "third": (qml.sample(), qml.sample()),
+                "first": qp.sample(),
+                "second": [100, qp.sample()],
+                "third": (qp.sample(), qp.sample()),
             }
 
         assert list(circuit().keys()) == ["first", "second", "third"]

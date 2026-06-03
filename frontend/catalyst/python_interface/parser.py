@@ -20,13 +20,22 @@ from xdsl.context import Context as xContext
 from xdsl.dialects import arith as xarith
 from xdsl.dialects import builtin as xbuiltin
 from xdsl.dialects import func as xfunc
+from xdsl.dialects import llvm as xllvm
 from xdsl.dialects import scf as xscf
 from xdsl.dialects import tensor as xtensor
 from xdsl.dialects import transform as xtransform
 from xdsl.ir import Dialect as xDialect
 from xdsl.parser import Parser as xParser
+from xdsl_jax.dialects.stablehlo import StableHLO
 
-from catalyst.python_interface.dialects import MBQC, QEC, Catalyst, Quantum, StableHLO
+from catalyst.python_interface.dialects import (
+    MBQC,
+    PBC,
+    Catalyst,
+    QecLogical,
+    QecPhysical,
+    Quantum,
+)
 
 
 class QuantumParser(xParser):  # pylint: disable=abstract-method
@@ -45,6 +54,7 @@ class QuantumParser(xParser):  # pylint: disable=abstract-method
         xarith.Arith,
         xbuiltin.Builtin,
         xfunc.Func,
+        xllvm.LLVM,
         xscf.Scf,
         StableHLO,
         xtensor.Tensor,
@@ -52,7 +62,9 @@ class QuantumParser(xParser):  # pylint: disable=abstract-method
         Quantum,
         MBQC,
         Catalyst,
-        QEC,
+        PBC,
+        QecLogical,
+        QecPhysical,
     )
 
     # pylint: disable=redefined-builtin

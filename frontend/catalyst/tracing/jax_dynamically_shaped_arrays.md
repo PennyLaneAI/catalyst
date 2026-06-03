@@ -3,7 +3,7 @@ Jax dynamically-shaped arrays
 
 <!--
 ``` python
-import pennylane as qml
+import pennylane as qp
 from jax import numpy as jnp
 from catalyst import qjit, for_loop, while_loop
 from catalyst.jax_extras import DBIdx, expand_args, while_loop_expansion_strategy

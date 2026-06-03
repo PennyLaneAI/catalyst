@@ -12,22 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <catch2/catch_approx.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
-
 #include <fstream>
 
-#include "ExecutionContext.hpp"
-#include "QuantumDevice.hpp"
-#include "QubitManager.hpp"
-#include "RuntimeCAPI.h"
+#include "catch2/catch_test_macros.hpp"
 
 #include "ResourceTracker.hpp"
-#include "TestUtils.hpp"
 #include "Types.h"
 
-using namespace Catch::Matchers;
 using namespace Catalyst::Runtime;
 
 namespace {
@@ -43,6 +34,16 @@ static const std::string RESOURCE_NAMES[] = {"PauliX",
                                              "ControlledQubitUnitary",
                                              "Adjoint(QubitUnitary)",
                                              "QubitUnitary"};
+
+static const std::string MEASUREMENT_NAMES[] = {
+    "expval(PauliX)",
+    "expval(PauliZ)",
+    "expval(Prod(num_terms=2))",
+    "expval(Hamiltonian(num_terms=2))",
+    "probs(all wires)",
+    "probs(1 wires)",
+    "probs(2 wires)",
+};
 
 static void ApplyGates(ResourceTracker &tracker)
 {
@@ -64,6 +65,25 @@ static void ApplyGates(ResourceTracker &tracker)
     tracker.MatrixOperation(true, {0});
     tracker.MatrixOperation(true, {0}, {1, 2});
 }
+
+static void ApplyMeasurements(ResourceTracker &tracker)
+{
+    // Apply named gates to test all possible name modifiers (adj, controlled, etc.)
+    auto pauli_x = tracker.Observable(ObsId::PauliX);
+    auto pauli_z = tracker.Observable(ObsId::PauliZ);
+    auto prod_obs = tracker.CombinedObservable("Prod", 2);
+    auto ham_obs = tracker.CombinedObservable("Hamiltonian", 2);
+
+    tracker.ObsMeasurement("expval", pauli_x);
+    tracker.ObsMeasurement("expval", pauli_z);
+    tracker.ObsMeasurement("expval", prod_obs);
+    tracker.ObsMeasurement("expval", ham_obs);
+
+    tracker.AnalyticalMeasurement("probs", "all");
+    tracker.AnalyticalMeasurement("probs", "1");
+    tracker.AnalyticalMeasurement("probs", "2");
+}
+
 } // namespace
 
 TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
@@ -448,4 +468,31 @@ TEST_CASE("Test Resource Tracker SetState Operations", "[resourcetracking]")
     CHECK(tracker.GetNumGatesBySize(1) == 1);
     CHECK(tracker.GetNumGatesBySize(3) == 1);
     CHECK(tracker.GetDepth() == 2);
+}
+
+TEST_CASE("Test Resource Tracker Measurements", "[resourcetracking]")
+{
+    ResourceTracker tracker;
+    for (size_t i = 0; i < 5; i++) {
+        tracker.AllocateQubit(i);
+    }
+    CHECK(tracker.GetNumMeasurements() == 0);
+    for (const auto &name : MEASUREMENT_NAMES) {
+        CHECK(tracker.GetNumMeasurements(name) == 0);
+    }
+
+    ApplyMeasurements(tracker);
+    CHECK(tracker.GetNumMeasurements() == 7);
+    for (const auto &name : MEASUREMENT_NAMES) {
+        CHECK(tracker.GetNumMeasurements(name) == 1);
+    }
+
+    // Apply the same gates again, should double the count
+    ApplyMeasurements(tracker);
+    CHECK(tracker.GetNumMeasurements() == 14);
+    for (const auto &name : MEASUREMENT_NAMES) {
+        CHECK(tracker.GetNumMeasurements(name) == 2);
+    }
+
+    CHECK(tracker.GetNumMeasurements("NonExistentMeasurement") == 0); // should not exist
 }

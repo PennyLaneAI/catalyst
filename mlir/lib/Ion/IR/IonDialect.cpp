@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
-
 #include "Ion/IR/IonDialect.h"
+
+#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
+
 #include "Ion/IR/IonOps.h"
 
 using namespace mlir;

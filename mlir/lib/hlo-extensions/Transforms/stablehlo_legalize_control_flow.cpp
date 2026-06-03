@@ -88,9 +88,9 @@ Value extractTensorValue(OpBuilder &b, Value tensor)
     if (mlir::cast<TensorType>(tensor.getType()).hasRank() &&
         mlir::cast<TensorType>(tensor.getType()).getRank() != 0) {
         tensor =
-            b.create<tensor::CollapseShapeOp>(loc, tensor, SmallVector<ReassociationIndices>());
+            tensor::CollapseShapeOp::create(b, loc, tensor, SmallVector<ReassociationIndices>());
     }
-    return b.create<tensor::ExtractOp>(loc, tensor, ValueRange());
+    return tensor::ExtractOp::create(b, loc, tensor, ValueRange());
 }
 
 struct ScfForBounds {
@@ -151,7 +151,7 @@ struct WhileOpPattern : public OpConversionPattern<stablehlo::WhileOp> {
         auto loc = op.getLoc();
 
         if (auto bounds = extractForBounds(op)) {
-            auto newForOp = rewriter.create<scf::ForOp>(
+            auto newForOp = scf::ForOp::create(rewriter,
                 loc, extractTensorValue(rewriter, bounds->lb),
                 extractTensorValue(rewriter, bounds->ub),
                 extractTensorValue(rewriter, bounds->step), adaptor.getOperands());
@@ -164,7 +164,7 @@ struct WhileOpPattern : public OpConversionPattern<stablehlo::WhileOp> {
             auto oldIndexArg = newForOp.getRegion().getArgument(1 + bounds->indexArgIndex);
             rewriter.setInsertionPointToStart(&newForOp.getRegion().front());
             auto indexArgTensor =
-                rewriter.create<tensor::FromElementsOp>(loc, oldIndexArg.getType(), indexArg);
+                tensor::FromElementsOp::create(rewriter, loc, oldIndexArg.getType(), indexArg);
             oldIndexArg.replaceAllUsesWith(indexArgTensor);
 
             rewriter.replaceOp(op, newForOp.getResults());
@@ -172,7 +172,7 @@ struct WhileOpPattern : public OpConversionPattern<stablehlo::WhileOp> {
         }
 
         auto newWhileOp =
-            rewriter.create<scf::WhileOp>(loc, op.getResultTypes(), adaptor.getOperands());
+            scf::WhileOp::create(rewriter, loc, op.getResultTypes(), adaptor.getOperands());
 
         // Inline while condition. The block is the same, except the boolean result
         // needs to be extracted and used with an scf.condition.
@@ -200,7 +200,7 @@ struct IfOpPattern : public OpConversionPattern<stablehlo::IfOp> {
     LogicalResult matchAndRewrite(stablehlo::IfOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        auto scfIf = rewriter.create<scf::IfOp>(op.getLoc(), op.getResultTypes(),
+        auto scfIf = scf::IfOp::create(rewriter, op.getLoc(), op.getResultTypes(),
                                                 extractTensorValue(rewriter, adaptor.getPred()),
                                                 /*withElseRegion=*/true);
         inlineStablehloRegionIntoSCFRegion(rewriter, op.getTrueBranch(), scfIf.getThenRegion());
@@ -228,12 +228,12 @@ struct CaseOpPattern : public OpConversionPattern<stablehlo::CaseOp> {
         auto constAttr = DenseElementsAttr::get(
             shapedType, {mlir::cast<mlir::Attribute>(outerBuilder.getI32IntegerAttr(currentIdx))});
         Value currentIdxVal =
-            outerBuilder.create<stablehlo::ConstantOp>(loc, idxValue.getType(), constAttr);
+            stablehlo::ConstantOp::create(outerBuilder, loc, idxValue.getType(), constAttr);
 
-        auto scfIf = outerBuilder.create<scf::IfOp>(
+        auto scfIf = scf::IfOp::create(outerBuilder,
             loc, op.getResultTypes(),
             extractTensorValue(outerBuilder,
-                               outerBuilder.create<stablehlo::CompareOp>(
+                               stablehlo::CompareOp::create(outerBuilder,
                                    loc, idxValue, currentIdxVal, ComparisonDirection::EQ)),
             /*withElseRegion=*/true);
         inlineStablehloRegionIntoSCFRegion(outerBuilder, op.getBranches()[currentIdx],
@@ -248,7 +248,7 @@ struct CaseOpPattern : public OpConversionPattern<stablehlo::CaseOp> {
             PatternRewriter::InsertionGuard guard(outerBuilder);
             outerBuilder.setInsertionPointToEnd(&scfIf.getElseRegion().back());
             auto innerIf = createNestedCases(nextIdx, op, adaptor, outerBuilder);
-            outerBuilder.create<scf::YieldOp>(op.getLoc(), innerIf.getResults());
+            scf::YieldOp::create(outerBuilder, op.getLoc(), innerIf.getResults());
         }
         return scfIf;
     }

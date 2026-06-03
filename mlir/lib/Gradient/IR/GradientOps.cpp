@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/IR/GradientOps.h"
+
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-
 #include "Gradient/IR/GradientDialect.h"
-#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/annotate_invalid_gradient_functions.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -220,18 +220,15 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
         }
     }
 
-    for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
-        // callee (function to be differentiated) always returns a single float
-        // grad type and shape should match the callee's argument's type and shape
-        // match from the tail because constant inputs will have types in the front
-        auto calleeInputType =
-            callee.getFunctionType().getInput(callee.getFunctionType().getNumInputs() - 1 - i);
-        auto gradRtype = grad_types[grad_types.size() - 1 - i];
+    // Each gradient result type must match the type of its corresponding
+    // differentiated operand (indexed by diffArgIndices).
+    for (size_t i = 0; i < diffArgIndices.size(); i++) {
+        auto calleeInputType = callee.getFunctionType().getInput(diffArgIndices[i]);
+        auto gradRtype = grad_types[i];
         if (calleeInputType != gradRtype) {
             return this->emitOpError("result types do not match")
-                   << " result " << i << " should match "
-                   << " was expected to match the type " << gradRtype << " but got "
-                   << calleeInputType;
+                   << " gradient " << i << " (for arg " << diffArgIndices[i] << ")"
+                   << " expected type " << calleeInputType << " but got " << gradRtype;
         }
     }
 

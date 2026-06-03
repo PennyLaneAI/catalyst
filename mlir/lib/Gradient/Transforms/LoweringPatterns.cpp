@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/IR/PatternMatch.h"
+
 #include "GradMethods/Adjoint.hpp"
 #include "GradMethods/FiniteDifference.hpp"
 #include "GradMethods/HybridGradient.hpp"
 #include "GradMethods/JVPVJPPatterns.hpp"
 #include "GradMethods/ParameterShift.hpp"
-
-#include "mlir/IR/PatternMatch.h"
-
 #include "Gradient/Transforms/Patterns.h"
 
 using namespace mlir;

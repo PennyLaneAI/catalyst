@@ -13,7 +13,6 @@
 # limitations under the License.
 """This file contains the implementation of the PennyLane-xDSL integration API."""
 
-
 import io
 
 from jax._src.interpreters import mlir
@@ -22,15 +21,17 @@ from jaxlib.mlir.ir import Context as jaxContext
 from jaxlib.mlir.ir import Module as jaxModule
 from pennylane.typing import Callable
 from xdsl.context import Context as xContext
-from xdsl.dialects.builtin import ModuleOp
+from xdsl.dialects.builtin import ArrayAttr, ModuleOp
+from xdsl.dialects.func import FuncOp
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 
+import catalyst
 from catalyst.python_interface.parser import QuantumParser
-from catalyst.python_interface.pass_api import ApplyTransformSequence
+from catalyst.python_interface.pass_api import ApplyTransformSequencePass
 
 
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods, protected-access
 class Compiler:
     """Compiler namespace"""
 
@@ -60,15 +61,31 @@ class Compiler:
         else:
             gentxtmod = module
 
+        # convert qref to value semantics
+        value_semantics_mlir = (
+            catalyst.python_interface.inspection.xdsl_conversion._quantum_opt_stderr(
+                '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+                stdin=str(gentxtmod),
+            )
+        )
+
         # Parse and transform with xDSL
         ctx = xContext(allow_unregistered=True)
-        parser = QuantumParser(ctx, gentxtmod)
+        parser = QuantumParser(ctx, value_semantics_mlir)
         # xmod is modified in place
         xmod = parser.parse_module()
-        pipeline = PassPipeline((ApplyTransformSequence(callback=callback),))
+        pipeline = PassPipeline((ApplyTransformSequencePass(callback=callback),))
         pipeline.apply(ctx, xmod)
 
-        # Convert back to string
+        # JAX serializes void func.func ops with `res_attrs = []` in generic form
+        # triggering an assertion in FuncToLLVM lowering.
+        # Assert that the canonicalization above has removed these empty attributes
+        for op in xmod.walk():
+            if not isinstance(op, FuncOp):
+                continue
+            for key in ("res_attrs", "arg_attrs"):
+                val = op.properties.get(key)
+                assert not (isinstance(val, ArrayAttr) and len(val) == 0)
         buffer = io.StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(xmod)
 

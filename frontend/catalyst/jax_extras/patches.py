@@ -25,11 +25,13 @@ from jax._src import config, core, source_info_util
 from jax._src.core import JaxprEqnContext, abstractify, standard_vma_rule
 from jax._src.interpreters import mlir
 from jax._src.interpreters.partial_eval import (
+    DynamicJaxprTrace,
     DynamicJaxprTracer,
     TracingEqn,
     compute_on,
     xla_metadata_lib,
 )
+from jax._src.lax import lax
 from jax._src.lax.slicing import (
     _argnum_weak_type,
     _gather_dtype_rule,
@@ -45,6 +47,8 @@ from jax._src.pjit import _out_type, _pjit_forwarding, jit_p
 from jax._src.sharding_impls import UnspecifiedValue
 from jax.core import AbstractValue, Tracer
 
+from catalyst.utils.patching import DictPatchWrapper
+
 __all__ = (
     "_drop_unused_vars2",
     "get_aval2",
@@ -56,6 +60,7 @@ __all__ = (
     "patched_dyn_shape_staging_rule",
     "patched_pjit_staging_rule",
     "patched_multi_broadcast_in_dim",
+    "get_jax_patches",
 )
 
 
@@ -409,3 +414,21 @@ def patched_pjit_staging_rule(trace, source_info, *args, **params):
     else:
         out_tracers = trace.default_process_primitive(jit_p, args, params, source_info=source_info)
     return out_tracers
+
+
+def get_jax_patches():
+    """Returns all the necessary patches for jax v0.7.2.
+    Should be used together with catalyst.utils.patching.Patcher.
+    """
+    return (
+        (pe, "_drop_unused_vars", patched_drop_unused_vars),
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
+        (
+            jax._src.pjit,  # pylint: disable=protected-access
+            "pjit_staging_rule",
+            patched_pjit_staging_rule,
+        ),
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+        (pe, "get_aval", get_aval2),
+    )

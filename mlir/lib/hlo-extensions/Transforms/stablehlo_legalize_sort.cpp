@@ -90,14 +90,14 @@ Value emitComparison(ImplicitLocOpBuilder &b, SmallVector<Value> &lhs, SmallVect
     for (auto [idx, arg] : llvm::enumerate(comparator.getArguments())) {
         Value value = idx % 2 == 0 ? lhs[idx / 2] : rhs[idx / 2];
         Type type = RankedTensorType::get({}, value.getType());
-        mapping.map(arg, b.create<tensor::FromElementsOp>(type, value));
+        mapping.map(arg, tensor::FromElementsOp::create(b, b.getLoc(), type, value));
     }
 
     for (Operation &op : block.without_terminator())
         b.clone(op, mapping);
     Value result = mapping.lookup(block.getTerminator()->getOperands().front());
 
-    return b.create<tensor::ExtractOp>(result, ValueRange());
+    return tensor::ExtractOp::create(b, b.getLoc(), result, ValueRange());
 }
 
 // Emits a binary search of `pivots` in `arrayMemrefs` (all rank 1) in the range
@@ -109,7 +109,7 @@ Value emitBinarySearch(ImplicitLocOpBuilder &b, Value leftInit, Value rightInit,
     ArithBuilder arith(b, b.getLoc());
 
     // while (
-    auto whileOp = b.create<scf::WhileOp>(types, SmallVector<Value, 2>{leftInit, rightInit});
+    auto whileOp = scf::WhileOp::create(b, b.getLoc(), types, SmallVector<Value, 2>{leftInit, rightInit});
     OpBuilder::InsertionGuard guard(b);
 
     //        left < right) {
@@ -118,7 +118,7 @@ Value emitBinarySearch(ImplicitLocOpBuilder &b, Value leftInit, Value rightInit,
     {
         Value left = before->getArgument(0), right = before->getArgument(1);
         b.setInsertionPointToEnd(before);
-        b.create<scf::ConditionOp>(arith.slt(left, right), before->getArguments());
+        scf::ConditionOp::create(b, b.getLoc(), arith.slt(left, right), before->getArguments());
     }
 
     Block *after =
@@ -127,13 +127,14 @@ Value emitBinarySearch(ImplicitLocOpBuilder &b, Value leftInit, Value rightInit,
         Value left = after->getArgument(0), right = after->getArgument(1);
         b.setInsertionPointToEnd(after);
         //   int mid = (left + right) >> 1;
-        Value one = b.create<arith::ConstantIndexOp>(1);
-        Value mid = b.create<arith::ShRUIOp>(arith.add(left, right), one);
-        Value midPlusOne = b.create<AddIOp>(mid, one);
+        Value one = arith::ConstantIndexOp::create(b, b.getLoc(), 1);
+        Value mid = arith::ShRUIOp::create(b, b.getLoc(), arith.add(left, right), one);
+        Value midPlusOne = AddIOp::create(b, b.getLoc(), mid, one);
 
         auto arraysAtMid =
             llvm::to_vector(llvm::map_range(arrayMemrefs, [&](Value arrayMemref) -> Value {
-                return b.create<memref::LoadOp>(arrayMemref, mid);
+                Type type = mlir::cast<MemRefType>(arrayMemref.getType()).getElementType();
+                return memref::LoadOp::create(b, b.getLoc(), type, arrayMemref, mid);
             }));
         Value cond = emitComparison(b, pivots, arraysAtMid, comparator);
         //   if (comparator(pivot, array[mid]))
@@ -144,7 +145,7 @@ Value emitBinarySearch(ImplicitLocOpBuilder &b, Value leftInit, Value rightInit,
         Value newRight = arith.select(cond, mid, right);
 
         // }
-        b.create<scf::YieldOp>(ValueRange{newLeft, newRight});
+        scf::YieldOp::create(b, b.getLoc(), ValueRange{newLeft, newRight});
     }
 
     return whileOp.getResult(0);
@@ -153,7 +154,7 @@ Value emitBinarySearch(ImplicitLocOpBuilder &b, Value leftInit, Value rightInit,
 SmallVector<Value> loadTensorElements(ImplicitLocOpBuilder &b, ValueRange tensors, Value index)
 {
     return llvm::to_vector(llvm::map_range(tensors, [&](Value tensor) -> Value {
-        return b.create<tensor::ExtractOp>(tensor, index);
+        return tensor::ExtractOp::create(b, b.getLoc(), tensor, index);
     }));
 }
 
@@ -161,7 +162,7 @@ SmallVector<Value> loadMemrefElements(ImplicitLocOpBuilder &b, ValueRange memref
 {
     return llvm::to_vector(llvm::map_range(memrefs, [&](Value memref) -> Value {
         Type type = mlir::cast<MemRefType>(memref.getType()).getElementType();
-        return b.create<memref::LoadOp>(type, memref, index);
+        return memref::LoadOp::create(b, b.getLoc(), type, memref, index);
     }));
 }
 
@@ -169,7 +170,7 @@ void storeMemrefElements(ImplicitLocOpBuilder &b, ValueRange memrefs, Value inde
                          ValueRange values)
 {
     for (auto [value, memref] : llvm::zip(values, memrefs)) {
-        b.create<memref::StoreOp>(value, memref, index);
+        memref::StoreOp::create(b, b.getLoc(), value, memref, index);
     }
 }
 
@@ -180,15 +181,15 @@ void emitInsertionSort(ImplicitLocOpBuilder &b, Value lo, Value hi, ValueRange i
                        ValueRange outputMemrefs, mlir::Region &comparator)
 {
     ArithBuilder arith(b, b.getLoc());
-    Value zero = b.create<arith::ConstantIndexOp>(0);
-    Value one = b.create<arith::ConstantIndexOp>(1);
+    Value zero = arith::ConstantIndexOp::create(b, b.getLoc(), 0);
+    Value one = arith::ConstantIndexOp::create(b, b.getLoc(), 1);
 
     // array[lo] = tensors[lo];
     storeMemrefElements(b, outputMemrefs, lo, loadTensorElements(b, inputTensors, lo));
 
     // for (int start = lo + 1; start < hi; ++start)
     {
-        auto forOp = b.create<scf::ForOp>(arith.add(lo, one), hi, one);
+        auto forOp = scf::ForOp::create(b, b.getLoc(), arith.add(lo, one), hi, one);
         OpBuilder::InsertionGuard outerGuard(b);
         b.setInsertionPointToStart(forOp.getBody());
         Value start = forOp.getInductionVar();
@@ -208,7 +209,7 @@ void emitInsertionSort(ImplicitLocOpBuilder &b, Value lo, Value hi, ValueRange i
         //    (strides != 1).
         // 2. It implements memcpy semantics, but we need memmove here.
         // So we go with a loop instead.
-        auto copyForOp = b.create<scf::ForOp>(zero, n, one);
+        auto copyForOp = scf::ForOp::create(b, b.getLoc(), zero, n, one);
         {
             OpBuilder::InsertionGuard innerGuard(b);
             b.setInsertionPointToStart(copyForOp.getBody());
@@ -238,7 +239,7 @@ void emitMerge(ImplicitLocOpBuilder &b, Value lo, Value mid, Value hi, ValueRang
     SmallVector<Location> whileArgLocs(whileArgTypes.size(), b.getLoc());
 
     // while(
-    auto whileOp = b.create<scf::WhileOp>(whileArgTypes, whileInitArgs);
+    auto whileOp = scf::WhileOp::create(b, b.getLoc(), whileArgTypes, whileInitArgs);
     {
         OpBuilder::InsertionGuard guard(b);
         {
@@ -250,7 +251,7 @@ void emitMerge(ImplicitLocOpBuilder &b, Value lo, Value mid, Value hi, ValueRang
             Value inbounds0 = arith.slt(i0, mid);
             Value inbounds1 = arith.slt(i1, hi);
 
-            b.create<scf::ConditionOp>(arith._and(inbounds0, inbounds1), before->getArguments());
+            scf::ConditionOp::create(b, b.getLoc(), arith._and(inbounds0, inbounds1), before->getArguments());
         }
 
         {
@@ -268,16 +269,16 @@ void emitMerge(ImplicitLocOpBuilder &b, Value lo, Value mid, Value hi, ValueRang
             Value cmp = emitComparison(b, vals1, vals0, comparator);
             SmallVector<Value> pickedVals;
             for (auto [val0, val1] : llvm::zip(vals0, vals1)) {
-                pickedVals.push_back(b.create<SelectOp>(cmp, val1, val0));
+                pickedVals.push_back(SelectOp::create(b, b.getLoc(), cmp, val1, val0));
             }
             storeMemrefElements(b, writeBufs, iOut, pickedVals);
 
-            Value one = b.create<arith::ConstantIndexOp>(1);
-            Value nexti0 = b.create<SelectOp>(cmp, i0, arith.add(i0, one));
-            Value nexti1 = b.create<SelectOp>(cmp, arith.add(i1, one), i1);
+            Value one = arith::ConstantIndexOp::create(b, b.getLoc(), 1);
+            Value nexti0 = SelectOp::create(b, b.getLoc(), cmp, i0, arith.add(i0, one));
+            Value nexti1 = SelectOp::create(b, b.getLoc(), cmp, arith.add(i1, one), i1);
             //   ++iOut;
-            Value nextIOut = b.create<AddIOp>(iOut, one);
-            b.create<scf::YieldOp>(ValueRange{nextIOut, nexti0, nexti1});
+            Value nextIOut = AddIOp::create(b, b.getLoc(), iOut, one);
+            scf::YieldOp::create(b, b.getLoc(), ValueRange{nextIOut, nexti0, nexti1});
         }
     }
 
@@ -293,9 +294,9 @@ void emitMerge(ImplicitLocOpBuilder &b, Value lo, Value mid, Value hi, ValueRang
     Value end = arith.select(leftoverIn0, mid, hi);
     Value n = arith.sub(end, start);
 
-    Value zero = b.create<arith::ConstantIndexOp>(0);
-    Value one = b.create<arith::ConstantIndexOp>(1);
-    auto forOp = b.create<scf::ForOp>(zero, n, one);
+    Value zero = arith::ConstantIndexOp::create(b, b.getLoc(), 0);
+    Value one = arith::ConstantIndexOp::create(b, b.getLoc(), 1);
+    auto forOp = scf::ForOp::create(b, b.getLoc(), zero, n, one);
     b.setInsertionPointToStart(forOp.getBody());
     Value copyIndex = forOp.getBody()->getArgument(0);
 
@@ -315,21 +316,21 @@ Value emitBottomUpMergeSort(ImplicitLocOpBuilder &b, Value lo, Value hi, int64_t
     ArithBuilder arith(b, b.getLoc());
     Value size = arith.sub(hi, lo);
 
-    Value zero = b.create<arith::ConstantIndexOp>(0);
-    Value insertionSortSize = b.create<arith::ConstantIndexOp>(kInsertionSortSize);
+    Value zero = arith::ConstantIndexOp::create(b, b.getLoc(), 0);
+    Value insertionSortSize = arith::ConstantIndexOp::create(b, b.getLoc(), kInsertionSortSize);
 
     // Run insertion sort on blocks of size kInsertionSortSize.
     // for (int start = 0; start < size; start += kInsertionSortSize) {
     {
-        auto forOp = b.create<scf::ForOp>(zero, size, insertionSortSize);
+        auto forOp = scf::ForOp::create(b, b.getLoc(), zero, size, insertionSortSize);
         OpBuilder::InsertionGuard guard(b);
         b.setInsertionPointToStart(forOp.getBody());
         Value start = forOp.getBody()->getArgument(0);
-        Value end = arith.add(b.create<MinSIOp>(arith.add(start, insertionSortSize), size), lo);
+        Value end = arith.add(MinSIOp::create(b, b.getLoc(), arith.add(start, insertionSortSize), size), lo);
         emitInsertionSort(b, start, end, inputTensors, outputs0, comparator);
     }
 
-    Value initParity = b.create<arith::ConstantIntOp>(0, 1);
+    Value initParity = arith::ConstantIntOp::create(b, b.getLoc(), 0, 1);
     if (staticSortDimSize >= 0 && staticSortDimSize < kInsertionSortSize) {
         return initParity;
     }
@@ -354,7 +355,7 @@ Value emitBottomUpMergeSort(ImplicitLocOpBuilder &b, Value lo, Value hi, int64_t
     SmallVector<Location> whileArgLocs(whileArgTypes.size(), b.getLoc());
 
     // while (
-    auto whileOp = b.create<scf::WhileOp>(whileArgTypes, whileInitArgs);
+    auto whileOp = scf::WhileOp::create(b, b.getLoc(), whileArgTypes, whileInitArgs);
     OpBuilder::InsertionGuard guard(b);
 
     //        currentSize < totalSize)
@@ -362,7 +363,7 @@ Value emitBottomUpMergeSort(ImplicitLocOpBuilder &b, Value lo, Value hi, int64_t
         Block *before = b.createBlock(&whileOp.getBefore(), {}, whileArgTypes, whileArgLocs);
         Value currentSize = before->getArgument(0);
         b.setInsertionPointToEnd(before);
-        b.create<scf::ConditionOp>(arith.slt(currentSize, size), before->getArguments());
+        scf::ConditionOp::create(b, b.getLoc(), arith.slt(currentSize, size), before->getArguments());
     }
 
     size_t numArgs = inputTensors.size();
@@ -379,25 +380,25 @@ Value emitBottomUpMergeSort(ImplicitLocOpBuilder &b, Value lo, Value hi, int64_t
 
         // for (int start = 0; start < size; start += 2*currentSize) {
         {
-            auto forOp = b.create<scf::ForOp>(zero, size, twoCurrentSize);
+            auto forOp = scf::ForOp::create(b, b.getLoc(), zero, size, twoCurrentSize);
             b.setInsertionPointToStart(forOp.getBody());
             Value start = forOp.getBody()->getArgument(0);
 
-            Value mid = b.create<MinSIOp>(size, arith.add(start, currentSize));
-            Value end = b.create<MinSIOp>(size, arith.add(start, twoCurrentSize));
+            Value mid = MinSIOp::create(b, b.getLoc(), size, arith.add(start, currentSize));
+            Value end = MinSIOp::create(b, b.getLoc(), size, arith.add(start, twoCurrentSize));
             emitMerge(b, start, mid, end, readBufs, writeBufs, comparator);
             b.setInsertionPointAfter(forOp);
         }
         // }
 
         // parity = !parity;
-        Value one = b.create<arith::ConstantIntOp>(1, 1);
+        Value one = arith::ConstantIntOp::create(b, b.getLoc(), 1, 1);
         Value notParity = arith.sub(one, parity);
         // currentSize *= 2;
         SmallVector<Value> nextWhileArgs{twoCurrentSize, notParity};
         llvm::copy(writeBufs, std::back_inserter(nextWhileArgs));
         llvm::copy(readBufs, std::back_inserter(nextWhileArgs));
-        b.create<scf::YieldOp>(nextWhileArgs);
+        scf::YieldOp::create(b, b.getLoc(), nextWhileArgs);
     }
     // }
 
@@ -425,7 +426,7 @@ struct Slicer {
     RankedTensorType toSlicedType(RankedTensorType sourceType)
     {
         return tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-            /*resultRank=*/1, sourceType, offsets, sizes, strides);
+            /*resultRank=*/1, sourceType, sizes);
     }
 
     MemRefType toSlicedType(MemRefType sourceType)
@@ -437,7 +438,7 @@ struct Slicer {
     template <typename Op, typename Ty> Value slice(ImplicitLocOpBuilder &b, Value input)
     {
         Ty ty = mlir::cast<Ty>(input.getType());
-        return b.create<Op>(toSlicedType(ty), input, offsets, sizes, strides).getResult();
+        return Op::create(b, b.getLoc(), toSlicedType(ty), input, offsets, sizes, strides).getResult();
     }
 
     Value apply(ImplicitLocOpBuilder &b, Value input)
@@ -486,16 +487,16 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
         auto firstOperandType = mlir::cast<ShapedType>(firstOperand.getType());
         int64_t inputRank = firstOperandType.getRank();
 
-        Value sortDimSize = b.createOrFold<tensor::DimOp>(
-            firstOperand, b.create<arith::ConstantIndexOp>(op.getDimension()));
+        Value sortDimSize = tensor::DimOp::create(b, b.getLoc(),
+            firstOperand, arith::ConstantIndexOp::create(b, b.getLoc(), op.getDimension()));
         int64_t staticSortDimSize = firstOperandType.getDimSize(op.getDimension());
 
         SmallVector<Value> dynamicDims;
         for (int i = 0; i < inputRank; ++i) {
             if (!firstOperandType.isDynamicDim(i))
                 continue;
-            Value index = b.create<arith::ConstantIndexOp>(i);
-            Value dimOp = b.create<tensor::DimOp>(firstOperand, index);
+            Value index = arith::ConstantIndexOp::create(b, b.getLoc(), i);
+            Value dimOp = tensor::DimOp::create(b, b.getLoc(), firstOperand, index);
             dynamicDims.push_back(dimOp);
         }
 
@@ -506,25 +507,25 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
             auto inputType = mlir::cast<ShapedType>(input.getType());
             auto memRefType = MemRefType::get(inputType.getShape(), inputType.getElementType());
 
-            outputMemrefs.push_back(b.create<memref::AllocOp>(memRefType, dynamicDims));
-            scratchMemrefs.push_back(b.create<memref::AllocOp>(memRefType, dynamicDims));
+            outputMemrefs.push_back(memref::AllocOp::create(b, b.getLoc(), memRefType, dynamicDims));
+            scratchMemrefs.push_back(memref::AllocOp::create(b, b.getLoc(), memRefType, dynamicDims));
         }
 
         b.setInsertionPoint(op);
-        Value zero = b.create<arith::ConstantIndexOp>(0);
-        Value one = b.create<arith::ConstantIndexOp>(1);
+        Value zero = arith::ConstantIndexOp::create(b, b.getLoc(), 0);
+        Value one = arith::ConstantIndexOp::create(b, b.getLoc(), 1);
 
-        Value forInitArg = b.create<arith::ConstantIntOp>(0, 1);
+        Value forInitArg = arith::ConstantIntOp::create(b, b.getLoc(), 0, 1);
         SmallVector<scf::ForOp> forOps;
         SmallVector<Value> ivs;
         forOps.reserve(inputRank - 1);
         ivs.reserve(inputRank - 1);
         for (int64_t i = 0; i < inputRank; ++i) {
             if (i != static_cast<int64_t>(op.getDimension())) {
-                Value dim = b.create<arith::ConstantIndexOp>(i);
-                Value ub = b.create<tensor::DimOp>(firstOperand, dim);
+                Value dim = arith::ConstantIndexOp::create(b, b.getLoc(), i);
+                Value ub = tensor::DimOp::create(b, b.getLoc(), firstOperand, dim);
                 scf::ForOp &forOp = forOps.emplace_back(
-                    b.create<scf::ForOp>(zero, ub, one, ValueRange{forInitArg}));
+                    scf::ForOp::create(b, b.getLoc(), zero, ub, one, ValueRange{forInitArg}));
                 ivs.push_back(forOp.getInductionVar());
                 b.setInsertionPointToStart(&forOp.getRegion().front());
             }
@@ -541,15 +542,15 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
         // Pass the parity bit through the for loops.
         for (auto i = static_cast<int64_t>(forOps.size() - 1); i >= 0; --i) {
             b.setInsertionPointToEnd(&forOps[i].getRegion().front());
-            b.create<scf::YieldOp>(ValueRange{parity});
+            scf::YieldOp::create(b, b.getLoc(), ValueRange{parity});
             parity = forOps[i]->getResult(0);
         }
         b.setInsertionPoint(op);
 
         SmallVector<Value> outputTensors;
         for (auto [out0, out1] : llvm::zip(outputMemrefs, scratchMemrefs)) {
-            Value s = b.create<SelectOp>(parity, out1, out0).getResult();
-            outputTensors.push_back(b.create<bufferization::ToTensorOp>(
+            Value s = SelectOp::create(b, b.getLoc(), parity, out1, out0).getResult();
+            outputTensors.push_back(bufferization::ToTensorOp::create(b, b.getLoc(),
                 memref::getTensorTypeFromMemRefType(s.getType()), s, /*restrict=*/true));
         }
 

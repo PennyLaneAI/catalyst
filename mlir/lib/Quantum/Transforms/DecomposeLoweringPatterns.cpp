@@ -16,14 +16,15 @@
 
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 
-#include "DecomposeLoweringImpl.hpp"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
+
+#include "DecomposeLoweringImpl.hpp"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -60,6 +61,21 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
         }
         func::FuncOp decompFunc = it->second;
 
+        // For null decomp rules, the signature will not have any quantum values
+        // This is a deviation from the standard decomp func signature, so we deal with it
+        // separately
+        if (!llvm::any_of(llvm::concat<const Type>(decompFunc.getFunctionType().getInputs(),
+                                                   decompFunc.getFunctionType().getResults()),
+                          [](const mlir::Type t) {
+                              return isa<quantum::QuregType, quantum::QubitType>(t);
+                          })) {
+            for (auto [inQubit, outQubit] :
+                 llvm::zip_equal(op.getQubitOperands(), op.getQubitResults())) {
+                rewriter.replaceAllUsesWith(outQubit, inQubit);
+            }
+            return success();
+        }
+
         // Here is the assumption that the decomposition function must have at least one input and
         // one result
         assert(decompFunc.getFunctionType().getNumInputs() > 0 &&
@@ -69,14 +85,15 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
 
         rewriter.setInsertionPointAfter(op);
 
-        auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
+        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
         auto analyzer = CustomOpSignatureAnalyzer(op, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
         auto callOp =
-            rewriter.create<func::CallOp>(op.getLoc(), decompFunc.getFunctionType().getResults(),
-                                          decompFunc.getSymName(), callOperands);
+            func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
+                                 decompFunc.getSymName(), callOperands);
 
         // Replace the op with the call op and adjust the insert ops for the qreg mode
         if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {
@@ -132,7 +149,8 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         rewriter.setInsertionPointAfter(op);
 
-        auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
+        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
         auto numQbitsAttr = decompFunc->getAttrOfType<IntegerAttr>("num_wires");
         if (!numQbitsAttr) {
             op.emitError("Decomposition function missing 'num_wires' attribute");
@@ -149,8 +167,8 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
         auto callOp =
-            rewriter.create<func::CallOp>(op.getLoc(), decompFunc.getFunctionType().getResults(),
-                                          decompFunc.getSymName(), callOperands);
+            func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
+                                 decompFunc.getSymName(), callOperands);
 
         // Replace the op with the call op and adjust the insert ops for the qreg mode
         if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {

@@ -11,25 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit tests for the unified compiler's entry point."""
+
+# pylint: disable=line-too-long
 
 from dataclasses import dataclass
 
-# pylint: disable=wrong-import-position,line-too-long
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 import jax
-import pennylane as qml
+import pennylane as qp
+import pytest
 from jaxlib.mlir.ir import Module as jModule
 from pennylane.capture import enabled as capture_enabled
 from xdsl import passes
 from xdsl.context import Context
 from xdsl.dialects import builtin, transform
-from xdsl.interpreters import Interpreter
 from xdsl.passes import PassPipeline
 
 from catalyst import CompileError, qjit
@@ -38,14 +33,12 @@ from catalyst.passes import cancel_inverses as catalyst_cancel_inverses
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface import Compiler
 from catalyst.python_interface.conversion import (
-    mlir_from_docstring,
     mlir_module,
-    xdsl_from_docstring,
+    parse_generic_to_mlir_module,
+    parse_generic_to_xdsl_module,
 )
 from catalyst.python_interface.pass_api import (
-    ApplyTransformSequence,
-    TransformFunctionsExt,
-    TransformInterpreterPass,
+    ApplyTransformSequencePass,
     available_passes,
     compiler_transform,
 )
@@ -53,6 +46,8 @@ from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 @dataclass(frozen=True)
@@ -92,14 +87,12 @@ def test_compiler():
     assert str(retval) == str(input_module)
 
 
-def test_generic_catalyst_program():
+@pytest.mark.parametrize("as_mod", [True, False])
+def test_generic_catalyst_program(as_mod):
     """
     test that actually will trigger the transform interpreter
     """
-
-    @mlir_from_docstring
-    def program():
-        """
+    program = """
         "builtin.module"() <{sym_name = "circuit"}> ({
           "func.func"() <{function_type = () -> tensor<2xcomplex<f64>>, sym_name = "jit_circuit", sym_visibility = "public"}> ({
             %8 = "catalyst.launch_kernel"() <{callee = @module_circuit::@circuit}> : () -> tensor<2xcomplex<f64>>
@@ -114,7 +107,7 @@ def test_generic_catalyst_program():
             }) {transform.with_named_sequence} : () -> ()
             "func.func"() <{function_type = () -> tensor<2xcomplex<f64>>, sym_name = "circuit", sym_visibility = "public"}> ({
               %0 = "arith.constant"() <{value = 0 : i64}> : () -> i64
-              "quantum.device"(%0) <{kwargs = "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}", lib = "/usr/local/lib/python3.11/dist-packages/pennylane_lightning/liblightning_qubit_catalyst.so", name = "LightningSimulator"}> : (i64) -> ()
+              "quantum.device"(%0) <{kwargs = "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}", lib = "/usr/local/lib/python3.11/dist-packages/pennylane_lightning/liblightning_qubit_catalyst.so", device_name = "LightningSimulator"}> : (i64) -> ()
               %1 = "quantum.alloc"() <{nqubits_attr = 1 : i64}> : () -> !quantum.reg
               %2 = "quantum.extract"(%1) <{idx_attr = 0 : i64}> : (!quantum.reg) -> !quantum.bit
               %3 = "quantum.custom"(%2) <{gate_name = "Hadamard", operandSegmentSizes = array<i32: 0, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0>}> : (!quantum.bit) -> !quantum.bit
@@ -125,7 +118,7 @@ def test_generic_catalyst_program():
               "quantum.dealloc"(%5) : (!quantum.reg) -> ()
               "quantum.device_release"() : () -> ()
               "func.return"(%7) : (tensor<2xcomplex<f64>>) -> ()
-            }) {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} : () -> ()
+            }) {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} : () -> ()
           }) : () -> ()
           "func.func"() <{function_type = () -> (), sym_name = "setup"}> ({
             "quantum.init"() : () -> ()
@@ -138,56 +131,30 @@ def test_generic_catalyst_program():
         }) : () -> ()
         """
 
-    retval = Compiler.run(program())
-    assert isinstance(retval, jModule)
-
-
-def test_generic_catalyst_program_as_string():
-    """
-    test that actually will trigger the transform interpreter
-    """
-
-    program: str = """
-        "builtin.module"() <{sym_name = "circuit"}> ({
-          "func.func"() <{function_type = () -> tensor<2xcomplex<f64>>, sym_name = "jit_circuit", sym_visibility = "public"}> ({
-            %8 = "catalyst.launch_kernel"() <{callee = @module_circuit::@circuit}> : () -> tensor<2xcomplex<f64>>
-            "func.return"(%8) : (tensor<2xcomplex<f64>>) -> ()
-          }) {llvm.emit_c_interface} : () -> ()
-          "builtin.module"() <{sym_name = "module_circuit"}> ({
-            "builtin.module"() ({
-              "transform.named_sequence"() <{function_type = (!transform.op<"builtin.module">) -> (), sym_name = "__transform_main"}> ({
-              ^bb0(%arg0: !transform.op<"builtin.module">):
-                "transform.yield"() : () -> ()
-              }) : () -> ()
-            }) {transform.with_named_sequence} : () -> ()
-            "func.func"() <{function_type = () -> tensor<2xcomplex<f64>>, sym_name = "circuit", sym_visibility = "public"}> ({
-              %0 = "arith.constant"() <{value = 0 : i64}> : () -> i64
-              "quantum.device"(%0) <{kwargs = "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}", lib = "/usr/local/lib/python3.11/dist-packages/pennylane_lightning/liblightning_qubit_catalyst.so", name = "LightningSimulator"}> : (i64) -> ()
-              %1 = "quantum.alloc"() <{nqubits_attr = 1 : i64}> : () -> !quantum.reg
-              %2 = "quantum.extract"(%1) <{idx_attr = 0 : i64}> : (!quantum.reg) -> !quantum.bit
-              %3 = "quantum.custom"(%2) <{gate_name = "Hadamard", operandSegmentSizes = array<i32: 0, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0>}> : (!quantum.bit) -> !quantum.bit
-              %4 = "quantum.custom"(%3) <{gate_name = "Hadamard", operandSegmentSizes = array<i32: 0, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0>}> : (!quantum.bit) -> !quantum.bit
-              %5 = "quantum.insert"(%1, %4) <{idx_attr = 0 : i64}> : (!quantum.reg, !quantum.bit) -> !quantum.reg
-              %6 = "quantum.compbasis"(%5) <{operandSegmentSizes = array<i32: 0, 1>}> : (!quantum.reg) -> !quantum.obs
-              %7 = "quantum.state"(%6) <{operandSegmentSizes = array<i32: 1, 0, 0>}> : (!quantum.obs) -> tensor<2xcomplex<f64>>
-              "quantum.dealloc"(%5) : (!quantum.reg) -> ()
-              "quantum.device_release"() : () -> ()
-              "func.return"(%7) : (tensor<2xcomplex<f64>>) -> ()
-            }) {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} : () -> ()
-          }) : () -> ()
-          "func.func"() <{function_type = () -> (), sym_name = "setup"}> ({
-            "quantum.init"() : () -> ()
-            "func.return"() : () -> ()
-          }) : () -> ()
-          "func.func"() <{function_type = () -> (), sym_name = "teardown"}> ({
-            "quantum.finalize"() : () -> ()
-            "func.return"() : () -> ()
-          }) : () -> ()
-        }) : () -> ()
-        """
+    if as_mod:
+        program = parse_generic_to_mlir_module(program)
+    expected_type = jModule if as_mod else str
 
     retval = Compiler.run(program)
-    assert isinstance(retval, str)
+    assert isinstance(retval, expected_type)
+
+
+def test_empty_res_attrs_on_void_func_is_omitted():
+    """Empty res_attrs on a void func.func must not reach the C++ driver."""
+
+    program = """
+        builtin.module {
+          "func.func"() <{function_type = () -> (), sym_name = "void_fn", res_attrs = []}> ({
+            "func.return"() : () -> ()
+          }) : () -> ()
+        }
+        """
+
+    out = Compiler.run(program)
+
+    assert isinstance(out, str)
+    assert "res_attrs = []" not in out
+    assert "arg_attrs = []" not in out
 
 
 def test_raises_error_when_pass_does_not_exists():
@@ -196,35 +163,27 @@ def test_raises_error_when_pass_does_not_exists():
     This should raise an error
     """
 
-    @xdsl_from_docstring
-    def empty_module():
-        """
-        builtin.module {}
-        """
-
-    @xdsl_from_docstring
-    def schedule_module():
-        """
+    module_string = """
         builtin.module {
-          builtin.module {
-            transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
-              %0 = transform.apply_registered_pass "this-pass-does-not-exists" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-              transform.yield
+            builtin.module {
+                builtin.module attributes {transform.with_named_sequence} {
+                    transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
+                    %0 = transform.apply_registered_pass "this-pass-does-not-exists" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                    transform.yield
+                    }
+                }
             }
-          }
         }
         """
+
+    module = parse_generic_to_xdsl_module(module_string)
 
     ctx = Context()
     ctx.load_dialect(builtin.Builtin)
     ctx.load_dialect(transform.Transform)
-    schedule = TransformInterpreterPass.find_transform_entry_point(
-        schedule_module(), "__transform_main"
-    )
-    interpreter = Interpreter(empty_module())
-    interpreter.register_implementations(TransformFunctionsExt(ctx, {}))
+    pass_ = ApplyTransformSequencePass()
     with pytest.raises(CompileError):
-        interpreter.call_op(schedule, (empty_module(),))
+        pass_.apply(ctx, module)
 
 
 def test_decorator():
@@ -237,25 +196,29 @@ def test_integration_for_transform_interpreter(capsys):
     """Test that a pass is run via the transform interpreter"""
 
     # The hello-world pass is in the IR
-    @xdsl_from_docstring
-    def program():
-        """
+    program = """
         builtin.module {
-          builtin.module {
-            transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
-              %0 = transform.apply_registered_pass "hello-world" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-              transform.yield
+            builtin.module {
+                builtin.module attributes {transform.with_named_sequence} {
+                    transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
+                        %0 = transform.apply_registered_pass "hello-world" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                        transform.yield
+                    }
+                }
+                func.func @foo() {
+                    func.return
+                }
             }
-          }
         }
         """
+    program = parse_generic_to_xdsl_module(program)
 
     ctx = Context()
     ctx.load_dialect(builtin.Builtin)
     ctx.load_dialect(transform.Transform)
 
-    pipeline = PassPipeline((ApplyTransformSequence(),))
-    pipeline.apply(ctx, program())
+    pipeline = PassPipeline((ApplyTransformSequencePass(),))
+    pipeline.apply(ctx, program)
     captured = capsys.readouterr()
     assert captured.out.strip() == "hello world"
 
@@ -270,11 +233,11 @@ class TestCatalystIntegration:
 
         assert capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()], capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -286,10 +249,10 @@ class TestCatalystIntegration:
         assert not capture_enabled()
 
         @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -301,12 +264,12 @@ class TestCatalystIntegration:
 
         assert capture_enabled()
 
-        @qjit
+        @qjit(capture=True)
         @hello_world_pass
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -321,10 +284,10 @@ class TestCatalystIntegration:
 
         @qjit
         @apply_pass("hello-world")
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -338,15 +301,15 @@ class TestCatalystIntegration:
 
         assert capture_enabled()
 
-        @qjit
+        @qjit(capture=True)
         @hello_world_pass
-        @qml.transforms.cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            qml.X(0)
-            qml.X(0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            qp.X(0)
+            qp.X(0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -362,12 +325,12 @@ class TestCatalystIntegration:
         @qjit
         @apply_pass("hello-world")
         @catalyst_cancel_inverses
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
-            qml.RX(x, 0)
-            qml.X(0)
-            qml.X(0)
-            return qml.expval(qml.Z(0))
+            qp.RX(x, 0)
+            qp.X(0)
+            qp.X(0)
+            return qp.expval(qp.Z(0))
 
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
@@ -399,23 +362,24 @@ class TestCallbackIntegration:
                 return
             print("hello world")
 
-        @xdsl_from_docstring
-        def program():
-            """
+        program = """
             builtin.module {
-              builtin.module {
-                transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
-                  %0 = transform.apply_registered_pass "none-pass" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-                  transform.yield
+                builtin.module {
+                    builtin.module attributes {transform.with_named_sequence} {
+                        transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
+                        %0 = transform.apply_registered_pass "none-pass" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                        transform.yield
+                        }
+                    }
                 }
-              }
             }
             """
+        program = parse_generic_to_xdsl_module(program)
 
         ctx = Context()
         ctx.load_dialect(builtin.Builtin)
-        pipeline = PassPipeline((ApplyTransformSequence(callback=print_between_passes),))
-        pipeline.apply(ctx, program())
+        pipeline = PassPipeline((ApplyTransformSequencePass(callback=print_between_passes),))
+        pipeline.apply(ctx, program)
         captured = capsys.readouterr()
         assert captured.out.strip() == "hello world"
 
@@ -428,43 +392,45 @@ class TestCallbackIntegration:
             print("=== Between Pass ===")
             print(module)
 
-        @xdsl_from_docstring
-        def program_2_passes():
-            """
+        program_2_passes = """
             builtin.module {
-              builtin.module @module_foo {
-                transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
-                  %0 = transform.apply_registered_pass "xdsl-cancel-inverses" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-                  %1 = transform.apply_registered_pass "xdsl-merge-rotations" to %0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-                  transform.yield %1 : !transform.op<"builtin.module">
-                  func.func public @foo() {
-                    %2 = "stablehlo.constant"() <{value = dense<0> : tensor<i64>}> : () -> tensor<i64>
-                    %3 = tensor.extract %2[] : tensor<i64>
-                    %4 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
-                    %5 = quantum.alloc(1) : !quantum.reg
-                    %6 = tensor.extract %2[] : tensor<i64>
-                    %7 = quantum.extract %5[%6] : !quantum.reg -> !quantum.bit
-                    %8 = "stablehlo.constant"() <{value = dense<1.000000e+00> : tensor<f64>}> : () -> tensor<f64>
-                    %9 = tensor.extract %8[] : tensor<f64>
-                    %10 = quantum.custom "RX"(%9) %7 : !quantum.bit
-                    %11 = tensor.extract %8[] : tensor<f64>
-                    %12 = quantum.custom "RX"(%11) %10 : !quantum.bit
-                    %13 = quantum.custom "Hadamard"() %12 : !quantum.bit
-                    %14 = quantum.custom "Hadamard"() %13 : !quantum.bit
-                    %15 = tensor.extract %1[] : tensor<i64>
-                    %16 = quantum.insert %5[%15], %14 : !quantum.reg, !quantum.bit
-                    %17 = quantum.compbasis qreg %16 : !quantum.obs
-                    %18 = quantum.probs %17 : tensor<2xf64>
-                  }
+                builtin.module {
+                    builtin.module @module_foo attributes {transform.with_named_sequence} {
+                        transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
+                            %0 = transform.apply_registered_pass "xdsl-cancel-inverses" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            %1 = transform.apply_registered_pass "xdsl-merge-rotations" to %0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+                            transform.yield %1 : !transform.op<"builtin.module">
+                        }
+                    }
+                    func.func public @foo() {
+                        %2 = "stablehlo.constant"() <{value = dense<0> : tensor<i64>}> : () -> tensor<i64>
+                        %3 = tensor.extract %2[] : tensor<i64>
+                        %4 = "stablehlo.constant"() <{value = dense<1> : tensor<i64>}> : () -> tensor<i64>
+                        %5 = quantum.alloc(1) : !quantum.reg
+                        %6 = tensor.extract %2[] : tensor<i64>
+                        %7 = quantum.extract %5[%6] : !quantum.reg -> !quantum.bit
+                        %8 = "stablehlo.constant"() <{value = dense<1.000000e+00> : tensor<f64>}> : () -> tensor<f64>
+                        %9 = tensor.extract %8[] : tensor<f64>
+                        %10 = quantum.custom "RX"(%9) %7 : !quantum.bit
+                        %11 = tensor.extract %8[] : tensor<f64>
+                        %12 = quantum.custom "RX"(%11) %10 : !quantum.bit
+                        %13 = quantum.custom "Hadamard"() %12 : !quantum.bit
+                        %14 = quantum.custom "Hadamard"() %13 : !quantum.bit
+                        %15 = tensor.extract %2[] : tensor<i64>
+                        %16 = quantum.insert %5[%15], %14 : !quantum.reg, !quantum.bit
+                        %17 = quantum.compbasis qreg %16 : !quantum.obs
+                        %18 = quantum.probs %17 : tensor<2xf64>
+                        func.return
+                    }
                 }
-              }
             }
             """
+        program_2_passes = parse_generic_to_xdsl_module(program_2_passes)
 
         ctx = Context()
         ctx.load_dialect(builtin.Builtin)
-        pipeline = PassPipeline((ApplyTransformSequence(callback=print_between_passes),))
-        pipeline.apply(ctx, program_2_passes())
+        pipeline = PassPipeline((ApplyTransformSequencePass(callback=print_between_passes),))
+        pipeline.apply(ctx, program_2_passes)
 
         out = capsys.readouterr().out
         printed_modules = out.split("=== Between Pass ===")[1:]
@@ -484,8 +450,9 @@ class TestCallbackIntegration:
 
         assert printed_modules[0] != printed_modules[1], "IR should differ between passes"
 
+    @pytest.mark.parametrize("skip_preprocess", [True, False])
     @pytest.mark.usefixtures("use_capture")
-    def test_callback_run_integration(self, capsys):
+    def test_callback_run_integration(self, capsys, skip_preprocess):
         """Test that the callback is integrated into the pass pipeline with the Compiler.run() method"""
 
         def print_between_passes(_, module, __, pass_level=0):
@@ -495,24 +462,30 @@ class TestCallbackIntegration:
             print("=== Between Pass ===")
             print(module)
 
-        @qml.qjit
+        @qp.qjit(skip_preprocess=skip_preprocess, capture=True)
         @iterative_cancel_inverses_pass
         @merge_rotations_pass
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
-            qml.RX(0.1, 0)
-            qml.RX(2.0, 0)
-            qml.Hadamard(1)
-            qml.Hadamard(1)
-            return qml.state()
+            qp.RX(0.1, 0)
+            qp.RX(2.0, 0)
+            qp.Hadamard(1)
+            qp.Hadamard(1)
+            return qp.state()
 
         Compiler.run(circuit.mlir_module, callback=print_between_passes)
         out = capsys.readouterr().out
         printed_modules = out.split("=== Between Pass ===")[1:]
 
-        assert (
-            len(printed_modules) == 2
-        ), "Callback should have been called twice (after each pass)."
+        if skip_preprocess:
+            assert (
+                len(printed_modules) == 2
+            ), "Callback should have been called twice (after each pass)."
+        else:
+            assert len(printed_modules) == 5, (
+                "Callback should have been called five times (after each pass, "
+                "including device preprocessing)."
+            )
 
         # callback after merge-rotations
         # We expect an `arith.addf` if rotations were merged

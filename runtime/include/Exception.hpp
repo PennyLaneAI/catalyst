@@ -16,10 +16,8 @@
 
 #include <exception>
 #include <iostream>
-
 #include <sstream>
 #include <string>
-#include <type_traits>
 #include <utility>
 
 /**
@@ -41,6 +39,11 @@
  * and source location if expression evaluates to false.
  */
 #define RT_ASSERT(expression) RT_FAIL_IF(!(expression), "Assertion: " #expression)
+
+/**
+ * @brief Macro that emits a non-fatal warning message to stderr.
+ */
+#define RT_WARN(message) std::cerr << "[Warning] Catalyst Runtime: " << (message) << "\n"
 
 namespace Catalyst::Runtime {
 

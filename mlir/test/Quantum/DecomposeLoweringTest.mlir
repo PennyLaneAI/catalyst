@@ -15,7 +15,7 @@
 // RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
 
 module @two_hadamards {
-  func.func public @test_two_hadamards() -> tensor<4xf64> {
+  func.func public @test_two_hadamards() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
@@ -86,7 +86,7 @@ module @single_hadamard {
 
 // -----
 module @recursive {
-  func.func public @test_recursive() -> tensor<4xf64> {
+  func.func public @test_recursive() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
@@ -132,7 +132,7 @@ module @recursive {
 
 // -----
 module @recursive {
-  func.func public @test_recursive() -> tensor<4xf64> {
+  func.func public @test_recursive() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
@@ -180,7 +180,7 @@ module @recursive {
 
 // Test parametric gates and wires
 module @param_rxry {
-  func.func public @test_param_rxry(%arg0: tensor<f64>, %arg1: tensor<i64>) -> tensor<2xf64> {
+  func.func public @test_param_rxry(%arg0: tensor<f64>, %arg1: tensor<i64>) -> tensor<2xf64> attributes {quantum.node} {
     %c0_i64 = arith.constant 0 : i64
 
     // CHECK: [[REG:%.+]] = quantum.alloc( 1) : !quantum.reg
@@ -223,7 +223,7 @@ module @param_rxry {
 
 // Test parametric gates and wires
 module @param_rxry_2 {
-  func.func public @test_param_rxry_2(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<i64>) -> tensor<2xf64> {
+  func.func public @test_param_rxry_2(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<i64>) -> tensor<2xf64> attributes {quantum.node} {
     %c0_i64 = arith.constant 0 : i64
 
     // CHECK: [[REG:%.+]] = quantum.alloc( 1) : !quantum.reg
@@ -269,7 +269,7 @@ module @param_rxry_2 {
 
 // Test recursive and qreg-based gate decomposition
 module @qreg_base_circuit {
-  func.func public @test_qreg_base_circuit() -> tensor<2xf64> {
+  func.func public @test_qreg_base_circuit() -> tensor<2xf64> attributes {quantum.node} {
       // CHECK: [[CST:%.+]] = arith.constant 1.000000e+00 : f64
       %cst = arith.constant 1.000000e+00 : f64
 
@@ -371,7 +371,7 @@ module @qreg_base_circuit {
 // -----
 
 module @multi_wire_cnot_decomposition {
-  func.func public @test_cnot_decomposition() -> tensor<4xf64> {
+  func.func public @test_cnot_decomposition() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -457,7 +457,7 @@ module @multi_wire_cnot_decomposition {
 // -----
 
 module @cnot_alternative_decomposition {
-  func.func public @test_cnot_alternative_decomposition() -> tensor<4xf64> {
+  func.func public @test_cnot_alternative_decomposition() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -510,7 +510,7 @@ module @cnot_alternative_decomposition {
 // -----
 
 module @mcm_example {
-  func.func public @test_mcm_hadamard() -> tensor<2xf64> {
+  func.func public @test_mcm_hadamard() -> tensor<2xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %mres, %out_qubit = quantum.measure %1 : i1, !quantum.bit
@@ -556,7 +556,7 @@ module @mcm_example {
 // -----
 
 module @circuit_with_multirz {
-  func.func public @test_with_multirz() -> tensor<4xf64> {
+  func.func public @test_with_multirz() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: func.func public @test_with_multirz() -> tensor<4xf64>
@@ -605,5 +605,127 @@ module @circuit_with_multirz {
     %extracted_1 = tensor.extract %1[] : tensor<i64>
     %3 = quantum.insert %arg0[%extracted_1], %out_qubits : !quantum.reg, !quantum.bit
     return %3 : !quantum.reg
+  }
+}
+
+// -----
+
+module @qreg_at_not_first_arg {
+  func.func public @test_qreg_at_not_first_arg() attributes {quantum.node} {
+    // CHECK: [[wire_tensor:%.+]] = arith.constant dense<[0, 1]> : tensor<2xi64>
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[zero:%.+]] = stablehlo.slice [[wire_tensor]] [0:1] : (tensor<2xi64>) -> tensor<1xi64>
+    // CHECK: [[zero_i64:%.+]] = stablehlo.reshape [[zero]] : (tensor<1xi64>) -> tensor<i64>
+    // CHECK: [[one:%.+]] = stablehlo.slice [[wire_tensor]] [1:2] : (tensor<2xi64>) -> tensor<1xi64>
+    // CHECK: [[one_i64:%.+]] = stablehlo.reshape [[one]] : (tensor<1xi64>) -> tensor<i64>
+    // CHECK: [[zero:%.+]] = tensor.extract [[zero_i64]][] : tensor<i64>
+    // CHECK: [[one:%.+]] = tensor.extract [[one_i64]][] : tensor<i64>
+    // CHECK: [[q0:%.+]] = quantum.extract [[reg]][[[zero]]] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q1:%.+]] = quantum.extract [[reg]][[[one]]] : !quantum.reg -> !quantum.bit
+    // CHECK: [[out_qubits:%.+]]:2 = quantum.custom "CZ"() [[q0]], [[q1]] : !quantum.bit, !quantum.bit
+    // CHECK: [[insert0:%.+]] = quantum.insert [[reg]][[[zero]]], [[out_qubits]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][[[one]]], [[out_qubits]]#1 : !quantum.reg, !quantum.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_qubits_0:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+    %3 = quantum.insert %0[ 0], %out_qubits_0#0 : !quantum.reg, !quantum.bit
+    %4 = quantum.insert %3[ 1], %out_qubits_0#1 : !quantum.reg, !quantum.bit
+    quantum.dealloc %4 : !quantum.reg
+    return
+  }
+
+  // CHECK-NOT: func.func private @my_cnot
+  func.func private @my_cnot(%arg0: tensor<2xi64>, %arg1: !quantum.reg) -> !quantum.reg attributes {target_gate = "CNOT"} {
+    %0 = stablehlo.slice %arg0 [0:1] : (tensor<2xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %2 = stablehlo.slice %arg0 [1:2] : (tensor<2xi64>) -> tensor<1xi64>
+    %3 = stablehlo.reshape %2 : (tensor<1xi64>) -> tensor<i64>
+    %extracted_0 = tensor.extract %1[] : tensor<i64>
+    %extracted_1 = tensor.extract %3[] : tensor<i64>
+    %4 = quantum.extract %arg1[%extracted_0] : !quantum.reg -> !quantum.bit
+    %5 = quantum.extract %arg1[%extracted_1] : !quantum.reg -> !quantum.bit
+    %out_qubits:2 = quantum.custom "CZ"() %4, %5 : !quantum.bit, !quantum.bit
+    %6 = quantum.insert %arg1[%extracted_0], %out_qubits#0 : !quantum.reg, !quantum.bit
+    %7 = quantum.insert %6[%extracted_1], %out_qubits#1 : !quantum.reg, !quantum.bit
+    return %7 : !quantum.reg
+  }
+}
+
+// -----
+
+module @null_decomp_rule{
+  func.func public @test_null_decomp_rule() attributes {quantum.node} {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1)
+    // CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0]
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK-NOT: PauliX
+    // CHECK: quantum.custom "Hadamard"() [[q0]] : !quantum.bit
+    %2 = quantum.custom "PauliX"() %1 : !quantum.bit
+    %3 = quantum.custom "Hadamard"() %2 : !quantum.bit
+    %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+    quantum.dealloc %4 : !quantum.reg
+    return
+  }
+
+  // CHECK-NOT: func.func private @null_decomp
+  func.func private @null_decomp() attributes {target_gate = "PauliX"} {
+    return
+  }
+}
+
+// -----
+
+module @different_qreg_values{
+  func.func public @circuit() attributes {quantum.node} {
+    // CHECK: [[wire_tensor:%.+]] = arith.constant dense<[2, 1]> : tensor<2xi64>
+    // CHECK: [[reg:%.+]] = quantum.alloc( 3) : !quantum.reg
+    // CHECK: [[q1:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() [[q0]] : !quantum.bit
+    // CHECK: [[H_insert:%.+]] = quantum.insert [[reg]][ 0], [[H]] : !quantum.reg, !quantum.bit
+    // CHECK: [[full_insert:%.+]] = quantum.insert [[H_insert]][ 1], [[q1]] : !quantum.reg, !quantum.bit
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "Hadamard"() %2 : !quantum.bit
+    %3 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+
+    // CHECK: [[two:%.+]] = stablehlo.slice [[wire_tensor]] [0:1] : (tensor<2xi64>) -> tensor<1xi64>
+    // CHECK: [[two_i64:%.+]] = stablehlo.reshape [[two]] : (tensor<1xi64>) -> tensor<i64>
+    // CHECK: [[one:%.+]] = stablehlo.slice [[wire_tensor]] [1:2] : (tensor<2xi64>) -> tensor<1xi64>
+    // CHECK: [[one_i64:%.+]] = stablehlo.reshape [[one]] : (tensor<1xi64>) -> tensor<i64>
+    // CHECK: [[two:%.+]] = tensor.extract [[two_i64]][] : tensor<i64>
+    // CHECK: [[one:%.+]] = tensor.extract [[one_i64]][] : tensor<i64>
+    // CHECK: [[q2:%.+]] = quantum.extract [[full_insert]][[[two]]] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q1:%.+]] = quantum.extract [[full_insert]][[[one]]] : !quantum.reg -> !quantum.bit
+    // CHECK: [[CZ:%.+]]:2 = quantum.custom "CZ"() [[q2]], [[q1]] : !quantum.bit, !quantum.bit
+    // CHECK: [[insert2:%.+]] = quantum.insert [[full_insert]][[[two]]], [[CZ]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert2]][[[one]]], [[CZ]]#1 : !quantum.reg, !quantum.bit
+    %4 = quantum.extract %3[ 2] : !quantum.reg -> !quantum.bit
+    %out_qubits_0:2 = quantum.custom "CNOT"() %4, %1 : !quantum.bit, !quantum.bit
+    %5 = quantum.insert %3[ 2], %out_qubits_0#0 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 1], %out_qubits_0#1 : !quantum.reg, !quantum.bit
+
+    quantum.dealloc %6 : !quantum.reg
+    return
+  }
+
+  // CHECK-NOT: func.func private @my_cnot
+  func.func private @my_cnot(%arg0: tensor<2xi64>, %arg1: !quantum.reg) -> !quantum.reg attributes {target_gate = "CNOT"} {
+    %0 = stablehlo.slice %arg0 [0:1] : (tensor<2xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %2 = stablehlo.slice %arg0 [1:2] : (tensor<2xi64>) -> tensor<1xi64>
+    %3 = stablehlo.reshape %2 : (tensor<1xi64>) -> tensor<i64>
+    %extracted_0 = tensor.extract %1[] : tensor<i64>
+    %extracted_1 = tensor.extract %3[] : tensor<i64>
+    %4 = quantum.extract %arg1[%extracted_0] : !quantum.reg -> !quantum.bit
+    %5 = quantum.extract %arg1[%extracted_1] : !quantum.reg -> !quantum.bit
+    %out_qubits:2 = quantum.custom "CZ"() %4, %5 : !quantum.bit, !quantum.bit
+    %6 = quantum.insert %arg1[%extracted_0], %out_qubits#0 : !quantum.reg, !quantum.bit
+    %7 = quantum.insert %6[%extracted_1], %out_qubits#1 : !quantum.reg, !quantum.bit
+    return %7 : !quantum.reg
   }
 }

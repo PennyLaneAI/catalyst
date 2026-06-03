@@ -2,25 +2,19 @@ Unified Compiler Cookbook
 =========================
 
 **Note:** The cookbook is developed with the following package versions,
-on Python 3.12.11:
+on Python 3.12.11. The content may be outdated if newer versions of any
+of the below packages are used:
 
 .. code-block:: bash
 
-    jax==0.6.2
-    jaxlib==0.6.2
+    jax==0.7.1
+    jaxlib==0.7.1
     numpy==2.3.1
-    pennylane==0.44.0-dev19
-    pennylane-lightning==0.43.0
-    pennylane-catalyst==0.14.0-dev15
-    xdsl==0.53.0
-    xdsl-jax==git+https://github.com/xdslproject/xdsl-jax.git@895f7c13e8d0f02bbe99d7fb9ebcaafea4ea629f#egg=xdsl_jax
-
-Note that ``xdsl-jax`` does not currently have a release published on
-PyPI, so it needs to be installed from GitHub by running the following:
-
-.. code-block:: bash
-
-    pip install git+https://github.com/xdslproject/xdsl-jax.git
+    pennylane==0.45.0.dev5
+    pennylane-lightning==0.44.dev26
+    pennylane-catalyst==0.15.0.dev9
+    xdsl==0.56.1
+    xdsl-jax==0.2.0
 
 Motivation
 ==========
@@ -260,10 +254,10 @@ operations looks like:
         # RX, etc.). These options basically say, "when the operation instance
         # is initialized, create 2 properties that store the length of each of
         # the different groups of operands and results.
-        irdl_options = [
+        irdl_options = (
             AttrSizedOperandSegments(as_property=True),
             AttrSizedResultSegments(as_property=True),
-        ]
+        )
 
         # var_operand_def means that the length of this operand
         # can vary.
@@ -305,8 +299,8 @@ dialects available in the xDSL layer of Catalyst:
   qubits, etc.
 - ``Catalyst``: this dialect contains operations and attributes for
   classical computing features unavailable out of the box with xDSL/MLIR
-- ``QEC``: This dialect contains operations and attributes useful for
-  QEC, such as PPRs/PPMs.
+- ``PBC``: This dialect contains operations and attributes useful for
+  PBC, such as PPRs/PPMs.
 - ``MBQC``: This dialect contains operations and attributes for
   representing MBQC formalism.
 
@@ -388,7 +382,9 @@ Some key methods are:
   values, all uses of these values must be updated accordingly before
   the erasure.
 - ``notify_op_modified``: Method to notify the rewriter that a change
-  was made to an operation manually.
+  was made to an operation manually. This is necessary when mutating
+  operations/attributes manually to update the worklist properly (see
+  details about ``PatternRewriteWalker`` below for more information).
 
 The example below shows us implementing a ``RewritePattern`` that
 updates all ``Hadamard``\ s with ``PauliX``\ s:
@@ -502,19 +498,19 @@ the “PennyLane integration” section below.
 
   .. code-block:: python
 
-      import pennylane as qml
+      import pennylane as qp
       from catalyst.python_interface.conversion import xdsl_from_qjit
 
-      dev = qml.device("lightning.qubit", wires=3)
+      dev = qp.device("lightning.qubit", wires=3)
 
       @xdsl_from_qjit
-      @qml.qjit(target="mlir")
-      @qml.qnode(dev)
+      @qp.qjit(target="mlir")
+      @qp.qnode(dev)
       def circuit():
-          qml.Hadamard(0)
-          qml.Hadamard(1)
-          qml.Hadamard(2)
-          return qml.state()
+          qp.Hadamard(0)
+          qp.Hadamard(1)
+          qp.Hadamard(2)
+          return qp.state()
 
   >>> mod = circuit()
   >>> print(mod)
@@ -661,21 +657,22 @@ capture is enabled:
 
 The integration with the xDSL layer happens after we lower to MLIR. We
 currently rely on JAX’s API to lower to MLIR. This has the special
-effect of lowering to a specific dialect called StableHLO, which is used
+effect of lowering to a dialect called StableHLO, which is used
 to represent all arithmetic operations present in the program.
 
-Once lowered to MLIR, if any xDSL registered passes are detected, we pass the control over to 
+Once lowered to MLIR, if any xDSL registered passes are detected, we pass the control over to
 the xDSL layer, which automatically detects and applies all xDSL transforms that were requested
 by the user.
 
 However, if you want to manually trigger the xDSL layer without using any xDSL registered passes,
-you can do so by specifying the ``pass_plugins`` parameter:
+you can do so by specifying the ``pass_plugins`` parameter. In almost all cases, this is unnecessary,
+but is noted here for completeness:
 
 .. code-block:: python
 
     from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 
-    @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+    @qp.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
     ...
 
 .. _ir-structure-1:
@@ -688,18 +685,18 @@ described below using the following example:
 
 .. code-block:: python
 
-    import pennylane as qml
+    import pennylane as qp
 
-    qml.capture.enable()
-    dev = qml.device("lightning.qubit", wires=1)
+    qp.capture.enable()
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qjit
-    @qml.transforms.cancel_inverses
-    @qml.transforms.merge_rotations
-    @qml.qnode(dev)
+    @qp.qjit
+    @qp.transforms.cancel_inverses
+    @qp.transforms.merge_rotations
+    @qp.qnode(dev)
     def circuit():
-        qml.X(0)
-        return qml.state()
+        qp.X(0)
+        return qp.state()
 
 >>> print(circuit.mlir)
 module @circuit {
@@ -783,14 +780,14 @@ its MLIR representation:
 
   .. code-block:: python
 
-      dev = qml.device("lightning.qubit", wires=3)
+      dev = qp.device("lightning.qubit", wires=3)
 
-      @qml.qjit(target="mlir")
-      @qml.qnode(dev)
+      @qp.qjit(target="mlir")
+      @qp.qnode(dev)
       def circuit():
-          qml.X(0)
-          qml.H(0)
-          return qml.state()
+          qp.X(0)
+          qp.H(0)
+          return qp.state()
 
   >>> print(circuit.mlir)
   module @circuit {
@@ -867,22 +864,22 @@ register using ``ExtractOp``. Consider the following example:
 
   .. code-block:: python
 
-      import pennylane as qml
+      import pennylane as qp
 
-      qml.capture.enable()
+      qp.capture.enable()
 
-      dev = qml.device("lightning.qubit", wires=3)
+      dev = qp.device("lightning.qubit", wires=3)
 
-      @qml.qjit(target="mlir")
-      @qml.qnode(dev)
+      @qp.qjit(target="mlir")
+      @qp.qnode(dev)
       def circuit(w1: int, w2: int):
-          qml.X(0)
-          qml.Y(w1)
-          qml.Z(w1)
-          qml.S(w2)
-          qml.T(w1)
-          qml.H(0)
-          return qml.state()
+          qp.X(0)
+          qp.Y(w1)
+          qp.Z(w1)
+          qp.S(w2)
+          qp.T(w1)
+          qp.H(0)
+          return qp.state()
 
   >>> print(circuit.mlir)
   module @circuit {
@@ -1002,15 +999,15 @@ currently accessible as
 
     # Program capture must be enabled to use the compiler transform
     # as a decorator
-    qml.capture.enable()
-    dev = qml.device("lightning.qubit", wires=1)
+    qp.capture.enable()
+    dev = qp.device("lightning.qubit", wires=1)
 
-    @qml.qjit
+    @qp.qjit
     @my_pass
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit(x):
-        qml.RX(x, 0)
-        return qml.expval(qml.Z(0))
+        qp.RX(x, 0)
+        return qp.expval(qp.Z(0))
 
     circuit(1.5)
 
@@ -1020,7 +1017,7 @@ the compiler.
 
 >>> my_pass.module_pass
 __main__.MyPass
->>> my_pass.name
+>>> my_pass.pass_name
 'my-pass'
 
 Additionally, we don’t need to manually apply passes using
@@ -1225,7 +1222,7 @@ used as input for the 2 ``PauliX`` gates.
 PennyLane integration
 ---------------------
 
-To use FileCheck with ``pytest``, we use the ```filecheck`` Python
+To use FileCheck with ``pytest``, we use the `filecheck Python
 package <https://pypi.org/project/filecheck/>`__, which allows us to use
 assertions for testing in a way that ``pytest`` can understand. All of
 the ``filecheck`` API has been captured inside two fixtures available
@@ -1234,7 +1231,7 @@ within the ``tests/python_interface`` folder:
 - ``run_filecheck``: This fixture is for unit testing. One can specify a
   program along with filecheck directives as a multi-line string.
 - ``run_filecheck_qjit``: This fixture is for integration testing. One
-  can create a normal ``qml.qjit``-ed workflow and include filecheck
+  can create a normal ``qp.qjit``-ed workflow and include filecheck
   directives as in-line comments.
 
 Let’s write tests for the ``HToXPass`` that was implemented in the
@@ -1302,15 +1299,15 @@ will explain what is going on.
         # with qjit, we can use the decorator created using
         # `compiler_transform`. To make sure that the xDSL API works
         # correctly, program capture must be enabled.
-        # qml.capture.enable()
-        @qml.qjit
+        # qp.capture.enable()
+        @qp.qjit
         @h_to_x_pass
         def circuit():
             # CHECK: [[q0:%.+]] = "test.op"() : () -> !quantum.bit
             # CHECK: quantum.custom "PauliX"() [[q0]] : !quantum.bit
             # CHECK-NOT: quantum.custom "Hadamard"
-            qml.Hadamard(0)
-            return qml.state()
+            qp.Hadamard(0)
+            return qp.state()
 
         # Finally, we use the run_filecheck_qjit fixture. We pass it our
         # original qjitted workflow. It extracts the filecheck directives

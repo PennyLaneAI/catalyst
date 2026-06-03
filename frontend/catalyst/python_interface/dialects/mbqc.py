@@ -28,15 +28,22 @@ from typing import TypeAlias
 
 from xdsl.dialects.builtin import (
     I32,
-    AnyAttr,
     Float64Type,
     IntegerAttr,
     IntegerType,
     StringAttr,
     i1,
 )
-from xdsl.ir import Dialect, EnumAttribute, Operation, SpacedOpaqueSyntaxAttribute, SSAValue
+from xdsl.ir import (
+    Attribute,
+    Dialect,
+    EnumAttribute,
+    Operation,
+    SpacedOpaqueSyntaxAttribute,
+    SSAValue,
+)
 from xdsl.irdl import (
+    IntSetConstraint,
     IRDLOperation,
     irdl_attr_definition,
     irdl_op_definition,
@@ -45,7 +52,6 @@ from xdsl.irdl import (
     prop_def,
     result_def,
 )
-from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.str_enum import StrEnum  # StrEnum is standard in Python>=3.11
 
 from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
@@ -86,7 +92,9 @@ class MeasureInBasisOp(IRDLOperation):
 
     angle = operand_def(Float64Type())
 
-    postselect = opt_prop_def(IntegerAttr[I32])
+    postselect = opt_prop_def(
+        IntegerAttr.constr(type=I32, value=IntSetConstraint(frozenset((0, 1))))
+    )
 
     mres = result_def(IntegerType(1))
 
@@ -96,13 +104,13 @@ class MeasureInBasisOp(IRDLOperation):
         self,
         in_qubit: QubitSSAValue | Operation,
         plane: MeasurementPlaneAttr,
-        angle: SSAValue[Float64Type],
+        angle: SSAValue[Float64Type] | Operation,
         postselect: int | IntegerAttr | None = None,
     ):
-        properties = {"plane": plane}
+        properties: dict[str, Attribute] = {"plane": plane}
 
         if isinstance(postselect, int):
-            postselect = IntegerAttr.from_int_and_width(postselect, 32)
+            postselect = IntegerAttr(postselect, 32)
 
         if postselect is not None:
             properties["postselect"] = postselect
@@ -112,14 +120,6 @@ class MeasureInBasisOp(IRDLOperation):
             properties=properties,
             result_types=(IntegerType(1), QubitType()),
         )
-
-    def verify_(self):
-        """Verify operation when rewriting."""
-        if self.postselect is None:
-            return
-
-        if self.postselect.value.data not in [0, 1]:  # pylint: disable=no-member
-            raise VerifyException("'postselect' must be 0 or 1.")
 
 
 @irdl_op_definition
@@ -143,7 +143,10 @@ class GraphStatePrepOp(IRDLOperation):
     qreg = result_def(QuregType)
 
     def __init__(
-        self, adj_matrix: AnyAttr, init_op: str | StringAttr, entangle_op: str | StringAttr
+        self,
+        adj_matrix: SSAValue[Attribute] | Operation,
+        init_op: str | StringAttr,
+        entangle_op: str | StringAttr,
     ):
         if isinstance(init_op, str):
             init_op = StringAttr(data=init_op)
@@ -151,7 +154,7 @@ class GraphStatePrepOp(IRDLOperation):
         if isinstance(entangle_op, str):
             entangle_op = StringAttr(data=entangle_op)
 
-        properties = {"init_op": init_op, "entangle_op": entangle_op}
+        properties: dict[str, Attribute] = {"init_op": init_op, "entangle_op": entangle_op}
 
         qreg = QuregType()
 

@@ -16,7 +16,7 @@
 
 # pylint: disable=missing-function-docstring
 
-import pennylane as qml
+import pennylane as qp
 
 from catalyst import cond, measure, qjit
 
@@ -24,7 +24,7 @@ from catalyst import cond, measure, qjit
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(n: int):
     # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<5> : tensor<i64>
     # CHECK:       [[b_t:%[a-zA-Z0-9_]+]] = stablehlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
@@ -38,7 +38,7 @@ def circuit(n: int):
         # pylint: disable=line-too-long
         # CHECK-DAG:   [[qreg_1:%[a-zA-Z0-9_]+]] = quantum.insert [[qreg_0]][ {{[%a-zA-Z0-9_]+}}], [[q1]]
         # CHECK:       scf.yield %arg0, [[qreg_1]]
-        qml.PauliX(wires=0)
+        qp.PauliX(wires=0)
         return n
 
     @cond_fn.otherwise
@@ -62,7 +62,7 @@ print(circuit.mlir)
 
 # CHECK-LABEL: public @jit_circuit_single_gate
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=1))
+@qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_single_gate(n: int):
     # pylint: disable=line-too-long
     # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<5> : tensor<i64>
@@ -89,7 +89,7 @@ def circuit_single_gate(n: int):
     # CHECK-DAG:   [[q3:%[a-zA-Z0-9_]+]] = quantum.custom "Hadamard"() [[q2]]
     # CHECK-DAG:   [[qreg_2:%[a-zA-Z0-9_]+]] = quantum.insert [[qreg_0]][ {{[%a-zA-Z0-9_]+}}], [[q3]]
     # CHECK:       scf.yield [[qreg_2]]
-    qml.cond(n <= 5, qml.PauliX, qml.Hadamard)(wires=0)
+    qp.cond(n <= 5, qp.PauliX, qp.Hadamard)(wires=0)
 
     # CHECK:       [[b6:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t6]]
     # CHECK:       [[qreg_out1:%.+]] = scf.if [[b6]]
@@ -100,7 +100,7 @@ def circuit_single_gate(n: int):
     # CHECK:       else
     # CHECK:       scf.yield [[qreg_out]]
 
-    qml.cond(n <= 6, qml.RX)(3.14, wires=0)
+    qp.cond(n <= 6, qp.RX)(3.14, wires=0)
 
     # CHECK:       [[b7:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t7]]
     # CHECK:       [[qreg_out2:%.+]] = scf.if [[b7]]
@@ -130,20 +130,20 @@ def circuit_single_gate(n: int):
     # CHECK:                scf.yield [[qreg_7]]
     # CHECK:             scf.yield [[qreg_out4]]
     # CHECK:          scf.yield [[qreg_out3]]
-    qml.cond(
+    qp.cond(
         n <= 7,
-        qml.Hadamard,
-        qml.PauliX,
+        qp.Hadamard,
+        qp.PauliX,
         (
-            (n <= 8, qml.PauliY),
-            (n <= 9, qml.PauliZ),
+            (n <= 8, qp.PauliY),
+            (n <= 9, qp.PauliZ),
         ),
     )(wires=0)
 
     # CHECK:       [[qobs:%.+]] = quantum.compbasis qreg [[qreg_out2]] : !quantum.obs
     # CHECK:       [[ret:%.+]] = quantum.probs [[qobs]]
     # CHECK:       return [[ret]]
-    return qml.probs()
+    return qp.probs()
 
 
 print(circuit_single_gate.mlir)

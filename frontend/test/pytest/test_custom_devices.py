@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test for custom device integration with Catalyst."""
+
 import platform
 
-import pennylane as qml
+import pennylane as qp
 import pytest
 from utils import CONFIG_CUSTOM_DEVICE
 
@@ -30,7 +31,7 @@ RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
-    class CustomDevice(qml.devices.Device):
+    class CustomDevice(qp.devices.Device):
         """Custom device"""
 
         name = "custom.device"
@@ -68,7 +69,7 @@ def test_custom_device_load():
     assert backend_info.kwargs["option2"] == 38
 
     @qjit
-    @qml.qnode(device)
+    @qp.qnode(device)
     def f():
         """Measurements on a NullQubit device always return false (i.e. 0)"""
         return measure(0)
@@ -79,7 +80,7 @@ def test_custom_device_load():
 def test_custom_device_bad_directory():
     """Test that custom device error."""
 
-    class CustomDevice(qml.devices.Device):
+    class CustomDevice(qp.devices.Device):
         """Custom Device"""
 
         name = "custom.device"
@@ -108,7 +109,7 @@ def test_custom_device_bad_directory():
     ):
 
         @qjit
-        @qml.qnode(CustomDevice(wires=1))
+        @qp.qnode(CustomDevice(wires=1))
         def f():
             return measure(0)
 
@@ -116,7 +117,7 @@ def test_custom_device_bad_directory():
 def test_custom_device_no_c_interface():
     """Test that custom device error."""
 
-    class CustomDevice(qml.devices.Device):
+    class CustomDevice(qp.devices.Device):
         """Custom Device"""
 
         name = "custom.device"
@@ -138,7 +139,7 @@ def test_custom_device_no_c_interface():
     ):
 
         @qjit
-        @qml.qnode(CustomDevice(wires=1))
+        @qp.qnode(CustomDevice(wires=1))
         def f():
             return measure(0)
 
@@ -147,15 +148,15 @@ def test_error_raised_no_unitary_support_for_matrix_ops():
     """Tests that an error is raised when a device specifies _to_matrix_ops but does not support
     the QubitUnitary operation"""
 
-    class CustomDevice(qml.devices.Device):
+    class CustomDevice(qp.devices.Device):
         """Custom device for testing."""
 
         name = "custom.device"
         config_filepath = CONFIG_CUSTOM_DEVICE
 
         _to_matrix_ops = {
-            "DiagonalQubitUnitary": qml.devices.capabilities.OperatorProperties(),
-            "BlockEncode": qml.devices.capabilities.OperatorProperties(),
+            "DiagonalQubitUnitary": qp.devices.capabilities.OperatorProperties(),
+            "BlockEncode": qp.devices.capabilities.OperatorProperties(),
         }
 
         def __init__(self, wires, shots=None, **kwargs):
@@ -183,5 +184,6 @@ def test_error_raised_no_unitary_support_for_matrix_ops():
         CompileError,
         match="The device that specifies to_matrix_ops must support QubitUnitary.",
     ):
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            QJITDevice(CustomDevice(wires=2)).preprocess(ctx)
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+            config = qp.devices.ExecutionConfig()
+            QJITDevice(CustomDevice(wires=2)).preprocess(config)

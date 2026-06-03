@@ -37,19 +37,19 @@ def mbqc_pipeline() -> PipelineStages:
     .. code-block:: python
 
         import numpy as np
-        import pennylane as qml
+        import pennylane as qp
         from catalyst.ftqc import mbqc_pipeline
 
-        qml.capture.enable()
+        qp.capture.enable()
 
-        dev = qml.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=1)
 
-        @qml.qjit(pipelines=mbqc_pipeline())
-        @qml.qnode(dev, mcm_method="tree-traversal")
+        @qp.qjit(pipelines=mbqc_pipeline())
+        @qp.qnode(dev, mcm_method="tree-traversal")
         def workload():
-            m0 = qml.ftqc.measure_arbitrary_basis(wires=0, angle=np.pi/4, plane="XY")
-            qml.cond(m0, qml.X, qml.I)(0)
-            return qml.expval(qml.Z(0))
+            m0 = qp.ftqc.measure_arbitrary_basis(wires=0, angle=np.pi/4, plane="XY")
+            qp.cond(m0, qp.X, qp.I)(0)
+            return qp.expval(qp.Z(0))
     """
     stages = default_pipeline()
 
@@ -80,5 +80,64 @@ def mbqc_pipeline() -> PipelineStages:
     # Enable array-backed registers via the "convert-quantum-to-llvm" pass
     quantum_to_llvm_pass = pipeline.index("convert-quantum-to-llvm")
     pipeline[quantum_to_llvm_pass] = "convert-quantum-to-llvm{use-array-backed-registers=true}"
+
+    return stages
+
+
+def qec_pipeline() -> PipelineStages:
+    """Return the pipeline stages for QEC workloads.
+
+    The QEC pipeline is identical to the default Catalyst pipeline, but with
+
+      * the QECP-to-LLVM dialect-conversion pass inserted immediately before the Quantum-to-LLVM
+        dialect-conversion pass in the ``MLIRToLLVMDialectConversion`` pipeline stage.
+
+    Returns:
+        PipelineStages: The list of pipeline stages.
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qp
+        from catalyst.ftqc import qec_pipeline
+
+        qp.capture.enable()
+
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(pipelines=qec_pipeline())
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def workload():
+            qp.Hadamard(0)
+            m0 = qp.measure(0)
+            return qp.sample([m0])
+    """
+    stages = default_pipeline()
+
+    # Find the MLIR-to-LLVM dialect-conversion stage, 'MLIRToLLVMDialectConversion'
+    stage_names = [item[0] for item in stages]
+    llvm_dialect_conversion_stage_name = "MLIRToLLVMDialectConversion"
+
+    assert (
+        llvm_dialect_conversion_stage_name in stage_names
+    ), "Stage 'MLIRToLLVMDialectConversion' not found in default pipeline stages"
+
+    llvm_dialect_conversion_stage_index = stage_names.index(llvm_dialect_conversion_stage_name)
+
+    _, pipeline = stages[llvm_dialect_conversion_stage_index]
+
+    assert "convert-quantum-to-llvm" in pipeline, (
+        "Pipeline for stage 'MLIRToLLVMDialectConversion' missing required pass "
+        "'convert-quantum-to-llvm'.\n"
+        f"The pipeline for this stage is: {pipeline}"
+    )
+
+    # Insert (in-place) the "convert-qecp-to-llvm" pass immediately before the
+    # "convert-quantum-to-llvm" pass in the MLIRToLLVMDialectConversion pipeline
+    insert_pass_before(
+        pipeline, ref_pass="convert-quantum-to-llvm", new_pass="convert-qecp-to-llvm"
+    )
 
     return stages

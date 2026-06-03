@@ -12,17 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iostream"
-#include "llvm/Support/raw_ostream.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Utils/GradientShape.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -52,11 +47,11 @@ struct PreprocessForwardOp : public OpRewritePattern<ForwardOp> {
         auto implResTy = implOp.getResultTypes();
         Location loc = op.getLoc();
 
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, inputs);
+        auto callOp = func::CallOp::create(rewriter, loc, impl, implResTy, inputs);
         SmallVector<Value> outputs(callOp.getResults());
 
         auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, outputs, F);
+        catalyst::gradient::ReturnOp::create(rewriter, loc, outputs, F);
 
         return success();
     }
@@ -96,11 +91,11 @@ struct PreprocessReverseOp : public OpRewritePattern<ReverseOp> {
         auto implResTy = implOp.getResultTypes();
         Location loc = op.getLoc();
 
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tapeInputs);
+        auto callOp = func::CallOp::create(rewriter, loc, impl, implResTy, tapeInputs);
         SmallVector<Value> outputs(callOp.getResults());
 
         auto T = rewriter.getIntegerAttr(rewriter.getI1Type(), 1);
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, outputs, T);
+        catalyst::gradient::ReturnOp::create(rewriter, loc, outputs, T);
 
         return success();
     }

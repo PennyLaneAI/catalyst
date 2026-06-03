@@ -14,6 +14,7 @@
 """
 Pytest configuration file for OQC test suite.
 """
+
 # pylint: disable=unused-import
 import os
 

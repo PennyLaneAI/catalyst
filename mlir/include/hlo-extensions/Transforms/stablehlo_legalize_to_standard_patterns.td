@@ -71,6 +71,7 @@ def createDenormalIEEE : NativeCodeCall<
     "::mlir::arith::DenormalModeAttr::get("
       "$_builder.getContext(), ::mlir::arith::DenormalMode::ieee"
     ")">;
+def createExactNone : NativeCodeCall<"::mlir::UnitAttr()">;
 
 
 // Unary Lowering Patterns.
@@ -108,7 +109,7 @@ def : Pat<(StableHLO_MulOp HLO_IntTensor:$l, HLO_IntTensor:$r),
           (Arith_MulIOp $l, $r, (createOverflowNone )),
           [(IsSameSizeConstraint $l, $r)]>;
 def : Pat<(StableHLO_DivOp HLO_IntTensor:$l, HLO_IntTensor:$r),
-          (Arith_DivSIOp $l, $r),
+          (Arith_DivSIOp $l, $r, (createExactNone )),
           [(IsSameSizeConstraint $l, $r)]>;
 def : Pat<(StableHLO_RemOp HLO_IntTensor:$l, HLO_IntTensor:$r),
           (Arith_RemSIOp $l, $r),
