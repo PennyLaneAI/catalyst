@@ -828,6 +828,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         """
         unitary_encoding_info = self.qec_code.unitary_encoding
 
+        required_keys = {"state_prep_index", "hadamard_indices", "cnot_indices"}
+        if not required_keys.issubset(unitary_encoding_info):
+            raise CompileError(
+                f"QEC code '{self.qec_code.name}' does not define a unitary encoding "
+                f"(missing {required_keys - set(unitary_encoding_info)}); cannot lower "
+                f"qecl.fabricate [magic] for this code."
+            )
+
         codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
         input_types = ()
         output_types = (codeblock_type,)
