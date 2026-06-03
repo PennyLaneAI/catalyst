@@ -1769,37 +1769,33 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 
     handleRegion(builder, f.getBody(), regionTracker);
 
-    // Return new value semantics quantum results
-    // Also need to append result attributes and update function type
-    size_t originalNumResults = f.getFunctionType().getNumResults();
     addRootVValuesToRetOp(f.front().getTerminator(), rValuesUsedBySubroutine.getArrayRef(),
                           regionTracker);
-    size_t newNumResults = f.front().getTerminator()->getNumOperands();
 
-    SmallVector<Attribute> newResAttrs;
-    if (ArrayAttr existingResAttrs = f.getResAttrsAttr()) {
-        // Copy existing result attributes
-        newResAttrs.append(existingResAttrs.begin(), existingResAttrs.end());
-    }
-    else {
-        // Pad with empty ones if none existed
-        for (size_t i = 0; i < originalNumResults; i++) {
-            newResAttrs.push_back(DictionaryAttr::get(ctx));
-        }
-    }
-    for (size_t i = 0; i < (newNumResults - originalNumResults); i++) {
-        newResAttrs.push_back(DictionaryAttr::get(ctx));
-    }
-    f.setResAttrsAttr(ArrayAttr::get(ctx, newResAttrs));
-
+    // Remove all old qref arguments
     eraseAllRemainingAnchorRValues(f);
-
-    // Nuke all old qref arguments
     f.front().eraseArguments(
         [](BlockArgument arg) { return isa<qref::QubitType, qref::QuregType>(arg.getType()); });
+    f.setFunctionType(
+        FunctionType::get(ctx, f.front().getArgumentTypes(), f.getFunctionType().getResults()));
 
-    f.setFunctionType(FunctionType::get(ctx, f.front().getArgumentTypes(),
-                                        f.front().getTerminator()->getOperandTypes()));
+    // Also need to append result attributes and update function type
+    size_t originalNumResults = f.getFunctionType().getNumResults();
+    SmallVector<unsigned> indicesToInsert;
+    SmallVector<Type> typesToInsert;
+    SmallVector<DictionaryAttr> attrsToInsert;
+    for (Type retType : f.front().getTerminator()->getOperandTypes()) {
+        if (isa<quantum::QuregType, quantum::QubitType>(retType)) {
+            typesToInsert.push_back(retType);
+        }
+        else {
+            continue;
+        }
+
+        indicesToInsert.push_back(originalNumResults);
+        attrsToInsert.push_back(DictionaryAttr::get(ctx));
+    }
+    assert(succeeded(f.insertResults(indicesToInsert, typesToInsert, attrsToInsert)));
 }
 
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
