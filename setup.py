@@ -371,6 +371,7 @@ elif system_platform == "Darwin":
         ],
         extra_compile_args=["-std=c++20"],
         define_macros=Py_LIMITED_API_macros,
+        extra_link_args=["-arch", "arm64"],
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
