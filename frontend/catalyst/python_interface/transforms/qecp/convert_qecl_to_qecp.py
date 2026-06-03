@@ -213,6 +213,38 @@ class EncodeOpConversion(RewritePattern):
         rewriter.replace_op(op, callOp)
 
 
+# MARK: Fabricate Op Pattern
+
+
+@dataclass
+class FabricateOpConversion(RewritePattern):
+    """Converts qecl.fabricate to the equivalent subroutine of qecp gates"""
+
+    qec_code: QecCode
+    fabricate_subroutine: func.FuncOp
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.FabricateOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `qecl.fabricate [magic]` op"""
+
+        if not op.init_state.data == "magic":
+            raise NotImplementedError(
+                "Lowering qecl.FabricateOp to the qecp dialect is only implemented "
+                "for init_state 'magic'"
+            )
+
+        if (k := op.out_codeblock.type.k.value.data) != self.qec_code.k:
+            raise CompileError(
+                f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
+                f"lowering to a code with k={self.qec_code.k}"
+            )
+
+        callee = builtin.SymbolRefAttr(self.fabricate_subroutine.sym_name)
+        return_types = self.fabricate_subroutine.function_type.outputs.data
+        callOp = func.CallOp(callee, arguments=(), return_types=return_types)
+        rewriter.replace_op(op, callOp)
+
+
 # MARK: QEC Cycle Op Pattern
 
 
@@ -373,46 +405,16 @@ class TransversalGateConversion(RewritePattern):
         rewriter.replace_op(op, subroutine_call_op)
 
 
-# MARK: Apply_T Pattern
+# MARK: Update Function Signatures
 
 
 @dataclass(frozen=True)
-class ApplyTConversion(RewritePattern):
-    """Converts qecl.fabricate [magic] to the equivalent subroutine of qecp gates"""
-
-    qec_code: QecCode
-    fabricate_subroutine: func.FuncOp
+class UpdateFunctionSignatures(RewritePattern):
+    """Update types for any FuncOps in the IR whose input/output types have changed."""
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, funcop: func.FuncOp, rewriter: PatternRewriter):
-        """Rewrite pattern for the `apply_T` subroutine"""
-
-        if not funcop.sym_name.data == "apply_T":
-            return
-
-        for op in funcop.body.walk():
-            if isinstance(op, qecl.FabricateOp):
-
-                if not op.init_state.data == "magic":
-                    raise NotImplementedError(
-                        "Lowering qecl.FabricateOp to the qecp dialect is only implemented "
-                        "for init_state 'magic'"
-                    )
-
-                out_codeblock = cast(
-                    qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.out_codeblock
-                )
-
-                if (k := out_codeblock.type.k.value.data) != self.qec_code.k:
-                    raise CompileError(
-                        f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
-                        f"lowering to a code with k={self.qec_code.k}"
-                    )
-
-                callee = builtin.SymbolRefAttr(self.fabricate_subroutine.sym_name)
-                return_types = self.fabricate_subroutine.function_type.outputs.data
-                callOp = func.CallOp(callee, arguments=(), return_types=return_types)
-                rewriter.replace_op(op, callOp)
+        """Match all FuncOps and call their update_function_type method"""
 
         funcop.update_function_type()
 
@@ -502,7 +504,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     InsertBlockConversion(),
                     ExtractBlockConversion(),
                     EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_subroutine),
-                    ApplyTConversion(
+                    FabricateOpConversion(
                         qec_code=self.qec_code, fabricate_subroutine=fabricate_subroutine
                     ),
                     QecCycleOpConversion(
@@ -517,6 +519,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         qec_code=self.qec_code,
                         gate_subroutines=transversal_gate_subroutines,
                     ),
+                    UpdateFunctionSignatures(),
                 ]
             )
         ).rewrite_module(op)
