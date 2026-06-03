@@ -43,6 +43,10 @@ else()
 
 
     set(BOOST_TARGETS boost_container boost_graph boost_core boost_assert boost_throw_exception boost_config)
+    set(BOOST_INCLUDE_LIBRARIES graph CACHE STRING "" FORCE)
+    set(BOOST_RUNTIME_LINK static CACHE STRING "" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(BOOST_ENABLE_CMAKE ON CACHE BOOL "" FORCE)
 
     foreach(t_name IN LISTS BOOST_TARGETS)
         if(TARGET ${t_name})
