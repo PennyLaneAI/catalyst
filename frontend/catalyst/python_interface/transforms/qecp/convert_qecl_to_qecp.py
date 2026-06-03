@@ -837,9 +837,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             )
 
             # extract qubits
-            extract_ops = [
-                qecp.ExtractQubitOp(codeblock, i) for i in range(self.qec_code.n)
-            ]
+            extract_ops = [qecp.ExtractQubitOp(codeblock, i) for i in range(self.qec_code.n)]
             magic_state_qubits = {i: ext_op.results[0] for i, ext_op in enumerate(extract_ops)}
 
             # apply H and T to the state prep input qubit
