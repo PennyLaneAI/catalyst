@@ -922,6 +922,50 @@ class TestLoweringTransversalGates:
 
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
+    def test_adjoint_s_lowering_Steane(
+        self, run_filecheck, qecl_to_qecp_steane_pipeline
+    ):
+        """Test that using the Steane code lowers Hadamard, Identity and S ops as expected. These ops
+        are applied on all qubits in the codeblock. For the S operator, the adjoint is applied."""
+
+        program = f"""
+        builtin.module @module_circuit {{
+                func.func @test_func() attributes {{quantum.node}} {{
+                    // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                    // CHECK-NEXT: [[codeblock2:%.+]] = func.call @s_adj_Steane([[codeblock]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                    // CHECK-NOT: qecl.s
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
+                    %1 = qecl.s %0[0] adj : !qecl.codeblock<1>
+                    return
+                }}
+                // CHECK: func.func private @s_adj_Steane([[codeblock_in:%.+]]: !qecp.codeblock<1 x 7>)
+                // CHECK-NEXT: [[q0:%.+]] = qecp.extract [[codeblock_in]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q1:%.+]] = qecp.extract [[codeblock_in]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q2:%.+]] = qecp.extract [[codeblock_in]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q3:%.+]] = qecp.extract [[codeblock_in]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q4:%.+]] = qecp.extract [[codeblock_in]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q5:%.+]] = qecp.extract [[codeblock_in]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK-NEXT: [[q6:%.+]] = qecp.extract [[codeblock_in]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+                // CHECK: [[q0_1:%.+]] = qecp.s [[q0]] : !qecp.qubit<data>
+                // CHECK: [[q1_1:%.+]] = qecp.s [[q1]] : !qecp.qubit<data>
+                // CHECK: [[q2_1:%.+]] = qecp.s [[q2]] : !qecp.qubit<data>
+                // CHECK: [[q3_1:%.+]] = qecp.s [[q3]] : !qecp.qubit<data>
+                // CHECK: [[q4_1:%.+]] = qecp.s [[q4]] : !qecp.qubit<data>
+                // CHECK: [[q5_1:%.+]] = qecp.s [[q5]] : !qecp.qubit<data>
+                // CHECK: [[q6_1:%.+]] = qecp.s [[q6]] : !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in1:%.+]] = qecp.insert [[codeblock_in]][0], [[q0_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in2:%.+]] = qecp.insert [[codeblock_in1]][1], [[q1_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in3:%.+]] = qecp.insert [[codeblock_in2]][2], [[q2_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in4:%.+]] = qecp.insert [[codeblock_in3]][3], [[q3_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in5:%.+]] = qecp.insert [[codeblock_in4]][4], [[q4_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_in6:%.+]] = qecp.insert [[codeblock_in5]][5], [[q5_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: [[codeblock_out:%.+]] = qecp.insert [[codeblock_in6]][6], [[q6_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
+                // CHECK-NEXT: func.return [[codeblock_out]]
+            }}
+            """
+
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
     def test_cnot_lowering_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that using the Steane code lowers ops as expected"""
 
