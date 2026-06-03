@@ -445,11 +445,13 @@ LogicalResult CountsOp::verify()
     }
 
     size_t numEigvals = 0;
-    if (getObs().getDefiningOp<NamedObsOp>()) {
+    if (getObs().getDefiningOp<quantum::NamedObsOp>() ||
+        getObs().getDefiningOp<qref::NamedObsOp>()) {
         // Any named observable has 2 eigenvalues.
         numEigvals = 2;
     }
-    else if (getObs().getDefiningOp<ComputationalBasisOp>()) {
+    else if (getObs().getDefiningOp<quantum::ComputationalBasisOp>() ||
+             getObs().getDefiningOp<qref::ComputationalBasisOp>()) {
         // In the computational basis, the "eigenvalues" are all possible bistrings one can measure.
         numEigvals = std::pow(2, numQubits.value());
     }
