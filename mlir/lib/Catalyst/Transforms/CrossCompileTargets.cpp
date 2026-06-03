@@ -325,11 +325,20 @@ struct CrossCompileTargetsPass
             dumpMLIR(*standalone, kernelDir, "extracted.mlir");
         }
 
-        // Lower the extracted module with the default pipeline (bufferization +
-        // LLVM-dialect lowering).
+        // Lower the extracted module. A 'pipeline' key on catalyst.target selects a named 
+        // target-lowering pipeline resolved against the host pipeline registry. 
+        // Without it, fall back to the default bufferization + LLVM-dialect lowering.
+        std::string pipelineSpec;
+        if (auto pipelineAttr = targetAttr.getAs<StringAttr>("pipeline")) {
+            pipelineSpec = pipelineAttr.getValue().str();
+        }
+        if (pipelineSpec.empty()) {
+            pipelineSpec = llvm::join(defaultLoweringPassList(), ",");
+        }
         PassManager subPM(ctx);
-        if (failed(parsePassPipeline(llvm::join(defaultLoweringPassList(), ","), subPM))) {
-            nested.emitError("failed to build the default target-lowering pipeline");
+        if (failed(parsePassPipeline(pipelineSpec, subPM))) {
+            nested.emitError("failed to build the target-lowering pipeline '" + pipelineSpec +
+                             "'");
             return failure();
         }
         if (failed(subPM.run(*standalone))) {
