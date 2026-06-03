@@ -17,7 +17,6 @@ file(GLOB SRC
     IonsDecompositionPatterns.cpp
     LoopBoundaryOptimizationPatterns.cpp
     MergeRotationsPatterns.cpp
-    InstantiateDecompRules.cpp
     SplitMultipleTapes.cpp
     adjoint_lowering.cpp
     cancel_inverses.cpp
