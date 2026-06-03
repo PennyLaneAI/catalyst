@@ -65,6 +65,7 @@ class Compiler:
         value_semantics_mlir = (
             catalyst.python_interface.inspection.xdsl_conversion._quantum_opt_stderr(
                 '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+                "--mlir-print-op-generic",
                 stdin=str(gentxtmod),
             )
         )
