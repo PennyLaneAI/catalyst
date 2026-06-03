@@ -1017,15 +1017,15 @@ class TestLoweringTransversalGates:
 
 # Mark: ApplyT
 
+
 class TestLoweringApplyT:
 
     def test_apply_t_toy_code(self, run_filecheck):
         pass
-        #ToDo
+        # ToDo
 
     def test_apply_t_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
-        """Test that the apply_T subroutine is lowered as expected for the Steane code.
-        """
+        """Test that the apply_T subroutine is lowered as expected for the Steane code."""
         program = """
         builtin.module @module_circuit {
             func.func @test_func() attributes {quantum.node} {
@@ -1046,6 +1046,7 @@ class TestLoweringApplyT:
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
         raise RuntimeError()
+
 
 # MARK: Integration
 
