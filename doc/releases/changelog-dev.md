@@ -47,6 +47,13 @@
   [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
   [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
 
+* Global toggles, ``compile_without_static_conditionals`` and ``compile_without_static_loops`` have
+  been added to control the capture behaviour for ``catalyst``/``pennylane`` ``cond`` and
+  ``for_loop`` instructions. Setting the toggle to ``True`` will automatically remove the respective
+  construct from the captured program (i.e. evaluate it in Python) whenever the predicate or bounds
+  are static.
+  [(#2912)](https://github.com/PennyLaneAI/catalyst/pull/2912)
+
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values
   trace back to the same allocation.
