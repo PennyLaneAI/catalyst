@@ -161,9 +161,15 @@
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
+* The experimental `convert-qecl-to-qecp` pass has been extended to support lowering 
+  `qecl.fabricate [magic]` to a subroutine that prepares a magic state through a simple, 
+  non-fault tolerant encoding.
+  [(#2894)](https://github.com/PennyLaneAI/catalyst/pull/2894)
+
 * The experimental QEC pipeline now supports compilation and execution of circuits that only 
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
 * More conservative casting to tracer arrays in conditionals to preserve constant (static) values
   better. This can be useful for optimizations that depend on values being static.
   [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
