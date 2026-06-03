@@ -305,7 +305,8 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
         TODO: We might come back to update the logic below to support 1-logical qubit circuits,
         where there is no ForOp encoding loop in the IR.
         """
-        # Step 1: Unroll encoding loops and ensure the quantum.node op body contains no nested regions.
+        # Step 1: Unroll encoding loops and ensure the quantum.node op body contains no
+        # nested regions.
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [UnrollEncodeLoop()],
@@ -319,6 +320,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                 qecp_alloc_op = None
                 regs = []
                 qecp_ops_to_remove = []
+                dealloced_regs = {}
 
                 for quantum_op in op_.walk():
                     rewriter = PatternRewriter(quantum_op)
@@ -329,8 +331,12 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                         case func.CallOp() if "encode_zero_" in quantum_op.callee.string_value():
                             regs.append(quantum_op.results[0])
                         case qecp.ExtractCodeblockOp():
+                            assert (quantum_op.idx is not None) ^ (quantum_op.idx_attr is not None)
                             qecp_ops_to_remove.append(quantum_op)
-                            idx = resolve_constant_params(quantum_op.idx)
+                            if quantum_op.idx is not None:
+                                idx = resolve_constant_params(quantum_op.idx)
+                            else:
+                                idx = quantum_op.idx_attr.value.data
                             quantum_op.codeblock.replace_all_uses_with(regs[idx])
                         case qecp.InsertCodeblockOp():
                             qecp_ops_to_remove.append(quantum_op)
@@ -339,6 +345,10 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                             quantum_op.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
                         case qecp.DeallocOp():
                             rewriter.erase_op(quantum_op)
+                        case quantum.DeviceReleaseOp():
+                            # Dealloc qregs before device release
+                            for _, dealloced_reg in dealloced_regs.items():
+                                rewriter.insert_op(dealloced_reg)
 
                 for quantum_op in reversed(qecp_ops_to_remove):
                     rewriter = PatternRewriter(quantum_op)

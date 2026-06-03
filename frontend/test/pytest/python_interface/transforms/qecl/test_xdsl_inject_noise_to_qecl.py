@@ -78,9 +78,9 @@ class TestInjectNoiseToQECLPassIntegration:
             # CHECK: qecl.noise
             # CHECK: qecl.qec
             # CHECK: qecl.measure {{%.+}}[0]
+            # CHECK: qecl.insert_block
             # CHECK: quantum.mcmobs
             # CHECK: quantum.sample
-            # CHECK: qecl.insert_block
             # CHECK: qecl.dealloc
             qp.H(0)
             m0 = qp.measure(0)

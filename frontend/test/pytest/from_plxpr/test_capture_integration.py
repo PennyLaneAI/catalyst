@@ -58,9 +58,9 @@ def has_catalyst_transforms(mlir):
 def is_rot_decomposed(mlir):
     """Check in the MLIR if a rot was decomposed"""
     return (
-        'quantum.custom "Rot"' not in mlir
-        and mlir.count('quantum.custom "RZ"') == 2
-        and mlir.count('quantum.custom "RY"') == 1
+        'qref.custom "Rot"' not in mlir
+        and mlir.count('qref.custom "RZ"') == 2
+        and mlir.count('qref.custom "RY"') == 1
     )
 
 
@@ -1364,7 +1364,7 @@ class TestCapture:
         result_1 = captured_circuit_1(1.5, 2.0)
         captured_circuit_1_mlir = captured_circuit_1.mlir
         assert "%cst = arith.constant 1.5" in captured_circuit_1_mlir
-        assert 'quantum.custom "RX"(%cst)' in captured_circuit_1_mlir
+        assert 'qref.custom "RX"(%cst)' in captured_circuit_1_mlir
         assert "%cst = arith.constant 2.0" not in captured_circuit_1_mlir
 
         # Test that qjit static_argnums takes precedence over the one on the qnode
@@ -1378,7 +1378,7 @@ class TestCapture:
         result_2 = captured_circuit_2(1.5, 2.0)
         captured_circuit_2_mlir = captured_circuit_2.mlir
         assert "%cst = arith.constant 2.0" in captured_circuit_2_mlir
-        assert 'quantum.custom "RY"(%cst)' in captured_circuit_2_mlir
+        assert 'qref.custom "RY"(%cst)' in captured_circuit_2_mlir
         assert "%cst = arith.constant 1.5" not in captured_circuit_2_mlir
 
         assert jnp.allclose(result_1, result_2)
@@ -1397,7 +1397,7 @@ class TestCapture:
         _ = workflow(1.5, 2.0)
         captured_circuit_3_mlir = workflow.mlir
         assert "%cst = arith.constant 1.5" in captured_circuit_3_mlir
-        assert 'quantum.custom "RX"(%cst)' in captured_circuit_3_mlir
+        assert 'qref.custom "RX"(%cst)' in captured_circuit_3_mlir
 
         qp.capture.disable()
 
