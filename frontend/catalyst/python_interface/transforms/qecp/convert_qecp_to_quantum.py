@@ -340,8 +340,12 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                             quantum_op.codeblock.replace_all_uses_with(regs[idx])
                         case qecp.InsertCodeblockOp():
                             qecp_ops_to_remove.append(quantum_op)
-                            dealloc = quantum.DeallocOp(quantum_op.codeblock)
-                            rewriter.insert_op(dealloc)
+                            if quantum_op.idx is not None:
+                                idx = resolve_constant_params(quantum_op.idx)
+                            elif quantum_op.idx_attr is not None:
+                                idx = quantum_op.idx_attr.value.data
+                            dealloc_op = quantum.DeallocOp(quantum_op.codeblock)
+                            dealloced_regs[regs[idx]] = dealloc_op
                             quantum_op.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
                         case qecp.DeallocOp():
                             rewriter.erase_op(quantum_op)
