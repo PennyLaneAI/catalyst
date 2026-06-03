@@ -77,7 +77,7 @@ mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotImpl(mlir::MLIRContext *ctx, 
 
     mlir::OwningOpRef<mlir::func::FuncOp> funcOp;
     moduleOp->walk([&](mlir::func::FuncOp func) {
-        if (func.getName() == "_pauli_rot_decomposition") {
+        if (func.getName() == "paulirot_decomp_rule") {
             func->remove();
             funcOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
             return mlir::WalkResult::interrupt();

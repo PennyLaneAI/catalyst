@@ -21,6 +21,6 @@ class TestQPCCallbacks:
         """Test that the QPC paulirot callback wrapper correctly returns the IR as a string."""
         result = paulirot_callback_wrapper(0.4, "XZZ", [0, 1, 2])
         assert isinstance(result, str)
-        assert "_pauli_rot_decomposition" in result
+        assert "paulirot_decomp_rule" in result
         assert "Hadamard" in result
         assert "multirz" in result

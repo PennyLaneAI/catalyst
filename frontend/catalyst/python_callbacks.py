@@ -12,31 +12,57 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This module provides infrastructure for lowering decomposition rules using compiler callbacks."""
+"""
+This module provides infrastructure for lowering decomposition rules using compiler callbacks.
+
+Callback functions should adhere to the following specifications:
+    The callback (python) function:
+        - Is named `{op name}_callback_wrapper`.
+        - Has a signature identical to the named parameters of the associated PL operator; dynamic
+          arguments may be unused, but should still be included for compatibility.
+        - Is able to AOT lower the decomposition rule to MLIR without invoking the compiler, e.g.
+          using `target="mlir"`, AOT compilation and `QJIT.mlir_module`.
+          See existing examples for further information.
+        - Returns a string representation of an MLIR module, containing a FuncOp which represents
+          the instantiated decomposition rule.
+
+    The FuncOp decomposition rule in the returned string:
+        - Is named `{op name}_decomp_rule`.
+        - Is an MLIR representation of the PennyLane decomposition rule associated with the
+          specified operator.
+        - Is instantiated with the static data provided, and all other data remains dynamic.
+        - Is compatible with the `decompose-lowering` pass, i.e. can be mapped to the MLIR operation
+          it decomposes and inlined.
+        - Is self-contained, and does not contain any device initialization, setup/teardown etc.
+"""
+
+# pylint: disable=protected-access,unused-argument
 
 import jax.numpy as jnp
 import pennylane as qp
 
 
 def paulirot_callback_wrapper(theta, pauli_word, wires):
-    """Wraps paulirot decomp rule to enable compile-time lowering."""
-    # pylint: disable=protected-access
+    """Wraps the paulirot decomp rule for compile-time lowering with a static pauli word.
+
+    The decomposition rule is identifiable by the name `paulirot_decomp_rule`.
+    """
     device = qp.device("null.qubit", wires=len(wires))
+    wires = jnp.array(wires)
+
+    def paulirot_decomp_rule(theta, wires):
+        qp.ops.qubit.parametric_ops_multi_qubit._pauli_rot_decomposition._impl(
+            theta, wires, pauli_word
+        )
+
+    paulirot_subroutine = qp.capture.subroutine(paulirot_decomp_rule)
 
     @qp.qjit(
         target="mlir",
         capture=True,
-        static_argnums=2,
     )
     @qp.qnode(device=device)
-    def circuit(theta, wires, pauli_word):
-        # declare subroutine
-        my_subroutine = qp.capture.subroutine(
-            qp.ops.qubit.parametric_ops_multi_qubit._pauli_rot_decomposition._impl, static_argnums=2
-        )
+    def circuit(theta: float):
+        paulirot_subroutine(theta, wires)
 
-        # call subroutine
-        my_subroutine(theta, wires, pauli_word)
-
-    circuit(theta, jnp.array(wires), pauli_word)
-    return str(circuit.mlir)
+    return str(circuit.mlir_module)
