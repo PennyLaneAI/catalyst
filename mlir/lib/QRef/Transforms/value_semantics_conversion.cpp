@@ -1750,8 +1750,8 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
                       const SetVector<Value> &rValuesUsedBySubroutine)
 {
     // Special: when calling this conversion pass with generic format MLIR, the input qref
-    // subroutine might have an empty `res_attr` attribtue, e.g. from JAX serialization We just
-    // remove it, since the subroutine return signature is changing.
+    // subroutine might have an empty `res_attr` attribtue, e.g. from JAX serialization.
+    // We just remove it, since the subroutine return signature is changing.
     f->removeAttr("res_attrs");
 
     MLIRContext *ctx = f.getContext();
