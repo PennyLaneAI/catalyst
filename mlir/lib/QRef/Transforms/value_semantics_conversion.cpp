@@ -1749,11 +1749,6 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
 void handleSubroutine(IRRewriter &builder, func::FuncOp f,
                       const SetVector<Value> &rValuesUsedBySubroutine)
 {
-    // Special: when calling this conversion pass with generic format MLIR, the input qref
-    // subroutine might have an empty `res_attr` attribtue, e.g. from JAX serialization.
-    // We just remove it, since the subroutine return signature is changing.
-    f->removeAttr("res_attrs");
-
     MLIRContext *ctx = f.getContext();
     OpBuilder::InsertionGuard guard(builder);
     Location loc = f->getLoc();
@@ -1773,8 +1768,29 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     }
 
     handleRegion(builder, f.getBody(), regionTracker);
+
+    // Return new value semantics quantum results
+    // Also need to append result attributes and update function type
+    size_t originalNumResults = f.getFunctionType().getNumResults();
     addRootVValuesToRetOp(f.front().getTerminator(), rValuesUsedBySubroutine.getArrayRef(),
                           regionTracker);
+    size_t newNumResults = f.front().getTerminator()->getNumOperands();
+
+    SmallVector<Attribute> newResAttrs;
+    if (ArrayAttr existingResAttrs = f.getResAttrsAttr()) {
+        // Copy existing result attributes
+        newResAttrs.append(existingResAttrs.begin(), existingResAttrs.end());
+    }
+    else {
+        // Pad with empty ones if none existed
+        for (size_t i = 0; i < originalNumResults; i++) {
+            newResAttrs.push_back(DictionaryAttr::get(ctx));
+        }
+    }
+    for (size_t i = 0; i < (newNumResults - originalNumResults); i++) {
+        newResAttrs.push_back(DictionaryAttr::get(ctx));
+    }
+    f.setResAttrsAttr(ArrayAttr::get(ctx, newResAttrs));
 
     eraseAllRemainingAnchorRValues(f);
 
