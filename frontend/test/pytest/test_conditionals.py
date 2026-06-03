@@ -224,8 +224,8 @@ class TestCond:
         if capture_mode:
             pytest.xfail("We forgot about this case and will fix it in pl-core.")  # [sc-97385]
 
-        def circuit():
-            @cond(True)
+        def circuit(pred: bool):
+            @cond(pred)
             def cond_fn():
                 return (1, 1)
 
@@ -356,8 +356,8 @@ class TestCond:
             pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
 
         @qjit(capture=capture_mode)
-        def circuit():
-            @cond(True)
+        def circuit(pred):
+            @cond(pred)
             def cond_fn():
                 return 0
 
@@ -369,7 +369,7 @@ class TestCond:
             assert r.dtype is jnp.dtype("int")  # pylint: disable=no-member
             return r
 
-        assert 0 == circuit()
+        assert 0 == circuit(True)
 
     def test_branch_multi_return_type_unification_qjit_2(self, capture_mode):
         """Test that unification happens before the results of the cond primitve is available."""
@@ -495,8 +495,8 @@ class TestCond:
 
         @qjit(capture=capture_mode)
         @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            @cond(True)
+        def circuit(pred):
+            @cond(pred)
             def cond_fn():
                 return 0
 
@@ -508,7 +508,7 @@ class TestCond:
             assert r.dtype is jnp.dtype("int")  # pylint: disable=no-member
             return r
 
-        assert 0 == circuit()
+        assert 0 == circuit(True)
 
     def test_branch_return_mismatch_classical(self, capture_mode):
         """Test that an exception is raised when the true branch returns a different pytree-shape
