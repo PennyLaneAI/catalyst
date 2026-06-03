@@ -51,6 +51,9 @@ class TestConvertQecPhysicalToQuantumPass:
         assert callable(convert_qecp_to_quantum_pass)
 
 
+# MARK: Type conversion
+
+
 class TestPhysicalCodeblockTypeConversion:
     """Type conversion from !qecp.codeblock<k x n> to !quantum.reg."""
 
