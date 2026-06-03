@@ -48,6 +48,7 @@ set(LIBS
     MLIRRTIO
     rtio-transforms
     MLIRRemote
+    remote-transforms
     MLIRQecLogical
     MLIRQecPhysical
     MLIRCatalystTest

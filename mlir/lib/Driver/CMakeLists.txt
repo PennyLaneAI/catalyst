@@ -77,6 +77,7 @@ set(LIBS
     MLIRRTIO
     rtio-transforms
     MLIRRemote
+    remote-transforms
     MLIRCatalystTest
     ${ENZYME_LIB}
     fmt::fmt
