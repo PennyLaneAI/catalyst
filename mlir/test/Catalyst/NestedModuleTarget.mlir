@@ -19,7 +19,7 @@
 
 // CHECK-LABEL: module @host
 module @host {
-  // CHECK: func.func private @ghz_0() attributes {catalyst.target = {backend = "accel"}}
+  // CHECK: func.func private @ghz_0() attributes {catalyst.entry_point, catalyst.target = {backend = "accel"}}
   // CHECK: func.func public @jit_main
   func.func public @jit_main() attributes {llvm.emit_c_interface} {
     // CHECK-NOT: catalyst.launch_kernel
@@ -32,7 +32,7 @@ module @host {
   // CHECK-NOT: catalyst.unique_names
   // CHECK: func.func @ghz_0()
   module @module_accel attributes {catalyst.target = {backend = "accel"}} {
-    func.func @ghz() {
+    func.func @ghz() attributes {catalyst.entry_point} {
       func.return
     }
   }
@@ -44,7 +44,7 @@ module @host {
 // -----
 
 // CHECK-LABEL: module @mixed
-// CHECK: func.func private @kernel_0() attributes {catalyst.target = {backend = "accel"}}
+// CHECK: func.func private @kernel_0() attributes {catalyst.entry_point, catalyst.target = {backend = "accel"}}
 // CHECK: func.func public @jit_run
 // CHECK: call @work_0()
 // CHECK: call @kernel_0()
@@ -66,7 +66,7 @@ module @mixed {
   }
 
   module @module_accel2 attributes {catalyst.target = {backend = "accel"}} {
-    func.func @kernel() {
+    func.func @kernel() attributes {catalyst.entry_point} {
       func.return
     }
   }
@@ -78,8 +78,8 @@ module @mixed {
 // -----
 
 // CHECK-LABEL: module @duplicate_target_names
-// CHECK-DAG: func.func private @kernel_1() attributes {attr = "value", catalyst.target = {backend = "accel"}}
-// CHECK-DAG: func.func private @kernel_0() attributes {catalyst.target = {backend = "accel"}}
+// CHECK-DAG: func.func private @kernel_1() attributes {attr = "value", catalyst.entry_point, catalyst.target = {backend = "accel"}}
+// CHECK-DAG: func.func private @kernel_0() attributes {catalyst.entry_point, catalyst.target = {backend = "accel"}}
 // CHECK: func.func public @jit_run
 // CHECK: call @kernel_1()
 // CHECK: call @kernel_0()
@@ -95,13 +95,13 @@ module @duplicate_target_names {
   }
 
   module @module_accel_a attributes {catalyst.target = {backend = "accel"}} {
-    func.func @kernel() attributes {attr = "value"} {
+    func.func @kernel() attributes {attr = "value", catalyst.entry_point} {
       func.return
     }
   }
 
   module @module_accel_b attributes {catalyst.target = {backend = "accel"}} {
-    func.func @kernel() {
+    func.func @kernel() attributes {catalyst.entry_point} {
       func.return
     }
   }
