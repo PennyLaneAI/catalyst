@@ -623,8 +623,17 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
 
         module_block = op.regions[0].blocks.first
         assert module_block is not None, "Module has no block"
-        t_subroutine = self.create_t_subroutine()
-        module_block.add_op(t_subroutine)
+
+        # The apply_T subroutine is built from `qecl.fabricate`.
+        # only emit it when the circuit actually contains a T gate.
+        has_t_gate = any(
+            isinstance(inner, quantum.CustomOp) and inner.gate_name.data == "T"
+            for inner in op.walk()
+        )
+        t_subroutine = None
+        if has_t_gate:
+            t_subroutine = self.create_t_subroutine()
+            module_block.add_op(t_subroutine)
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(

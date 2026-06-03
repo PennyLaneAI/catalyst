@@ -14,6 +14,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
+  instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
+  with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
+  identifier, and totals across the call graph are computed on demand.
+  [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
+
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
@@ -64,6 +70,12 @@
   to tracing errors.
   [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
 
+* Dynamically allocated wires can now be used in quantum adjoints.
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+
+* Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -94,6 +106,18 @@
 * A new compiler pass `mark-entry-points` has been added, which annotates externally-callable
   entry functions with the `catalyst.entry_point` attribute.
   [(#2899)](https://github.com/PennyLaneAI/catalyst/pull/2899)
+
+* The frontend now generates MLIR in reference semantics when capture is enabled.
+  [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
+  [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
+  [(#2672)](https://github.com/PennyLaneAI/catalyst/pull/2672)
+  [(#2694)](https://github.com/PennyLaneAI/catalyst/pull/2694)
+  [(#2717)](https://github.com/PennyLaneAI/catalyst/pull/2717)
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+  [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
+  [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
+  [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)

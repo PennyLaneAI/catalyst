@@ -670,6 +670,29 @@ class TestGatePattern:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_no_apply_t_subroutine_for_clifford_circuit(
+        self, run_filecheck, quantum_to_qecl_pipeline_k_1
+    ):
+        """Test that the `apply_T` magic-state subroutine is NOT emitted for a Clifford-only
+        circuit (one with no T gates).
+
+        """
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: qecl.hadamard
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+                %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+                %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
+                %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+                return
+            }
+            // CHECK-NOT: @apply_T
+            // CHECK-NOT: qecl.fabricate
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
     def test_gate_cnot_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that CNOT gates (`quantum.custom "CNOT"() ops) are converted to their corresponding
         `qecl.cnot` ops for k = 1.
@@ -874,9 +897,9 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.qec
             # CHECK: apply_T
             # CHECK: qecl.measure {{%.+}}[0]
+            # CHECK: qecl.insert_block
             # CHECK: quantum.mcmobs
             # CHECK: quantum.sample
-            # CHECK: qecl.insert_block
             # CHECK: qecl.dealloc
             qp.H(0)
             qp.T(0)
@@ -912,9 +935,9 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.measure
             # CHECK: qecl.measure
             # CHECK: qecl.measure
+            # CHECK: qecl.insert_block
             # CHECK: quantum.mcmobs
             # CHECK: quantum.sample
-            # CHECK: qecl.insert_block
             # CHECK: qecl.dealloc
             qp.H(0)
             qp.CNOT([0, 1])

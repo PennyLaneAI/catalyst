@@ -129,7 +129,10 @@ def custom_lower_jaxpr_to_module(
     # Create a keepalives list that will be mutated during the lowering.
     keepalives = []
     host_callbacks = []
-    custom_lowering_rules = catalyst.jax_primitives.CUSTOM_LOWERING_RULES
+    custom_lowering_rules = (
+        catalyst.jax_primitives.CUSTOM_LOWERING_RULES
+        + catalyst.from_plxpr.qref_jax_primitives.CUSTOM_LOWERING_RULES
+    )
     lowering_params = LoweringParameters(override_lowering_rules=custom_lowering_rules)
     ctx = ModuleContext(
         backend=None,

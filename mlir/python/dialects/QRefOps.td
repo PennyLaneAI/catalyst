@@ -12,23 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef QREF_PASSES
-#define QREF_PASSES
+#ifndef PYTHON_BINDINGS_QREF_OPS
+#define PYTHON_BINDINGS_QREF_OPS
 
-include "mlir/Pass/PassBase.td"
+include "QRef/IR/QRefOps.td"
 
-def ValueSemanticsConversionPass : Pass<"convert-to-value-semantics"> {
-    let summary = "Convert to value semantics quantum dialect";
-
-    let dependentDialects = [
-       "catalyst::quantum::QuantumDialect",
-       "catalyst::CatalystDialect",
-       "math::MathDialect"
-    ];
-}
-
-def VerifyNoQuantumUseAfterFreePass : Pass<"verify-no-quantum-use-after-free"> {
-    let summary = "Verify that the quantum program has no uses of qubits or registers after they have been deallocated";
-}
-
-#endif // QREF_PASSES
+#endif

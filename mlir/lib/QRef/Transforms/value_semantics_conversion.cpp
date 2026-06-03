@@ -22,13 +22,17 @@
 #include <variant>
 #include <vector>
 
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/CallGraph.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/MLIRContext.h"
@@ -41,6 +45,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/WalkResult.h"
 
+#include "Catalyst/IR/CatalystOps.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
@@ -894,6 +899,89 @@ struct SubroutineInfo {
     SetVector<Value> necessarySubroutineRValues;
     SmallVector<std::variant<unsigned, std::pair<unsigned, uint64_t>>> newArgsInfo;
 }; // struct SubroutineInfo
+
+void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp)
+{
+    // Only potentially aliasing case is where both rQubits come from qref.get ops
+    // This is because those coming from single qubit allocations are guaranteed to be not aliasing
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(callOp);
+    Location loc = callOp.getLoc();
+    Type i64Type = builder.getI64Type();
+
+    // Group all rQubits from get ops based on source registers
+    // Within each register group, we must assert that all indices are different
+    // The structure of `reg_to_indices` is a map whose keys are the source register
+    // and the value is a pair of two sets, the first containing static indices, the second
+    // containing dynamic indices
+    llvm::MapVector<Value, std::pair<SetVector<uint64_t>, SetVector<Value>>> reg_to_indices;
+    for (Value callArg : callOp.getArgOperands()) {
+        if (isa<qref::QubitType>(callArg.getType()) &&
+            isa_and_nonnull<qref::GetOp>(callArg.getDefiningOp())) {
+            qref::GetOp getOp = cast<qref::GetOp>(callArg.getDefiningOp());
+            Value qreg = getOp.getQreg();
+            std::optional<uint64_t> staticIndex = getOp.getIdxAttr();
+            Value dynamicIndex = getOp.getIdx();
+            bool isStatic = staticIndex.has_value();
+
+            auto [_, inserted] = reg_to_indices.try_emplace(qreg);
+            if (isStatic) {
+                if (!inserted) {
+                    // qreg already exists, static index must be new
+                    assert(!reg_to_indices[qreg].first.contains(staticIndex.value()) &&
+                           "Can only call subroutines with non aliasing qubits");
+                }
+                reg_to_indices[qreg].first.insert(staticIndex.value());
+            }
+            else {
+                reg_to_indices[qreg].second.insert(dynamicIndex);
+            }
+        }
+    }
+
+    // For each qreg, must runtime assert that the dynamic indices are all different
+    for (auto [qreg, indexSets] : reg_to_indices) {
+        if (indexSets.second.empty()) {
+            // All indices are static, already checked above in the pass
+            // No need to assert in runtime
+            return;
+        }
+
+        uint64_t num_qubit_operands = indexSets.first.size() + indexSets.second.size();
+        auto expectedNumOnes = arith::ConstantOp::create(
+            builder, loc, i64Type, IntegerAttr::get(i64Type, num_qubit_operands));
+
+        auto accumulator = arith::ConstantOp::create(builder, loc, builder.getI64Type(),
+                                                     IntegerAttr::get(i64Type, 0));
+        Operation *loopUpdater = accumulator;
+        for (uint64_t staticIndex : indexSets.first) {
+            auto one =
+                arith::ConstantOp::create(builder, loc, i64Type, IntegerAttr::get(i64Type, 1));
+            auto shiftSize = arith::ConstantOp::create(
+                builder, loc, i64Type, builder.getIntegerAttr(i64Type, staticIndex));
+            auto shiftedOne =
+                arith::ShLIOp::create(builder, loc, one.getResult(), shiftSize.getResult());
+            auto xorOp = arith::XOrIOp::create(builder, loc, loopUpdater->getResult(0),
+                                               shiftedOne.getResult());
+            loopUpdater = xorOp;
+        }
+
+        for (Value dynamicIndex : indexSets.second) {
+            auto one =
+                arith::ConstantOp::create(builder, loc, i64Type, IntegerAttr::get(i64Type, 1));
+            auto shiftedOne = arith::ShLIOp::create(builder, loc, one.getResult(), dynamicIndex);
+            auto xorOp = arith::XOrIOp::create(builder, loc, loopUpdater->getResult(0),
+                                               shiftedOne.getResult());
+            loopUpdater = xorOp;
+        }
+
+        auto numOneBits = math::CtPopOp::create(builder, loc, i64Type, loopUpdater->getResult(0));
+        auto compOp = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::eq,
+                                            numOneBits.getResult(), expectedNumOnes.getResult());
+        catalyst::AssertionOp::create(builder, loc, compOp.getResult(),
+                                      "Can only call subroutines with non aliasing qubits");
+    }
+}
 
 void stageCallOpForConversion(IRRewriter &builder, func::CallOp callOp,
                               SubroutineInfo &subroutineInfo)
@@ -1769,11 +1857,11 @@ struct ValueSemanticsConversionPass
         IRRewriter builder(ctx);
 
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
-            if (!llvm::all_of(
-                    getOp->getUsers(),
-                    llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
-                                  qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp,
-                                  mbqc::RefMeasureInBasisOp, pbc::RefPPMeasurementOp>)) {
+            if (!llvm::all_of(getOp->getUsers(),
+                              llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
+                                            qref::ComputationalBasisOp, qref::NamedObsOp,
+                                            qref::HermitianOp, mbqc::RefMeasureInBasisOp,
+                                            pbc::RefPPMeasurementOp, func::CallOp>)) {
                 getOp.emitOpError(
                     "qref.get operations can only be used by qref dialect gate operations");
                 return WalkResult::interrupt();
@@ -1826,6 +1914,7 @@ struct ValueSemanticsConversionPass
                 for (auto use : *uses) {
                     Operation *user = use.getUser();
                     if (auto callOp = dyn_cast<func::CallOp>(user)) {
+                        checkNoAliasingQubitsInCallOp(builder, callOp);
                         stageCallOpForConversion(builder, callOp, info);
                     }
                 }
