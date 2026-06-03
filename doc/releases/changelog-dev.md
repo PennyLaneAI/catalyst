@@ -166,13 +166,6 @@
   non-fault tolerant encoding.
   [(#2894)](https://github.com/PennyLaneAI/catalyst/pull/2894)
 
-* The experimental `convert-qecp-to-quantum` pass has been extended to support translating
-  the following ops to the `quantum` dialect for execution and validation on simulators.
-  - `qecp.allocate_cb` to register allocation in the quantum dialect
-  - `qecp.deallocate_cb` to register deallocation in the quantum dialect
-  - `qecp.t` to `quantum.custom "T"`
-  [(#2895)](https://github.com/PennyLaneAI/catalyst/pull/2895)
-
 * The experimental QEC pipeline now supports compilation and execution of circuits that only 
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
