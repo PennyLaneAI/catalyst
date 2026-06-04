@@ -10,13 +10,13 @@
 #include "llvm/Support/raw_ostream.h"
 
 struct PhasePolynomial {
-    std::unordered_map<Parity, Term> poly;   // dense_map in mlir
+    std::unordered_map<Parity, Term> terms;   // dense_map in mlir
     // bots are not seperated and duplicate!
 
     // Constructors
     PhasePolynomial() = default;
-    PhasePolynomial(std::unordered_map<Parity, Term> poly) :
-        poly(std::move(poly)) {}
+    PhasePolynomial(std::unordered_map<Parity, Term> terms) :
+        terms(std::move(terms)) {}
 
     // Operators
     PhasePolynomial& operator+=(const PhasePolynomial& rhs);
@@ -26,5 +26,5 @@ struct PhasePolynomial {
     std::string algebraicView(size_t qubitNum) const;
 
     // Methods
-    void insertTerm(const Parity& parity, const Term& term);
+    void insertContributor(const Parity& parity, const Term& contributor);
 };

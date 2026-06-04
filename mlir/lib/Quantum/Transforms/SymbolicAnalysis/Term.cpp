@@ -73,3 +73,13 @@ std::string Term::algebraicView() const {
     }
     return res;
 }
+
+GateID Term::getHead() const {
+    if (!gateRefPol_0.empty()) {
+        return gateRefPol_0[0];
+    }
+    if (!gateRefPol_1.empty()) {
+        return gateRefPol_1[0];
+    }
+    return -1;
+}

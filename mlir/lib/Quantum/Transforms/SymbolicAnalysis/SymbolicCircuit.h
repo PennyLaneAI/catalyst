@@ -7,14 +7,13 @@
 
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
 
 // PathSum?
 struct SymbolicCircuit {    // indices are 1-based
     size_t qubitNum;
     size_t auxVarNum;
     PhasePolynomial phasePoly;
-    AffineTransform affTrans;
+    AffineTransform stateTrans;
 
     enum Gate { I, H, X, Y, Z, S, T, RZ, CNOT, SWAP, U, GP };
     static constexpr size_t DYNAMIC_ARITY = 3;
@@ -27,16 +26,15 @@ struct SymbolicCircuit {    // indices are 1-based
     SymbolicCircuit() = default;
     SymbolicCircuit(size_t qubitNum) :
         qubitNum(qubitNum), auxVarNum(0), 
-        phasePoly(PhasePolynomial()), affTrans(AffineTransform::identity(qubitNum)) {}
-    SymbolicCircuit(size_t qubitNum, size_t auxVarNum, PhasePolynomial phasePoly, AffineTransform affTrans) :
+        phasePoly(PhasePolynomial()), stateTrans(AffineTransform::identity(qubitNum)) {}
+    SymbolicCircuit(size_t qubitNum, size_t auxVarNum, PhasePolynomial phasePoly, AffineTransform stateTrans) :
         qubitNum(qubitNum), auxVarNum(auxVarNum), 
-        phasePoly(std::move(phasePoly)), affTrans(std::move(affTrans)) {}
+        phasePoly(std::move(phasePoly)), stateTrans(std::move(stateTrans)) {}
 
     // Operators
     friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SymbolicCircuit& circ);
 
     // Gate Applications
-    llvm::SmallVector<size_t, 4> convertIndicesBase(llvm::ArrayRef<size_t> indices);
     void ensureCapacity(llvm::ArrayRef<size_t> qubitIndices);
     void applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices, GateID gateId);
     void applyGateRZ(size_t qubitIndex, GateID gateId);
