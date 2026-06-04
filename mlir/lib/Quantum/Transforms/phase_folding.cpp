@@ -16,6 +16,8 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h" // For arith::ConstantOp
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 
 #include <vector>
 #include <cassert>
@@ -33,16 +35,16 @@ namespace quantum {
 
 struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     using PhaseFoldingPassBase::PhaseFoldingPassBase;
-    using Gate = SymbolicCircuit::Gate;
 
     llvm::DenseMap<mlir::Value, size_t> ssaToQubitMap;
+    std::vector<quantum::CustomOp*> idToOpMap;
 
     // TODO: make ins and outs of the same parent type if possible.
-    std::vector<size_t> getQubitIndices(const std::vector<mlir::Value>& ins, const std::vector<mlir::OpResult>& outs) {     
+    llvm::SmallVector<size_t, 4> getQubitIndices(llvm::ArrayRef<mlir::Value> ins, const llvm::ArrayRef<mlir::OpResult>& outs) {     
         assert(ins.size() == outs.size());
         size_t n = ins.size();
 
-        std::vector<size_t> indices;
+        llvm::SmallVector<size_t, 4> indices;
         indices.reserve(n);
 
         for (size_t i = 0; i < n; i++) {
@@ -74,58 +76,70 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         return indices;
     }
 
-    Gate extractGateFromOp(quantum::CustomOp op) {
-        Gate gate = llvm::StringSwitch<Gate>(op.getGateName())
+    SymbolicCircuit::Gate extractGateFromOp(quantum::CustomOp op) {
+        return llvm::StringSwitch<SymbolicCircuit::Gate>(op.getGateName())
                     .Case("CNOT", SymbolicCircuit::CNOT)
                     .Case("PauliX", SymbolicCircuit::X)
                     .Case("PauliY", SymbolicCircuit::Y)
                     .Case("PauliZ", SymbolicCircuit::Z)
-                    .Case("T", SymbolicCircuit::T)   // T^\dag?
-                    .Case("S", SymbolicCircuit::S)   // S^\dag?
+                    .Case("T", SymbolicCircuit::T)
+                    .Case("S", SymbolicCircuit::S)
                     .Case("RZ", SymbolicCircuit::RZ)
                     .Case("SWAP", SymbolicCircuit::SWAP)
                     .Case("Identity", SymbolicCircuit::I)
                     .Case("Hadamard", SymbolicCircuit::H)
                     .Case("GlobalPhase", SymbolicCircuit::GP)
                     .Default(SymbolicCircuit::U);
-        if (gate == SymbolicCircuit::Y && op.getAdjointFlag()) {
-            gate = SymbolicCircuit::Y_dag;
-        }
-        return gate;
     }
+
     void runOnOperation() override {
         llvm::outs() << "Hello phase-folding world!\n";
 
-        SymbolicCircuit circ = SymbolicCircuit();
-        llvm::outs() << circ << "\n";
+        SymbolicCircuit symCirc = SymbolicCircuit();
+        llvm::outs() << symCirc << "\n";
 
-        int l = 0;
+        GateID gateID = -1;
         getOperation()->walk([&](quantum::CustomOp op) {
-            std::vector<mlir::Value> ins = op.getQubitOperands();
-            std::vector<mlir::OpResult> outs = op.getQubitResults();
-            std::vector<size_t> qubitIndices = getQubitIndices(ins, outs);
+            // getting affected wires
+            llvm::SmallVector<size_t, 4> qubitIndices = getQubitIndices(op.getQubitOperands(), op.getQubitResults());
 
-            Gate gate = extractGateFromOp(op);
+            // tracking Rz gates
+            SymbolicCircuit::Gate gate = extractGateFromOp(op);
+            if (SymbolicCircuit::isRZ(gate)) {
+                idToOpMap.push_back(&op);
+                gateID++;
 
-            circ.applyGate(gate, &qubitIndices, l++);
-            // circ.applyGate(gate, qubitIndices, op.getLoc().getAsOpaquePointer());
-            // maybe passing op itself instead of loc?
+                llvm::outs() << gateID << ": \n";
+                for (auto operand : op.getParams()) {
+                    llvm::outs() << "  *" << operand << "\n";
+                }
+            }
 
-
-            llvm::outs() << "Location:\n";
-            llvm::outs() << "  " << op.getLoc() << "\n";
-
-            // llvm::outs() << "Operands:\n";
-            // for (auto operand : op.getOperands()) {
-            //     llvm::outs() << "  " << operand << "\n";
-            // }
-
-            // op->dump();
-            // op.getOperands();
+            // updating symbolic circuit
+            symCirc.applyGate(gate, op.getAdjointFlag(), qubitIndices, gateID);
+            
             llvm::outs() << "-------------------------\n";
         });
 
-        llvm::outs() << circ << "\n";
+        llvm::outs() << symCirc << "\n";
+
+        // for (const auto& [parity, term] : symCirc.phasePoly.poly) {
+        //     // auto angle = 0;
+
+        //     if (term.gateNum() > 1) {
+        //         for (GateID id : term.gateRefPol_0) {
+        //             quantum::CustomOp* op = idToOpMap[id];
+        //             llvm::outs() << id << ": \n";
+        //             // for (auto operand : op->getParams()) {
+        //             //     llvm::outs() << "  *" << operand << "\n";
+        //             // }
+        //         }
+        //         for (GateID id : term.gateRefPol_1) {
+        //             llvm::outs() << id << " ";
+        //         }
+        //         llvm::outs() << "should be merged.\n";
+        //     }
+        // }
     }
 };
 
@@ -134,10 +148,15 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 } // namespace catalyst
 
 
-// about initializing map
-// an ExtractOp can be either dynamic or static, which has either getIdx() (of type Value) or getIdxAttr() (of type uint64_t) respectively. 
-// check Paul's PR on reference-semantic to get an idea of how handling dynamic case.
-
 // Currently ignoring any blocks or dynamic allocations, only capturing pure quantum circuits.
 
 // for merging, should probably have another walk.
+// first, I ignore Z and S gates. then they can be merged too!
+
+// llvm::outs() << "Location:\n";
+// llvm::outs() << "  " << op.getLoc() << "\n";
+// llvm::outs() << "Operands:\n";
+// for (auto operand : op.getOperands()) {
+//     llvm::outs() << "  " << operand << "\n";
+// }
+// op->dump();

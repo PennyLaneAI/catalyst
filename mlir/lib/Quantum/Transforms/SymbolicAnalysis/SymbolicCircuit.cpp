@@ -1,48 +1,61 @@
 // #include <iostream>
-#include <vector>
 #include "SymbolicCircuit.h"
 
 /*.................
     Operators:
 ...................*/
 llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SymbolicCircuit& circ) {
-    os << "Phase polynomial:\n" << circ.phasePoly;
-    os << "Affine transformation:\n" << circ.affTrans;
+    // os << "Phase polynomial:\n" << circ.phasePoly;
+    // os << "Affine transformation:\n" << circ.affTrans;
+    os << "Phase polynomial:\n" << circ.phasePoly.algebraicView(circ.qubitNum);
+    os << "Affine transformation:\n" << circ.affTrans.algebraicView(circ.qubitNum);
     return os;
 }
 
 /*.................
     Gate Applications:
 ...................*/
-void SymbolicCircuit::applyGate(Gate gate, std::vector<size_t>* qubitIndices, GateID gateId) {
-    matchDim(qubitIndices);
+void SymbolicCircuit::applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices, GateID gateId) {
+    llvm::SmallVector<size_t, 4> indices = convertIndicesBase(qubitIndices);
+    ensureCapacity(indices);
 
     assert(SymbolicCircuit::getGateArity(gate) == SymbolicCircuit::DYNAMIC_ARITY || 
-            qubitIndices->size() == SymbolicCircuit::getGateArity(gate));
+            indices.size() == SymbolicCircuit::getGateArity(gate));
 
     switch (gate) {
     case I:     break;
-    case H:     applyGateH((*qubitIndices)[0]);    break;
-    case X:     applyGateX((*qubitIndices)[0]);    break;
-    case Y:     applyGateY((*qubitIndices)[0], gateId);    break;
-    case Y_dag: applyGateY_dag((*qubitIndices)[0], gateId);    break;
+    case H:     applyGateH(indices[0]);    break;
+    case X:     applyGateX(indices[0]);    break;
+    case Y:     
+        if (isAdjoint)  applyGateY_dag(indices[0], gateId);
+        else            applyGateY(indices[0], gateId);
+        break;
     case Z:
     case S:
     case T:
-    case RZ:    applyGateRZ((*qubitIndices)[0], gateId);   break;
-    case CNOT:  applyGateCNOT((*qubitIndices)[0], (*qubitIndices)[1]);    break;
-    case SWAP:  applyGateSWAP((*qubitIndices)[0], (*qubitIndices)[1]);    break;
-    case U:     applyGateU(*qubitIndices);   break;
+    case RZ:    applyGateRZ(indices[0], gateId);   break;
+    case CNOT:  applyGateCNOT(indices[0], indices[1]);    break;
+    case SWAP:  applyGateSWAP(indices[0], indices[1]);    break;
+    case U:     applyGateU(indices);   break;
     case GP:    break;  // figure out later.
     }
 }
 
-void SymbolicCircuit::matchDim(std::vector<size_t>* qubitIndices) {
+llvm::SmallVector<size_t, 4> SymbolicCircuit::convertIndicesBase(llvm::ArrayRef<size_t> indices) {
+    llvm::SmallVector<size_t, 4> oneBasedIndices;
+    oneBasedIndices.reserve(indices.size());
+    
+    for (size_t idx : indices) {
+        oneBasedIndices.push_back(idx + 1);
+    }
+    return oneBasedIndices;
+}
+
+void SymbolicCircuit::ensureCapacity(llvm::ArrayRef<size_t> indices) {
     size_t maxIndex = 0;
-    for (size_t i = 0; i < qubitIndices->size(); i++) {
-        (*qubitIndices)[i]++;   // convert to 1-based index
-        if ((*qubitIndices)[i] > maxIndex) {
-            maxIndex = (*qubitIndices)[i];
+    for (size_t idx : indices) {
+        if (idx > maxIndex) {
+            maxIndex = idx;
         }
     }
 
@@ -50,7 +63,6 @@ void SymbolicCircuit::matchDim(std::vector<size_t>* qubitIndices) {
         affTrans.extendTo(maxIndex);
         qubitNum = maxIndex;
     }
-    // llvm::outs() << " (total qubits: " << qubitNum << ")\n";
 }
 
 // Do I need seperate Z, S, Sdag, T, Tdag functions?
@@ -100,7 +112,7 @@ void SymbolicCircuit::applyGateH(size_t qubitIndex) {
     affTrans.setRow(qubitIndex, Parity::eVec(qubitNum + auxVarNum, qubitNum + auxVarNum));  // are the indices correct?
 }   // make sure nothing leads to segment fault and index out of bounds. also update operations to support different dimendions accordingly.
 
-void SymbolicCircuit::applyGateU(const std::vector<size_t>& qubitIndices) {
+void SymbolicCircuit::applyGateU(llvm::ArrayRef<size_t> qubitIndices) {
     llvm::outs() << "U on qubits ";
     for (size_t index : qubitIndices) {
         llvm::outs() << index << ", ";

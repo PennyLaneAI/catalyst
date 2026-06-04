@@ -3,6 +3,7 @@
 // #include <iosfwd>
 #include <vector>
 #include <utility>
+#include <string>
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -26,5 +27,12 @@ struct Term {
     Term& operator+=(const Term& rhs);
     Term operator+(const Term& rhs) const;
 
+    size_t gateNum() const;
+
     friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Term& term);
+    std::string algebraicView() const;
 };
+
+inline size_t Term::gateNum() const {
+    return gateRefPol_0.size() + gateRefPol_1.size();
+}

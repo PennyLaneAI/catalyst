@@ -39,3 +39,37 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Term& term) {
     }
     return os;
 }
+
+std::string Term::algebraicView() const {
+    std::string res = "";
+
+    if (!gateRefPol_0.empty()) {
+        res += "[0: (";
+
+        for (size_t i = 0; i < gateRefPol_0.size(); i++) {
+            if (i > 0) {
+                res += ", ";
+            }
+            res += ("l" + std::to_string(gateRefPol_0[i] + 1));
+        }
+        res += ")";
+
+        res += (gateRefPol_1.empty() ? "]" : ", ");
+    }
+    
+    if (!gateRefPol_1.empty()) {
+
+        res += (gateRefPol_0.empty() ? "[" : "");
+
+        res += "1: (";
+
+        for (size_t i = 0; i < gateRefPol_1.size(); i++) {
+            if (i > 0) {
+                res += ", ";
+            }
+            res += ("l" + std::to_string(gateRefPol_1[i] + 1));
+        }
+        res += ")]";        
+    }
+    return res;
+}

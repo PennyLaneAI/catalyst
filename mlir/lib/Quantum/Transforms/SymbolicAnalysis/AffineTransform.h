@@ -21,6 +21,7 @@ public:
 
     // Operators
     friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const AffineTransform& trans);
+    std::string algebraicView(size_t qubitNum) const;
 
     // Getters
     [[nodiscard]] size_t getRowNum() const;

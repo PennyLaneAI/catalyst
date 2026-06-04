@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 #include <functional>
+#include <string>
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -30,6 +31,7 @@ public:
 
     friend struct std::hash<Parity>;
     friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Parity& par);
+    std::string algebraicView(size_t qubitNum) const;
 
     // Checks & Inspections
     [[nodiscard]] bool isIdenticalWith(const Parity& rhs) const;
@@ -72,7 +74,6 @@ private:
     void offBitAtBlock(Index ind);
     void flipBitAtBlock(Index ind);
     void extendBitsTo(size_t newVarNum);
-    [[nodiscard]] std::string algebraicView() const;
 };
 
 inline size_t Parity::getVarNum() const {

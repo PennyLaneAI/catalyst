@@ -3,6 +3,7 @@
 // #include <iosfwd>
 #include <unordered_map>
 #include <utility>
+#include <string>
 #include "Parity.h"
 #include "Term.h"
 
@@ -22,6 +23,7 @@ struct PhasePolynomial {
     PhasePolynomial operator+(const PhasePolynomial& rhs) const;
 
     friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const PhasePolynomial& pp);
+    std::string algebraicView(size_t qubitNum) const;
 
     // Methods
     void insertTerm(const Parity& parity, const Term& term);

@@ -74,7 +74,7 @@ Parity Parity::operator+(const Parity& rhs) const {
 
 llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Parity& par) {
     os << par.getLinearPartString() << " " << par.getAffineValue();
-    os << "  (" << par.algebraicView() << ")";
+    // os << "  (" << par.algebraicView() << ")";
     return os;
 }
 
@@ -252,7 +252,7 @@ void Parity::extendBitsTo(size_t newVarNum) {
     }
 }
 
-std::string Parity::algebraicView() const {
+std::string Parity::algebraicView(size_t qubitNum) const {
     std::string res = "";
     size_t n = 0;
     for (size_t i = 1; i <= varNum; i++) {
@@ -260,18 +260,19 @@ std::string Parity::algebraicView() const {
             if (n > 0) {
                 res += " + ";
             }
-            res += ("x" + std::to_string(i));
+            if (i <= qubitNum) {
+                res += ("x" + std::to_string(i));
+            } else {
+                res += ("y" + std::to_string(i - qubitNum));
+            }
             n++;
         }
     }
     bool c = getAffineValue();
     if (c) {
-        if (n > 0) {
-            res += " + ";
-        }
-        res += "1";
+        res += (n > 0) ? " + 1" : "1";
     }
     return res;
-}   // can make it more readable due to path variables.
+}
 
 // TODO: other isomorphism that ignores affine values.

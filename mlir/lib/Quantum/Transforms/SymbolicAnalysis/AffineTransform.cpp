@@ -26,6 +26,14 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const AffineTransform& tran
     return os;
 }
 
+std::string AffineTransform::algebraicView(size_t qubitNum) const {
+    std::string res = "";
+    for (size_t i = 0; i < exprMatrix.size(); i++) {
+        res += ("x'" + std::to_string(i + 1) + " = " + exprMatrix[i].algebraicView(qubitNum) + '\n');
+    }
+    return res;
+}
+
 /*.................
     Getters and Setters:
 ...................*/

@@ -6,6 +6,8 @@
 #include "AffineTransform.h"
 
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 
 // PathSum?
 struct SymbolicCircuit {    // indices are 1-based
@@ -14,18 +16,12 @@ struct SymbolicCircuit {    // indices are 1-based
     PhasePolynomial phasePoly;
     AffineTransform affTrans;
 
-    enum Gate { I, H, X, Y, Y_dag, Z, S, T, RZ, CNOT, SWAP, U, GP };
+    enum Gate { I, H, X, Y, Z, S, T, RZ, CNOT, SWAP, U, GP };
     static constexpr size_t DYNAMIC_ARITY = 3;
-    static constexpr size_t getGateArity(Gate gate) {
-        switch (gate) {
-        case U:
-        case I:     return DYNAMIC_ARITY;
-        case CNOT:
-        case SWAP:  return 2;
-        case GP:    return 0;
-        default:    return 1;
-        }
-    }
+    static constexpr size_t arities[] = { DYNAMIC_ARITY, 1, 1, 1, 1, 1, 1, 1, 2, 2, DYNAMIC_ARITY, 0 };
+    static constexpr size_t getGateArity(Gate gate) { return arities[gate]; }
+    // static constexpr bool isRZ(Gate gate) { return ((gate == Z) || (gate == S) || (gate == T) || (gate == RZ)); }
+    static constexpr bool isRZ(Gate gate) { return ((gate == T) || (gate == RZ)); }
 
     // Constructors
     SymbolicCircuit() = default;
@@ -40,8 +36,9 @@ struct SymbolicCircuit {    // indices are 1-based
     friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SymbolicCircuit& circ);
 
     // Gate Applications
-    void matchDim(std::vector<size_t>* qubitIndices);
-    void applyGate(Gate gate, std::vector<size_t>* qubitIndices, GateID gateId);
+    llvm::SmallVector<size_t, 4> convertIndicesBase(llvm::ArrayRef<size_t> indices);
+    void ensureCapacity(llvm::ArrayRef<size_t> qubitIndices);
+    void applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices, GateID gateId);
     void applyGateRZ(size_t qubitIndex, GateID gateId);
     void applyGateX(size_t qubitIndex);
     void applyGateY(size_t qubitIndex, GateID gateId);
@@ -49,6 +46,6 @@ struct SymbolicCircuit {    // indices are 1-based
     void applyGateCNOT(size_t controlIndex, size_t targetIndex);
     void applyGateSWAP(size_t qubitIndex1, size_t qubitIndex2);
     void applyGateH(size_t qubitIndex);
-    void applyGateU(const std::vector<size_t>& qubitIndices);
+    void applyGateU(llvm::ArrayRef<size_t> qubitIndices);
 };
 // what are you going to do with Z and S?

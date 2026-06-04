@@ -27,6 +27,14 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const PhasePolynomial& pp) 
     return os;
 }
 
+std::string PhasePolynomial::algebraicView(size_t qubitNum) const {
+    std::string res = "";
+    for (const auto& [key, value] : poly) {
+        res += (key.algebraicView(qubitNum) + " -> " + value.algebraicView() + "\n");
+    }
+    return res;
+}
+
 /*.................
     Methods:
 ...................*/
