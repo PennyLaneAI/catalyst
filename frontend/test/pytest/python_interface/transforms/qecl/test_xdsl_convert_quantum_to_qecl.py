@@ -671,8 +671,8 @@ class TestGatePattern:
             // CHECK-NEXT: [[mres:%.+]], [[in_codeblock3:%.+]] = qecl.measure [[in_codeblock2]][0]
             // CHECK-NEXT: qecl.dealloc_cb [[in_codeblock3]]
             // CHECK-NEXT: [[out_codeblock:%.+]] = scf.if [[mres]] -> (!qecl.codeblock<1>)
-            // CHECK-NEXT:     [[s_corrected_cb:%.+]] = qecl.s [[magic_cb2]][0]
-            // CHECK-NEXT:     [[corrected_cb:%.+]] = qecl.x [[s_corrected_cb]]
+            // CHECK-NEXT:     [[x_corrected_cb:%.+]] = qecl.x [[magic_cb2]][0]
+            // CHECK-NEXT:     [[corrected_cb:%.+]] = qecl.s [[x_corrected_cb]]
             // CHECK-NEXT:     scf.yield [[corrected_cb]]
             // CHECK-NEXT: else
             // CHECK-NEXT:     scf.yield [[magic_cb2]]
