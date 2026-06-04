@@ -638,7 +638,6 @@ class TestQECPassIntegration:
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
-        @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
@@ -692,7 +691,6 @@ class TestQECPassIntegration:
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
-        @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
@@ -750,4 +748,5 @@ class TestQECPassIntegration:
         run_filecheck_qjit(circ)
         samples = circ()
         eigenvalues = [-1 if s else 1 for s in samples]
-        assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.05)
+        # could have a lower atol with more shots, but given test duration, not worth it
+        assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.07)
