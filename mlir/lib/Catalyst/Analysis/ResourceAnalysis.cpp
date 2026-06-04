@@ -246,6 +246,20 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
     }
 }
 
+ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp)
+{
+    ResourceResult result;
+
+    for (auto &region : funcOp->getRegions()) {
+        analyzeRegion(region, result, /*isAdjoint*/ false);
+    }
+
+    // TODO: Additional handling for entrypoint functions
+
+    result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
+    funcResults[funcOp.getName()] = std::move(result);
+}
+
 std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t &counter)
 {
     // Bump `counter` until the resulting name does not collide with an

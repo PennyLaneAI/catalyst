@@ -21,6 +21,8 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "PBC/IR/PBCOps.h"
 
+#include <mlir/Dialect/Func/IR/FuncOps.h>
+
 using namespace mlir;
 
 namespace catalyst {
@@ -29,6 +31,7 @@ class ResourceAnalysis {
   public:
     // walk all func::FuncOps within the operation.
     explicit ResourceAnalysis(ModuleOp moduleOp);
+    explicit ResourceAnalysis(func::FuncOp funcOp);
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 
