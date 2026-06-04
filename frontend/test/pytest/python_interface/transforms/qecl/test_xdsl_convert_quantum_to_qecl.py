@@ -1016,6 +1016,74 @@ class TestControlFlow:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_conditional_nested(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with a nested `scf.if` conditional ops."""
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program(%arg0: tensor<i1>, %arg1: tensor<i1>) {
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.extract_block>
+            //   COM: <qecl.encode>
+            // CHECK: [[hreg0:%.+]] = qecl.insert_block
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: [[cond0:%.+]] = tensor.extract
+            %cond0 = tensor.extract %arg0[] : tensor<i1>
+
+            // CHECK: [[outer_hreg:%.+]] = scf.if [[cond0]] -> (!qecl.hyperreg<1 x 1>)
+            // CHECK:     qecl.extract_block [[hreg0]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     qecl.x
+            //   COM:     <qec cycle>
+            // CHECK:     [[outer_hreg_true:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[outer_hreg_true]] : !qecl.hyperreg<1 x 1>
+            // CHECK: else
+            // CHECK:     qecl.extract_block [[hreg0]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     qecl.z
+            //   COM:     <qec cycle>
+            // CHECK:     [[outer_hreg_false:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     [[cond1:%.+]] = tensor.extract
+            // CHECK:     [[inner_hreg:%.+]] = scf.if [[cond1]] -> (!qecl.hyperreg<1 x 1>)
+            // CHECK:         qecl.extract_block [[outer_hreg_false]][0]
+            //   COM:         <qec cycle>
+            // CHECK:         qecl.y
+            //   COM:         <qec cycle>
+            // CHECK:         [[inner_hreg_true:%.+]] = qecl.insert_block [[outer_hreg_false]][0]
+            // CHECK:         scf.yield [[inner_hreg_true]] : !qecl.hyperreg<1 x 1>
+            // CHECK:     else
+            // CHECK:         scf.yield [[outer_hreg_false]] : !qecl.hyperreg<1 x 1>
+            // CHECK:     scf.yield [[inner_hreg]] : !qecl.hyperreg<1 x 1>
+            %1 = scf.if %cond0 -> (!quantum.reg) {
+                %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %3 = quantum.custom "PauliX"() %2 : !quantum.bit
+                %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+                scf.yield %4 : !quantum.reg
+            } else {
+                %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %3 = quantum.custom "PauliZ"() %2 : !quantum.bit
+                %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+                %cond1 = tensor.extract %arg1[] : tensor<i1>
+                %5 = scf.if %cond1 -> (!quantum.reg) {
+                    %6 = quantum.extract %4[ 0] : !quantum.reg -> !quantum.bit
+                    %7 = quantum.custom "PauliY"() %6 : !quantum.bit
+                    %8 = quantum.insert %4[ 0], %7 : !quantum.reg, !quantum.bit
+                    scf.yield %8 : !quantum.reg
+                } else {
+                    scf.yield %4 : !quantum.reg
+                }
+                scf.yield %5 : !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[outer_hreg]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %1 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
 
 # MARK: Integration Tests
 
