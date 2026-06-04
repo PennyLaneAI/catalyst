@@ -17,6 +17,8 @@ from catalyst.python_callbacks import paulirot_callback_wrapper
 
 
 class TestQPCCallbacks:
+    """Test the python wrapper functions used for decomposition callbacks."""
+
     def test_paulirot_wrapper(self):
         """Test that the QPC paulirot callback wrapper correctly returns the IR as a string."""
         result = paulirot_callback_wrapper(0.4, "XZZ", [0, 1, 2])
