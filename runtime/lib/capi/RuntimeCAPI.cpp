@@ -169,6 +169,8 @@ void *_mlir_memref_to_llvm_alloc(size_t size)
     return ptr;
 }
 
+void *__catalyst__rt__alloc_managed(size_t size) { return _mlir_memref_to_llvm_alloc(size); }
+
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
     void *ptr = aligned_alloc(alignment, size);

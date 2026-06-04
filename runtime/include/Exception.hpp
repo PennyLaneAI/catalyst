@@ -51,7 +51,7 @@ namespace Catalyst::Runtime {
  * @brief This is the general exception thrown by Catalyst for runtime errors
  * that is derived from `std::exception`.
  */
-class RuntimeException : public std::exception {
+class __attribute__((visibility("default"))) RuntimeException : public std::exception {
   private:
     const std::string err_msg;
 

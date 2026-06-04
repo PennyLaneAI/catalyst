@@ -179,10 +179,13 @@ struct CustomCallOpInterface
         // Add the initial number of arguments
         int32_t numArguments = static_cast<int32_t>(customCallOp.getNumOperands());
         IntegerAttr numArgumentsAttr = rewriter.getI32IntegerAttr(numArguments);
+        auto newOp = CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
+                                          customCallOp.getCallTargetName(), numArgumentsAttr);
 
-        // Create an updated custom call operation
-        CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
-                             customCallOp.getCallTargetName(), numArgumentsAttr);
+        // carry over any discardable attributes
+        for (NamedAttribute attr : op->getDiscardableAttrs()) {
+            newOp->setAttr(attr.getName(), attr.getValue());
+        }
         size_t startIndex = bufferArgs.size() - customCallOp.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferResults);
