@@ -192,7 +192,7 @@
 
 <h3>Documentation 📝</h3>
 
-* Remove reference to missing docs section "decomposition-rules."
+* A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
   [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
 
 <h3>Contributors ✍️</h3>
