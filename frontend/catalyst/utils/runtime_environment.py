@@ -20,7 +20,6 @@ import os
 import os.path
 import sys
 import sysconfig
-from pathlib import Path
 
 from catalyst._configuration import INSTALLED
 from catalyst._revision import __revision__
