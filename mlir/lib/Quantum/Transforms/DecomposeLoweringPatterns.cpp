@@ -183,12 +183,78 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
     }
 };
 
+struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
+  private:
+    const llvm::StringMap<func::FuncOp> &decompositionRegistry;
+    const llvm::StringSet<llvm::MallocAllocator> &targetGateSet;
+
+  public:
+    DLPauliRotOpPattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
+                        const llvm::StringSet<llvm::MallocAllocator> &gateSet)
+        : OpRewritePattern<PauliRotOp>(context), decompositionRegistry(registry),
+          targetGateSet(gateSet)
+    {
+    }
+
+    LogicalResult matchAndRewrite(PauliRotOp op, PatternRewriter &rewriter) const override
+    {
+        std::string gateName = "paulirot" + op.getPauliWord();
+
+        // Only decompose the op if it is not in the target gate set
+        if (targetGateSet.contains("paulirot")) {
+            return failure();
+        }
+
+        // Find the corresponding decomposition function for the op
+        auto it = decompositionRegistry.find(gateName);
+        if (it == decompositionRegistry.end()) {
+            return failure();
+        }
+        func::FuncOp decompFunc = it->second;
+        decompFunc.dump();
+
+        // Here is the assumption that the decomposition function must have at least one input
+        // and one result
+        assert(decompFunc.getFunctionType().getNumInputs() > 0 &&
+               "Decomposition function must have at least one input");
+        assert(decompFunc.getFunctionType().getNumResults() >= 1 &&
+               "Decomposition function must have at least one result");
+
+        rewriter.setInsertionPointAfter(op);
+
+        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
+        auto analyzer = PauliRotOpSignatureAnalyzer(op, enableQreg);
+        assert(analyzer && "Analyzer should be valid");
+
+        auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
+        for (auto operand : callOperands) {
+            operand.dump();
+        }
+        auto callOp =
+            func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
+                                 decompFunc.getSymName(), callOperands);
+
+        // Replace the op with the call op and adjust the insert ops for the qreg mode
+        if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {
+            auto results = analyzer.prepareCallResultForQreg(callOp, rewriter);
+            rewriter.replaceOp(op, results);
+        }
+        else {
+            rewriter.replaceOp(op, callOp->getResults());
+        }
+
+        return success();
+    }
+};
+
 void populateDecomposeLoweringPatterns(RewritePatternSet &patterns,
                                        const llvm::StringMap<func::FuncOp> &decompositionRegistry,
                                        const llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
 {
     patterns.add<DLCustomOpPattern>(patterns.getContext(), decompositionRegistry, targetGateSet);
     patterns.add<DLMultiRZOpPattern>(patterns.getContext(), decompositionRegistry, targetGateSet);
+    patterns.add<DLPauliRotOpPattern>(patterns.getContext(), decompositionRegistry, targetGateSet);
 }
 
 } // namespace quantum

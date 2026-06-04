@@ -63,6 +63,9 @@
   that have multiple quantum operands, of either quantum register or qubit type.
   [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
+* The `--decompose-lowering` pass now supports `quantum.paulirot` operators.
+  [(#2893)](https://github.com/PennyLaneAI/catalyst/pull/2893)
+
 * Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
   to tracing errors.
   [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
@@ -116,6 +119,7 @@
   [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
   [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
   [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
+  [(#2911)](https://github.com/PennyLaneAI/catalyst/pull/2911)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -200,6 +204,12 @@
   better. This can be useful for optimizations that depend on values being static.
   [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
 
+* The experimental QEC pipeline now supports the following control-flow operations:
+
+  - Conditionals (`scf.if`)
+    [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
+  - For loops (`scf.for`)
+    [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
 
 <h3>Documentation 📝</h3>
 
