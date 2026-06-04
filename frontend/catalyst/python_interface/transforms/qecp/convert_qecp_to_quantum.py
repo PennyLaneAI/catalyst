@@ -142,6 +142,7 @@ class DeallocAuxQubitConversion(RewritePattern):
         """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary qubit."""
         rewriter.replace_op(op, quantum.DeallocQubitOp(op.qubit))
 
+
 @dataclass(frozen=True)
 class AllocCodeblockConversion(RewritePattern):
     """Op conversion pattern from qecp.alloc_cb to quantum.alloc."""
@@ -160,6 +161,7 @@ class DeallocCodeblockConversion(RewritePattern):
     def match_and_rewrite(self, op: qecp.DeallocCodeblockOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary qubit."""
         rewriter.replace_op(op, quantum.DeallocOp(op.codeblock))
+
 
 # MARK: Data qubit extract and insertion patterns
 

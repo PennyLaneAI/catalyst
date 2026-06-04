@@ -219,7 +219,7 @@ class TestCodeblockAllocDeallocConversion:
 
     @pytest.mark.parametrize("n", [1, 3, 7])
     def test_alloc_codeblock_lowering(self, run_filecheck, n):
-        """Test lowering allocation of a codeblock of n physical qubits via qecp.alloc_cb 
+        """Test lowering allocation of a codeblock of n physical qubits via qecp.alloc_cb
         to an allocation of a quantum register of n qubits quantum.alloc."""
         program = f"""
         builtin.module {{
@@ -501,7 +501,9 @@ class TestGateMeasureConversion:
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
+
 # MARK: Subroutines
+
 
 class TestSubroutineConversion:
     """Lowering of subroutine funcOp and call ops with qecp types to quantum types."""
@@ -566,6 +568,7 @@ class TestSubroutineConversion:
 
 
 # MARK: Hyperregisters
+
 
 class TestHyperRegisterLowering:
     """Unit test for hyperreg related type and operations lowering."""
@@ -706,8 +709,18 @@ class TestQECPassIntegration:
 
         ghz()
 
-    @pytest.mark.parametrize("n, diagonalizing_gates, expected_res, shots", [(1, [qp.H], 0.707, 1000), (1, [qp.Z, qp.S, qp.H], 0.707, 1000), (2, [qp.H], 0, 1000), (2, [qp.Z, qp.S, qp.H], 1, 100)])
-    def test_T_gate_integration(self, n, diagonalizing_gates, expected_res, shots, run_filecheck_qjit):
+    @pytest.mark.parametrize(
+        "n, diagonalizing_gates, expected_res, shots",
+        [
+            (1, [qp.H], 0.707, 1000),
+            (1, [qp.Z, qp.S, qp.H], 0.707, 1000),
+            (2, [qp.H], 0, 1000),
+            (2, [qp.Z, qp.S, qp.H], 1, 100),
+        ],
+    )
+    def test_T_gate_integration(
+        self, n, diagonalizing_gates, expected_res, shots, run_filecheck_qjit
+    ):
         """Integration test for T gates."""
 
         dev = qp.device("lightning.qubit", wires=1)
@@ -738,5 +751,3 @@ class TestQECPassIntegration:
         samples = circ()
         eigenvalues = [-1 if s else 1 for s in samples]
         assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.05)
-
-
