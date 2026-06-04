@@ -16,8 +16,10 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+import catalyst
 from catalyst import AutoGraphError, autograph_source, disable_autograph, qjit, run_autograph
 from catalyst.utils.dummy import dummy_func
+from catalyst.utils.patching import Patcher
 
 
 def print_code(fn):
@@ -561,10 +563,11 @@ print_code(chain_logical_call)
 def f():
     """Simple function with if statements"""
     x = 6
-    if x > 5:
-        y = x**2
-    else:
-        y = x**3
+    with Patcher((catalyst, "compile_without_static_conditionals", False)):
+        if x > 5:
+            y = x**2
+        else:
+            y = x**3
     return y
 
 
@@ -590,10 +593,11 @@ print(disable_autograph_decorator_jax.jaxpr)
 def g():
     """Simple function with if statements"""
     x = 6
-    if x > 5:
-        y = x**2
-    else:
-        y = x**3
+    with Patcher((catalyst, "compile_without_static_conditionals", False)):
+        if x > 5:
+            y = x**2
+        else:
+            y = x**3
     return y
 
 
@@ -617,10 +621,11 @@ print(enable_autograph_decorator_jax.jaxpr)
 def h():
     """Simple function with if statements"""
     x = 6
-    if x > 5:
-        y = x**2
-    else:
-        y = x**3
+    with Patcher((catalyst, "compile_without_static_conditionals", False)):
+        if x > 5:
+            y = x**2
+        else:
+            y = x**3
     return y
 
 
@@ -645,10 +650,11 @@ print(disable_autograph_context_manager_jax.jaxpr)
 def func():
     """Simple function with if statements"""
     x = 6
-    if x > 5:
-        y = x**2
-    else:
-        y = x**3
+    with Patcher((catalyst, "compile_without_static_conditionals", False)):
+        if x > 5:
+            y = x**2
+        else:
+            y = x**3
     return y
 
 
