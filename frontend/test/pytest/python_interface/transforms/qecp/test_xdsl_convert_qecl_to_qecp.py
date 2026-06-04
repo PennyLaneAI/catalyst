@@ -46,6 +46,7 @@ def fixture_qecl_to_qecp_steane_pipeline():
     return (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
 
 
+# pylint: disable=too-many-arguments
 @pytest.fixture(name="get_generic_qec_code", scope="module")
 def fixture_get_generic_qec_code():
     """Fixture factory that returns a function to create `QecCode` objects for generic QEC codes."""
@@ -54,6 +55,7 @@ def fixture_get_generic_qec_code():
         n: int,
         k: int,
         d: int,
+        *,
         name: str = "TestCode",
         n_aux: int = 3,
         x_tanner=None,
@@ -1031,6 +1033,7 @@ class TestLoweringTransversalGates:
 
 
 class TestLoweringFabricateOp:
+    """Test lowering for the qecl.fabricate op"""
 
     def test_lower_fabricate_toy_code(self, run_filecheck, get_generic_qec_code):
         """Test that `qecl.fabricate [magic]` op lowers to a call to the magic-state
