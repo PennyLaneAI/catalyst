@@ -15,6 +15,7 @@ RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqc/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
+UNINSTALL_PL ?= ON
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
 TEST_BACKEND ?= "lightning.qubit"
@@ -118,9 +119,11 @@ catalyst: runtime dialects plugin frontend oqc
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
+ifeq ($(UNINSTALL_PL),ON)
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
+endif
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
