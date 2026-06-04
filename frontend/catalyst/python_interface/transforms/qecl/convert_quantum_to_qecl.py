@@ -172,59 +172,48 @@ class AllocOpConversion(RewritePattern):
 
         ops_to_insert: tuple[Operation, ...] = ()
 
-        if hyper_reg_width == 1:
-            # No need to loop, insert encode op directly.
-            ops_to_insert = (
-                extract_op := qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=0),
-                encode_op := qecl.EncodeOp(extract_op.codeblock, init_state="zero"),
-                qecl.InsertCodeblockOp(
-                    in_hyper_reg=hyper_reg, idx=0, codeblock=encode_op.out_codeblock
-                ),
+        # Loop over all codeblocks in the hyper-register and encode them to logical zero state.
+        # Ops for lower bound, upper bound, and step size.
+        lb_op = arith.ConstantOp.from_int_and_width(0, IndexType())
+        ub_op = arith.ConstantOp.from_int_and_width(hyper_reg_width, IndexType())
+        step_op = arith.ConstantOp.from_int_and_width(1, IndexType())
+
+        for_body = Block(
+            [],
+            arg_types=(builtin.IndexType(), hyper_reg.type),
+        )
+
+        for_each_codeblock_op = scf.ForOp(
+            lb=lb_op,
+            ub=ub_op,
+            step=step_op,
+            iter_args=(hyper_reg,),
+            body=for_body,
+        )
+
+        # Build the body of the for loop. On each iteration, extract the codeblock at the
+        # iteration index, encode it, and re-insert into hyper-register. Finally, yield the
+        # updated hyper-register.
+        with ImplicitBuilder(for_each_codeblock_op.body):
+            indvar = cast(BlockArgument[IndexType], for_each_codeblock_op.body.block.args[0])
+            hyper_reg = cast(
+                BlockArgument[qecl.LogicalHyperRegisterType],
+                for_each_codeblock_op.body.block.args[1],
             )
 
-        else:
-            # Loop over all codeblocks in the hyper-register and encode them to logical zero state.
-            # Ops for lower bound, upper bound, and step size.
-            lb_op = arith.ConstantOp.from_int_and_width(0, IndexType())
-            ub_op = arith.ConstantOp.from_int_and_width(hyper_reg_width, IndexType())
-            step_op = arith.ConstantOp.from_int_and_width(1, IndexType())
-
-            for_body = Block(
-                [],
-                arg_types=(builtin.IndexType(), hyper_reg.type),
+            extract_op = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=indvar)
+            encode_op = qecl.EncodeOp(extract_op.codeblock, init_state="zero")
+            insert_op = qecl.InsertCodeblockOp(
+                in_hyper_reg=hyper_reg, idx=indvar, codeblock=encode_op.out_codeblock
             )
+            scf.YieldOp(insert_op.out_hyper_reg)
 
-            for_each_codeblock_op = scf.ForOp(
-                lb=lb_op,
-                ub=ub_op,
-                step=step_op,
-                iter_args=(hyper_reg,),
-                body=for_body,
-            )
-
-            # Build the body of the for loop. On each iteration, extract the codeblock at the
-            # iteration index, encode it, and re-insert into hyper-register. Finally, yield the
-            # updated hyper-register.
-            with ImplicitBuilder(for_each_codeblock_op.body):
-                indvar = cast(BlockArgument[IndexType], for_each_codeblock_op.body.block.args[0])
-                hyper_reg = cast(
-                    BlockArgument[qecl.LogicalHyperRegisterType],
-                    for_each_codeblock_op.body.block.args[1],
-                )
-
-                extract_op = qecl.ExtractCodeblockOp(hyper_reg=hyper_reg, idx=indvar)
-                encode_op = qecl.EncodeOp(extract_op.codeblock, init_state="zero")
-                insert_op = qecl.InsertCodeblockOp(
-                    in_hyper_reg=hyper_reg, idx=indvar, codeblock=encode_op.out_codeblock
-                )
-                scf.YieldOp(insert_op.out_hyper_reg)
-
-            ops_to_insert = (
-                lb_op,
-                ub_op,
-                step_op,
-                for_each_codeblock_op,
-            )
+        ops_to_insert = (
+            lb_op,
+            ub_op,
+            step_op,
+            for_each_codeblock_op,
+        )
 
         assert ops_to_insert, "Sequence of ops to insert is empty"
         return ops_to_insert

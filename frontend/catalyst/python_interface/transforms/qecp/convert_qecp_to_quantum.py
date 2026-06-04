@@ -18,10 +18,6 @@ This module contains the implementation of the xDSL convert-qecp-to-quantum dial
 
 Known Limitations
 -----------------
-
-  * The hyper-register lowering is experimental can only target programs with more than one logical
-    codeblock, where there is a loop for encoding each logical codeblock. It's sufficient for the
-    GHZ circuit. We might have to come back to this later.
   * The current hyper-register lowering implementation also does not support any control flow that
     iterates over hyper registers, except for the encoding loop.
 """
@@ -284,6 +280,9 @@ class UnrollEncodeLoop(RewritePattern):
                 rewriter.erase_op(op)
 
 
+# MARK: Conversion Pass
+
+
 @dataclass(frozen=True)
 class ConvertQecPhysicalToQuantumPass(ModulePass):
     """
@@ -345,9 +344,7 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                                 idx = resolve_constant_params(quantum_op.idx)
                             elif quantum_op.idx_attr is not None:
                                 idx = quantum_op.idx_attr.value.data
-                            if regs[idx] not in dealloced_regs:
-                                dealloc_op = quantum.DeallocOp(regs[idx])
-                                dealloced_regs[regs[idx]] = dealloc_op
+                            dealloced_regs[idx] = quantum.DeallocOp(quantum_op.codeblock)
                             quantum_op.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
                         case qecp.DeallocOp():
                             rewriter.erase_op(quantum_op)

@@ -96,6 +96,11 @@
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
+* Fixed a bug that passed incorrect SSA values to the final register deallocation when translating 
+  from the `qecp` to the `quantum` dialect. This bug prevented deallocation of unneeded registers 
+  after magic state injection.
+  [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
 * Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
   after a PBC op but read from a register not updated by that op. Layer grouping now checks
   data dependencies through insert to extract chains instead of textual op ordering.
@@ -185,6 +190,10 @@
     [(#2867)](https://github.com/PennyLaneAI/catalyst/pull/2867)
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
+
+* The experimental QEC pipeline now supports compilation and execution of circuits that only 
+  include a single wire (a previously unsupported edge-case).
+  [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
 * More conservative casting to tracer arrays in conditionals to preserve constant (static) values
   better. This can be useful for optimizations that depend on values being static.
