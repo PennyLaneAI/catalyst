@@ -23,6 +23,14 @@ declare_mlir_dialect_python_bindings(
 declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT QuantumPythonSources
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
+  TD_FILE dialects/QRefOps.td
+  SOURCES
+  dialects/qref.py
+  DIALECT_NAME qref)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT QuantumPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
   TD_FILE dialects/GradientOps.td
   SOURCES
   dialects/gradient.py

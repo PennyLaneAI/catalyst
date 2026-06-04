@@ -32,7 +32,7 @@ from catalyst.python_interface.transforms.qecp import (
 from catalyst.python_interface.transforms.qecp.qec_code_lib import QecCode
 from catalyst.utils.exceptions import CompileError
 
-# pylint: disable=line-too-long
+# pylint: disable=line-too-long,too-many-lines
 
 
 pytestmark = pytest.mark.xdsl
@@ -1054,9 +1054,9 @@ class TestQECPLoweringIntegration:
             # CHECK: func.call @measure_transversal_Steane
             # CHECK: func.call @measure_transversal_Steane
             # CHECK: func.call @measure_transversal_Steane
+            # CHECK: qecp.insert_block
             # CHECK: quantum.mcmobs
             # CHECK: quantum.sample
-            # CHECK: qecp.insert_block
             # CHECK: qecp.dealloc
             qp.H(0)
             qp.CNOT([0, 1])

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <algorithm> // std::move_backward
-#include <variant>
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -26,52 +25,13 @@
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
+#include "Quantum/Utils/QubitIndex.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
 
 namespace catalyst {
 namespace quantum {
-
-/// A struct to represent qubit indices in quantum operations.
-///
-/// This struct provides a way to handle qubit indices that can be either:
-/// - A runtime Value (for dynamic indices computed at runtime)
-/// - An IntegerAttr (for compile-time constant indices)
-/// - Invalid/uninitialized (represented by std::monostate)
-/// And a qreg value to represent the qreg that the index belongs to
-///
-/// The struct uses std::variant to ensure only one type is active at a time,
-/// preventing invalid states.
-///
-/// Example usage:
-///   QubitIndex dynamicIdx(operandValue);     // Runtime qubit index
-///   QubitIndex staticIdx(IntegerAttr::get(...)); // Compile-time constant
-///   QubitIndex invalidIdx;                   // Uninitialized state
-///
-///   if (dynamicIdx) {                        // Check if valid
-///     if (dynamicIdx.isValue()) {            // Check if runtime value
-///       Value idx = dynamicIdx.getValue();   // Get the Value
-///     }
-///   }
-class QubitIndex {
-  private:
-    // use monostate to represent the invalid index
-    std::variant<std::monostate, Value, IntegerAttr> index;
-    Value qreg;
-
-  public:
-    QubitIndex() : index(std::monostate()), qreg(nullptr) {}
-    QubitIndex(Value val, Value qreg) : index(val), qreg(qreg) {}
-    QubitIndex(IntegerAttr attr, Value qreg) : index(attr), qreg(qreg) {}
-
-    bool isValue() const { return std::holds_alternative<Value>(index); }
-    bool isAttr() const { return std::holds_alternative<IntegerAttr>(index); }
-    operator bool() const { return isValue() || isAttr(); }
-    Value getReg() const { return qreg; }
-    Value getValue() const { return isValue() ? std::get<Value>(index) : nullptr; }
-    IntegerAttr getAttr() const { return isAttr() ? std::get<IntegerAttr>(index) : nullptr; }
-};
 
 // The goal of this class is to analyze the signature of a custom operation to get the enough
 // information to prepare the call operands and results for replacing the op to calling the
@@ -443,43 +403,6 @@ class BaseSignatureAnalyzer {
         // Output qubit indices are the same as input qubit indices
         signature.outQubitIndices = signature.inWireIndices;
         signature.outCtrlQubitIndices = signature.inCtrlWireIndices;
-    }
-
-    QubitIndex getExtractIndex(Value qubit)
-    {
-        while (qubit) {
-            if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
-                if (Value idx = extractOp.getIdx()) {
-                    return QubitIndex(idx, extractOp.getQreg());
-                }
-                if (IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
-                    return QubitIndex(idxAttr, extractOp.getQreg());
-                }
-            }
-
-            if (auto gate = dyn_cast_or_null<quantum::QuantumGate>(qubit.getDefiningOp())) {
-                auto qubitOperands = gate.getQubitOperands();
-                auto qubitResults = gate.getQubitResults();
-                auto it =
-                    llvm::find_if(qubitResults, [&](Value result) { return result == qubit; });
-
-                if (it != qubitResults.end()) {
-                    size_t resultIndex = std::distance(qubitResults.begin(), it);
-                    if (resultIndex < qubitOperands.size()) {
-                        qubit = qubitOperands[resultIndex];
-                        continue;
-                    }
-                }
-            }
-            else if (auto measureOp = dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
-                qubit = measureOp.getInQubit();
-                continue;
-            }
-
-            break;
-        }
-
-        return QubitIndex();
     }
 };
 
