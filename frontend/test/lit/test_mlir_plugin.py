@@ -90,8 +90,7 @@ module @module {
 """
 
 ext = "so" if platform.system() == "Linux" else "dylib"
-plugin_path = get_lib_path("catalyst", "") + f"/StandalonePlugin.{ext}"
-plugin = Path(plugin_path)
+plugin = Path(get_lib_path("catalyst", "CATALYST_LIB_DIR")) / f"StandalonePlugin.{ext}"
 custom_pipeline = [("run_only_plugin", ["builtin.module(apply-transform-sequence)"])]
 mlir_string = _quantum_opt(
     ("--load-pass-plugin", plugin),
