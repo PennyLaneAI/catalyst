@@ -112,11 +112,10 @@ Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
  */
 void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewriter)
 {
-    llvm::SmallVector<Value> memrefs = getReturnMemRefs(op);
-    if (memrefs.empty())
+    if (getReturnMemRefs(op).empty()) {
         return;
-
-    llvm::SmallVector<Value> newMemRefs;
+    }
+    auto operands = op.getOperands();
 
     LLVMTypeConverter typeConverter(rewriter.getContext());
     Type mlirIndex = rewriter.getIndexType();
@@ -124,7 +123,16 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
     auto deadbeefAttr = rewriter.getIntegerAttr(mlirIndex, 0xdeadbeef);
     Value deadbeef = LLVM::ConstantOp::create(rewriter, op->getLoc(), llvmIndex, deadbeefAttr);
 
-    for (Value memref : memrefs) {
+    llvm::SmallVector<Value> newOperands;
+    newOperands.reserve(operands.size());
+
+    for (Value operand : operands) {
+        if (!isa<MemRefType>(operand.getType())) {
+            newOperands.push_back(operand);
+            continue;
+        }
+
+        Value memref = operand;
         Type ty = memref.getType();
         Type llvmTy = typeConverter.convertType(ty);
         Value llvmMemRef =
@@ -146,10 +154,10 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
                 scf::YieldOp::create(builder, loc, memref);
             });
 
-        newMemRefs.push_back(ifOp.getResult(0));
+        newOperands.push_back(ifOp.getResult(0));
     }
 
-    rewriter.replaceOpWithNewOp<func::ReturnOp>(op, newMemRefs);
+    rewriter.replaceOpWithNewOp<func::ReturnOp>(op, newOperands);
 }
 
 void applyCopyGlobalMemRefTransform(func::FuncOp op, PatternRewriter &rewriter)

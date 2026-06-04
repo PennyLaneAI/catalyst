@@ -96,6 +96,11 @@
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
+* Fixed a bug where the non-memref return operands were silently dropped in the `--cp-global-memref`
+  pass, producing invalid IR. The pass now handles functions that return a mix of memref and
+  non-memref values.
+  [(#2887)](https://github.com/PennyLaneAI/catalyst/pull/2887)
+
 * Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
   after a PBC op but read from a register not updated by that op. Layer grouping now checks
   data dependencies through insert to extract chains instead of textual op ordering.
