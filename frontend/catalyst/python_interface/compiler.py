@@ -80,7 +80,7 @@ class Compiler:
 
         # JAX serializes void func.func ops with `res_attrs = []` in generic form
         # triggering an assertion in FuncToLLVM lowering.
-        # Remove empty arrays in-place so the generic printer omits them.\
+        # Remove empty arrays in-place so the generic printer omits them.
         for op in xmod.walk():
             if not isinstance(op, FuncOp):
                 continue
