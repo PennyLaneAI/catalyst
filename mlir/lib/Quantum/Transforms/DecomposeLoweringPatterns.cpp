@@ -76,9 +76,12 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
             return success();
         }
 
-        // Here is the assumption that the decomposition function must have at least one input
+        // Here is the assumption that the decomposition function must have at least one input and
+        // one result
         assert(decompFunc.getFunctionType().getNumInputs() > 0 &&
                "Decomposition function must have at least one input");
+        assert(decompFunc.getFunctionType().getNumResults() >= 1 &&
+               "Decomposition function must have at least one result");
 
         rewriter.setInsertionPointAfter(op);
 
@@ -224,7 +227,6 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
         assert(analyzer && "Analyzer should be valid");
 
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
-
         auto callOp =
             func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
                                  decompFunc.getSymName(), callOperands);
