@@ -187,7 +187,6 @@
   better. This can be useful for optimizations that depend on values being static.
   [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
 
-
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
