@@ -149,17 +149,17 @@ class AllocCodeblockConversion(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.AllocCodeblockOp, rewriter: PatternRewriter):
-        """Op conversion rewrite pattern for lowering ops that allocate an auxiliary qubit."""
+        """Op conversion rewrite pattern for lowering ops that allocate an auxiliary codeblock."""
         rewriter.replace_op(op, quantum.AllocOp(op.codeblock.type.n))
 
 
 @dataclass(frozen=True)
 class DeallocCodeblockConversion(RewritePattern):
-    """Op conversion pattern from qecp.dealloc_cb to quantum.alloc."""
+    """Op conversion pattern from qecp.dealloc_cb to quantum.dealloc."""
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.DeallocCodeblockOp, rewriter: PatternRewriter):
-        """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary qubit."""
+        """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary codeblock."""
         rewriter.replace_op(op, quantum.DeallocOp(op.codeblock))
 
 
@@ -391,6 +391,8 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                 [
                     AllocCodeblockConversion(),
                     DeallocCodeblockConversion(),
+                    # AllocCodeblock conversion must come before Type conversion, because
+                    # it relies on accessing op.codeblock.type.n to get the register size
                     PhysicalCodeblockTypeConversion(recursive=True),
                     QecPhysicalQubitTypeConversion(recursive=True),
                     AllocAuxQubitConversion(),
