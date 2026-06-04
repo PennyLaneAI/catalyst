@@ -890,15 +890,15 @@ class TestControlFlow:
             // CHECK:     [[hreg_false:%.+]] = qecl.insert_block [[hreg0]][0]
             // CHECK:     scf.yield [[hreg_false]] : !qecl.hyperreg<1 x 1>
             %1 = scf.if %cond -> (!quantum.reg) {
-                %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-                %out_qubits = quantum.custom "PauliX"() %5 : !quantum.bit
-                %6 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
-                scf.yield %6 : !quantum.reg
+                %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %3 = quantum.custom "PauliX"() %2 : !quantum.bit
+                %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+                scf.yield %4 : !quantum.reg
             } else {
-                %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-                %out_qubits = quantum.custom "PauliZ"() %5 : !quantum.bit
-                %6 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
-                scf.yield %6 : !quantum.reg
+                %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %3 = quantum.custom "PauliZ"() %2 : !quantum.bit
+                %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+                scf.yield %4 : !quantum.reg
             }
 
             // CHECK: qecl.dealloc [[out_hreg]] : !qecl.hyperreg<1 x 1>
@@ -945,8 +945,8 @@ class TestControlFlow:
             // CHECK: else
             // CHECK:     scf.yield [[cb2]] : !qecl.codeblock<1>
             %3 = scf.if %cond -> (!quantum.bit) {
-                %3 = quantum.custom "PauliZ"() %2 : !quantum.bit
-                scf.yield %3 : !quantum.bit
+                %5 = quantum.custom "PauliZ"() %2 : !quantum.bit
+                scf.yield %5 : !quantum.bit
             } else {
                 scf.yield %2 : !quantum.bit
             }
@@ -980,7 +980,7 @@ class TestControlFlow:
             %0 = quantum.alloc( 1) : !quantum.reg
 
             // CHECK: [[cond:%.+]] = tensor.extract
-            %extracted = tensor.extract %arg0[] : tensor<i1>
+            %cond = tensor.extract %arg0[] : tensor<i1>
 
             // CHECK: [[mres:%.+]], [[out_hreg:%.+]] = scf.if [[cond]] -> (i1, !qecl.hyperreg<1 x 1>)
             // CHECK:     qecl.extract_block [[hreg0]][0]
@@ -996,16 +996,16 @@ class TestControlFlow:
             //   COM:     <qec cycle>
             // CHECK:     [[hreg_false:%.+]] = qecl.insert_block [[hreg0]][0]
             // CHECK:     scf.yield [[mres_false]], [[hreg_false]] : i1, !qecl.hyperreg<1 x 1>
-            %1, %2 = scf.if %extracted -> (i1, !quantum.reg) {
-                %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-                %mres, %out_qubit = quantum.measure %5 : i1, !quantum.bit
-                %6 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
-                scf.yield %mres, %6 : i1, !quantum.reg
+            %1, %2 = scf.if %cond -> (i1, !quantum.reg) {
+                %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %mres, %4 = quantum.measure %3 : i1, !quantum.bit
+                %5 = quantum.insert %0[ 0], %4 : !quantum.reg, !quantum.bit
+                scf.yield %mres, %5 : i1, !quantum.reg
             } else {
-                %5 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-                %mres, %out_qubit = quantum.measure %5 : i1, !quantum.bit
-                %6 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
-                scf.yield %mres, %6 : i1, !quantum.reg
+                %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %mres, %4 = quantum.measure %3 : i1, !quantum.bit
+                %5 = quantum.insert %0[ 0], %4 : !quantum.reg, !quantum.bit
+                scf.yield %mres, %5 : i1, !quantum.reg
             }
 
             // CHECK: qecl.dealloc [[out_hreg]] : !qecl.hyperreg<1 x 1>
