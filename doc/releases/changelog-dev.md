@@ -133,6 +133,7 @@
 * The experimental compiler pass `convert-quantum-to-qecl` has been extended to lower
   `quantum.custom "T"` gates to the `qecl` layer as a subroutine using a magic state.
   [(#2870)](https://github.com/PennyLaneAI/catalyst/pull/2870)
+  [(#2917)](https://github.com/PennyLaneAI/catalyst/pull/2917)
 
 * The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
   [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
