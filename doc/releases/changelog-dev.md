@@ -190,6 +190,11 @@
   better. This can be useful for optimizations that depend on values being static.
   [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
 
+* The experimental QEC pipeline now supports the following control-flow operations:
+
+  - Conditionals (`scf.if`)
+    [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
