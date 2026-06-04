@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for the python callbacks module."""
+
 from catalyst.python_callbacks import paulirot_callback_wrapper
 
 
