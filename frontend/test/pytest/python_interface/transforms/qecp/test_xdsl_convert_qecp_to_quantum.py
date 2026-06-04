@@ -626,3 +626,30 @@ class TestQECPassIntegration:
             return qp.sample([m0, m1, m2])
 
         ghz()
+
+    @pytest.mark.parametrize(
+        "gates, expected_results",
+        [([qp.H], 0), ([qp.H, qp.Y, qp.H], 0), ([qp.H, qp.X, qp.H], -1), ([qp.H, qp.S, qp.H],)],
+    )
+    def test_qec_single_gate_ops_integration(self):
+        """Integration tests for combinations of single-gate ops."""
+
+        dev = qp.device("lightning.qubit", wires=3)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.Y
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            m2 = qp.measure(2)
+            return qp.sample([m0, m1, m2])
+
+        ghz()

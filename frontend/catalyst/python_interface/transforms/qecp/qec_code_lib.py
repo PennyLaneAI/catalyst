@@ -41,6 +41,7 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
             "z": (qecp.PauliZOp, [4, 5, 6]),
             "hadamard": (qecp.HadamardOp, [0, 1, 2, 3, 4, 5, 6]),
             "s": (partial(qecp.SOp, adjoint=True), [0, 1, 2, 3, 4, 5, 6]),
+            "s_adj": (qecp.SOp, [0, 1, 2, 3, 4, 5, 6]),
         },
         {
             "cnot": qecp.CnotOp,
