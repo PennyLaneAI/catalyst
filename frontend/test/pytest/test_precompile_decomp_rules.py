@@ -129,11 +129,21 @@ class TestCompileOpDecompRules:
 
 def test_bytecode_file():
     """Test that the bytecode file is generated correctly."""
-    Path(BYTECODE_FILE_PATH).unlink(missing_ok=True)
+    orig_bcfile = Path(BYTECODE_FILE_PATH)
+    tmp_bcfile = None
 
-    precompile_decomp_rules()
+    if orig_bcfile.exists():
+        tmp_bcfile = orig_bcfile.replace(BYTECODE_FILE_PATH + ".tmpbackup")
 
-    assert Path(BYTECODE_FILE_PATH).exists()
+    try:
+        precompile_decomp_rules()
+        assert orig_bcfile.exists()
+
+    finally:
+        if tmp_bcfile:
+            tmp_bcfile = tmp_bcfile.replace(orig_bcfile)
+        else:
+            orig_bcfile.unlink(missing_ok=True)
 
     # NOTE: empty pass is needed to prevent running default pipeline
     rules = _quantum_opt("--empty", BYTECODE_FILE_PATH)
@@ -143,3 +153,7 @@ def test_bytecode_file():
     assert "_pauliz_to_ps" in rules
     assert "_cphase_to_ppr" in rules
     assert "_crot" in rules
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
