@@ -60,6 +60,10 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
                 [1, 6],
                 [3, 0],
             ),
+            # The state_prep_index is the index of the physical qubit that the state is
+            # injected on (i.e. for a magic state, -H-T is applied here pre-encoding).
+            # Must be consistent with the qubit treated as the encoding "input" by the
+            # cnot_indices ordering above.
             "state_prep_index": 6,
         },
     ),
