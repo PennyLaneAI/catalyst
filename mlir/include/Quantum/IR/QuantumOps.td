@@ -566,6 +566,15 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
         mlir::ValueRange getAllParams() {
             return getODSOperands(getParamOperandIdx());
         }
+
+        std::string getPauliWord() {
+            std::string pauliWord;
+
+            for (mlir::Attribute pauliChar : getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue();
+            }
+            return pauliWord;
+        }
     }];
 
     let hasVerifier = 1;
