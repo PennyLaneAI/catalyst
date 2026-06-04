@@ -192,6 +192,9 @@
 
 <h3>Documentation 📝</h3>
 
+* Remove reference to missing docs section "decomposition-rules."
+  [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
