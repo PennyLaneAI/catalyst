@@ -63,6 +63,9 @@
   that have multiple quantum operands, of either quantum register or qubit type.
   [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
+* The `--decompose-lowering` pass now supports `quantum.paulirot` operators.
+  [(#2893)](https://github.com/PennyLaneAI/catalyst/pull/2893)
+
 * Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
   to tracing errors.
   [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
