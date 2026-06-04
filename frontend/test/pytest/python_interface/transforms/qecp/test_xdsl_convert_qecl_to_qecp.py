@@ -1039,7 +1039,7 @@ class TestLoweringFabricateOp:
         """Test that `qecl.fabricate [magic]` op lowers to a call to the magic-state
         fabrication subroutine with a toy code, and that the subroutine performs H-T
         state injection on the code's state_prep_index followed by the unitary encoding
-        as defined by `hadamard_indices` and `hadamard_indices`."""
+        as defined by `hadamard_indices` and `cnot_indices`."""
 
         qec_code = get_generic_qec_code(
             n=3,
