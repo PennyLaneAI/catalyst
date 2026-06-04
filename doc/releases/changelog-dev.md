@@ -19,6 +19,7 @@
   with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
   identifier, and totals across the call graph are computed on demand.
   [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
+  [(#2900)](https://github.com/PennyLaneAI/catalyst/pull/2900)
 
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
@@ -110,6 +111,7 @@
   [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
   [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
   [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
+  [(#2911)](https://github.com/PennyLaneAI/catalyst/pull/2911)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -200,4 +202,5 @@ Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
