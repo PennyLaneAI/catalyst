@@ -123,8 +123,10 @@ ifeq ($(UNINSTALL_PL),ON)
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
-endif
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
+else
+	$(PYTHON) -m pip install -e . --no-deps
+endif
 	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
 
