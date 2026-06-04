@@ -629,12 +629,31 @@ class TestQECPassIntegration:
 
     @pytest.mark.parametrize(
         "gates, expected_results",
-        [([qp.H], 0), ([qp.H, qp.Y, qp.H], 0), ([qp.H, qp.X, qp.H], -1), ([qp.H, qp.S, qp.H],)],
+        [
+            # expected results are (expval(X), expval(Y) expval(Z))
+            # pauli ops all behave as expected from ground state
+            ([qp.X], (0, 0, -1)),
+            ([qp.Y], (0, 0, -1)),
+            ([qp.Z], (0, 0, 1)),
+            # hadamard projects onto x-axis
+            ([qp.H], (1, 0, 0)),
+            # x after hadamard does nothing, y and z flip expval(X)
+            ([qp.H, qp.X], (1, 0, 0)),
+            ([qp.H, qp.Y], (-1, 0, 0)),
+            ([qp.H, qp.Z], (-1, 0, 0)),
+            # adjoint and S adjoint rotate onto y axis in expected directions
+            ([qp.H, qp.S], (0, 1, 0)),
+            ([qp.H, qp.adjoint(qp.S)], (0, -1, 0)),
+            # hadamard is self-inverse
+            ([qp.H, qp.H], (0, 0, 1)),
+        ],
     )
-    def test_qec_single_gate_ops_integration(self):
-        """Integration tests for combinations of single-gate ops."""
+    def test_qec_single_clifford_gate_ops_integration(self, gates, expected_results):
+        """Integration tests for combinations of single Clifford gate ops."""
 
-        dev = qp.device("lightning.qubit", wires=3)
+        dev = qp.device("lightning.qubit", wires=1)
+
+        # compile_pipeline = qp.CompilePipeline()
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
@@ -642,14 +661,25 @@ class TestQECPassIntegration:
         @inject_noise_to_qecl_pass
         @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
-        @qp.set_shots(10)
+        @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot")
-        def ghz():
-            qp.Hadamard(0)
-            qp.Y
+        def test_circ():
+            for gate in gates:
+                gate(0)
+                # gate(1)
+                # gate(2)
+            qp.H(0)
+            # qp.Z(1)
+            # qp.S(1)
+            # qp.H(1)
             m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            m2 = qp.measure(2)
-            return qp.sample([m0, m1, m2])
+            # m1 = qp.measure(1)
+            # m2 = qp.measure(2)
+            return qp.sample(m0)#, qp.sample(m1), qp.sample(m2)
 
-        ghz()
+        all_samples = test_circ()
+        print(all_samples)
+        raise RuntimeError()
+
+        # res = [np.mean([-1 if s else 1 for s in sample]) for sample in all_samples]
+        # assert np.allclose(res, expected_result)
