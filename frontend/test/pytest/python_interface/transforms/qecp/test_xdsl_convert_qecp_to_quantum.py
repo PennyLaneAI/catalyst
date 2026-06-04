@@ -713,7 +713,8 @@ class TestQECPassIntegration:
             (1, [qp.H], 0.707, 1000),
             (1, [qp.Z, qp.S, qp.H], 0.707, 1000),
             (2, [qp.H], 0, 1000),
-            (2, [qp.Z, qp.S, qp.H], 1, 100),
+            # 2 T-gates in the Y basis is always 1, we can use fewer shots
+            (2, [qp.Z, qp.S, qp.H], 1, 20),
         ],
     )
     def test_T_gate_integration(
