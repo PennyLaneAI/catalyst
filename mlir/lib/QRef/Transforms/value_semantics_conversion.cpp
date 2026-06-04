@@ -1755,47 +1755,71 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 
     // Add new quantum arguments
     QubitValueTracker regionTracker;
-    for (auto rValue : rValuesUsedBySubroutine) {
-        Value newArg;
+    size_t originalNumArgs = f.getFunctionType().getNumInputs();
+    SmallVector<unsigned> indicesToInsertArgs;
+    SmallVector<Type> typesToInsertArgs;
+    SmallVector<DictionaryAttr> attrsToInsertArgs;
+    SmallVector<Location> locsToInsertArgs;
+    SmallVector<unsigned> newVargIndices;
+    size_t numNewArgsAdded = 0;
+    for (Value rValue : rValuesUsedBySubroutine) {
         if (isa<qref::QubitType>(rValue.getType())) {
-            newArg = f.getBody().front().addArgument(quantum::QubitType::get(ctx), loc);
-            regionTracker.setCurrentVQubit(rValue, newArg);
+            typesToInsertArgs.push_back(quantum::QubitType::get(ctx));
+            newVargIndices.push_back(originalNumArgs + (numNewArgsAdded++));
         }
         else if (isa<qref::QuregType>(rValue.getType())) {
-            newArg = f.getBody().front().addArgument(quantum::QuregType::get(ctx), loc);
-            regionTracker.setCurrentVQreg(rValue, newArg);
+            typesToInsertArgs.push_back(quantum::QuregType::get(ctx));
+            newVargIndices.push_back(originalNumArgs + (numNewArgsAdded++));
+        }
+
+        indicesToInsertArgs.push_back(originalNumArgs);
+        attrsToInsertArgs.push_back(DictionaryAttr::get(ctx));
+        locsToInsertArgs.push_back(loc);
+    }
+    assert(succeeded(f.insertArguments(indicesToInsertArgs, typesToInsertArgs, attrsToInsertArgs,
+                                       locsToInsertArgs)));
+    for (auto [i, rValue] : llvm::zip_equal(newVargIndices, rValuesUsedBySubroutine)) {
+        if (isa<qref::QubitType>(rValue.getType())) {
+            regionTracker.setCurrentVQubit(rValue, f.getArgument(i));
+        }
+        else if (isa<qref::QuregType>(rValue.getType())) {
+            regionTracker.setCurrentVQreg(rValue, f.getArgument(i));
         }
     }
 
+    // Convert the body
     handleRegion(builder, f.getBody(), regionTracker);
-
     addRootVValuesToRetOp(f.front().getTerminator(), rValuesUsedBySubroutine.getArrayRef(),
                           regionTracker);
 
     // Remove all old qref arguments
     eraseAllRemainingAnchorRValues(f);
-    f.front().eraseArguments(
-        [](BlockArgument arg) { return isa<qref::QubitType, qref::QuregType>(arg.getType()); });
-    f.setFunctionType(
-        FunctionType::get(ctx, f.front().getArgumentTypes(), f.getFunctionType().getResults()));
+    BitVector eraseArgsIndices(f.getNumArguments());
+    for (auto [i, argType] : llvm::enumerate(f.getArgumentTypes())) {
+        if (isa<qref::QuregType, qref::QubitType>(argType)) {
+            eraseArgsIndices.set(i);
+        }
+    }
+    assert(succeeded(f.eraseArguments(eraseArgsIndices)));
 
-    // Also need to append result attributes and update function type
+    // Add value semantics returns
     size_t originalNumResults = f.getFunctionType().getNumResults();
-    SmallVector<unsigned> indicesToInsert;
-    SmallVector<Type> typesToInsert;
-    SmallVector<DictionaryAttr> attrsToInsert;
+    SmallVector<unsigned> indicesToInsertResults;
+    SmallVector<Type> typesToInsertResults;
+    SmallVector<DictionaryAttr> attrsToInsertResults;
     for (Type retType : f.front().getTerminator()->getOperandTypes()) {
         if (isa<quantum::QuregType, quantum::QubitType>(retType)) {
-            typesToInsert.push_back(retType);
+            typesToInsertResults.push_back(retType);
         }
         else {
             continue;
         }
 
-        indicesToInsert.push_back(originalNumResults);
-        attrsToInsert.push_back(DictionaryAttr::get(ctx));
+        indicesToInsertResults.push_back(originalNumResults);
+        attrsToInsertResults.push_back(DictionaryAttr::get(ctx));
     }
-    assert(succeeded(f.insertResults(indicesToInsert, typesToInsert, attrsToInsert)));
+    assert(succeeded(
+        f.insertResults(indicesToInsertResults, typesToInsertResults, attrsToInsertResults)));
 }
 
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
