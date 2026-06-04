@@ -111,6 +111,7 @@
   [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
   [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
   [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
+  [(#2911)](https://github.com/PennyLaneAI/catalyst/pull/2911)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
