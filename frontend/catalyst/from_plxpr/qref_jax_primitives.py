@@ -65,6 +65,7 @@ with Patcher(
         AllocOp,
         ComputationalBasisOp,
         CustomOp,
+        CtrlOp,
         DeallocOp,
         GetOp,
         GlobalPhaseOp,

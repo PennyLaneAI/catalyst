@@ -771,7 +771,29 @@ def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, 
     let hasVerifier = 1;
 }
 
-def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
+def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">, AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>, AllTypesMatch<["args", "results"]]> {
+    let summary = "Calculate the ctrl of the enclosed operations";
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_ctrl_qubits,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$results
+    );
+
+    let assemblyFormat = [{
+        `(` $in_ctrl_qubits $in_ctrl_values $args `)` attr-dict `:` type($out_ctrl_qubits) type($results) $region
+    }];
+
+}
+
+def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp", "CtrlOp"]>]> {
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
