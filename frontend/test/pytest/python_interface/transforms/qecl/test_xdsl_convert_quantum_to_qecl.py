@@ -1232,6 +1232,57 @@ class TestControlFlow:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_for_loop_nested(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with a nested `scf.for` loop."""
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program() {
+            // CHECK: [[c1:%.+]] = arith.constant 1
+            // CHECK: [[c5:%.+]] = arith.constant 5
+            // CHECK: [[c0:%.+]] = arith.constant 0
+            %c1 = arith.constant 1 : index
+            %c5 = arith.constant 5 : index
+            %c0 = arith.constant 0 : index
+
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.extract_block>
+            //   COM: <qecl.encode>
+            // CHECK: [[hreg0:%.+]] = qecl.insert_block
+            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]]
+            // CHECK: [[cb1:%.+]] = qecl.qec [[cb0]]
+            %0 = quantum.alloc( 1) : !quantum.reg
+            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+
+            //      CHECK: [[outer_cb:%.+]] = scf.for {{%.+}} = [[c0]] to [[c5]] step [[c1]]
+            // CHECK-SAME:         iter_args([[cb_arg_outer:%.+]] = [[cb1]]) -> (!qecl.codeblock<1>)
+            //      CHECK:     [[cb2:%.+]] = qecl.x [[cb_arg_outer]][0]
+            //      CHECK:     [[cb3:%.+]] = qecl.qec [[cb2]]
+            //      CHECK:     [[inner_cb:%.+]] = scf.for {{%.+}} = [[c0]] to [[c5]] step [[c1]]
+            // CHECK-SAME:             iter_args([[cb_arg_inner:%.+]] = [[cb3]]) -> (!qecl.codeblock<1>)
+            //      CHECK:         [[cb4:%.+]] = qecl.z [[cb_arg_inner]][0]
+            //      CHECK:         [[cb5:%.+]] = qecl.qec [[cb4]]
+            //      CHECK:         scf.yield [[cb5]]
+            //      CHECK:     scf.yield [[inner_cb]]
+            %2 = scf.for %arg2 = %c0 to %c5 step %c1 iter_args(%arg3 = %1) -> (!quantum.bit) {
+                %4 = quantum.custom "PauliX"() %arg3 : !quantum.bit
+                %5 = scf.for %arg4 = %c0 to %c5 step %c1 iter_args(%arg5 = %4) -> (!quantum.bit) {
+                    %6 = quantum.custom "PauliZ"() %arg5 : !quantum.bit
+                    scf.yield %6 : !quantum.bit
+                }
+                scf.yield %5 : !quantum.bit
+            }
+
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[outer_cb]]
+            // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
+            %3 = quantum.insert %0[0], %2 : !quantum.reg, !quantum.bit
+            quantum.dealloc %3 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
 
 # MARK: Integration Tests
 
