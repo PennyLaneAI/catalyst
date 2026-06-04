@@ -21,34 +21,9 @@ Unit tests for the dynamic qubit allocation.
 import pennylane as qp
 
 from catalyst import qjit
-from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p
 
 
-@qjit(target="mlir")
-def test_single_qubit_dealloc():
-    """
-    Unit test for the single qubit dealloc primitive's lowerings.
-    """
-
-    # CHECK: [[qubit:.]]:AbstractQbit() = qextract {{.+}} 3
-    # CHECK: qdealloc_qb [[qubit]]
-
-    # CHECK: [[qubit:%.+]] = quantum.extract {{.+}} 3
-    # CHECK: quantum.dealloc_qb [[qubit]] : !quantum.bit
-
-    qreg = qalloc_p.bind(10)
-    qubit = qextract_p.bind(qreg, 3)
-    qdealloc_qb_p.bind(qubit)
-
-
-print(test_single_qubit_dealloc.jaxpr)
-print(test_single_qubit_dealloc.mlir)
-
-
-qp.capture.enable()
-
-
-@qjit(target="mlir")
+@qjit(target="mlir", capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_basic_dynalloc():
     """
@@ -57,33 +32,28 @@ def test_basic_dynalloc():
     Test both the explicit call API and the context manager API.
     """
 
-    # CHECK: [[device_init_qreg:%.+]] = quantum.alloc( 3)
+    # CHECK: [[device_init_qreg:%.+]] = qref.alloc( 3)
 
-    # CHECK: [[dyn_qreg:%.+]] = quantum.alloc( 2)
-    # CHECK: [[dyn_bit0:%.+]] = quantum.extract [[dyn_qreg]][ 0]
-    # CHECK: [[dyn_bit1:%.+]] = quantum.extract [[dyn_qreg]][ 1]
-    # CHECK: [[Xout:%.+]] = quantum.custom "PauliX"() [[dyn_bit0]]
-    # CHECK: [[dev_bit2:%.+]] = quantum.extract [[device_init_qreg]][ 2]
-    # CHECK: [[CNOTout:%.+]]:2 = quantum.custom "CNOT"() [[dyn_bit1]], [[dev_bit2]]
-    # CHECK: [[insert0:%.+]] = quantum.insert [[dyn_qreg]][ 0], [[Xout]]
-    # CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOTout]]#0
-    # CHECK: quantum.dealloc [[insert1]]
+    # CHECK: [[dyn_qreg:%.+]] = qref.alloc( 2)
+    # CHECK: [[dyn_bit0:%.+]] = qref.get [[dyn_qreg]][ 0]
+    # CHECK: [[dyn_bit1:%.+]] = qref.get [[dyn_qreg]][ 1]
+    # CHECK: qref.custom "PauliX"() [[dyn_bit0]]
+    # CHECK: [[dev_bit2:%.+]] = qref.get [[device_init_qreg]][ 2]
+    # CHECK: qref.custom "CNOT"() [[dyn_bit1]], [[dev_bit2]]
+    # CHECK: qref.dealloc [[dyn_qreg]]
 
     qs = qp.allocate(2)
     qp.X(qs[0])
     qp.CNOT(wires=[qs[1], 2])
     qp.deallocate(qs[:])
 
-    # CHECK: [[dyn_qreg:%.+]] = quantum.alloc( 4)
-    # CHECK: [[dyn_bit1:%.+]] = quantum.extract [[dyn_qreg]][ 1]
-    # CHECK: [[dyn_bit2:%.+]] = quantum.extract [[dyn_qreg]][ 2]
-    # CHECK: [[Xout:%.+]] = quantum.custom "PauliX"() [[dyn_bit1]]
-    # CHECK: [[dev_bit1:%.+]] = quantum.extract [[device_init_qreg]][ 1]
-    # CHECK: [[CNOTout:%.+]]:2 = quantum.custom "CNOT"() [[dyn_bit2]], [[dev_bit1]]
-    # CHECK: [[insert0:%.+]] = quantum.insert [[dyn_qreg]][ 1], [[Xout]]
-    # CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 2], [[CNOTout]]#0
-    # CHECK: [[insert2:%.+]] = quantum.insert [[insert1]][ 3]
-    # CHECK: quantum.dealloc [[insert2]]
+    # CHECK: [[dyn_qreg:%.+]] = qref.alloc( 4)
+    # CHECK: [[dyn_bit1:%.+]] = qref.get [[dyn_qreg]][ 1]
+    # CHECK: [[dyn_bit2:%.+]] = qref.get [[dyn_qreg]][ 2]
+    # CHECK: qref.custom "PauliX"() [[dyn_bit1]]
+    # CHECK: [[dev_bit1:%.+]] = qref.get [[device_init_qreg]][ 1]
+    # CHECK: qref.custom "CNOT"() [[dyn_bit2]], [[dev_bit1]]
+    # CHECK: qref.dealloc [[dyn_qreg]]
 
     with qp.allocate(4) as qs1:
         qp.X(qs1[1])
@@ -95,26 +65,22 @@ def test_basic_dynalloc():
 print(test_basic_dynalloc.mlir)
 
 
-@qjit(autograph=True, target="mlir")
+@qjit(autograph=True, target="mlir", capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_measure_with_reset():
     """
     Test qp.allocate with qp.measure with a reset.
     """
 
-    # CHECK: [[device_init_qreg:%.+]] = quantum.alloc( 3)
+    # CHECK: [[device_init_qreg:%.+]] = qref.alloc( 3)
 
-    # CHECK: [[dyn_qreg:%.+]] = quantum.alloc( 1)
-    # CHECK: [[dyn_qubit:%.+]] = quantum.extract [[dyn_qreg]][ 0]
-    # CHECK: [[mres:%.+]], [[mout_qubit:%.+]] = quantum.measure [[dyn_qubit]] postselect 1
-    # CHECK: [[reset_qubit:%.+]] = scf.if [[mres]] -> (!quantum.bit) {
-    # CHECK:    [[x_out_qubit:%.+]] = quantum.custom "PauliX"() [[mout_qubit]]
-    # CHECK:    scf.yield [[x_out_qubit]] : !quantum.bit
-    # CHECK:  } else {
-    # CHECK:    scf.yield [[mout_qubit]] : !quantum.bit
+    # CHECK: [[dyn_qreg:%.+]] = qref.alloc( 1)
+    # CHECK: [[dyn_qubit:%.+]] = qref.get [[dyn_qreg]][ 0]
+    # CHECK: [[mres:%.+]] = qref.measure [[dyn_qubit]] postselect 1
+    # CHECK: scf.if [[mres]] {
+    # CHECK:    qref.custom "PauliX"() [[dyn_qubit]]
     # CHECK:  }
-    # CHECK:  [[dealloc_qreg:%.+]] = quantum.insert [[dyn_qreg]][ 0], [[reset_qubit]]
-    # CHECK:  quantum.dealloc [[dealloc_qreg]]
+    # CHECK:  qref.dealloc [[dyn_qreg]]
 
     with qp.allocate(1) as q:
         qp.measure(wires=q[0], reset=True, postselect=1)
@@ -125,34 +91,30 @@ def test_measure_with_reset():
 print(test_measure_with_reset.mlir)
 
 
-@qjit(autograph=True, target="mlir")
+@qjit(autograph=True, target="mlir", capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_pass_reg_into_forloop():
     """
     Test using a dynamically allocated resgister from inside a subscope.
     """
 
-    # CHECK: [[global_reg:%.+]] = quantum.alloc( 2)
-    # CHECK: [[dyn_reg:%.+]] = quantum.alloc( 1)
-    # CHECK: [[for_out:%.+]]:2 = scf.for %arg0 = {{.+}} to {{.+}} step {{.+}} iter_args
-    # CHECK-SAME: (%arg1 = [[dyn_reg]], %arg2 = [[global_reg]]) -> (!quantum.reg, !quantum.reg) {
-    # CHECK:    [[x_in:%.+]] = quantum.extract %arg1[ 0]
-    # CHECK:    [[x_out:%.+]] = quantum.custom "PauliX"() [[x_in]]
-    # CHECK:    [[cnot_in:%.+]] = quantum.extract %arg2[ 0]
-    # CHECK:    [[cnot_out:%.+]]:2 = quantum.custom "CNOT"() [[x_out]], [[cnot_in]]
-    # CHECK:    [[global_reg_yield:%.+]] = quantum.insert %arg2[ 0], [[cnot_out]]#1
-    # CHECK:    [[dyn_reg_yield:%.+]] = quantum.insert %arg1[ 0], [[cnot_out]]#0
-    # CHECK:    scf.yield [[dyn_reg_yield]], [[global_reg_yield]] : !quantum.reg, !quantum.reg
-    # CHECK: quantum.dealloc [[for_out]]#0 : !quantum.reg
+    # CHECK: [[global_reg:%.+]] = qref.alloc( 2)
+    # CHECK: [[dyn_reg:%.+]] = qref.alloc( 1)
+    # CHECK: [[dyn_qubit:%.+]] = qref.get [[dyn_reg]][ 0]
+    # CHECK: scf.for %arg0 = {{.+}} to {{.+}} step {{.+}} {
+    # CHECK:    qref.custom "PauliX"() [[dyn_qubit]]
+    # CHECK:    [[q0:%.+]] = qref.get [[global_reg]][ 0]
+    # CHECK:    qref.custom "CNOT"() [[dyn_qubit]], [[q0]]
+    # CHECK: qref.dealloc [[dyn_reg]] : !qref.reg<1>
 
     with qp.allocate(1) as q:
         for _ in range(3):
             qp.X(wires=q[0])
             qp.CNOT(wires=[q[0], 0])
 
-    # CHECK: [[global_bit0:%.+]] = quantum.extract [[for_out]]#1[ 0]
-    # CHECK: [[global_bit1:%.+]] = quantum.extract [[for_out]]#1[ 1]
-    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[global_bit0]], [[global_bit1]] : !quantum.obs
+    # CHECK: [[global_bit0:%.+]] = qref.get [[global_reg]][ 0]
+    # CHECK: [[global_bit1:%.+]] = qref.get [[global_reg]][ 1]
+    # CHECK: [[obs:%.+]] = qref.compbasis qubits [[global_bit0]], [[global_bit1]] : !quantum.obs
     # CHECK: {{.+}} = quantum.probs [[obs]] : tensor<4xf64>
     return qp.probs(wires=[0, 1])
 
@@ -160,33 +122,25 @@ def test_pass_reg_into_forloop():
 print(test_pass_reg_into_forloop.mlir)
 
 
-@qjit(autograph=True, target="mlir")
+@qjit(autograph=True, target="mlir", capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_pass_multiple_regs_into_forloop():
     """
     Test using multiple dynamically allocated resgisters from inside a subscope.
     """
 
-    # CHECK: [[global_reg:%.+]] = quantum.alloc( 3)
-    # CHECK: [[q1:%.+]] = quantum.alloc( 1)
-    # CHECK: [[q2:%.+]] = quantum.alloc( 2)
-    # CHECK: [[for_out:%.+]]:3 = scf.for %arg0 = {{.+}} to {{.+}} step {{.+}} iter_args
-    # CHECK-SAME: (%arg1 = [[q1]], %arg2 = [[q2]], %arg3 = [[global_reg]])
-    # CHECK-SAME: -> (!quantum.reg, !quantum.reg, !quantum.reg) {
-    # CHECK:    [[q1_0:%.+]] = quantum.extract %arg1[ 0]
-    # CHECK:    [[glob_0:%.+]] = quantum.extract %arg3[ 0]
-    # CHECK:    [[cnot_out0:%.+]]:2 = quantum.custom "CNOT"() [[q1_0]], [[glob_0]]
-    # CHECK:    [[q2_1:%.+]] = quantum.extract %arg2[ 1]
-    # CHECK:    [[glob_1:%.+]] = quantum.extract %arg3[ 1]
-    # CHECK:    [[cnot_out1:%.+]]:2 = quantum.custom "CNOT"() [[q2_1]], [[glob_1]]
-    # CHECK:    [[glob_ins:%.+]] = quantum.insert %arg3[ 0], [[cnot_out0]]#1
-    # CHECK:    [[glob_yield:%.+]] = quantum.insert [[glob_ins]][ 1], [[cnot_out1]]#1
-    # CHECK:    [[q1_yield:%.+]] = quantum.insert %arg1[ 0], [[cnot_out0]]#0
-    # CHECK:    [[q2_yield:%.+]] = quantum.insert %arg2[ 1], [[cnot_out1]]#0
-    # CHECK:    scf.yield [[q1_yield]], [[q2_yield]], [[glob_yield]]
-    # CHECK-SAME: : !quantum.reg, !quantum.reg, !quantum.reg
-    # CHECK:  quantum.dealloc [[for_out]]#1 : !quantum.reg
-    # CHECK:  quantum.dealloc [[for_out]]#0 : !quantum.reg
+    # CHECK: [[global_reg:%.+]] = qref.alloc( 3)
+    # CHECK: [[reg1:%.+]] = qref.alloc( 1)
+    # CHECK: [[q1_0:%.+]] = qref.get [[reg1]][ 0]
+    # CHECK: [[reg2:%.+]] = qref.alloc( 2)
+    # CHECK: [[q2_1:%.+]] = qref.get [[reg2]][ 1]
+    # CHECK: scf.for %arg0 = {{.+}} to {{.+}} step {{.+}} {
+    # CHECK:    [[glob_0:%.+]] = qref.get [[global_reg]][ 0]
+    # CHECK:    qref.custom "CNOT"() [[q1_0]], [[glob_0]]
+    # CHECK:    [[glob_1:%.+]] = qref.get [[global_reg]][ 1]
+    # CHECK:    qref.custom "CNOT"() [[q2_1]], [[glob_1]]
+    # CHECK:  qref.dealloc [[reg2]] : !qref.reg<2>
+    # CHECK:  qref.dealloc [[reg1]] : !qref.reg<1>
 
     with qp.allocate(1) as q1:
         with qp.allocate(2) as q2:
@@ -200,36 +154,32 @@ def test_pass_multiple_regs_into_forloop():
 print(test_pass_multiple_regs_into_forloop.mlir)
 
 
-@qjit(autograph=True, target="mlir")
+@qjit(autograph=True, target="mlir", capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_pass_multiple_regs_into_whileloop(N: int):
     """
     Test using multiple dynamically allocated resgisters from inside a while loop.
     """
 
-    # CHECK:  [[global_reg:%.+]] = quantum.alloc( 2)
-    # CHECK:  [[q1:%.+]] = quantum.alloc( 1)
-    # CHECK:  [[q2:%.+]] = quantum.alloc( 4)
-    # CHECK:  [[while_out:%.+]]:4 = scf.while (%arg1 = {{%.+}}, %arg2 = [[q1]], %arg3 = [[q2]],
-    # CHECK-SAME:  %arg4 = [[global_reg]]) : (tensor<i64>, !quantum.reg, !quantum.reg, !quantum.reg)
-    # CHECK-SAME:  -> (tensor<i64>, !quantum.reg, !quantum.reg, !quantum.reg) {
+    # CHECK:  [[global_reg:%.+]] = qref.alloc( 2)
+    # CHECK:  [[reg1:%.+]] = qref.alloc( 1)
+    # CHECK:  [[q1_0:%.+]] = qref.get [[reg1]][ 0]
+    # CHECK:  [[reg2:%.+]] = qref.alloc( 4)
+    # CHECK:  [[q2_0:%.+]] = qref.get [[reg2]][ 0]
+    # CHECK:  [[i:%.+]] = scf.while (%arg1 = {{%.+}}) : (tensor<i64>) -> tensor<i64> {
     # CHECK:    stablehlo.compare  LT, %arg1, %arg0
-    # CHECK:    scf.condition({{%.+}}) %arg1, %arg2, %arg3, %arg4
+    # CHECK:    scf.condition({{%.+}}) %arg1 : tensor<i64>
     # CHECK:  } do {
-    # CHECK:  ^bb0(%arg1: tensor<i64>, %arg2: !quantum.reg, %arg3: !quantum.reg, %arg4: !quantum.reg
-    # CHECK:    [[q1_0:%.+]] = quantum.extract %arg2[ 0]
-    # CHECK:    [[glob_1:%.+]] = quantum.extract %arg4[ 1]
-    # CHECK:    [[cnot_out0:%.+]]:2 = quantum.custom "CNOT"() [[q1_0]], [[glob_1]]
-    # CHECK:    [[q2_0:%.+]] = quantum.extract %arg3[ 0]
-    # CHECK:    [[cnot_out1:%.+]]:2 = quantum.custom "CNOT"() [[q2_0]], [[cnot_out0]]#1
+    # CHECK:  ^bb0(%arg1: tensor<i64>):
+    # CHECK:    [[glob_1:%.+]] = qref.get [[global_reg]][ 1]
+    # CHECK:    qref.custom "CNOT"() [[q1_0]], [[glob_1]]
+    # CHECK:    [[glob_1:%.+]] = qref.get [[global_reg]][ 1]
+    # CHECK:    qref.custom "CNOT"() [[q2_0]], [[glob_1]]
     # CHECK:    [[i:%.+]] = stablehlo.add %arg1, {{%.+}}
-    # CHECK:    [[glob_yield:%.+]] = quantum.insert %arg4[ 1], [[cnot_out1]]#1
-    # CHECK:    [[q1_yield:%.+]] = quantum.insert %arg2[ 0], [[cnot_out0]]#0
-    # CHECK:    [[q2_yield:%.+]] = quantum.insert %arg3[ 0], [[cnot_out1]]#0
-    # CHECK:    scf.yield [[i]], [[q1_yield]], [[q2_yield]], [[glob_yield]]
+    # CHECK:    scf.yield [[i]] : tensor<i64>
     # CHECK:  }
-    # CHECK:  quantum.dealloc [[while_out]]#2
-    # CHECK:  quantum.dealloc [[while_out]]#1
+    # CHECK:  qref.dealloc [[reg2]] : !qref.reg<4>
+    # CHECK:  qref.dealloc [[reg1]] : !qref.reg<1>
 
     i = 0
     with qp.allocate(1) as q1:
@@ -259,17 +209,16 @@ def test_quantum_subroutine():
         qp.ctrl(qp.RX, (w1, w2))(theta, wires=0)
 
     # CHECK:  [[angle:%.+]] = stablehlo.constant dense<1.230000e+00>
-    # CHECK:  [[two:%.+]] = stablehlo.constant dense<2>
-    # CHECK:  [[one:%.+]] = stablehlo.constant dense<1>
-    # CHECK:  [[zero:%.+]] = stablehlo.constant dense<0>
-    # CHECK:  [[global_qreg:%.+]] = quantum.alloc( 1)
-    # CHECK:  [[q1:%.+]] = quantum.alloc( 2)
-    # CHECK:  [[q2:%.+]] = quantum.alloc( 3)
-    # CHECK:  {{%.+}}:3 = call @flip([[global_qreg]], [[q1]], [[q2]], [[zero]], [[one]], [[two]], [[angle]])
-    # CHECK-SAME: (!quantum.reg, !quantum.reg, !quantum.reg, tensor<i64>, tensor<i64>, tensor<i64>, tensor<f64>)
-    # CHECK-SAME: -> (!quantum.reg, !quantum.reg, !quantum.reg)
+    # CHECK:  [[global_qreg:%.+]] = qref.alloc( 1)
+    # CHECK:  [[reg1:%.+]] = qref.alloc( 2)
+    # CHECK:  [[q1_0:%.+]] = qref.get [[reg1]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK:  [[q1_1:%.+]] = qref.get [[reg1]][ 1] : !qref.reg<2> -> !qref.bit
+    # CHECK:  [[reg2:%.+]] = qref.alloc( 3)
+    # CHECK:  [[q2_2:%.+]] = qref.get [[reg2]][ 2] : !qref.reg<3> -> !qref.bit
+    # CHECK:  call @flip([[global_qreg]], [[q1_0]], [[q1_1]], [[q2_2]], [[angle]])
+    # CHECK-SAME: (!qref.reg<1>, !qref.bit, !qref.bit, !qref.bit, tensor<f64>) -> ()
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=True)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
         with qp.allocate(2) as q1:
@@ -277,32 +226,17 @@ def test_quantum_subroutine():
                 flip(q1[0], q1[1], q2[2], 1.23)
         return qp.probs(wires=[0])
 
-    # CHECK: func.func private @flip(
-    # CHECK:   [[zero:%.+]] = tensor.extract %arg3[]
-    # CHECK:   [[q1_0:%.+]] = quantum.extract %arg1[[[zero]]]
-    # CHECK:   [[x_out:%.+]] = quantum.custom "PauliX"() [[q1_0]]
-    # CHECK:   [[one:%.+]] = tensor.extract %arg4[]
-    # CHECK:   [[q1_1:%.+]] = quantum.extract %arg1[[[one]]]
-    # CHECK:   [[y_out:%.+]] = quantum.custom "PauliY"() [[q1_1]]
-    # CHECK:   [[two:%.+]] = tensor.extract %arg5[]
-    # CHECK:   [[q2_2:%.+]] = quantum.extract %arg2[[[two]]]
-    # CHECK:   [[z_out:%.+]] = quantum.custom "PauliZ"() [[q2_2]]
-    # CHECK:   [[glob_0:%.+]] = quantum.extract %arg0[ 0]
-    # CHECK:   [[angle:%.+]] = tensor.extract %arg6[]
-    # CHECK:   [[rx_out:%.+]], [[rx_ctrl_out:%.+]]:2 = quantum.custom "RX"([[angle]]) [[glob_0]]
-    # CHECK-SAME: ctrls([[x_out]], [[y_out]])
-    # CHECK:   [[glob_re:%.+]] = quantum.insert %arg0[ 0], [[rx_out]]
-    # CHECK:   [[q2_re:%.+]] = quantum.insert %arg2[{{%.+}}], [[z_out]]
-    # CHECK:   [[zero:%.+]] = tensor.extract %arg3[]
-    # CHECK:   [[_q1_re:%.+]] = quantum.insert %arg1[[[zero]]], [[rx_ctrl_out]]#0
-    # CHECK:   [[one:%.+]] = tensor.extract %arg4[]
-    # CHECK:   [[q1_re:%.+]] = quantum.insert [[_q1_re]][[[one]]], [[rx_ctrl_out]]#1
-    # CHECK:   return [[glob_re]], [[q1_re]], [[q2_re]] : !quantum.reg, !quantum.reg, !quantum.reg
+    # CHECK: func.func private @flip(%arg0: !qref.reg<1>, %arg1: !qref.bit, %arg2: !qref.bit, %arg3: !qref.bit, %arg4: tensor<f64>)
+    # CHECK:   [[true:%.+]] = arith.constant true
+    # CHECK:   qref.custom "PauliX"() %arg1 : !qref.bit
+    # CHECK:   qref.custom "PauliY"() %arg2 : !qref.bit
+    # CHECK:   qref.custom "PauliZ"() %arg3 : !qref.bit
+    # CHECK:   [[glob_0:%.+]] = qref.get %arg0[ 0] : !qref.reg<1> -> !qref.bit
+    # CHECK:   [[angle:%.+]] = tensor.extract %arg4[] : tensor<f64>
+    # CHECK:   qref.custom "RX"([[angle]]) [[glob_0]] ctrls(%arg1, %arg2) ctrlvals([[true]], [[true]]) : !qref.bit ctrls !qref.bit, !qref.bit
+    # CHECK:   return
 
     print(circuit.mlir)
 
 
 test_quantum_subroutine()
-
-
-qp.capture.disable()
