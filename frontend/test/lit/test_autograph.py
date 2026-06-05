@@ -16,6 +16,18 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+import importlib.util
+import os
+import sys
+
+module_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "catalyst.autograph.exclusion.py"
+)
+module_spec = importlib.util.spec_from_file_location("catalyst.autograph.__exclusion", module_path)
+test_module = importlib.util.module_from_spec(module_spec)
+sys.modules[test_module.__name__] = test_module
+module_spec.loader.exec_module(test_module)
+
 import catalyst
 from catalyst import AutoGraphError, autograph_source, disable_autograph, qjit, run_autograph
 from catalyst.utils.patching import Patcher
@@ -674,26 +686,13 @@ print(enable_autograph_context_manager_jax.jaxpr)
 # -----
 
 
-def dummy_func(x):
-    """Simple function with if statements for testing the 'auto_include' option of @qjit.
-    The parent 'catalyst' module is excluded for autograph conversion by default, hence
-    adding this module explicitly to the inclusion list will override that restriction"""
-
-    with Patcher((catalyst, "compile_without_static_conditionals", False)):
-        if x > 5:
-            y = x**2
-        else:
-            y = x**3
-    return y
-
-
 # CHECK-LABEL: def include_module_to_autograph
-@qjit(autograph=True, autograph_include=["catalyst.utils.dummy"])
+@qjit(autograph=True, autograph_include=["catalyst.autograph.__exclusion"])
 def include_module_to_autograph(x: float, n: int):
     """Checks that a module is included to Autograph conversion."""
     # CHECK: branch_jaxprs=[{ lambda ; . let  in (36:i64[],) }, { lambda ; . let  in (216:i64[],) }]
     for _ in range(n):
-        x = x + dummy_func(6)
+        x = x + test_module.dummy_func(6)
     return x
 
 
@@ -712,7 +711,7 @@ def excluded_module_from_autograph(x: float, n: int):
     # CHECK:     f:f64[] = add e 36.0:f64[]
     # CHECK:   in (f,) }
     for _ in range(n):
-        x = x + dummy_func(6)
+        x = x + test_module.dummy_func(6)
     return x
 
 
