@@ -46,28 +46,61 @@ def fixture_qecl_to_qecp_steane_pipeline():
     return (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Steane")),)
 
 
+# pylint: disable=too-many-arguments
 @pytest.fixture(name="get_generic_qec_code", scope="module")
 def fixture_get_generic_qec_code():
     """Fixture factory that returns a function to create `QecCode` objects for generic QEC codes."""
 
-    def _make_qec_code(n: int, k: int, d: int, name: str = "ToyCode", n_aux: int = 3) -> QecCode:
+    def _make_qec_code(
+        n: int,
+        k: int,
+        d: int,
+        *,
+        name: str = "TestCode",
+        n_aux: int = 3,
+        x_tanner=None,
+        z_tanner=None,
+        transversal_1q_gates=None,
+        transversal_2q_gates=None,
+        unitary_encoding=None,
+    ) -> QecCode:
         rng = np.random.default_rng(seed=42)
+
+        if x_tanner is None:
+            x_tanner = rng.integers(low=0, high=1, size=(n_aux, n))
+
+        if z_tanner is None:
+            z_tanner = rng.integers(low=0, high=1, size=(n_aux, n))
+
+        if transversal_1q_gates is None:
+            transversal_1q_gates = {
+                "x": (qecp.PauliXOp, list(range(n))),
+                "y": (qecp.PauliXOp, list(range(n))),
+                "z": (qecp.PauliXOp, list(range(n))),
+                "hadamard": (qecp.HadamardOp, list(range(n))),
+                "s": (partial(qecp.SOp, adjoint=True), list(range(n))),
+            }
+
+        if transversal_2q_gates is None:
+            transversal_2q_gates = {"cnot": qecp.CnotOp}
+
+        if unitary_encoding is None:
+            unitary_encoding = {
+                "state_prep_index": rng.integers(n),
+                "hadamard_indices": [i for i in range(n) if i % 2],
+                "cnot_indices": [[i, i + 1] for i in range(n - 1)],
+            }
 
         return QecCode(
             name=name,
             n=n,
             k=k,
             d=d,
-            x_tanner=rng.integers(low=0, high=1, size=(n_aux, n)),
-            z_tanner=rng.integers(low=0, high=1, size=(n_aux, n)),
-            transversal_1q_gates={
-                "x": (qecp.PauliXOp, list(range(n))),
-                "y": (qecp.PauliXOp, list(range(n))),
-                "z": (qecp.PauliXOp, list(range(n))),
-                "hadamard": (qecp.HadamardOp, list(range(n))),
-                "s": (partial(qecp.SOp, adjoint=True), list(range(n))),
-            },
-            transversal_2q_gates={"cnot": qecp.CnotOp},
+            x_tanner=x_tanner,
+            z_tanner=z_tanner,
+            transversal_1q_gates=transversal_1q_gates,
+            transversal_2q_gates=transversal_2q_gates,
+            unitary_encoding=unitary_encoding,
         )
 
     return _make_qec_code
@@ -293,21 +326,19 @@ class TestLoweringEncode:
     @pytest.mark.parametrize(
         "k", [1, pytest.param(2, marks=pytest.mark.xfail(reason="Only k = 1 is supported"))]
     )
-    def test_with_fake_code(self, code_name, k, run_filecheck):
+    def test_with_fake_code(self, code_name, k, run_filecheck, get_generic_qec_code):
         """Test that a single qecl.encode operation is lowered to a call to the encoding
         subroutine using a generic 'code' that relies on two data qubits (set by n) and
         two auxiliary qubits (set by the number of rows in the z_tanner graph)"""
 
         n = 2
-        qec_code = QecCode(
-            code_name,
+        qec_code = get_generic_qec_code(
             n=n,
             k=k,
             d=1,
+            name=code_name,
             x_tanner=np.eye(n),
             z_tanner=np.eye(n),
-            transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
-            transversal_2q_gates={},
         )
 
         program = f"""
@@ -632,7 +663,7 @@ class TestLoweringMeasure:
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
-    def test_measure_toy_code(self, run_filecheck):
+    def test_measure_toy_code(self, run_filecheck, get_generic_qec_code):
         """Test the lowering pattern for `qecl.measure` ops with a toy QEC code.
 
         Note that the transversal-measurement subroutine is essentially the same as the Steane code
@@ -674,15 +705,11 @@ class TestLoweringMeasure:
         //       CHECK: }
         }
         """
-        qec_code = QecCode(
-            "TestCode",
+        qec_code = get_generic_qec_code(
             n=5,
             k=1,
             d=3,
-            x_tanner=np.eye(5),
-            z_tanner=np.eye(5),
             transversal_1q_gates={"z": (qecp.PauliZOp, [0, 2])},
-            transversal_2q_gates={},
         )
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
 
@@ -695,7 +722,9 @@ class TestLoweringMeasure:
             [("z", (qecp.PauliZOp, []))],
         ],
     )
-    def test_measure_with_missing_pauli_z_def_raise(self, run_filecheck, gate_data):
+    def test_measure_with_missing_pauli_z_def_raise(
+        self, run_filecheck, gate_data, get_generic_qec_code
+    ):
         """Test that running the convert-qecl-to-qecp pass without specifying a logical Z observable
         raise an error when creating the physical-measurement decoding subroutine.
         """
@@ -712,15 +741,11 @@ class TestLoweringMeasure:
         }
         """
 
-        qec_code = QecCode(
-            "TestCode",
+        qec_code = get_generic_qec_code(
             n=7,
             k=1,
             d=3,
-            x_tanner=np.eye(7),
-            z_tanner=np.eye(7),
             transversal_1q_gates=dict(gate_data),
-            transversal_2q_gates={},
         )
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
 
@@ -736,22 +761,18 @@ class TestLoweringMeasure:
 class TestLoweringTransversalGates:
     """Unit tests for lowering transversal gates in the convert-qecl-to-qecp pass."""
 
-    def test_single_qubit_op_lowering_generic(self, run_filecheck):
+    def test_single_qubit_op_lowering_generic(self, run_filecheck, get_generic_qec_code):
         """Test that a generic QEC code lowers ops as instructed. In this case (n=3,
         x is transversal and applied on indicies 0 and 2), we expect to extract 3
         qubits, apply the pattern XIX on them, and re-insert them."""
 
         n, k = (3, 1)
 
-        qec_code = QecCode(
-            "TestCode",
+        qec_code = get_generic_qec_code(
             n=n,
             k=k,
             d=1,
-            x_tanner=np.eye(n),
-            z_tanner=np.eye(n),
             transversal_1q_gates={"x": (qecp.PauliXOp, [0, 2]), "z": (qecp.PauliZOp, [0, 2])},
-            transversal_2q_gates={},
         )
 
         program = f"""
@@ -781,20 +802,17 @@ class TestLoweringTransversalGates:
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
         run_filecheck(program, pipeline)
 
-    def test_two_qubit_op_lowering_generic(self, run_filecheck):
+    def test_two_qubit_op_lowering_generic(self, run_filecheck, get_generic_qec_code):
         """Test that a generic QEC code lowers ops as instructed. In this case (n=3,
         x is transversal and applied on indicies 0 and 2), we expect to extract 3
         qubits, apply the pattern XIX on them, and re-insert them."""
 
         n, k = (3, 1)
 
-        qec_code = QecCode(
-            "TestCode",
+        qec_code = get_generic_qec_code(
             n=n,
             k=k,
             d=1,
-            x_tanner=np.eye(n),
-            z_tanner=np.eye(n),
             transversal_1q_gates={"z": (qecp.PauliZOp, [0])},
             transversal_2q_gates={"cnot": qecp.CnotOp},
         )
@@ -979,20 +997,16 @@ class TestLoweringTransversalGates:
 
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
-    def test_nontransveral_ops_ignored(self, run_filecheck):
+    def test_nontransveral_ops_ignored(self, run_filecheck, get_generic_qec_code):
         """Test that a generic QEC code lowers ops as instructed"""
 
         n, k = (3, 1)
 
-        qec_code = QecCode(
-            "TestCode",
+        qec_code = get_generic_qec_code(
             n=n,
             k=k,
             d=1,
-            x_tanner=np.eye(n),
-            z_tanner=np.eye(n),
             transversal_1q_gates={"x": (qecp.PauliXOp, [0, 1]), "z": (qecp.PauliZOp, [0, 1])},
-            transversal_2q_gates={},
         )
 
         program = f"""
@@ -1013,6 +1027,131 @@ class TestLoweringTransversalGates:
 
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
         run_filecheck(program, pipeline)
+
+
+# Mark: FabricateOp
+
+
+class TestLoweringFabricateOp:
+    """Test lowering for the qecl.fabricate op"""
+
+    def test_lower_fabricate_toy_code(self, run_filecheck, get_generic_qec_code):
+        """Test that `qecl.fabricate [magic]` op lowers to a call to the magic-state
+        fabrication subroutine with a toy code, and that the subroutine performs H-T
+        state injection on the code's state_prep_index followed by the unitary encoding
+        as defined by `hadamard_indices` and `cnot_indices`."""
+
+        qec_code = get_generic_qec_code(
+            n=3,
+            k=1,
+            d=1,
+            unitary_encoding={
+                "hadamard_indices": (0, 2),
+                "cnot_indices": ([0, 1], [2, 0]),
+                "state_prep_index": 1,
+            },
+        )
+
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK:   [[magic_cb:%.+]] = func.call @fabricate_magic_state_TestCode() : () -> !qecp.codeblock<1 x 3>
+                %0 = qecl.fabricate[magic] : !qecl.codeblock<1>
+                return
+            }
+            // CHECK-LABEL: func.func private @fabricate_magic_state_TestCode() -> !qecp.codeblock<1 x 3>
+            //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 3>
+            // Extract qubits
+            //       CHECK-DAG:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
+            // State injection on the state_prep_index (q1)
+            //       CHECK:   [[q1_1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
+            //       CHECK:   [[q1_2:%.+]] = qecp.t [[q1_1]] : !qecp.qubit<data>
+            // Unitary encoding
+            //       CHECK:   [[q0_1:%.+]] = qecp.hadamard [[q0]] : !qecp.qubit<data>
+            //       CHECK:   [[q2_1:%.+]] = qecp.hadamard [[q2]] : !qecp.qubit<data>
+            //       CHECK:   [[q0_2:%.+]], [[q1_out:%.+]] = qecp.cnot [[q0_1]], [[q1_2]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK:   [[q2_out:%.+]], [[q0_out:%.+]] = qecp.cnot [[q2_1]], [[q0_2]] : !qecp.qubit<data>, !qecp.qubit<data>
+            // Insert qubits and return
+            //       CHECK:   [[cb_1:%.+]] = qecp.insert [[cb]][0], [[q0_out]]
+            //       CHECK:   [[cb_2:%.+]] = qecp.insert [[cb_1]][1], [[q1_out]]
+            //       CHECK:   [[cb_3:%.+]] = qecp.insert [[cb_2]][2], [[q2_out]]
+            //       CHECK:   func.return [[cb_3:%.+]] : !qecp.codeblock<1 x 3>
+        }
+        """
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+        run_filecheck(program, pipeline)
+
+    def test_fabricate_lowering_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test that `qecl.fabricate [magic]` op lowers to a call to the magic-state
+        fabrication subroutine when using the Steane code, and that the subroutine performs
+        H-T state injection on the Steane code's state_prep_index (qubit 6) followed by the
+        unitary encoding."""
+
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK:   [[magic_cb:%.+]] = func.call @fabricate_magic_state_Steane() : () -> !qecp.codeblock<1 x 7>
+                %0 = qecl.fabricate[magic] : !qecl.codeblock<1>
+                return
+            }
+            // CHECK-LABEL: func.func private @fabricate_magic_state_Steane() -> !qecp.codeblock<1 x 7>
+            //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 7>
+            //       CHECK-DAG:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q3:%.+]] = qecp.extract [[cb]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q4:%.+]] = qecp.extract [[cb]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q5:%.+]] = qecp.extract [[cb]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q6:%.+]] = qecp.extract [[cb]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            // State injection on the state_prep_index (qubit 6): H then T
+            //       CHECK:   [[h_inj:%.+]] = qecp.hadamard [[q6]] : !qecp.qubit<data>
+            //       CHECK:   [[t_inj:%.+]] = qecp.t [[h_inj]] : !qecp.qubit<data>
+            // Unitary encoding: Hadamards on indices 1, 2, 3
+            //       CHECK:   [[h1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
+            //       CHECK:   [[h2:%.+]] = qecp.hadamard [[q2]] : !qecp.qubit<data>
+            //       CHECK:   [[h3:%.+]] = qecp.hadamard [[q3]] : !qecp.qubit<data>
+            // First few CNOTs of the encoding circuit
+            //       CHECK:   qecp.cnot [[h1]], [[q0]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK:   qecp.cnot [[h2]], [[q4]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK:   qecp.cnot [[t_inj]], [[q5]] : !qecp.qubit<data>, !qecp.qubit<data>
+        }
+        """
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+    def test_apply_t_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test that the call signature for the apply_T subroutine is updated as expected."""
+
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+                // CHECK: [[cb1:%.+]] = func.call @apply_T([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                %2 = func.call @apply_T(%0) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                return
+            }
+            //      CHECK-LABEL: func.func private @apply_T([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
+            // CHECK: func.call @fabricate_magic_state_Steane() : () -> !qecp.codeblock<1 x 7>
+            // CHECK: qecp.dealloc_cb
+            func.func private @apply_T(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
+                %1 = qecl.fabricate[magic] : !qecl.codeblock<1>
+                qecl.dealloc_cb %0 : !qecl.codeblock<1>
+                func.return %1 : !qecl.codeblock<1>
+            }
+            //      CHECK-LABEL: func.func private @fabricate_magic_state_Steane
+            // CHECK: qecp.alloc_cb
+            // CHECK: qecp.h
+            // CHECK: qecp.t [[qb:%.+]]
+            // CHECK-NOT: qecp.t [[qb:%.+]] adj
+            // CHECK: qecp.h
+            // CHECK: qecp.cnot
+        }
+        """
+
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
 
 # MARK: Integration

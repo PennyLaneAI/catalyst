@@ -42,6 +42,11 @@ class TestQecCode:
             np.array([1] * n),
             transversal_1q_gates={"x": (qecp.PauliXOp, [0, 1, 2])},
             transversal_2q_gates={"cnot": qecp.CnotOp},
+            unitary_encoding={
+                "state_prep_index": 2,
+                "hadamard_indices": [0, 1],
+                "cnot_indices": ([0, 1], [1, 2]),
+            },
         )
 
         assert qec_code.name == name
@@ -52,18 +57,24 @@ class TestQecCode:
         assert np.all(qec_code.z_tanner == np.array([1] * n))
         assert qec_code.transversal_1q_gates == {"x": (qecp.PauliXOp, [0, 1, 2])}
         assert qec_code.transversal_2q_gates == {"cnot": qecp.CnotOp}
+        assert qec_code.unitary_encoding == {
+            "state_prep_index": 2,
+            "hadamard_indices": [0, 1],
+            "cnot_indices": ([0, 1], [1, 2]),
+        }
 
     @pytest.mark.parametrize(
         "inputs, expected_str",
         [
-            (("Steane", 7, 1, 3, np.eye(7), np.eye(7), {}, {}), "[[7, 1, 3]] Steane"),
-            (("", 7, 1, 3, np.eye(7), np.eye(7), {}, {}), "[[7, 1, 3]] <unknown>"),
-            (("  ", 7, 1, 3, np.eye(7), np.eye(7), {}, {}), "[[7, 1, 3]] <unknown>"),
+            (("Steane", 7, 1, 3), "[[7, 1, 3]] Steane"),
+            (("", 7, 1, 3), "[[7, 1, 3]] <unknown>"),
+            (("  ", 7, 1, 3), "[[7, 1, 3]] <unknown>"),
         ],
     )
     def test_str_representation(self, inputs, expected_str):
         """Test the string representation of the `QecCode` class for various inputs."""
-        qec_code = QecCode(*inputs)
+        _, n, _, _ = inputs
+        qec_code = QecCode(*inputs, np.eye(n), np.eye(n), {}, {}, {})
         assert str(qec_code) == expected_str
 
     @pytest.mark.parametrize(
@@ -78,6 +89,7 @@ class TestQecCode:
                 "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1]]),
                 "transversal_1q_gates": {"x": (qecp.PauliXOp, [0, 1, 2])},
                 "transversal_2q_gates": {},
+                "unitary_encoding": {},
             },
             {
                 "name": "Shor",
@@ -91,6 +103,7 @@ class TestQecCode:
                     "hadamdar": (qecp.HadamardOp, [2, 4]),
                 },
                 "transversal_2q_gates": {"cnot": qecp.CnotOp},
+                "unitary_encoding": {},
             },
             {
                 "name": "Unknown",
@@ -102,6 +115,11 @@ class TestQecCode:
                 "extra-field": 42,
                 "transversal_1q_gates": {"z": (qecp.PauliZOp, [4, 5, 6])},
                 "transversal_2q_gates": {"cnot": qecp.CnotOp},
+                "unitary_encoding": {
+                    "state_prep_index": 2,
+                    "hadamard_indices": [0, 1],
+                    "cnot_indices": ([0, 1], [1, 2]),
+                },
             },
         ],
     )
@@ -130,6 +148,7 @@ class TestQecCode:
                 "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1]]),
                 "transversal_1q_gates": {"x": (qecp.PauliXOp, [0, 1, 2])},
                 "transversal_2q_gates": {"cnot": qecp.CnotOp},
+                "unitary_encoding": {},
             },
             {
                 "name": "Shor",
@@ -140,6 +159,11 @@ class TestQecCode:
                 "z_tanner": np.array([[0, 0, 1, 1, 0, 1, 1, 0, 1]]),
                 "transversal_1q_gates": {"x": (qecp.PauliXOp, [0, 1, 2])},
                 "transversal_2q_gates": {},
+                "unitary_encoding": {
+                    "state_prep_index": 2,
+                    "hadamard_indices": [0, 1],
+                    "cnot_indices": ([0, 1], [1, 2]),
+                },
             },
         ],
     )
@@ -168,7 +192,15 @@ class TestQecCode:
         correctable errors of the code, t = floor((d - 1) / 2).
         """
         qec_code = QecCode(
-            "", 1, 1, d, np.array([]), np.array([]), {}, {}
+            "",
+            1,
+            1,
+            d,
+            np.array([]),
+            np.array([]),
+            {},
+            {},
+            {},
         )  # only value of d matters
 
         assert qec_code.correctable_errors == expected_t
