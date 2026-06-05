@@ -11,12 +11,12 @@ _Calculate the adjoint of the enclosed operations_
 Syntax:
 
 ```
-operation ::= `quantum.adjoint` `(` $qreg `)` attr-dict `:` type(operands) $region
+operation ::= `quantum.adjoint` `(` $args `)` attr-dict `:` type($results) $region
 ```
 
 Traits: `SingleBlockImplicitTerminator<YieldOp>`, `SingleBlock`
 
-Interfaces: `NoMemoryEffect (MemoryEffectOpInterface)`, `QuantumRegion`
+Interfaces: `NoMemoryEffect (MemoryEffectOpInterface)`
 
 Effects: `MemoryEffects::Effect{}`
 
@@ -24,13 +24,13 @@ Effects: `MemoryEffects::Effect{}`
 
 | Operand | Description |
 | :-----: | ----------- |
-| `qreg` | An array of value-semantic qubits (i.e. quantum register). |
+| `args` | variadic of An array of value-semantic qubits (i.e. quantum register). or A value-semantic qubit (state). |
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
-| `out_qreg` | An array of value-semantic qubits (i.e. quantum register). |
+| `results` | variadic of An array of value-semantic qubits (i.e. quantum register). or A value-semantic qubit (state). |
 
 
 ### `quantum.alloc` (::catalyst::quantum::AllocOp)
@@ -42,10 +42,6 @@ Syntax:
 ```
 operation ::= `quantum.alloc` `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
 ```
-
-Interfaces: `NoMemoryEffect (MemoryEffectOpInterface)`
-
-Effects: `MemoryEffects::Effect{}`
 
 #### Attributes:
 
@@ -86,7 +82,7 @@ operation ::= `quantum.alloc_qb` attr-dict `:` type(results)
 
 ### `quantum.compbasis` (::catalyst::quantum::ComputationalBasisOp)
 
-_Define a pseudo-obeservable of the computational basis for use in measurements_
+_Define a pseudo-observable of the computational basis for use in measurements_
 
 Syntax:
 
@@ -408,7 +404,7 @@ _Global Phase._
 Syntax:
 
 ```
-operation ::= `quantum.gphase` `(` $params `)` attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` (`ctrls` type($out_ctrl_qubits)^ )?
+operation ::= `quantum.gphase` `(` $angle `)` (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? ( `:` `ctrls` type($out_ctrl_qubits)^ )?
 ```
 
 Applies global phase to the current system.
@@ -428,7 +424,7 @@ Interfaces: `DifferentiableGate`, `ParametrizedGate`, `QuantumGate`, `QuantumOpe
 
 | Operand | Description |
 | :-----: | ----------- |
-| `params` | 64-bit float |
+| `angle` | 64-bit float |
 | `in_ctrl_qubits` | variadic of A value-semantic qubit (state). |
 | `in_ctrl_values` | variadic of 1-bit signless integer |
 
@@ -573,6 +569,50 @@ Effects: `MemoryEffects::Effect{}`
 | `out_qreg` | An array of value-semantic qubits (i.e. quantum register). |
 
 
+### `quantum.mcmobs` (::catalyst::quantum::MCMObsOp)
+
+_Define a pseudo-observable of mid-circuit measurements for use in measurement processes_
+
+Syntax:
+
+```
+operation ::= `quantum.mcmobs` $mcms attr-dict `:` type(results)
+```
+
+The `quantum.mcmobs` operation defines a quantum observable from mid-circuit measurements,
+to be used by other operations such as measurement processes.
+
+The only argument is a sequence of boolean result values of mid-circuit measurements.
+
+Example:
+
+```mlir
+func.func @foo(%mcm: i1)
+{
+    %obs = quantum.mcmobs %mcm : !quantum.obs
+    func.return
+}
+```
+
+Traits: `AlwaysSpeculatableImplTrait`
+
+Interfaces: `ConditionallySpeculatable`, `NoMemoryEffect (MemoryEffectOpInterface)`
+
+Effects: `MemoryEffects::Effect{}`
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `mcms` | variadic of 1-bit signless integer |
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `obs` | A quantum observable for use in measurements. |
+
+
 ### `quantum.measure` (::catalyst::quantum::MeasureOp)
 
 _A single-qubit projective measurement in the computational basis._
@@ -713,11 +753,242 @@ Syntax:
 operation ::= `quantum.num_qubits` attr-dict `:` type(results)
 ```
 
+Interfaces: `MemoryEffectOpInterface (MemoryEffectOpInterface)`
+
+Effects: `MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}`
+
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
 | `num_qubits` | 64-bit signless integer |
+
+
+### `quantum.operator` (::catalyst::quantum::OperatorOp)
+
+_A generalized quantum operation with arbitrary input signature._
+
+The `quantum.operator` is a generic representation for arbitrary quantum operations
+that cannot be expressed by the simpler `quantum.custom` op and don't have a dedicated
+operation.
+It's purpose is to represent high-level operations from frontend languages such as
+PennyLane — in particular templates and operators parametrized by Python (or
+frontend-language) data. The signature allows for an arbitrary number of dynamic data
+arguments (of arbitrary MLIR type), as well as limited static data (e.g. Pauli-word
+strings). Frontend-level data arguments are compressed into a unique identifier, since
+in general they may not be lowerable to MLIR.
+
+The operation has two mutually exclusive representations:
+
+* **Qubit mode** (`in_qubits` / `out_qubits`):
+  Use this when the operator acts on a statically known set of wires. Qubits are
+  threaded through the op explicitly and can carry per-control values through
+  `in_ctrl_qubits` / `in_ctrl_values` (with matching `out_ctrl_qubits`).
+  This is the natural representation for fixed-arity gates and operators.
+
+* **Register mode** (`in_qreg` / `out_qreg` + index arrays):
+  Use this when the operator acts on a dynamic number of wires. The operation receives
+  one register and one or more index arrays selecting which qubits in that register
+  are targeted. Controls are expressed with matching control index/value arrays.
+
+Besides one of the above, the operator can hold the following information:
+
+* `op_name` — canonical operator name
+* Operator inputs in one of several forms:
+  * `params` — dynamic operator inputs
+  * `static_data` — static inputs available to compiler passes
+  * `UID` — non-lowerable static inputs compressed into a unique ID; It can be used for
+            equivalence checking but not much else. The decomposition rule functions
+            (if provided) will reference the UID they were generated with.
+  * `forward_args` — dynamic inputs of operators that were themselves input to this
+                     operator; Can only be present if `UID` is also present. Usually
+                     just forwarded to decomposition functions after the params list.
+* `decompositions` — optional symbol list of decomposition rule functions; This argument
+                     is added for decomposition rules generated by the frontend together
+                     with the program. Otherwise, decomposition rules will be obtained
+                     from a pre-compiled library or generated by the compiler on demand.
+* Optional frontend-level metadata:
+  * `param_map` — maps frontend argument names to the lowered `params` operand positions
+  * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+
+Examples:
+
+A complex operator with one compilable static argument and an `adjoint`
+modifier acting on a single qubit:
+
+```mlir
+%out = quantum.operator "MyOp"(%theta: f64) adj qubits(%q)
+    static_data = {pauli_word = "XYZ", greedy = true}
+```
+
+An operator with two qubit-mode controls:
+
+```mlir
+%oq, %ocq:2 = quantum.operator "MyOp"() qubits(%q)
+    ctrls(%cq0, %cq1) ctrl_vals(%cv0, %cv1)
+```
+
+An operator acting on a dynamic number of qubits, expressed in register mode,
+with explicit name-to-position maps for its parameters and wire arguments:
+
+```mlir
+%out_qreg = quantum.operator "MyOp"(%state: tensor<?xcomplex<f64>>)
+    quregs(%qreg) indices(%w0: tensor<?xi64>, %w1: tensor<1xi64>)
+    param_map = {state_vector = [0]}
+    qubit_map = {wires = [0], precision_wire = [1]}
+```
+
+An operator carrying frontend-level data (summarized by `UID`), together with
+pre-traced decomposition rules referenced through `decompositions` and extra
+dynamic data forwarded into those rules via `forward(...)`:
+
+```mlir
+%out:3 = quantum.operator "MyOp"(%state: tensor<8xcomplex<f64>>) qubits(%q0, %q1, %q2)
+    UID(324958) forward(%phi: f64, %delta: f64)
+    decompositions = [@MyOp324958_0, @MyOp324958_1]
+```
+
+Traits: `AttrSizedOperandSegments`, `AttrSizedResultSegments`, `Unitary`
+
+Interfaces: `NoMemoryEffect (MemoryEffectOpInterface)`, `ParametrizedGate`, `QuantumGate`, `QuantumOperation`
+
+Effects: `MemoryEffects::Effect{}`
+
+#### Attributes:
+
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>decompositions</code></td><td>::mlir::ArrayAttr</td><td>FlatSymbolRefArrayAttr with const builder</td></tr>
+<tr><td><code>static_data</code></td><td>::mlir::DictionaryAttr</td><td>dictionary of named attribute values</td></tr>
+<tr><td><code>param_map</code></td><td>::mlir::DictionaryAttr</td><td>dictionary of named attribute values dictionary with DenseI64ArrayAttr values</td></tr>
+<tr><td><code>qubit_map</code></td><td>::mlir::DictionaryAttr</td><td>dictionary of named attribute values dictionary with DenseI64ArrayAttr values</td></tr>
+</table>
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `params` | variadic of any type |
+| `forward_args` | variadic of any type |
+| `in_qubits` | variadic of A value-semantic qubit (state). |
+| `in_ctrl_qubits` | variadic of A value-semantic qubit (state). |
+| `in_ctrl_values` | variadic of 1-bit signless integer |
+| `in_qreg` | An array of value-semantic qubits (i.e. quantum register). |
+| `arr_qubit_indices` | variadic of 1D tensor of 64-bit signless integer values |
+| `arr_ctrl_indices` | 1D tensor of 64-bit signless integer values |
+| `arr_ctrl_values` | 1D tensor of 1-bit signless integer values |
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `out_qubits` | variadic of A value-semantic qubit (state). |
+| `out_ctrl_qubits` | variadic of A value-semantic qubit (state). |
+| `out_qreg` | An array of value-semantic qubits (i.e. quantum register). |
+
+
+### `quantum.pcphase` (::catalyst::quantum::PCPhaseOp)
+
+_Apply a projector-controlled phase gate_
+
+Syntax:
+
+```
+operation ::= `quantum.pcphase` `(` $theta `,` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+```
+
+This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
+of wires and takes a rotation angle.
+It also takes another number, an integer called `dim`, which defines a specific part
+of the quantum state. The gate then applies a positive phase shift to a portion of the
+state defined by `dim`. At the same time, it applies a negative phase shift to the rest
+of the state.
+
+.. note::
+    This operation is one of the few quantum operations that is not applied via
+    ``quantum.custom``. The reason for this is that it needs to be handled in a special
+    way during the lowering due to its C function being variadic on the number of qubits.
+
+.. note::
+    `dim` is currently captured as a float number for compatibility with
+    runtime and device integration.
+
+
+Traits: `AttrSizedOperandSegments`, `AttrSizedResultSegments`, `Unitary`
+
+Interfaces: `DifferentiableGate`, `NoMemoryEffect (MemoryEffectOpInterface)`, `ParametrizedGate`, `QuantumGate`, `QuantumOperation`
+
+Effects: `MemoryEffects::Effect{}`
+
+#### Attributes:
+
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>adjoint</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+</table>
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `theta` | 64-bit float |
+| `dim` | 64-bit float |
+| `in_qubits` | variadic of A value-semantic qubit (state). |
+| `in_ctrl_qubits` | variadic of A value-semantic qubit (state). |
+| `in_ctrl_values` | variadic of 1-bit signless integer |
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `out_qubits` | variadic of A value-semantic qubit (state). |
+| `out_ctrl_qubits` | variadic of A value-semantic qubit (state). |
+
+
+### `quantum.paulirot` (::catalyst::quantum::PauliRotOp)
+
+_Apply a Pauli Product Rotation_
+
+Syntax:
+
+```
+operation ::= `quantum.paulirot` $pauli_product `(` $angle `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+```
+
+The `quantum.paulirot` operation applies a rotation around a Pauli product
+operator to the state-vector.
+The arguments are the rotation angle `angle`, a string representing the
+Pauli product operator, and a set of qubits the operation acts on.
+
+Traits: `AttrSizedOperandSegments`, `AttrSizedResultSegments`, `Unitary`
+
+Interfaces: `DifferentiableGate`, `NoMemoryEffect (MemoryEffectOpInterface)`, `ParametrizedGate`, `QuantumGate`, `QuantumOperation`
+
+Effects: `MemoryEffects::Effect{}`
+
+#### Attributes:
+
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>pauli_product</code></td><td>::mlir::ArrayAttr</td><td>A product of Pauli operators, aka a Pauli word.</td></tr>
+<tr><td><code>adjoint</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+</table>
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `angle` | 64-bit float |
+| `in_qubits` | variadic of A value-semantic qubit (state). |
+| `in_ctrl_qubits` | variadic of A value-semantic qubit (state). |
+| `in_ctrl_values` | variadic of 1-bit signless integer |
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `out_qubits` | variadic of A value-semantic qubit (state). |
+| `out_ctrl_qubits` | variadic of A value-semantic qubit (state). |
 
 
 ### `quantum.probs` (::catalyst::quantum::ProbsOp)
@@ -837,7 +1108,7 @@ The number of samples to draw is determined by the device shots argument in the 
 
 Note that the return value type depends on the type of observable provided. Computational
 basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
-other obversables the output is a 1D array of lenth equal to the shot number.
+other observables the output is a 1D array of length equal to the shot number.
 
 Example:
 
@@ -859,7 +1130,7 @@ func.func @foo(%q0: !quantum.bit, %q1: !quantum.bit, %shots: i64)
 
     The return value type depends on the type of observable provided. Computational
     basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
-    other obversables the output is a 1D array of lenth equal to the shot number.
+    other observables the output is a 1D array of length equal to the shot number.
 
 .. note::
 
@@ -1107,5 +1378,4 @@ Effects: `MemoryEffects::Effect{}`
 
 | Operand | Description |
 | :-----: | ----------- |
-| `retvals` | variadic of An array of value-semantic qubits (i.e. quantum register). |
-
+| `retvals` | variadic of An array of value-semantic qubits (i.e. quantum register). or A value-semantic qubit (state). |
