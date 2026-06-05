@@ -140,7 +140,7 @@ static std::string getPBCOpName(Operation *op)
             return "PPR-pi/" + std::to_string(std::abs(rk));
         })
         .Case<pbc::PPRotationArbitraryOp>([](auto) -> std::string { return "PPR-Phi"; })
-        .Case<pbc::PPMeasurementOp, pbc::SelectPPMeasurementOp>(
+        .Case<pbc::PPMeasurementOp, pbc::RefPPMeasurementOp, pbc::SelectPPMeasurementOp>(
             [](auto) -> std::string { return "PPM"; })
         .Default([](Operation *o) { return o->getName().getStringRef().str(); });
 }
@@ -464,8 +464,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // PBC operations
-    if (isa<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
-            pbc::SelectPPMeasurementOp, pbc::PrepareStateOp, pbc::FabricateOp>(op)) {
+    if (isa<pbc::PPRotationOp, pbc::RefPPMeasurementOp, pbc::PPRotationArbitraryOp,
+            pbc::PPMeasurementOp, pbc::SelectPPMeasurementOp, pbc::PrepareStateOp,
+            pbc::FabricateOp>(op)) {
         std::string name = getPBCOpName(op);
         int nQubits = getPBCQubitCount(op);
         result.operations[name][{nQubits, 0}] += 1;
@@ -473,7 +474,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // MBQC operations
-    if (isa<mbqc::MeasureInBasisOp, mbqc::GraphStatePrepOp>(op)) {
+    if (isa<mbqc::MeasureInBasisOp, mbqc::RefMeasureInBasisOp, mbqc::GraphStatePrepOp,
+            mbqc::RefGraphStatePrepOp>(op)) {
         std::string name = op->getName().getStringRef().str();
         result.operations[name][{0, 0}] += 1;
         return;

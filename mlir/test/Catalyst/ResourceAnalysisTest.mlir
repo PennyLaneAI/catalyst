@@ -854,6 +854,9 @@ func.func @auto_qm_flag_unset() {
 // CHECK-DAG: "CNOT(2)": 1
 // CHECK-DAG: "Adjoint(T)(1)": 1
 // CHECK-DAG: "S(1)": 1
+// CHECK-PPM: "PPM(0)": 1,
+// CHECK-DAG: "mbqc.graph_state_prep(0)": 1,
+// CHECK-DAG: "mbqc.ref.measure_in_basis(0)": 1
 
 func.func @qref() {
     %0 = qref.alloc( 2) : !qref.reg<2>
@@ -866,7 +869,17 @@ func.func @qref() {
     qref.custom "T"() %1 adj : !qref.bit
     qref.custom "S"() %2 : !qref.bit
     qref.custom "CNOT"() %1, %2 : !qref.bit, !qref.bit
+
     %meas = qref.measure %1 : i1
+
+    %pbc_meas = pbc.ref.ppm ["X", "Z"] %1, %2: i1
+
+    %angle = arith.constant 4.0 : f64
+    %mbqc_meas = mbqc.ref.measure_in_basis [ZX, %angle] %2 : i1
+
+    %adj_matrix = arith.constant dense<[1, 0, 1, 0, 0, 1]> : tensor<6xi1>
+    %graph_reg = mbqc.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
+
     qref.dealloc %0 : !qref.reg<2>
     return
 }
