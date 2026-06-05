@@ -222,6 +222,7 @@ Lillian Frederiksen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
+River McCubbin,
 Shuli Shu,
 Paul Haochen Wang,
 Jake Zaia.
