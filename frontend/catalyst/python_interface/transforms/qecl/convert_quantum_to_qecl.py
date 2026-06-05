@@ -981,7 +981,8 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
             )
 
             with ImplicitBuilder(if_apply_corr_op.true_region):
-                # This branch is for the case where a correction is needed
+                # the correction operator "SX" is applied via applying its component gates 
+                # right to left, i.e. with X, followed by S
                 corrected_cb1 = qecl.PauliXOp(magic_state1, idx=0)
                 corr_cb_out = qecl.SOp(corrected_cb1, idx=0)
                 scf.YieldOp(corr_cb_out)
