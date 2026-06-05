@@ -638,6 +638,7 @@ class TestQECPassIntegration:
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
@@ -691,6 +692,7 @@ class TestQECPassIntegration:
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
