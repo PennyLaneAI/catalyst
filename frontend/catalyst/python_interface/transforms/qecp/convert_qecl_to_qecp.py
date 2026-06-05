@@ -834,7 +834,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         unitary_encoding_info = self.qec_code.unitary_encoding
 
         required_keys = {"state_prep_index", "hadamard_indices", "cnot_indices"}
-        if not required_keys.issubset(unitary_encoding_info):
+        if not required_keys.issubset(unitary_encoding_info):  # pragma: no cover
             raise CompileError(
                 f"QEC code '{self.qec_code.name}' does not define a unitary encoding "
                 f"(missing {required_keys - set(unitary_encoding_info)}); cannot lower "
