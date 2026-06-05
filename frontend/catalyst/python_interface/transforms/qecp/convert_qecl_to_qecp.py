@@ -227,13 +227,13 @@ class FabricateOpConversion(RewritePattern):
     def match_and_rewrite(self, op: qecl.FabricateOp, rewriter: PatternRewriter):
         """Rewrite pattern for `qecl.fabricate [magic]` op"""
 
-        if not op.init_state.data == "magic":
+        if not op.init_state.data == "magic":  # pragma: no cover
             raise NotImplementedError(
                 "Lowering qecl.FabricateOp to the qecp dialect is only implemented "
                 "for init_state 'magic'"
             )
 
-        if (k := op.out_codeblock.type.k.value.data) != self.qec_code.k:
+        if (k := op.out_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
