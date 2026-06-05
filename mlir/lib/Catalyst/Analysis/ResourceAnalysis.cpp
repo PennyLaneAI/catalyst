@@ -47,12 +47,12 @@ namespace catalyst {
 
 static bool isSkippedOp(Operation *op)
 {
-    return isa<quantum::ComputationalBasisOp, quantum::DeallocOp, qref::DeallocOp,
-               quantum::DeallocQubitOp, qref::DeallocQubitOp, quantum::DeviceReleaseOp,
-               quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp, quantum::HamiltonianOp,
-               quantum::HermitianOp, qref::HermitianOp, quantum::InitializeOp, quantum::InsertOp,
-               quantum::NamedObsOp, qref::NamedObsOp, quantum::NumQubitsOp, quantum::TensorOp,
-               quantum::YieldOp, pbc::YieldOp>(op);
+    return isa<quantum::ComputationalBasisOp, qref::ComputationalBasisOp, quantum::DeallocOp,
+               qref::DeallocOp, quantum::DeallocQubitOp, qref::DeallocQubitOp,
+               quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp,
+               quantum::HamiltonianOp, quantum::HermitianOp, qref::HermitianOp,
+               quantum::InitializeOp, quantum::InsertOp, quantum::NamedObsOp, qref::NamedObsOp,
+               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp>(op);
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.
