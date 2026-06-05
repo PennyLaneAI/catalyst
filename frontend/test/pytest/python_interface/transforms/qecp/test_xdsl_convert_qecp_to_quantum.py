@@ -658,8 +658,8 @@ class TestQECPassIntegration:
             qp.transform(pass_name="symbol-dce"),
             inject_noise_to_qecl_pass,
             convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1),
-            convert_qecp_to_quantum_pass, 
-            )
+            convert_qecp_to_quantum_pass,
+        )
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @qec_conversion_and_noise_passes
@@ -671,7 +671,7 @@ class TestQECPassIntegration:
             qp.H(0)
             m0 = qp.measure(0)
             return qp.sample(m0)
-        
+
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
@@ -684,7 +684,7 @@ class TestQECPassIntegration:
             qp.H(0)
             m0 = qp.measure(0)
             return qp.sample(m0)
-        
+
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
@@ -701,4 +701,3 @@ class TestQECPassIntegration:
             eigvals = [-1 if s else 1 for s in samples]
             # the tolerance is a bit high, but it keeps number of shots down
             assert np.isclose(np.mean(eigvals), res, atol=0.1)
-    
