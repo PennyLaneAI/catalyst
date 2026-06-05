@@ -92,7 +92,7 @@ class QecCode:
             between all pairs of corresponding qubits.
         unitary_encoding (dict): A dictionary defining the unitary encoding for the
             ground state, including indices in the code block to prepare the qubits in the |+>
-            state by applying a Haramard, and indices to apply CNOT gates. Also included is a
+            state by applying a Hadamard, and indices to apply CNOT gates. Also included is a
             state-prep index. This is the index to apply physical gates to before encoding
             to encode a non-zero state - for example, applying H-T at this index before unitary
             encoding generates a magic state (not fault-tolerantly).
