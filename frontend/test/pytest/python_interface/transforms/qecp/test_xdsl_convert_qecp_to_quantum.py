@@ -751,3 +751,48 @@ class TestQECPassIntegration:
         eigenvalues = [-1 if s else 1 for s in samples]
         # could have a lower atol with more shots, but given test duration, not worth it
         assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.07)
+
+
+    @pytest.mark.parametrize(
+        "n, diagonalizing_gates, expected_res, shots",
+        [
+            (1, [qp.H], 0.707, 1000),
+            (1, [qp.Z, qp.S, qp.H], -0.707, 1000),
+            # with 2 adj-T gates, expval(Y) is -1 for every shot, so we can use fewer shots
+            (2, [qp.Z, qp.S, qp.H], -1, 20),
+        ],
+    )
+    def test_T_adj_gate_integration(
+        self, n, diagonalizing_gates, expected_res, shots, run_filecheck_qjit
+    ):
+        """Integration test for adjoint(T) gates."""
+
+        dev = qp.device("lightning.qubit", wires=1)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=6)
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            # CHECK: quantum.alloc
+            # CHECK: func.call @apply_T_adj
+            # CHECK: fabricate_magic_state_conj_Steane
+            # CHECK: qecp.assemble_tanner
+            # CHECK: qecp.decode_esm_css
+            # CHECK: quantum.custom "Hadamard"
+            qp.Hadamard(0)
+            for _ in range(n):
+                qp.adjoint(qp.T)(0)
+            for op in diagonalizing_gates:
+                op(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        run_filecheck_qjit(circ)
+        samples = circ()
+        eigenvalues = [-1 if s else 1 for s in samples]
+        # could have a lower atol with more shots, but given test duration, not worth it
+        assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.07)

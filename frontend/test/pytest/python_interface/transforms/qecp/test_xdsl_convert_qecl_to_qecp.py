@@ -1035,7 +1035,7 @@ class TestLoweringTransversalGates:
 class TestLoweringFabricateOp:
     """Test lowering for the qecl.fabricate op"""
 
-    @pytest.mark.parametrize("init_state, adj", [("magic", ""), ("magic_conj", "adj")])
+    @pytest.mark.parametrize("init_state, adj", [("magic", ""), ("magic_conj", " adj")])
     def test_lower_fabricate_toy_code(self, init_state, adj, run_filecheck, get_generic_qec_code):
         """Test that `qecl.fabricate [magic]` op lowers to a call to the magic-state
         fabrication subroutine with a toy code, and that the subroutine performs H-T
@@ -1068,7 +1068,7 @@ class TestLoweringFabricateOp:
             //       CHECK:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
             // State injection on the state_prep_index (q1)
             //       CHECK:   [[q1_1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
-            //       CHECK:   [[q1_2:%.+]] = qecp.t [[q1_1]] {adj} : !qecp.qubit<data>
+            //       CHECK:   [[q1_2:%.+]] = qecp.t [[q1_1]]{adj} : !qecp.qubit<data>
             // Unitary encoding
             //       CHECK:   [[q0_1:%.+]] = qecp.hadamard [[q0]] : !qecp.qubit<data>
             //       CHECK:   [[q2_1:%.+]] = qecp.hadamard [[q2]] : !qecp.qubit<data>
@@ -1084,7 +1084,7 @@ class TestLoweringFabricateOp:
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
         run_filecheck(program, pipeline)
 
-    @pytest.mark.parametrize("init_state, adj", [("magic", ""), ("magic_conj", "adj")])
+    @pytest.mark.parametrize("init_state, adj", [("magic", ""), ("magic_conj", " adj")])
     def test_fabricate_lowering_steane(self, init_state, adj, run_filecheck, qecl_to_qecp_steane_pipeline):
         """Test that `qecl.fabricate [magic]` op lowers to a call to the magic-state
         fabrication subroutine when using the Steane code, and that the subroutine performs
@@ -1098,27 +1098,26 @@ class TestLoweringFabricateOp:
                 %0 = qecl.fabricate[{init_state}] : !qecl.codeblock<1>
                 return
             }}
-            // CHECK-LABEL: func.func private @fabricate_magic_Steane() -> !qecp.codeblock<1 x 7>
+            // CHECK-LABEL: func.func private @fabricate_{init_state}_Steane() -> !qecp.codeblock<1 x 7>
             //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 7>
-            //       CHECK:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK:   [[q3:%.+]] = qecp.extract [[cb]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK:   [[q4:%.+]] = qecp.extract [[cb]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK:   [[q5:%.+]] = qecp.extract [[cb]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK:   [[q6:%.+]] = qecp.extract [[cb]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-NEXT:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-NEXT:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-NEXT:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-NEXT:   [[q3:%.+]] = qecp.extract [[cb]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-NEXT:   [[q4:%.+]] = qecp.extract [[cb]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-NEXT:   [[q5:%.+]] = qecp.extract [[cb]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-NEXT:   [[q6:%.+]] = qecp.extract [[cb]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
             // State injection on the state_prep_index (qubit 6): H then T
-            //       CHECK:   [[h_inj:%.+]] = qecp.hadamard [[q6]] : !qecp.qubit<data>
-            //       CHECK:   [[t_inj:%.+]] = qecp.t [[h_inj]] {adj} : !qecp.qubit<data>
+            //       CHECK-NEXT:   [[h_inj:%.+]] = qecp.hadamard [[q6]] : !qecp.qubit<data>
+            //       CHECK-NEXT:   [[t_inj:%.+]] = qecp.t [[h_inj]]{adj} : !qecp.qubit<data>
             // Unitary encoding: Hadamards on indices 1, 2, 3
-            //       CHECK:   [[h1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
-            //       CHECK:   [[h2:%.+]] = qecp.hadamard [[q2]] : !qecp.qubit<data>
-            //       CHECK:   [[h3:%.+]] = qecp.hadamard [[q3]] : !qecp.qubit<data>
+            //       CHECK-NEXT:   [[h1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
+            //       CHECK-NEXT:   [[h2:%.+]] = qecp.hadamard [[q2]] : !qecp.qubit<data>
+            //       CHECK-NEXT:   [[h3:%.+]] = qecp.hadamard [[q3]] : !qecp.qubit<data>
             // First few CNOTs of the encoding circuit
-            //       CHECK:   qecp.cnot [[h1]], [[q0]] : !qecp.qubit<data>, !qecp.qubit<data>
-            //       CHECK:   qecp.cnot [[h2]], [[q4]] : !qecp.qubit<data>, !qecp.qubit<data>
-            //       CHECK:   qecp.cnot [[t_inj]], [[q5]] : !qecp.qubit<data>, !qecp.qubit<data>
-            //       CHECK:   func.return
+            //       CHECK-NEXT:   qecp.cnot [[h1]], [[q0]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK-NEXT:   qecp.cnot [[h2]], [[q4]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK-NEXT:   qecp.cnot [[t_inj]], [[q5]] : !qecp.qubit<data>, !qecp.qubit<data>
         }}
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
