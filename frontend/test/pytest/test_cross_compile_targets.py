@@ -45,12 +45,13 @@ def test_remote_dispatch_full_chain():
         assert os.path.exists(target_object)
 
         ir = get_compilation_stage(jitted, "CrossCompileTargets")
-        assert 'fn("remote_open")' in ir
-        assert 'fn("remote_send_binary")' in ir
-        assert 'fn("remote_call")' in ir
-        assert 'fn("remote_close")' in ir
+        assert "remote.open" in ir
+        assert "remote.send_binary" in ir
+        assert "remote.launch" in ir
+        # Teardown close is handled by the runtime at process exit, not emitted as an op.
+        assert "remote.close" not in ir
         assert "ADDR:PORT" in ir
-        assert target_object in ir  
-        assert "module @module_circuit" not in ir 
+        assert target_object in ir
+        assert "module @module_circuit" not in ir
     finally:
         jitted.workspace.cleanup()
