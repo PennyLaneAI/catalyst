@@ -1062,22 +1062,22 @@ class TestLoweringFabricateOp:
             // CHECK-LABEL: func.func private @fabricate_magic_state_TestCode() -> !qecp.codeblock<1 x 3>
             //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 3>
             // Extract qubits
-            //       CHECK-NEXT:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
             // State injection on the state_prep_index (q1)
-            //       CHECK-NEXT:   [[q1_1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q1_2:%.+]] = qecp.t [[q1_1]] : !qecp.qubit<data>
+            //       CHECK-DAG:   [[q1_1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
+            //       CHECK-DAG:   [[q1_2:%.+]] = qecp.t [[q1_1]] : !qecp.qubit<data>
             // Unitary encoding
-            //       CHECK-NEXT:   [[q0_1:%.+]] = qecp.hadamard [[q0]] : !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q2_1:%.+]] = qecp.hadamard [[q2]] : !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q0_2:%.+]], [[q1_out:%.+]] = qecp.cnot [[q0_1]], [[q1_2]] : !qecp.qubit<data>, !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q2_out:%.+]], [[q0_out:%.+]] = qecp.cnot [[q2_1]], [[q0_2]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK-DAG:   [[q0_1:%.+]] = qecp.hadamard [[q0]] : !qecp.qubit<data>
+            //       CHECK-DAG:   [[q2_1:%.+]] = qecp.hadamard [[q2]] : !qecp.qubit<data>
+            //       CHECK-DAG:   [[q0_2:%.+]], [[q1_out:%.+]] = qecp.cnot [[q0_1]], [[q1_2]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK-DAG:   [[q2_out:%.+]], [[q0_out:%.+]] = qecp.cnot [[q2_1]], [[q0_2]] : !qecp.qubit<data>, !qecp.qubit<data>
             // Insert qubits and return
-            //       CHECK-NEXT:   [[cb_1:%.+]] = qecp.insert [[cb]][0], [[q0_out]]
-            //       CHECK-NEXT:   [[cb_2:%.+]] = qecp.insert [[cb_1]][1], [[q1_out]]
-            //       CHECK-NEXT:   [[cb_3:%.+]] = qecp.insert [[cb_2]][2], [[q2_out]]
-            //       CHECK-NEXT:   func.return [[cb_3:%.+]] : !qecp.codeblock<1 x 3>
+            //       CHECK-DAG:   [[cb_1:%.+]] = qecp.insert [[cb]][0], [[q0_out]]
+            //       CHECK-DAG:   [[cb_2:%.+]] = qecp.insert [[cb_1]][1], [[q1_out]]
+            //       CHECK-DAG:   [[cb_3:%.+]] = qecp.insert [[cb_2]][2], [[q2_out]]
+            //       CHECK-DAG:   func.return [[cb_3:%.+]] : !qecp.codeblock<1 x 3>
         }
         """
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
@@ -1098,24 +1098,24 @@ class TestLoweringFabricateOp:
             }
             // CHECK-LABEL: func.func private @fabricate_magic_state_Steane() -> !qecp.codeblock<1 x 7>
             //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 7>
-            //       CHECK-NEXT:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q3:%.+]] = qecp.extract [[cb]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q4:%.+]] = qecp.extract [[cb]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q5:%.+]] = qecp.extract [[cb]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q6:%.+]] = qecp.extract [[cb]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q3:%.+]] = qecp.extract [[cb]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q4:%.+]] = qecp.extract [[cb]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q5:%.+]] = qecp.extract [[cb]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q6:%.+]] = qecp.extract [[cb]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
             // State injection on the state_prep_index (qubit 6): H then T
-            //       CHECK-NEXT:   [[h_inj:%.+]] = qecp.hadamard [[q6]] : !qecp.qubit<data>
-            //       CHECK-NEXT:   [[t_inj:%.+]] = qecp.t [[h_inj]] : !qecp.qubit<data>
+            //       CHECK-DAG:   [[h_inj:%.+]] = qecp.hadamard [[q6]] : !qecp.qubit<data>
+            //       CHECK-DAG:   [[t_inj:%.+]] = qecp.t [[h_inj]] : !qecp.qubit<data>
             // Unitary encoding: Hadamards on indices 1, 2, 3
-            //       CHECK-NEXT:   [[h1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
-            //       CHECK-NEXT:   [[h2:%.+]] = qecp.hadamard [[q2]] : !qecp.qubit<data>
-            //       CHECK-NEXT:   [[h3:%.+]] = qecp.hadamard [[q3]] : !qecp.qubit<data>
+            //       CHECK-DAG:   [[h1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
+            //       CHECK-DAG:   [[h2:%.+]] = qecp.hadamard [[q2]] : !qecp.qubit<data>
+            //       CHECK-DAG:   [[h3:%.+]] = qecp.hadamard [[q3]] : !qecp.qubit<data>
             // First few CNOTs of the encoding circuit
-            //       CHECK-NEXT:   qecp.cnot [[h1]], [[q0]] : !qecp.qubit<data>, !qecp.qubit<data>
-            //       CHECK-NEXT:   qecp.cnot [[h2]], [[q4]] : !qecp.qubit<data>, !qecp.qubit<data>
-            //       CHECK-NEXT:   qecp.cnot [[t_inj]], [[q5]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK-DAG:   qecp.cnot [[h1]], [[q0]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK-DAG:   qecp.cnot [[h2]], [[q4]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK-DAG:   qecp.cnot [[t_inj]], [[q5]] : !qecp.qubit<data>, !qecp.qubit<data>
         }
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
