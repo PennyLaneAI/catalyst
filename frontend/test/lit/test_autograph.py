@@ -18,7 +18,6 @@
 
 import catalyst
 from catalyst import AutoGraphError, autograph_source, disable_autograph, qjit, run_autograph
-from catalyst.utils.dummy import dummy_func
 from catalyst.utils.patching import Patcher
 
 
@@ -673,6 +672,19 @@ print(enable_autograph_context_manager_jax.jaxpr)
 
 
 # -----
+
+
+def dummy_func(x):
+    """Simple function with if statements for testing the 'auto_include' option of @qjit.
+    The parent 'catalyst' module is excluded for autograph conversion by default, hence
+    adding this module explicitly to the inclusion list will override that restriction"""
+
+    with Patcher((catalyst, "compile_without_static_conditionals", False)):
+        if x > 5:
+            y = x**2
+        else:
+            y = x**3
+    return y
 
 
 # CHECK-LABEL: def include_module_to_autograph
