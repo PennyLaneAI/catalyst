@@ -485,7 +485,7 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
         catalyst::utils::LinesCount::call(moduleOp);
 
         // Cross-compile catalyst.target nested modules and dispatch for execution
-        if (pipeline.getName() == "GradientLoweringStage" && !options.workspace.empty()) {
+        if (pipeline.getName() == "BufferizationStage" && !options.workspace.empty()) {
             Pipeline targetPipeline;
             targetPipeline.setName("CrossCompileTargets");
             std::string dumpIntermediate = options.keepIntermediate ? "true" : "false";
