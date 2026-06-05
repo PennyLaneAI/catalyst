@@ -124,7 +124,7 @@ OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitVal
 
     Operation *newOp = builder.create(state);
 
-    if (isa<quantum::QuantumOperation>(vOp)) {
+    if (isa<quantum::QuantumOperation, quantum::MeasureOp>(vOp)) {
         // Cascade the tracker for gate-like ops
         SmallVector<Value> vQuantumOperands;
         SmallVector<Value> vQuantumResults;
@@ -189,6 +189,30 @@ void handleDealloc(IRRewriter &builder, quantum::DeallocOp vDeallocOp, QubitValu
     erasureWorklist.push_back(vDeallocOp);
 }
 
+void handleAllocQubit(IRRewriter &builder, quantum::AllocQubitOp vAllocQbOp,
+                      QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vAllocQbOp);
+    Location loc = vAllocQbOp.getLoc();
+
+    auto rAllocQbOp = qref::AllocQubitOp::create(builder, loc);
+    tracker.setRQubit(vAllocQbOp.getQubit(), rAllocQbOp.getQubit());
+    erasureWorklist.push_back(vAllocQbOp);
+}
+
+void handleDeallocQubit(IRRewriter &builder, quantum::DeallocQubitOp vDeallocQbOp,
+                        QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vDeallocQbOp);
+    Location loc = vDeallocQbOp.getLoc();
+
+    qref::DeallocQubitOp::create(builder, loc, tracker.getRQubit(vDeallocQbOp.getQubit()));
+
+    erasureWorklist.push_back(vDeallocQbOp);
+}
+
 // Although multiple qref.get ops can alias, multiple quantum.extract ops will definitely not alias
 void handleExtract(IRRewriter &builder, quantum::ExtractOp vExtractOp, QubitValueTracker &tracker,
                    SmallVector<Operation *> &erasureWorklist)
@@ -232,7 +256,6 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
                 SmallVector<Operation *> &erasureWorklist)
 {
     OpBuilder::InsertionGuard guard(builder);
-    // MLIRContext *ctx = vGateOp.getContext();
 
     qref::QuantumOperation rGateOp;
     Operation *_vGateOp = vGateOp.getOperation();
@@ -274,6 +297,16 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
     erasureWorklist.push_back(vGateOp);
 }
 
+void handleMeasure(IRRewriter &builder, quantum::MeasureOp vMeasureOp, QubitValueTracker &tracker,
+                   SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+
+    auto rMeasureOp = migrateOpToReferenceSemantics<qref::MeasureOp>(builder, vMeasureOp, tracker);
+    builder.replaceAllUsesWith(vMeasureOp.getMres(), rMeasureOp.getMres());
+    erasureWorklist.push_back(vMeasureOp);
+}
+
 void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,
                      QubitValueTracker &tracker)
 {
@@ -298,9 +331,9 @@ void handleHermitian(IRRewriter &builder, quantum::HermitianOp vHermitianOp,
     builder.replaceOp(vHermitianOp, rHermitianOp);
 }
 
-void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker,
-                  SmallVector<Operation *> &erasureWorklist)
+void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
 {
+    SmallVector<Operation *> erasureWorklist;
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
         llvm::TypeSwitch<Operation *, void>(op)
             .Case<quantum::AllocOp>(
@@ -310,8 +343,10 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker,
             .Case<quantum::ExtractOp>(
                 [&](auto o) { handleExtract(builder, o, tracker, erasureWorklist); })
             .Case<quantum::InsertOp>([&](auto o) { handleInsert(o, tracker, erasureWorklist); })
-            // .Case<qref::AllocQubitOp>([&](auto o) { handleAllocQubit(builder, o, tracker); })
-            // .Case<qref::DeallocQubitOp>([&](auto o) { handleDeallocQubit(builder, o, tracker); })
+            .Case<quantum::AllocQubitOp>(
+                [&](auto o) { handleAllocQubit(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::DeallocQubitOp>(
+                [&](auto o) { handleDeallocQubit(builder, o, tracker, erasureWorklist); })
             .Case<quantum::QuantumOperation>(
                 [&](auto o) { handleGate(builder, o, tracker, erasureWorklist); })
             // .Case<func::CallOp>([&](auto o) { handleCall(builder, o, tracker); })
@@ -319,7 +354,8 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker,
                 [&](auto o) { handleCompbasis(builder, o, tracker); })
             .Case<quantum::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
             .Case<quantum::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
-            // .Case<qref::MeasureOp>([&](auto o) { handleMeasure(builder, o, tracker); })
+            .Case<quantum::MeasureOp>(
+                [&](auto o) { handleMeasure(builder, o, tracker, erasureWorklist); })
             // .Case<mbqc::RefMeasureInBasisOp>(
             //     [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
             // .Case<pbc::RefPPMeasurementOp>([&](auto o) { handlePPM(builder, o, tracker); })
@@ -332,6 +368,8 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker,
             //     [&](auto o) { handleGraphStatePrep(builder, o, tracker); })
             .Default([](Operation *) {});
     });
+
+    eraseAllVOps(erasureWorklist);
 }
 
 } // namespace
@@ -364,9 +402,7 @@ struct ReferenceSemanticsConversionPass
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
-            SmallVector<Operation *> erasureWorklist;
-            handleRegion(builder, targetFunc.getBody(), tracker, erasureWorklist);
-            eraseAllVOps(erasureWorklist);
+            handleRegion(builder, targetFunc.getBody(), tracker);
         }
     }
 };

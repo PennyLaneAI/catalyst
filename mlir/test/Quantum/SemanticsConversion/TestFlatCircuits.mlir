@@ -393,20 +393,35 @@ func.func @test_hermitian_op(%arg0: tensor<4x4xcomplex<f64>>) -> !quantum.obs at
 
 // -----
 
-// module {
-//   func.func @test_measure_op() -> (i1, i1, i1) attributes {quantum.node} {
-//     %0 = quantum.alloc( 1) : !quantum.reg
-//     %1 = quantum.alloc_qb : !quantum.bit
-//     %mres, %out_qubit = quantum.measure %1 : i1, !quantum.bit
-//     %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-//     %mres_0, %out_qubit_1 = quantum.measure %2 : i1, !quantum.bit
-//     %mres_2, %out_qubit_3 = quantum.measure %out_qubit_1 : i1, !quantum.bit
-//     %3 = quantum.insert %0[ 0], %out_qubit_3 : !quantum.reg, !quantum.bit
-//     quantum.dealloc %3 : !quantum.reg
-//     quantum.dealloc_qb %out_qubit : !quantum.bit
-//     return %mres, %mres_0, %mres_2 : i1, i1, i1
-//   }
-// }
+
+// CHECK-LABEL: test_measure_op
+func.func @test_measure_op() -> (i1, i1, i1) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    // CHECK: [[qubit:%.+]] = qref.alloc_qb : !qref.bit
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.alloc_qb : !quantum.bit
+
+    // CHECK: [[mres:%.+]] = qref.measure [[qubit]] : i1
+    %mres, %out_qubit = quantum.measure %1 : i1, !quantum.bit
+
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<1> -> !qref.bit
+    // CHECK: [[mres_0:%.+]] = qref.measure [[q0]] : i1
+    // CHECK: [[mres_2:%.+]] = qref.measure [[q0]] : i1
+    // CHECK-NOT: quantum.insert
+    %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %mres_0, %out_qubit_1 = quantum.measure %2 : i1, !quantum.bit
+    %mres_2, %out_qubit_3 = quantum.measure %out_qubit_1 : i1, !quantum.bit
+    %3 = quantum.insert %0[ 0], %out_qubit_3 : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<1>
+    // CHECK: qref.dealloc_qb [[qubit]] : !qref.bit
+    quantum.dealloc %3 : !quantum.reg
+    quantum.dealloc_qb %out_qubit : !quantum.bit
+
+    // CHECK: return [[mres]], [[mres_0]], [[mres_2]] : i1, i1, i1
+    return %mres, %mres_0, %mres_2 : i1, i1, i1
+}
+
 
 // -----
 
@@ -496,16 +511,21 @@ func.func @test_dynamic_wire_index(%arg0: i64) -> f64 attributes {quantum.node} 
 }
 
 
-// // -----
+// -----
 
-// module {
-//   func.func @test_alloc_qb() attributes {quantum.node} {
-//     %0 = quantum.alloc_qb : !quantum.bit
-//     %out_qubits = quantum.custom "X"() %0 : !quantum.bit
-//     quantum.dealloc_qb %out_qubits : !quantum.bit
-//     return
-//   }
-// }
+
+// CHECK: test_alloc_qb
+func.func @test_alloc_qb() attributes {quantum.node} {
+    // CHECK: [[qubit:%.+]] = qref.alloc_qb : !qref.bit
+    // CHECK: qref.custom "X"() [[qubit]] : !qref.bit
+    // CHECK: qref.dealloc_qb [[qubit]] : !qref.bit
+
+    %0 = quantum.alloc_qb : !quantum.bit
+    %out_qubits = quantum.custom "X"() %0 : !quantum.bit
+    quantum.dealloc_qb %out_qubits : !quantum.bit
+    return
+}
+
 
 // // -----
 
