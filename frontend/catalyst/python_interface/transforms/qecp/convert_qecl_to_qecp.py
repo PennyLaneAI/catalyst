@@ -189,7 +189,7 @@ class EncodeOpConversion(RewritePattern):
     def match_and_rewrite(self, op: qecl.EncodeOp, rewriter: PatternRewriter):
         """Rewrite pattern for `qecl.encode [zero]` op"""
 
-        if not op.init_state.data == "zero": # pragma: no cover
+        if not op.init_state.data == "zero":  # pragma: no cover
             raise NotImplementedError(
                 "Lowering qecl.EncodeOp to the qecp dialect is only implemented "
                 "for init_state 'zero'"
@@ -199,7 +199,7 @@ class EncodeOpConversion(RewritePattern):
             qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
         )
 
-        if (k := in_codeblock.type.k.value.data) != self.qec_code.k: # pragma: no cover
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
@@ -263,7 +263,7 @@ class QecCycleOpConversion(RewritePattern):
             qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
         )
 
-        if (k := in_codeblock.type.k.value.data) != self.qec_code.k: # pragma: no cover
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
@@ -817,16 +817,16 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         non-fault tolerant encoding intended for use on a simulator, and not a distillation process
         for generating a magic state from many noisy copies.
 
-        The encoding process follows the third option for magic state encoding described in 
-        https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that the correction is 
-        SX as decribed in Nielsen & Chuang, (Section 10.6.2), rather than a single NOT gate. 
+        The encoding process follows the third option for magic state encoding described in
+        https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that the correction is
+        SX as decribed in Nielsen & Chuang, (Section 10.6.2), rather than a single NOT gate.
         This was found to produce the correct result for circuit simulations.
 
         The encoding method involves putting the initial QEC physical qubit in the desired state
         via application of a Hadamard and physical T gate, and then using the gate encoding for the
-        zero state to create the desired state for the codeblock. Note that we do not use the 
-        syndrome-measurement based encoding that we use for `encode [zero]`; the unitary 
-        encoder maps an arbitrary input |psi> -> |psi_L>, whereas the stabilizer-measurement 
+        zero state to create the desired state for the codeblock. Note that we do not use the
+        syndrome-measurement based encoding that we use for `encode [zero]`; the unitary
+        encoder maps an arbitrary input |psi> -> |psi_L>, whereas the stabilizer-measurement
         enocding procedure only projects the input state onto the codespace.
 
         Note that this method does not insert the subroutine into the module op. Instead it

@@ -23,7 +23,7 @@ import numpy as np
 from catalyst.python_interface.dialects import qecp
 
 _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
-    # the indices/ordering for the operators and encodings in the Steane code are those used 
+    # the indices/ordering for the operators and encodings in the Steane code are those used
     # in https://arxiv.org/pdf/2107.07505
     "Steane": (
         7,
