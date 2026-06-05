@@ -14,6 +14,8 @@
 
 """Tests for the decomposition rule precompilation utilities."""
 
+from pathlib import Path
+
 import pennylane as qp
 import pytest
 
@@ -127,17 +129,31 @@ class TestCompileOpDecompRules:
 
 def test_bytecode_file():
     """Test that the bytecode file is generated correctly."""
-    BYTECODE_FILE_PATH.unlink(missing_ok=True)
+    orig_bcfile = Path(BYTECODE_FILE_PATH)
+    tmp_bcfile = None
 
-    precompile_decomp_rules()
+    if orig_bcfile.exists():
+        tmp_bcfile = orig_bcfile.replace(BYTECODE_FILE_PATH + ".tmpbackup")
 
-    assert BYTECODE_FILE_PATH.exists()
+    try:
+        precompile_decomp_rules()
+        assert orig_bcfile.exists()
+
+    finally:
+        if tmp_bcfile:
+            tmp_bcfile = tmp_bcfile.replace(orig_bcfile)
+        else:
+            orig_bcfile.unlink(missing_ok=True)
 
     # NOTE: empty pass is needed to prevent running default pipeline
-    rules = _quantum_opt("--empty", str(BYTECODE_FILE_PATH))
+    rules = _quantum_opt("--empty", BYTECODE_FILE_PATH)
 
     assert "_isingxy_to_h_cy" in rules
     assert "_doublexcit" in rules
     assert "_pauliz_to_ps" in rules
     assert "_cphase_to_ppr" in rules
     assert "_crot" in rules
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

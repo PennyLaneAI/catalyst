@@ -1802,7 +1802,7 @@ def graph_decomposition_setup_inputs(
     fixed_decomps: dict | None = None,
     alt_decomps: dict | None = None,
     bytecode_rules: str | None = None,
-    _builtin_rule_path: Path = BYTECODE_FILE_PATH,
+    _builtin_rule_path: str = BYTECODE_FILE_PATH,
 ):  # pylint: disable=unused-argument
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
@@ -1902,7 +1902,7 @@ def graph_decomposition_setup_inputs(
 
     options: dict[str, dict | tuple | str] = {
         "gate_set": gate_set,
-        "bytecode_rules": str(_builtin_rule_path),
+        "bytecode_rules": _builtin_rule_path,
     }
 
     if fixed_decomps:
