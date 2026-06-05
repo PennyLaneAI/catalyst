@@ -643,7 +643,7 @@ class TestQECPassIntegration:
             ([qp.H, qp.Z], (-1, 0, 0)),
             # adjoint and S adjoint rotate onto y axis in expected directions
             ([qp.H, qp.S], (0, 1, 0)),
-            ([qp.H, qp.adjoint(qp.S)], (0, -1, 0)),
+            ([qp.H, lambda w: qp.adjoint(qp.S(w))], (0, -1, 0)),
             # hadamard is self-inverse
             ([qp.H, qp.H], (0, 0, 1)),
         ],
@@ -653,33 +653,52 @@ class TestQECPassIntegration:
 
         dev = qp.device("lightning.qubit", wires=1)
 
-        # compile_pipeline = qp.CompilePipeline()
+        qec_conversion_and_noise_passes = qp.CompilePipeline(
+            convert_quantum_to_qecl_pass(k=1),
+            qp.transform(pass_name="symbol-dce"),
+            inject_noise_to_qecl_pass,
+            convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1),
+            convert_qecp_to_quantum_pass, 
+            )
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
-        @convert_qecp_to_quantum_pass
-        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
-        @inject_noise_to_qecl_pass
-        @qp.transform(pass_name="symbol-dce")
-        @convert_quantum_to_qecl_pass(k=1)
-        @qp.set_shots(1)
+        @qec_conversion_and_noise_passes
+        @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
-        def test_circ():
+        def x_circ():
             for gate in gates:
                 gate(0)
-                # gate(1)
-                # gate(2)
             qp.H(0)
-            # qp.Z(1)
-            # qp.S(1)
-            # qp.H(1)
             m0 = qp.measure(0)
-            # m1 = qp.measure(1)
-            # m2 = qp.measure(2)
-            return qp.sample(m0)#, qp.sample(m1), qp.sample(m2)
+            return qp.sample(m0)
+        
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qec_conversion_and_noise_passes
+        @qp.set_shots(700)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def y_circ():
+            for gate in gates:
+                gate(0)
+            qp.Z(0)
+            qp.S(0)
+            qp.H(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+        
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qec_conversion_and_noise_passes
+        @qp.set_shots(700)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def z_circ():
+            for gate in gates:
+                gate(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
 
-        all_samples = test_circ()
-        print(all_samples)
-        raise RuntimeError()
+        all_samples = x_circ(), y_circ(), z_circ()
 
-        # res = [np.mean([-1 if s else 1 for s in sample]) for sample in all_samples]
-        # assert np.allclose(res, expected_result)
+        for samples, res in zip(all_samples, expected_results):
+            eigvals = [-1 if s else 1 for s in samples]
+            # the tolerance is a bit high, but it keeps number of shots down
+            assert np.isclose(np.mean(eigvals), res, atol=0.1)
+    
