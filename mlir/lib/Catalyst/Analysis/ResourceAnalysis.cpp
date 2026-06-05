@@ -30,6 +30,9 @@
 #include "Catalyst/Utils/ConstantResolve.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
+#include "QRef/IR/QRefDialect.h"
+#include "QRef/IR/QRefInterfaces.h"
+#include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -44,10 +47,11 @@ namespace catalyst {
 
 static bool isSkippedOp(Operation *op)
 {
-    return isa<quantum::ComputationalBasisOp, quantum::DeallocOp, quantum::DeallocQubitOp,
-               quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp,
-               quantum::HamiltonianOp, quantum::HermitianOp, quantum::InitializeOp,
-               quantum::InsertOp, quantum::NamedObsOp, quantum::NumQubitsOp, quantum::TensorOp,
+    return isa<quantum::ComputationalBasisOp, quantum::DeallocOp, qref::DeallocOp,
+               quantum::DeallocQubitOp, qref::DeallocQubitOp, quantum::DeviceReleaseOp,
+               quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp, quantum::HamiltonianOp,
+               quantum::HermitianOp, qref::HermitianOp, quantum::InitializeOp, quantum::InsertOp,
+               quantum::NamedObsOp, qref::NamedObsOp, quantum::NumQubitsOp, quantum::TensorOp,
                quantum::YieldOp, pbc::YieldOp>(op);
 }
 
@@ -58,7 +62,8 @@ static bool isCustomDialectOp(Operation *op)
     if (!dialect) {
         return false;
     }
-    return isa<quantum::QuantumDialect, pbc::PBCDialect, mbqc::MBQCDialect>(dialect);
+    return isa<quantum::QuantumDialect, pbc::PBCDialect, mbqc::MBQCDialect, qref::QRefDialect>(
+        dialect);
 }
 
 //===----------------------------------------------------------------------===//
@@ -70,19 +75,26 @@ static std::string getGateOpName(Operation *op, bool isAdjoint)
 {
     std::string name =
         llvm::TypeSwitch<Operation *, std::string>(op)
-            .Case<quantum::CustomOp>([](auto customOp) { return customOp.getGateName().str(); })
-            .Case<quantum::PauliRotOp>([](auto) { return "PauliRot"; })
-            .Case<quantum::GlobalPhaseOp>([](auto) { return "GlobalPhase"; })
-            .Case<quantum::MultiRZOp>([](auto) { return "MultiRZ"; })
-            .Case<quantum::PCPhaseOp>([](auto) { return "PCPhase"; })
-            .Case<quantum::QubitUnitaryOp>([](auto) { return "QubitUnitary"; })
-            .Case<quantum::SetStateOp>([](auto) { return "SetState"; })
-            .Case<quantum::SetBasisStateOp>([](auto) { return "SetBasisState"; })
+            .Case<quantum::CustomOp, qref::CustomOp>(
+                [](auto customOp) { return customOp.getGateName().str(); })
+            .Case<quantum::PauliRotOp, qref::PauliRotOp>([](auto) { return "PauliRot"; })
+            .Case<quantum::GlobalPhaseOp, qref::GlobalPhaseOp>([](auto) { return "GlobalPhase"; })
+            .Case<quantum::MultiRZOp, qref::MultiRZOp>([](auto) { return "MultiRZ"; })
+            .Case<quantum::PCPhaseOp, qref::PCPhaseOp>([](auto) { return "PCPhase"; })
+            .Case<quantum::QubitUnitaryOp, qref::QubitUnitaryOp>(
+                [](auto) { return "QubitUnitary"; })
+            .Case<quantum::SetStateOp, qref::SetStateOp>([](auto) { return "SetState"; })
+            .Case<quantum::SetBasisStateOp, qref::SetBasisStateOp>(
+                [](auto) { return "SetBasisState"; })
             .Default([](Operation *o) { return o->getName().getStringRef().str(); });
 
     // Combine region-level adjoint (from quantum.adjoint) with
     // op-level adjoint flag (from the adj attribute on the gate).
     if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+        isAdjoint ^= gate.getAdjointFlag();
+    }
+
+    if (auto gate = dyn_cast<qref::QuantumGate>(op)) {
         isAdjoint ^= gate.getAdjointFlag();
     }
 
@@ -98,6 +110,9 @@ static int getGateQubitCount(Operation *op)
     if (auto qOp = dyn_cast<quantum::QuantumOperation>(op)) {
         return static_cast<int>(qOp.getQubitOperands().size());
     }
+    if (auto qOp = dyn_cast<qref::QuantumOperation>(op)) {
+        return static_cast<int>(qOp.getQubitOperands().size());
+    }
     return 0;
 }
 
@@ -105,6 +120,9 @@ static int getGateQubitCount(Operation *op)
 static int getGateParamCount(Operation *op)
 {
     if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
+        return static_cast<int>(gate.getAllParams().size());
+    }
+    if (auto gate = dyn_cast<qref::ParametrizedGate>(op)) {
         return static_cast<int>(gate.getAllParams().size());
     }
     return 0;
@@ -147,11 +165,11 @@ static std::string getObservableName(Operation *obsOp)
     }
 
     return llvm::TypeSwitch<Operation *, std::string>(obsOp)
-        .Case<quantum::ComputationalBasisOp>([](auto cbOp) {
+        .Case<quantum::ComputationalBasisOp, qref::ComputationalBasisOp>([](auto cbOp) {
             unsigned n = cbOp.getQubits().size();
             return n == 0 ? std::string("all wires") : std::to_string(n) + " wires";
         })
-        .Case<quantum::NamedObsOp>(
+        .Case<quantum::NamedObsOp, qref::NamedObsOp>(
             [](auto op) { return stringifyNamedObservable(op.getType()).str(); })
         .Case<quantum::TensorOp>(
             [](auto op) { return "Prod(num_terms=" + std::to_string(op.getTerms().size()) + ")"; })
@@ -165,7 +183,7 @@ static std::string getObservableName(Operation *obsOp)
 /// e.g. "MidCircuitMeasure", "expval(PauliZ)", "sample(all wires)", "probs(2 wires)".
 static std::string getMeasurementName(Operation *op)
 {
-    if (isa<quantum::MeasureOp>(op)) {
+    if (isa<quantum::MeasureOp, qref::MeasureOp>(op)) {
         return "MidCircuitMeasure";
     }
 
@@ -394,9 +412,12 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 {
     for (Block &block : region) {
         for (Operation &op : block) {
+            bool needsCollection = true;
+
             llvm::TypeSwitch<Operation &, void>(op)
-                .Case([&](quantum::AdjointOp adjOp) {
+                .Case<quantum::AdjointOp, qref::AdjointOp>([&](auto adjOp) {
                     analyzeRegion(adjOp.getRegion(), result, !isAdjoint);
+                    needsCollection = false;
                 })
                 .Case([&](mlir::scf::ForOp forLoopOp) {
                     analyzeForLoop(forLoopOp, result, isAdjoint);
@@ -417,7 +438,9 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
                     // other operations - do nothing
                 });
 
-            collectOperation(&op, result, isAdjoint);
+            if (needsCollection) {
+                collectOperation(&op, result, isAdjoint);
+            }
         }
     }
 }
@@ -435,9 +458,11 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
 {
     // Quantum gates
-    if (isa<quantum::CustomOp, quantum::PauliRotOp, quantum::GlobalPhaseOp, quantum::MultiRZOp,
-            quantum::PCPhaseOp, quantum::QubitUnitaryOp, quantum::SetStateOp,
-            quantum::SetBasisStateOp>(op)) {
+    if (isa<quantum::CustomOp, qref::CustomOp, quantum::PauliRotOp, qref::PauliRotOp,
+            quantum::GlobalPhaseOp, qref::GlobalPhaseOp, quantum::MultiRZOp, qref::MultiRZOp,
+            quantum::PCPhaseOp, qref::PCPhaseOp, quantum::QubitUnitaryOp, qref::QubitUnitaryOp,
+            quantum::SetStateOp, qref::SetStateOp, quantum::SetBasisStateOp, qref::SetBasisStateOp>(
+            op)) {
         std::string name = getGateOpName(op, isAdjoint);
         int nQubits = getGateQubitCount(op);
         int nParams = getGateParamCount(op);
@@ -446,8 +471,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // Measurements
-    if (isa<quantum::MeasureOp, quantum::SampleOp, quantum::CountsOp, quantum::ExpvalOp,
-            quantum::VarianceOp, quantum::ProbsOp, quantum::StateOp>(op)) {
+    if (isa<quantum::MeasureOp, qref::MeasureOp, quantum::SampleOp, quantum::CountsOp,
+            quantum::ExpvalOp, quantum::VarianceOp, quantum::ProbsOp, quantum::StateOp>(op)) {
         result.measurements[getMeasurementName(op)] += 1;
         return;
     }
@@ -484,6 +509,19 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
     // Metadata: qubit allocation
     if (isa<quantum::AllocQubitOp>(op)) {
+        result.numAllocQubits += 1;
+        return;
+    }
+
+    // Metadata: qubit allocations
+    if (auto allocOp = dyn_cast<qref::AllocOp>(op)) {
+        uint64_t nqubits = allocOp.getNqubitsAttr().value_or(0);
+        result.numAllocQubits += nqubits;
+        return;
+    }
+
+    // Metadata: qubit allocation
+    if (isa<qref::AllocQubitOp>(op)) {
         result.numAllocQubits += 1;
         return;
     }

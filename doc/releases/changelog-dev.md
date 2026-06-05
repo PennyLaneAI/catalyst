@@ -21,6 +21,9 @@
   [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
   [(#2900)](https://github.com/PennyLaneAI/catalyst/pull/2900)
 
+* The `ResourceAnalysis` pass now supports IR in reference semantics natively, rather than requiring a conversion step.
+  [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
+
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
@@ -95,6 +98,11 @@
 * Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
+
+* Fixed a bug that passed incorrect SSA values to the final register deallocation when translating 
+  from the `qecp` to the `quantum` dialect. This bug prevented deallocation of unneeded registers 
+  after magic state injection.
+  [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
 * Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
   after a PBC op but read from a register not updated by that op. Layer grouping now checks
@@ -186,9 +194,20 @@
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
+* The experimental QEC pipeline now supports compilation and execution of circuits that only 
+  include a single wire (a previously unsupported edge-case).
+  [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
 * More conservative casting to tracer arrays in conditionals to preserve constant (static) values
   better. This can be useful for optimizations that depend on values being static.
   [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
+
+* The experimental QEC pipeline now supports the following control-flow operations:
+
+  - Conditionals (`scf.if`)
+    [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
+  - For loops (`scf.for`)
+    [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
 
 <h3>Documentation 📝</h3>
 
