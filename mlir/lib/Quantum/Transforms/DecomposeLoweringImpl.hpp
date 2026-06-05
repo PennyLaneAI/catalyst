@@ -419,6 +419,18 @@ class CustomOpSignatureAnalyzer : public BaseSignatureAnalyzer {
     }
 };
 
+class PauliRotOpSignatureAnalyzer : public BaseSignatureAnalyzer {
+  public:
+    PauliRotOpSignatureAnalyzer() = delete;
+
+    PauliRotOpSignatureAnalyzer(PauliRotOp op, bool enableQregMode)
+        : BaseSignatureAnalyzer(op, op.getAngle(), op.getNonCtrlQubitOperands(),
+                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
+                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
+                                enableQregMode)
+    {
+    }
+};
 class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
   public:
     MultiRZOpSignatureAnalyzer() = delete;
