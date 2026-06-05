@@ -816,7 +816,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         non-fault tolerant encoding intended for use on a simulator, and not a distillation process
         for generating a magic state from many noisy copies.
 
-        The encoding process follows the third option for magic state encodingdescribed in 
+        The encoding process follows the third option for magic state encoding described in 
         https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that the correction is 
         SX as decribed in Nielsen & Chuang, (Section 10.6.2), rather than a single NOT gate. 
         This was found to produce the correct result for circuit simulations.
