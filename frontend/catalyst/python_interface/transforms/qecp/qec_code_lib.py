@@ -23,6 +23,8 @@ import numpy as np
 from catalyst.python_interface.dialects import qecp
 
 _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
+    # the indices/ordering for the operators and encodings in the Steane code are those used
+    # in https://arxiv.org/pdf/2107.07505
     "Steane": (
         7,
         1,
@@ -44,6 +46,27 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         },
         {
             "cnot": qecp.CnotOp,
+        },
+        {
+            "hadamard_indices": (1, 2, 3),
+            "cnot_indices": (
+                [1, 0],
+                [2, 4],
+                [6, 5],
+                [2, 0],
+                [3, 5],
+                [6, 4],
+                [2, 6],
+                [3, 4],
+                [1, 5],
+                [1, 6],
+                [3, 0],
+            ),
+            # The state_prep_index is the index of the physical qubit that the state is
+            # injected on (i.e. for a magic state, -H-T is applied here pre-encoding).
+            # Must be consistent with the qubit treated as the encoding "input" by the
+            # cnot_indices ordering above. See https://arxiv.org/pdf/2107.07505 (Fig 10)
+            "state_prep_index": 6,
         },
     ),
 }
@@ -69,6 +92,12 @@ class QecCode:
             op to be applied, and the indices. Assumes k=1. Does not specify indices - for
             now, we assume 2-qubit gates between two codeblocks, where the gate is applied
             between all pairs of corresponding qubits.
+        unitary_encoding (dict): A dictionary defining the unitary encoding for the
+            ground state, including indices in the code block to prepare the qubits in the |+>
+            state by applying a Hadamard, and indices to apply CNOT gates. Also included is a
+            state-prep index. This is the index to apply physical gates to before encoding
+            to encode a non-zero state - for example, applying H-T at this index before unitary
+            encoding generates a magic state (not fault-tolerantly).
     """
 
     name: str
@@ -79,6 +108,7 @@ class QecCode:
     z_tanner: np.ndarray
     transversal_1q_gates: dict
     transversal_2q_gates: dict
+    unitary_encoding: dict
 
     def __str__(self):
         if self.name == "" or str.isspace(self.name):
@@ -114,6 +144,7 @@ class QecCode:
         ...    "z_tanner": np.eye(7),
         ...    "transversal_1q_gates": {},
         ...    "transversal_2q_gates": {},
+        ...    "unitary_encoding": {}
         ...    })
         QecCode(name='Steane', n=7, k=1, d=3)
         """
