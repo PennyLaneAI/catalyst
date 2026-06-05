@@ -96,8 +96,8 @@
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
-* Fixed a bug that passed incorrect SSA values to the final register deallocation when translating 
-  from the `qecp` to the `quantum` dialect. This bug prevented deallocation of unneeded registers 
+* Fixed a bug that passed incorrect SSA values to the final register deallocation when translating
+  from the `qecp` to the `quantum` dialect. This bug prevented deallocation of unneeded registers
   after magic state injection.
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
@@ -120,6 +120,10 @@
   [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
   [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
   [(#2911)](https://github.com/PennyLaneAI/catalyst/pull/2911)
+
+* A new pass `--convert-to-reference-semantics` has been added. The pass takes in MLIR in value
+  semantics `quantum` dialect, and converts them to reference semantics `qref` dialect.
+  [(#2920)](https://github.com/PennyLaneAI/catalyst/pull/2920)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -191,7 +195,7 @@
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
-* The experimental QEC pipeline now supports compilation and execution of circuits that only 
+* The experimental QEC pipeline now supports compilation and execution of circuits that only
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
