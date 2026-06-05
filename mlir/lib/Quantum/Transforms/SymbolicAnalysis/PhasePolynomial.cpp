@@ -38,7 +38,7 @@ std::string PhasePolynomial::algebraicView(size_t qubitNum) const {
 /*.................
     Methods:
 ...................*/
-void PhasePolynomial::insertContributor(const Parity& parity, const Term& contributor) {
+void PhasePolynomial::insertContributor(const Parity& parity, const PhaseBucket& contributor) {
     // auto [it, inserted] = poly.try_emplace(parity, term);
     // if (!inserted) {
     //     it->second += term;

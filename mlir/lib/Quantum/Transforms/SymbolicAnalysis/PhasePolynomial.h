@@ -1,21 +1,23 @@
 #pragma once
 
 // #include <iosfwd>
-#include <unordered_map>
+// #include <unordered_map>
 #include <utility>
 #include <string>
 #include "Parity.h"
-#include "Term.h"
+#include "PhaseBucket.h"
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
 
 struct PhasePolynomial {
-    std::unordered_map<Parity, Term> terms;   // dense_map in mlir
+    // llvm::DenseMap<Parity, PhaseBucket> terms;
+    std::unordered_map<Parity, PhaseBucket> terms;   // dense_map in mlir
     // bots are not seperated and duplicate!
 
     // Constructors
     PhasePolynomial() = default;
-    PhasePolynomial(std::unordered_map<Parity, Term> terms) :
+    PhasePolynomial(std::unordered_map<Parity, PhaseBucket> terms) :
         terms(std::move(terms)) {}
 
     // Operators
@@ -26,5 +28,5 @@ struct PhasePolynomial {
     std::string algebraicView(size_t qubitNum) const;
 
     // Methods
-    void insertContributor(const Parity& parity, const Term& contributor);
+    void insertContributor(const Parity& parity, const PhaseBucket& contributor);
 };

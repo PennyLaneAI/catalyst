@@ -4,9 +4,11 @@
 #include <utility>
 #include "PhasePolynomial.h"
 #include "AffineTransform.h"
+#include "Gate.h"
 
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/ArrayRef.h"
+
 
 // PathSum?
 struct SymbolicCircuit {    // indices are 1-based
@@ -14,14 +16,7 @@ struct SymbolicCircuit {    // indices are 1-based
     size_t auxVarNum;
     PhasePolynomial phasePoly;
     AffineTransform stateTrans;
-
-    enum Gate { I, H, X, Y, Z, S, T, RZ, CNOT, SWAP, U, GP };
-    static constexpr size_t DYNAMIC_ARITY = 3;
-    static constexpr size_t arities[] = { DYNAMIC_ARITY, 1, 1, 1, 1, 1, 1, 1, 2, 2, DYNAMIC_ARITY, 0 };
-    static constexpr size_t getGateArity(Gate gate) { return arities[gate]; }
-    // static constexpr bool isRZ(Gate gate) { return ((gate == Z) || (gate == S) || (gate == T) || (gate == RZ)); }
-    static constexpr bool isRZ(Gate gate) { return ((gate == T) || (gate == RZ)); }
-
+    
     // Constructors
     SymbolicCircuit() = default;
     SymbolicCircuit(size_t qubitNum) :
@@ -46,4 +41,3 @@ struct SymbolicCircuit {    // indices are 1-based
     void applyGateH(size_t qubitIndex);
     void applyGateU(llvm::ArrayRef<size_t> qubitIndices);
 };
-// what are you going to do with Z and S?

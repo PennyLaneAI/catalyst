@@ -31,8 +31,8 @@ file(GLOB SRC
     loop_boundary_optimization.cpp
     LoopBoundaryOptimizationPatterns.cpp
     phase_folding.cpp
-    SymbolicAnalysis/Term.h
-    SymbolicAnalysis/Term.cpp
+    SymbolicAnalysis/PhaseBucket.h
+    SymbolicAnalysis/PhaseBucket.cpp
     SymbolicAnalysis/Parity.h
     SymbolicAnalysis/Parity.cpp
     SymbolicAnalysis/PhasePolynomial.h
@@ -41,6 +41,7 @@ file(GLOB SRC
     SymbolicAnalysis/AffineTransform.cpp
     SymbolicAnalysis/SymbolicCircuit.h
     SymbolicAnalysis/SymbolicCircuit.cpp
+    SymbolicAnalysis/Gate.h
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

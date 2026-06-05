@@ -67,15 +67,27 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
 
     %q7 = quantum.custom "Hadamard"() %q6#1 : !quantum.bit
 
-    %q8 = quantum.custom "T"() %q6#0 : !quantum.bit
+    // %q8 = quantum.custom "T"() %q6#0 : !quantum.bit
+    %q8 = quantum.custom "T"() %q6#0 {adjoint}: !quantum.bit
     %q9 = quantum.custom "T"() %q7 : !quantum.bit
     %q10:2 = quantum.custom "CNOT"() %q9, %q8 : !quantum.bit, !quantum.bit
     %q11 = quantum.custom "T"() %q10#1 {adjoint}: !quantum.bit
     %q12:2 = quantum.custom "CNOT"() %q10#0, %q11 : !quantum.bit, !quantum.bit
 
     %c = arith.constant 1.1212 : f64
-    %q13 = quantum.custom "RZ"(%c) %q12#0 : !quantum.bit
+    // %q13 = quantum.custom "RZ"(%c) %q12#0 : !quantum.bit
+    %q13 = quantum.custom "T"() %q12#0 : !quantum.bit
+
+    %q14 = quantum.custom "T"() %q13 : !quantum.bit
+    %q15 = quantum.custom "T"() %q14 : !quantum.bit
+    %q16 = quantum.custom "T"() %q15 : !quantum.bit
+    %q17 = quantum.custom "T"() %q16 : !quantum.bit
+    %q18 = quantum.custom "T"() %q17 : !quantum.bit
+    %q19 = quantum.custom "T"() %q18 : !quantum.bit
+    %q20 = quantum.custom "T"() %q19 : !quantum.bit
 
     // func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit
-    func.return %q12#1, %q13 : !quantum.bit, !quantum.bit
+    func.return %q12#1, %q19 : !quantum.bit, !quantum.bit
 }
+
+// 3.9269908169872414 : f64

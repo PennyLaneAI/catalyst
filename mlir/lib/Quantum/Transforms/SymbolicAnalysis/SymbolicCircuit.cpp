@@ -18,25 +18,25 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SymbolicCircuit& circ
 void SymbolicCircuit::applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices, GateID gateId) {
     ensureCapacity(qubitIndices);
 
-    assert(SymbolicCircuit::getGateArity(gate) == SymbolicCircuit::DYNAMIC_ARITY || 
-            qubitIndices.size() == SymbolicCircuit::getGateArity(gate));
+    assert(arity(gate) == DYNAMIC_ARITY || 
+            qubitIndices.size() == arity(gate));
 
     switch (gate) {
-    case I:     break;
-    case H:     applyGateH(qubitIndices[0]);    break;
-    case X:     applyGateX(qubitIndices[0]);    break;
-    case Y:     
+    case Gate::I:     break;
+    case Gate::H:     applyGateH(qubitIndices[0]);    break;
+    case Gate::X:     applyGateX(qubitIndices[0]);    break;
+    case Gate::Y:     
         if (isAdjoint)  applyGateY_dag(qubitIndices[0], gateId);
         else            applyGateY(qubitIndices[0], gateId);
         break;
-    case Z:
-    case S:
-    case T:
-    case RZ:    applyGateRZ(qubitIndices[0], gateId);   break;
-    case CNOT:  applyGateCNOT(qubitIndices[0], qubitIndices[1]);    break;
-    case SWAP:  applyGateSWAP(qubitIndices[0], qubitIndices[1]);    break;
-    case U:     applyGateU(qubitIndices);   break;
-    case GP:    break;  // figure out later.
+    case Gate::Z:
+    case Gate::S:
+    case Gate::T:
+    case Gate::RZ:    applyGateRZ(qubitIndices[0], gateId);   break;
+    case Gate::CNOT:  applyGateCNOT(qubitIndices[0], qubitIndices[1]);    break;
+    case Gate::SWAP:  applyGateSWAP(qubitIndices[0], qubitIndices[1]);    break;
+    case Gate::U:     applyGateU(qubitIndices);   break;
+    case Gate::GP:    break;  // figure out later.
     }
 }
 
@@ -59,7 +59,7 @@ void SymbolicCircuit::applyGateRZ(size_t qubitIndex, GateID gateId) {
     llvm::outs() << "R_z on q" << qubitIndex << " at l" << gateId << ":\n";
 
     const Parity& parity = stateTrans.getRow(qubitIndex);
-    Term contributor = Term(gateId, parity.getAffineValue());
+    PhaseBucket contributor = PhaseBucket(gateId, parity.getAffineValue());
     phasePoly.insertContributor(parity, contributor);
 }
 
