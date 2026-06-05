@@ -43,32 +43,6 @@ func.func @basic_gates() {
 
 // -----
 
-// Basic gate counting in reference semantics
-
-// CHECK-LABEL: "basic_gates"
-// CHECK:   "num_alloc_qubits": 2
-// CHECK:   "num_arg_qubits": 0
-// CHECK:   "num_qubits": 2
-// CHECK:   "operations"
-// CHECK-DAG: "Hadamard(1)": 1
-// CHECK-DAG: "CNOT(2)": 1
-// CHECK-DAG: "T(1)": 1
-// CHECK-DAG: "S(1)": 1
-
-func.func @basic_gates() {
-    %0 = qref.alloc( 2) : !qref.reg<2>
-    %1 = qref.get %0[ 0] : !qref.reg<2> -> !qref.bit
-    %2 = qref.get %0[ 1] : !qref.reg<2> -> !qref.bit
-    qref.custom "Hadamard"() %1 : !qref.bit
-    qref.custom "T"() %1 : !qref.bit
-    qref.custom "S"() %2 : !qref.bit
-    qref.custom "CNOT"() %1, %2 : !qref.bit, !qref.bit
-    qref.dealloc %0 : !qref.reg<2>
-    return
-}
-
-// -----
-
 // PBC operations (PPR and PPM)
 
 // CHECK-LABEL: "pbc_operations"
@@ -859,5 +833,40 @@ func.func @auto_qm_flag_unset() {
     %r = quantum.insert %0[ 0], %out : !quantum.reg, !quantum.bit
     quantum.dealloc %r : !quantum.reg
     quantum.device_release
+    return
+}
+
+// -----
+
+// general operations in reference semantics
+
+// CHECK-LABEL: "qref"
+
+// CHECK: "measurements"
+// CHECK-DAG: "MidCircuitMeasure": 1
+
+// CHECK:   "num_alloc_qubits": 2
+// CHECK:   "num_arg_qubits": 0
+// CHECK:   "num_qubits": 2
+
+// CHECK:   "operations"
+// CHECK-DAG: "Adjoint(Hadamard)(1)": 1
+// CHECK-DAG: "CNOT(2)": 1
+// CHECK-DAG: "Adjoint(T)(1)": 1
+// CHECK-DAG: "S(1)": 1
+
+func.func @qref() {
+    %0 = qref.alloc( 2) : !qref.reg<2>
+    %1 = qref.get %0[ 0] : !qref.reg<2> -> !qref.bit
+    %2 = qref.get %0[ 1] : !qref.reg<2> -> !qref.bit
+    qref.adjoint {
+    ^bb0():
+        qref.custom "Hadamard"() %1 : !qref.bit
+    }
+    qref.custom "T"() %1 adj : !qref.bit
+    qref.custom "S"() %2 : !qref.bit
+    qref.custom "CNOT"() %1, %2 : !qref.bit, !qref.bit
+    %meas = qref.measure %1 : i1
+    qref.dealloc %0 : !qref.reg<2>
     return
 }
