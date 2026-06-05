@@ -1911,7 +1911,7 @@ def graph_decomposition_setup_inputs(
         "gate_set": gate_set,
         "bytecode_rules": str(_builtin_rule_path),
         "callback_plugin_path": libQPC_path,
-        "libpython_path": str(libpython_path) if libpython_path else str(get_libpython_path()),
+        "libpython_path": str(libpython_path if libpython_path else get_libpython_path()),
     }
 
     if fixed_decomps:
