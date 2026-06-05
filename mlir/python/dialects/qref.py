@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Conversion from plxpr to catalyst jaxpr"""
+"""MLIR Dialect for Qref dialect."""
 
-from catalyst.from_plxpr.from_plxpr import from_plxpr, trace_from_pennylane
+# pylint: disable=relative-beyond-top-level
+from ._qref_ops_gen import *  # noqa: F401

@@ -19,6 +19,7 @@
   with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
   identifier, and totals across the call graph are computed on demand.
   [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
+  [(#2900)](https://github.com/PennyLaneAI/catalyst/pull/2900)
 
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
@@ -62,9 +63,18 @@
   that have multiple quantum operands, of either quantum register or qubit type.
   [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
+* The `--decompose-lowering` pass now supports `quantum.paulirot` operators.
+  [(#2893)](https://github.com/PennyLaneAI/catalyst/pull/2893)
+
 * Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
   to tracing errors.
   [(#2891)](https://github.com/PennyLaneAI/catalyst/pull/2891)
+
+* Dynamically allocated wires can now be used in quantum adjoints.
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+
+* Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
 <h3>Breaking changes 💔</h3>
 
@@ -86,12 +96,30 @@
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
+* Fixed a bug that passed incorrect SSA values to the final register deallocation when translating 
+  from the `qecp` to the `quantum` dialect. This bug prevented deallocation of unneeded registers 
+  after magic state injection.
+  [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
 * Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
   after a PBC op but read from a register not updated by that op. Layer grouping now checks
   data dependencies through insert to extract chains instead of textual op ordering.
   [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
 
 <h3>Internal changes ⚙️</h3>
+
+* The frontend now generates MLIR in reference semantics when capture is enabled.
+  [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
+  [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
+  [(#2672)](https://github.com/PennyLaneAI/catalyst/pull/2672)
+  [(#2694)](https://github.com/PennyLaneAI/catalyst/pull/2694)
+  [(#2717)](https://github.com/PennyLaneAI/catalyst/pull/2717)
+  [(#2720)](https://github.com/PennyLaneAI/catalyst/pull/2720)
+  [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+  [(#2757)](https://github.com/PennyLaneAI/catalyst/pull/2757)
+  [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
+  [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
+  [(#2911)](https://github.com/PennyLaneAI/catalyst/pull/2911)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -163,10 +191,20 @@
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
+* The experimental QEC pipeline now supports compilation and execution of circuits that only 
+  include a single wire (a previously unsupported edge-case).
+  [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
 * More conservative casting to tracer arrays in conditionals to preserve constant (static) values
   better. This can be useful for optimizations that depend on values being static.
   [(#2892)](https://github.com/PennyLaneAI/catalyst/pull/2892)
 
+* The experimental QEC pipeline now supports the following control-flow operations:
+
+  - Conditionals (`scf.if`)
+    [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
+  - For loops (`scf.for`)
+    [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
 
 <h3>Documentation 📝</h3>
 
@@ -182,4 +220,5 @@ Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
