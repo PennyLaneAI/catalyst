@@ -22,12 +22,11 @@
 #include "mlir/Pass/Pass.h"
 
 #include "PBC/IR/PBCOps.h"
-#include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/QubitIndex.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -37,23 +36,11 @@ using namespace catalyst;
 
 namespace {
 
-void eraseAllRemainingAnchorVValues(func::FuncOp f)
+void eraseAllVOps(SmallVector<Operation *> &erasureWorklist)
 {
-    // f.walk([&](qref::GetOp getOp) {
-    //     assert(getOp.use_empty() &&
-    //            "qref.bit Values must have no uses after the semantic conversion");
-    //     getOp->erase();
-    // });
-    f.walk([&](quantum::AllocOp allocOp) {
-        assert(allocOp.use_empty() &&
-               "quantum.reg Values must have no uses after the semantic conversion");
-        allocOp->erase();
-    });
-    // f.walk([&](mbqc::RefGraphStatePrepOp graphStatePrepOp) {
-    //     assert(graphStatePrepOp.use_empty() &&
-    //            "qref.reg Values must have no uses after the semantic conversion");
-    //     graphStatePrepOp->erase();
-    // });
+    for (auto op : llvm::reverse(erasureWorklist)) {
+        op->erase();
+    }
 }
 
 struct QubitValueTracker {
@@ -76,12 +63,90 @@ struct QubitValueTracker {
         return rQreg;
     }
 
+    void setRQubit(Value vQubit, Value rQubit)
+    {
+        assert(isa<quantum::QubitType>(vQubit.getType()) && "Expected quantum.bit type");
+        assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
+        this->qubit_map[vQubit] = rQubit;
+    }
+
+    Value getRQubit(Value vQubit)
+    {
+        assert(isa<quantum::QubitType>(vQubit.getType()) && "Expected quantum.bit type");
+
+        Value rQubit = this->qubit_map.at(vQubit);
+        assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
+        return rQubit;
+    }
+
   private:
     llvm::DenseMap<Value, Value> qreg_map;
-    llvm::DenseMap<Value, quantum::QubitIndex> qubit_map;
+    llvm::DenseMap<Value, Value> qubit_map;
 }; // struct QubitValueTracker
 
-void handleAlloc(IRRewriter &builder, quantum::AllocOp vAllocOp, QubitValueTracker &tracker)
+template <typename OpTy>
+OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitValueTracker &tracker)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vOp);
+    Location loc = vOp->getLoc();
+
+    // Create the new op using the generic state-based approach
+    // We cannot just clone, since we are changing the op type
+    OperationState state(loc, OpTy::getOperationName());
+
+    SmallVector<Value> rOperands;
+    SmallVector<Value> vQuantumOperands;
+    SmallVector<Value> vQuantumResults;
+    for (Value v : vOp->getOperands()) {
+        if (isa<quantum::QubitType>(v.getType())) {
+            rOperands.push_back(tracker.getRQubit(v));
+            vQuantumOperands.push_back(v);
+        }
+        else if (isa<quantum::QuregType>(v.getType())) {
+            rOperands.push_back(tracker.getRQreg(v));
+            vQuantumOperands.push_back(v);
+        }
+        else {
+            // This branch includes classical operands
+            rOperands.push_back(v);
+        }
+    }
+    for (Value v : vOp->getResults()) {
+        if (isa<quantum::QubitType, quantum::QuregType>(v.getType())) {
+            vQuantumResults.push_back(v);
+        }
+    }
+
+    // Cascade the tracker
+    for (auto [vqo, vqr] : llvm::zip_equal(vQuantumOperands, vQuantumResults)) {
+        if (isa<quantum::QubitType>(vqo.getType())) {
+            tracker.setRQubit(vqr, tracker.getRQubit(vqo));
+        }
+        else if (isa<quantum::QuregType>(vqo.getType())) {
+            tracker.setRQreg(vqr, tracker.getRQreg(vqo));
+        }
+    }
+
+    state.addOperands(rOperands);
+    state.addAttributes(vOp->getAttrs());
+
+    // Remove all quantum result values from the value semantics op
+    // Need to keep classical results, e.g. measurement's i1 results
+    SmallVector<Type> outTypes;
+    for (Type t : vOp->getResultTypes()) {
+        if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
+            outTypes.push_back(t);
+        }
+    }
+    state.addTypes(outTypes);
+
+    Operation *newOp = builder.create(state);
+    return cast<OpTy>(newOp);
+}
+
+void handleAlloc(IRRewriter &builder, quantum::AllocOp vAllocOp, QubitValueTracker &tracker,
+                 SmallVector<Operation *> &erasureWorklist)
 {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(vAllocOp);
@@ -101,9 +166,11 @@ void handleAlloc(IRRewriter &builder, quantum::AllocOp vAllocOp, QubitValueTrack
     }
 
     tracker.setRQreg(vAllocOp.getQreg(), rAllocOp.getQreg());
+    erasureWorklist.push_back(vAllocOp);
 }
 
-void handleDealloc(IRRewriter &builder, quantum::DeallocOp vDeallocOp, QubitValueTracker &tracker)
+void handleDealloc(IRRewriter &builder, quantum::DeallocOp vDeallocOp, QubitValueTracker &tracker,
+                   SmallVector<Operation *> &erasureWorklist)
 {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(vDeallocOp);
@@ -111,18 +178,110 @@ void handleDealloc(IRRewriter &builder, quantum::DeallocOp vDeallocOp, QubitValu
 
     qref::DeallocOp::create(builder, loc, tracker.getRQreg(vDeallocOp.getQreg()));
 
-    builder.eraseOp(vDeallocOp);
+    erasureWorklist.push_back(vDeallocOp);
 }
 
-void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
+// Although multiple qref.get ops can alias, multiple quantum.extract ops will definitely not alias
+void handleExtract(IRRewriter &builder, quantum::ExtractOp vExtractOp, QubitValueTracker &tracker,
+                   SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vExtractOp);
+    Location loc = vExtractOp.getLoc();
+
+    std::optional<uint64_t> idxAttr = vExtractOp.getIdxAttr();
+    Value idxValue = vExtractOp.getIdx();
+    assert((idxAttr.has_value() ^ (idxValue != nullptr)) &&
+           "expected exactly one index for extract op");
+
+    Value rQreg = tracker.getRQreg(vExtractOp.getQreg());
+
+    Type qubitType = qref::QubitType::get(vExtractOp->getContext());
+    Type i64Type = builder.getI64Type();
+    qref::GetOp getOp;
+    if (idxAttr.has_value()) {
+        getOp = qref::GetOp::create(builder, loc, qubitType, rQreg, {},
+                                    IntegerAttr::get(i64Type, idxAttr.value()));
+    }
+    else {
+        getOp = qref::GetOp::create(builder, loc, qubitType, rQreg, idxValue, nullptr);
+    }
+
+    tracker.setRQubit(vExtractOp.getQubit(), getOp.getQubit());
+    erasureWorklist.push_back(vExtractOp);
+}
+
+// Although insert ops do not materialize to anything in reference semantics, they need to be
+// visited to update the tracker.
+void handleInsert(quantum::InsertOp vInsertOp, QubitValueTracker &tracker,
+                  SmallVector<Operation *> &erasureWorklist)
+{
+    tracker.setRQreg(vInsertOp.getOutQreg(), tracker.getRQreg(vInsertOp.getInQreg()));
+    erasureWorklist.push_back(vInsertOp);
+}
+
+void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitValueTracker &tracker,
+                SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    // MLIRContext *ctx = vGateOp.getContext();
+
+    qref::QuantumOperation rGateOp;
+    Operation *_vGateOp = vGateOp.getOperation();
+    if (auto vCustomOp = dyn_cast<quantum::CustomOp>(_vGateOp)) {
+        rGateOp = migrateOpToReferenceSemantics<qref::CustomOp>(builder, vCustomOp, tracker);
+        rGateOp->removeAttr("resultSegmentSizes");
+    }
+    else if (auto vPauliRotOP = dyn_cast<quantum::PauliRotOp>(_vGateOp)) {
+        rGateOp = migrateOpToReferenceSemantics<qref::PauliRotOp>(builder, vPauliRotOP, tracker);
+        rGateOp->removeAttr("resultSegmentSizes");
+    }
+    else if (auto vGPhaseOp = dyn_cast<quantum::GlobalPhaseOp>(_vGateOp)) {
+        rGateOp = migrateOpToReferenceSemantics<qref::GlobalPhaseOp>(builder, vGPhaseOp, tracker);
+    }
+    else if (auto vMultiRZOp = dyn_cast<quantum::MultiRZOp>(_vGateOp)) {
+        rGateOp = migrateOpToReferenceSemantics<qref::MultiRZOp>(builder, vMultiRZOp, tracker);
+        rGateOp->removeAttr("resultSegmentSizes");
+    }
+    else if (auto vPCPhaseOp = dyn_cast<quantum::PCPhaseOp>(_vGateOp)) {
+        rGateOp = migrateOpToReferenceSemantics<qref::PCPhaseOp>(builder, vPCPhaseOp, tracker);
+        rGateOp->removeAttr("resultSegmentSizes");
+    }
+    else if (auto vQubitUnitaryOp = dyn_cast<quantum::QubitUnitaryOp>(_vGateOp)) {
+        rGateOp =
+            migrateOpToReferenceSemantics<qref::QubitUnitaryOp>(builder, vQubitUnitaryOp, tracker);
+        rGateOp->removeAttr("resultSegmentSizes");
+    }
+    else if (auto vSetStateOp = dyn_cast<quantum::SetStateOp>(_vGateOp)) {
+        rGateOp = migrateOpToReferenceSemantics<qref::SetStateOp>(builder, vSetStateOp, tracker);
+    }
+    else if (auto vSetBasisStateOp = dyn_cast<quantum::SetBasisStateOp>(_vGateOp)) {
+        rGateOp = migrateOpToReferenceSemantics<qref::SetBasisStateOp>(builder, vSetBasisStateOp,
+                                                                       tracker);
+    }
+    else {
+        vGateOp->emitOpError("unknown gate op in quantum dialect");
+    }
+
+    erasureWorklist.push_back(vGateOp);
+}
+
+void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker,
+                  SmallVector<Operation *> &erasureWorklist)
 {
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
         llvm::TypeSwitch<Operation *, void>(op)
-            .Case<quantum::AllocOp>([&](auto o) { handleAlloc(builder, o, tracker); })
-            .Case<quantum::DeallocOp>([&](auto o) { handleDealloc(builder, o, tracker); })
+            .Case<quantum::AllocOp>(
+                [&](auto o) { handleAlloc(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::DeallocOp>(
+                [&](auto o) { handleDealloc(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::ExtractOp>(
+                [&](auto o) { handleExtract(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::InsertOp>([&](auto o) { handleInsert(o, tracker, erasureWorklist); })
             // .Case<qref::AllocQubitOp>([&](auto o) { handleAllocQubit(builder, o, tracker); })
             // .Case<qref::DeallocQubitOp>([&](auto o) { handleDeallocQubit(builder, o, tracker); })
-            // .Case<qref::QuantumOperation>([&](auto o) { handleGate(builder, o, tracker); })
+            .Case<quantum::QuantumOperation>(
+                [&](auto o) { handleGate(builder, o, tracker, erasureWorklist); })
             // .Case<func::CallOp>([&](auto o) { handleCall(builder, o, tracker); })
             // .Case<qref::ComputationalBasisOp>([&](auto o) { handleCompbasis(builder, o, tracker);
             // }) .Case<qref::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
@@ -172,8 +331,9 @@ struct ReferenceSemanticsConversionPass
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
-            handleRegion(builder, targetFunc.getBody(), tracker);
-            eraseAllRemainingAnchorVValues(targetFunc);
+            SmallVector<Operation *> erasureWorklist;
+            handleRegion(builder, targetFunc.getBody(), tracker, erasureWorklist);
+            eraseAllVOps(erasureWorklist);
         }
     }
 };

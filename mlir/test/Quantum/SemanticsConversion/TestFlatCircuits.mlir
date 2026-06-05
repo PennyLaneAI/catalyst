@@ -16,6 +16,7 @@
 
 // RUN: quantum-opt --convert-to-reference-semantics --split-input-file --verify-diagnostics %s | FileCheck %s
 
+
 // CHECK-LABEL: test_static_alloc
 func.func @test_static_alloc() attributes {quantum.node} {
     // CHECK: [[qreg:%.+]] = qref.alloc( 2) : !qref.reg<2>
@@ -28,7 +29,9 @@ func.func @test_static_alloc() attributes {quantum.node} {
     return
 }
 
+
 // -----
+
 
 // CHECK-LABEL: test_dynamic_alloc
 func.func @test_dynamic_alloc(%arg0: i64) attributes {quantum.node} {
@@ -41,3 +44,412 @@ func.func @test_dynamic_alloc(%arg0: i64) attributes {quantum.node} {
 
     return
 }
+
+
+// -----
+
+
+// CHECK-LABEL: test_set_state
+func.func @test_set_state(%arg0: tensor<4xcomplex<f64>>) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    %0 = quantum.alloc( 2) : !quantum.reg
+
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<2> -> !qref.bit
+    // CHECK: [[q1:%.+]] = qref.get [[qreg]][ 1] : !qref.reg<2> -> !qref.bit
+    // CHECK-NOT: quantum.extract
+    // CHECK: qref.set_state(%arg0) [[q0]], [[q1]] : tensor<4xcomplex<f64>>, !qref.bit, !qref.bit
+    // CHECK-NOT: quantum.insert
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3:2 = quantum.set_state(%arg0) %1, %2 : (tensor<4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    %4 = quantum.insert %0[ 0], %3#0 : !quantum.reg, !quantum.bit
+    %5 = quantum.insert %4[ 1], %3#1 : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<2>
+    quantum.dealloc %5 : !quantum.reg
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_set_basis_state
+func.func @test_set_basis_state(%arg0: tensor<2xi1>) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    %0 = quantum.alloc( 2) : !quantum.reg
+
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<2> -> !qref.bit
+    // CHECK: [[q1:%.+]] = qref.get [[qreg]][ 1] : !qref.reg<2> -> !qref.bit
+    // CHECK-NOT: quantum.extract
+    // CHECK: qref.set_basis_state(%arg0) [[q0]], [[q1]] : tensor<2xi1>, !qref.bit, !qref.bit
+    // CHECK-NOT: quantum.insert
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3:2 = quantum.set_basis_state(%arg0) %1, %2 : (tensor<2xi1>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    %4 = quantum.insert %0[ 0], %3#0 : !quantum.reg, !quantum.bit
+    %5 = quantum.insert %4[ 1], %3#1 : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<2>
+    quantum.dealloc %5 : !quantum.reg
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_custom_op
+func.func @test_custom_op(%arg0: f64, %arg1: f64, %arg2: i1) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<2> -> !qref.bit
+    // CHECK: [[q1:%.+]] = qref.get [[qreg]][ 1] : !qref.reg<2> -> !qref.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: qref.custom "CNOT"() [[q0]], [[q1]] : !qref.bit, !qref.bit
+    // CHECK-NOT: quantum.custom
+    %out_qubits:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+
+    // CHECK: qref.custom "RX"(%arg0) [[q0]] : !qref.bit
+    // CHECK-NOT: quantum.custom
+    %out_qubits_0 = quantum.custom "RX"(%arg0) %out_qubits#0 : !quantum.bit
+
+    // CHECK: qref.custom "some_gate"(%arg0, %arg1) [[q0]] adj ctrls([[q1]]) ctrlvals(%arg2) : !qref.bit ctrls !qref.bit
+    // CHECK-NOT: quantum.custom
+    %out_qubits_1, %out_ctrl_qubits = quantum.custom "some_gate"(%arg0, %arg1) %out_qubits_0 adj ctrls(%out_qubits#1) ctrlvals(%arg2) : !quantum.bit ctrls !quantum.bit
+
+    // CHECK-NOT: quantum.insert
+    %3 = quantum.insert %0[ 0], %out_qubits_1 : !quantum.reg, !quantum.bit
+    %4 = quantum.insert %3[ 1], %out_ctrl_qubits : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<2>
+    quantum.dealloc %4 : !quantum.reg
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_paulirot_op
+func.func @test_paulirot_op(%arg0: f64, %arg1: i1) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<2> -> !qref.bit
+    // CHECK: [[q1:%.+]] = qref.get [[qreg]][ 1] : !qref.reg<2> -> !qref.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: qref.paulirot ["Z", "X"](%arg0) [[q0]], [[q1]] : !qref.bit, !qref.bit
+    // CHECK-NOT: quantum.paulirot
+    %out_qubits:2 = quantum.paulirot ["Z", "X"](%arg0) %1, %2 : !quantum.bit, !quantum.bit
+
+    // CHECK: qref.paulirot ["Y"](%arg0) [[q0]] adj ctrls([[q1]]) ctrlvals(%arg1) : !qref.bit ctrls !qref.bit
+    // CHECK-NOT: quantum.paulirot
+    %out_qubits_0, %out_ctrl_qubits = quantum.paulirot ["Y"](%arg0) %out_qubits#0 adj ctrls(%out_qubits#1) ctrlvals(%arg1) : !quantum.bit ctrls !quantum.bit
+
+    // CHECK-NOT: quantum.insert
+    %3 = quantum.insert %0[ 0], %out_qubits_0 : !quantum.reg, !quantum.bit
+    %4 = quantum.insert %3[ 1], %out_ctrl_qubits : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<2>
+    quantum.dealloc %4 : !quantum.reg
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_gphase
+func.func @test_gphase(%arg0: f64, %arg1: i1) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    %0 = quantum.alloc( 2) : !quantum.reg
+
+    // CHECK: qref.gphase(%arg0)
+    // CHECK-NOT: quantum.gphase
+    quantum.gphase(%arg0)
+
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<2> -> !qref.bit
+    // CHECK: qref.gphase(%arg0) ctrls([[q0]]) ctrlvals(%arg1) : ctrls !qref.bit
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.gphase(%arg0) ctrls(%1) ctrlvals(%arg1) : ctrls !quantum.bit
+
+    // CHECK-NOT: quantum.insert
+    %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<2>
+    quantum.dealloc %3 : !quantum.reg
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_multirz_op
+func.func @test_multirz_op(%arg0: f64, %arg1: i1) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<2> -> !qref.bit
+    // CHECK: [[q1:%.+]] = qref.get [[qreg]][ 1] : !qref.reg<2> -> !qref.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: qref.multirz(%arg0) [[q0]], [[q1]] : !qref.bit, !qref.bit
+    // CHECK-NOT: quantum.multirz
+    %out_qubits:2 = quantum.multirz(%arg0) %1, %2 : !quantum.bit, !quantum.bit
+
+    // CHECK: qref.multirz(%arg0) [[q0]] ctrls([[q1]]) ctrlvals(%arg1) : !qref.bit ctrls !qref.bit
+    // CHECK-NOT: quantum.multirz
+    %out_qubits_0, %out_ctrl_qubits = quantum.multirz(%arg0) %out_qubits#0 ctrls(%out_qubits#1) ctrlvals(%arg1) : !quantum.bit ctrls !quantum.bit
+
+    // CHECK-NOT: quantum.insert
+    %3 = quantum.insert %0[ 0], %out_qubits_0 : !quantum.reg, !quantum.bit
+    %4 = quantum.insert %3[ 1], %out_ctrl_qubits : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<2>
+    quantum.dealloc %4 : !quantum.reg
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_pcphase_op
+func.func @test_pcphase_op(%arg0: f64, %arg1: i1) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<2> -> !qref.bit
+    // CHECK: [[q1:%.+]] = qref.get [[qreg]][ 1] : !qref.reg<2> -> !qref.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: qref.pcphase(%arg0, %arg0) [[q0]], [[q1]] : !qref.bit, !qref.bit
+    // CHECK-NOT: quantum.pcphase
+    %out_qubits:2 = quantum.pcphase(%arg0, %arg0) %1, %2 : !quantum.bit, !quantum.bit
+
+    // CHECK: qref.pcphase(%arg0, %arg0) [[q0]] ctrls([[q1]]) ctrlvals(%arg1) : !qref.bit ctrls !qref.bit
+    // CHECK-NOT: quantum.pcphase
+    %out_qubits_0, %out_ctrl_qubits = quantum.pcphase(%arg0, %arg0) %out_qubits#0 ctrls(%out_qubits#1) ctrlvals(%arg1) : !quantum.bit ctrls !quantum.bit
+
+    // CHECK-NOT: quantum.insert
+    %3 = quantum.insert %0[ 0], %out_qubits_0 : !quantum.reg, !quantum.bit
+    %4 = quantum.insert %3[ 1], %out_ctrl_qubits : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<2>
+    quantum.dealloc %4 : !quantum.reg
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_unitary_op
+func.func @test_unitary_op(%arg0: tensor<4x4xcomplex<f64>>, %arg1: i1) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<3> -> !qref.bit
+    // CHECK: [[q1:%.+]] = qref.get [[qreg]][ 1] : !qref.reg<3> -> !qref.bit
+    // CHECK: [[q2:%.+]] = qref.get [[qreg]][ 2] : !qref.reg<3> -> !qref.bit
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+
+    // CHECK: qref.unitary(%arg0 : tensor<4x4xcomplex<f64>>) [[q0]], [[q1]] : !qref.bit, !qref.bit
+    // CHECK-NOT: quantum.unitary
+    %out_qubits:2 = quantum.unitary(%arg0 : tensor<4x4xcomplex<f64>>) %1, %2 : !quantum.bit, !quantum.bit
+
+    // CHECK: qref.unitary(%arg0 : tensor<4x4xcomplex<f64>>) [[q0]], [[q1]] adj ctrls([[q2]]) ctrlvals(%arg1) : !qref.bit, !qref.bit ctrls !qref.bit
+    // CHECK-NOT: quantum.unitary
+    %out_qubits_0:2, %out_ctrl_qubits = quantum.unitary(%arg0 : tensor<4x4xcomplex<f64>>) %out_qubits#0, %out_qubits#1 adj ctrls(%3) ctrlvals(%arg1) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+
+    // CHECK-NOT: quantum.insert
+    %4 = quantum.insert %0[ 0], %out_qubits_0#0 : !quantum.reg, !quantum.bit
+    %5 = quantum.insert %4[ 1], %out_qubits_0#1 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 2], %out_ctrl_qubits : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<3>
+    quantum.dealloc %6 : !quantum.reg
+    return
+}
+
+
+// // -----
+
+// module {
+//   func.func @test_compbasis_op() -> (!quantum.obs, !quantum.obs) attributes {quantum.node} {
+//     %0 = quantum.alloc( 2) : !quantum.reg
+//     %1 = quantum.alloc( 3) : !quantum.reg
+//     %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+//     %3 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+//     %out_qubits:2 = quantum.custom "CNOT"() %2, %3 : !quantum.bit, !quantum.bit
+//     %4 = quantum.compbasis qubits %out_qubits#0, %out_qubits#1 : !quantum.obs
+//     %5 = quantum.insert %0[ 0], %out_qubits#0 : !quantum.reg, !quantum.bit
+//     %6 = quantum.insert %5[ 1], %out_qubits#1 : !quantum.reg, !quantum.bit
+//     quantum.dealloc %6 : !quantum.reg
+//     %7 = quantum.compbasis qreg %1 : !quantum.obs
+//     quantum.dealloc %1 : !quantum.reg
+//     return %4, %7 : !quantum.obs, !quantum.obs
+//   }
+// }
+
+// // -----
+
+// module {
+//   func.func @test_namedobs_op() -> (!quantum.obs, !quantum.obs) attributes {quantum.node} {
+//     %0 = quantum.alloc( 2) : !quantum.reg
+//     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+//     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+//     %out_qubits:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+//     %3 = quantum.insert %0[ 0], %out_qubits#0 : !quantum.reg, !quantum.bit
+//     %4 = quantum.insert %3[ 1], %out_qubits#1 : !quantum.reg, !quantum.bit
+//     %5 = quantum.extract %4[ 0] : !quantum.reg -> !quantum.bit
+//     %6 = quantum.namedobs %5[ PauliX] : !quantum.obs
+//     %7 = quantum.insert %4[ 0], %5 : !quantum.reg, !quantum.bit
+//     %8 = quantum.extract %7[ 1] : !quantum.reg -> !quantum.bit
+//     %9 = quantum.namedobs %8[ PauliZ] : !quantum.obs
+//     %10 = quantum.insert %7[ 1], %8 : !quantum.reg, !quantum.bit
+//     quantum.dealloc %10 : !quantum.reg
+//     return %6, %9 : !quantum.obs, !quantum.obs
+//   }
+// }
+
+// // -----
+
+// module {
+//   func.func @test_hermitian_op(%arg0: tensor<4x4xcomplex<f64>>) -> !quantum.obs attributes {quantum.node} {
+//     %0 = quantum.alloc( 2) : !quantum.reg
+//     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+//     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+//     %out_qubits:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
+//     %3 = quantum.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) %out_qubits#0, %out_qubits#1 : !quantum.obs
+//     %4 = quantum.insert %0[ 0], %out_qubits#0 : !quantum.reg, !quantum.bit
+//     %5 = quantum.insert %4[ 1], %out_qubits#1 : !quantum.reg, !quantum.bit
+//     quantum.dealloc %5 : !quantum.reg
+//     return %3 : !quantum.obs
+//   }
+// }
+
+// // -----
+
+// module {
+//   func.func @test_measure_op() -> (i1, i1, i1) attributes {quantum.node} {
+//     %0 = quantum.alloc( 1) : !quantum.reg
+//     %1 = quantum.alloc_qb : !quantum.bit
+//     %mres, %out_qubit = quantum.measure %1 : i1, !quantum.bit
+//     %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+//     %mres_0, %out_qubit_1 = quantum.measure %2 : i1, !quantum.bit
+//     %mres_2, %out_qubit_3 = quantum.measure %out_qubit_1 : i1, !quantum.bit
+//     %3 = quantum.insert %0[ 0], %out_qubit_3 : !quantum.reg, !quantum.bit
+//     quantum.dealloc %3 : !quantum.reg
+//     quantum.dealloc_qb %out_qubit : !quantum.bit
+//     return %mres, %mres_0, %mres_2 : i1, i1, i1
+//   }
+// }
+
+// // -----
+
+// module {
+//   func.func @test_multiple_allocs() attributes {quantum.node} {
+//     %0 = quantum.alloc( 2) : !quantum.reg
+//     %1 = quantum.alloc( 1) : !quantum.reg
+//     %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
+//     %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+//     %out_qubits:2 = quantum.custom "CNOT"() %2, %3 : !quantum.bit, !quantum.bit
+//     %4 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+//     %out_qubits_0:2 = quantum.custom "CNOT"() %out_qubits#0, %4 : !quantum.bit, !quantum.bit
+//     %5 = quantum.insert %1[ 0], %out_qubits_0#0 : !quantum.reg, !quantum.bit
+//     %out_qubits_1:2 = quantum.custom "CNOT"() %out_qubits#1, %out_qubits_0#1 : !quantum.bit, !quantum.bit
+//     %6 = quantum.insert %0[ 0], %out_qubits_1#0 : !quantum.reg, !quantum.bit
+//     %7 = quantum.insert %6[ 1], %out_qubits_1#1 : !quantum.reg, !quantum.bit
+//     quantum.dealloc %7 : !quantum.reg
+//     quantum.dealloc %5 : !quantum.reg
+//     return
+//   }
+// }
+
+// // -----
+
+// module {
+//   func.func @test_dynamic_wire_index(%arg0: i64) -> f64 attributes {quantum.node} {
+//     %0 = quantum.alloc( 2) : !quantum.reg
+//     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+//     %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
+//     %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+//     %3 = quantum.extract %2[%arg0] : !quantum.reg -> !quantum.bit
+//     %out_qubits_0 = quantum.custom "PauliZ"() %3 : !quantum.bit
+//     %out_qubits_1 = quantum.custom "PauliY"() %out_qubits_0 : !quantum.bit
+//     %4 = quantum.insert %2[%arg0], %out_qubits_1 : !quantum.reg, !quantum.bit
+//     %5 = quantum.extract %4[ 0] : !quantum.reg -> !quantum.bit
+//     %out_qubits_2 = quantum.custom "PauliX"() %5 : !quantum.bit
+//     %out_qubits_3 = quantum.custom "PauliY"() %out_qubits_2 : !quantum.bit
+//     %6 = quantum.insert %4[ 0], %out_qubits_3 : !quantum.reg, !quantum.bit
+//     %7 = quantum.extract %6[%arg0] : !quantum.reg -> !quantum.bit
+//     %8 = quantum.namedobs %7[ PauliX] : !quantum.obs
+//     %9 = quantum.insert %6[%arg0], %7 : !quantum.reg, !quantum.bit
+//     %10 = quantum.expval %8 : f64
+//     quantum.dealloc %9 : !quantum.reg
+//     return %10 : f64
+//   }
+// }
+
+// // -----
+
+// module {
+//   func.func @test_alloc_qb() attributes {quantum.node} {
+//     %0 = quantum.alloc_qb : !quantum.bit
+//     %out_qubits = quantum.custom "X"() %0 : !quantum.bit
+//     quantum.dealloc_qb %out_qubits : !quantum.bit
+//     return
+//   }
+// }
+
+// // -----
+
+// module {
+//   func.func @test_adjoint_op() attributes {quantum.node} {
+//     %0 = quantum.alloc( 2) : !quantum.reg
+//     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+//     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+//     %3:2 = quantum.adjoint(%1, %2) : !quantum.bit, !quantum.bit {
+//     ^bb0(%arg0: !quantum.bit, %arg1: !quantum.bit):
+//       %out_qubits = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+//       %out_qubits_0:2 = quantum.custom "CNOT"() %out_qubits, %arg1 : !quantum.bit, !quantum.bit
+//       quantum.yield %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
+//     }
+//     %4 = quantum.insert %0[ 0], %3#0 : !quantum.reg, !quantum.bit
+//     %5 = quantum.insert %4[ 1], %3#1 : !quantum.reg, !quantum.bit
+//     quantum.dealloc %5 : !quantum.reg
+//     return
+//   }
+// }
+
+// // -----
+
+// module {
+//   func.func @test_adjoint_op_nested() attributes {quantum.node} {
+//     %0 = quantum.alloc( 2) : !quantum.reg
+//     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+//     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+//     %3:2 = quantum.adjoint(%1, %2) : !quantum.bit, !quantum.bit {
+//     ^bb0(%arg0: !quantum.bit, %arg1: !quantum.bit):
+//       %out_qubits = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+//       %6:2 = quantum.adjoint(%out_qubits, %arg1) : !quantum.bit, !quantum.bit {
+//       ^bb0(%arg2: !quantum.bit, %arg3: !quantum.bit):
+//         %out_qubits_1:2 = quantum.custom "CNOT"() %arg2, %arg3 : !quantum.bit, !quantum.bit
+//         quantum.yield %out_qubits_1#0, %out_qubits_1#1 : !quantum.bit, !quantum.bit
+//       }
+//       %out_qubits_0:2 = quantum.custom "SWAP"() %6#0, %6#1 : !quantum.bit, !quantum.bit
+//       quantum.yield %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
+//     }
+//     %4 = quantum.insert %0[ 0], %3#0 : !quantum.reg, !quantum.bit
+//     %5 = quantum.insert %4[ 1], %3#1 : !quantum.reg, !quantum.bit
+//     quantum.dealloc %5 : !quantum.reg
+//     return
+//   }
+// }
