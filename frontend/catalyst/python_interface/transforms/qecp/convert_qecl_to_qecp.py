@@ -189,7 +189,7 @@ class EncodeOpConversion(RewritePattern):
     def match_and_rewrite(self, op: qecl.EncodeOp, rewriter: PatternRewriter):
         """Rewrite pattern for `qecl.encode [zero]` op"""
 
-        if not op.init_state.data == "zero":
+        if not op.init_state.data == "zero": # pragma: no cover
             raise NotImplementedError(
                 "Lowering qecl.EncodeOp to the qecp dialect is only implemented "
                 "for init_state 'zero'"
@@ -199,7 +199,7 @@ class EncodeOpConversion(RewritePattern):
             qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
         )
 
-        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k: # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
@@ -263,7 +263,7 @@ class QecCycleOpConversion(RewritePattern):
             qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
         )
 
-        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k: # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
@@ -405,13 +405,14 @@ class TransversalGateConversion(RewritePattern):
         rewriter.replace_op(op, subroutine_call_op)
 
 
-# MARK: Update Function Signatures
+# MARK: Signature update
 
 
 @dataclass(frozen=True)
 class UpdateFunctionSignatures(RewritePattern):
     """Update types for any FuncOps in the IR whose input/output types have changed."""
 
+    # pylint: disable=unused-argument
     @op_type_rewrite_pattern
     def match_and_rewrite(self, funcop: func.FuncOp, rewriter: PatternRewriter):
         """Match all FuncOps and call their update_function_type method"""
