@@ -124,7 +124,7 @@ OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitVal
 
     Operation *newOp = builder.create(state);
 
-    if (isa<quantum::QuantumOperation, quantum::MeasureOp>(vOp)) {
+    if (isa<quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp>(vOp)) {
         // Cascade the tracker for gate-like ops
         SmallVector<Value> vQuantumOperands;
         SmallVector<Value> vQuantumResults;
@@ -307,6 +307,17 @@ void handleMeasure(IRRewriter &builder, quantum::MeasureOp vMeasureOp, QubitValu
     erasureWorklist.push_back(vMeasureOp);
 }
 
+void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTracker &tracker,
+               SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+
+    auto rPPMOp = migrateOpToReferenceSemantics<pbc::RefPPMeasurementOp>(builder, vPPMOp, tracker);
+
+    builder.replaceAllUsesWith(vPPMOp.getMres(), rPPMOp.getMres());
+    erasureWorklist.push_back(vPPMOp);
+}
+
 void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,
                      QubitValueTracker &tracker)
 {
@@ -358,7 +369,8 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
                 [&](auto o) { handleMeasure(builder, o, tracker, erasureWorklist); })
             // .Case<mbqc::RefMeasureInBasisOp>(
             //     [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
-            // .Case<pbc::RefPPMeasurementOp>([&](auto o) { handlePPM(builder, o, tracker); })
+            .Case<pbc::PPMeasurementOp>(
+                [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
             // .Case<qref::AdjointOp>([&](auto o) { handleAdjoint(builder, o, tracker); })
             // .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
             // .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
