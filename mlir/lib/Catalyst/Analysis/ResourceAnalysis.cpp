@@ -253,8 +253,13 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
 
         if (funcOp.getName() == entryFunc) {
             for (auto argType : funcOp.getArgumentTypes()) {
-                if (isa<quantum::QubitType>(argType)) {
+                if (isa<quantum::QubitType, qref::QubitType>(argType)) {
                     result.numArgQubits += 1;
+                }
+                if (auto qregType = dyn_cast<qref::QuregType>(argType)) {
+                    if (qregType.isStatic()) {
+                        result.numArgQubits += qregType.getSize().getInt();
+                    }
                 }
             }
         }

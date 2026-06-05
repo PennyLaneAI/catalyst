@@ -46,7 +46,8 @@ struct ResourceResult {
     // qubits from qref/quantum alloc/alloc_qubit ops
     int64_t numAllocQubits = 0;
 
-    // qubits from !quantum.bit function arguments (entry function only)
+    // qubits from !quantum.bit, qref.bit and qref.reg<{static}> function arguments (entry function
+    // only)
     int64_t numArgQubits = 0;
 
     // total qubits (allocated + argument)

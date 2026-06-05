@@ -846,8 +846,8 @@ func.func @auto_qm_flag_unset() {
 // CHECK-DAG: "MidCircuitMeasure": 1
 
 // CHECK:   "num_alloc_qubits": 2
-// CHECK:   "num_arg_qubits": 0
-// CHECK:   "num_qubits": 2
+// CHECK:   "num_arg_qubits": 3
+// CHECK:   "num_qubits": 5
 
 // CHECK:   "operations"
 // CHECK-DAG: "Adjoint(Hadamard)(1)": 1
@@ -858,7 +858,7 @@ func.func @auto_qm_flag_unset() {
 // CHECK-DAG: "mbqc.graph_state_prep(0)": 1,
 // CHECK-DAG: "mbqc.ref.measure_in_basis(0)": 1
 
-func.func @qref() {
+func.func @qref(%arg0: !qref.bit, %arg1: !qref.reg<2>) {
     %0 = qref.alloc( 2) : !qref.reg<2>
     %1 = qref.get %0[ 0] : !qref.reg<2> -> !qref.bit
     %2 = qref.get %0[ 1] : !qref.reg<2> -> !qref.bit
