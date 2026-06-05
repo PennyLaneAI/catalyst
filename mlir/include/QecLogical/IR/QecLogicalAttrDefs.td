@@ -28,6 +28,7 @@ def LogicalCodeblockInitState : I32EnumAttr<"LogicalCodeblockInitState",
     [
         I32EnumAttrCase<"Zero",  0, "zero">,  // |0⟩
         I32EnumAttrCase<"Magic", 1, "magic">  // |m⟩ = |0⟩ + e^{iπ/4}|1⟩  (Magic state)
+        I32EnumAttrCase<"Magic_conj", 1, "magic_conj">  // |m̄⟩ = |0⟩ + e^{-iπ/4}|1⟩  (Magic state conjugated)
     ]> {
     let cppNamespace = "catalyst::qecl";
     let genSpecializedAttr = 0;
