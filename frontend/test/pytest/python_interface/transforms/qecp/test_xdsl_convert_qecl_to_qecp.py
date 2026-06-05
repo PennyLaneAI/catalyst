@@ -926,16 +926,16 @@ class TestLoweringTransversalGates:
         """Test that using the Steane code lowers Hadamard, Identity and S ops as expected. These ops
         are applied on all qubits in the codeblock. For the S operator, the adjoint is applied."""
 
-        program = f"""
-        builtin.module @module_circuit {{
-                func.func @test_func() attributes {{quantum.node}} {{
+        program = """
+        builtin.module @module_circuit {
+                func.func @test_func() attributes {quantum.node} {
                     // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
                     // CHECK-NEXT: [[codeblock2:%.+]] = func.call @s_adj_Steane([[codeblock]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
                     // CHECK-NOT: qecl.s
                     %0 = "test.op"() : () -> !qecl.codeblock<1>
                     %1 = qecl.s %0[0] adj : !qecl.codeblock<1>
                     return
-                }}
+                }
                 // CHECK: func.func private @s_adj_Steane([[codeblock_in:%.+]]: !qecp.codeblock<1 x 7>)
                 // CHECK-NEXT: [[q0:%.+]] = qecp.extract [[codeblock_in]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
                 // CHECK-NEXT: [[q1:%.+]] = qecp.extract [[codeblock_in]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
@@ -959,7 +959,7 @@ class TestLoweringTransversalGates:
                 // CHECK-NEXT: [[codeblock_in6:%.+]] = qecp.insert [[codeblock_in5]][5], [[q5_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
                 // CHECK-NEXT: [[codeblock_out:%.+]] = qecp.insert [[codeblock_in6]][6], [[q6_1]] : !qecp.codeblock<1 x 7>, !qecp.qubit<data>
                 // CHECK-NEXT: func.return [[codeblock_out]]
-            }}
+            }
             """
 
         run_filecheck(program, qecl_to_qecp_steane_pipeline)

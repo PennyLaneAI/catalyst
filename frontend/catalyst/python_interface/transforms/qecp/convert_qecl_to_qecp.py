@@ -70,6 +70,7 @@ from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_o
 from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
 from .qec_code_lib import QecCode
 
+# pylint: disable=too-many-lines
 
 class CheckType(StrEnum):
     """Check types for QEC codes. Currently limited to CSS codes (X and Z checks)."""
