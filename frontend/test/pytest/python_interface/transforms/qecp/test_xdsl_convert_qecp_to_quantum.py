@@ -709,6 +709,7 @@ class TestQECPassIntegration:
 
         ghz()
 
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
     @pytest.mark.parametrize(
         "n, diagonalizing_gates, expected_res, shots",
         [
