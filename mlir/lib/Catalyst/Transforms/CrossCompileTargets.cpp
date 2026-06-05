@@ -87,7 +87,11 @@ std::vector<std::string> defaultLoweringPassList()
     std::vector<std::string> passes;
     passes.reserve(buf.size() + llvmPasses.size());
     passes.insert(passes.end(), buf.begin(), buf.end());
-    passes.insert(passes.end(), llvmPasses.begin(), llvmPasses.end());
+    for (const auto &passName : llvmPasses) {
+        if (passName != "convert-remote-to-llvm") {
+            passes.push_back(passName);
+        }
+    }
     return passes;
 }
 
