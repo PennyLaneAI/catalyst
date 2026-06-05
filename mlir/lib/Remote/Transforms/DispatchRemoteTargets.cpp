@@ -18,16 +18,16 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/IR/CatalystOps.h"
+#include "Remote/IR/RemoteOps.h"
+#include "Remote/Transforms/Passes.h"
 
 using namespace mlir;
 
 namespace catalyst {
+namespace remote {
 
-#define GEN_PASS_DECL_DISPATCHREMOTETARGETSPASS
 #define GEN_PASS_DEF_DISPATCHREMOTETARGETSPASS
-#include "Catalyst/Transforms/Passes.h.inc"
+#include "Remote/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -37,17 +37,19 @@ bool isEntryPoint(func::FuncOp fn)
     return fn->hasAttr("catalyst.entry_point");
 }
 
-// Ships cross-compiled `catalyst.target` modules to a remote executor.
+// Ships cross-compiled `catalyst.target` modules to a remote executor using the `remote` dialect.
 //
 // This pass should be run after `cross-compile-targets`, which records each module's object file in
 // `catalyst.object_file`. For every nested module carrying a `catalyst.dispatch` attribute this pass:
-//   1. Injects `remote_open` into `setup()` (once per unique address) and
-//      `remote_send_binary` into `setup()` (once per module; the object holds every entry).
-//   2. Rewrites every host-side `func.call` to an entry function into a
-//      `catalyst.custom_call fn("remote_call")` carrying the object path, address,
-//      and callee.
-//   3. Injects `remote_close` into `teardown()` once any session was opened.
-//   4. Erases the bodyless external declarations and the nested module from the host.
+//   1. Injects `remote.open` into `setup()` (once per unique address) and `remote.send_binary`
+//      into `setup()` (once per module; the object holds every entry).
+//   2. Rewrites every host-side `func.call` to an entry function into a `remote.launch` op carrying
+//      the executor address and the entry callee. Its lowering resolves `_catalyst_pyface_<callee>`
+//      in the shipped object.
+//   3. Erases the bodyless external declarations and the nested module from the host.
+//
+// Session teardown is handled by the runtime, which closes every open session when the process
+// exits, so no explicit close op is emitted (matching `cross-compile-remote-kernels`).
 struct DispatchRemoteTargetsPass
     : impl::DispatchRemoteTargetsPassBase<DispatchRemoteTargetsPass> {
     using DispatchRemoteTargetsPassBase::DispatchRemoteTargetsPassBase;
@@ -69,7 +71,7 @@ struct DispatchRemoteTargetsPass
             return;
         }
 
-        // Modules sharing an executor get a single remote_open.
+        // Modules sharing an executor get a single remote.open.
         llvm::SmallSet<std::string, 4> openedAddresses;
 
         for (auto nested : targetMods) {
@@ -78,57 +80,41 @@ struct DispatchRemoteTargetsPass
             }
             nested.erase();
         }
-
-        // One remote_close covers every open session.
-        if (!openedAddresses.empty()) {
-            injectRemoteCloseIntoTeardown(host);
-        }
     }
 
-    // Insert a no-operand CustomCallOp before the terminator of `funcName` in `host`.
-    // Returns the op so the caller can attach attributes, or nullptr if the function
-    // is absent or bodyless.
-    catalyst::CustomCallOp injectCustomCallInto(ModuleOp host, StringRef funcName,
-                                                StringRef callName)
+    // Insert `remote.open` before the terminator of `setup`. No-op if setup is absent or bodyless.
+    void injectRemoteOpenIntoSetup(ModuleOp host, StringAttr addressAttr)
     {
-        auto fn = host.lookupSymbol<func::FuncOp>(funcName);
-        if (!fn || fn.getBody().empty()) {
-            return nullptr;
+        auto setupFn = host.lookupSymbol<func::FuncOp>("setup");
+        if (!setupFn || setupFn.getBody().empty()) {
+            return;
         }
-        Operation *terminator = fn.getBody().front().getTerminator();
+        Operation *terminator = setupFn.getBody().front().getTerminator();
         if (!terminator) {
-            return nullptr;
+            return;
         }
         OpBuilder b(terminator);
-        return catalyst::CustomCallOp::create(b, fn.getLoc(), TypeRange{}, ValueRange{},
-                                              callName, nullptr);
+        remote::OpenOp::create(b, setupFn.getLoc(), addressAttr);
     }
 
-    void injectRemoteOpenIntoSetup(ModuleOp host, StringRef addr)
-    {
-        auto op = injectCustomCallInto(host, "setup", "remote_open");
-        if (op) {
-            op->setAttr("catalyst.remote_address", StringAttr::get(&getContext(), addr));
-        }
-    }
-
-    void injectRemoteCloseIntoTeardown(ModuleOp host)
-    {
-        // remote_close closes all open sessions; no address needed.
-        injectCustomCallInto(host, "teardown", "remote_close");
-    }
-
+    // Insert `remote.send_binary` before the terminator of `setup`. No-op if setup is absent or
+    // bodyless. Always called after `injectRemoteOpenIntoSetup` so the session is opened first.
     void injectRemoteSendBinaryIntoSetup(ModuleOp host, StringAttr addressAttr, StringAttr pathAttr)
     {
-        auto op = injectCustomCallInto(host, "setup", "remote_send_binary");
-        if (op) {
-            op->setAttr("catalyst.remote_address", addressAttr);
-            op->setAttr("catalyst.remote_kernel_path", pathAttr);
+        auto setupFn = host.lookupSymbol<func::FuncOp>("setup");
+        if (!setupFn || setupFn.getBody().empty()) {
+            return;
         }
+        Operation *terminator = setupFn.getBody().front().getTerminator();
+        if (!terminator) {
+            return;
+        }
+        OpBuilder b(terminator);
+        remote::SendBinaryOp::create(b, setupFn.getLoc(), addressAttr, pathAttr);
     }
 
     // Open a session (once per address), ship the object recorded in
-    // `catalyst.object_file`, and rewrite each host-side func.call into a `remote_call`.
+    // `catalyst.object_file`, and rewrite each host-side func.call into a `remote.launch`.
     LogicalResult dispatchViaOrcRemote(ModuleOp host, ModuleOp nested,
                                        llvm::SmallSet<std::string, 4> &openedAddresses)
     {
@@ -154,17 +140,17 @@ struct DispatchRemoteTargetsPass
         auto pathAttr = StringAttr::get(ctx, objPathAttr.getValue());
         auto addressAttr = StringAttr::get(ctx, moduleAddress);
 
-        // Inject remote_open (setup) once per unique address.
+        // Inject remote.open (setup) once per unique address.
         if (!openedAddresses.count(moduleAddress)) {
             openedAddresses.insert(moduleAddress);
-            injectRemoteOpenIntoSetup(host, moduleAddress);
+            injectRemoteOpenIntoSetup(host, addressAttr);
         }
 
         // Ship the object once per module: a single `catalyst.object_file` holds every
-        // entry function, and remote_call resolves individual symbols within it.
+        // entry function, and remote.launch resolves individual symbols within it.
         injectRemoteSendBinaryIntoSetup(host, addressAttr, pathAttr);
 
-        // Per entry-marked function: rewrite host-side calls to remote_call.
+        // Per entry-marked function: rewrite host-side calls to remote.launch.
         for (auto nestedFn : nested.getOps<func::FuncOp>()) {
             if (!isEntryPoint(nestedFn)) {
                 continue;
@@ -186,14 +172,22 @@ struct DispatchRemoteTargetsPass
                 }
             }
             for (func::CallOp call : calls) {
+                // remote.launch marshals memref descriptors, so its lowering only accepts
+                // memref-typed operands and results. Reject anything else here with a clear
+                // error rather than crashing later in convert-remote-to-llvm. This runs after
+                // bufferization, so a well-formed entry call is already memref-typed.
+                auto isMemref = [](Type ty) { return isa<MemRefType>(ty); };
+                if (!llvm::all_of(call.getOperandTypes(), isMemref) ||
+                    !llvm::all_of(call.getResultTypes(), isMemref)) {
+                    call.emitOpError("remote dispatch of '")
+                        << fnName << "' requires memref-typed operands and results";
+                    return failure();
+                }
                 OpBuilder b(call);
-                auto custom = catalyst::CustomCallOp::create(
-                    b, call.getLoc(), call.getResultTypes(), call.getOperands(), "remote_call",
-                    nullptr);
-                custom->setAttr("catalyst.remote_kernel_path", pathAttr);
-                custom->setAttr("catalyst.remote_address", addressAttr);
-                custom->setAttr("catalyst.remote_kernel_callee", calleeAttr);
-                call.replaceAllUsesWith(custom.getResults());
+                auto launch =
+                    remote::LaunchOp::create(b, call.getLoc(), call.getResultTypes(),
+                                             call.getOperands(), addressAttr, calleeAttr);
+                call.replaceAllUsesWith(launch.getResults());
                 call.erase();
             }
 
@@ -205,4 +199,5 @@ struct DispatchRemoteTargetsPass
 
 } // namespace
 
+} // namespace remote
 } // namespace catalyst

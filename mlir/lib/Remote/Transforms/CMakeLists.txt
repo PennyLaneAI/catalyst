@@ -7,6 +7,7 @@ set(LLVM_LINK_COMPONENTS
 
 file(GLOB SRC
     CrossCompileRemoteKernels.cpp
+    DispatchRemoteTargets.cpp
     RemoteToLLVM.cpp
 )
 

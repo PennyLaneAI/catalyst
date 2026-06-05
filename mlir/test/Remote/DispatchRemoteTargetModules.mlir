@@ -17,29 +17,27 @@
 // This pass consumes the input IR left by cross-compile-targets which carries catalyst.object_file,
 // plus a catalyst.dispatch attributes.
 
-// setup() opens the session once and ships the module's object
+// setup() opens the session once and ships the module's object.
 // CHECK-LABEL: func.func @setup()
-// CHECK: catalyst.custom_call fn("remote_open")
-// CHECK-SAME: catalyst.remote_address = "ADDR:PORT"
-// CHECK: catalyst.custom_call fn("remote_send_binary")
-// CHECK-SAME: catalyst.remote_address = "ADDR:PORT"
-// CHECK-SAME: catalyst.remote_kernel_path = "/tmp/target_compute.o"
-// CHECK-NOT: catalyst.custom_call fn("remote_send_binary")
+// CHECK: remote.open("ADDR:PORT")
+// CHECK: remote.send_binary("ADDR:PORT", "/tmp/target_compute.o")
+// CHECK-NOT: remote.send_binary
 // CHECK: return
 
-// teardown() closes the session.
+// teardown() is left untouched: the runtime closes sessions at process exit.
 // CHECK-LABEL: func.func @teardown()
-// CHECK: catalyst.custom_call fn("remote_close")
+// CHECK-NOT: remote.
+// CHECK: return
 
-// Each host-side call is rewritten to its own remote_call.
-// CHECK-LABEL: func.func public @jit_main()
-// CHECK: catalyst.custom_call fn("remote_call")
-// CHECK-SAME: catalyst.remote_kernel_callee = "noop"
-// CHECK: catalyst.custom_call fn("remote_call")
-// CHECK-SAME: catalyst.remote_kernel_callee = "noop2"
+// Each host-side call is rewritten to its own remote.launch, preserving the call's
+// operand/result types (a typed call exercises the memref-result path).
+// CHECK-LABEL: func.func public @jit_main
+// CHECK: remote.launch("noop", "ADDR:PORT") () : () -> ()
+// CHECK: remote.launch("compute", "ADDR:PORT") (%{{.*}}) : (memref<4xf64>) -> memref<4xf64>
 
 // The bodyless declarations and the nested module are erased.
 // CHECK-NOT: func.call @noop
+// CHECK-NOT: func.call @compute
 // CHECK-NOT: module @target_compute
 
 module @jit_test_dispatch {
@@ -53,16 +51,16 @@ module @jit_test_dispatch {
   }
 
   func.func private @noop()
-  func.func private @noop2()
+  func.func private @compute(memref<4xf64>) -> memref<4xf64>
 
-  func.func public @jit_main() attributes {llvm.emit_c_interface} {
+  func.func public @jit_main(%arg0: memref<4xf64>) -> memref<4xf64> attributes {llvm.emit_c_interface} {
     func.call @noop() : () -> ()
-    func.call @noop2() : () -> ()
-    return
+    %0 = func.call @compute(%arg0) : (memref<4xf64>) -> memref<4xf64>
+    return %0 : memref<4xf64>
   }
 
   module @target_compute attributes {catalyst.object_file = "/tmp/target_compute.o", catalyst.dispatch = {address = "ADDR:PORT"}} {
     func.func private @noop() attributes {catalyst.entry_point}
-    func.func private @noop2() attributes {catalyst.entry_point}
+    func.func private @compute(memref<4xf64>) -> memref<4xf64> attributes {catalyst.entry_point}
   }
 }
