@@ -49,7 +49,7 @@ static bool isSkippedOp(Operation *op)
 {
     return isa<quantum::ComputationalBasisOp, quantum::DeallocOp, qref::DeallocOp,
                quantum::DeallocQubitOp, qref::DeallocQubitOp, quantum::DeviceReleaseOp,
-               quantum::ExtractOp, qref::GetOp, quantum::FinalizeOp, quantum::HamiltonianOp,
+               quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp, quantum::HamiltonianOp,
                quantum::HermitianOp, qref::HermitianOp, quantum::InitializeOp, quantum::InsertOp,
                quantum::NamedObsOp, qref::NamedObsOp, quantum::NumQubitsOp, quantum::TensorOp,
                quantum::YieldOp, pbc::YieldOp>(op);
@@ -398,12 +398,12 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 {
     for (Block &block : region) {
         for (Operation &op : block) {
+            bool needsCollection = true;
+
             llvm::TypeSwitch<Operation &, void>(op)
-                .Case([&](quantum::AdjointOp adjOp) {
+                .Case<quantum::AdjointOp, qref::AdjointOp>([&](auto adjOp) {
                     analyzeRegion(adjOp.getRegion(), result, !isAdjoint);
-                })
-                .Case([&](qref::AdjointOp adjOp) {
-                    analyzeRegion(adjOp.getRegion(), result, !isAdjoint);
+                    needsCollection = false;
                 })
                 .Case([&](mlir::scf::ForOp forLoopOp) {
                     analyzeForLoop(forLoopOp, result, isAdjoint);
@@ -424,7 +424,9 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
                     // other operations - do nothing
                 });
 
-            collectOperation(&op, result, isAdjoint);
+            if (needsCollection) {
+                collectOperation(&op, result, isAdjoint);
+            }
         }
     }
 }
