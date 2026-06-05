@@ -32,7 +32,7 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         {
-            # keys need to match the names of the corresponding qecl.gate gates; if any adjoint 
+            # keys need to match the names of the corresponding qecl.gate gates; if any adjoint
             # gates are supported, they should be included as a separate entry with key "gatename_adj"
             # values are a tuple of the qecp gate, and the indices its applied at in the codeblock
             # will need to be refactored for k>1
