@@ -25,6 +25,7 @@
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
 
@@ -96,38 +97,18 @@ OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitVal
     OperationState state(loc, OpTy::getOperationName());
 
     SmallVector<Value> rOperands;
-    SmallVector<Value> vQuantumOperands;
-    SmallVector<Value> vQuantumResults;
     for (Value v : vOp->getOperands()) {
         if (isa<quantum::QubitType>(v.getType())) {
             rOperands.push_back(tracker.getRQubit(v));
-            vQuantumOperands.push_back(v);
         }
         else if (isa<quantum::QuregType>(v.getType())) {
             rOperands.push_back(tracker.getRQreg(v));
-            vQuantumOperands.push_back(v);
         }
         else {
             // This branch includes classical operands
             rOperands.push_back(v);
         }
     }
-    for (Value v : vOp->getResults()) {
-        if (isa<quantum::QubitType, quantum::QuregType>(v.getType())) {
-            vQuantumResults.push_back(v);
-        }
-    }
-
-    // Cascade the tracker
-    for (auto [vqo, vqr] : llvm::zip_equal(vQuantumOperands, vQuantumResults)) {
-        if (isa<quantum::QubitType>(vqo.getType())) {
-            tracker.setRQubit(vqr, tracker.getRQubit(vqo));
-        }
-        else if (isa<quantum::QuregType>(vqo.getType())) {
-            tracker.setRQreg(vqr, tracker.getRQreg(vqo));
-        }
-    }
-
     state.addOperands(rOperands);
     state.addAttributes(vOp->getAttrs());
 
@@ -142,6 +123,33 @@ OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitVal
     state.addTypes(outTypes);
 
     Operation *newOp = builder.create(state);
+
+    if (isa<quantum::QuantumOperation>(vOp)) {
+        // Cascade the tracker for gate-like ops
+        SmallVector<Value> vQuantumOperands;
+        SmallVector<Value> vQuantumResults;
+        for (Value v : vOp->getOperands()) {
+            if (isa<quantum::QubitType, quantum::QuregType>(v.getType())) {
+                vQuantumOperands.push_back(v);
+            }
+        }
+
+        for (Value v : vOp->getResults()) {
+            if (isa<quantum::QubitType, quantum::QuregType>(v.getType())) {
+                vQuantumResults.push_back(v);
+            }
+        }
+
+        for (auto [vqo, vqr] : llvm::zip_equal(vQuantumOperands, vQuantumResults)) {
+            if (isa<quantum::QubitType>(vqo.getType())) {
+                tracker.setRQubit(vqr, tracker.getRQubit(vqo));
+            }
+            else if (isa<quantum::QuregType>(vqo.getType())) {
+                tracker.setRQreg(vqr, tracker.getRQreg(vqo));
+            }
+        }
+    }
+
     return cast<OpTy>(newOp);
 }
 
@@ -266,6 +274,30 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
     erasureWorklist.push_back(vGateOp);
 }
 
+void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,
+                     QubitValueTracker &tracker)
+{
+    auto rCompbasisOp =
+        migrateOpToReferenceSemantics<qref::ComputationalBasisOp>(builder, vCompbasisOp, tracker);
+    builder.replaceOp(vCompbasisOp, rCompbasisOp);
+}
+
+void handleNamedObs(IRRewriter &builder, quantum::NamedObsOp vNamedObsOp,
+                    QubitValueTracker &tracker)
+{
+    auto rNamedObsOp =
+        migrateOpToReferenceSemantics<qref::NamedObsOp>(builder, vNamedObsOp, tracker);
+    builder.replaceOp(vNamedObsOp, rNamedObsOp);
+}
+
+void handleHermitian(IRRewriter &builder, quantum::HermitianOp vHermitianOp,
+                     QubitValueTracker &tracker)
+{
+    auto rHermitianOp =
+        migrateOpToReferenceSemantics<qref::HermitianOp>(builder, vHermitianOp, tracker);
+    builder.replaceOp(vHermitianOp, rHermitianOp);
+}
+
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker,
                   SmallVector<Operation *> &erasureWorklist)
 {
@@ -283,9 +315,10 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker,
             .Case<quantum::QuantumOperation>(
                 [&](auto o) { handleGate(builder, o, tracker, erasureWorklist); })
             // .Case<func::CallOp>([&](auto o) { handleCall(builder, o, tracker); })
-            // .Case<qref::ComputationalBasisOp>([&](auto o) { handleCompbasis(builder, o, tracker);
-            // }) .Case<qref::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
-            // .Case<qref::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
+            .Case<quantum::ComputationalBasisOp>(
+                [&](auto o) { handleCompbasis(builder, o, tracker); })
+            .Case<quantum::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
+            .Case<quantum::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
             // .Case<qref::MeasureOp>([&](auto o) { handleMeasure(builder, o, tracker); })
             // .Case<mbqc::RefMeasureInBasisOp>(
             //     [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
