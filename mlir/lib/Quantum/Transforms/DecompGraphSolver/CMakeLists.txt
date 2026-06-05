@@ -14,9 +14,8 @@ set(MIN_BOOST_VERSION 1.83.0)
 
 include(FetchContent)
 
-# Locally we don't need to check for Boost::multiprecision explicitly.
-# Linking Boost::random automatically includes multiprecision headers
-# Explicitly adding it here and target_link_libraries will cause failure.
+# The decompsolver target only needs the Boost Graph Library. Linking
+# Boost::graph (below) propagates its INTERFACE include dirs automatically,
 find_package(Boost ${MIN_BOOST_VERSION} COMPONENTS graph QUIET)
 
 if (Boost_FOUND)
@@ -41,6 +40,8 @@ else()
 
     FetchContent_MakeAvailable(Boost)
 
+    # Ensure the cache variable is consistent with the found branch
+    set(CATALYST_BOOST_FETCHED TRUE CACHE BOOL "Boost was fetched via FetchContent" FORCE)
 
     set(BOOST_TARGETS boost_container boost_graph boost_core boost_assert boost_throw_exception boost_config)
 
