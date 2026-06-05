@@ -14,13 +14,17 @@
 
 #define DEBUG_TYPE "reference-semantics-conversion"
 
+#include <cmath> // std::sqrt
+
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
+#include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
@@ -124,7 +128,8 @@ OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitVal
 
     Operation *newOp = builder.create(state);
 
-    if (isa<quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp>(vOp)) {
+    if (isa<quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp,
+            mbqc::MeasureInBasisOp>(vOp)) {
         // Cascade the tracker for gate-like ops
         SmallVector<Value> vQuantumOperands;
         SmallVector<Value> vQuantumResults;
@@ -307,6 +312,17 @@ void handleMeasure(IRRewriter &builder, quantum::MeasureOp vMeasureOp, QubitValu
     erasureWorklist.push_back(vMeasureOp);
 }
 
+void handleMeasureInBasis(IRRewriter &builder, mbqc::MeasureInBasisOp vMeasureInBasisOp,
+                          QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+
+    auto rMeasureInBasisOp = migrateOpToReferenceSemantics<mbqc::RefMeasureInBasisOp>(
+        builder, vMeasureInBasisOp, tracker);
+    builder.replaceAllUsesWith(vMeasureInBasisOp.getMres(), rMeasureInBasisOp.getMres());
+    erasureWorklist.push_back(vMeasureInBasisOp);
+}
+
 void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTracker &tracker,
                SmallVector<Operation *> &erasureWorklist)
 {
@@ -342,6 +358,35 @@ void handleHermitian(IRRewriter &builder, quantum::HermitianOp vHermitianOp,
     builder.replaceOp(vHermitianOp, rHermitianOp);
 }
 
+void handleGraphStatePrep(IRRewriter &builder, mbqc::GraphStatePrepOp vGraphStatePrepOp,
+                          QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vGraphStatePrepOp);
+
+    Location loc = vGraphStatePrepOp.getLoc();
+    MLIRContext *ctx = vGraphStatePrepOp.getContext();
+
+    ShapedType adjMatrixType = cast<ShapedType>(vGraphStatePrepOp.getAdjMatrix().getType());
+    assert(adjMatrixType.isStaticDim(0) &&
+           "Dynamically sized mbqc.graph_state_prep op not supported");
+
+    size_t adjMatrixSize = adjMatrixType.getShape()[0];
+    size_t should_be_perfect_square = 1 + 8 * adjMatrixSize;
+    double square_root_candidate = std::sqrt(should_be_perfect_square);
+    assert(std::ceil(square_root_candidate) == std::floor(square_root_candidate) &&
+           "mbqc.graph_state_prep expects tensor size to be a triangular number");
+    size_t numQubits = (1 + (size_t)square_root_candidate) / 2;
+    Type qregType = qref::QuregType::get(ctx, builder.getI64IntegerAttr(numQubits));
+
+    auto rGraphStatePrepOp = mbqc::RefGraphStatePrepOp::create(
+        builder, loc, qregType, vGraphStatePrepOp.getAdjMatrix(), vGraphStatePrepOp.getInitOp(),
+        vGraphStatePrepOp.getEntangleOp());
+
+    tracker.setRQreg(vGraphStatePrepOp.getQreg(), rGraphStatePrepOp.getQreg());
+    erasureWorklist.push_back(vGraphStatePrepOp);
+}
+
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
 {
     SmallVector<Operation *> erasureWorklist;
@@ -367,8 +412,8 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
             .Case<quantum::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
             .Case<quantum::MeasureOp>(
                 [&](auto o) { handleMeasure(builder, o, tracker, erasureWorklist); })
-            // .Case<mbqc::RefMeasureInBasisOp>(
-            //     [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
+            .Case<mbqc::MeasureInBasisOp>(
+                [&](auto o) { handleMeasureInBasis(builder, o, tracker, erasureWorklist); })
             .Case<pbc::PPMeasurementOp>(
                 [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
             // .Case<qref::AdjointOp>([&](auto o) { handleAdjoint(builder, o, tracker); })
@@ -376,8 +421,8 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
             // .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
             // .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker); })
             // .Case<scf::WhileOp>([&](auto o) { handleWhile(builder, o, tracker); })
-            // .Case<mbqc::RefGraphStatePrepOp>(
-            //     [&](auto o) { handleGraphStatePrep(builder, o, tracker); })
+            .Case<mbqc::GraphStatePrepOp>(
+                [&](auto o) { handleGraphStatePrep(builder, o, tracker, erasureWorklist); })
             .Default([](Operation *) {});
     });
 
