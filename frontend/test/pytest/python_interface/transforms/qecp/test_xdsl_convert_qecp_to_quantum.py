@@ -502,15 +502,15 @@ class TestHyperRegisterLowering:
                 func.func public @circuit() -> () attributes {quantum.node} {
                     // CHECK-NOT: qecp
                     // CHECK: [[reg0:%.+]] = quantum.alloc(7) : !quantum.reg
-                    // CHECK-NEXT: [[reg0:%.+]] = func.call @encode_zero_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: [[reg0_1:%.+]] = func.call @encode_zero_Steane([[reg0]]) : (!quantum.reg) -> !quantum.reg
                     // CHECK-NEXT: [[reg1:%.+]] = quantum.alloc(7) : !quantum.reg
-                    // CHECK-NEXT: [[reg1:%.+]] = func.call @encode_zero_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
-                    // CHECK: [[reg0:%.+]] = func.call @noise_subroutine_code_1x7x1([[reg0:%.+]]
-                    // CHECK-NEXT: [[reg0:%.+]] = func.call @qec_cycle_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
-                    // CHECK-NEXT: [[reg0:%.+]] = func.call @hadamard_Steane([[reg0:%.+]]) : (!quantum.reg) -> !quantum.reg
-                    // CHECK-NEXT: [[reg1:%.+]] = func.call @hadamard_Steane([[reg1:%.+]]) : (!quantum.reg) -> !quantum.reg
-                    // CHECK-NEXT: quantum.dealloc [[reg0:%.+]] : !quantum.reg
-                    // CHECK-NEXT: quantum.dealloc [[reg1:%.+]] : !quantum.reg
+                    // CHECK-NEXT: [[reg1_1:%.+]] = func.call @encode_zero_Steane([[reg1]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK: [[reg0_2:%.+]] = func.call @noise_subroutine_code_1x7x1([[reg0_1]]
+                    // CHECK-NEXT: [[reg0_3:%.+]] = func.call @qec_cycle_Steane([[reg0_2]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: [[reg0_4:%.+]] = func.call @hadamard_Steane([[reg0_3]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: [[reg1_2:%.+]] = func.call @hadamard_Steane([[reg1_1]]) : (!quantum.reg) -> !quantum.reg
+                    // CHECK-NEXT: quantum.dealloc [[reg0_4]] : !quantum.reg
+                    // CHECK-NEXT: quantum.dealloc [[reg1_2]] : !quantum.reg
                     // CHECK-NEXT: quantum.device_release
                     %0 = qecp.alloc() : !qecp.hyperreg<2 x 1 x 7>
                     %1 = arith.constant 0 : index
