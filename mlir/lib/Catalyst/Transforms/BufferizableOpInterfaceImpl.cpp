@@ -181,8 +181,10 @@ struct CustomCallOpInterface
         IntegerAttr numArgumentsAttr = rewriter.getI32IntegerAttr(numArguments);
 
         // Create an updated custom call operation
-        CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
-                             customCallOp.getCallTargetName(), numArgumentsAttr);
+        auto newCustomCallOp =
+            CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
+                                 customCallOp.getCallTargetName(), numArgumentsAttr);
+        newCustomCallOp->setDiscardableAttrs(customCallOp->getDiscardableAttrDictionary());
         size_t startIndex = bufferArgs.size() - customCallOp.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferResults);

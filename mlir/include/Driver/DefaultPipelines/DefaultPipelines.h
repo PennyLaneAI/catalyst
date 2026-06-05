@@ -150,6 +150,7 @@ const PipelineList pipelineList{
       "memref-to-llvm-tbaa",
       "finalize-memref-to-llvm{use-generic-functions}",
       "convert-index-to-llvm",
+      "convert-remote-to-llvm",
       "convert-catalyst-to-llvm",
       // TODO: remove this once PBC has its own pipeline
       "convert-pbc-to-llvm",
