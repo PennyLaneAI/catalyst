@@ -150,6 +150,7 @@ class AllocCodeblockConversion(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecp.AllocCodeblockOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate an auxiliary codeblock."""
+        assert isinstance(op.codeblock.type, qecp.PhysicalCodeblockType)
         rewriter.replace_op(op, quantum.AllocOp(op.codeblock.type.n))
 
 

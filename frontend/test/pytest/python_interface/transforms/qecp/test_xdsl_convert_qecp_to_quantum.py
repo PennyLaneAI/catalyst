@@ -638,6 +638,7 @@ class TestQECPassIntegration:
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
@@ -691,6 +692,7 @@ class TestQECPassIntegration:
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
@@ -707,6 +709,7 @@ class TestQECPassIntegration:
 
         ghz()
 
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
     @pytest.mark.parametrize(
         "n, diagonalizing_gates, expected_res, shots",
         [
@@ -759,7 +762,7 @@ class TestQECPassIntegration:
             (1, [qp.H], 0.707, 1000),
             (1, [qp.Z, qp.S, qp.H], -0.707, 1000),
             # with 2 adj-T gates, expval(Y) is -1 for every shot, so we can use fewer shots
-            # (2, [qp.Z, qp.S, qp.H], -1, 20),
+            (2, [qp.Z, qp.S, qp.H], -1, 20),
         ],
     )
     def test_T_adj_gate_integration(

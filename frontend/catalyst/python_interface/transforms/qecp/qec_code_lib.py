@@ -23,6 +23,8 @@ import numpy as np
 from catalyst.python_interface.dialects import qecp
 
 _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
+    # the indices/ordering for the operators and encodings in the Steane code are those used
+    # in https://arxiv.org/pdf/2107.07505
     "Steane": (
         7,
         1,
@@ -30,7 +32,8 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         {
-            # keys need to match the names of the corresponding qecl.gate gates
+            # keys need to match the names of the corresponding qecl.gate gates; if any adjoint
+            # gates are supported, they should be included as a separate entry with key "gatename_adj"
             # values are a tuple of the qecp gate, and the indices its applied at in the codeblock
             # will need to be refactored for k>1
             "x": (qecp.PauliXOp, [4, 5, 6]),
@@ -63,7 +66,7 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
             # The state_prep_index is the index of the physical qubit that the state is
             # injected on (i.e. for a magic state, -H-T is applied here pre-encoding).
             # Must be consistent with the qubit treated as the encoding "input" by the
-            # cnot_indices ordering above.
+            # cnot_indices ordering above. See https://arxiv.org/pdf/2107.07505 (Fig 10)
             "state_prep_index": 6,
         },
     ),

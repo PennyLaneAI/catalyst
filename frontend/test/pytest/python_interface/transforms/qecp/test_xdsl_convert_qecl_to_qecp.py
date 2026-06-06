@@ -1063,9 +1063,9 @@ class TestLoweringFabricateOp:
             // CHECK-LABEL: func.func private @fabricate_{init_state}_TestCode() -> !qecp.codeblock<1 x 3> 
             //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 3>
             // Extract qubits
-            //       CHECK:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
-            //       CHECK:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
-            //       CHECK:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
             // State injection on the state_prep_index (q1)
             //       CHECK:   [[q1_1:%.+]] = qecp.hadamard [[q1]] : !qecp.qubit<data>
             //       CHECK:   [[q1_2:%.+]] = qecp.t [[q1_1]]{adj} : !qecp.qubit<data>
@@ -1100,13 +1100,13 @@ class TestLoweringFabricateOp:
             }}
             // CHECK-LABEL: func.func private @fabricate_{init_state}_Steane() -> !qecp.codeblock<1 x 7>
             //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 7>
-            //       CHECK-NEXT:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q3:%.+]] = qecp.extract [[cb]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q4:%.+]] = qecp.extract [[cb]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q5:%.+]] = qecp.extract [[cb]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
-            //       CHECK-NEXT:   [[q6:%.+]] = qecp.extract [[cb]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q3:%.+]] = qecp.extract [[cb]][3] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q4:%.+]] = qecp.extract [[cb]][4] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q5:%.+]] = qecp.extract [[cb]][5] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q6:%.+]] = qecp.extract [[cb]][6] : !qecp.codeblock<1 x 7> -> !qecp.qubit<data>
             // State injection on the state_prep_index (qubit 6): H then T
             //       CHECK-NEXT:   [[h_inj:%.+]] = qecp.hadamard [[q6]] : !qecp.qubit<data>
             //       CHECK-NEXT:   [[t_inj:%.+]] = qecp.t [[h_inj]]{adj} : !qecp.qubit<data>

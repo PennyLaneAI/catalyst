@@ -96,10 +96,13 @@
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
 
-* Fixed a bug that passed incorrect SSA values to the final register deallocation when translating 
-  from the `qecp` to the `quantum` dialect. This bug prevented deallocation of unneeded registers 
+* Fixed a bug that passed incorrect SSA values to the final register deallocation when translating
+  from the `qecp` to the `quantum` dialect. This bug prevented deallocation of unneeded registers
   after magic state injection.
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
+* Fix memory bugs in the PBC passes.
+  [(#2918)](https://github.com/PennyLaneAI/catalyst/pull/2918)
 
 * Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
   after a PBC op but read from a register not updated by that op. Layer grouping now checks
