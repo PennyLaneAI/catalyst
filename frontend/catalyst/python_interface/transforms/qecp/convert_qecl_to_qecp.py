@@ -24,7 +24,7 @@ The convert-qecl-to-qecp pass has the following known limitations:
 
   * No support for QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
   * No support for non-CSS codes
-  * Only supports lowering of transversal gates and measurements. Does not support non-Clifford gates.
+  * Only supports the transversal gates defined in the `QecCode` + T gates
   * Only logical Pauli Z observables (computational basis) are supported for lowering `qecl.measure`
     operations.
   * Support for control flow in the user program is not fully implemented or tested
@@ -71,6 +71,7 @@ from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
 from .qec_code_lib import QecCode
 
 # pylint: disable=too-many-lines
+
 
 class CheckType(StrEnum):
     """Check types for QEC codes. Currently limited to CSS codes (X and Z checks)."""
@@ -141,6 +142,16 @@ class DeallocationConversion(RewritePattern):
         rewriter.replace_op(op, qecp.DeallocOp(op.hyper_reg))
 
 
+@dataclass
+class DeallocCodeBlockConversion(RewritePattern):
+    """Op conversion pattern from qecl.dealloc_cb -> qecp.dealloc_cb."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.DeallocCodeblockOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        rewriter.replace_op(op, qecp.DeallocCodeblockOp(op.codeblock))
+
+
 # MARK: Extract/Insert Patterns
 
 
@@ -180,7 +191,7 @@ class EncodeOpConversion(RewritePattern):
     def match_and_rewrite(self, op: qecl.EncodeOp, rewriter: PatternRewriter):
         """Rewrite pattern for `qecl.encode [zero]` op"""
 
-        if not op.init_state.data == "zero":
+        if not op.init_state.data == "zero":  # pragma: no cover
             raise NotImplementedError(
                 "Lowering qecl.EncodeOp to the qecp dialect is only implemented "
                 "for init_state 'zero'"
@@ -190,7 +201,7 @@ class EncodeOpConversion(RewritePattern):
             qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
         )
 
-        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
@@ -201,6 +212,38 @@ class EncodeOpConversion(RewritePattern):
         return_types = self.encode_subroutine.function_type.outputs.data
         callOp = func.CallOp(callee, arguments, return_types)
 
+        rewriter.replace_op(op, callOp)
+
+
+# MARK: Fabricate Op Pattern
+
+
+@dataclass
+class FabricateOpConversion(RewritePattern):
+    """Converts qecl.fabricate to the equivalent subroutine of qecp gates"""
+
+    qec_code: QecCode
+    fabricate_subroutine: func.FuncOp
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.FabricateOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `qecl.fabricate [magic]` op"""
+
+        if not op.init_state.data == "magic":  # pragma: no cover
+            raise NotImplementedError(
+                "Lowering qecl.FabricateOp to the qecp dialect is only implemented "
+                "for init_state 'magic'"
+            )
+
+        if (k := op.out_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
+            raise CompileError(
+                f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
+                f"lowering to a code with k={self.qec_code.k}"
+            )
+
+        callee = builtin.SymbolRefAttr(self.fabricate_subroutine.sym_name)
+        return_types = self.fabricate_subroutine.function_type.outputs.data
+        callOp = func.CallOp(callee, arguments=(), return_types=return_types)
         rewriter.replace_op(op, callOp)
 
 
@@ -222,7 +265,7 @@ class QecCycleOpConversion(RewritePattern):
             qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
         )
 
-        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
@@ -367,6 +410,21 @@ class TransversalGateConversion(RewritePattern):
         rewriter.replace_op(op, subroutine_call_op)
 
 
+# MARK: Signature update
+
+
+@dataclass(frozen=True)
+class UpdateFunctionSignatures(RewritePattern):
+    """Update types for any FuncOps in the IR whose input/output types have changed."""
+
+    # pylint: disable=unused-argument
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, funcop: func.FuncOp, rewriter: PatternRewriter):
+        """Match all FuncOps and call their update_function_type method"""
+
+        funcop.update_function_type()
+
+
 # MARK: Conversion Pass
 
 
@@ -429,6 +487,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         physical_meas_decode_subroutine = self.create_physical_meas_decode_subroutine()
         module_block.add_op(physical_meas_decode_subroutine)
 
+        fabricate_subroutine = self.create_fabricate_subroutine()
+        module_block.add_op(fabricate_subroutine)
+
         # 1Q gate and 2Q gate subroutines are returned as dicts storing
         # {"gate_name": subroutine_funcop}
         transversal_gate_subroutines = (
@@ -445,9 +506,13 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     HyperRegisterTypeConversion(qec_code=self.qec_code),
                     AllocationConversion(),
                     DeallocationConversion(),
+                    DeallocCodeBlockConversion(),
                     InsertBlockConversion(),
                     ExtractBlockConversion(),
                     EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_subroutine),
+                    FabricateOpConversion(
+                        qec_code=self.qec_code, fabricate_subroutine=fabricate_subroutine
+                    ),
                     QecCycleOpConversion(
                         qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_subroutine
                     ),
@@ -460,6 +525,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         qec_code=self.qec_code,
                         gate_subroutines=transversal_gate_subroutines,
                     ),
+                    UpdateFunctionSignatures(),
                 ]
             )
         ).rewrite_module(op)
@@ -741,6 +807,91 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         funcOp = func.FuncOp(
             name=f"encode_zero_{self.qec_code.name}",
+            function_type=(input_types, output_types),
+            visibility="private",
+            region=Region([block]),
+        )
+
+        return funcOp
+
+    # MARK: Fabricate subroutine
+
+    def create_fabricate_subroutine(self) -> func.FuncOp:
+        """Create a subroutine that allocates a codeblock and encodes it in the magic state for
+        the QEC code (based on the tanner graph), and returns the encoded codeblock. This is a
+        non-fault tolerant encoding intended for use on a simulator, and not a distillation process
+        for generating a magic state from many noisy copies.
+
+        The encoding process follows the third option for magic state encoding described in
+        https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that the correction is
+        SX as decribed in Nielsen & Chuang, (Section 10.6.2), rather than a single NOT gate.
+        This was found to produce the correct result for circuit simulations.
+
+        The encoding method involves putting the initial QEC physical qubit in the desired state
+        via application of a Hadamard and physical T gate, and then using the gate encoding for the
+        zero state to create the desired state for the codeblock. Note that we do not use the
+        syndrome-measurement based encoding that we use for `encode [zero]`; the unitary
+        encoder maps an arbitrary input |psi> -> |psi_L>, whereas the stabilizer-measurement
+        enocding procedure only projects the input state onto the codespace.
+
+        Note that this method does not insert the subroutine into the module op. Instead it
+        returns the built func.FuncOp object that can then be subsequently inserted where desired.
+        """
+        unitary_encoding_info = self.qec_code.unitary_encoding
+
+        required_keys = {"state_prep_index", "hadamard_indices", "cnot_indices"}
+        if not required_keys.issubset(unitary_encoding_info):  # pragma: no cover
+            raise CompileError(
+                f"QEC code '{self.qec_code.name}' does not define a unitary encoding "
+                f"(missing {required_keys - set(unitary_encoding_info)}); cannot lower "
+                f"qecl.fabricate [magic] for this code."
+            )
+
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+        input_types = ()
+        output_types = (codeblock_type,)
+
+        block = Block(arg_types=input_types)
+
+        with ImplicitBuilder(block):
+            codeblock = qecp.AllocCodeblockOp(
+                codeblock_type=qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+            )
+
+            # extract qubits
+            extract_ops = [qecp.ExtractQubitOp(codeblock, i) for i in range(self.qec_code.n)]
+            magic_state_qubits = {i: ext_op.results[0] for i, ext_op in enumerate(extract_ops)}
+
+            # apply H and T to the state prep input qubit
+            state_prep_index = unitary_encoding_info["state_prep_index"]
+            h_op = qecp.HadamardOp(magic_state_qubits[state_prep_index])
+            t_op = qecp.TOp(h_op.results[0])
+            magic_state_qubits[state_prep_index] = t_op.results[0]
+
+            # Perform unitary encoding circuit for the code
+            hadamards = unitary_encoding_info["hadamard_indices"]
+            cnot_pairs = unitary_encoding_info["cnot_indices"]
+
+            for idx in hadamards:
+                h = qecp.HadamardOp(magic_state_qubits[idx])
+                magic_state_qubits[idx] = h.results[0]
+
+            for ctrl_idx, trgt_idx in cnot_pairs:
+                cnot_op = qecp.CnotOp(magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx])
+                magic_state_qubits[ctrl_idx] = cnot_op.results[0]
+                magic_state_qubits[trgt_idx] = cnot_op.results[1]
+
+            # insert data qubits back into the codeblock
+            encoded_codeblock = codeblock
+            for i in range(self.qec_code.n):
+                insert_op = qecp.InsertQubitOp(encoded_codeblock, i, magic_state_qubits[i])
+                encoded_codeblock = insert_op.results[0]
+
+            # return the encoded codeblock
+            func.ReturnOp(encoded_codeblock)
+
+        funcOp = func.FuncOp(
+            name=f"fabricate_magic_state_{self.qec_code.name}",
             function_type=(input_types, output_types),
             visibility="private",
             region=Region([block]),
