@@ -946,7 +946,9 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                                  ╚═══╝
 
         The corresponding subroutine for T-adjoint uses a conjugate magic state, and applies
-        S-adjoint instead of S in the correction.
+        S-adj instead of S in the correction. The correction is derived in Zhou, Leung & Chuang,
+        Phys. Rev. A 62, 052316 (2000), arXiv:quant-ph/0002039, Sec. IV.A, Eqs. (13)-(15).
+        Replacing T in these equations with T-adjoint yields the correction used here.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
