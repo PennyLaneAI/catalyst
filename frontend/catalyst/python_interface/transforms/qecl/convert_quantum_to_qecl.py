@@ -943,6 +943,9 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
             |input_state> ──╰X──┤↗├──║── deallocate
                                  ╚═══╝
 
+        The corresponding subroutine for the adjoint uses a conjugate magic state, and applies
+        the conditional correction adjoint(SX), i.e. XS†
+        
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
         """
@@ -988,10 +991,17 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
             )
 
             with ImplicitBuilder(if_apply_corr_op.true_region):
-                # the correction operator "SX" is applied via applying its component gates
-                # right to left, i.e. with X, followed by S
-                corrected_cb1 = qecl.PauliXOp(magic_state1, idx=0)
-                corr_cb_out = qecl.SOp(corrected_cb1, idx=0)
+                # This branch is for the case where a correctable error was detected
+                if adj:
+                    # the correction operator "XS†" is applied via applying its component gates
+                    # right to left, i.e. with adjoint(S), followed by X   
+                    corrected_cb1 = qecl.SOp(magic_state1, idx=0, adjoint=True)
+                    corr_cb_out = qecl.PauliXOp(corrected_cb1, idx=0)
+                else:    
+                    # the correction operator "SX" is applied via applying its component gates
+                    # right to left, i.e. with X, followed by S               
+                    corrected_cb1 = qecl.PauliXOp(magic_state1, idx=0)
+                    corr_cb_out = qecl.SOp(corrected_cb1, idx=0)
                 scf.YieldOp(corr_cb_out)
 
             with ImplicitBuilder(if_apply_corr_op.false_region):

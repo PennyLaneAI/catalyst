@@ -862,9 +862,8 @@ class TestQECPassIntegration:
             # CHECK: qecp.decode_esm_css
             # CHECK: quantum.custom "Hadamard"
             qp.Hadamard(0)
-            qp.adjoint(qp.T(0))  # adjoint of op
-            if n==2:
-                qp.adjoint(qp.T)(0)  # adjoint of class - do we want to worry about supporting this?
+            for _ in range(n):
+                qp.adjoint(qp.T(0))
             for op in diagonalizing_gates:
                 op(0)
             m0 = qp.measure(0)
