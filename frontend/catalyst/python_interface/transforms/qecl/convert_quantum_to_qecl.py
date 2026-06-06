@@ -102,6 +102,8 @@ from catalyst.python_interface.dialects import qecl, quantum
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 from catalyst.utils.exceptions import CompileError
 
+# pylint: disable=too-many-lines
+
 # MARK: Alloc Op Pattern
 
 
