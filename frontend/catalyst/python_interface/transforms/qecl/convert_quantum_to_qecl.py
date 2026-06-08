@@ -716,6 +716,7 @@ class ScfIfConversion(ScfConversionPattern[scf.IfOp]):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: scf.IfOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.if` ops."""
         super().match_and_rewrite(op, rewriter)
 
     @classmethod
@@ -743,6 +744,7 @@ class ScfForConversion(ScfConversionPattern[scf.ForOp]):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: scf.ForOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.for` ops."""
         super().match_and_rewrite(op, rewriter)
 
         first_block = self._get_first_block(op)
@@ -786,11 +788,12 @@ class ScfForConversion(ScfConversionPattern[scf.ForOp]):
 # MARK: SCF While Pattern
 
 
-class ScfWhileConversion(ScfConversionPattern):
+class ScfWhileConversion(ScfConversionPattern[scf.WhileOp]):
     """Handles conversion of `scf.while` loop ops."""
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: scf.WhileOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.while` ops."""
         super().match_and_rewrite(op, rewriter)
 
         before_block = self._get_first_block_in_before_region(op)
