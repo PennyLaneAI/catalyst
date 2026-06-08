@@ -71,10 +71,6 @@ config.substitutions.append(("%PYTHON", python_executable))
 
 # allow virtual env for embedded interpreter
 config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", "")
-bytecode_path = getattr(config, "bytecode_path", "")
-if not bytecode_path:
-    bytecode_path = os.getenv("BYTECODE_PATH", "")
-config.substitutions.append(("%BYTECODE_PATH", bytecode_path))
 
 # Define PATH when running frontend tests from an mlir build target.
 try:
@@ -102,7 +98,7 @@ except AttributeError:
     from lit.llvm.config import LLVMConfig  # fmt:skip
     llvm_config = LLVMConfig(lit_config, config)
 
-    # When running outside CMake context (e.g., make lit-coverage)
+    # When running outside CMake context (e.g., make lit-coverage),
     # we need to manually set up the LLVM tools path
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
     llvm_tools_dir = os.path.join(project_root, "mlir", "llvm-project", "build", "bin")
@@ -125,4 +121,4 @@ except AttributeError:
 
     catalyst_bin_dir = os.getenv("CATALYST_BIN_DIR", "")
     if os.path.exists(catalyst_bin_dir):
-        llvm_config.add_tool_substitutions(["quantum-opt", "catalyst"], [catalyst_bin_dir])
+        llvm_config.add_tool_substitutions(["catalyst"], [catalyst_bin_dir])
