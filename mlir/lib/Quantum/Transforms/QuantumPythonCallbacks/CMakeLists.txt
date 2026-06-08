@@ -1,5 +1,5 @@
 option(CATALYST_ENABLE_PYTHON_CALLBACKS
-       "Build the embedded-interpreter callback plugin (PauliRot graph-decomposition)" ON)
+       "Build the embedded-interpreter callback plugin" ON)
 if (NOT CATALYST_ENABLE_PYTHON_CALLBACKS)
     return()
 endif()
@@ -45,19 +45,6 @@ target_link_libraries(QuantumPythonCallbacks PRIVATE
     quantum-transforms  # for DecompCallback
 )
 
-target_compile_definitions(QuantumPythonCallbacks PRIVATE
-    NB_DOMAIN=${MLIR_BINDINGS_PYTHON_NB_DOMAIN}
-)
-
-target_compile_options(QuantumPythonCallbacks PRIVATE
-    -Wno-cast-qual
-    -Wno-covered-switch-default
-)
-
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(QuantumPythonCallbacks PRIVATE "-Wno-unknown-warning-option")
-endif()
-
 if (APPLE)
     target_link_options(QuantumPythonCallbacks PRIVATE "LINKER:-undefined,dynamic_lookup")
 else()
@@ -68,13 +55,10 @@ target_include_directories(QuantumPythonCallbacks PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# Use a constant suffix to simplify locating the library
 set_target_properties(QuantumPythonCallbacks PROPERTIES
     PREFIX "lib"
+    SUFFIX ".so"
     POSITION_INDEPENDENT_CODE ON
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
-
-# Install next to the catalyst binary
-install(TARGETS QuantumPythonCallbacks
-    LIBRARY DESTINATION lib)
-
