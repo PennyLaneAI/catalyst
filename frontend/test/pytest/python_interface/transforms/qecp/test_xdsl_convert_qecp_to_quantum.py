@@ -743,7 +743,7 @@ class TestQECPassIntegration:
             convert_qecp_to_quantum_pass,
         )
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=123)
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -754,7 +754,7 @@ class TestQECPassIntegration:
             m0 = qp.measure(0)
             return qp.sample(m0)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=456)
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -767,7 +767,7 @@ class TestQECPassIntegration:
             m0 = qp.measure(0)
             return qp.sample(m0)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=789)
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
