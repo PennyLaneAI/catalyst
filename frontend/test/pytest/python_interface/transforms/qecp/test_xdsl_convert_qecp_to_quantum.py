@@ -883,3 +883,28 @@ class TestQECPassIntegration:
         eigenvalues = [-1 if s else 1 for s in samples]
         # could have a lower atol with more shots, but given test duration, not worth it
         assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.07)
+
+    def test_control_flow_null_qubit_Steane(self):
+        """Integration test for lowering a simple circuit with control flow through the QEC pipeline
+        and executing on null.qubit.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            @qp.for_loop(0, 10, 1)
+            def loop(i):
+                qp.cond(i % 2 == 0, qp.X, qp.Z)(0)
+
+            loop()
+            m0 = qp.measure(0)
+
+            return qp.sample([m0])
+
+        circ()
