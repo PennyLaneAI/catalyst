@@ -225,6 +225,31 @@ int mqbcGraphStatePrepNumQubitsAllocated(mlir::Value adjMatrix)
     return (1 + sqrtDiscriminant) / 2;
 }
 
+/**
+ * @brief Collect a single MBQC operation into the ResourceResult.
+ *
+ * This categorizes the operation into gates, measurements, classical instructions,
+ * or function calls, and updates the corresponding counts in the ResourceResult.
+ *
+ * @param op The MBQC operation to collect.
+ * @param result The ResourceResult to update with the operation's resource usage.
+ * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
+ */
+void collectMBQCOperation(Operation *op, ResourceResult &result, bool isAdjoint)
+{
+    std::string name = op->getName().getStringRef().str();
+    result.operations[name][{0, 0}] += 1;
+
+    // Metadata: MBQC graph qubit allocation
+    if (auto graphOp = dyn_cast<mbqc::GraphStatePrepOp>(op)) {
+        result.numAllocQubits += mqbcGraphStatePrepNumQubitsAllocated(graphOp.getAdjMatrix());
+    }
+
+    if (auto graphOp = dyn_cast<mbqc::RefGraphStatePrepOp>(op)) {
+        result.numAllocQubits += mqbcGraphStatePrepNumQubitsAllocated(graphOp.getAdjMatrix());
+    }
+}
+
 //===----------------------------------------------------------------------===//
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
@@ -502,18 +527,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     // MBQC operations
     if (isa<mbqc::MeasureInBasisOp, mbqc::RefMeasureInBasisOp, mbqc::GraphStatePrepOp,
             mbqc::RefGraphStatePrepOp>(op)) {
-        std::string name = op->getName().getStringRef().str();
-        result.operations[name][{0, 0}] += 1;
-
-        // Metadata: MBQC graph qubit allocation
-        if (auto graphOp = dyn_cast<mbqc::GraphStatePrepOp>(op)) {
-            result.numAllocQubits += mqbcGraphStatePrepNumQubitsAllocated(graphOp.getAdjMatrix());
-        }
-
-        if (auto graphOp = dyn_cast<mbqc::RefGraphStatePrepOp>(op)) {
-            result.numAllocQubits += mqbcGraphStatePrepNumQubitsAllocated(graphOp.getAdjMatrix());
-        }
-
+        collectMBQCOperation(op, result, isAdjoint);
         return;
     }
 
