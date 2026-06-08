@@ -149,6 +149,9 @@
   after magic state injection.
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
+* Fix memory bugs in the PBC passes.
+  [(#2918)](https://github.com/PennyLaneAI/catalyst/pull/2918)
+
 * Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
   after a PBC op but read from a register not updated by that op. Layer grouping now checks
   data dependencies through insert to extract chains instead of textual op ordering.
@@ -239,7 +242,12 @@
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
-* The experimental QEC pipeline now supports compilation and execution of circuits that only
+* The experimental `convert-qecl-to-qecp` pass has been extended to support lowering 
+  `qecl.fabricate [magic]` to a subroutine that prepares a magic state through a simple, 
+  non-fault tolerant encoding.
+  [(#2894)](https://github.com/PennyLaneAI/catalyst/pull/2894)
+
+* The experimental QEC pipeline now supports compilation and execution of circuits that only 
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
