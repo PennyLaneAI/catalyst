@@ -15,13 +15,12 @@
 #pragma once
 
 #include "llvm/ADT/StringMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "PBC/IR/PBCOps.h"
-
-#include <mlir/Dialect/Func/IR/FuncOps.h>
 
 using namespace mlir;
 

@@ -545,19 +545,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         return;
     }
 
-    // Metadata: qubit allocations
-    if (auto allocOp = dyn_cast<qref::AllocOp>(op)) {
-        uint64_t nqubits = allocOp.getNqubitsAttr().value_or(0);
-        result.numAllocQubits += nqubits;
-        return;
-    }
-
-    // Metadata: qubit allocation
-    if (isa<qref::AllocQubitOp>(op)) {
-        result.numAllocQubits += 1;
-        return;
-    }
-
     // Function calls
     if (auto callOp = dyn_cast<func::CallOp>(op)) {
         result.functionCalls[callOp.getCallee()] += 1;
