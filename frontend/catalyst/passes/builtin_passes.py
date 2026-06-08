@@ -1802,7 +1802,7 @@ def graph_decomposition_setup_inputs(
     fixed_decomps: dict | None = None,
     alt_decomps: dict | None = None,
     bytecode_rules: str | None = None,
-    _builtin_rule_path: Path = BYTECODE_FILE_PATH,
+    _builtin_rule_path: str = BYTECODE_FILE_PATH,
     callback_plugin_path: Path | None = None,
     libpython_path: Path | None = None,
 ):  # pylint: disable=unused-argument, too-many-arguments, too-many-positional-arguments
@@ -1909,7 +1909,7 @@ def graph_decomposition_setup_inputs(
 
     options: dict[str, dict | tuple | str] = {
         "gate_set": gate_set,
-        "bytecode_rules": str(_builtin_rule_path),
+        "bytecode_rules": _builtin_rule_path,
         "callback_plugin_path": libQPC_path,
         "libpython_path": str(libpython_path if libpython_path else get_libpython_path()),
     }

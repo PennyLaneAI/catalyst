@@ -47,12 +47,12 @@ namespace catalyst {
 
 static bool isSkippedOp(Operation *op)
 {
-    return isa<quantum::ComputationalBasisOp, quantum::DeallocOp, qref::DeallocOp,
-               quantum::DeallocQubitOp, qref::DeallocQubitOp, quantum::DeviceReleaseOp,
-               quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp, quantum::HamiltonianOp,
-               quantum::HermitianOp, qref::HermitianOp, quantum::InitializeOp, quantum::InsertOp,
-               quantum::NamedObsOp, qref::NamedObsOp, quantum::NumQubitsOp, quantum::TensorOp,
-               quantum::YieldOp, pbc::YieldOp>(op);
+    return isa<quantum::ComputationalBasisOp, qref::ComputationalBasisOp, quantum::DeallocOp,
+               qref::DeallocOp, quantum::DeallocQubitOp, qref::DeallocQubitOp,
+               quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp,
+               quantum::HamiltonianOp, quantum::HermitianOp, qref::HermitianOp,
+               quantum::InitializeOp, quantum::InsertOp, quantum::NamedObsOp, qref::NamedObsOp,
+               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp>(op);
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.
@@ -140,7 +140,7 @@ static std::string getPBCOpName(Operation *op)
             return "PPR-pi/" + std::to_string(std::abs(rk));
         })
         .Case<pbc::PPRotationArbitraryOp>([](auto) -> std::string { return "PPR-Phi"; })
-        .Case<pbc::PPMeasurementOp, pbc::SelectPPMeasurementOp>(
+        .Case<pbc::PPMeasurementOp, pbc::RefPPMeasurementOp, pbc::SelectPPMeasurementOp>(
             [](auto) -> std::string { return "PPM"; })
         .Default([](Operation *o) { return o->getName().getStringRef().str(); });
 }
@@ -204,6 +204,25 @@ static std::string getMeasurementName(Operation *op)
     return baseName;
 }
 
+/**
+ * @brief Collect a single MBQC operation into the ResourceResult.
+ *
+ * This categorizes the operation into gates, measurements, classical instructions,
+ * or function calls, and updates the corresponding counts in the ResourceResult.
+ *
+ * @param op The MBQC operation to collect.
+ * @param result The ResourceResult to update with the operation's resource usage.
+ * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
+ */
+void collectMBQCOperation(Operation *op, ResourceResult &result, bool isAdjoint)
+{
+    std::string name = op->getName().getStringRef().str();
+    result.operations[name][{0, 0}] += 1;
+
+    llvm::TypeSwitch<Operation *, void>(op).Case<mbqc::GraphStatePrepOp, mbqc::RefGraphStatePrepOp>(
+        [&](auto graphOp) { result.numAllocQubits += graphOp.getNumQubitsFromAdjMatrixSize(); });
+}
+
 //===----------------------------------------------------------------------===//
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
@@ -253,8 +272,13 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
 
         if (funcOp.getName() == entryFunc) {
             for (auto argType : funcOp.getArgumentTypes()) {
-                if (isa<quantum::QubitType>(argType)) {
+                if (isa<quantum::QubitType, qref::QubitType>(argType)) {
                     result.numArgQubits += 1;
+                }
+                if (auto qregType = dyn_cast<qref::QuregType>(argType)) {
+                    if (qregType.isStatic()) {
+                        result.numArgQubits += qregType.getSize().getInt();
+                    }
                 }
             }
         }
@@ -478,8 +502,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // PBC operations
-    if (isa<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
-            pbc::SelectPPMeasurementOp, pbc::PrepareStateOp, pbc::FabricateOp>(op)) {
+    if (isa<pbc::PPRotationOp, pbc::RefPPMeasurementOp, pbc::PPRotationArbitraryOp,
+            pbc::PPMeasurementOp, pbc::SelectPPMeasurementOp, pbc::PrepareStateOp,
+            pbc::FabricateOp>(op)) {
         std::string name = getPBCOpName(op);
         int nQubits = getPBCQubitCount(op);
         result.operations[name][{nQubits, 0}] += 1;
@@ -487,9 +512,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // MBQC operations
-    if (isa<mbqc::MeasureInBasisOp, mbqc::GraphStatePrepOp>(op)) {
-        std::string name = op->getName().getStringRef().str();
-        result.operations[name][{0, 0}] += 1;
+    if (isa<mbqc::MeasureInBasisOp, mbqc::RefMeasureInBasisOp, mbqc::GraphStatePrepOp,
+            mbqc::RefGraphStatePrepOp>(op)) {
+        collectMBQCOperation(op, result, isAdjoint);
         return;
     }
 
@@ -507,8 +532,15 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         return;
     }
 
+    // Metadata: qubit allocations
+    if (auto allocOp = dyn_cast<qref::AllocOp>(op)) {
+        uint64_t nqubits = allocOp.getNqubitsAttr().value_or(0);
+        result.numAllocQubits += nqubits;
+        return;
+    }
+
     // Metadata: qubit allocation
-    if (isa<quantum::AllocQubitOp>(op)) {
+    if (isa<quantum::AllocQubitOp, qref::AllocQubitOp>(op)) {
         result.numAllocQubits += 1;
         return;
     }

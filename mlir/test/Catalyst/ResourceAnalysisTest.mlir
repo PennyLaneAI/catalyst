@@ -43,6 +43,27 @@ func.func @basic_gates() {
 
 // -----
 
+// MBQC Operations
+
+// CHECK-LABEL: "mbqc_gates"
+// CHECK: "num_alloc_qubits": 4
+// CHECK: "operations"
+// CHECK-DAG: "mbqc.graph_state_prep(0)": 1,
+// CHECK-DAG: "mbqc.measure_in_basis(0)": 1
+func.func @mbqc_gates() {
+    %adj_matrix = arith.constant dense<[1, 0, 1, 0, 0, 1]> : tensor<6xi1>
+    %graph_reg = mbqc.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
+
+    %q0 = quantum.extract %graph_reg[0] : !quantum.reg -> !quantum.bit
+
+    %angle = arith.constant 4.0 : f64
+    %mbqc_meas, %out = mbqc.measure_in_basis [ZX, %angle] %q0 : i1, !quantum.bit
+
+    return
+}
+
+// -----
+
 // PBC operations (PPR and PPM)
 
 // CHECK-LABEL: "pbc_operations"
@@ -845,17 +866,20 @@ func.func @auto_qm_flag_unset() {
 // CHECK: "measurements"
 // CHECK-DAG: "MidCircuitMeasure": 1
 
-// CHECK:   "num_alloc_qubits": 2
-// CHECK:   "num_arg_qubits": 0
-// CHECK:   "num_qubits": 2
+// CHECK:   "num_alloc_qubits": 6
+// CHECK:   "num_arg_qubits": 3
+// CHECK:   "num_qubits": 9
 
 // CHECK:   "operations"
 // CHECK-DAG: "Adjoint(Hadamard)(1)": 1
 // CHECK-DAG: "CNOT(2)": 1
 // CHECK-DAG: "Adjoint(T)(1)": 1
 // CHECK-DAG: "S(1)": 1
+// CHECK-PPM: "PPM(0)": 1,
+// CHECK-DAG: "mbqc.ref.graph_state_prep(0)": 1,
+// CHECK-DAG: "mbqc.ref.measure_in_basis(0)": 1
 
-func.func @qref() {
+func.func @qref(%arg0: !qref.bit, %arg1: !qref.reg<2>) {
     %0 = qref.alloc( 2) : !qref.reg<2>
     %1 = qref.get %0[ 0] : !qref.reg<2> -> !qref.bit
     %2 = qref.get %0[ 1] : !qref.reg<2> -> !qref.bit
@@ -866,7 +890,17 @@ func.func @qref() {
     qref.custom "T"() %1 adj : !qref.bit
     qref.custom "S"() %2 : !qref.bit
     qref.custom "CNOT"() %1, %2 : !qref.bit, !qref.bit
+
     %meas = qref.measure %1 : i1
+
+    %pbc_meas = pbc.ref.ppm ["X", "Z"] %1, %2: i1
+
+    %angle = arith.constant 4.0 : f64
+    %mbqc_meas = mbqc.ref.measure_in_basis [ZX, %angle] %2 : i1
+
+    %adj_matrix = arith.constant dense<[1, 0, 1, 0, 0, 1]> : tensor<6xi1>
+    %graph_reg = mbqc.ref.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !qref.reg<4>
+
     qref.dealloc %0 : !qref.reg<2>
     return
 }
