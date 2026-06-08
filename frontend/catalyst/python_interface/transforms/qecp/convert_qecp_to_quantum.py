@@ -319,16 +319,17 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
     def _apply_experimental_hyperregister_lowering(self, op: builtin.ModuleOp):
         """Apply a separate pattern rewrite for lowering hyperregister-related qecp ops to quantum
         ops.
+
         NOTE: This is an experimental rewriting for the hyperregister related operations and types.
+
         1. Each codeblock allocated by qecp.alloc is replaced with a quantum.reg allocation.
         2. The encoding loop operation is unrolled.
         3. `qecp.extract_codeblock` operations are removed from the IR by replacing the uses with
-        the corresponding quantum.reg SSA value.
+           the corresponding quantum.reg SSA value.
         4. `qecp.insert_codeblock` operations are replaced with `quantum.dealloc` operation.
+
         NOTE: The current implementation only targets the 3-logical qubit GHZ circuit. The
         implementation is based on the IR structure of the specific circuit.
-        TODO: We might come back to update the logic below to support 1-logical qubit circuits,
-        where there is no ForOp encoding loop in the IR.
         """
         # Step 1: Unroll encoding loops and ensure the quantum.node op body contains no
         # nested regions.
