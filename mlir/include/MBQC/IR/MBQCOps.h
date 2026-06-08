@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <cmath> // std::sqrt, ceil, floor for formulas on graph state prep op
+
 #include "MBQC/IR/MBQCDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
