@@ -157,12 +157,6 @@ def DecomposeArbitraryPPRPass : Pass<"decompose-arbitrary-ppr"> {
     let summary = "Decompose an arbitrary angle PPR into a collection of PPRs, PPMs and a single-qubit arbitrary PPR in the Z basis.";
 }
 
-def UnrollConditionalPPRPPMPass : Pass<"unroll-conditional-ppr-ppm"> {
-    let summary = "Lower conditional PPR/PPM operations into normal PPR/PPM using scf conditional dialect.";
-    
-    let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
-}
-
 def LowerPBCInitOpsPass : Pass<"lower-pbc-init-ops"> {
     let summary = "Lower PBC initialization ops (prepare, fabricate) to quantum dialect op (set_basis_state).";
     

@@ -34,7 +34,6 @@ void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &,
 void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool avoidYMeasure);
 void populatePPRToMBQCPatterns(mlir::RewritePatternSet &);
 void populateDecomposeArbitraryPPRPatterns(mlir::RewritePatternSet &);
-void populateUnrollConditionalPPRPPMPatterns(mlir::RewritePatternSet &);
 void populateLowerPBCInitOpsPatterns(mlir::RewritePatternSet &);
 void populateConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
                                 mlir::RewritePatternSet &patterns);
