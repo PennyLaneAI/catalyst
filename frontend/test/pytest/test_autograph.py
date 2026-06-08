@@ -28,6 +28,7 @@ from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
 
+import catalyst
 from catalyst import AutoGraphError, debug, passes, qjit
 from catalyst.api_extensions import (
     adjoint,
@@ -44,8 +45,8 @@ from catalyst.api_extensions import (
 )
 from catalyst.autograph import autograph_source, disable_autograph, run_autograph
 from catalyst.autograph.transformer import TRANSFORMER
-from catalyst.utils.dummy import dummy_func
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.patching import Patcher
 
 
 def check_cache(*args):
@@ -1890,6 +1891,19 @@ class TestDisableAutograph:
             return x
 
         assert g() == 36.4
+
+
+def dummy_func(x):
+    """Simple function with if statements for testing the 'auto_include' option of @qjit.
+    The parent 'catalyst' module is excluded for autograph conversion by default, hence
+    adding this module explicitly to the inclusion list will override that restriction"""
+
+    with Patcher((catalyst, "compile_without_static_conditionals", False)):
+        if x > 5:
+            y = x**2
+        else:
+            y = x**3
+    return y
 
 
 class TestAutographInclude:
