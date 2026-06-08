@@ -196,7 +196,7 @@ class TestQecLogicalOps:
 
         assert_valid_idx_attr(insert_block_op, idx)
 
-    @pytest.mark.parametrize("init_state", ["magic", qecl.LogicalCodeblockInitStateAttr("magic")])
+    @pytest.mark.parametrize("init_state", ["magic", qecl.LogicalCodeblockInitStateAttr("magic"), "magic_conj", qecl.LogicalCodeblockInitStateAttr("magic_conj")])
     def test_qecl_op_constructor_fabricate(self, init_state):
         """Test the constructor of the qecl.fabricate op."""
         fabricate_op = qecl.FabricateOp(
@@ -320,6 +320,9 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[magic:%.+]] = qecl.fabricate{{\s*}}[magic] : !qecl.codeblock<1>
     %magic = qecl.fabricate [magic] : !qecl.codeblock<1>
+
+    // CHECK: [[magic:%.+]] = qecl.fabricate{{\s*}}[magic_conj] : !qecl.codeblock<1>
+    %magic_conj = qecl.fabricate [magic_conj] : !qecl.codeblock<1>
 
     // CHECK: qecl.dealloc_cb [[magic]] : !qecl.codeblock<1>
     qecl.dealloc_cb %magic : !qecl.codeblock<1>
