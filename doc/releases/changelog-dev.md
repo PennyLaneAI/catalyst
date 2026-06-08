@@ -69,9 +69,9 @@
   ```python
   import pennylane as qp
   import catalyst
-  
+
   catalyst.compile_without_static_loops = True
-  
+
   @qp.qjit
   @qp.qnode(qp.device("lightning.qubit", wires=2))
   def f():
@@ -251,16 +251,12 @@
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
-<<<<<<< HEAD
-* The experimental QEC pipeline now supports compilation and execution of circuits that only
-=======
-* The experimental `convert-qecl-to-qecp` pass has been extended to support lowering 
-  `qecl.fabricate [magic]` to a subroutine that prepares a magic state through a simple, 
+* The experimental `convert-qecl-to-qecp` pass has been extended to support lowering
+  `qecl.fabricate [magic]` to a subroutine that prepares a magic state through a simple,
   non-fault tolerant encoding.
   [(#2894)](https://github.com/PennyLaneAI/catalyst/pull/2894)
 
-* The experimental QEC pipeline now supports compilation and execution of circuits that only 
->>>>>>> origin/main
+* The experimental QEC pipeline now supports compilation and execution of circuits that only
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
