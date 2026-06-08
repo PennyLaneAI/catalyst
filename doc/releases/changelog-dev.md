@@ -21,6 +21,9 @@
   [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
   [(#2900)](https://github.com/PennyLaneAI/catalyst/pull/2900)
 
+* The `ResourceAnalysis` pass now supports IR in reference semantics natively, rather than requiring a conversion step.
+  [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
+
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
@@ -277,6 +280,7 @@ Lillian Frederiksen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
+River McCubbin,
 Shuli Shu,
 Paul Haochen Wang,
 Jake Zaia.
