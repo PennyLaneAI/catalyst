@@ -39,15 +39,7 @@ std::atomic<bool> resolutionAttempted{false};
 
 using RegisterFn = void (*)();
 
-static const std::vector<std::string> kAlternativePluginNames = {
-    "libQuantumPythonCallbacks.so",
-    "libQuantumPythonCallbacks.abi3.so",
-    "libQuantumPythonCallbacks.cpython-311-darwin.so",
-    "libQuantumPythonCallbacks.dylib",
-    "libQuantumPythonCallbacks.abi3.dylib",
-    "libQuantumPythonCallbacks.cpython-311-aarch64-linux-gnu.so",
-    "libQuantumPythonCallbacks.cpython-311-x86_64-linux-gnu.so",
-};
+static const std::string pluginName = "libQuantumPythonCallbacks.so";
 
 // Resolve the plugin path. Search order:
 // 1. $CATALYST_PYTHON_CALLBACK_PLUGIN (explicit override).
@@ -66,12 +58,10 @@ std::string resolvePluginPath(std::string callbackPluginPath)
         }
 
         if (llvm::sys::fs::is_directory(path)) {
-            for (const auto &name : kAlternativePluginNames) {
-                llvm::SmallString<256> candidate(path);
-                llvm::sys::path::append(candidate, name);
-                if (llvm::sys::fs::exists(candidate)) {
-                    return std::string(candidate);
-                }
+            llvm::SmallString<256> candidate(path);
+            llvm::sys::path::append(candidate, pluginName);
+            if (llvm::sys::fs::exists(candidate)) {
+                return std::string(candidate);
             }
             return {};
         }
