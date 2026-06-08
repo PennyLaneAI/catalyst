@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Utility code for keeping paths
-"""
+"""Utility code for keeping paths."""
 
 import os
 import os.path
@@ -52,7 +50,7 @@ BYTECODE_FILE_PATH = os.path.join(
 )
 
 
-def get_libpython_path() -> Path | str:  # pragma: no cover
+def get_libpython_path() -> str:  # pragma: no cover
     """Return the path to the python shared library, or empty string if failed to find."""
     libdir = sysconfig.get_config_var("LIBDIR")
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
@@ -60,15 +58,15 @@ def get_libpython_path() -> Path | str:  # pragma: no cover
 
     # macOS framework-style installations
     if framework_prefix:
-        return Path(framework_prefix) / Path(ldlibrary)
+        return os.path.join(framework_prefix, ldlibrary)
 
     if not (libdir and ldlibrary):
         return ""
 
     # standard installation
-    ldlibrary_path = Path(libdir) / ldlibrary
-    if ldlibrary_path.exists():
-        return ldlibrary_path.resolve()
+    ldlibrary_path = os.path.join(libdir, ldlibrary)
+    if os.path.exists(ldlibrary_path):
+        return ldlibrary_path
 
     return ""
 
