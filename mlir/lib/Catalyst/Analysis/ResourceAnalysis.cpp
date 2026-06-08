@@ -205,27 +205,6 @@ static std::string getMeasurementName(Operation *op)
 }
 
 /**
- * @brief return the number of qubits allocated by an mbqc (Ref)GraphStatePrepOp if the input tensor
- * is static, or 0.
- */
-int mqbcGraphStatePrepNumQubitsAllocated(mlir::Value adjMatrix)
-{
-    auto shapedType = llvm::dyn_cast<mlir::ShapedType>(adjMatrix.getType());
-    if (shapedType.isDynamicDim(0)) {
-        llvm::errs() << "failed to cast mbqc graph shape\n";
-        return 0;
-    }
-
-    int64_t m = shapedType.getDimSize(0);
-
-    int64_t discriminant = 1 + 8 * m;
-
-    int64_t sqrtDiscriminant = std::sqrt(discriminant);
-    llvm::errs() << "found mbqc graph num qubits: " << (1 + sqrtDiscriminant) / 2 << "\n";
-    return (1 + sqrtDiscriminant) / 2;
-}
-
-/**
  * @brief Collect a single MBQC operation into the ResourceResult.
  *
  * This categorizes the operation into gates, measurements, classical instructions,
@@ -240,14 +219,8 @@ void collectMBQCOperation(Operation *op, ResourceResult &result, bool isAdjoint)
     std::string name = op->getName().getStringRef().str();
     result.operations[name][{0, 0}] += 1;
 
-    // Metadata: MBQC graph qubit allocation
-    if (auto graphOp = dyn_cast<mbqc::GraphStatePrepOp>(op)) {
-        result.numAllocQubits += mqbcGraphStatePrepNumQubitsAllocated(graphOp.getAdjMatrix());
-    }
-
-    if (auto graphOp = dyn_cast<mbqc::RefGraphStatePrepOp>(op)) {
-        result.numAllocQubits += mqbcGraphStatePrepNumQubitsAllocated(graphOp.getAdjMatrix());
-    }
+    llvm::TypeSwitch<Operation *, void>(op).Case<mbqc::GraphStatePrepOp, mbqc::RefGraphStatePrepOp>(
+        [&](auto graphOp) { result.numAllocQubits += graphOp.getNumQubitsFromAdjMatrixSize(); });
 }
 
 //===----------------------------------------------------------------------===//
