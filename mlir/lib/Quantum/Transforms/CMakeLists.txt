@@ -1,7 +1,6 @@
 set(LIBRARY_NAME quantum-transforms)
 
 add_subdirectory(DecompGraphSolver)
-# add_subdirectory(QuantumPythonCallbacks)
 
 file(GLOB SRC
     AdjointPatterns.cpp
