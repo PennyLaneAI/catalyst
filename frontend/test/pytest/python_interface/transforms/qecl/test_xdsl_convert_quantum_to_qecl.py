@@ -673,8 +673,8 @@ class TestGatePattern:
             // CHECK-NEXT: [[mres:%.+]], [[in_codeblock3:%.+]] = qecl.measure [[in_codeblock2]][0]
             // CHECK-NEXT: qecl.dealloc_cb [[in_codeblock3]]
             // CHECK-NEXT: [[out_codeblock:%.+]] = scf.if [[mres]] -> (!qecl.codeblock<1>)
-            // CHECK-NEXT:     [[s_corrected_cb:%.+]] = qecl.s [[magic_cb2]][0]
-            // CHECK-NEXT:     [[corrected_cb:%.+]] = qecl.x [[s_corrected_cb]]
+            // CHECK-NEXT:     [[x_corrected_cb:%.+]] = qecl.x [[magic_cb2]][0]
+            // CHECK-NEXT:     [[corrected_cb:%.+]] = qecl.s [[x_corrected_cb]]
             // CHECK-NEXT:     scf.yield [[corrected_cb]]
             // CHECK-NEXT: else
             // CHECK-NEXT:     scf.yield [[magic_cb2]]
@@ -877,17 +877,15 @@ class TestControlFlow:
         builtin.module @top {
         // CHECK-LABEL: func.func @test_program(
         func.func @test_program(%arg0: tensor<i1>) {
-            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            //   COM: <qecl.extract_block>
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
             //   COM: <qecl.encode>
-            // CHECK: [[hreg0:%.+]] = qecl.insert_block
             %0 = quantum.alloc( 1) : !quantum.reg
 
             // CHECK: [[cond:%.+]] = tensor.extract
             %cond = tensor.extract %arg0[] : tensor<i1>
 
             // CHECK: [[out_hreg:%.+]] = scf.if [[cond]] -> (!qecl.hyperreg<1 x 1>)
-            // CHECK:     qecl.extract_block [[hreg0]][0]
+            // CHECK:     qecl.extract_block [[hreg0:%.+]][0]
             //   COM:     <qec cycle>
             // CHECK:     qecl.x
             //   COM:     <qec cycle>
@@ -934,38 +932,34 @@ class TestControlFlow:
         builtin.module @top {
         // CHECK-LABEL: func.func @test_program(
         func.func @test_program(%arg0: tensor<i1>) {
-            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            //   COM: <qecl.extract_block>
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
             //   COM: <qecl.encode>
-            // CHECK: [[hreg0:%.+]] = qecl.insert_block
-            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]]
-            //   COM: <qec cycle>
-            // CHECK: [[cb1:%.+]] = qecl.x
-            // CHECK: [[cb2:%.+]] = qecl.qec
             %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: {{%.+}} = qecl.extract_block [[hreg0:%.+]][0]
+            //   COM: <qecl.qec>
             %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-            %2 = quantum.custom "PauliX"() %1 : !quantum.bit
 
             // CHECK: [[cond:%.+]] = tensor.extract
             %cond = tensor.extract %arg0[] : tensor<i1>
 
             // CHECK: [[out_cb:%.+]] = scf.if [[cond]] -> (!qecl.codeblock<1>)
-            // CHECK:     [[cb3:%.+]] = qecl.z [[cb2]]
-            // CHECK:     [[cb4:%.+]] = qecl.qec
-            // CHECK:     scf.yield [[cb4]] : !qecl.codeblock<1>
+            // CHECK:     qecl.z [[cb0:%.+]][0]
+            //   COM:     <qecl.qec>
+            // CHECK:     scf.yield {{%.+}} : !qecl.codeblock<1>
             // CHECK: else
-            // CHECK:     scf.yield [[cb2]] : !qecl.codeblock<1>
-            %3 = scf.if %cond -> (!quantum.bit) {
-                %5 = quantum.custom "PauliZ"() %2 : !quantum.bit
-                scf.yield %5 : !quantum.bit
+            // CHECK:     scf.yield [[cb0]] : !qecl.codeblock<1>
+            %2 = scf.if %cond -> (!quantum.bit) {
+                %4 = quantum.custom "PauliZ"() %1 : !quantum.bit
+                scf.yield %4 : !quantum.bit
             } else {
-                scf.yield %2 : !quantum.bit
+                scf.yield %1 : !quantum.bit
             }
 
-            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]]
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[out_cb]]
             // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
-            %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
-            quantum.dealloc %4 : !quantum.reg
+            %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+            quantum.dealloc %3 : !quantum.reg
             func.return
         }
         }
@@ -984,17 +978,15 @@ class TestControlFlow:
         builtin.module @top {
         // CHECK-LABEL: func.func @test_program(
         func.func @test_program(%arg0: tensor<i1>) {
-            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            //   COM: <qecl.extract_block>
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
             //   COM: <qecl.encode>
-            // CHECK: [[hreg0:%.+]] = qecl.insert_block
             %0 = quantum.alloc( 1) : !quantum.reg
 
             // CHECK: [[cond:%.+]] = tensor.extract
             %cond = tensor.extract %arg0[] : tensor<i1>
 
             // CHECK: [[mres:%.+]], [[out_hreg:%.+]] = scf.if [[cond]] -> (i1, !qecl.hyperreg<1 x 1>)
-            // CHECK:     qecl.extract_block [[hreg0]][0]
+            // CHECK:     qecl.extract_block [[hreg0:%.+]][0]
             //   COM:     <qec cycle>
             // CHECK:     [[mres_true:%.+]], {{%.+}} = qecl.measure
             //   COM:     <qec cycle>
@@ -1033,17 +1025,15 @@ class TestControlFlow:
         builtin.module @top {
         // CHECK-LABEL: func.func @test_program(
         func.func @test_program(%arg0: tensor<i1>, %arg1: tensor<i1>) {
-            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            //   COM: <qecl.extract_block>
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
             //   COM: <qecl.encode>
-            // CHECK: [[hreg0:%.+]] = qecl.insert_block
             %0 = quantum.alloc( 1) : !quantum.reg
 
             // CHECK: [[cond0:%.+]] = tensor.extract
             %cond0 = tensor.extract %arg0[] : tensor<i1>
 
             // CHECK: [[outer_hreg:%.+]] = scf.if [[cond0]] -> (!qecl.hyperreg<1 x 1>)
-            // CHECK:     qecl.extract_block [[hreg0]][0]
+            // CHECK:     qecl.extract_block [[hreg0:%.+]][0]
             //   COM:     <qec cycle>
             // CHECK:     qecl.x
             //   COM:     <qec cycle>
@@ -1110,14 +1100,12 @@ class TestControlFlow:
             %c5 = arith.constant 5 : index
             %c0 = arith.constant 0 : index
 
-            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            //   COM: <qecl.extract_block>
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
             //   COM: <qecl.encode>
-            // CHECK: [[hreg0:%.+]] = qecl.insert_block
             %0 = quantum.alloc( 1) : !quantum.reg
 
             //      CHECK: [[out_hreg:%.+]] = scf.for %arg0 = [[c0]] to [[c5]] step [[c1]]
-            // CHECK-SAME:         iter_args([[hreg_arg:%.+]] = [[hreg0]]) -> (!qecl.hyperreg<1 x 1>)
+            // CHECK-SAME:         iter_args([[hreg_arg:%.+]] = {{%.+}}) -> (!qecl.hyperreg<1 x 1>)
             //      CHECK:     [[hreg1:%.+]] = qecl.extract_block [[hreg_arg]][0]
             //        COM:     <qec cycle>
             //      CHECK:     qecl.x
@@ -1160,32 +1148,28 @@ class TestControlFlow:
             %c5 = arith.constant 5 : index
             %c0 = arith.constant 0 : index
 
-            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            //   COM: <qecl.extract_block>
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
             //   COM: <qecl.encode>
-            // CHECK: [[hreg0:%.+]] = qecl.insert_block
-            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]]
-            //   COM: <qec cycle>
-            // CHECK: [[cb1:%.+]] = qecl.x
-            // CHECK: [[cb2:%.+]] = qecl.qec
             %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: {{%.+}} = qecl.extract_block [[hreg0:%.+]][0]
+            //   COM: <qec cycle>
             %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-            %2 = quantum.custom "PauliX"() %1 : !quantum.bit
 
             //      CHECK: [[out_cb:%.+]] = scf.for %arg0 = [[c0]] to [[c5]] step [[c1]]
-            // CHECK-SAME:         iter_args([[cb_arg:%.+]] = [[cb2]]) -> (!qecl.codeblock<1>)
-            //      CHECK:     [[cb3:%.+]] = qecl.x
-            //      CHECK:     [[cb4:%.+]] = qecl.qec
-            //      CHECK:     scf.yield [[cb4]] : !qecl.codeblock<1>
-            %3 = scf.for %arg0 = %c0 to %c5 step %c1 iter_args(%arg1 = %2) -> (!quantum.bit) {
+            // CHECK-SAME:         iter_args([[cb_arg:%.+]] = {{%.+}}) -> (!qecl.codeblock<1>)
+            //      CHECK:     qecl.x
+            //        COM:     <qecl.qec>
+            //      CHECK:     scf.yield {{.+}} : !qecl.codeblock<1>
+            %2 = scf.for %arg0 = %c0 to %c5 step %c1 iter_args(%arg1 = %1) -> (!quantum.bit) {
                 %out_qubits = quantum.custom "PauliX"() %arg1 : !quantum.bit
                 scf.yield %out_qubits : !quantum.bit
             }
 
             // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[out_cb]]
             // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
-            %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
-            quantum.dealloc %4 : !quantum.reg
+            %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+            quantum.dealloc %3 : !quantum.reg
             func.return
         }
         }
@@ -1208,18 +1192,16 @@ class TestControlFlow:
             %c5 = arith.constant 5 : index
             %c0 = arith.constant 0 : index
 
-            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            //   COM: <qecl.extract_block>
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
             //   COM: <qecl.encode>
-            // CHECK: [[hreg0:%.+]] = qecl.insert_block
             %0 = quantum.alloc( 1) : !quantum.reg
 
             // CHECK: [[c1_i64:%.+]] = arith.constant dense<1> : tensor<i64>
             %c1_i64 = arith.constant dense<1> : tensor<i64>
 
             //      CHECK: [[c_out:%.+]], [[hreg_out:%.+]] = scf.for %arg1 = %c0 to %c5 step %c1
-            // CHECK-SAME:         iter_args([[c_arg:%.+]] = [[c1_i64]], [[hreg_arg:%.+]] = [[hreg0]])
-            // CHECK-SAME:          -> (tensor<i64>, !qecl.hyperreg<1 x 1>)
+            // CHECK-SAME:         iter_args([[c_arg:%.+]] = [[c1_i64]], [[hreg_arg:%.+]] = {{%.+}}) ->
+            // CHECK-SAME:         (tensor<i64>, !qecl.hyperreg<1 x 1>)
             //      CHECK:     [[hreg1:%.+]] = qecl.extract_block [[hreg_arg]][0]
             //        COM:     <qec cycle>
             //      CHECK:     qecl.x
@@ -1256,25 +1238,23 @@ class TestControlFlow:
             %c5 = arith.constant 5 : index
             %c0 = arith.constant 0 : index
 
-            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            //   COM: <qecl.extract_block>
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
             //   COM: <qecl.encode>
-            // CHECK: [[hreg0:%.+]] = qecl.insert_block
-            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]]
-            // CHECK: [[cb1:%.+]] = qecl.qec [[cb0]]
             %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: {{%.+}} = qecl.extract_block [[hreg0:%.+]][0]
             %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
 
             //      CHECK: [[outer_cb:%.+]] = scf.for {{%.+}} = [[c0]] to [[c5]] step [[c1]]
-            // CHECK-SAME:         iter_args([[cb_arg_outer:%.+]] = [[cb1]]) -> (!qecl.codeblock<1>)
-            //      CHECK:     [[cb2:%.+]] = qecl.x [[cb_arg_outer]][0]
-            //      CHECK:     [[cb3:%.+]] = qecl.qec [[cb2]]
+            // CHECK-SAME:         iter_args([[cb_arg_outer:%.+]] = {{%.+}}) -> (!qecl.codeblock<1>)
+            //      CHECK:     qecl.x [[cb_arg_outer]][0]
+            //        COM:     <qecl.qec>
             //      CHECK:     [[inner_cb:%.+]] = scf.for {{%.+}} = [[c0]] to [[c5]] step [[c1]]
-            // CHECK-SAME:             iter_args([[cb_arg_inner:%.+]] = [[cb3]]) -> (!qecl.codeblock<1>)
+            // CHECK-SAME:             iter_args([[cb_arg_inner:%.+]] = {{%.+}}) -> (!qecl.codeblock<1>)
             //      CHECK:         [[cb4:%.+]] = qecl.z [[cb_arg_inner]][0]
-            //      CHECK:         [[cb5:%.+]] = qecl.qec [[cb4]]
-            //      CHECK:         scf.yield [[cb5]]
-            //      CHECK:     scf.yield [[inner_cb]]
+            //        COM:         <qecl.qec>
+            //      CHECK:         scf.yield {{%.+}} : !qecl.codeblock<1>
+            //      CHECK:     scf.yield [[inner_cb]] : !qecl.codeblock<1>
             %2 = scf.for %arg2 = %c0 to %c5 step %c1 iter_args(%arg3 = %1) -> (!quantum.bit) {
                 %4 = quantum.custom "PauliX"() %arg3 : !quantum.bit
                 %5 = scf.for %arg4 = %c0 to %c5 step %c1 iter_args(%arg5 = %4) -> (!quantum.bit) {

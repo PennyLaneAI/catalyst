@@ -102,6 +102,8 @@ from catalyst.python_interface.dialects import qecl, quantum
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
 from catalyst.utils.exceptions import CompileError
 
+# pylint: disable=too-many-lines
+
 # MARK: Alloc Op Pattern
 
 
@@ -981,9 +983,10 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
             )
 
             with ImplicitBuilder(if_apply_corr_op.true_region):
-                # This branch is for the case where a correction is needed
-                corrected_cb1 = qecl.SOp(magic_state1, idx=0)
-                corr_cb_out = qecl.PauliXOp(corrected_cb1, idx=0)
+                # the correction operator "SX" is applied via applying its component gates
+                # right to left, i.e. with X, followed by S
+                corrected_cb1 = qecl.PauliXOp(magic_state1, idx=0)
+                corr_cb_out = qecl.SOp(corrected_cb1, idx=0)
                 scf.YieldOp(corr_cb_out)
 
             with ImplicitBuilder(if_apply_corr_op.false_region):
