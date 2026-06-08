@@ -1000,7 +1000,7 @@ def _convert_value_passed_to_block_args(
         rewriter.replace_uses_with_if(
             new_block_arg,
             conv_cast_op.results[0],
-            lambda use: use.operation is not conv_cast_op,
+            lambda use, op=conv_cast_op: use.operation is not op,
         )
 
 
