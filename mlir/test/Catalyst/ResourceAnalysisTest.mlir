@@ -43,6 +43,27 @@ func.func @basic_gates() {
 
 // -----
 
+// MBQC Operations
+
+// CHECK-LABEL: "mbqc_gates"
+// CHECK: "num_alloc_qubits": 4
+// CHECK: "operations"
+// CHECK-DAG: "mbqc.graph_state_prep(0)": 1,
+// CHECK-DAG: "mbqc.measure_in_basis(0)": 1
+func.func @mbqc_gates() {
+    %adj_matrix = arith.constant dense<[1, 0, 1, 0, 0, 1]> : tensor<6xi1>
+    %graph_reg = mbqc.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
+
+    %q0 = quantum.extract %graph_reg[0] : !quantum.reg -> !quantum.bit
+
+    %angle = arith.constant 4.0 : f64
+    %mbqc_meas, %out = mbqc.measure_in_basis [ZX, %angle] %q0 : i1, !quantum.bit
+
+    return
+}
+
+// -----
+
 // PBC operations (PPR and PPM)
 
 // CHECK-LABEL: "pbc_operations"
@@ -845,9 +866,9 @@ func.func @auto_qm_flag_unset() {
 // CHECK: "measurements"
 // CHECK-DAG: "MidCircuitMeasure": 1
 
-// CHECK:   "num_alloc_qubits": 2
+// CHECK:   "num_alloc_qubits": 6
 // CHECK:   "num_arg_qubits": 3
-// CHECK:   "num_qubits": 5
+// CHECK:   "num_qubits": 9
 
 // CHECK:   "operations"
 // CHECK-DAG: "Adjoint(Hadamard)(1)": 1
