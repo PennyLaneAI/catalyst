@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "PythonFunction.hpp"
-
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Diagnostics.h"
