@@ -223,13 +223,13 @@ class FabricateOpConversion(RewritePattern):
     """Converts qecl.fabricate to the equivalent subroutine of qecp gates"""
 
     qec_code: QecCode
-    fabricate_subroutines: func.FuncOp
+    fabricate_subroutines: dict[str, func.FuncOp]
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.FabricateOp, rewriter: PatternRewriter):
         """Rewrite pattern for `qecl.fabricate` op"""
 
-        supported_states = [state for state in self.fabricate_subroutines.keys()]
+        supported_states = list(self.fabricate_subroutines)
         if op.init_state.data not in supported_states:  # pragma: no cover
             raise NotImplementedError(
                 "Lowering qecl.FabricateOp to the qecp dialect is only implemented "
@@ -819,7 +819,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     # MARK: Fabricate subroutines
 
-    def create_fabricate_subroutines(self) -> func.FuncOp:
+    def create_fabricate_subroutines(self) -> dict[str, func.FuncOp]:
         """Create a subroutine that allocates a codeblock and encodes it in the magic state for
         the QEC code (based on the tanner graph), and returns the encoded codeblock. This is a
         non-fault tolerant encoding intended for use on a simulator, and not a distillation process

@@ -1194,6 +1194,8 @@ class TestLoweringFabricateOp:
             // CHECK: func.call @fabricate_magic_conj_Steane() : () -> !qecp.codeblock<1 x 7>
             func.func private @apply_T_adj(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
                 %1 = qecl.fabricate[magic_conj] : !qecl.codeblock<1>
+                qecl.dealloc_cb %0 : !qecl.codeblock<1>
+                func.return %1 : !qecl.codeblock<1>
             }
             //      CHECK-LABEL: func.func private @fabricate_magic_Steane
             // CHECK: qecp.alloc_cb
@@ -1205,7 +1207,7 @@ class TestLoweringFabricateOp:
             //      CHECK-LABEL: func.func private @fabricate_magic_conj_Steane
             // CHECK: qecp.alloc_cb
             // CHECK: qecp.t [[qb:%.+]] adj
-            // CHECK-NOT: qepc.t [[qb:%.+]] :
+            // CHECK-NOT: qecp.t [[qb:%.+]] :
         }
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
