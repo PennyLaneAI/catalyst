@@ -21,6 +21,9 @@
   [(#2782)](https://github.com/PennyLaneAI/catalyst/pull/2782)
   [(#2900)](https://github.com/PennyLaneAI/catalyst/pull/2900)
 
+* The `ResourceAnalysis` pass now supports IR in reference semantics natively, rather than requiring a conversion step.
+  [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
+
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
@@ -53,6 +56,56 @@
   [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
   [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
   [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
+
+* Global toggles, ``compile_without_static_conditionals`` and ``compile_without_static_loops`` have
+  been added to control the capture behaviour for ``catalyst``/``pennylane`` ``cond`` and
+  ``for_loop`` instructions. Setting the toggle to ``True`` will automatically remove the respective
+  construct from the captured program (i.e., evaluate it in Python) whenever the predicate or bounds
+  are static.
+  [(#2912)](https://github.com/PennyLaneAI/catalyst/pull/2912)
+
+  For example, consider the following circuit with a statically defined `for` loop bound.
+
+  ```python
+  import pennylane as qp
+  import catalyst
+  
+  catalyst.compile_without_static_loops = True
+  
+  @qp.qjit
+  @qp.qnode(qp.device("lightning.qubit", wires=2))
+  def f():
+      @qp.for_loop(0, 2)
+      def loop(i):
+          qp.H(i)
+      loop()
+      return qp.state()
+  ```
+  Using the `catalyst.compile_without_static_loops` toggle, Catalyst will evaluate
+  the `for_loop` in Python, which unrolls the `for_loop`. This can be verified by printing
+  the `jaxpr` representation of the circuit.
+  ```pycon
+  >>> print(f.jaxpr)
+  ...
+            b:AbstractQreg() = qalloc 2:i64[]
+            c:AbstractQbit() = qextract b 0:i64[]
+            d:AbstractQbit() = qinst[
+              adjoint=False
+              ctrl_len=0
+              op=Hadamard
+              params_len=0
+              qubits_len=1
+            ] c
+            e:AbstractQbit() = qextract b 1:i64[]
+            f:AbstractQbit() = qinst[
+              adjoint=False
+              ctrl_len=0
+              op=Hadamard
+              params_len=0
+              qubits_len=1
+            ]
+  ...
+  ```
 
 * The `--decompose-lowering` pass can now handle cases where the decomposed gate act on qubit values
   extracted from different quantum register SSA values, as long as all these quantum register values
@@ -218,6 +271,9 @@
 
 <h3>Documentation 📝</h3>
 
+* A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
+  [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -229,6 +285,7 @@ Lillian Frederiksen,
 Sengthai Heng,
 Christina Lee,
 Mehrdad Malekmohammadi,
+River McCubbin,
 Shuli Shu,
 Paul Haochen Wang,
 Jake Zaia.

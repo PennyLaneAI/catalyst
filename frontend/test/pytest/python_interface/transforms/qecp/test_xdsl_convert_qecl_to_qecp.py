@@ -941,7 +941,7 @@ class TestLoweringTransversalGates:
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
 
     def test_adjoint_s_lowering_Steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
-        """Test that using the Steane code lowers S adjoint as expected the physical S operator
+        """Test that using the Steane code lowers S adjoint as expected (the physical S operator
         is applied to all qubits in the codeblock)."""
 
         program = """
