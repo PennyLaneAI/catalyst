@@ -73,6 +73,14 @@ try:
 except ImportError:
     _PL_OK = False
 
+try:
+    import openqasm3 as _openqasm3_mod
+
+    _OPENQASM3_OK = True
+except ImportError:
+    _openqasm3_mod = None  # type: ignore
+    _OPENQASM3_OK = False
+
 
 # ── Section 2: Constants ───────────────────────────────────────────────────────
 _WIDTH = 72
@@ -299,6 +307,113 @@ def aggregate_by_hamming_weight(counts_dict: dict) -> dict:
 # ── Section 5: Stage 1 — Frontend ─────────────────────────────────────────────
 
 
+def _detect_qasm_version(content: str) -> int:
+    """Return 2 or 3 by inspecting the file content.
+
+    Priority order:
+      1. Explicit ``OPENQASM <N>`` version statement (definitive).
+      2. Block comment ``/*`` — not valid in QASM 2, so must be QASM 3.
+      3. ``stdgates.inc`` include — the QASM 3 standard library
+         (QASM 2 uses ``qelib1.inc``).
+      4. QASM-3-only keywords (defcalgrammar, stretch, duration, extern).
+      5. Default → 2 (safe fallback; caller may retry as QASM 3 on failure).
+    """
+    m = re.search(r"OPENQASM\s+(\d+)", content)
+    if m:
+        return int(m.group(1))
+    # Block comments (/* */) and line comments (//) are QASM 3 — not valid in QASM 2
+    if content.lstrip().startswith(("/*", "//")):
+        return 3
+    # stdgates.inc is the QASM 3 standard library (QASM 2 uses qelib1.inc)
+    if "stdgates.inc" in content:
+        return 3
+    # QASM 3-specific keywords
+    if re.search(r"\b(defcalgrammar|defcal|stretch|duration|extern)\b", content):
+        return 3
+    # QASM 2.0 is ASCII-only; any non-ASCII character (e.g. θ, π) signals QASM 3
+    try:
+        content.encode("ascii")
+    except UnicodeEncodeError:
+        return 3
+    return 2
+
+
+def _load_qasm3_circuit(path: Path, content: str) -> StageResult:
+    """Parse a QASM 3 file and produce a QuantumCircuit.
+
+    Two-stage approach:
+      1. ``openqasm3.parse()``  — reference parser for syntax validation and
+         AST-level information (works for *all* QASM 3 files, including those
+         that use features Qiskit cannot yet import, e.g. ``uint``, ``const``,
+         ``def``, timing directives, pulse calibration).
+      2. ``qiskit.qasm3.loads()`` — converts the validated QASM 3 into a
+         ``QuantumCircuit`` so the rest of the pipeline (MLIR gen, opt,
+         translate) can proceed.  Fails gracefully with a specific error message
+         when unsupported QASM 3 features are encountered.
+    """
+    # ── Step 1: openqasm3 syntax validation ───────────────────────────────────
+    ast_detail = ""
+    if _OPENQASM3_OK:
+        try:
+            program = _openqasm3_mod.parse(content, permissive=False)
+            n_stmts = len(program.statements)
+            # Count a few interesting node types for the detail string
+            gate_defs = sum(
+                1
+                for s in program.statements
+                if type(s).__name__ == "QuantumGateDefinition"
+            )
+            qubit_decls = sum(
+                1
+                for s in program.statements
+                if type(s).__name__ == "QubitDeclaration"
+            )
+            ast_detail = (
+                f"openqasm3 AST OK — {n_stmts} statements"
+                + (f", {qubit_decls} qubit decl(s)" if qubit_decls else "")
+                + (f", {gate_defs} gate def(s)" if gate_defs else "")
+            )
+        except Exception as exc:
+            return StageResult(False, None, f"OpenQASM3 syntax error: {exc}")
+    elif not _AER_OK:
+        return StageResult(
+            False,
+            None,
+            "Neither openqasm3 nor qiskit.qasm3 is available. "
+            "Install with: pip install openqasm3 qiskit-aer",
+        )
+
+    # ── Step 2: qiskit.qasm3.loads() → QuantumCircuit ────────────────────────
+    if _AER_OK:  # _AER_OK implies qiskit.qasm3 was importable
+        try:
+            qc = _qasm3_mod.loads(content)
+            detail = (
+                f"QASM3 — {qc.num_qubits} qubits, {qc.num_clbits} cbits, "
+                f"{len(qc.data)} gates"
+                + (f"  [{ast_detail}]" if ast_detail else "")
+            )
+            return StageResult(True, qc, detail)
+        except Exception as exc:
+            # Parse was valid QASM3 but Qiskit can't convert it to QuantumCircuit
+            # (e.g. uint, const, def subroutine, timing, pulse calibration)
+            reason = str(exc)[:300]
+            suffix = f"\n  [{ast_detail}]" if ast_detail else ""
+            return StageResult(
+                False,
+                None,
+                f"QASM3 syntax valid but Qiskit importer does not support this feature:\n"
+                f"  {reason}{suffix}",
+            )
+
+    # openqasm3 validated OK but no QuantumCircuit converter is available
+    return StageResult(
+        False,
+        None,
+        f"QASM3 syntax valid ({ast_detail}) but qiskit.qasm3 is required for "
+        "QuantumCircuit conversion. Install: pip install qiskit qiskit-aer",
+    )
+
+
 def _extract_qiskit_circuit(ns: dict):
     """Scan an exec'd namespace for a QuantumCircuit object."""
     for name in _QISKIT_VARNAMES:
@@ -344,12 +459,38 @@ def run_stage1_frontend(path: Path, lang: str) -> StageResult:
         return StageResult(False, None, "qiskit is not installed")
 
     if lang == "qasm":
+        # Read file once so both the version detector and the QASM3 loader can
+        # use the same content without re-opening the file.
+        try:
+            content = path.read_text(encoding="utf-8", errors="replace")
+        except Exception as exc:
+            return StageResult(False, None, f"Cannot read file: {exc}")
+
+        qasm_version = _detect_qasm_version(content)
+
+        if qasm_version >= 3:
+            # Route through the openqasm3 + qiskit.qasm3 path
+            return _load_qasm3_circuit(path, content)
+
+        # QASM 2 path — use Qiskit's native parser
         try:
             qc = QuantumCircuit.from_qasm_file(str(path))
-            detail = f"{qc.num_qubits} qubits, {qc.num_clbits} cbits, {len(qc.data)} gates"
+            detail = f"QASM2 — {qc.num_qubits} qubits, {qc.num_clbits} cbits, {len(qc.data)} gates"
             return StageResult(True, qc, detail)
         except Exception as exc:
-            return StageResult(False, None, str(exc))
+            qasm2_err = str(exc)
+            # If the QASM2 parser rejects the file it may actually be QASM3 without
+            # an explicit version statement. Retry with the QASM3 loader and prefer
+            # its result as long as openqasm3 could validate the file — even if
+            # qiskit.qasm3 conversion fails, that error is more informative than a
+            # raw "non-ASCII byte" from the QASM2 parser.
+            if _OPENQASM3_OK or _AER_OK:
+                fallback = _load_qasm3_circuit(path, content)
+                if fallback.passed or (
+                    fallback.message and "QASM3 syntax valid" in fallback.message
+                ):
+                    return fallback
+            return StageResult(False, None, qasm2_err)
 
     elif lang == "qiskit":
         try:

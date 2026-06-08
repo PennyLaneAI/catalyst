@@ -1,4 +1,5 @@
 
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
@@ -28,52 +29,6 @@ class QASM3Emitter {
     {
         os << "OPENQASM 3.0;\ninclude \"stdgates.inc\";\n\n";
 
-        // Define gates that are not in stdgates.inc but are commonly used in QASM 2.0
-        // These definitions are compatible with Qiskit's conventions
-        os << "// Additional gate definitions for QASM 2.0 compatibility\n";
-        os << "gate rzz(theta) a, b {\n";
-        os << "  cx a, b;\n";
-        os << "  rz(theta) b;\n";
-        os << "  cx a, b;\n";
-        os << "}\n\n";
-
-        os << "gate rxx(theta) a, b {\n";
-        os << "  h a;\n";
-        os << "  h b;\n";
-        os << "  cx a, b;\n";
-        os << "  rz(theta) b;\n";
-        os << "  cx a, b;\n";
-        os << "  h a;\n";
-        os << "  h b;\n";
-        os << "}\n\n";
-
-        os << "gate ryy(theta) a, b {\n";
-        os << "  rx(pi/2) a;\n";
-        os << "  rx(pi/2) b;\n";
-        os << "  cx a, b;\n";
-        os << "  rz(theta) b;\n";
-        os << "  cx a, b;\n";
-        os << "  rx(-pi/2) a;\n";
-        os << "  rx(-pi/2) b;\n";
-        os << "}\n\n";
-
-        os << "gate rccx a, b, c {\n";
-        os << "  h c;\n";
-        os << "  t c;\n";
-        os << "  cx b, c;\n";
-        os << "  tdg c;\n";
-        os << "  cx a, c;\n";
-        os << "  t c;\n";
-        os << "  cx b, c;\n";
-        os << "  tdg c;\n";
-        os << "  h c;\n";
-        os << "  t c;\n";
-        os << "  cx a, b;\n";
-        os << "  t a;\n";
-        os << "  tdg b;\n";
-        os << "  cx a, b;\n";
-        os << "}\n\n";
-
         // Walk the module
         for (Operation &op : module.getBody()->getOperations()) {
             if (failed(emitOperation(&op)))
@@ -92,6 +47,8 @@ class QASM3Emitter {
     DenseMap<Value, std::string> qubitMap;
     // Map SSA values to OpenQASM classical bits (e.g. "c[0]")
     DenseMap<Value, std::string> bitMap;
+    // Track which non-stdgates custom gate definitions have been emitted
+    llvm::SmallSet<std::string, 8> emittedCustomGates;
 
     LogicalResult emitOperation(Operation *op)
     {
@@ -109,8 +66,7 @@ class QASM3Emitter {
             .Case<scf::YieldOp>([&](scf::YieldOp op) { return success(); }) // Handled by parent
             .Case<func::ReturnOp>([&](func::ReturnOp op) { return success(); })
             .Default([&](Operation *op) {
-                // Ignore other ops for now or emit warning
-                // os << "// Unhandled op: " << op->getName().getStringRef() << "\n";
+                llvm::errs() << "WARNING: Unhandled op: " << op->getName().getStringRef() << "\n";
                 return success();
             });
     }
@@ -177,7 +133,7 @@ class QASM3Emitter {
         if (auto st = getConst(op.getStep()))
             step = *st;
 
-        os << "for " << loopVar << " in [" << start << ":" << step << ":" << stop << "]";
+        os << "for int " << loopVar << " in [" << start << ":" << step << ":" << stop << "]";
         os << " {\n";
 
         // Handle body
@@ -263,7 +219,7 @@ class QASM3Emitter {
                 if (auto cOp = constVal.getDefiningOp<arith::ConstantOp>()) {
                     if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
                         if (intAttr.getInt() == 1)
-                            condExpr = bitMap[bitVal] + " == false";
+                            condExpr = "!" + bitMap[bitVal];
                     }
                 }
             }
@@ -411,6 +367,64 @@ class QASM3Emitter {
         return success();
     }
 
+    // Emit the gate body definition for custom gates not in stdgates.inc,
+    // but only on first use. This avoids polluting every output file with
+    // definitions for gates the circuit does not actually use.
+    void maybeEmitCustomGateDef(const std::string &name)
+    {
+        if (emittedCustomGates.count(name))
+            return;
+        emittedCustomGates.insert(name);
+
+        if (name == "rzz") {
+            os << "gate rzz(theta) a, b {\n";
+            os << "  cx a, b;\n";
+            os << "  rz(theta) b;\n";
+            os << "  cx a, b;\n";
+            os << "}\n\n";
+        }
+        else if (name == "rxx") {
+            os << "gate rxx(theta) a, b {\n";
+            os << "  h a;\n";
+            os << "  h b;\n";
+            os << "  cx a, b;\n";
+            os << "  rz(theta) b;\n";
+            os << "  cx a, b;\n";
+            os << "  h a;\n";
+            os << "  h b;\n";
+            os << "}\n\n";
+        }
+        else if (name == "ryy") {
+            os << "gate ryy(theta) a, b {\n";
+            os << "  rx(pi/2) a;\n";
+            os << "  rx(pi/2) b;\n";
+            os << "  cx a, b;\n";
+            os << "  rz(theta) b;\n";
+            os << "  cx a, b;\n";
+            os << "  rx(-pi/2) a;\n";
+            os << "  rx(-pi/2) b;\n";
+            os << "}\n\n";
+        }
+        else if (name == "rccx") {
+            os << "gate rccx a, b, c {\n";
+            os << "  h c;\n";
+            os << "  t c;\n";
+            os << "  cx b, c;\n";
+            os << "  tdg c;\n";
+            os << "  cx a, c;\n";
+            os << "  t c;\n";
+            os << "  cx b, c;\n";
+            os << "  tdg c;\n";
+            os << "  h c;\n";
+            os << "  t c;\n";
+            os << "  cx a, b;\n";
+            os << "  t a;\n";
+            os << "  tdg b;\n";
+            os << "  cx a, b;\n";
+            os << "}\n\n";
+        }
+    }
+
     LogicalResult emitCustomGate(CustomOp op)
     {
         // quantum.custom "name" (q1, q2)
@@ -426,10 +440,11 @@ class QASM3Emitter {
             // cu1(lambda) in QASM 2.0 is equivalent to cp(lambda) in QASM 3.0
             qasmGateName = "cp";
         }
-        else if (gateName == "rzz" || gateName == "rxx" || gateName == "ryy") {
-            // These gates are not in stdgates.inc but are valid parameterized gates
-            // We'll emit them as-is and they should work in QASM 3.0
+        else if (gateName == "rzz" || gateName == "rxx" || gateName == "ryy" ||
+                 gateName == "rccx") {
+            // These gates are not in stdgates.inc; emit their definition on first use.
             qasmGateName = gateName.str();
+            maybeEmitCustomGateDef(qasmGateName);
         }
         else {
             qasmGateName = gateName.str();
