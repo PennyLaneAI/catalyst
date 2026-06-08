@@ -66,7 +66,9 @@
   ```python
   import pennylane as qp
   import catalyst
+  
   catalyst.compile_without_static_loops = True
+  
   @qp.qjit
   @qp.qnode(qp.device("lightning.qubit", wires=2))
   def f():
