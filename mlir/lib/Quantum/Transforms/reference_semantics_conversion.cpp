@@ -14,8 +14,6 @@
 
 #define DEBUG_TYPE "reference-semantics-conversion"
 
-#include <cmath> // std::sqrt
-
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
