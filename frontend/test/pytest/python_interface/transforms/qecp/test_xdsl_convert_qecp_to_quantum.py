@@ -783,7 +783,7 @@ class TestQECPassIntegration:
             eigvals = [-1 if s else 1 for s in samples]
             # the tolerance is a bit high, but it keeps number of shots down
             assert np.isclose(np.mean(eigvals), res, atol=0.1)
-    
+
     # pylint: disable=too-many-positional-arguments, too-many-arguments
     @pytest.mark.parametrize(
         "n, diagonalizing_gates, expected_res, shots",
