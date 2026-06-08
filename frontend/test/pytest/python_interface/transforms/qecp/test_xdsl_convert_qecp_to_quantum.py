@@ -743,7 +743,7 @@ class TestQECPassIntegration:
             convert_qecp_to_quantum_pass,
         )
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=123)
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -754,7 +754,7 @@ class TestQECPassIntegration:
             m0 = qp.measure(0)
             return qp.sample(m0)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=456)
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -767,7 +767,7 @@ class TestQECPassIntegration:
             m0 = qp.measure(0)
             return qp.sample(m0)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=789)
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -783,7 +783,7 @@ class TestQECPassIntegration:
             eigvals = [-1 if s else 1 for s in samples]
             # the tolerance is a bit high, but it keeps number of shots down
             assert np.isclose(np.mean(eigvals), res, atol=0.1)
-    
+
     # pylint: disable=too-many-positional-arguments, too-many-arguments
     @pytest.mark.parametrize(
         "n, diagonalizing_gates, expected_res, shots",
