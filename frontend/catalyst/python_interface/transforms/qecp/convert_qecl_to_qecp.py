@@ -230,19 +230,19 @@ class FabricateOpConversion(RewritePattern):
         """Rewrite pattern for `qecl.fabricate` op"""
 
         supported_states = [state for state in self.fabricate_subroutines.keys()]
-        if op.init_state.data not in supported_states:    # pragma: no cover
+        if op.init_state.data not in supported_states:  # pragma: no cover
             raise NotImplementedError(
                 "Lowering qecl.FabricateOp to the qecp dialect is only implemented "
                 f"for the following init_states: {supported_states}"
             )
-        
-        if (k := op.out_codeblock.type.k.value.data) != self.qec_code.k:    # pragma: no cover
+
+        if (k := op.out_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
             )
-        
-        subroutine = self.fabricate_subroutines[op.init_state.data]        
+
+        subroutine = self.fabricate_subroutines[op.init_state.data]
         callee = builtin.SymbolRefAttr(subroutine.sym_name)
         return_types = subroutine.function_type.outputs.data
         callOp = func.CallOp(callee, arguments=(), return_types=return_types)
@@ -849,7 +849,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 f"(missing {required_keys - set(unitary_encoding_info)}); cannot lower "
                 f"qecl.fabricate [magic] for this code."
             )
-        
+
         subroutines = {}
 
         for init_state in ["magic", "magic_conj"]:
@@ -887,7 +887,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     magic_state_qubits[idx] = h.results[0]
 
                 for ctrl_idx, trgt_idx in cnot_pairs:
-                    cnot_op = qecp.CnotOp(magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx])
+                    cnot_op = qecp.CnotOp(
+                        magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx]
+                    )
                     magic_state_qubits[ctrl_idx] = cnot_op.results[0]
                     magic_state_qubits[trgt_idx] = cnot_op.results[1]
 

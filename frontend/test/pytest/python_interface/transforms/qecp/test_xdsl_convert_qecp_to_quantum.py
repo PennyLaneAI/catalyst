@@ -830,7 +830,6 @@ class TestQECPassIntegration:
         # could have a lower atol with more shots, but given test duration, not worth it
         assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.07)
 
-
     @pytest.mark.parametrize(
         "n, diagonalizing_gates, expected_res, shots",
         [

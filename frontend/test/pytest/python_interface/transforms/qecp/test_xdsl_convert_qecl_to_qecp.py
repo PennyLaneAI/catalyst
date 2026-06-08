@@ -1127,7 +1127,9 @@ class TestLoweringFabricateOp:
         run_filecheck(program, pipeline)
 
     @pytest.mark.parametrize("init_state, adj", [("magic", ""), ("magic_conj", " adj")])
-    def test_fabricate_lowering_steane(self, init_state, adj, run_filecheck, qecl_to_qecp_steane_pipeline):
+    def test_fabricate_lowering_steane(
+        self, init_state, adj, run_filecheck, qecl_to_qecp_steane_pipeline
+    ):
         """Test that `qecl.fabricate [magic]` op lowers to a call to the magic-state
         fabrication subroutine when using the Steane code, and that the subroutine performs
         H-T state injection on the Steane code's state_prep_index (qubit 6) followed by the
