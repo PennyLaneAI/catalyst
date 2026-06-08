@@ -23,10 +23,9 @@ import numpy as np
 from catalyst.python_interface.dialects import qecp
 
 _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
-    # the indices/ordering for the operators and encodings in the Steane code are those used
-    # in https://arxiv.org/pdf/2107.07505
-    "Steane": (
-        7,
+    # add ref
+    "Shor913": (
+        9,
         1,
         3,
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
@@ -69,6 +68,39 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
             # Must be consistent with the qubit treated as the encoding "input" by the
             # cnot_indices ordering above. See https://arxiv.org/pdf/2107.07505 (Fig 10)
             "state_prep_index": 6,
+        },
+    ),
+    # the indices/ordering for the operators and encodings in the Steane code are those used
+    # in https://arxiv.org/pdf/2107.07505
+    "Steane": (
+        7,
+        1,
+        3,
+        np.array([[1, 1, 1, 1, 1, 1, 0, 0, 0], [0, 0, 0, 1, 1, 1, 1, 1, 1]]),
+        np.array([[1, 1, 0, 0, 0, 0, 0, 0, 0], [0, 1, 2, 0, 0, 0, 0, 0, 0], [0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 0, 0, 1, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 1, 1, 0], [0, 0, 0, 0, 0, 0, 0, 1, 1]]),
+        # Z is applied transversally using physial X, and vice versa. 
+        # There are no transversal phase gates for this code.
+        {"x": (qecp.PauliZOp, range(9)), "z": (qecp.PauliXOp, range(9))},
+        {"cnot": qecp.CnotOp},
+        {
+            "hadamard_indices": (1, 2, 3),
+            "cnot_indices": (
+                [1, 0],
+                [2, 4],
+                [6, 5],
+                [2, 0],
+                [3, 5],
+                [6, 4],
+                [2, 6],
+                [3, 4],
+                [1, 5],
+                [1, 6],
+                [3, 0],
+            ),
+            # The state_prep_index is the index of the physical qubit that the state is
+            # injected on (i.e. for a magic state, -H-T is applied here pre-encoding).
+            # Add reference
+            "state_prep_index": 0,
         },
     ),
 }
