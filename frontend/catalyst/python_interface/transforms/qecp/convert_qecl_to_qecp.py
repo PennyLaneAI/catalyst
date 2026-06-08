@@ -871,12 +871,12 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
                 # apply H and T to the state prep input qubit
                 state_prep_index = unitary_encoding_info["state_prep_index"]
-                h_op = qecp.HadamardOp(magic_state_qubits[state_prep_index])
+                next_op = qecp.HadamardOp(magic_state_qubits[state_prep_index])
                 if init_state == "magic":
-                    t_op = qecp.TOp(h_op.results[0])
+                    next_op = qecp.TOp(next_op.results[0])
                 elif init_state == "magic_conj":
-                    t_op = qecp.TOp(h_op.results[0], adjoint=True)
-                magic_state_qubits[state_prep_index] = t_op.results[0]
+                    next_op = qecp.TOp(next_op.results[0], adjoint=True)
+                magic_state_qubits[state_prep_index] = next_op.results[0]
 
                 # Perform unitary encoding circuit for the code
                 hadamards = unitary_encoding_info["hadamard_indices"]
