@@ -329,7 +329,7 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: [[magic:%.+]] = qecl.fabricate{{\s*}}[magic] : !qecl.codeblock<1>
     %magic = qecl.fabricate [magic] : !qecl.codeblock<1>
 
-    // CHECK: [[magic:%.+]] = qecl.fabricate{{\s*}}[magic_conj] : !qecl.codeblock<1>
+    // CHECK: [[magic_conj:%.+]] = qecl.fabricate{{\s*}}[magic_conj] : !qecl.codeblock<1>
     %magic_conj = qecl.fabricate [magic_conj] : !qecl.codeblock<1>
 
     // CHECK: qecl.dealloc_cb [[magic]] : !qecl.codeblock<1>
