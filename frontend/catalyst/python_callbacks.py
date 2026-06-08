@@ -62,7 +62,7 @@ def paulirot_callback_wrapper(theta, pauli_word, wires):
         capture=True,
     )
     @qp.qnode(device=device)
-    def circuit(theta: float):
+    def circuit():
         paulirot_subroutine(theta, wires)
 
     return str(circuit.mlir_module)
