@@ -196,7 +196,15 @@ class TestQecLogicalOps:
 
         assert_valid_idx_attr(insert_block_op, idx)
 
-    @pytest.mark.parametrize("init_state", ["magic", qecl.LogicalCodeblockInitStateAttr("magic"), "magic_conj", qecl.LogicalCodeblockInitStateAttr("magic_conj")])
+    @pytest.mark.parametrize(
+        "init_state",
+        [
+            "magic",
+            qecl.LogicalCodeblockInitStateAttr("magic"),
+            "magic_conj",
+            qecl.LogicalCodeblockInitStateAttr("magic_conj"),
+        ],
+    )
     def test_qecl_op_constructor_fabricate(self, init_state):
         """Test the constructor of the qecl.fabricate op."""
         fabricate_op = qecl.FabricateOp(
