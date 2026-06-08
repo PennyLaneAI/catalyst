@@ -1,5 +1,6 @@
 // #include <iostream>
 #include "SymbolicCircuit.h"
+#include <cassert>
 
 /*.................
     Operators:
@@ -49,9 +50,16 @@ void SymbolicCircuit::ensureCapacity(llvm::ArrayRef<size_t> indices) {
     }
 
     if (maxIndex > qubitNum) {
-        stateTrans.extendTo(maxIndex);
-        qubitNum = maxIndex;
+        extendQubitsTo(maxIndex);
+        // stateTrans.extendTo(maxIndex);
+        // qubitNum = maxIndex;
     }
+}
+
+void SymbolicCircuit::extendQubitsTo(size_t newQubitNum) {
+    assert(newQubitNum > qubitNum);
+    stateTrans.extendTo(newQubitNum);
+    qubitNum = newQubitNum;
 }
 
 // Do I need seperate Z, S, Sdag, T, Tdag functions?

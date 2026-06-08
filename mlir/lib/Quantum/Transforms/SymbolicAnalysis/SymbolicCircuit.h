@@ -31,6 +31,7 @@ struct SymbolicCircuit {    // indices are 1-based
 
     // Gate Applications
     void ensureCapacity(llvm::ArrayRef<size_t> qubitIndices);
+    void extendQubitsTo(size_t newQubitNum);
     void applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices, GateID gateId);
     void applyGateRZ(size_t qubitIndex, GateID gateId);
     void applyGateX(size_t qubitIndex);
@@ -41,3 +42,5 @@ struct SymbolicCircuit {    // indices are 1-based
     void applyGateH(size_t qubitIndex);
     void applyGateU(llvm::ArrayRef<size_t> qubitIndices);
 };
+
+// aux vars should be after all qubit vars. if it's not possible, we should change the data structure of parity, or storing the types of vars somewhere.

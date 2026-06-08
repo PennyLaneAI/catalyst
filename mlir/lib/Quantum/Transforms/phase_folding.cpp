@@ -38,8 +38,8 @@ namespace quantum {
 struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     using PhaseFoldingPassBase::PhaseFoldingPassBase;
     
-    llvm::DenseMap<mlir::Value, size_t> SSAToWireMap;
-    std::vector<quantum::CustomOp> RotationOps;
+    llvm::DenseMap<mlir::Value, size_t> ssaToWireMap;   // handle multiple registers
+    std::vector<quantum::CustomOp> phaseOps;
 
     size_t getIndexFromExtractOp(mlir::Value& value) {
         if (auto extractOp = llvm::cast<quantum::ExtractOp>(value.getDefiningOp())) {
@@ -69,16 +69,16 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             mlir::OpResult outValue = outs[i];
             
             size_t index;
-            auto it = SSAToWireMap.find(inValue);
-            if (it != SSAToWireMap.end()) { // inVal is the result of a prev. op.
+            auto it = ssaToWireMap.find(inValue);
+            if (it != ssaToWireMap.end()) { // inVal is the result of a prev. op.
                 index = it->second;
-                SSAToWireMap.erase(it);
+                ssaToWireMap.erase(it);
             } else {                        // first gate on the wire
                 index = getIndexFromExtractOp(inValue);
             }
 
             indices.push_back(index);
-            SSAToWireMap[outValue] = index;
+            ssaToWireMap[outValue] = index;
         }
         return indices;
     }
@@ -93,18 +93,34 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         return oneBasedIndices;
     }
 
-    Gate gateFromOp(llvm::StringRef gateName) {
-        for (size_t i = 0; i < NATIVE_GATES_COUNT; i++) {
-            if (GATE_NAME[i] == gateName) {
+
+    Gate gateFromName(llvm::StringRef gateName) {
+        for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
+            if ((GATE_NAME[i] == gateName)) {
                 return static_cast<Gate>(i);
             }
         }
         return Gate::U;
     }
 
-    double getRotationAngle(quantum::CustomOp& op) {
+    Gate extractCliffTGate(quantum::CustomOp& op) {
+        Gate gate = gateFromName(op.getGateName());
+        if (!op.getInCtrlQubits().empty() || !op.getInCtrlValues().empty()) {
+            if (isPhaseGate(gate)) {
+                return Gate::I; // C-Rz gates don't alter state space, but alter phase space non-linearly, which I'm not going to track for now, but should be trackable using xy = x + y - (x \oplus y).
+            }
+            // if (gate == Gate::X && op.getInCtrlQubits().size() == 1 && op.getInCtrlValues().empty()) {
+            //     return Gate::CNOT;
+            // }    should pass getInCtrlQubit as qubitIn. will do it later.
+            return Gate::U;                                       
+        }
+        return gate;
+    }
+
+
+    double getPhase(quantum::CustomOp& op) {
         double c = (op.getAdjointFlag() ? -1 : 1);
-        double angle = rotAngle(gateFromOp(op.getGateName()));
+        double angle = rotAngle(gateFromName(op.getGateName()));
 
         return ((angle != UNKNOWN_ANGLE ? angle : extractRZAngle(op.getParams())) * c);
     }
@@ -123,10 +139,10 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     double sumAngles(const PhaseBucket& contributors) {
         double sum = 0.0;
         for (GateID id : contributors.zeroAffineRZs) {
-            sum += getRotationAngle(RotationOps[id]);
+            sum += getPhase(phaseOps[id]);
         }
         for (GateID id : contributors.oneAffineRZs) {
-            sum -= getRotationAngle(RotationOps[id]);
+            sum -= getPhase(phaseOps[id]);
         }
         return sum;
     }
@@ -145,48 +161,65 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         // return std::fmod(angle, 2 * PI);
     }
 
-    void updateTargetOp(GateID targetOpID, double sumAngle) {
-        quantum::CustomOp& targetOp = RotationOps[targetOpID];
+
+    void removePhaseOp(quantum::CustomOp& op) {
+        Gate gate = gateFromName(op.getGateName());
+        insertedGateCount[static_cast<size_t>(gate)]--;
+
+        if (gate == Gate::Y) {
+            op.setGateName(GATE_NAME[static_cast<size_t>(Gate::X)]);
+            insertedGateCount[static_cast<size_t>(Gate::X)]++;
+        } else {
+            killOp(op);
+        }       
+    }
+
+    void updateTargetOp(quantum::CustomOp& targetOp, double sumAngle) {
         quantum::CustomOp lastOp = targetOp;
+        mlir::OpBuilder builder(targetOp.getContext());
 
         double normAngle = normalizeAngle(sumAngle);
         
         // consider - angles?
         if (normAngle >= rotAngle(Gate::Z)) {
-            quantum::CustomOp zOp = injectOpAfter(lastOp, Gate::Z, false, 0.0);
+            quantum::CustomOp zOp = injectOpAfter(builder, lastOp, Gate::Z, false, 0.0);
             lastOp = zOp;
             normAngle -= rotAngle(Gate::Z);
         }
         if (normAngle >= rotAngle(Gate::S)) {
-            quantum::CustomOp sOp = injectOpAfter(lastOp, Gate::S, false, 0.0);
+            quantum::CustomOp sOp = injectOpAfter(builder, lastOp, Gate::S, false, 0.0);
             lastOp = sOp;
             normAngle -= rotAngle(Gate::S);
         }
         if (normAngle == rotAngle(Gate::T)) {
-            quantum::CustomOp sOp = injectOpAfter(lastOp, Gate::T, false, 0.0);
+            quantum::CustomOp sOp = injectOpAfter(builder, lastOp, Gate::T, false, 0.0);
             lastOp = sOp;
             normAngle -= rotAngle(Gate::T);
         }
         if (normAngle != 0.0) {
-            quantum::CustomOp rzOp = injectOpAfter(lastOp, Gate::RZ, false, normAngle);
+            quantum::CustomOp rzOp = injectOpAfter(builder, lastOp, Gate::RZ, false, normAngle);
             lastOp = rzOp;
         }
 
-        removeOp(targetOpID);
+        removePhaseOp(targetOp);
     }
+    // Put discretization option non and off
 
-    quantum::CustomOp injectOpAfter(quantum::CustomOp& preOp, Gate gate, bool isAdjoint, double angle) {
-        mlir::OpBuilder builder(preOp.getContext());
+    // Test with multiple insertions
+    quantum::CustomOp injectOpAfter(mlir::OpBuilder& builder, quantum::CustomOp& preOp, Gate gate, bool isAdjoint, double angle) {
         builder.setInsertionPointAfter(preOp.getOperation());
         mlir::Value qIn = preOp.getQubitResults()[0];
-        mlir::Value angleVal = arith::ConstantOp::create(builder, preOp.getLoc(), builder.getF64FloatAttr(angle));
+        mlir::Value angleVal;
+        if (gate == Gate::RZ) {
+            angleVal = arith::ConstantOp::create(builder, preOp.getLoc(), builder.getF64FloatAttr(angle));
+        }    
         
         quantum::CustomOp newOp = quantum::CustomOp::create(
                             builder,
                             preOp.getLoc(),
             /*gate_name=*/  GATE_NAME[static_cast<size_t>(gate)],
             /*in_qubits=*/  mlir::ValueRange({qIn}),
-            /*params=*/     (angle != 0.0) ? mlir::ValueRange({angleVal}) : mlir::ValueRange({}),
+            /*params=*/     (gate == Gate::RZ) ? mlir::ValueRange({angleVal}) : mlir::ValueRange({}),
             /*adjoint=*/    isAdjoint
         );
 
@@ -196,49 +229,47 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             }
         );
 
-        finalGateCount[static_cast<size_t>(gate)]++;
-
+        insertedGateCount[static_cast<size_t>(gate)]++;
         return newOp;
     }
 
-    void removeOp(GateID id) {
-        quantum::CustomOp& op = RotationOps[id];
+    void killOp(quantum::CustomOp& op) {
+        assert(op.getInCtrlQubits().empty() && op.getInCtrlValues().empty());
 
-        mlir::Value qIn = op.getQubitOperands()[0];
-        mlir::Value qOut = op.getQubitResults()[0];
-
-        qOut.replaceAllUsesWith(qIn);
+        mlir::ValueRange qIns = op.getInQubits(); // get in_qubit
+        op.replaceAllUsesWith(qIns);
         op.erase();
     }
 
-    void runOnOperation() override {
-        llvm::outs() << "Hello phase-folding world!\n";
-
-        SymbolicCircuit symCirc = SymbolicCircuit();
-        llvm::outs() << symCirc << "\n";
-
-        // Phase Analysis
+    
+    void phaseAnalysis(SymbolicCircuit& symCirc) {
         GateID gateID = -1;
-        getOperation()->walk([&](quantum::CustomOp op) {
-            // getting affected wires
-            llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(op.getQubitOperands(), op.getQubitResults()));
+        getOperation()->walk([&](Operation *op) {
+            // if (isa<AllocOp>(op)){
 
-            // tracking Rz gates
-            Gate gate = gateFromOp(op.getGateName());
-            if (isRZ(gate)) {
-                RotationOps.push_back(op);
-                gateID++;
+            // }
+            // if (auto allocOp = dyn_cast<AllocOp>(op)){
 
+            // }
+            if (CustomOp customOp = dyn_cast<CustomOp>(op)) {
+                // getting affected wires
+                llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(customOp.getQubitOperands(), customOp.getQubitResults())); // getQubitIndices(customOp.getInQubits(), customOp.getOutQubits())
+
+                // tracking phase gates
+                Gate gate = extractCliffTGate(customOp);
+                if (isPhaseGate(gate)) {
+                    phaseOps.push_back(customOp);
+                    gateID++;
+                }
                 initialGateCount[static_cast<size_t>(gate)]++;
+
+                // updating symbolic circuit
+                symCirc.applyGate(gate, customOp.getAdjointFlag(), qubitIndices, gateID);
             }
-
-            // updating symbolic circuit
-            symCirc.applyGate(gate, op.getAdjointFlag(), qubitIndices, gateID);
         });
+    }
 
-        llvm::outs() << symCirc << "\n";
-
-        // Phase Merge
+    void phaseMerge(SymbolicCircuit& symCirc) {
         for (auto& [parity, contributors] : symCirc.phasePoly.terms) {
             if (contributors.gateCount() > 1) {
                 double angleSum = sumAngles(contributors);
@@ -247,24 +278,38 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
                 if (!contributors.isMergeTargetAffineZero()) {
                     angleSum *= -1.0;
                 }
-                updateTargetOp(targetOpID, angleSum);                
+                updateTargetOp(phaseOps[targetOpID], angleSum);                
 
                 for (GateID id : llvm::concat<GateID>(contributors.zeroAffineRZs, contributors.oneAffineRZs)) {
                     if (id != targetOpID) {
-                        removeOp(id);
+                        removePhaseOp(phaseOps[id]);
                     }
                 }
             }
         }
+    }
 
-        llvm::outs() << "Z-count: initial->" << initialGateCount[static_cast<size_t>(Gate::Z)] 
-            << "  final->" << finalGateCount[static_cast<size_t>(Gate::Z)] << "\n";
-        llvm::outs() << "S-count: initial->" << initialGateCount[static_cast<size_t>(Gate::S)] 
-            << "  final->" << finalGateCount[static_cast<size_t>(Gate::S)] << "\n";
-        llvm::outs() << "T-count: initial->" << initialGateCount[static_cast<size_t>(Gate::T)] 
-            << "  final->" << finalGateCount[static_cast<size_t>(Gate::T)] << "\n";
-        llvm::outs() << "RZ-count: initial->" << initialGateCount[static_cast<size_t>(Gate::RZ)] 
-            << "  final->" << finalGateCount[static_cast<size_t>(Gate::RZ)] << "\n";
+    void reportStats() {
+        for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
+            if (insertedGateCount[i] != 0) {
+                llvm::outs() << GATE_NAME[i] << ": initial-> " << initialGateCount[i] 
+                    << ",  final-> " << (initialGateCount[i] + insertedGateCount[i]) 
+                    << ". difference-> " << insertedGateCount[i] << "\n";
+            }
+        }
+    }
+
+    void runOnOperation() override {
+        llvm::outs() << "Hello phase-folding world!\n";
+
+        SymbolicCircuit symCirc = SymbolicCircuit();
+        llvm::outs() << symCirc << "\n";
+
+        phaseAnalysis(symCirc);
+        llvm::outs() << symCirc << "\n";
+
+        phaseMerge(symCirc);
+        reportStats();        
     }
 };
 

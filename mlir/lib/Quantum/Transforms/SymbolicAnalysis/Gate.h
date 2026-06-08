@@ -7,7 +7,7 @@ enum class Gate {
     I, H, X, Y, Z, S, T, RZ, CNOT, SWAP, U, GP 
 };
 
-inline static constexpr size_t NATIVE_GATES_COUNT = 12;
+inline static constexpr size_t PRIMITIV_GATES_COUNT = 12;
 
 inline static constexpr size_t DYNAMIC_ARITY = 3;
 static constexpr size_t arity(Gate gate) {
@@ -33,13 +33,13 @@ static constexpr double rotAngle(Gate gate){
     };
 }
 
-static constexpr bool isRZ(Gate gate) {
-    return ((gate == Gate::T) || (gate == Gate::RZ) || (gate == Gate::Z) || (gate == Gate::S));
+static constexpr bool isPhaseGate(Gate gate) {
+    return ((gate == Gate::RZ) || (gate == Gate::T) || (gate == Gate::S) || (gate == Gate::Z) || (gate == Gate::Y));
 }
 
 inline static constexpr llvm::StringLiteral GATE_NAME[] = { 
     "Identity", "Hadamard", "PauliX", "PauliY", "PauliZ", "S", "T", "RZ", "CNOT", "SWAP", "_", "GlobalPhase" 
 };
 
-static size_t initialGateCount[NATIVE_GATES_COUNT] = {0};
-static size_t finalGateCount[NATIVE_GATES_COUNT] = {0};
+static int initialGateCount[PRIMITIV_GATES_COUNT] = {0};
+static int insertedGateCount[PRIMITIV_GATES_COUNT] = {0};

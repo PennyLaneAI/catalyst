@@ -35,21 +35,7 @@ Parity Parity::eVec(size_t varNum, size_t pos) {    // e_i, starting from 1 (0 i
 // check if they are the same up to adding some 0 bits in the end. 
 // (so they can be considered equal if we had added some path vaiables and now their 0)
 bool Parity::operator==(const Parity& rhs) const {
-    size_t minBlockNum = std::min(bits.size(), rhs.bits.size());
-
-    for (size_t i = 0; i < minBlockNum; i++) {
-        if (bits[i] != rhs.bits[i]) {
-            return false;
-        }
-    }
-
-    const std::vector<uint64_t>& longerBits = (bits.size() > rhs.bits.size()) ? bits : rhs.bits;
-    for (size_t i = minBlockNum; i < longerBits.size(); i++) {
-        if (longerBits[i] != 0) {
-            return false;
-        }
-    }
-    return true;    
+    return isEquivalentFromBlockWith(0, rhs);
 }
 
 Parity& Parity::operator+=(const Parity& rhs) {
@@ -163,6 +149,36 @@ void Parity::extendBitsAtWith(size_t pos, bool value) {
 ...................*/
 bool Parity::isIdenticalWith(const Parity& rhs) const {
     return varNum == rhs.varNum && bits == rhs.bits;
+}
+
+bool Parity::isLinearEquivalentWith(const Parity& rhs) const {
+    uint64_t b1 = bits.empty() ? 0 : bits[0];
+    uint64_t b2 = rhs.bits.empty() ? 0 : rhs.bits[0];
+
+    if ((b1 ^ b2) > 1) {
+        return false;
+    }
+    return isEquivalentFromBlockWith(1, rhs);
+}
+
+// check if they are the same up to adding some 0 bits in the end. 
+// (so they can be considered equal if we had added some path vaiables and now their 0)
+bool Parity::isEquivalentFromBlockWith(size_t fstBlock, const Parity& rhs) const {
+    size_t minBlockNum = std::min(bits.size(), rhs.bits.size());
+
+    for (size_t i = fstBlock; i < minBlockNum; i++) {
+        if (bits[i] != rhs.bits[i]) {
+            return false;
+        }
+    }
+
+    const std::vector<uint64_t>& longerBits = (bits.size() > rhs.bits.size()) ? bits : rhs.bits;
+    for (size_t i = minBlockNum; i < longerBits.size(); i++) {
+        if (longerBits[i] != 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool Parity::isUnsat() const {
