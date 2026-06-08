@@ -142,6 +142,7 @@
   Physical (`qecp`) dialect.
   [(#2776)](https://github.com/PennyLaneAI/catalyst/pull/2776)
   [(#2871)](https://github.com/PennyLaneAI/catalyst/pull/2871)
+  [(#2922)](https://github.com/PennyLaneAI/catalyst/pull/2922)
 
 * The experimental compiler pass `convert-quantum-to-qecl` has been extended to lower
   `quantum.custom "T"` gates to the `qecl` layer as a subroutine using a magic state.
