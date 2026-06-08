@@ -367,16 +367,7 @@ void handleGraphStatePrep(IRRewriter &builder, mbqc::GraphStatePrepOp vGraphStat
     Location loc = vGraphStatePrepOp.getLoc();
     MLIRContext *ctx = vGraphStatePrepOp.getContext();
 
-    ShapedType adjMatrixType = cast<ShapedType>(vGraphStatePrepOp.getAdjMatrix().getType());
-    assert(adjMatrixType.isStaticDim(0) &&
-           "Dynamically sized mbqc.graph_state_prep op not supported");
-
-    size_t adjMatrixSize = adjMatrixType.getShape()[0];
-    size_t should_be_perfect_square = 1 + 8 * adjMatrixSize;
-    double square_root_candidate = std::sqrt(should_be_perfect_square);
-    assert(std::ceil(square_root_candidate) == std::floor(square_root_candidate) &&
-           "mbqc.graph_state_prep expects tensor size to be a triangular number");
-    size_t numQubits = (1 + (size_t)square_root_candidate) / 2;
+    size_t numQubits = vGraphStatePrepOp.getNumQubitsFromAdjMatrixSize();
     Type qregType = qref::QuregType::get(ctx, builder.getI64IntegerAttr(numQubits));
 
     auto rGraphStatePrepOp = mbqc::RefGraphStatePrepOp::create(
