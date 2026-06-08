@@ -254,44 +254,10 @@ def test_ppr_to_ppm():
             # CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}} cond([[pred]])
             qp.CNOT([0, 1])
 
-        # CHECK-LABEL: public @cir_pauli_corrected_avoid_y_0
-        @ppr_to_ppm(decompose_method="pauli-corrected", avoid_y_measure=True)
-        @to_ppr
-        @qp.qnode(device)
-        def cir_pauli_corrected_avoid_y():
-            # CHECK: quantum.custom "Hadamard"
-            # CHECK: quantum.custom "T"
-            # CHECK: [[m:%.+]], {{.+}} = pbc.ppm ["Z", "Z"]
-            # CHECK: scf.if [[m]]
-            # CHECK:   quantum.custom "Hadamard"
-            # CHECK:   quantum.custom "S"
-            # CHECK:   pbc.ppm ["Z", "Z"]
-            # CHECK:   pbc.ppm ["X", "X"]
-            # CHECK:   pbc.ppr ["Z"](2) {{.+}} cond(
-            # CHECK:   quantum.dealloc_qb
-            # CHECK:   quantum.dealloc_qb
-            # CHECK:   scf.yield
-            # CHECK: else
-            # CHECK:   pbc.ppm ["X"]
-            # CHECK:   pbc.ppr ["Z"](2)
-            # CHECK:   quantum.dealloc_qb
-            # CHECK:   scf.yield
-            qp.T(0)
-
-            # CHECK: quantum.custom "Hadamard"
-            # CHECK: quantum.custom "S"
-            # # Avoid Y-measurement, so Z-measurement should be used
-            # CHECK: pbc.ppm ["Z", "X", "Z"]
-            # CHECK: pbc.ppm ["X"]
-            # CHECK: [[pred:%.+]] = arith.xori
-            # CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}} cond([[pred]])
-            qp.CNOT([0, 1])
-
         return (
             cir_default(),
             cir_inject_magic_state(),
             cir_pauli_corrected(),
-            cir_pauli_corrected_avoid_y(),
         )
 
     print(circuit_ppr_to_ppm.mlir_opt)

@@ -1234,9 +1234,8 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
 
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
-            (requires :math:`Y`-state preparation). This is currently only supported when using the
-            ``"clifford-corrected"`` and ``"pauli-corrected"`` decomposition methods. Defaults to
-            ``False``.
+            (requires :math:`Y`-state preparation). This affects ``auto-corrected`` non-Clifford
+            decompositions and Clifford (:math:`\pi/4`) decompositions. Defaults to ``False``.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1354,9 +1353,8 @@ def ppm_compilation_setup_inputs(
 
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
-            (requires :math:`Y`-state preparation). This is currently only supported when using the
-            ``"clifford-corrected"`` and ``"pauli-corrected"`` decomposition methods. Defaults to
-            ``False``.
+            (requires :math:`Y`-state preparation). This affects ``auto-corrected`` non-Clifford
+            decompositions and Clifford (:math:`\pi/4`) decompositions. Defaults to ``False``.
 
         max_pauli_size (int): The maximum size of the Pauli strings after commuting or merging.
             Defaults to 0 (no limit).
