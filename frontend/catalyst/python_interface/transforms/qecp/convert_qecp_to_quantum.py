@@ -50,6 +50,7 @@ _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.hadamard": "Hadamard",
     "qecp.identity": "Identity",
     "qecp.s": "S",
+    "qecp.t": "T",
     "qecp.x": "PauliX",
     "qecp.y": "PauliY",
     "qecp.z": "PauliZ",
@@ -119,7 +120,7 @@ class QecPhysicalQubitTypeConversion(TypeConversionPattern):
         return QubitType()
 
 
-# MARK: Auxiliary qubit Alloc/Dealloc Patterns
+# MARK: Alloc/Dealloc Patterns
 
 
 @dataclass(frozen=True)
@@ -140,6 +141,27 @@ class DeallocAuxQubitConversion(RewritePattern):
     def match_and_rewrite(self, op: qecp.DeallocAuxQubitOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary qubit."""
         rewriter.replace_op(op, quantum.DeallocQubitOp(op.qubit))
+
+
+@dataclass(frozen=True)
+class AllocCodeblockConversion(RewritePattern):
+    """Op conversion pattern from qecp.alloc_cb to quantum.alloc."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.AllocCodeblockOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate an auxiliary codeblock."""
+        assert isinstance(op.codeblock.type, qecp.PhysicalCodeblockType)
+        rewriter.replace_op(op, quantum.AllocOp(op.codeblock.type.n))
+
+
+@dataclass(frozen=True)
+class DeallocCodeblockConversion(RewritePattern):
+    """Op conversion pattern from qecp.dealloc_cb to quantum.dealloc."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.DeallocCodeblockOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary codeblock."""
+        rewriter.replace_op(op, quantum.DeallocOp(op.codeblock))
 
 
 # MARK: Data qubit extract and insertion patterns
@@ -368,6 +390,10 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
+                    AllocCodeblockConversion(),
+                    DeallocCodeblockConversion(),
+                    # AllocCodeblock conversion must come before Type conversion, because
+                    # it relies on accessing op.codeblock.type.n to get the register size
                     PhysicalCodeblockTypeConversion(recursive=True),
                     QecPhysicalQubitTypeConversion(recursive=True),
                     AllocAuxQubitConversion(),

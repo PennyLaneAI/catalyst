@@ -51,6 +51,9 @@ class TestConvertQecPhysicalToQuantumPass:
         assert callable(convert_qecp_to_quantum_pass)
 
 
+# MARK: Type conversion
+
+
 class TestPhysicalCodeblockTypeConversion:
     """Type conversion from !qecp.codeblock<k x n> to !quantum.reg."""
 
@@ -164,6 +167,9 @@ class TestQecPhysicalQubitTypeConversionPatternUnit:
         assert out == QubitType()
 
 
+# MARK: Alloc/Dealloc aux
+
+
 class TestAuxAllocDeallocConversion:
     """Lowering of qecp.alloc_aux / qecp.dealloc_aux to quantum.alloc_qb / quantum.dealloc_qb."""
 
@@ -203,6 +209,51 @@ class TestAuxAllocDeallocConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+# MARK: Alloc/Dealloc CB
+
+
+class TestCodeblockAllocDeallocConversion:
+    """Lowering of qecp.alloc_cb/dealloc_cb to quantum.alloc/dealloc."""
+
+    @pytest.mark.parametrize("n", [1, 3, 7])
+    def test_alloc_codeblock_lowering(self, run_filecheck, n):
+        """Test lowering allocation of a codeblock of n physical qubits via qecp.alloc_cb
+        to an allocation of a quantum register of n qubits quantum.alloc."""
+        program = f"""
+        builtin.module {{
+        // CHECK-LABEL: test_alloc_cb
+        func.func @test_alloc_cb() {{
+            // CHECK: quantum.alloc({n}) : !quantum.reg
+            %0 = qecp.alloc_cb : !qecp.codeblock<1 x {n}>
+            // CHECK-NOT: qecp.alloc_cb
+            // CHECK-NOT: !qecp.codeblock
+            return
+        }}
+        }}
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_dealloc_codeblock_lowering(self, run_filecheck):
+        """Test that qecp.dealloc_cb lowers to quantum.dealloc on the register/codeblock"""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_dealloc_cb
+        func.func @test_dealloc_cb() {
+            // CHECK: [[reg:%.+]] = "test.op"() : () -> !quantum.reg
+            %0 = "test.op"() : () -> !qecp.codeblock<1 x 3>
+            // CHECK: quantum.dealloc [[reg]] : !quantum.reg
+            qecp.dealloc_cb %0 : !qecp.codeblock<1 x 3>
+            // CHECK-NOT: qecp.dealloc_cb
+            return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+# MARK: Insert/extract qb
 
 
 class TestExtractInsertQubitConversion:
@@ -267,6 +318,9 @@ class TestExtractInsertQubitConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+# MARK: Gates
 
 
 class TestGateMeasureConversion:
@@ -370,6 +424,25 @@ class TestGateMeasureConversion:
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
+    def test_t_lowering(self, run_filecheck):
+        """qecp.t lowers to quantum.custom "T"."""
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_t
+        func.func @test_t() {
+            %cb = "test.op"() : () -> !qecp.codeblock<1 x 1>
+            %q0 = qecp.extract %cb[0] : !qecp.codeblock<1 x 1> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = quantum.custom "T"() [[q0:%.+]] : !quantum.bit
+            %q1 = qecp.t %q0 : !qecp.qubit<data>
+            // CHECK: [[q2:%.+]] = quantum.custom "T"() [[q1:%.+]] adj : !quantum.bit
+            %q2 = qecp.t %q1 adj : !qecp.qubit<data>
+            // CHECK-NOT: qecp.t
+            return %q2 : !qecp.qubit<data>
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
     def test_cnot_lowering(self, run_filecheck):
         """qecp.cnot lowers to quantum.custom "CNOT"."""
         program = """
@@ -427,6 +500,9 @@ class TestGateMeasureConversion:
         }
         """
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+
+# MARK: Subroutines
 
 
 class TestSubroutineConversion:
@@ -491,6 +567,9 @@ class TestSubroutineConversion:
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
 
+# MARK: Hyperregisters
+
+
 class TestHyperRegisterLowering:
     """Unit test for hyperreg related type and operations lowering."""
 
@@ -545,6 +624,9 @@ class TestHyperRegisterLowering:
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
 
+# MARK: Integration tests
+
+
 @pytest.mark.slow
 class TestQECPassIntegration:
     """Integration lit tests for the all qec-related pass"""
@@ -556,9 +638,9 @@ class TestQECPassIntegration:
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
-        @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -610,9 +692,9 @@ class TestQECPassIntegration:
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
         @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
-        @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -626,3 +708,49 @@ class TestQECPassIntegration:
             return qp.sample([m0, m1, m2])
 
         ghz()
+
+    # pylint: disable=too-many-positional-arguments, too-many-arguments
+    @pytest.mark.parametrize(
+        "n, diagonalizing_gates, expected_res, shots",
+        [
+            (1, [qp.H], 0.707, 1000),
+            (1, [qp.Z, qp.S, qp.H], 0.707, 1000),
+            (2, [qp.H], 0, 1000),
+            # 2 T-gates in the Y basis is always 1, we can use fewer shots
+            (2, [qp.Z, qp.S, qp.H], 1, 20),
+        ],
+    )
+    def test_T_gate_integration(
+        self, n, diagonalizing_gates, expected_res, shots, run_filecheck_qjit
+    ):
+        """Integration test for T gates."""
+
+        dev = qp.device("lightning.qubit", wires=1)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=6)
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            # CHECK: quantum.alloc
+            # CHECK: func.call @apply_T
+            # CHECK: fabricate_magic_state_Steane
+            # CHECK: qecp.assemble_tanner
+            # CHECK: qecp.decode_esm_css
+            # CHECK: quantum.custom "Hadamard"
+            qp.Hadamard(0)
+            for _ in range(n):
+                qp.T(0)
+            for op in diagonalizing_gates:
+                op(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        run_filecheck_qjit(circ)
+        samples = circ()
+        eigenvalues = [-1 if s else 1 for s in samples]
+        # could have a lower atol with more shots, but given test duration, not worth it
+        assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.07)
