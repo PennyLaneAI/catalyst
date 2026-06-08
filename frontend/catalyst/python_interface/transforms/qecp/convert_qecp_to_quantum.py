@@ -18,8 +18,11 @@ This module contains the implementation of the xDSL convert-qecp-to-quantum dial
 
 Known Limitations
 -----------------
-  * The current hyper-register lowering implementation also does not support any control flow that
-    iterates over hyper registers, except for the encoding loop.
+
+  * The current hyper-register lowering implementation not support control-flow operations that
+    iterate over physical hyper-registers, except for the encoding loop after allocating the
+    hyper-register. However, control-flow ops that iterate over types, like physical codeblocks, are
+    supported.
 """
 
 from dataclasses import dataclass
