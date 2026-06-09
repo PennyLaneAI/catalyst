@@ -709,6 +709,81 @@ class TestQECPassIntegration:
 
         ghz()
 
+    @pytest.mark.parametrize(
+        "gates, expected_results",
+        [
+            # expected results are (expval(X), expval(Y) expval(Z))
+            # pauli ops all behave as expected from ground state
+            ([qp.X], (0, 0, -1)),
+            ([qp.Y], (0, 0, -1)),
+            ([qp.Z], (0, 0, 1)),
+            # hadamard projects onto x-axis
+            ([qp.H], (1, 0, 0)),
+            # x after hadamard does nothing, y and z flip expval(X)
+            ([qp.H, qp.X], (1, 0, 0)),
+            ([qp.H, qp.Y], (-1, 0, 0)),
+            ([qp.H, qp.Z], (-1, 0, 0)),
+            # adjoint and S adjoint rotate onto y axis in expected directions
+            ([qp.H, qp.S], (0, 1, 0)),
+            ([qp.H, lambda w: qp.adjoint(qp.S(w))], (0, -1, 0)),
+            # hadamard is self-inverse
+            ([qp.H, qp.H], (0, 0, 1)),
+        ],
+    )
+    def test_qec_single_clifford_gate_ops_integration(self, gates, expected_results):
+        """Integration tests for combinations of single Clifford gate ops."""
+
+        dev = qp.device("lightning.qubit", wires=1)
+
+        qec_conversion_and_noise_passes = qp.CompilePipeline(
+            convert_quantum_to_qecl_pass(k=1),
+            qp.transform(pass_name="symbol-dce"),
+            inject_noise_to_qecl_pass,
+            convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1),
+            convert_qecp_to_quantum_pass,
+        )
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=123)
+        @qec_conversion_and_noise_passes
+        @qp.set_shots(700)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def x_circ():
+            for gate in gates:
+                gate(0)
+            qp.H(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=456)
+        @qec_conversion_and_noise_passes
+        @qp.set_shots(700)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def y_circ():
+            for gate in gates:
+                gate(0)
+            qp.Z(0)
+            qp.S(0)
+            qp.H(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=789)
+        @qec_conversion_and_noise_passes
+        @qp.set_shots(700)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def z_circ():
+            for gate in gates:
+                gate(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        all_samples = x_circ(), y_circ(), z_circ()
+
+        for samples, res in zip(all_samples, expected_results):
+            eigvals = [-1 if s else 1 for s in samples]
+            # the tolerance is a bit high, but it keeps number of shots down
+            assert np.isclose(np.mean(eigvals), res, atol=0.1)
+
     # pylint: disable=too-many-positional-arguments, too-many-arguments
     @pytest.mark.parametrize(
         "n, diagonalizing_gates, expected_res, shots",

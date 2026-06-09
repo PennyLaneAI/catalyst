@@ -28,7 +28,7 @@ struct ResourceResult {
     // method for merging two ResourceResult values
     enum class MergeMethod { Sum, Max, Min };
 
-    // quantum, pbc, mbqc operations are stored
+    // quantum, qref, pbc, mbqc operations are stored
     // as a map from operation name to a map of
     // name -> ((numWires, numParams) -> count)
     llvm::StringMap<llvm::DenseMap<std::pair<int, int>, int64_t>> operations;
@@ -43,10 +43,11 @@ struct ResourceResult {
     // Ignored by `multiplyByScalar`; `mergeWith` mints a fresh id on key conflicts.
     llvm::StringMap<uint64_t> varFunctionCalls;
 
-    // qubits from quantum.alloc / quantum.alloc_qubit ops
+    // qubits from qref/quantum alloc/alloc_qubit ops
     int64_t numAllocQubits = 0;
 
-    // qubits from !quantum.bit function arguments (entry function only)
+    // qubits from !quantum.bit, qref.bit and qref.reg<{static}> function arguments (entry function
+    // only)
     int64_t numArgQubits = 0;
 
     // total qubits (allocated + argument)
@@ -65,7 +66,7 @@ struct ResourceResult {
     bool hasDynLoop = false;
 
     // Set when quantum.device is present: true if {auto_qubit_management} is
-    // active (register grows dynamically on quantum.extract), false if not.
+    // active (register grows dynamically on quantum.extract/qref.get), false if not.
     // nullopt means no quantum.device in this function.
     std::optional<bool> autoQubitManagement;
 
