@@ -1177,23 +1177,12 @@ class TestLoweringFabricateOp:
 
                 // CHECK: [[cb1:%.+]] = func.call @apply_T([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
                 %2 = func.call @apply_T(%0) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
-
-                // CHECK: [[cb2:%.+]] = func.call @apply_T_adj([[cb1]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
-                %3 = func.call @apply_T_adj(%2) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
-                return
             }
             //      CHECK-LABEL: func.func private @apply_T([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
             // CHECK: func.call @fabricate_magic_Steane() : () -> !qecp.codeblock<1 x 7>
             // CHECK: qecp.dealloc_cb
             func.func private @apply_T(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
                 %1 = qecl.fabricate[magic] : !qecl.codeblock<1>
-                qecl.dealloc_cb %0 : !qecl.codeblock<1>
-                func.return %1 : !qecl.codeblock<1>
-            }
-            //      CHECK-LABEL: func.func private @apply_T_adj([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
-            // CHECK: func.call @fabricate_magic_conj_Steane() : () -> !qecp.codeblock<1 x 7>
-            func.func private @apply_T_adj(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
-                %1 = qecl.fabricate[magic_conj] : !qecl.codeblock<1>
                 qecl.dealloc_cb %0 : !qecl.codeblock<1>
                 func.return %1 : !qecl.codeblock<1>
             }
@@ -1204,10 +1193,39 @@ class TestLoweringFabricateOp:
             // CHECK-NOT: qecp.t [[qb:%.+]] adj
             // CHECK: qecp.h
             // CHECK: qecp.cnot
+            // CHECK-NOT: func.func private @fabricate_magic_conj_Steane()
+        }
+        """
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+    def test_apply_adj_t_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test that the call signature for the apply_T_adj subroutine is updated as expected."""
+
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+                // CHECK: [[cb1:%.+]] = func.call @apply_T_adj([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                %1 = func.call @apply_T_adj(%0) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                return
+            }
+            //      CHECK-LABEL: func.func private @apply_T_adj([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
+            // CHECK: func.call @fabricate_magic_conj_Steane() : () -> !qecp.codeblock<1 x 7>
+            func.func private @apply_T_adj(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
+                %1 = qecl.fabricate[magic_conj] : !qecl.codeblock<1>
+                qecl.dealloc_cb %0 : !qecl.codeblock<1>
+                func.return %1 : !qecl.codeblock<1>
+            }
+            // CHECK-NOT: func.func private @fabricate_magic_Steane
             //      CHECK-LABEL: func.func private @fabricate_magic_conj_Steane
             // CHECK: qecp.alloc_cb
+            // CHECK: qecp.h
             // CHECK: qecp.t [[qb:%.+]] adj
             // CHECK-NOT: qecp.t [[qb:%.+]] :
+            // CHECK: qecp.h
+            // CHECK: qecp.cnot
         }
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)

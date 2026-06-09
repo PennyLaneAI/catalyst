@@ -202,6 +202,7 @@
   [(#2870)](https://github.com/PennyLaneAI/catalyst/pull/2870)
   [(#2921)](https://github.com/PennyLaneAI/catalyst/pull/2921)
 
+
 * The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
   [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
 
