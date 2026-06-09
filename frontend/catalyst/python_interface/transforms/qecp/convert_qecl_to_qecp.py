@@ -869,24 +869,6 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             magic_state_qubits[state_prep_index] = t_op.results[0]
 
             # Perform unitary encoding circuit for the code
-
-            # def cnot_fn(ctrl_idx, trgt_ids):
-            #     cnot_op = qecp.CnotOp(magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx])
-            #     magic_state_qubits[ctrl_idx] = cnot_op.results[0]
-            #     magic_state_qubits[trgt_idx] = cnot_op.results[1]
-        
-            # # hadamards = unitary_encoding_info["hadamard_indices"]
-            # # cnot_pairs = unitary_encoding_info["cnot_indices"]
-
-            # # for idx in hadamards:
-            # #     h = qecp.HadamardOp(magic_state_qubits[idx])
-            # #     magic_state_qubits[idx] = h.results[0]
-
-            # # for ctrl_idx, trgt_idx in cnot_pairs:
-            # #     cnot_op = qecp.CnotOp(magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx])
-            # #     magic_state_qubits[ctrl_idx] = cnot_op.results[0]
-            # #     magic_state_qubits[trgt_idx] = cnot_op.results[1]
-
             for op, wire_idxs in unitary_encoding_info["ops"]:
                 op_out = op(*[magic_state_qubits[idx] for idx in wire_idxs])
                 for i, idx in enumerate(wire_idxs):
