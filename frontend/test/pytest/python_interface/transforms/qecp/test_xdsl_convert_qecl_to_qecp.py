@@ -1277,3 +1277,80 @@ class TestQECPLoweringIntegration:
             return qp.sample([m0])
 
         run_filecheck_qjit(circuit)
+
+
+# MARK: Extensibility
+
+class TestExtensibility():
+    """Test the extensibility to other k=1 CSS codes by testing compilation with the Shor-913 code.
+    Note that this code does not support any transversal phase gates. These tests check 
+    lowering to the qecp dialect, rather than execution and validity of results."""
+
+    def test_transversal_gates(self):
+        """ToDo: docstring. Note we add no noise."""
+
+        dev = qp.device("lightning.qubit", wires=1)
+        pipe = [("pipe", ["quantum-compilation-stage"])]
+
+        @qp.qjit(capture=True, pipelines=pipe, target="mlir")
+        @convert_qecl_to_qecp_pass(qec_code="Shor913", number_errors=0)
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(1000)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            qp.X(0)
+            qp.Z(1)
+            qp.CNOT([0, 1])
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            return qp.sample([m0, m1])
+        
+        mlir = circ.mlir_opt
+        print(mlir)
+        raise RuntimeError
+
+    def test_fabricate_magic_state_shor(self, run_filecheck):
+        """Todo. Note that this has to be a lit test for fabricate op, because without transversal 
+        S, we can't run the apply_T subroutine"""
+
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK:   [[magic_cb:%.+]] = func.call @fabricate_magic_state_Shor913() : () -> !qecp.codeblock<1 x 9>
+                %0 = qecl.fabricate[magic] : !qecl.codeblock<1>
+                return
+            }
+            // CHECK-LABEL: func.func private @fabricate_magic_state_Shor913() -> !qecp.codeblock<1 x 9>
+            //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 9>
+            //       CHECK-DAG:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q2:%.+]] = qecp.extract [[cb]][2] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q3:%.+]] = qecp.extract [[cb]][3] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q4:%.+]] = qecp.extract [[cb]][4] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q5:%.+]] = qecp.extract [[cb]][5] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q6:%.+]] = qecp.extract [[cb]][6] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q7:%.+]] = qecp.extract [[cb]][7] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK-DAG:   [[q8:%.+]] = qecp.extract [[cb]][8] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // State injection on the state_prep_index (qubit 6): H then T
+            //       CHECK:   [[h_inj:%.+]] = qecp.hadamard [[q0]] : !qecp.qubit<data>
+            //       CHECK:   [[q0_1:%.+]] = qecp.t [[h_inj]] : !qecp.qubit<data>
+            // Unitary encoding: initial CNOTs
+            //       CHECK:   [[q0_2:%.+]], [[q3_1:%.+]] = qecp.cnot [[q0_1]], [[q3]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK:   [[q0_3:%.+]], [[q6_1:%.+]] = qecp.cnot [[q0_2]], [[q6]] : !qecp.qubit<data>, !qecp.qubit<data>
+            // Unitary encoing: Hadamards on indices 0, 3, 6
+            //       CHECK:   [[q0_4:%.+]] = qecp.hadamard [[q0_3]] : !qecp.qubit<data>
+            //       CHECK:   [[q3_2:%.+]] = qecp.hadamard [[q3_1]] : !qecp.qubit<data>
+            //       CHECK:   [[q6_2:%.+]] = qecp.hadamard [[q6_1]] : !qecp.qubit<data>
+            // Unitary encoding: more CNOTs - [n, n+1] and [n, n+2] for n in [0, 3, 6]
+            //       CHECK:   [[q0_5:%.+]], [[q1_1:%.+]] = qecp.cnot [[q0_4]], [[q1]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK:   qecp.cnot [[q0_5]], [[q2]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK:   [[q3_3:%.+]], [[q4_1:%.+]] = qecp.cnot [[q3_2]], [[q4]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK:   qecp.cnot [[q3_3]], [[q5]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK:   [[q6_3:%.+]], [[q7_1:%.+]] = qecp.cnot [[q6_2]], [[q7]] : !qecp.qubit<data>, !qecp.qubit<data>
+            //       CHECK:   qecp.cnot [[q6_3]], [[q8]] : !qecp.qubit<data>, !qecp.qubit<data>
+
+        }
+        """
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Shor913")),)
+        run_filecheck(program, pipeline)
+
