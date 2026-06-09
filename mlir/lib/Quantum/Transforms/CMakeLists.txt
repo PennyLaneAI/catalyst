@@ -30,6 +30,7 @@ file(GLOB SRC
     IonsDecompositionPatterns.cpp
     loop_boundary_optimization.cpp
     LoopBoundaryOptimizationPatterns.cpp
+    reference_semantics_conversion.cpp
     phase_folding.cpp
     SymbolicAnalysis/PhaseBucket.h
     SymbolicAnalysis/PhaseBucket.cpp
