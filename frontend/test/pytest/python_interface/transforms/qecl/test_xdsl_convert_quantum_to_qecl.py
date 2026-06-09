@@ -662,9 +662,13 @@ class TestGatePattern:
                 // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
                 %2 = quantum.custom "T"() %1 : !quantum.bit
 
-                // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb2]] : !qecl.codeblock<1> to !quantum.bit
+                // CHECK: [[cb3:%.+]] = func.call @apply_T_adj([[cb2]]) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                // CHECK: [[cb4:%.+]] = qecl.qec [[cb3]] : !qecl.codeblock<1>
+                // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb4]] : !qecl.codeblock<1> to !quantum.bit
+                %3 = quantum.custom "T"() %2 adj : !quantum.bit
+
                 // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
-                %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+                %4 = "test.op"(%3) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
                 return
             }
             //      CHECK: func.func private @apply_T([[in_codeblock:%.+]]: !qecl.codeblock<1>)
@@ -679,6 +683,8 @@ class TestGatePattern:
             // CHECK-NEXT: else
             // CHECK-NEXT:     scf.yield [[magic_cb2]]
             //      CHECK: func.return [[out_codeblock]]
+            //      CHECK: func.func private @apply_T_adj([[in_codeblock:%.+]]: !qecl.codeblock<1>)
+            // CHECK-NEXT: [[magic_cb:%.+]] = qecl.fabricate[magic_conj] : !qecl.codeblock<1>
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
