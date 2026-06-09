@@ -92,7 +92,7 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         ),
         # Z is applied transversally using physial X, and vice versa.
         # There are no transversal phase gates for this code.
-        {"x": (qecp.PauliZOp, [0, 3, 6]), "z": (qecp.PauliXOp, [0, 1, 2])},
+        {"x": (qecp.PauliZOp, [0, 3, 6]), "z": (qecp.PauliXOp, [0, 3, 6])},
         {"cnot": qecp.CnotOp},
         {
             "ops": [
