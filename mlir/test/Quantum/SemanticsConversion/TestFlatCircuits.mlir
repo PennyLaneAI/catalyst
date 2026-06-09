@@ -652,7 +652,7 @@ func.func public @test_adjoint_with_allocation(%arg0: i64) attributes {quantum.n
     %5 = quantum.insert %1[ 1], %4 : !quantum.reg, !quantum.bit
     quantum.dealloc %5 : !quantum.reg
 
-    // CHECK: [[q43:%.+]] = qref.get %0[ 3] : !qref.reg<4> -> !qref.bit
+    // CHECK: [[q43:%.+]] = qref.get [[qreg4]][ 3] : !qref.reg<4> -> !qref.bit
     %6 = quantum.extract %2[ 3] : !quantum.reg -> !quantum.bit
 
     // CHECK: qref.adjoint {
