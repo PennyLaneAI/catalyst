@@ -117,7 +117,11 @@ def DispatchRemoteTargetsPass : Pass<"dispatch-remote-targets", "mlir::ModuleOp"
         The pass is a no-op when no `catalyst.dispatch` modules are present.
     }];
 
-    let dependentDialects = ["catalyst::remote::RemoteDialect", "mlir::func::FuncDialect"];
+    let dependentDialects = [
+        "catalyst::remote::RemoteDialect",
+        "catalyst::CatalystDialect",
+        "mlir::func::FuncDialect"
+    ];
 }
 
 #endif // REMOTE_PASSES

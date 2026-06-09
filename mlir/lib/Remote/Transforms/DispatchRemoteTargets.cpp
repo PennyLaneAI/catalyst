@@ -18,6 +18,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
+#include "Catalyst/IR/CatalystOps.h"
 #include "Remote/IR/RemoteOps.h"
 #include "Remote/Transforms/Passes.h"
 
@@ -67,19 +68,96 @@ struct DispatchRemoteTargetsPass
             }
         }
 
-        if (targetMods.empty()) {
+        // catalyst.custom_call ops whose backend_config carries a `dispatch` entry
+        // The call-target name is the executor-side symbol.
+        SmallVector<catalyst::CustomCallOp> libCalls;
+        host.walk([&](catalyst::CustomCallOp call) {
+            if (remoteDispatchOf(call)) {
+                libCalls.push_back(call);
+            }
+        });
+
+        if (targetMods.empty() && libCalls.empty()) {
             return;
         }
 
         // Modules sharing an executor get a single remote.open.
         llvm::SmallSet<std::string, 4> openedAddresses;
+        StringAttr executorAddress;
 
         for (auto nested : targetMods) {
-            if (failed(dispatchViaOrcRemote(host, nested, openedAddresses))) {
+            if (failed(dispatchViaOrcRemote(host, nested, openedAddresses, executorAddress))) {
                 return signalPassFailure();
             }
             nested.erase();
         }
+
+        const size_t numQnodeExecutors = openedAddresses.size();
+
+        if (!libCalls.empty()) {
+            for (catalyst::CustomCallOp call : libCalls) {
+                StringAttr dispatch = remoteDispatchOf(call);
+                if ((!dispatch || dispatch.getValue().empty()) && numQnodeExecutors > 1) {
+                    call.emitOpError("ambiguous remote executor");
+                    return signalPassFailure();
+                }
+                StringAttr addrAttr = libCallAddress(call, executorAddress);
+                if (!addrAttr) {
+                    call.emitOpError("remote runtime_call has no executor address");
+                    return signalPassFailure();
+                }
+                if (openedAddresses.insert(addrAttr.str()).second) {
+                    injectRemoteOpenIntoSetup(host, addrAttr);
+                }
+            }
+            if (failed(rewriteRemoteLibCalls(libCalls, executorAddress))) {
+                return signalPassFailure();
+            }
+        }
+    }
+
+    static StringAttr remoteDispatchOf(catalyst::CustomCallOp call)
+    {
+        if (auto cfg = call.getBackendConfigAttr()) {
+            return cfg.getAs<StringAttr>("dispatch");
+        }
+        return nullptr;
+    }
+
+    static StringAttr libCallAddress(catalyst::CustomCallOp call, StringAttr fallbackAddress)
+    {
+        if (StringAttr dispatch = remoteDispatchOf(call)) {
+            if (!dispatch.getValue().empty()) {
+                return dispatch;
+            }
+        }
+        return fallbackAddress;
+    }
+
+    LogicalResult rewriteRemoteLibCalls(ArrayRef<catalyst::CustomCallOp> libCalls,
+                                        StringAttr fallbackAddress)
+    {
+        MLIRContext *ctx = &getContext();
+        for (catalyst::CustomCallOp call : libCalls) {
+            StringAttr addressAttr = libCallAddress(call, fallbackAddress);
+            if (!addressAttr) {
+                call.emitOpError("remote runtime_call has no executor address");
+                return failure();
+            }
+            auto symAttr = StringAttr::get(ctx, call.getCallTargetName());
+            OpBuilder b(call);
+            IntegerAttr numInputAttr = nullptr;
+            if (auto n = call.getNumberOriginalArg()) {
+                numInputAttr = b.getI32IntegerAttr(*n);
+            }
+            auto remoteCall =
+                remote::CallOp::create(b, call.getLoc(), call.getResultTypes(), call.getOperands(),
+                                       /*address=*/addressAttr, /*symbol=*/symAttr,
+                                       /*num_input_args=*/numInputAttr);
+            call.replaceAllUsesWith(remoteCall.getResults());
+            call.erase();
+        }
+        return success();
     }
 
     // Insert `remote.open` before the terminator of `setup`. No-op if setup is absent or bodyless.
@@ -116,7 +194,8 @@ struct DispatchRemoteTargetsPass
     // Open a session (once per address), ship the object recorded in
     // `catalyst.object_file`, and rewrite each host-side func.call into a `remote.launch`.
     LogicalResult dispatchViaOrcRemote(ModuleOp host, ModuleOp nested,
-                                       llvm::SmallSet<std::string, 4> &openedAddresses)
+                                       llvm::SmallSet<std::string, 4> &openedAddresses,
+                                       StringAttr &executorAddress)
     {
         MLIRContext *ctx = &getContext();
 
@@ -139,6 +218,8 @@ struct DispatchRemoteTargetsPass
 
         auto pathAttr = StringAttr::get(ctx, objPathAttr.getValue());
         auto addressAttr = StringAttr::get(ctx, moduleAddress);
+        // Remember the executor address so standalone remote lib calls reuse it.
+        executorAddress = addressAttr;
 
         // Inject remote.open (setup) once per unique address.
         if (!openedAddresses.count(moduleAddress)) {
