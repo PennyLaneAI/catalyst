@@ -570,10 +570,17 @@ def _runtime_call_lowering(jax_ctx: mlir.LoweringRuleContext, *args, kernel_desc
     The artifact path is written as a catalyst.runtime_artifacts ArrayAttr on calling module.
     """
     results_ty = list(convert_shaped_arrays_to_tensors(jax_ctx.avals_out))
+
+    if kernel_descriptor.remote:
+        call_op = CustomCallOp(results_ty, list(args), kernel_descriptor.name)
+        address = kernel_descriptor.remote_address or ""
+        call_op.operation.attributes["backend_config"] = ir.DictAttr.get(
+            {"dispatch": ir.StringAttr.get(address)}
+        )
+        return call_op.results
+
     call_op = CustomCallOp(results_ty, list(args), kernel_descriptor.name)
-
     record_runtime_artifact(jax_ctx.module_context.module.operation, kernel_descriptor.artifact)
-
     return call_op.results
 
 

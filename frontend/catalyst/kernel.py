@@ -25,17 +25,41 @@ import jax.numpy as jnp
 
 @dataclass(frozen=True)
 class KernelDescriptor:
-    """Describes the ABI of a pre-compiled external kernel.
+    """Describes the ABI of an external kernel callable via :func:`runtime_call`.
+
+    One of two shapes, distinguished by ``artifact``:
+      * **local kernel** — ``artifact`` is a path to the shared library; ``remote_address`` is None.
+      * **remote symbol** — ``artifact`` is None (the symbol lives on the executor);
+        ``remote_address`` is the bound executor (``"host:port"``) or None to inherit the program's
+        single executor.
 
     Attributes:
-        name:        C symbol name exported by the artifact.
-        artifact:    Absolute path to the shared library (.so / .dylib).
-        output_spec: Tuple of (shape_tuple, dtype_str) for each output tensor.
+        name:           C symbol name. For a local kernel it is exported by ``artifact``; for a
+                        remote kernel it is a symbol already loaded on the executor.
+        artifact:       Absolute path to the shared library (.so / .dylib), or ``None`` for a
+                        remote symbol (which lives on the executor, not in a local artifact).
+        output_spec:    Tuple of (shape_tuple, dtype_str) for each output tensor.
+        remote_address: For a remote kernel, the executor address it targets, e.g.
+                        ``"ADDR:PORT"``; ``None`` means "inherit the program's single
+                        executor". Must be ``None`` for a local kernel.
     """
 
     name: str
-    artifact: str  # absolute path to .so / .dylib
+    artifact: Optional[str]  # absolute path to .so / .dylib, or None for a remote symbol
     output_spec: tuple  # ((shape_tuple, dtype_str), ...)
+    remote_address: Optional[str] = None  # bound executor for a remote symbol; None => inherit
+
+    @property
+    def remote(self) -> bool:
+        """True iff this is an executor-side symbol (no local artifact)."""
+        return self.artifact is None
+
+    def __post_init__(self):
+        # `remote_address` only makes sense for a remote symbol; a local kernel has no executor.
+        if self.remote_address is not None and self.artifact is not None:
+            raise ValueError(
+                "kernel: `remote_address` is only valid for a remote kernel (artifact=None)"
+            )
 
 
 def _to_hashable(spec):
@@ -53,29 +77,56 @@ def _to_hashable(spec):
     return tuple(entries)
 
 
-def declare(name: str, artifact: str, outputs) -> KernelDescriptor:
-    """Declare a pre-compiled external kernel for use with :func:`kernel.runtime_call`.
+def declare(name: str, artifact: Optional[str] = None, outputs=None, *,
+            remote=False) -> KernelDescriptor:
+    """Declare an external kernel for use with :func:`kernel.runtime_call`.
 
     Args:
-        name:     C symbol exported by the artifact (e.g. ``"my_func"``).
-        artifact: Path to the shared library. Resolved relative to ``os.getcwd()``
-                  if not absolute. The file must exist at declare time.
-        outputs:  :class:`jax.ShapeDtypeStruct` or tuple of them describing each
-                  output tensor. JAX needs these shapes at trace time to infer
-                  what the function returns.
+        name:     C symbol name. For a local kernel, exported by ``artifact``; for a remote
+                  kernel, a symbol already loaded on the executor (e.g.
+                  ``"fpga_trampoline_a_setup"``).
+        artifact: Path to the shared library for a local kernel (resolved relative to
+                  ``os.getcwd()`` if not absolute; must exist at declare time). Omit for a
+                  remote kernel.
+        outputs:  :class:`jax.ShapeDtypeStruct` or tuple of them describing each output tensor.
+                  JAX needs these at trace time to infer what the call returns.
+        remote:   Mark the symbol as executor-side. Pass the **remote device**
+                  (``remote(target(...), address=...)``) to bind this call explicitly to that
+                  executor's address. ``True`` inheriting the program's single remote executor.
 
     Returns:
         A :class:`KernelDescriptor`
     """
+    output_spec = _to_hashable(outputs) if outputs is not None else ()
+
+    if remote:
+        address = None
+        if remote is not True:
+            from catalyst.api_extensions.target import get_dispatch
+
+            dispatch = get_dispatch(remote)
+            if dispatch is None:
+                raise ValueError(
+                    "kernel.declare(remote=<device>): the device has no remote dispatch; wrap it "
+                    "with remote(target(...), address=...) first, or pass remote=True to inherit "
+                    "the program's single executor."
+                )
+            address = dispatch.address
+        # Remote symbol: no local artifact; `remote` is derived from artifact=None.
+        return KernelDescriptor(
+            name=name, artifact=None, output_spec=output_spec, remote_address=address
+        )
+
+    if artifact is None:
+        raise ValueError(
+            "kernel.declare: a local kernel requires `artifact`; pass remote=True for an "
+            "executor-side symbol"
+        )
     artifact = os.path.abspath(artifact)
     if not os.path.isfile(artifact):
         raise FileNotFoundError(f"kernel.declare: artifact not found: {artifact!r}")
 
-    return KernelDescriptor(
-        name=name,
-        artifact=artifact,
-        output_spec=_to_hashable(outputs),
-    )
+    return KernelDescriptor(name=name, artifact=artifact, output_spec=output_spec)
 
 
 def define(builder, *, name: Optional[str] = None, outputs):
@@ -102,10 +153,13 @@ def define(builder, *, name: Optional[str] = None, outputs):
 
 
 def runtime_call(kernel_descriptor, *args):
-    """Call a pre-compiled external kernel from inside ``@qjit``.
+    """Call an external kernel from inside ``@qjit`` — local or remote.
+
+    If ``kernel_descriptor.remote`` is set, the symbol is dispatched on the program's remote
+    executor (rewritten to a ``remote.call``); otherwise it calls the local artifact.
 
     Args:
-        kernel_descriptor: A :class:`KernelDescriptor` returned by :func:`declare`.
+        kernel_descriptor: A :class:`KernelDescriptor` returned by :func:`declare` / :func:`define`.
         *args: Input tensors. JAX infers shapes and dtypes at trace time.
 
     Returns:
