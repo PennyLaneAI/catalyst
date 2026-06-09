@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Test conversion to value semantics quantum dialect for PBC circuits.
+// Test conversion to reference semantics quantum dialect for PBC circuits.
 
 // RUN: quantum-opt --convert-to-reference-semantics --split-input-file --verify-diagnostics %s | FileCheck %s
 
