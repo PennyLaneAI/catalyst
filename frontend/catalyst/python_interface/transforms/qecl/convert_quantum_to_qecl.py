@@ -534,7 +534,7 @@ class TerminatorConversion(RewritePattern):
         for operand in op.operands:
             operand_owner = operand.owner
             if isinstance(operand.type, quantum.QuregType):
-                # Expect `!quantum.reg `types to be convertible to `!qecl.hyperreg` types
+                # Expect `!quantum.reg` types to be convertible to `!qecl.hyperreg` types
                 if not _is_type_convertible(
                     operand_owner, qecl.LogicalHyperRegisterType
                 ):  # pragma: no cover
