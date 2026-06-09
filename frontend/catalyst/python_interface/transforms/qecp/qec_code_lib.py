@@ -23,9 +23,10 @@ import numpy as np
 from catalyst.python_interface.dialects import qecp
 
 _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
-    # add ref
-    "Shor913": (
-        9,
+    # the indices/ordering for the operators and encodings in the Steane code are those used
+    # in https://arxiv.org/pdf/2107.07505
+    "Steane": (
+        7,
         1,
         3,
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
@@ -36,10 +37,7 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
             # values are a tuple of the qecp gate, and the indices its applied at in the codeblock
             # will need to be refactored for k>1
             "x": (qecp.PauliXOp, [4, 5, 6]),
-            "y": (
-                qecp.PauliYOp,
-                [4, 5, 6],
-            ),
+            "y": (qecp.PauliYOp, [4, 5, 6]),
             "z": (qecp.PauliZOp, [4, 5, 6]),
             "hadamard": (qecp.HadamardOp, [0, 1, 2, 3, 4, 5, 6]),
             "s": (partial(qecp.SOp, adjoint=True), [0, 1, 2, 3, 4, 5, 6]),
@@ -49,20 +47,26 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
             "cnot": qecp.CnotOp,
         },
         {
-            "hadamard_indices": (1, 2, 3),
-            "cnot_indices": (
-                [1, 0],
-                [2, 4],
-                [6, 5],
-                [2, 0],
-                [3, 5],
-                [6, 4],
-                [2, 6],
-                [3, 4],
-                [1, 5],
-                [1, 6],
-                [3, 0],
-            ),
+            # ops (in the form of a qecp operator and the indices of the codeblock
+            # it should be applied on) defining a transporter encoding circuit, i.e. 
+            # one that maps an input to the logical version of that input, rather 
+            # than just encoding logical 0
+            "ops": [
+                (qecp.HadamardOp, [1]),
+                (qecp.HadamardOp, [2]),
+                (qecp.HadamardOp, [3]),
+                (qecp.CnotOp, [1, 0]),
+                (qecp.CnotOp, [2, 4]),
+                (qecp.CnotOp, [6, 5]),
+                (qecp.CnotOp, [2, 0]),
+                (qecp.CnotOp, [3, 5]),
+                (qecp.CnotOp, [6, 4]),
+                (qecp.CnotOp, [2, 6]),
+                (qecp.CnotOp, [3, 4]),
+                (qecp.CnotOp, [1, 5]),
+                (qecp.CnotOp, [1, 6]),
+                (qecp.CnotOp, [3, 0]),
+            ],
             # The state_prep_index is the index of the physical qubit that the state is
             # injected on (i.e. for a magic state, -H-T is applied here pre-encoding).
             # Must be consistent with the qubit treated as the encoding "input" by the
@@ -70,33 +74,40 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
             "state_prep_index": 6,
         },
     ),
-    # the indices/ordering for the operators and encodings in the Steane code are those used
-    # in https://arxiv.org/pdf/2107.07505
-    "Steane": (
-        7,
+    # add ref
+    "Shor913": (
+        9,
         1,
         3,
         np.array([[1, 1, 1, 1, 1, 1, 0, 0, 0], [0, 0, 0, 1, 1, 1, 1, 1, 1]]),
-        np.array([[1, 1, 0, 0, 0, 0, 0, 0, 0], [0, 1, 2, 0, 0, 0, 0, 0, 0], [0, 0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 0, 0, 1, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 1, 1, 0], [0, 0, 0, 0, 0, 0, 0, 1, 1]]),
-        # Z is applied transversally using physial X, and vice versa. 
+        np.array(
+            [
+                [1, 1, 0, 0, 0, 0, 0, 0, 0],
+                [0, 1, 2, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 1, 0, 0, 0, 0],
+                [0, 0, 0, 0, 1, 1, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1],
+            ]
+        ),
+        # Z is applied transversally using physial X, and vice versa.
         # There are no transversal phase gates for this code.
-        {"x": (qecp.PauliZOp, range(9)), "z": (qecp.PauliXOp, range(9))},
+        {"x": (qecp.PauliZOp, [0, 3, 6]), "z": (qecp.PauliXOp, [0, 1, 2])},
         {"cnot": qecp.CnotOp},
         {
-            "hadamard_indices": (1, 2, 3),
-            "cnot_indices": (
-                [1, 0],
-                [2, 4],
-                [6, 5],
-                [2, 0],
-                [3, 5],
-                [6, 4],
-                [2, 6],
-                [3, 4],
-                [1, 5],
-                [1, 6],
-                [3, 0],
-            ),
+            "ops": [
+                (qecp.CnotOp, [0, 3]),
+                (qecp.CnotOp, [0, 6]),
+                (qecp.HadamardOp, [0]),
+                (qecp.HadamardOp, [3]),
+                (qecp.HadamardOp, [6]),
+                (qecp.CnotOp, [0, 1]),
+                (qecp.CnotOp, [0, 2]),
+                (qecp.CnotOp, [3, 4]),
+                (qecp.CnotOp, [3, 5]),
+                (qecp.CnotOp, [6, 7]),
+                (qecp.CnotOp, [6, 8]),
+            ],
             # The state_prep_index is the index of the physical qubit that the state is
             # injected on (i.e. for a magic state, -H-T is applied here pre-encoding).
             # Add reference

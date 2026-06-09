@@ -839,7 +839,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         """
         unitary_encoding_info = self.qec_code.unitary_encoding
 
-        required_keys = {"state_prep_index", "hadamard_indices", "cnot_indices"}
+        required_keys = {"state_prep_index", "ops"}
         if not required_keys.issubset(unitary_encoding_info):  # pragma: no cover
             raise CompileError(
                 f"QEC code '{self.qec_code.name}' does not define a unitary encoding "
@@ -869,17 +869,28 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             magic_state_qubits[state_prep_index] = t_op.results[0]
 
             # Perform unitary encoding circuit for the code
-            hadamards = unitary_encoding_info["hadamard_indices"]
-            cnot_pairs = unitary_encoding_info["cnot_indices"]
 
-            for idx in hadamards:
-                h = qecp.HadamardOp(magic_state_qubits[idx])
-                magic_state_qubits[idx] = h.results[0]
+            # def cnot_fn(ctrl_idx, trgt_ids):
+            #     cnot_op = qecp.CnotOp(magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx])
+            #     magic_state_qubits[ctrl_idx] = cnot_op.results[0]
+            #     magic_state_qubits[trgt_idx] = cnot_op.results[1]
+        
+            # # hadamards = unitary_encoding_info["hadamard_indices"]
+            # # cnot_pairs = unitary_encoding_info["cnot_indices"]
 
-            for ctrl_idx, trgt_idx in cnot_pairs:
-                cnot_op = qecp.CnotOp(magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx])
-                magic_state_qubits[ctrl_idx] = cnot_op.results[0]
-                magic_state_qubits[trgt_idx] = cnot_op.results[1]
+            # # for idx in hadamards:
+            # #     h = qecp.HadamardOp(magic_state_qubits[idx])
+            # #     magic_state_qubits[idx] = h.results[0]
+
+            # # for ctrl_idx, trgt_idx in cnot_pairs:
+            # #     cnot_op = qecp.CnotOp(magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx])
+            # #     magic_state_qubits[ctrl_idx] = cnot_op.results[0]
+            # #     magic_state_qubits[trgt_idx] = cnot_op.results[1]
+
+            for op, wire_idxs in unitary_encoding_info["ops"]:
+                op_out = op(*[magic_state_qubits[idx] for idx in wire_idxs])
+                for i, idx in enumerate(wire_idxs):
+                    magic_state_qubits[idx] = op_out.results[i]
 
             # insert data qubits back into the codeblock
             encoded_codeblock = codeblock
