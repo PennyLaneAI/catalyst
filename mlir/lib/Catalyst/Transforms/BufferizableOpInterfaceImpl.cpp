@@ -180,10 +180,12 @@ struct CustomCallOpInterface
         int32_t numArguments = static_cast<int32_t>(customCallOp.getNumOperands());
         IntegerAttr numArgumentsAttr = rewriter.getI32IntegerAttr(numArguments);
 
-        // Create an updated custom call operation
+        // Create an updated custom call operation. `backend_config` is a declared attribute, so it
+        // must be passed to the builder explicitly; discardable attrs are carried separately below.
         auto newCustomCallOp =
             CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
-                                 customCallOp.getCallTargetName(), numArgumentsAttr);
+                                 customCallOp.getCallTargetName(), numArgumentsAttr,
+                                 customCallOp.getBackendConfigAttr());
         newCustomCallOp->setDiscardableAttrs(customCallOp->getDiscardableAttrDictionary());
         size_t startIndex = bufferArgs.size() - customCallOp.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
