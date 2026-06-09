@@ -14,14 +14,12 @@ set(MIN_BOOST_VERSION 1.83.0)
 
 include(FetchContent)
 
-# Locally we don't need to check for Boost::multiprecision explicitly.
-# Linking Boost::random automatically includes multiprecision headers
-# Explicitly adding it here and target_link_libraries will cause failure.
+# The decompsolver target only needs the Boost Graph Library. Linking
+# Boost::graph (below) propagates its INTERFACE include dirs automatically,
 find_package(Boost ${MIN_BOOST_VERSION} COMPONENTS graph QUIET)
 
 if (Boost_FOUND)
     message(STATUS "Found System Boost ${Boost_VERSION}")
-    set(CATALYST_BOOST_FETCHED FALSE CACHE BOOL "Boost was found on the system" FORCE)
 else()
     message(STATUS "Boost >= ${MIN_BOOST_VERSION} not found on system. Fetching...")
 
@@ -40,7 +38,6 @@ else()
     )
 
     FetchContent_MakeAvailable(Boost)
-
 
     set(BOOST_TARGETS boost_container boost_graph boost_core boost_assert boost_throw_exception boost_config)
 
@@ -63,6 +60,9 @@ else()
 
 endif()
 
+# Check that the include_dir doesn't point to a missing dir:
+get_target_property(_boost_inc Boost::graph INTERFACE_INCLUDE_DIRECTORIES)
+message(STATUS "Boost graph headers: ${_boost_inc}")
 
 add_library(decompsolver OBJECT DGBuilder.cpp DGSolver.cpp)
 
