@@ -393,15 +393,16 @@ void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValu
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(vAdjointOp);
     Location loc = vAdjointOp->getLoc();
+    QubitValueTracker regionTracker = tracker;
 
     // Add block args to the map
     for (auto [blockArg, operand] : llvm::zip_equal(vAdjointOp.getRegion().front().getArguments(),
                                                     vAdjointOp->getOperands())) {
         if (isa<quantum::QubitType>(blockArg.getType())) {
-            tracker.setRQubit(blockArg, tracker.getRQubit(operand));
+            regionTracker.setRQubit(blockArg, tracker.getRQubit(operand));
         }
         else if (isa<quantum::QuregType>(blockArg.getType())) {
-            tracker.setRQreg(blockArg, tracker.getRQreg(operand));
+            regionTracker.setRQreg(blockArg, tracker.getRQreg(operand));
         }
     }
 
@@ -409,7 +410,7 @@ void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValu
     auto rAdjointOp = qref::AdjointOp::create(builder, loc);
     builder.inlineRegionBefore(vAdjointOp.getRegion(), rAdjointOp.getRegion(),
                                rAdjointOp.getRegion().end());
-    handleRegion(builder, rAdjointOp.getRegion(), tracker);
+    handleRegion(builder, rAdjointOp.getRegion(), regionTracker);
     cascadeMapAhead(vAdjointOp, tracker);
     erasureWorklist.push_back(vAdjointOp);
 
