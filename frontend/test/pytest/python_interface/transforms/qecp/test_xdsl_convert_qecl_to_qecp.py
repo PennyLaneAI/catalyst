@@ -1314,17 +1314,17 @@ class TestQECPLoweringIntegration:
         run_filecheck_qjit(circuit)
 
 
-# MARK: Extensibility
+# MARK: Generality
 
-class TestExtensibility():
-    """Test the extensibility to other k=1 CSS codes by testing compilation with the Shor-913 code.
-    Note that this code does not support any transversal phase gates. These tests check 
-    lowering to the qecp dialect, rather than execution and validity of results."""
+class TestGenerality():
+    """Test the generality for other k=1 CSS codes beyond the Steane code by testing compilation 
+    with the Shor-913 code. Note that this code does not support any transversal phase gates. These
+    tests check lowering to the qecp dialect, rather than execution and validity of results."""
 
     def test_transversal_gates(self):
         """ToDo: docstring. Note we add no noise."""
 
-        dev = qp.device("lightning.qubit", wires=1)
+        dev = qp.device("lightning.qubit", wires=2)
         pipe = [("pipe", ["quantum-compilation-stage"])]
 
         @qp.qjit(capture=True, pipelines=pipe, target="mlir")
@@ -1351,11 +1351,11 @@ class TestExtensibility():
         program = """
         builtin.module @module_circuit {
             func.func @test_func() attributes {quantum.node} {
-                // CHECK:   [[magic_cb:%.+]] = func.call @fabricate_magic_state_Shor913() : () -> !qecp.codeblock<1 x 9>
+                // CHECK:   [[magic_cb:%.+]] = func.call @fabricate_magic_Shor913() : () -> !qecp.codeblock<1 x 9>
                 %0 = qecl.fabricate[magic] : !qecl.codeblock<1>
                 return
             }
-            // CHECK-LABEL: func.func private @fabricate_magic_state_Shor913() -> !qecp.codeblock<1 x 9>
+            // CHECK-LABEL: func.func private @fabricate_magic_Shor913() -> !qecp.codeblock<1 x 9>
             //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 9>
             //       CHECK-DAG:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
             //       CHECK-DAG:   [[q1:%.+]] = qecp.extract [[cb]][1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
