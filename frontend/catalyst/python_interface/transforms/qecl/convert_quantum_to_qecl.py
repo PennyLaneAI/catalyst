@@ -590,27 +590,15 @@ class TerminatorConversion(RewritePattern):
         rewriter.notify_op_modified(parent_op)
 
 
-# MARK: SCF Yield Pattern
+# MARK: SCF Terminator Patterns
 
 
-class ScfYieldConversion(TerminatorConversion):
-    """Handles conversion of `scf.yield` terminator ops."""
-
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: scf.YieldOp, rewriter: PatternRewriter):
-        """Rewrite pattern for `scf.yield` ops."""
-        super().match_and_rewrite(op, rewriter)
-
-
-# MARK: SCF Condition Pattern
-
-
-class ScfConditionConversion(TerminatorConversion):
-    """Handles conversion of `scf.condition` terminator ops."""
+class ScfTerminatorConversion(TerminatorConversion):
+    """Handles conversion of `scf.yield` and `scf.condition` terminator ops."""
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: scf.ConditionOp, rewriter: PatternRewriter):
-        """Rewrite pattern for `scf.condition` ops."""
+    def match_and_rewrite(self, op: scf.YieldOp | scf.ConditionOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.yield` and `scf.condition` ops."""
         super().match_and_rewrite(op, rewriter)
 
 
@@ -1039,8 +1027,7 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                     DeallocOpConversion(),
                     CustomOpConversion(t_subroutine=t_subroutine),
                     MeasureOpConversion(),
-                    ScfYieldConversion(),
-                    ScfConditionConversion(),
+                    ScfTerminatorConversion(),
                     ScfIfConversion(),
                     ScfForConversion(),
                     ScfWhileConversion(),
