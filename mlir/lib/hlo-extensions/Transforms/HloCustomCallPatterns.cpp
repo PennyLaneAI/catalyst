@@ -132,7 +132,8 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::
         newOperands.append(operands.begin(), operands.end());
         auto callTargetAttr = rewriter.getStringAttr(calleeName);
         rewriter.replaceOpWithNewOp<CustomCallOp>(op, resultsType, newOperands, callTargetAttr,
-                                                  nullptr);
+                                                  /*number_original_arg=*/nullptr,
+                                                  /*backend_config=*/nullptr);
 
         return success();
     }
