@@ -30,6 +30,7 @@ file(GLOB SRC
     merge_global_phase.cpp
     merge_rotation.cpp
     quantum_to_llvm.cpp
+    reference_semantics_conversion.cpp
     split_non_commuting.cpp
     split_to_single_terms.cpp
 )

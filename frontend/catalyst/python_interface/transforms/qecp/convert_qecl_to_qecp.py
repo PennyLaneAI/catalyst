@@ -371,6 +371,9 @@ class TransversalGateConversion(RewritePattern):
 
         gate_name = op.name.split(".")[1]  # op.name is "qecl.gate_name"
 
+        if getattr(op, "adjoint", None):
+            gate_name = f"{gate_name}_adj"
+
         op_codeblocks = (
             (op.in_ctrl_codeblock, op.in_trgt_codeblock)
             if gate_name in self.qec_code.transversal_2q_gates

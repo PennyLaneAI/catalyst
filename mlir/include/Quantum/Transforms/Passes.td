@@ -33,6 +33,14 @@ def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let dependentDialects = ["LLVM::LLVMDialect"];
 }
 
+def ReferenceSemanticsConversionPass : Pass<"convert-to-reference-semantics"> {
+    let summary = "Convert to reference semantics quantum dialect";
+
+    let dependentDialects = [
+       "catalyst::qref::QRefDialect"
+    ];
+}
+
 def EmitCatalystPyInterfacePass : Pass<"emit-catalyst-py-interface"> {
     let summary = "Emit catalyst python's default interface.";
 
