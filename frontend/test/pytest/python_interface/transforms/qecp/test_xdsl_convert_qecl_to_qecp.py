@@ -1448,8 +1448,8 @@ class TestGenerality:
         run_filecheck(program, pipeline)
 
     def test_qec_cycle_shor(self, run_filecheck):
-        """Test that a `qecl.qec` op is lowered to a call to the QEC-cycle subroutine for the Shor913
-        code.
+        """Test that a `qecl.qec` op is lowered to a call to the QEC-cycle subroutine for the
+        Shor913 code.
         """
         program = """
         // CHECK-LABEL: test_module
@@ -1556,9 +1556,9 @@ class TestGenerality:
         run_filecheck(program, pipeline)
 
     def test_fabricate_magic_state_shor(self, run_filecheck):
-        """Test that the `fabricate` op for the magic state is generated as expected. Note that
-        without transversal S, we can't lower the apply_T subroutine, so we only test the
-        generation of the `fabricate` subroutine.
+        """Test that the `fabricate` op for the magic state is generated as expected for the
+        Shor913 code. Note that without transversal S, we can't lower the apply_T subroutine,
+        so we can only test the generation of the `fabricate` subroutine.
 
         Since this is only used in applying T at the moment, this isn't reachable from any
         frontend code, but we can still check that it works."""

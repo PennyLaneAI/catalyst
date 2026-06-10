@@ -103,8 +103,8 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         {"x": (qecp.PauliZOp, [0, 3, 6]), "z": (qecp.PauliXOp, [0, 1, 2])},
         {"cnot": qecp.CnotOp},
         #### Unitary encoding circuit ####
-        # jukebox generated this and verified it in simulation 
-        # see simulation to validate here: 
+        # jukebox generated this and verified it in simulation
+        # see simulation to validate here:
         # https://app.notion.com/p/xanaduai/Shor-9-1-3-code-37bbc6bd17648058841aed64f771ee9c
         {
             "ops": [
