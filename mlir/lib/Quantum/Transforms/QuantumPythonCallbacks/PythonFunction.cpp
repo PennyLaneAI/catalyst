@@ -41,8 +41,7 @@ std::string pythonLowerPauliRot(double theta, const std::string &pauliWord, std:
 
                 nb::object pythonResult = wrapperFunction(theta, pauliWord.c_str(), pyWires);
 
-                // must cast char* to allocate and then std::string
-                return std::string(nb::cast<const char *>(pythonResult));
+                return nb::borrow<nb::str>(pythonResult).c_str();
             }
             catch (const nb::python_error &error) {
                 throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
