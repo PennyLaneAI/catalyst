@@ -145,6 +145,31 @@
   checks with strict type-based checking.
   [(#2873)](https://github.com/PennyLaneAI/catalyst/pull/2873)
 
+* Fixed support of region-based adjoint (`qp.adjoint(qfunc)()`) when used in conjunction with
+  dynamic qubit allocation.
+  [(#2933)](https://github.com/PennyLaneAI/catalyst/pull/2933)
+
+  For instance, the following would previously fail:
+  ```py
+  def fun(w):
+    with qp.allocate(1) as qs:
+        qp.S(qs[0])
+    qp.X(w)
+
+  @qp.qjit(capture=True)
+  @qp.qnode(qp.device("null.qubit", wires=1))
+  def circuit():
+      qp.adjoint(fun)(0)
+      return qp.probs()
+  ```
+  with the error message:
+  ```
+  catalyst.utils.exceptions.CompileError: catalyst failed with error code 1: Failed to run pipeline: QuantumCompilationStage
+  Compilation failed:
+  circuit:31:9: error: Unhandled operation in adjoint region
+  circuit:31:9: note: see current operation: "quantum.dealloc"(%13) : (!quantum.reg) -> ()
+  ```
+
 * Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
