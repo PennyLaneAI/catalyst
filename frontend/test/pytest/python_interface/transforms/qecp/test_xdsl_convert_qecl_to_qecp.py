@@ -781,7 +781,6 @@ class TestLoweringMeasure:
         run_filecheck(program, pipeline)
 
 
-
 # MARK: TransversalGates
 
 
@@ -1116,8 +1115,6 @@ class TestLoweringTransversalGates:
             """
 
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
-
-
 
 
 # Mark: FabricateOp
