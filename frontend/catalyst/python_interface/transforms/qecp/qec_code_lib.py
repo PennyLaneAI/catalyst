@@ -29,8 +29,10 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         7,
         1,
         3,
+        #### Stabilizers ####
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
+        #### Transversal gates ####
         {
             # keys need to match the names of the corresponding qecl.gate gates; if any adjoint
             # gates are supported, they should be included as a separate entry with key "gatename_adj"
@@ -46,10 +48,11 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         {
             "cnot": qecp.CnotOp,
         },
+        #### Unitary encoding circuit ####
         {
             # ops (in the form of a qecp operator and the indices of the codeblock
-            # it should be applied on) defining a transporter encoding circuit, i.e. 
-            # one that maps an input to the logical version of that input, rather 
+            # it should be applied on) defining a transporter encoding circuit, i.e.
+            # one that maps an input to the logical version of that input, rather
             # than just encoding logical 0
             "ops": [
                 (qecp.HadamardOp, [1]),
@@ -74,26 +77,33 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
             "state_prep_index": 6,
         },
     ),
-    # add ref
     "Shor913": (
+        # see Steane code for general comments on the inputs to define the code
         9,
         1,
         3,
+        #### Stabilizers ####
+        # from error correction zoo, https://errorcorrectionzoo.org/c/shor_nine
         np.array([[1, 1, 1, 1, 1, 1, 0, 0, 0], [0, 0, 0, 1, 1, 1, 1, 1, 1]]),
         np.array(
             [
                 [1, 1, 0, 0, 0, 0, 0, 0, 0],
-                [0, 1, 2, 0, 0, 0, 0, 0, 0],
+                [0, 1, 1, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 1, 1, 0, 0, 0, 0],
                 [0, 0, 0, 0, 1, 1, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 1, 1, 0],
                 [0, 0, 0, 0, 0, 0, 0, 1, 1],
             ]
         ),
-        # Z is applied transversally using physial X, and vice versa.
-        # There are no transversal phase gates for this code.
-        {"x": (qecp.PauliZOp, [0, 3, 6]), "z": (qecp.PauliXOp, [0, 3, 6])},
+        #### Transversal gates ####
+        # X: physical Z on a single qubit from each set of 3, make +|111> into -|111> and vice-versa
+        # Z: X-flip on the all the bits on one set of 3: doesn't modify |0>, generates overall -1 sign for |1>
+        # CNOT is transversal for all CSS codes
+        # There are no Hadamard or S gates for this code #ToDo: reference
+        {"x": (qecp.PauliZOp, [0, 3, 6]), "z": (qecp.PauliXOp, [0, 1, 2])},
         {"cnot": qecp.CnotOp},
+        #### Unitary encoding circuit ####
+        # jukebox generated this and verified it in simulation. # ToDo: provide validation info on notion
         {
             "ops": [
                 (qecp.CnotOp, [0, 3]),
@@ -108,9 +118,6 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
                 (qecp.CnotOp, [6, 7]),
                 (qecp.CnotOp, [6, 8]),
             ],
-            # The state_prep_index is the index of the physical qubit that the state is
-            # injected on (i.e. for a magic state, -H-T is applied here pre-encoding).
-            # Add reference
             "state_prep_index": 0,
         },
     ),
@@ -137,12 +144,14 @@ class QecCode:
             op to be applied, and the indices. Assumes k=1. Does not specify indices - for
             now, we assume 2-qubit gates between two codeblocks, where the gate is applied
             between all pairs of corresponding qubits.
-        unitary_encoding (dict): A dictionary defining the unitary encoding for the
-            ground state, including indices in the code block to prepare the qubits in the |+>
-            state by applying a Hadamard, and indices to apply CNOT gates. Also included is a
-            state-prep index. This is the index to apply physical gates to before encoding
-            to encode a non-zero state - for example, applying H-T at this index before unitary
-            encoding generates a magic state (not fault-tolerantly).
+        unitary_encoding (dict): A dictionary defining the unitary encoding for the code words.
+            It includes 'ops' (a list of tuples that each indicate a qecp gate and the codeblock
+            indices it should be applied to), and a state-prep index. The state-prep index is the
+            index to apply physical gates to before encoding, in order to encode a non-zero state
+            - for example, applying H-T at this index before unitary encoding generates a magic
+            state (not fault-tolerantly). For this to work, the chosen encoder should be an isometric
+            encoder, i.e. it should map the input on one of the wires to the codespace, rather than
+            just encoding zero.
     """
 
     name: str
