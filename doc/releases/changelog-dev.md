@@ -198,7 +198,8 @@
   [(#2922)](https://github.com/PennyLaneAI/catalyst/pull/2922)
 
 * The experimental compiler pass `convert-quantum-to-qecl` has been extended to lower the
-  `quantum.custom "T"` gate to the `qecl` layer as a subroutine using a magic state (or conjugate magic state in the case of the adjoint).
+  `quantum.custom "T"` gate to the `qecl` layer as a subroutine using a magic state (or conjugate
+  magic state in the case of the adjoint).
   [(#2870)](https://github.com/PennyLaneAI/catalyst/pull/2870)
   [(#2921)](https://github.com/PennyLaneAI/catalyst/pull/2921)
 
