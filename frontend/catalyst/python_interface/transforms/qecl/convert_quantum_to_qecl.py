@@ -905,16 +905,18 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
         assert module_block is not None, "Module has no block"
 
         # only build and add the T-gate subroutines when the circuit contains a T gate
-        has_t_gate = any(
-            isinstance(inner, quantum.CustomOp) and inner.gate_name.data == "T"
-            for inner in op.walk()
-        )
+        t_gates = [inner_op for inner_op in op.walk() if isinstance(inner_op, quantum.CustomOp) and inner_op.gate_name.data == "T"]
+        has_t_gate = any(gate.adjoint is None for gate in t_gates)
+        has_adjoint_t_gate = any(gate.adjoint is not None for gate in t_gates)
+
         t_subroutine = None
         t_adj_subroutine = None
+
         if has_t_gate:
             t_subroutine = self.create_t_subroutine()
-            t_adj_subroutine = self.create_t_subroutine(adj=True)
             module_block.add_op(t_subroutine)
+        if has_adjoint_t_gate:
+            t_adj_subroutine = self.create_t_subroutine(adj=True)
             module_block.add_op(t_adj_subroutine)
 
         PatternRewriteWalker(

@@ -708,6 +708,7 @@ class TestGatePattern:
             }
             // CHECK-NOT: @apply_T
             // CHECK-NOT: qecl.fabricate
+            // CHECK-NOT: @apply_T_adj
         }
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
