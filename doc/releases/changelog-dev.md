@@ -181,6 +181,7 @@
   semantics `quantum` dialect, and converts them to reference semantics `qref` dialect.
   [(#2920)](https://github.com/PennyLaneAI/catalyst/pull/2920)
   [(#2930)](https://github.com/PennyLaneAI/catalyst/pull/2930)
+  [(#2931)](https://github.com/PennyLaneAI/catalyst/pull/2931)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
