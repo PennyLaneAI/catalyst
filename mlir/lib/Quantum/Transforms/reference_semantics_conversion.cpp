@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 
 #include "MBQC/IR/MBQCOps.h"
@@ -50,6 +51,22 @@ void eraseAllVOps(Region &r, SmallVector<Operation *> &erasureWorklist)
     for (auto op : llvm::reverse(erasureWorklist)) {
         op->erase();
     }
+}
+
+void eraseSCFYieldQuantumOperands(scf::YieldOp yieldOp)
+{
+    // scf.yield can yield both classical and quantum values
+    // We need to only keep the classical yields from scf regions
+
+    // Somewhat unfortunately, the operand erasure API does not have a lambda version
+    // So we need to be a bit manual here
+    BitVector eraseIndices(yieldOp->getNumOperands());
+    for (auto [i, argType] : llvm::enumerate(yieldOp.getOperandTypes())) {
+        if (isa<quantum::QuregType, quantum::QubitType>(argType)) {
+            eraseIndices.set(i);
+        }
+    }
+    yieldOp->eraseOperands(eraseIndices);
 }
 
 struct QubitValueTracker {
@@ -420,6 +437,55 @@ void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValu
     });
 }
 
+void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker,
+               SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(forOp);
+    Location loc = forOp->getLoc();
+    QubitValueTracker regionTracker = tracker;
+
+    // Add quantum block args to the map
+    // Classical args must remain on the new for loop op
+    SmallVector<Value> newIterArgs;
+    SmallVector<unsigned> classicalIndices;
+    for (auto [i, operand] : llvm::enumerate(forOp.getInitArgs())) {
+        BlockArgument blockArg = forOp.getRegionIterArg(i);
+        if (isa<quantum::QubitType>(blockArg.getType())) {
+            regionTracker.setRQubit(blockArg, tracker.getRQubit(operand));
+        }
+        else if (isa<quantum::QuregType>(blockArg.getType())) {
+            regionTracker.setRQreg(blockArg, tracker.getRQreg(operand));
+        }
+        else {
+            newIterArgs.push_back(operand);
+            classicalIndices.push_back(i);
+        }
+    }
+
+    // Create the new for op and handle
+    auto newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
+                                      forOp.getStep(), newIterArgs);
+    builder.eraseBlock(newLoop.getBody());
+
+    builder.inlineRegionBefore(forOp.getRegion(), newLoop.getRegion(), newLoop.getRegion().end());
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(newLoop.getRegion().front().getTerminator()));
+    handleRegion(builder, newLoop.getRegion(), regionTracker);
+    cascadeMapAhead(forOp, tracker);
+    erasureWorklist.push_back(forOp);
+
+    // Remove the moved over value semantics block args
+    newLoop.getRegion().front().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+
+    // Update use of classical results
+    for (auto [oldResultIdx, newResult] :
+         llvm::zip_equal(classicalIndices, newLoop->getResults())) {
+        builder.replaceAllUsesWith(forOp->getResult(oldResultIdx), newResult);
+    }
+}
+
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
 {
     SmallVector<Operation *> erasureWorklist;
@@ -453,7 +519,7 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
             // .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
             // .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
-            // .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker); })
+            .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker, erasureWorklist); })
             // .Case<scf::WhileOp>([&](auto o) { handleWhile(builder, o, tracker); })
             .Case<mbqc::GraphStatePrepOp>(
                 [&](auto o) { handleGraphStatePrep(builder, o, tracker, erasureWorklist); })
