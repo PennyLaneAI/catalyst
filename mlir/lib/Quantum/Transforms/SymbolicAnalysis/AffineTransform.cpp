@@ -61,11 +61,11 @@ void AffineTransform::swapRows(size_t row1, size_t row2) {
     std::swap(getRow(row1), getRow(row2));
 }
 
-void AffineTransform::extendTo(size_t newRowNum) {
+void AffineTransform::extendTo(size_t newRowNum, size_t auxVarNum) {
     if (newRowNum > getRowNum()) {
         exprMatrix.reserve(newRowNum);
         for (size_t i = getRowNum() + 1; i <= newRowNum; i++) {
-            exprMatrix.push_back(Parity::eVec(newRowNum, i));
+            exprMatrix.push_back(Parity::eVec(newRowNum + auxVarNum, i + auxVarNum));
         }
     }   // it might be more efficient to resize to newRowNum, and then just turn the eVec bits on for the new rows.
 }

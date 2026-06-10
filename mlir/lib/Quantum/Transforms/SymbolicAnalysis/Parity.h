@@ -65,9 +65,9 @@ private:
 
     static const size_t BLOCK_SIZE = 64;
 
-    size_t varNum;  // should be removed
+    size_t varNum;
     llvm::SmallVector<uint64_t, 8> bits;
-    // Least significant bit (pos = 0) is the affine value. pos = i corresponds to x_i
+    // Least significant bit (pos = 0) is the affine value. pos = i corresponds to x_i (not anymore, there may be path variables in between)
 
     // DenseMap Helpers
     enum class State : uint8_t { Valid, Empty, Tombstone } state = State::Valid;

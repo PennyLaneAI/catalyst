@@ -33,7 +33,7 @@ public:
     void flipAffineValueAtRow(size_t row);
 
     // Methods
-    void extendTo(size_t newRowNum);
+    void extendTo(size_t newRowNum, size_t auxVarNum);
     void swapRows(size_t row1, size_t row2);
     void addRows(size_t sourceRow, size_t targetRow);
     void addRowWithParity(size_t row, const Parity& parity);

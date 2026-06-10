@@ -78,6 +78,10 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
     
     %q13 = quantum.custom "T"() %q12#0 : !quantum.bit   // on q2
 
+    %reg2 = quantum.alloc( 2) : !quantum.reg
+    %p0 = quantum.extract %reg2[ 0] : !quantum.reg -> !quantum.bit
+    %p1 = quantum.extract %reg2[ 1] : !quantum.reg -> !quantum.bit    
+
     // %c = arith.constant 1.1212 : f64
     // %q_temp = quantum.custom "RZ"(%c) %q13 : !quantum.bit
 
@@ -88,6 +92,8 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
     // %q18 = quantum.custom "T"() %q17 : !quantum.bit
     // %q19 = quantum.custom "T"() %q18 : !quantum.bit
     // %q20 = quantum.custom "T"() %q19 : !quantum.bit
+
+    %p3 = quantum.custom "T"() %p0 : !quantum.bit
 
     // func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit
     func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit

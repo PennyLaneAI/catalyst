@@ -51,15 +51,16 @@ void SymbolicCircuit::ensureCapacity(llvm::ArrayRef<size_t> indices) {
 
     if (maxIndex > qubitNum) {
         extendQubitsTo(maxIndex);
-        // stateTrans.extendTo(maxIndex);
-        // qubitNum = maxIndex;
     }
 }
 
 void SymbolicCircuit::extendQubitsTo(size_t newQubitNum) {
-    assert(newQubitNum > qubitNum);
-    stateTrans.extendTo(newQubitNum);
+    stateTrans.extendTo(newQubitNum, auxVarNum);
     qubitNum = newQubitNum;
+}
+
+void SymbolicCircuit::extendQubitsBy(size_t addQubitNum) {
+    extendQubitsTo(qubitNum + addQubitNum);
 }
 
 void SymbolicCircuit::applyGateRZ(size_t qubitIndex, GateID gateId) {

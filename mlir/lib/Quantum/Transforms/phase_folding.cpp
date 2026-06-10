@@ -59,7 +59,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
 
-    size_t getIndexFromExtractOp(mlir::Value& value) {
+    size_t getIndexFromExtractOp(mlir::Value value) {  // handle multiple registers
         if (auto extractOp = llvm::cast<quantum::ExtractOp>(value.getDefiningOp())) {
             auto staticIdx = extractOp.getIdxAttr();
             if (staticIdx.has_value()) {
@@ -75,7 +75,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }
     }
 
-    llvm::SmallVector<size_t, 4> getQubitIndices(llvm::ArrayRef<mlir::Value> ins, const llvm::ArrayRef<mlir::OpResult>& outs) {     
+    llvm::SmallVector<size_t, 4> getQubitIndices(mlir::ValueRange ins, mlir::ResultRange outs) {     
         assert(ins.size() == outs.size());
         size_t n = ins.size();
 
@@ -93,6 +93,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
                 ssaToWireMap.erase(it);
             } else {                        // first gate on the wire
                 index = getIndexFromExtractOp(inValue);
+                llvm::outs() << "> " << inValue << " ... " << index << "\n";
             }
 
             indices.push_back(index);
@@ -230,20 +231,25 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             // if (isa<AllocOp>(op)){
 
             // }
-            // if (auto allocOp = dyn_cast<AllocOp>(op)){
+            if (AllocOp allocOp = dyn_cast<AllocOp>(op)){
+                auto regSize = allocOp.getNqubitsAttr();
+                symCirc.extendQubitsBy(static_cast<size_t>(regSize.value_or(0)));
 
-            // }
-            if (CustomOp customOp = dyn_cast<CustomOp>(op)) {
+                llvm::outs() << "Allocation Operation! " << allocOp.getNqubitsAttr() << "\n";
+                op->dump();
+            }
+            else if (quantum::SetBasisStateOp basisOp = dyn_cast<quantum::SetBasisStateOp>(op)) {
+                llvm::outs() << "Set Basis State Operation! " << "\n";
+            }
+            else if (CustomOp customOp = dyn_cast<CustomOp>(op)) {
                 // getting affected wires
-                llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(customOp.getQubitOperands(), customOp.getQubitResults())); // getQubitIndices(customOp.getInQubits(), customOp.getOutQubits())
+                llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(customOp.getInQubits(), customOp.getOutQubits()));
 
                 // tracking phase gates
                 Gate gate = extractCliffTGate(customOp);
                 if (isPhaseGate(gate)) {
                     phaseOps.push_back(customOp);
                     gateID++;
-
-                    // llvm::outs() << customOp.getGateName() << " at " << customOp.getLoc() << "\n";
                 }
                 initialGateCount[static_cast<size_t>(gate)]++;
 
@@ -295,8 +301,15 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 
 /*
 TODO: 
-initialize qubitNum when got a register allocation op   (what are you going to do with auxVars?)
+initialize qubitNum when got a register allocation op   (what are you going to do with auxVars? nothing!)
+define another variable for number of registers, and another map between reg names and a starting index (previous reg st index + prev reg size), 
+then the qubit index (when the first gate is being applied) is that st index + index in register
+a mini memory allocation handling task
+
+
 ancila initialization (0/1) (SetBasisStateOp)
+
+change getRow to getRowMutable in AffineTrans
 
 testttt
 
