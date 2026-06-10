@@ -754,6 +754,33 @@ class TestLoweringMeasure:
         ):
             run_filecheck(program, pipeline)
 
+    def test_no_subroutine_if_no_measure(self, get_generic_qec_code, run_filecheck):
+        """Test that the measure subroutine isn't generated and added to the code if it isn't needed"""
+
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        // CHECK-NOT: func.call @measure_transversal_TestCode
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = qecl.x %0[0] : !qecl.codeblock<1>
+            return
+        }
+        }
+        """
+
+        qec_code = get_generic_qec_code(
+            n=7,
+            k=1,
+            d=3,
+            transversal_1q_gates={"x": (qecp.PauliXOp, [])},
+        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+
+        # no z operator defined, a program with measure would fail with a compilation error
+        run_filecheck(program, pipeline)
+
+
 
 # MARK: TransversalGates
 
@@ -1069,6 +1096,28 @@ class TestLoweringTransversalGates:
 
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
         run_filecheck(program, pipeline)
+
+    def test_only_needed_op_subroutines(self, qecl_to_qecp_steane_pipeline, run_filecheck):
+        """Test that only the needed gate subroutine are generated for the circuit"""
+
+        program = """
+        builtin.module @module_circuit {
+                func.func @test_func() attributes {quantum.node} {
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
+                    %1 = qecl.hadamard %0[0] : !qecl.codeblock<1>
+                    %2 = qecl.s %1[0] adj : !qecl.codeblock<1>
+                    return
+                }
+                // CHECK: func.func private @hadamard_Steane
+                // CHECK: func.func private @s_adj_Steane
+                // CHECK-NOT: func.func private @x_Steane
+                // CHECK-NOT: func.func private @s_Steane
+            }
+            """
+
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+
 
 
 # Mark: FabricateOp
