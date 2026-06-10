@@ -1256,7 +1256,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.z_tanner)
             case _:
                 assert False, f"Unknown CheckType: '{check_type}'"
-            
+
         aux_qubits = [
             cast(OpResult[qecp.QecPhysicalQubitType], op.results[0]) for op in aux_allocate_ops
         ]
