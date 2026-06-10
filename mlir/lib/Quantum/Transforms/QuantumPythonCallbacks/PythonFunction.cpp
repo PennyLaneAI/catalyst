@@ -15,8 +15,6 @@
 #include <string>
 #include <vector>
 
-#include "nanobind/STL/string.h" // string/str conversion
-#include "nanobind/STL/vector.h" // vector/list conversion
 #include "nanobind/nanobind.h"
 
 #include "PythonDriverUtils.hpp"
@@ -36,13 +34,15 @@ std::string pythonLowerPauliRot(double theta, const std::string &pauliWord, std:
                 nb::module_ wrapperModule = nb::module_::import_(moduleName);
                 nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-                nb::object pythonResult = wrapperFunction(theta, pauliWord, wires);
-
-                if (pythonResult.is_none()) {
-                    return std::string("");
+                nb::list pyWires;
+                for (int w : wires) {
+                    pyWires.append(w);
                 }
 
-                return nb::cast<std::string>(pythonResult);
+                nb::object pythonResult = wrapperFunction(theta, pauliWord.c_str(), pyWires);
+
+                // must cast char* to allocate and then std::string
+                return std::string(nb::cast<const char *>(pythonResult));
             }
             catch (const nb::python_error &error) {
                 throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
