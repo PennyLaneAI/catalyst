@@ -14,11 +14,10 @@
 
 #include "PythonDriverUtils.hpp"
 
+#include <iostream>
 #include <optional>
 
 #include "Python.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
 #include "nanobind/eval.h"
 #include "nanobind/nanobind.h"
 
@@ -58,7 +57,7 @@ void syncSitePackages()
         nb::exec(sitePackagesScript, scope);
     }
     catch (const nb::python_error &e) {
-        llvm::errs() << "Failed to load site-packages: " << e.what();
+        std::cout << "Failed to load site-packages: " << e.what();
         return;
     }
 }
@@ -69,26 +68,17 @@ void syncSitePackages()
  */
 PyInterpreterGuard::PyInterpreterGuard() : impl(std::make_unique<Impl>())
 {
-    LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Initializing interpreter...\n");
     if (!Py_IsInitialized()) {
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE
-                                << "No existing interpreter found, spawning a new one...\n");
         Py_Initialize();
         impl->createdInterpreter = true;
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Spawning a new interpreter.\n");
 
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Syncing site-packages...\n");
         syncSitePackages();
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Site packages synced.\n");
 
         impl->release.emplace();
     }
     else {
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE
-                                << "Found existing interpreter, ensuring packages are synced...\n");
         nb::gil_scoped_acquire acquire;
         syncSitePackages();
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Site packages synced.\n");
     }
 }
 

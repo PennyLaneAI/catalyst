@@ -38,12 +38,7 @@ nanobind_add_module(QuantumPythonCallbacks
 )
 
 # TODO: move MLIR parsing back to quantum-transforms, let callbacks only handle calling python
-target_link_libraries(QuantumPythonCallbacks PRIVATE
-    MLIRIR
-    MLIRFuncDialect
-    MLIRParser
-    quantum-transforms  # for DecompCallback
-)
+target_link_libraries(QuantumPythonCallbacks PRIVATE)
 
 if (APPLE)
     target_link_options(QuantumPythonCallbacks PRIVATE "LINKER:-undefined,dynamic_lookup")

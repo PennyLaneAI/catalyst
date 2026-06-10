@@ -15,8 +15,14 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace catalyst::quantum {
+
+using LowerPauliRotFn = std::string (*)(double theta, std::string pauliWord,
+                                        std::vector<int> wires);
+
+extern LowerPauliRotFn pythonLowerPauliRot;
 
 bool loadPythonCallbackPlugin(std::string callbackPluginPath, std::string libpythonPath);
 

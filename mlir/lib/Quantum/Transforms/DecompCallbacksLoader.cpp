@@ -26,9 +26,10 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "Quantum/Transforms/DecompCallbacks.h"
-
 namespace catalyst::quantum {
+
+// TODO: genericize this
+LowerPauliRotFn pythonLowerPauliRot = nullptr;
 
 namespace {
 
@@ -36,8 +37,6 @@ namespace {
 // repeated calls don't keep paying
 // the symbol lookup cost.
 std::atomic<bool> resolutionAttempted{false};
-
-using RegisterFn = void (*)();
 
 static const std::string pluginName = "libQuantumPythonCallbacks.so";
 
@@ -143,7 +142,7 @@ void ensureLibpythonLoaded(std::string libpythonPath)
                     "fail with undefined symbols.\n";
 }
 
-RegisterFn loadAndResolve(std::string callbackPluginPath, std::string libpythonPath)
+LowerPauliRotFn loadAndResolve(std::string callbackPluginPath, std::string libpythonPath)
 {
     std::string path = resolvePluginPath(callbackPluginPath);
     if (path.empty()) {
@@ -163,10 +162,19 @@ RegisterFn loadAndResolve(std::string callbackPluginPath, std::string libpythonP
         return nullptr;
     }
 
-    auto *sym = reinterpret_cast<RegisterFn>(::dlsym(libHandle, "registerPythonDecompCallback"));
+    // use a c-safe function for getting the callback to allow cpp types in the python caller
+    auto *getCallback = reinterpret_cast<void *(*)()>(::dlsym(libHandle, "getPythonLowerPauliRot"));
+    if (!getCallback) {
+        llvm::errs() << "[decomp-callbacks-loader] dlopen succeeded but symbol "
+                        "'getPythonLowerPauliRot' not found in '"
+                     << path << "'\n";
+    }
+
+    // resolve the proper python-decomposition lowering function via the getter
+    auto *sym = reinterpret_cast<LowerPauliRotFn>(getCallback());
     if (!sym) {
         llvm::errs() << "[decomp-callbacks-loader] dlopen succeeded but symbol "
-                        "'registerPythonDecompCallback' not found in '"
+                        "'pythonLowerPauliRot' not found in '"
                      << path << "'\n";
     }
     return sym;
@@ -176,21 +184,19 @@ RegisterFn loadAndResolve(std::string callbackPluginPath, std::string libpythonP
 
 bool loadPythonCallbackPlugin(std::string callbackPluginPath, std::string libpythonPath)
 {
-    if (getLowerPauliRot()) {
+    if (pythonLowerPauliRot) {
         return true;
     }
 
+    // Avoid additional lookups
     if (resolutionAttempted.exchange(true)) {
-        return getLowerPauliRot() != nullptr;
+        // explicit check in case of thread race conditions
+        return pythonLowerPauliRot != nullptr;
     }
 
-    RegisterFn reg = loadAndResolve(callbackPluginPath, libpythonPath);
-    if (!reg) {
-        return false;
-    }
+    pythonLowerPauliRot = loadAndResolve(callbackPluginPath, libpythonPath);
 
-    reg();
-    return getLowerPauliRot() != nullptr;
+    return pythonLowerPauliRot != nullptr;
 }
 
 } // namespace catalyst::quantum

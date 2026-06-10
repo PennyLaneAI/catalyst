@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Location.h"
-#include "mlir/Parser/Parser.h"
-#include "nanobind/nanobind.h"
+#include <string>
+#include <vector>
 
-#include "Quantum/Transforms/DecompCallbacks.h"
+#include "nanobind/STL/string.h" // string/str conversion
+#include "nanobind/STL/vector.h" // vector/list conversion
+#include "nanobind/nanobind.h"
 
 #include "PythonDriverUtils.hpp"
 
@@ -27,97 +25,38 @@
 
 namespace nb = nanobind;
 
-namespace {
-
-mlir::OwningOpRef<mlir::func::FuncOp> lowerPauliRotImpl(mlir::MLIRContext *ctx, double theta,
-                                                        const std::string &pauliWord,
-                                                        llvm::ArrayRef<int> wires)
+std::string pythonLowerPauliRot(double theta, const std::string &pauliWord, std::vector<int> wires)
 {
-    std::vector<int> wiresVec(wires.begin(), wires.end());
+    std::string mlirText =
+        QuantumPythonCallbacks::PyInterpreterGuard::ensure().withGil([&] -> std::string {
+            const char *moduleName = "catalyst.python_callbacks";
+            const char *functionName = "paulirot_callback_wrapper";
 
-    // Invoke Python and parse the returned MLIR text.
-    std::string mlirText = QuantumPythonCallbacks::PyInterpreterGuard::ensure().withGil([&] {
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Lowering decomp rule for paulirot with pauliword "
-                                << pauliWord << "\n");
-        const char *moduleName = "catalyst.python_callbacks";
-        const char *functionName = "paulirot_callback_wrapper";
+            try {
+                nb::module_ wrapperModule = nb::module_::import_(moduleName);
+                nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-        try {
-            LLVM_DEBUG(llvm::dbgs()
-                       << DEBUG_TYPE << "Importing python module " << moduleName << "\n");
-            nb::module_ wrapperModule = nb::module_::import_(moduleName);
+                nb::object pythonResult = wrapperFunction(theta, pauliWord, wires);
 
-            LLVM_DEBUG(llvm::dbgs()
-                       << DEBUG_TYPE << "Getting python function " << functionName << "\n");
-            nb::object wrapperFunction = wrapperModule.attr(functionName);
+                if (pythonResult.is_none()) {
+                    return std::string("");
+                }
 
-            nb::list pyWires;
-            for (int w : wires) {
-                pyWires.append(w);
+                return nb::cast<std::string>(pythonResult);
             }
+            catch (const nb::python_error &error) {
+                throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
+                                                           error.what());
+            }
+            catch (const std::exception &error) {
+                throw;
+            }
+        });
 
-            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "Executing " << functionName << "\n");
-            nb::object pythonResult = wrapperFunction(theta, pauliWord.c_str(), pyWires);
-
-            std::string output = nb::cast<const char *>(pythonResult);
-            LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "returning string result from lowering\n");
-            return std::string(output);
-        }
-        catch (const nb::python_error &error) {
-            llvm::errs() << "failed to lower callback\n";
-            throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
-                                                       error.what());
-        }
-    });
-
-    mlir::ParserConfig config(ctx);
-    auto moduleOp = mlir::parseSourceString(llvm::StringRef(mlirText), config);
-    if (!moduleOp) {
-        return nullptr;
-    }
-
-    mlir::OwningOpRef<mlir::func::FuncOp> funcOp;
-    moduleOp->walk([&](mlir::func::FuncOp func) {
-        if (func.getName() == "paulirot_decomp_rule") {
-            func->remove();
-            funcOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
-            return mlir::WalkResult::interrupt();
-        }
-        return mlir::WalkResult::advance();
-    });
-    return funcOp;
+    return mlirText;
 }
 
-// Exception-safe entry point installed in the registry. Converts any failure
-// to an MLIR diagnostic + nullptr return so the pass can signalPassFailure.
-mlir::OwningOpRef<mlir::func::FuncOp> pythonLowerPauliRot(mlir::MLIRContext *ctx, double theta,
-                                                          const std::string &pauliWord,
-                                                          llvm::ArrayRef<int> wires)
+extern "C" __attribute__((visibility("default"))) void *getPythonLowerPauliRot()
 {
-    try {
-        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << "lowering paulirot with pauliword " << pauliWord
-                                << "\n");
-        return lowerPauliRotImpl(ctx, theta, pauliWord, wires);
-    }
-    catch (const std::exception &e) {
-        mlir::emitError(mlir::UnknownLoc::get(ctx))
-            << "PauliRot decomposition callback failed for pauli_word='" << pauliWord
-            << "': " << e.what();
-        return nullptr;
-    }
-    catch (...) {
-        mlir::emitError(mlir::UnknownLoc::get(ctx))
-            << "PauliRot decomposition callback failed for pauli_word='" << pauliWord
-            << "': unknown exception";
-        return nullptr;
-    }
-}
-
-} // namespace
-
-// The default visibility keeps the symbol in the .so's dynamic table even under
-// -fvisibility=hidden. C linkage so the loader can resolve by plain name.
-extern "C" __attribute__((visibility("default"))) void registerPythonDecompCallback()
-{
-    catalyst::quantum::registerLowerPauliRot(pythonLowerPauliRot);
+    return reinterpret_cast<void *>(pythonLowerPauliRot);
 }

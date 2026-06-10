@@ -58,10 +58,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
 {
     using timer = catalyst::utils::Timer<>;
 
-#ifdef CATALYST_ENABLE_PYTHON_CALLBACKS
-    QuantumPythonCallbacks::registerPythonDecompCallback();
-#endif
-
     mlir::OpPrintingFlags opPrintingFlags{};
     if (options.useNameLocAsPrefix) {
         opPrintingFlags.printNameLocAsPrefix();

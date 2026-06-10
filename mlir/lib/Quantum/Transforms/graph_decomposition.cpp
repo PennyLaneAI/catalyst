@@ -34,7 +34,6 @@
 #include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/DecompCallbacks.h"
 #include "Quantum/Transforms/DecompCallbacksLoader.h"
 #include "Quantum/Transforms/Passes.h"
 
@@ -305,18 +304,28 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             std::vector<int> wires(pauliRot.getInQubits().size());
             std::iota(wires.begin(), wires.end(), 0);
 
-            auto callbackFunction = getLowerPauliRot();
+            std::string mlirText = pythonLowerPauliRot(0.2, pauliWord, wires);
 
-            if (!callbackFunction) {
-                llvm::errs() << "failed to find paulirot callback function\n";
+            mlir::ParserConfig config(context);
+            auto moduleOp = mlir::parseSourceString(llvm::StringRef(mlirText), config);
+            if (!moduleOp) {
+                llvm::errs() << "failed to parse MLIR from python callback\n";
                 return failure();
             }
 
-            auto outOp = callbackFunction(context, 0.2, pauliWord, wires);
+            mlir::OwningOpRef<mlir::func::FuncOp> outOp;
+            moduleOp->walk([&](mlir::func::FuncOp func) {
+                // TODO: enable multiple decomposition rules for the same operator
+                if (func.getName() == "paulirot_decomp_rule") {
+                    func->remove();
+                    outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
+                    return mlir::WalkResult::interrupt();
+                }
+                return mlir::WalkResult::advance();
+            });
 
             if (!outOp) {
-                llvm::errs() << "failed to lower paulirot decomp rule for pauli word " << pauliWord
-                             << "\n";
+                llvm::errs() << "failed to find paulirot_decomp_rule in parsed MLIR\n";
                 return failure();
             }
 
