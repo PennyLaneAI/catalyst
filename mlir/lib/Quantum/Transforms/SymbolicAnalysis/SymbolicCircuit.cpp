@@ -62,49 +62,43 @@ void SymbolicCircuit::extendQubitsTo(size_t newQubitNum) {
     qubitNum = newQubitNum;
 }
 
-// Do I need seperate Z, S, Sdag, T, Tdag functions?
 void SymbolicCircuit::applyGateRZ(size_t qubitIndex, GateID gateId) {
-    llvm::outs() << "R_z on q" << qubitIndex << " at l" << gateId << ":\n";
+    Parity& parity = stateTrans.getRow(qubitIndex);
 
-    const Parity& parity = stateTrans.getRow(qubitIndex);
-    PhaseBucket contributor = PhaseBucket(gateId, parity.getAffineValue());
+    bool affineVal = parity.getAffineValue();
+    PhaseBucket contributor = PhaseBucket(gateId, affineVal);
+    
+    parity.clearAffineValue();
     phasePoly.insertContributor(parity, contributor);
+    parity.setAffineValue(affineVal);
 }
 
 void SymbolicCircuit::applyGateX(size_t qubitIndex) {
-    llvm::outs() << "X on q" << qubitIndex << ":\n";
     stateTrans.flipAffineValueAtRow(qubitIndex);
 }
 
 void SymbolicCircuit::applyGateY(size_t qubitIndex, GateID gateId) {
-    llvm::outs() << "Y on q" << qubitIndex << ":\n";
     applyGateX(qubitIndex);
     applyGateRZ(qubitIndex, gateId);
     // global phase of +i.
 }
 
 void SymbolicCircuit::applyGateY_dag(size_t qubitIndex, GateID gateId) {
-    llvm::outs() << "Y† on q" << qubitIndex << ":\n";
-
     applyGateRZ(qubitIndex, gateId);
     applyGateX(qubitIndex);
     // global phase of -i.
 }
 
 void SymbolicCircuit::applyGateCNOT(size_t controlIndex, size_t targetIndex) {
-    llvm::outs() << "CNOT on q" << controlIndex << " q" << targetIndex << ":\n";
     stateTrans.addRows(controlIndex, targetIndex);
 }
 
 void SymbolicCircuit::applyGateSWAP(size_t qubitIndex1, size_t qubitIndex2) {
-    llvm::outs() << "SWAP on q" << qubitIndex1 << " q" << qubitIndex2 << ":\n";
     stateTrans.swapRows(qubitIndex1, qubitIndex2);
 }
 
 // uninterpreted gates.
-void SymbolicCircuit::applyGateH(size_t qubitIndex) {
-    llvm::outs() << "H on q" << qubitIndex << ":\n";
-    
+void SymbolicCircuit::applyGateH(size_t qubitIndex) {   
     auxVarNum++;
     stateTrans.setRow(qubitIndex, Parity::eVec(qubitNum + auxVarNum, qubitNum + auxVarNum));  // are the indices correct?
 }   // make sure nothing leads to segment fault and index out of bounds. also update operations to support different dimendions accordingly.
@@ -121,5 +115,3 @@ void SymbolicCircuit::applyGateU(llvm::ArrayRef<size_t> qubitIndices) {
         stateTrans.setRow(qubitIndices[i], Parity::eVec(qubitNum + auxVarNum, qubitNum + auxVarNum - n + i)); // are the indices correct?
     }
 }
-
-// watch out of Y gates for bug in phase merge!

@@ -1,9 +1,9 @@
 // #include <ostream>
-#include <vector>
 #include <cassert>
 #include "Parity.h"
 
-// using namespace std;
+#include "llvm/ADT/Hashing.h"
+
 using Index = std::pair<size_t, size_t>;   // block index, bit index
 
 static const Index AFFINE_VALUE_INDEX = {0, 0};   // it's LSB. for MSB would be varNum.
@@ -32,10 +32,10 @@ Parity Parity::eVec(size_t varNum, size_t pos) {    // e_i, starting from 1 (0 i
 /*.................
     Operators:
 ...................*/
-// check if they are the same up to adding some 0 bits in the end. 
-// (so they can be considered equal if we had added some path vaiables and now their 0)
 bool Parity::operator==(const Parity& rhs) const {
-    return isEquivalentFromBlockWith(0, rhs);
+    if (state != rhs.state) { return false; }
+    if (state != State::Valid) { return true; }
+    return isEquivalentWithFromBlock(rhs, 0);
 }
 
 Parity& Parity::operator+=(const Parity& rhs) {
@@ -64,24 +64,11 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Parity& par) {
     return os;
 }
 
-// TODO: check
-size_t std::hash<Parity>::operator()(const Parity& p) const {
-    // FNV-1a constants for 64-bit systems
-    size_t res = 0xcbf29ce484222325; 
-    
-    // Loop directly through the raw uint64_t values
-    for (uint64_t block : p.getBits()) {
-        res ^= block;
-        res *= 0x100000001b3; // Multiply by the FNV prime
-    }
-    return res;
-}
-
 /*.................
     Getters:
 ...................*/
 // It's not efficient, but is only for testing right now.
-std::vector<uint64_t> Parity::getLinearPart() const {
+llvm::SmallVector<uint64_t, 8> Parity::getLinearPart() const {
     Parity linearPart = *this;
     linearPart.setAffineValue(0);
     return linearPart.getBits();
@@ -129,6 +116,10 @@ void Parity::offBitAt(size_t pos) {
     offBitAtBlock(getIndex(pos));
 }
 
+void Parity::clearAffineValue() {
+    offBitAtBlock(AFFINE_VALUE_INDEX);
+}
+
 void Parity::flipBitAt(size_t pos) {
     assert(pos > varNum);
     flipBitAtBlock(getIndex(pos));
@@ -152,18 +143,15 @@ bool Parity::isIdenticalWith(const Parity& rhs) const {
 }
 
 bool Parity::isLinearEquivalentWith(const Parity& rhs) const {
-    uint64_t b1 = bits.empty() ? 0 : bits[0];
-    uint64_t b2 = rhs.bits.empty() ? 0 : rhs.bits[0];
+    uint64_t blockL = bits.empty() ? 0 : bits[0];
+    uint64_t blockR = rhs.bits.empty() ? 0 : rhs.bits[0];
 
-    if ((b1 ^ b2) > 1) {
-        return false;
-    }
-    return isEquivalentFromBlockWith(1, rhs);
+    return ((blockL ^ blockR) > 1) ? false : isEquivalentWithFromBlock(rhs, 1);
 }
 
 // check if they are the same up to adding some 0 bits in the end. 
 // (so they can be considered equal if we had added some path vaiables and now their 0)
-bool Parity::isEquivalentFromBlockWith(size_t fstBlock, const Parity& rhs) const {
+bool Parity::isEquivalentWithFromBlock(const Parity& rhs, size_t fstBlock) const {
     size_t minBlockNum = std::min(bits.size(), rhs.bits.size());
 
     for (size_t i = fstBlock; i < minBlockNum; i++) {
@@ -172,7 +160,7 @@ bool Parity::isEquivalentFromBlockWith(size_t fstBlock, const Parity& rhs) const
         }
     }
 
-    const std::vector<uint64_t>& longerBits = (bits.size() > rhs.bits.size()) ? bits : rhs.bits;
+    const llvm::SmallVector<uint64_t, 8>& longerBits = (bits.size() > rhs.bits.size()) ? bits : rhs.bits;
     for (size_t i = minBlockNum; i < longerBits.size(); i++) {
         if (longerBits[i] != 0) {
             return false;
@@ -290,5 +278,3 @@ std::string Parity::algebraicView(size_t qubitNum) const {
     }
     return res;
 }
-
-// TODO: other isomorphism that ignores affine values.

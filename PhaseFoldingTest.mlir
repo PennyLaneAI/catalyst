@@ -54,40 +54,45 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
     %reg = quantum.alloc( 2) : !quantum.reg
     // %i = arith.constant 1 : index
     %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
-    %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+    %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit    
     
     // %c0 = arith.constant 3.141592 : f64
 
-    %q2 = quantum.custom "T"() %q0 : !quantum.bit
+    %q2 = quantum.custom "T"() %q0 : !quantum.bit   // l1
     // %q2 = quantum.custom "RZ"(%c0) %q0 : !quantum.bit
-    %q3 = quantum.custom "T"() %q1 : !quantum.bit
+    %q3 = quantum.custom "T"() %q1 : !quantum.bit   // l2
     %q4:2 = quantum.custom "CNOT"() %q2, %q3 : !quantum.bit, !quantum.bit
-    %q5 = quantum.custom "T"() %q4#1 {adjoint}: !quantum.bit
+    %q5 = quantum.custom "T"() %q4#1 {adjoint}: !quantum.bit    // l3
     %q6:2 = quantum.custom "CNOT"() %q4#0, %q5 : !quantum.bit, !quantum.bit
 
     %q7 = quantum.custom "Hadamard"() %q6#1 : !quantum.bit
 
-    // %q8 = quantum.custom "T"() %q6#0 : !quantum.bit
-    %q8 = quantum.custom "T"() %q6#0 {adjoint}: !quantum.bit
-    %q9 = quantum.custom "T"() %q7 : !quantum.bit
+    %q21 = quantum.custom "PauliX"() %q6#0 : !quantum.bit
+
+    %q8 = quantum.custom "T"() %q21 : !quantum.bit  // l4
+    %q9 = quantum.custom "T"() %q7 : !quantum.bit   // l5
     %q10:2 = quantum.custom "CNOT"() %q9, %q8 : !quantum.bit, !quantum.bit
-    %q11 = quantum.custom "T"() %q10#1 {adjoint}: !quantum.bit
+    %q11 = quantum.custom "T"() %q10#1 {adjoint}: !quantum.bit  // l6
     %q12:2 = quantum.custom "CNOT"() %q10#0, %q11 : !quantum.bit, !quantum.bit
 
-    %c = arith.constant 1.1212 : f64
-    // %q13 = quantum.custom "RZ"(%c) %q12#0 : !quantum.bit
-    %q13 = quantum.custom "T"() %q12#0 : !quantum.bit
+    
+    %q13 = quantum.custom "T"() %q12#0 : !quantum.bit   // on q2
+
+    // %c = arith.constant 1.1212 : f64
+    // %q_temp = quantum.custom "RZ"(%c) %q13 : !quantum.bit
 
     %q14 = quantum.custom "T"() %q13 : !quantum.bit
     %q15 = quantum.custom "T"() %q14 : !quantum.bit
     %q16 = quantum.custom "T"() %q15 : !quantum.bit
-    %q17 = quantum.custom "T"() %q16 : !quantum.bit
-    %q18 = quantum.custom "T"() %q17 : !quantum.bit
-    %q19 = quantum.custom "T"() %q18 : !quantum.bit
-    %q20 = quantum.custom "T"() %q19 : !quantum.bit
+    // %q17 = quantum.custom "PauliY"() %q16 : !quantum.bit
+    // %q18 = quantum.custom "T"() %q17 : !quantum.bit
+    // %q19 = quantum.custom "T"() %q18 : !quantum.bit
+    // %q20 = quantum.custom "T"() %q19 : !quantum.bit
 
     // func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit
-    func.return %q12#1, %q19 : !quantum.bit, !quantum.bit
+    func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit
 }
 
 // 3.9269908169872414 : f64
+
+// test y and wsap

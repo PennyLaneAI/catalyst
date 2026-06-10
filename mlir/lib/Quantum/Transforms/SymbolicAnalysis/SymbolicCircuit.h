@@ -13,7 +13,8 @@
 // PathSum?
 struct SymbolicCircuit {    // indices are 1-based
     size_t qubitNum;
-    size_t auxVarNum;
+    size_t auxVarNum;           // is it really important to distinguish aux and qubit vars?
+    // vactor<bool> isAux;
     PhasePolynomial phasePoly;
     AffineTransform stateTrans;
     

@@ -38,27 +38,27 @@ std::string AffineTransform::algebraicView(size_t qubitNum) const {
     Getters and Setters:
 ...................*/
 void AffineTransform::setRow(size_t row, const Parity& parity) {
-    getRowRef(row) = parity;
+    getRow(row) = parity;
 }
 
 void AffineTransform::flipAffineValueAtRow(size_t row) {
-    getRowRef(row).flipAffineValue();
+    getRow(row).flipAffineValue();
 }
 
 /*.................
     Methods:
 ...................*/
 void AffineTransform::addRowWithParity(size_t row, const Parity& parity) {
-    getRowRef(row) += parity;
+    getRow(row) += parity;
 }
 
 void AffineTransform::addRows(size_t sourceRow, size_t targetRow) {    // E_i,j
-    getRowRef(targetRow) += getRow(sourceRow);
+    getRow(targetRow) += getRow(sourceRow);
 }
 
 // TODO: Test
 void AffineTransform::swapRows(size_t row1, size_t row2) {
-    std::swap(getRowRef(row1), getRowRef(row2));
+    std::swap(getRow(row1), getRow(row2));
 }
 
 void AffineTransform::extendTo(size_t newRowNum) {

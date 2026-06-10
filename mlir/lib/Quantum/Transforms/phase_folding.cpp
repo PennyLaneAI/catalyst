@@ -4,7 +4,8 @@
 #include "mlir/Pass/Pass.h"
 
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Matchers.h"
+#include "mlir/IR/Matchers.h"   // mlir::matchPattern, mlir::m_Constant
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h" // For arith::ConstantOp
 #include "llvm/ADT/StringRef.h"
@@ -40,6 +41,23 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     
     llvm::DenseMap<mlir::Value, size_t> ssaToWireMap;   // handle multiple registers
     std::vector<quantum::CustomOp> phaseOps;
+
+    void updateStats(Gate gate, int incr) {
+        insertedGateCount[static_cast<size_t>(gate)] += incr;
+    }
+
+    void reportStats() {
+        llvm::outs() << "Stats:\n";
+        for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
+            if (insertedGateCount[i] != 0) {
+                llvm::outs() << GATE_NAME[i] << ": initial-> " << initialGateCount[i] 
+                    << ",  final-> " << (initialGateCount[i] + insertedGateCount[i]) 
+                    << ". difference-> " << insertedGateCount[i] << "\n";
+            }
+        }
+        llvm::outs() << "\n";
+    }
+
 
     size_t getIndexFromExtractOp(mlir::Value& value) {
         if (auto extractOp = llvm::cast<quantum::ExtractOp>(value.getDefiningOp())) {
@@ -147,96 +165,60 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         return sum;
     }
 
-    double normalizeAngle(double angle) {
-        double quot = std::floor(angle / (2 * PI));
-        double res = angle - ((2 * PI) * quot);
-        if (res >= (2 * PI)) {
-            return 0.0;
-        } 
-        if (res < 0.0) {
-            return res + (2 * PI);
-        }
-        return res;
-
-        // return std::fmod(angle, 2 * PI);
+    double normalizeAngle(double angle) {   // returns equivalent angle between [-PI, PI]
+        return std::remainder(angle, 2 * PI);
     }
 
 
-    void removePhaseOp(quantum::CustomOp& op) {
-        Gate gate = gateFromName(op.getGateName());
-        insertedGateCount[static_cast<size_t>(gate)]--;
+    void updateTargetOp(quantum::CustomOp& targetOp, double sumAngle) {
+        double normAngle = normalizeAngle(sumAngle);
+        bool isAdjoint = (normAngle < 0.0);
+        normAngle = std::abs(normAngle);
+        Gate gate = gateWithAngle(normAngle);
 
-        if (gate == Gate::Y) {
-            op.setGateName(GATE_NAME[static_cast<size_t>(Gate::X)]);
-            insertedGateCount[static_cast<size_t>(Gate::X)]++;
+        if (gate == Gate::I) {
+            killOp(targetOp);
+        } else {
+            replaceOpWith(targetOp, gate, isAdjoint, normAngle);
+        }
+    }
+
+    void removePhaseOp(quantum::CustomOp& op) {
+        if (gateFromName(op.getGateName()) == Gate::Y) {
+            replaceOpWith(op, Gate::X, false, 0.0);
         } else {
             killOp(op);
         }       
     }
 
-    void updateTargetOp(quantum::CustomOp& targetOp, double sumAngle) {
-        quantum::CustomOp lastOp = targetOp;
-        mlir::OpBuilder builder(targetOp.getContext());
+    void replaceOpWith(quantum::CustomOp& preOp, Gate newGate, bool isAdjoint, double angle) {
+        updateStats(gateFromName(preOp.getGateName()), -1);
 
-        double normAngle = normalizeAngle(sumAngle);
-        
-        // consider - angles?
-        if (normAngle >= rotAngle(Gate::Z)) {
-            quantum::CustomOp zOp = injectOpAfter(builder, lastOp, Gate::Z, false, 0.0);
-            lastOp = zOp;
-            normAngle -= rotAngle(Gate::Z);
-        }
-        if (normAngle >= rotAngle(Gate::S)) {
-            quantum::CustomOp sOp = injectOpAfter(builder, lastOp, Gate::S, false, 0.0);
-            lastOp = sOp;
-            normAngle -= rotAngle(Gate::S);
-        }
-        if (normAngle == rotAngle(Gate::T)) {
-            quantum::CustomOp sOp = injectOpAfter(builder, lastOp, Gate::T, false, 0.0);
-            lastOp = sOp;
-            normAngle -= rotAngle(Gate::T);
-        }
-        if (normAngle != 0.0) {
-            quantum::CustomOp rzOp = injectOpAfter(builder, lastOp, Gate::RZ, false, normAngle);
-            lastOp = rzOp;
-        }
-
-        removePhaseOp(targetOp);
-    }
-    // Put discretization option non and off
-
-    // Test with multiple insertions
-    quantum::CustomOp injectOpAfter(mlir::OpBuilder& builder, quantum::CustomOp& preOp, Gate gate, bool isAdjoint, double angle) {
-        builder.setInsertionPointAfter(preOp.getOperation());
-        mlir::Value qIn = preOp.getQubitResults()[0];
+        mlir::IRRewriter rewriter(preOp.getContext());
+        rewriter.setInsertionPoint(preOp.getOperation());
         mlir::Value angleVal;
-        if (gate == Gate::RZ) {
-            angleVal = arith::ConstantOp::create(builder, preOp.getLoc(), builder.getF64FloatAttr(angle));
-        }    
-        
+        if (newGate == Gate::RZ) {
+            angleVal = arith::ConstantOp::create(rewriter, preOp.getLoc(), rewriter.getF64FloatAttr(angle));
+        }
+
         quantum::CustomOp newOp = quantum::CustomOp::create(
-                            builder,
+                            rewriter,
                             preOp.getLoc(),
-            /*gate_name=*/  GATE_NAME[static_cast<size_t>(gate)],
-            /*in_qubits=*/  mlir::ValueRange({qIn}),
-            /*params=*/     (gate == Gate::RZ) ? mlir::ValueRange({angleVal}) : mlir::ValueRange({}),
+            /*gate_name=*/  GATE_NAME[static_cast<size_t>(newGate)],
+            /*in_qubits=*/  preOp.getInQubits(),
+            /*params=*/     (newGate == Gate::RZ) ? mlir::ValueRange({angleVal}) : mlir::ValueRange({}),
             /*adjoint=*/    isAdjoint
         );
 
-        qIn.replaceUsesWithIf(newOp.getQubitResults()[0], 
-            [&](mlir::OpOperand& use) {
-                return use.getOwner() != newOp.getOperation();
-            }
-        );
-
-        insertedGateCount[static_cast<size_t>(gate)]++;
-        return newOp;
+        rewriter.replaceOp(preOp, newOp);       
+        updateStats(newGate, +1);
     }
 
     void killOp(quantum::CustomOp& op) {
-        assert(op.getInCtrlQubits().empty() && op.getInCtrlValues().empty());
-
-        mlir::ValueRange qIns = op.getInQubits(); // get in_qubit
+        assert(op.getInCtrlQubits().empty() && op.getInCtrlValues().empty());   // move to somewhere better        
+        updateStats(gateFromName(op.getGateName()), -1);
+      
+        mlir::ValueRange qIns = op.getInQubits();
         op.replaceAllUsesWith(qIns);
         op.erase();
     }
@@ -260,6 +242,8 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
                 if (isPhaseGate(gate)) {
                     phaseOps.push_back(customOp);
                     gateID++;
+
+                    // llvm::outs() << customOp.getGateName() << " at " << customOp.getLoc() << "\n";
                 }
                 initialGateCount[static_cast<size_t>(gate)]++;
 
@@ -289,21 +273,11 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }
     }
 
-    void reportStats() {
-        for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
-            if (insertedGateCount[i] != 0) {
-                llvm::outs() << GATE_NAME[i] << ": initial-> " << initialGateCount[i] 
-                    << ",  final-> " << (initialGateCount[i] + insertedGateCount[i]) 
-                    << ". difference-> " << insertedGateCount[i] << "\n";
-            }
-        }
-    }
-
     void runOnOperation() override {
         llvm::outs() << "Hello phase-folding world!\n";
 
         SymbolicCircuit symCirc = SymbolicCircuit();
-        llvm::outs() << symCirc << "\n";
+        // llvm::outs() << symCirc << "\n";
 
         phaseAnalysis(symCirc);
         llvm::outs() << symCirc << "\n";
@@ -317,18 +291,14 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 } // namespace quantum
 } // namespace catalyst
 
-
 // Currently ignoring any blocks or dynamic allocations, only capturing pure quantum circuits.
 
 /*
 TODO: 
-test S, Z, and Y
+initialize qubitNum when got a register allocation op   (what are you going to do with auxVars?)
+ancila initialization (0/1) (SetBasisStateOp)
 
-initialize qubitNum when got a register allocation op
-
-testttt  (make sure same parities with different affine consts work fine)
-
-ancila initialization (0/1)
+testttt
 
 is the current 1-based indexing of qubits in SymbolicCircuit good?
 is the current merge phase efficient?

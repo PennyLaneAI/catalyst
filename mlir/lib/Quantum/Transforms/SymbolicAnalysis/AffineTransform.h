@@ -26,7 +26,7 @@ public:
     // Getters
     [[nodiscard]] size_t getRowNum() const;
     [[nodiscard]] size_t getColNum(size_t row) const;
-    [[nodiscard]] const Parity& getRow(size_t row) const;
+    [[nodiscard]] Parity& getRow(size_t row) const;
     
     // Setters
     void setRow(size_t row, const Parity& parity);
@@ -43,7 +43,6 @@ private:
 
    // Helper Methods
     explicit AffineTransform(size_t n);   // Identity matrix by default
-    [[nodiscard]] Parity& getRowRef(size_t row) const;
 };
 
 inline size_t AffineTransform::getRowNum() const {
@@ -54,11 +53,7 @@ inline size_t AffineTransform::getColNum(size_t row) const {
     return getRow(row).getVarNum();
 }
 
-inline const Parity& AffineTransform::getRow(size_t row) const {
+inline Parity& AffineTransform::getRow(size_t row) const {
     assert(row > 0 && row <= getRowNum());
-    return exprMatrix[row - 1];
-}
-
-inline Parity& AffineTransform::getRowRef(size_t row) const {
-    return const_cast<Parity&>(static_cast<const AffineTransform&>(*this).getRow(row));
+    return const_cast<Parity&>(exprMatrix[row - 1]);
 }

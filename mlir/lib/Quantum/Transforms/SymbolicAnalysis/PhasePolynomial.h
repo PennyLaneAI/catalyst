@@ -1,7 +1,6 @@
 #pragma once
 
 // #include <iosfwd>
-// #include <unordered_map>
 #include <utility>
 #include <string>
 #include "Parity.h"
@@ -11,13 +10,12 @@
 #include "llvm/Support/raw_ostream.h"
 
 struct PhasePolynomial {
-    // llvm::DenseMap<Parity, PhaseBucket> terms;
-    std::unordered_map<Parity, PhaseBucket> terms;   // dense_map in mlir
+    llvm::DenseMap<Parity, PhaseBucket> terms;
     // bots are not seperated and duplicate!
 
     // Constructors
     PhasePolynomial() = default;
-    PhasePolynomial(std::unordered_map<Parity, PhaseBucket> terms) :
+    PhasePolynomial(llvm::DenseMap<Parity, PhaseBucket> terms) :
         terms(std::move(terms)) {}
 
     // Operators
