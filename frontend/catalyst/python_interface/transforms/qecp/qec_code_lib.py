@@ -99,11 +99,13 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         # X: physical Z on a single qubit from each set of 3, make +|111> into -|111> and vice-versa
         # Z: X-flip on the all the bits on one set of 3: doesn't modify |0>, generates overall -1 sign for |1>
         # CNOT is transversal for all CSS codes
-        # There are no Hadamard or S gates for this code #ToDo: reference
+        # There are no transversal Hadamard or S gates for this code
         {"x": (qecp.PauliZOp, [0, 3, 6]), "z": (qecp.PauliXOp, [0, 1, 2])},
         {"cnot": qecp.CnotOp},
         #### Unitary encoding circuit ####
-        # jukebox generated this and verified it in simulation. # ToDo: provide validation info on notion
+        # jukebox generated this and verified it in simulation 
+        # see simulation to validate here: 
+        # https://app.notion.com/p/xanaduai/Shor-9-1-3-code-37bbc6bd17648058841aed64f771ee9c
         {
             "ops": [
                 (qecp.CnotOp, [0, 3]),
