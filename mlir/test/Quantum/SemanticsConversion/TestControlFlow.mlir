@@ -284,3 +284,174 @@ func.func public @test_for_loop_with_dynamic_allocation() attributes {quantum.no
     quantum.dealloc %4#1 : !quantum.reg
     return
 }
+
+
+// -----
+
+
+// CHECK-LABEL: test_basic_while_loop
+func.func @test_basic_while_loop(%arg0: f64) attributes {quantum.node} {
+
+    // CHECK: [[q:%.+]] = qref.alloc_qb : !qref.bit
+    %0 = quantum.alloc_qb : !quantum.bit
+
+    // CHECK: scf.while : () -> () {
+    %1 = scf.while (%arg1 = %0) : (!quantum.bit) -> !quantum.bit {
+
+        // CHECK: [[mres:%.+]] = qref.measure [[q]] : i1
+        // CHECK: scf.condition([[mres]])
+        %mres, %out_qubit = quantum.measure %arg1 : i1, !quantum.bit
+        scf.condition(%mres) %out_qubit : !quantum.bit
+
+    // CHECK: } do {
+    // CHECK-NOT: ^bb
+    } do {
+    ^bb0(%arg1: !quantum.bit):
+
+        // CHECK: qref.custom "gate"(%arg0) [[q]] : !qref.bit
+        // CHECK: scf.yield
+        %out_qubits = quantum.custom "gate"(%arg0) %arg1 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    }
+
+    // CHECK: qref.dealloc_qb [[q]] : !qref.bit
+    quantum.dealloc_qb %1 : !quantum.bit
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_while_loop_with_existing_args
+func.func @test_while_loop_with_existing_args(%arg0: i1, %arg1: f64) -> (f64, f64) attributes {quantum.node} {
+    // CHECK: [[cst:%.+]] = arith.constant 1.000000e-01 : f64
+    // CHECK: [[qreg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    // CHECK: [[q2:%.+]] = qref.get [[qreg]][ 2] : !qref.reg<3> -> !qref.bit
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<3> -> !qref.bit
+    // CHECK: [[q1:%.+]] = qref.get [[qreg]][ 1] : !qref.reg<3> -> !qref.bit
+    %cst = arith.constant 1.000000e-01 : f64
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[loopOut:%.+]]:2 = scf.while (%arg2 = %arg1) : (f64) -> (f64, f64) {
+    %4:5 = scf.while (%arg2 = %arg1, %arg3 = %1, %arg4 = %2, %arg5 = %3) : (f64, !quantum.bit, !quantum.bit, !quantum.bit) -> (f64, f64, !quantum.bit, !quantum.bit, !quantum.bit) {
+
+        // CHECK: [[mres:%.+]] = qref.measure [[q2]] : i1
+        // CHECK: [[neg:%.+]] = arith.negf %arg2 : f64
+        // CHECK: scf.condition([[mres]]) %arg2, [[neg]] : f64, f64
+        %mres, %out_qubit = quantum.measure %arg3 : i1, !quantum.bit
+        %8 = arith.negf %arg2 : f64
+        scf.condition(%mres) %arg2, %8, %out_qubit, %arg4, %arg5 : f64, f64, !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK: } do {
+    // CHECK: ^bb0(%arg2: f64, %arg3: f64):
+    } do {
+    ^bb0(%arg2: f64, %arg3: f64, %arg4: !quantum.bit, %arg5: !quantum.bit, %arg6: !quantum.bit):
+
+        // CHECK: qref.custom "gate"(%arg2, %arg3) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
+        // CHECK: [[add:%.+]] = arith.addf %arg2, [[cst]] : f64
+        // CHECK: scf.yield [[add]] : f64
+        %out_qubits:3 = quantum.custom "gate"(%arg2, %arg3) %arg5, %arg6, %arg4 : !quantum.bit, !quantum.bit, !quantum.bit
+        %8 = arith.addf %arg2, %cst : f64
+        scf.yield %8, %out_qubits#2, %out_qubits#0, %out_qubits#1 : f64, !quantum.bit, !quantum.bit, !quantum.bit
+    }
+
+    // CHECK-NOT: quantum.insert
+    %5 = quantum.insert %0[ 2], %4#2 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 0], %4#3 : !quantum.reg, !quantum.bit
+    %7 = quantum.insert %6[ 1], %4#4 : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<3>
+    // CHECK: return [[loopOut]]#0, [[loopOut]]#1 : f64, f64
+    quantum.dealloc %7 : !quantum.reg
+    return %4#0, %4#1 : f64, f64
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_while_dynamic_index
+func.func @test_while_dynamic_index(%arg0: i1, %arg1: i64) -> i64 attributes {quantum.node} {
+
+    // CHECK: [[one:%.+]] = arith.constant 1 : i64
+    // CHECK: [[qreg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    %c1_i64 = arith.constant 1 : i64
+    %0 = quantum.alloc( 3) : !quantum.reg
+
+    // CHECK: [[loopOut:%.+]] = scf.while (%arg2 = %arg1) : (i64) -> i64 {
+    %1:2 = scf.while (%arg2 = %arg1, %arg3 = %0) : (i64, !quantum.reg) -> (i64, !quantum.reg) {
+
+        // CHECK: scf.condition(%arg0) %arg2 : i64
+        scf.condition(%arg0) %arg2, %arg3 : i64, !quantum.reg
+
+    // CHECK: } do {
+    // CHECK: ^bb0(%arg2: i64):
+    } do {
+    ^bb0(%arg2: i64, %arg3: !quantum.reg):
+
+        // CHECK: [[qi:%.+]] = qref.get [[qreg]][%arg2] : !qref.reg<3>, i64 -> !qref.bit
+        // CHECK: qref.custom "gate"() [[qi]] : !qref.bit
+        // CHECK: [[add:%.+]] = arith.addi %arg2, [[one]] : i64
+        // CHECK: scf.yield [[add]] : i64
+        %2 = quantum.extract %arg3[%arg2] : !quantum.reg -> !quantum.bit
+        %out_qubits = quantum.custom "gate"() %2 : !quantum.bit
+        %3 = quantum.insert %arg3[%arg2], %out_qubits : !quantum.reg, !quantum.bit
+        %4 = arith.addi %arg2, %c1_i64 : i64
+        scf.yield %4, %3 : i64, !quantum.reg
+    }
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<3>
+    // CHECK: return [[loopOut]] : i64
+    quantum.dealloc %1#1 : !quantum.reg
+    return %1#0 : i64
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_while_loop_nested
+func.func @test_while_loop_nested(%arg0: i1) attributes {quantum.node} {
+
+    // CHECK: [[qreg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    // CHECK: [[q0:%.+]] = qref.get [[qreg]][ 0] : !qref.reg<3> -> !qref.bit
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: scf.while : () -> () {
+    // CHECK:     scf.condition(%arg0)
+    // CHECK: } do {
+    // CHECK-NOT: bb0
+    %2 = scf.while (%arg1 = %1) : (!quantum.bit) -> !quantum.bit {
+        scf.condition(%arg0) %arg1 : !quantum.bit
+    } do {
+    ^bb0(%arg1: !quantum.bit):
+
+        // CHECK: scf.while : () -> () {
+        // CHECK:     scf.condition(%arg0)
+        // CHECK: } do {
+        // CHECK-NOT: bb0
+        %6 = scf.while (%arg2 = %arg1) : (!quantum.bit) -> !quantum.bit {
+            scf.condition(%arg0) %arg2 : !quantum.bit
+        } do {
+        ^bb0(%arg2: !quantum.bit):
+
+            // CHECK: qref.custom "X"() [[q0]] : !qref.bit
+            // CHECK: scf.yield
+            %out_qubits = quantum.custom "X"() %arg2 : !quantum.bit
+            scf.yield %out_qubits : !quantum.bit
+        }
+
+        // CHECK: scf.yield
+        scf.yield %6 : !quantum.bit
+    }
+    %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+
+    // CHECK: qref.dealloc [[qreg]] : !qref.reg<3>
+    quantum.dealloc %3 : !quantum.reg
+    return
+}

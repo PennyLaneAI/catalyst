@@ -16,6 +16,8 @@
 
 #include "reference_semantics_conversion.h"
 
+#include <optional>
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -61,7 +63,7 @@ void eraseSCFYieldQuantumOperands(scf::YieldOp yieldOp)
     // Somewhat unfortunately, the operand erasure API does not have a lambda version
     // So we need to be a bit manual here
     BitVector eraseIndices(yieldOp->getNumOperands());
-    for (auto [i, argType] : llvm::enumerate(yieldOp.getOperandTypes())) {
+    for (auto [i, argType] : llvm::enumerate(yieldOp->getOperandTypes())) {
         if (isa<quantum::QuregType, quantum::QubitType>(argType)) {
             eraseIndices.set(i);
         }
@@ -486,7 +488,103 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     }
 }
 
-void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
+void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker,
+                 SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(whileOp);
+    Location loc = whileOp->getLoc();
+
+    // Add quantum block args to the map
+    // Classical args must remain on the new while loop op
+    QubitValueTracker beforeRegionTracker = tracker;
+    SmallVector<Value> newBeforeArgs;
+    for (auto [blockArg, operand] :
+         llvm::zip_equal(whileOp.getBeforeArguments(), whileOp.getInits())) {
+        if (isa<quantum::QubitType>(operand.getType())) {
+            beforeRegionTracker.setRQubit(blockArg, tracker.getRQubit(operand));
+        }
+        else if (isa<quantum::QuregType>(operand.getType())) {
+            beforeRegionTracker.setRQreg(blockArg, tracker.getRQreg(operand));
+        }
+        else {
+            newBeforeArgs.push_back(operand);
+        }
+    }
+
+    // Collect new while op results. Only classical results remain.
+    // Note that while loop op's result and operand types don't necessarily match
+    SmallVector<Type> newResultTypes;
+    SmallVector<unsigned> oldClassicalResultIndices;
+    for (auto [i, res] : llvm::enumerate(whileOp->getResults())) {
+        Type t = res.getType();
+        if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
+            newResultTypes.push_back(t);
+            oldClassicalResultIndices.push_back(i);
+        }
+    }
+
+    // Create the new while op
+    auto newLoop = scf::WhileOp::create(builder, loc, newResultTypes, newBeforeArgs);
+    builder.inlineRegionBefore(whileOp.getBefore(), newLoop.getBefore(), newLoop.getBefore().end());
+    builder.inlineRegionBefore(whileOp.getAfter(), newLoop.getAfter(), newLoop.getAfter().end());
+
+    // Remove condition op's quantum terminating values
+    scf::ConditionOp newConditionOp = newLoop.getConditionOp();
+    SmallVector<Value> conditionOpArgSave(newConditionOp.getArgs());
+    BitVector conditionOpEraseIndices(newConditionOp->getNumOperands());
+    for (auto [i, arg] : llvm::enumerate(newConditionOp.getArgs())) {
+        if (isa<quantum::QuregType>(arg.getType())) {
+            conditionOpEraseIndices.set(i + 1);
+        }
+        else if (isa<quantum::QubitType>(arg.getType())) {
+            conditionOpEraseIndices.set(i + 1);
+        }
+    }
+    newConditionOp->eraseOperands(conditionOpEraseIndices);
+
+    // Handle the Before region, and cascade the map into the After region
+    SmallVector<Operation *> beforeRegionErasureWorklist =
+        handleRegion(builder, newLoop.getBefore(), beforeRegionTracker, false).value();
+
+    QubitValueTracker afterRegionTracker = tracker;
+    for (auto [i, arg] : llvm::enumerate(conditionOpArgSave)) {
+        if (isa<quantum::QuregType>(arg.getType())) {
+            afterRegionTracker.setRQreg(newLoop.getAfterArguments()[i],
+                                        beforeRegionTracker.getRQreg(arg));
+        }
+        else if (isa<quantum::QubitType>(arg.getType())) {
+            afterRegionTracker.setRQubit(newLoop.getAfterArguments()[i],
+                                         beforeRegionTracker.getRQubit(arg));
+        }
+    }
+
+    // Handle the After region
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(newLoop.getAfter().front().getTerminator()));
+    handleRegion(builder, newLoop.getAfter(), afterRegionTracker);
+
+    // Erase value semantics residue
+    for (auto op : llvm::reverse(beforeRegionErasureWorklist)) {
+        op->erase();
+    }
+    newLoop.getBeforeBody()->eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+    newLoop.getAfterBody()->eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+
+    // Deal with connection back to the outside
+    cascadeMapAhead(whileOp, tracker);
+    erasureWorklist.push_back(whileOp);
+    for (auto [oldResultIdx, newResult] :
+         llvm::zip_equal(oldClassicalResultIndices, newLoop->getResults())) {
+        builder.replaceAllUsesWith(whileOp->getResult(oldResultIdx), newResult);
+    }
+}
+
+std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region &r,
+                                                     QubitValueTracker &tracker, bool erase)
 {
     assert(r.hasOneBlock() && "Expected region to have a single block");
     assert(r.front().getTerminator() && "Expected region to have a terminator");
@@ -523,13 +621,19 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
             // .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
             // .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
             .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker, erasureWorklist); })
-            // .Case<scf::WhileOp>([&](auto o) { handleWhile(builder, o, tracker); })
+            .Case<scf::WhileOp>([&](auto o) { handleWhile(builder, o, tracker, erasureWorklist); })
             .Case<mbqc::GraphStatePrepOp>(
                 [&](auto o) { handleGraphStatePrep(builder, o, tracker, erasureWorklist); })
             .Default([](Operation *) {});
     });
 
-    eraseAllVOps(r, erasureWorklist);
+    if (erase) {
+        eraseAllVOps(r, erasureWorklist);
+        return std::nullopt;
+    }
+    else {
+        return erasureWorklist;
+    }
 }
 
 } // namespace
