@@ -794,6 +794,67 @@ class ScfForConversion(ScfConversionPattern):
         return yield_op
 
 
+class ComputationalBasisOpConversion(RewritePattern):
+    """Converts `quantum.compbasis` ops to sets of `qecl.measure` and `quantum.mcmobs` ops.
+
+    TODO (more explanation; do we assume k = 1?)
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `quantum.compbasis` ops."""
+
+        if op.qreg is not None:
+            self._convert_qreg_compbasis_to_mcm_obs(op, rewriter)
+        else:
+            self._convert_qubit_compbasis_to_mcm_obs(op, rewriter)
+
+    @classmethod
+    def _convert_qubit_compbasis_to_mcm_obs(
+        cls, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter
+    ):
+        """TODO"""
+        meas_results: list[OpResult] = []
+
+        for qubit in op.qubits:
+            qubit_owner_op = qubit.owner
+            if not _is_type_convertible(
+                qubit_owner_op, qecl.LogicalCodeblockType
+            ):  # pragma: no cover
+                _raise_failed_to_convert_op_compile_error(op)
+
+            conv_cast_op = builtin.UnrealizedConversionCastOp.get(
+                (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
+            )
+            measure_op = qecl.MeasureOp(in_codeblock=conv_cast_op.results[0], idx=0)
+            cast_to_qubit_op = _cast_to_qubit(measure_op.out_codeblock)
+
+            rewriter.insert_op(conv_cast_op, insertion_point=InsertPoint.before(op))
+            rewriter.insert_op(measure_op, insertion_point=InsertPoint.after(conv_cast_op))
+            rewriter.insert_op(cast_to_qubit_op, insertion_point=InsertPoint.after(measure_op))
+
+            rewriter.replace_uses_with_if(
+                qubit_owner_op.results[0],
+                cast_to_qubit_op.results[0],
+                lambda use: use.operation is not conv_cast_op,
+            )
+
+            meas_results.append(measure_op.mres)
+
+        mcmobs_op = quantum.MCMObsOp(
+            operands=(meas_results,), result_types=(quantum.ObservableType(),)
+        )
+
+        rewriter.replace_op(op, mcmobs_op)
+
+    @classmethod
+    def _convert_qreg_compbasis_to_mcm_obs(
+        cls, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter
+    ):
+        """TODO"""
+        raise NotImplementedError("support for `quantum.compbasis qreg` is not yet implemented")
+
+
 # MARK: Helpers
 
 
@@ -916,6 +977,7 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                     ScfYieldConversion(),
                     ScfIfConversion(),
                     ScfForConversion(),
+                    ComputationalBasisOpConversion(),
                 ]
             )
         ).rewrite_module(op)
