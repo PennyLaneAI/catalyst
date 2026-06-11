@@ -68,6 +68,13 @@ struct QubitValueTracker {
         assert(isa<quantum::QuregType>(vQreg.getType()) && "Expected quantum.reg type");
         assert(isa<qref::QuregType>(rQreg.getType()) && "Expected qref.reg type");
         this->qreg_map[vQreg] = rQreg;
+
+        if (failed(this->checkReferenceIsVisible(vQreg, rQreg))) {
+            vQreg.getDefiningOp()->emitError(
+                "The value semantics quantum value is referring to a quantum reference that is not "
+                "visible to its scope. The reference must exist in the same scope, or a parent "
+                "scope as the value.");
+        }
     }
 
     Value getRQreg(Value vQreg)
@@ -84,6 +91,13 @@ struct QubitValueTracker {
         assert(isa<quantum::QubitType>(vQubit.getType()) && "Expected quantum.bit type");
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
         this->qubit_map[vQubit] = rQubit;
+
+        if (failed(this->checkReferenceIsVisible(vQubit, rQubit))) {
+            vQubit.getDefiningOp()->emitError(
+                "The value semantics quantum value is referring to a quantum reference that is not "
+                "visible to its scope. The reference must exist in the same scope, or a parent "
+                "scope as the value.");
+        }
     }
 
     Value getRQubit(Value vQubit)
@@ -98,6 +112,18 @@ struct QubitValueTracker {
   private:
     llvm::DenseMap<Value, Value> qreg_map;
     llvm::DenseMap<Value, Value> qubit_map;
+
+    // We need to make sure that any value semantics quantum Value is only referring to a reference
+    // that is actually scope-visible.
+    LogicalResult checkReferenceIsVisible(Value vVal, Value rVal)
+    {
+        Region *vRegion = vVal.getParentRegion();
+        Region *rRegion = rVal.getParentRegion();
+        if (!rRegion->isAncestor(vRegion)) {
+            return failure();
+        }
+        return success();
+    }
 }; // struct QubitValueTracker
 
 void cascadeMapAhead(Operation *vOp, QubitValueTracker &tracker)
