@@ -476,7 +476,7 @@ func.func @test_adjoint_op() attributes {quantum.node}
 
     // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[q1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK: [[ADJOINT:%.+]]:2 = quantum.adjoint([[q0]], [[q1]]) : !quantum.bit, !quantum.bit {
+    // CHECK: [[ADJOINT:%.+]]:2 = quantum.adjoint([[q0]], [[q1]]) (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit) {
     // CHECK: ^bb0(%arg0: !quantum.bit, %arg1: !quantum.bit):
     qref.adjoint {
     ^bb0():
@@ -509,7 +509,7 @@ func.func @test_adjoint_op_nested() attributes {quantum.node}
 
     // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[q1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK: [[OUTER_ADJ:%.+]]:2 = quantum.adjoint([[q0]], [[q1]]) : !quantum.bit, !quantum.bit {
+    // CHECK: [[OUTER_ADJ:%.+]]:2 = quantum.adjoint([[q0]], [[q1]]) (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit) {
     // CHECK: ^bb0(%arg0: !quantum.bit, %arg1: !quantum.bit):
     qref.adjoint {
     ^bb0():
@@ -518,7 +518,7 @@ func.func @test_adjoint_op_nested() attributes {quantum.node}
         // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() %arg0 : !quantum.bit
         qref.custom "Hadamard"() %q0 : !qref.bit
 
-        // CHECK: [[INNER_ADJ:%.+]]:2 = quantum.adjoint([[HADAMARD]], %arg1) : !quantum.bit, !quantum.bit {
+        // CHECK: [[INNER_ADJ:%.+]]:2 = quantum.adjoint([[HADAMARD]], %arg1) (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit) {
         // CHECK: ^bb0(%arg2: !quantum.bit, %arg3: !quantum.bit):
         qref.adjoint {
         ^bb0():

@@ -765,7 +765,7 @@ def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, 
     );
 
     let assemblyFormat = [{
-        `(` $args `)` attr-dict `:` type($results) $region
+        `(` $args `)` attr-dict functional-type($args, $results) $region
     }];
 
     let hasVerifier = 1;
