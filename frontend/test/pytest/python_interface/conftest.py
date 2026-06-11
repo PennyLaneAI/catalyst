@@ -70,8 +70,7 @@ def print_dbg_banner(message: str, max_text_len: int = 80, **kwargs):
         # Cut it down to fit, ensuring room for ellipses and at least 3 banner chars on either side
         message = message[: _max_len - 11] + "..."
 
-    if message:
-        message = f" {message} "
+    message = f" {message} "
 
     print_dbg(f"{message.center(_max_len, "=")}", **kwargs)
 
@@ -225,8 +224,8 @@ def _get_filecheck_directives(qjit_fn):
 
 
 def _get_qjit_fn_src(qjit_fn) -> str:
-    """Return a string containing the source code of the input QJIT function (including FileCheck)
-    directives.
+    """Return a string containing the source code of the input QJIT function (including comments and
+    FileCheck directives).
 
     This function is primarily used for debugging purposes.
     """
