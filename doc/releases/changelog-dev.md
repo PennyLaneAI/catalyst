@@ -108,6 +108,10 @@
   dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
   [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
 
+* A new operation has been added to the Quantum dialect to represent generic and high-level
+  quantum operators, including operators with frontend-end specific data.
+  [(#2883)](https://github.com/PennyLaneAI/catalyst/pull/2883)
+
 * In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
   operations have been added:
 
@@ -131,6 +135,7 @@ Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
+David Ittah,
 Christina Lee,
 Mehrdad Malekmohammadi,
 Shuli Shu,
