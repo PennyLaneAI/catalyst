@@ -18,6 +18,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -232,12 +233,6 @@ LogicalResult OperatorOp::verify()
         return emitOpError() << "in_qreg and out_qreg must either both be present or absent";
     }
 
-    if (getInQubits().size() != getOutQubits().size()) {
-        return emitOpError() << "number of input qubits (" << getInQubits().size()
-                             << ") and output qubits (" << getOutQubits().size()
-                             << ") must be the same";
-    }
-
     if (!getForwardArgs().empty() && !getUID()) {
         return emitOpError() << "forward_args can only be present when UID is provided";
     }
@@ -251,18 +246,6 @@ LogicalResult OperatorOp::verify()
         return emitOpError()
                << "cannot mix qubit controls (in_ctrl_qubits/in_ctrl_values/out_ctrl_qubits) "
                << "with register controls (arr_ctrl_indices/arr_ctrl_values)";
-    }
-
-    if (getInCtrlQubits().size() != getOutCtrlQubits().size()) {
-        return emitOpError() << "number of input control qubits (" << getInCtrlQubits().size()
-                             << ") and output control qubits (" << getOutCtrlQubits().size()
-                             << ") must be the same";
-    }
-
-    if (getInCtrlQubits().size() != getInCtrlValues().size()) {
-        return emitOpError() << "number of input control qubits (" << getInCtrlQubits().size()
-                             << ") and control values (" << getInCtrlValues().size()
-                             << ") must be the same";
     }
 
     if (static_cast<bool>(getArrCtrlIndices()) != static_cast<bool>(getArrCtrlValues())) {
@@ -322,8 +305,7 @@ LogicalResult OperatorOp::verify()
         }
         else {
             const size_t numInputQubits = getInQubits().size();
-            std::vector<bool> coveredQubits(numInputQubits, false);
-            size_t coveredCount = 0;
+            llvm::SmallDenseSet<int64_t> coveredQubits;
             for (NamedAttribute namedAttr : qubitMap) {
                 auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
                 for (int64_t idx : denseArray.asArrayRef()) {
@@ -332,16 +314,13 @@ LogicalResult OperatorOp::verify()
                                << "qubit_map index is out of bounds with respect to qubits: " << idx
                                << " is not in [0, " << numInputQubits << ")";
                     }
-                    if (!coveredQubits[static_cast<size_t>(idx)]) {
-                        coveredQubits[static_cast<size_t>(idx)] = true;
-                        ++coveredCount;
-                    }
+                    coveredQubits.insert(idx);
                 }
             }
-            if (getQubitMapAttr() && coveredCount != numInputQubits) {
+            if (getQubitMapAttr() && coveredQubits.size() != numInputQubits) {
                 return emitOpError()
                        << "qubit_map must cover all qubit values in qubit mode: expected "
-                       << numInputQubits << ", got " << coveredCount;
+                       << numInputQubits << ", got " << coveredQubits.size();
             }
         }
     }
@@ -1090,32 +1069,26 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
     }
 
     // 9. Optional inherent metadata blocks.
-    while (true) {
-        if (succeeded(parser.parseOptionalKeyword("static_data"))) {
-            DictionaryAttr staticData;
-            if (parser.parseEqual() || parser.parseAttribute(staticData)) {
-                return failure();
-            }
-            result.addAttribute("static_data", staticData);
-            continue;
+    if (succeeded(parser.parseOptionalKeyword("static_data"))) {
+        DictionaryAttr staticData;
+        if (parser.parseEqual() || parser.parseAttribute(staticData)) {
+            return failure();
         }
-        if (succeeded(parser.parseOptionalKeyword("param_map"))) {
-            DictionaryAttr paramMap;
-            if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, paramMap)) {
-                return failure();
-            }
-            result.addAttribute("param_map", paramMap);
-            continue;
+        result.addAttribute("static_data", staticData);
+    }
+    if (succeeded(parser.parseOptionalKeyword("param_map"))) {
+        DictionaryAttr paramMap;
+        if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, paramMap)) {
+            return failure();
         }
-        if (succeeded(parser.parseOptionalKeyword("qubit_map"))) {
-            DictionaryAttr qubitMap;
-            if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, qubitMap)) {
-                return failure();
-            }
-            result.addAttribute("qubit_map", qubitMap);
-            continue;
+        result.addAttribute("param_map", paramMap);
+    }
+    if (succeeded(parser.parseOptionalKeyword("qubit_map"))) {
+        DictionaryAttr qubitMap;
+        if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, qubitMap)) {
+            return failure();
         }
-        break;
+        result.addAttribute("qubit_map", qubitMap);
     }
 
     // 10. Resolve operands in segment order.
