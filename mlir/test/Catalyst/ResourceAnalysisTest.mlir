@@ -400,7 +400,7 @@ func.func @adjoint_static_for_loop(%arg0: !quantum.reg) -> !quantum.reg {
     %c1 = arith.constant 1 : index
     %c0_i64 = arith.constant 0 : i64
 
-    %r = quantum.adjoint(%arg0) (!quantum.reg) -> (!quantum.reg) {
+    %r = quantum.adjoint(%arg0) : !quantum.reg {
     ^bb0(%a0: !quantum.reg):
         %r2 = scf.for %i = %c0 to %c5 step %c1 iter_args(%a = %a0) -> (!quantum.reg) {
             %q = quantum.extract %a[%c0_i64] : !quantum.reg -> !quantum.bit
