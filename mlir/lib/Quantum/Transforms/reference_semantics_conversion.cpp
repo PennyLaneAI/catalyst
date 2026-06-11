@@ -14,6 +14,9 @@
 
 #define DEBUG_TYPE "reference-semantics-conversion"
 
+#include "reference_semantics_conversion.h"
+
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -38,13 +41,6 @@ using namespace catalyst;
 // and variable names like "rQubit" stand for "qubits in reference semantics".
 
 namespace {
-
-void eraseAllVOps(SmallVector<Operation *> &erasureWorklist)
-{
-    for (auto op : llvm::reverse(erasureWorklist)) {
-        op->erase();
-    }
-}
 
 struct QubitValueTracker {
   public:
@@ -87,6 +83,33 @@ struct QubitValueTracker {
     llvm::DenseMap<Value, Value> qubit_map;
 }; // struct QubitValueTracker
 
+void cascadeMapAhead(Operation *vOp, QubitValueTracker &tracker)
+{
+    // Cascade the tracker for gate-like ops
+    SmallVector<Value> vQuantumOperands;
+    SmallVector<Value> vQuantumResults;
+    for (Value v : vOp->getOperands()) {
+        if (isa<quantum::QubitType, quantum::QuregType>(v.getType())) {
+            vQuantumOperands.push_back(v);
+        }
+    }
+
+    for (Value v : vOp->getResults()) {
+        if (isa<quantum::QubitType, quantum::QuregType>(v.getType())) {
+            vQuantumResults.push_back(v);
+        }
+    }
+
+    for (auto [vqo, vqr] : llvm::zip_equal(vQuantumOperands, vQuantumResults)) {
+        if (isa<quantum::QubitType>(vqo.getType())) {
+            tracker.setRQubit(vqr, tracker.getRQubit(vqo));
+        }
+        else if (isa<quantum::QuregType>(vqo.getType())) {
+            tracker.setRQreg(vqr, tracker.getRQreg(vqo));
+        }
+    }
+}
+
 template <typename OpTy>
 OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitValueTracker &tracker)
 {
@@ -128,29 +151,7 @@ OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitVal
 
     if (isa<quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp,
             mbqc::MeasureInBasisOp>(vOp)) {
-        // Cascade the tracker for gate-like ops
-        SmallVector<Value> vQuantumOperands;
-        SmallVector<Value> vQuantumResults;
-        for (Value v : vOp->getOperands()) {
-            if (isa<quantum::QubitType, quantum::QuregType>(v.getType())) {
-                vQuantumOperands.push_back(v);
-            }
-        }
-
-        for (Value v : vOp->getResults()) {
-            if (isa<quantum::QubitType, quantum::QuregType>(v.getType())) {
-                vQuantumResults.push_back(v);
-            }
-        }
-
-        for (auto [vqo, vqr] : llvm::zip_equal(vQuantumOperands, vQuantumResults)) {
-            if (isa<quantum::QubitType>(vqo.getType())) {
-                tracker.setRQubit(vqr, tracker.getRQubit(vqo));
-            }
-            else if (isa<quantum::QuregType>(vqo.getType())) {
-                tracker.setRQreg(vqr, tracker.getRQreg(vqo));
-            }
-        }
+        cascadeMapAhead(vOp, tracker);
     }
 
     return cast<OpTy>(newOp);
@@ -376,8 +377,44 @@ void handleGraphStatePrep(IRRewriter &builder, mbqc::GraphStatePrepOp vGraphStat
     erasureWorklist.push_back(vGraphStatePrepOp);
 }
 
+void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValueTracker &tracker,
+                   SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vAdjointOp);
+    Location loc = vAdjointOp->getLoc();
+    QubitValueTracker regionTracker = tracker;
+
+    // Add block args to the map
+    for (auto [blockArg, operand] : llvm::zip_equal(vAdjointOp.getRegion().front().getArguments(),
+                                                    vAdjointOp->getOperands())) {
+        if (isa<quantum::QubitType>(blockArg.getType())) {
+            regionTracker.setRQubit(blockArg, tracker.getRQubit(operand));
+        }
+        else if (isa<quantum::QuregType>(blockArg.getType())) {
+            regionTracker.setRQreg(blockArg, tracker.getRQreg(operand));
+        }
+    }
+
+    // Create the rAdjoint op and handle
+    auto rAdjointOp = qref::AdjointOp::create(builder, loc);
+    builder.inlineRegionBefore(vAdjointOp.getRegion(), rAdjointOp.getRegion(),
+                               rAdjointOp.getRegion().end());
+    handleRegion(builder, rAdjointOp.getRegion(), regionTracker);
+    cascadeMapAhead(vAdjointOp, tracker);
+    erasureWorklist.push_back(vAdjointOp);
+
+    // Remove the moved over value semantics block args
+    rAdjointOp.getRegion().front().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+}
+
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
 {
+    assert(r.hasOneBlock() && "Expected region to have a single block");
+    assert(r.front().getTerminator() && "Expected the region body to have a terminator");
+
     SmallVector<Operation *> erasureWorklist;
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
         llvm::TypeSwitch<Operation *, void>(op)
@@ -405,7 +442,8 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker, erasureWorklist); })
             .Case<pbc::PPMeasurementOp>(
                 [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
-            // .Case<qref::AdjointOp>([&](auto o) { handleAdjoint(builder, o, tracker); })
+            .Case<quantum::AdjointOp>(
+                [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
             // .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
             // .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
             // .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker); })
@@ -415,7 +453,12 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
             .Default([](Operation *) {});
     });
 
-    eraseAllVOps(erasureWorklist);
+    if (isa<quantum::YieldOp>(r.front().getTerminator())) {
+        erasureWorklist.push_back(r.front().getTerminator());
+    }
+    for (auto op : llvm::reverse(erasureWorklist)) {
+        op->erase();
+    }
 }
 
 } // namespace
