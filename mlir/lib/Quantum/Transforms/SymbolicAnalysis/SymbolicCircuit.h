@@ -9,7 +9,7 @@
 #include "llvm/ADT/ArrayRef.h"
 
 
-struct SymbolicCircuit {    // indices are 1-based
+struct SymbolicCircuit { // indices are 1-based
     size_t qubitNum;
     size_t auxVarNum;
     // std::vector<bool> isAux;
@@ -42,4 +42,6 @@ struct SymbolicCircuit {    // indices are 1-based
     void applyGateSWAP(size_t qubitIndex1, size_t qubitIndex2);
     void applyGateH(size_t qubitIndex);
     void applyGateU(llvm::ArrayRef<size_t> qubitIndices);
+
+    void initQubit(size_t qubitIndex, bool basisState);
 };

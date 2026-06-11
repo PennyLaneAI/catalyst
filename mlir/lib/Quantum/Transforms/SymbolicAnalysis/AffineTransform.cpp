@@ -39,6 +39,10 @@ void AffineTransform::setRow(size_t row, const Parity& parity) {
     getRowMutable(row) = parity;
 }
 
+void AffineTransform::resetRow(size_t row) {
+    getRowMutable(row).reset();
+}
+
 void AffineTransform::flipAffineValueAtRow(size_t row) {
     getRowMutable(row).flipAffineValue();
 }

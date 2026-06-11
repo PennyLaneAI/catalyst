@@ -58,9 +58,12 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
     
     // %c0 = arith.constant 3.141592 : f64
 
+    %tens01 = arith.constant dense<[false]> : tensor<1xi1>
+    %q18 = quantum.set_basis_state(%tens01) %q1 : (tensor<1xi1>, !quantum.bit) -> !quantum.bit
+
     %q2 = quantum.custom "T"() %q0 : !quantum.bit   // l1
     // %q2 = quantum.custom "RZ"(%c0) %q0 : !quantum.bit
-    %q3 = quantum.custom "T"() %q1 : !quantum.bit   // l2
+    %q3 = quantum.custom "T"() %q18 : !quantum.bit   // l2
     %q4:2 = quantum.custom "CNOT"() %q2, %q3 : !quantum.bit, !quantum.bit
     %q5 = quantum.custom "T"() %q4#1 {adjoint}: !quantum.bit    // l3
     %q6:2 = quantum.custom "CNOT"() %q4#0, %q5 : !quantum.bit, !quantum.bit
@@ -104,6 +107,10 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
 
     %qb = quantum.alloc_qb : !quantum.bit
     %h = quantum.custom "PauliX"() %qb : !quantum.bit
+
+    // %tens01 = arith.constant dense<[false, true]> : tensor<2xi1>
+    // %q18:2 = quantum.set_basis_state(%tens01) %q12#1, %q17 : (tensor<2xi1>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+
     // func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit
     func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit
 }

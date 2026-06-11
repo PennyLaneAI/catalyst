@@ -94,6 +94,10 @@ bool Parity::getAffineValue() const {
 /*
     Setters:
 */
+void Parity::reset() {
+    bits.assign(1, 0);
+}
+
 void Parity::setBitAt(size_t pos, bool value) {
     assert(pos <= varNum);
     setBitAtBlock(getIndex(pos), value);
@@ -160,6 +164,15 @@ bool Parity::isEquivalentWithFromBlock(const Parity& rhs, size_t fstBlock) const
     const llvm::SmallVector<uint64_t, 8>& longerBits = (bits.size() > rhs.bits.size()) ? bits : rhs.bits;
     for (size_t i = minBlockNum; i < longerBits.size(); i++) {
         if (longerBits[i] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Parity::isZero() const {
+    for (size_t i = 0; i < bits.size(); i++) {
+        if (bits[i] != 0) {
             return false;
         }
     }

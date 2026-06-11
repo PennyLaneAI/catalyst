@@ -112,3 +112,10 @@ void SymbolicCircuit::applyGateU(llvm::ArrayRef<size_t> qubitIndices) {
         stateTrans.setRow(qubitIndices[i], Parity::eVec(qubitNum + auxVarNum, qubitNum + auxVarNum - n + i)); // are the indices correct?
     }
 }   // make sure nothing leads to segment fault and index out of bounds.
+
+void SymbolicCircuit::initQubit(size_t qubitIndex, bool basisState) {
+    stateTrans.resetRow(qubitIndex);
+    if (basisState) {
+        stateTrans.flipAffineValueAtRow(qubitIndex);
+    }    
+}

@@ -37,6 +37,7 @@ public:
     // Checks & Inspections
     [[nodiscard]] bool isIdenticalWith(const Parity& rhs) const;
     [[nodiscard]] bool isLinearEquivalentWith(const Parity& rhs) const;
+    [[nodiscard]] bool isZero() const;
     [[nodiscard]] bool isUnsat() const;
     [[nodiscard]] bool isLinearZero() const;
 
@@ -50,6 +51,7 @@ public:
     [[nodiscard]] bool getAffineValue() const;
 
     // Setters
+    void reset();
     void setBitAt(size_t pos, bool value);
     void setAffineValue(bool value);
     void onBitAt(size_t pos);

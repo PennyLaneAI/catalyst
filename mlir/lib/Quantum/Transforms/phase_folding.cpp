@@ -62,7 +62,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
 
-    // Qubit Indices:
+    // Qubit Extraction:
     void allocateRegister(mlir::Value qreg, auto regSize,  SymbolicCircuit& symCirc) {
         qregToBaseMap[qreg] = symCirc.qubitNum;
         symCirc.extendQubitsBy(static_cast<size_t>(regSize.value_or(0)));
@@ -72,6 +72,36 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         ssaToWireMap[qubit] = symCirc.qubitNum;
         symCirc.extendQubitsBy(1);
     }
+
+    mlir::DenseElementsAttr extractBasisState(SetBasisStateOp basisOp) {
+        mlir::Value basisStateTensor = basisOp.getBasisState();
+        mlir::Operation* defOp = basisStateTensor.getDefiningOp();
+
+        if (auto constOp = mlir::dyn_cast_or_null<mlir::arith::ConstantOp>(defOp)) {
+            if (auto denseAttr = mlir::dyn_cast<mlir::DenseElementsAttr>(constOp.getValue())) {                
+                return denseAttr;
+            } else {
+                llvm::errs() << "Error: Basis state constant is not a DenseElementsAttr.\n";
+                assert(false);
+            }
+        } else {
+            llvm::errs() << "Error: Dynamic basis state initialization is not supported.\n";
+            assert(false);
+        }
+    }
+
+    void initQubitsState(SetBasisStateOp basisOp, SymbolicCircuit& symCirc) {
+        llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(basisOp.getInQubits(), basisOp.getOutQubits()));
+        mlir::DenseElementsAttr basisState = extractBasisState(basisOp);
+
+        assert(static_cast<size_t>(basisState.getNumElements()) == qubitIndices.size());
+
+        size_t i = 0;
+        for (const llvm::APInt& val : basisState.getValues<llvm::APInt>()) {
+            symCirc.initQubit(qubitIndices[i], val.getBoolValue());
+            i++;
+        }
+    }   // should I assert that no gate has been applied to this qubit?
 
     size_t getIndexFromExtractOp(mlir::Value value) {
         if (auto extractOp = llvm::cast<quantum::ExtractOp>(value.getDefiningOp())) {
@@ -248,7 +278,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
     
-    // Phase-folding Algorithm
+    // Phase-folding Algorithm:
     void phaseAnalysis(CustomOp customOp, SymbolicCircuit& symCirc, GateID& gateID) {
         // getting affected wires
         llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(customOp.getInQubits(), customOp.getOutQubits()));
@@ -282,10 +312,15 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
                     }
                 }
             }
+            if (parity.isZero()) {
+                for (GateID id : llvm::concat<GateID>(contributors.zeroAffineRZs, contributors.oneAffineRZs)) {
+                    removePhaseOp(phaseOps[id]);
+                }
+            }
         }
-    }
+    }   // clean
 
-    
+
     void runOnOperation() override {
         llvm::outs() << "Hello phase-folding world!\n";
 
@@ -293,17 +328,17 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         GateID gateID = -1;
 
         getOperation()->walk([&](Operation *op) {
-            if (CustomOp customOp = dyn_cast<CustomOp>(op)) {
+            if (auto customOp = dyn_cast<CustomOp>(op)) {
                 phaseAnalysis(customOp, symCirc, gateID);
             }
-            else if (AllocQubitOp allocQbOp = dyn_cast<AllocQubitOp>(op)){
+            else if (auto allocQbOp = dyn_cast<AllocQubitOp>(op)){
                 allocateQubit(allocQbOp.getResult(), symCirc);
             }
-            else if (quantum::AllocOp allocOp = dyn_cast<AllocOp>(op)){
+            else if (auto allocOp = dyn_cast<AllocOp>(op)){
                 allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), symCirc);
             }
-            else if (quantum::SetBasisStateOp basisOp = dyn_cast<SetBasisStateOp>(op)) {
-                llvm::outs() << "Set Basis State Operation! " << "\n";
+            else if (auto basisOp = dyn_cast<SetBasisStateOp>(op)) {
+                initQubitsState(basisOp, symCirc);
             }
         });
 
@@ -320,12 +355,9 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 
 // Currently ignoring any blocks or dynamic allocations, only capturing pure quantum circuits.
 
-/*
-TODO: 
-ancila initialization (0/1) (SetBasisStateOp)
-
-testttt
-if (isa<AllocOp>(op)){}
-
+/*  TEST
+Do I need to handle DeallocOps?
 is the current 1-based indexing of qubits in SymbolicCircuit good?
+
+if (isa<AllocOp>(op)){}
 */

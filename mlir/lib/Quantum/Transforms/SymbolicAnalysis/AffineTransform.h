@@ -8,7 +8,7 @@
 
 #include "llvm/Support/raw_ostream.h"
 
-class AffineTransform {
+class AffineTransform { // indices are 1-based
 public:
     // Constructors
     AffineTransform() = default;
@@ -30,6 +30,7 @@ public:
     
     // Setters
     void setRow(size_t row, const Parity& parity);
+    void resetRow(size_t row);
     void flipAffineValueAtRow(size_t row);
 
     // Methods
