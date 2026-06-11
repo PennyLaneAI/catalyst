@@ -1,6 +1,5 @@
 #pragma once
 
-// #include <iosfwd>
 #include <vector>
 #include <utility>
 #include <string>
@@ -27,12 +26,13 @@ struct PhaseBucket {
     PhaseBucket& operator+=(const PhaseBucket& rhs);
     PhaseBucket operator+(const PhaseBucket& rhs) const;
 
-    size_t gateCount() const;
-    GateID mergeTarget() const;
-    bool isMergeTargetAffineZero() const;
-
     friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const PhaseBucket& PhaseBucket);
     std::string algebraicView() const;
+
+    // Methods
+    size_t gateCount() const;
+    GateID getMergeTarget() const;
+    bool isMergeTargetAffineZero() const;
 };
 
 inline size_t PhaseBucket::gateCount() const {

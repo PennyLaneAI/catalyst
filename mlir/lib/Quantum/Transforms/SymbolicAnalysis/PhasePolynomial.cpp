@@ -1,9 +1,8 @@
-// #include <ostream>
 #include "PhasePolynomial.h"
 
-/*.................
+/*
     Operators:
-...................*/
+*/
 PhasePolynomial& PhasePolynomial::operator+=(const PhasePolynomial& rhs) {
     if (terms.empty()) {
         terms.reserve(rhs.terms.size());
@@ -35,9 +34,9 @@ std::string PhasePolynomial::algebraicView(size_t qubitNum) const {
     return res;
 }
 
-/*.................
+/*
     Methods:
-...................*/
+*/
 void PhasePolynomial::insertContributor(const Parity& parity, const PhaseBucket& contributor) {
     // auto [it, inserted] = poly.try_emplace(parity, term);
     // if (!inserted) {

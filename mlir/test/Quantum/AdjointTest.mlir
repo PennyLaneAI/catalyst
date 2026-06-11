@@ -559,3 +559,80 @@ func.func private @adjoint_index_switch(%idx: index) -> !quantum.reg {
 
   return %1 : !quantum.reg
 }
+
+// -----
+
+// Test adjoint lowering through a dynamic single-qubit allocation/deallocation pair.
+
+// CHECK-LABEL: @adjoint_dynamic_qubit
+func.func private @adjoint_dynamic_qubit(%r: !quantum.reg) -> !quantum.reg {
+  // CHECK-NOT: quantum.adjoint
+  %out = quantum.adjoint(%r) : !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %q0 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+    %aux = quantum.alloc_qb : !quantum.bit
+    %g:2 = quantum.custom "CNOT"() %q0, %aux : !quantum.bit, !quantum.bit
+    quantum.dealloc_qb %g#1 : !quantum.bit
+    %ins = quantum.insert %arg0[ 0], %g#0 : !quantum.reg, !quantum.bit
+    quantum.yield %ins : !quantum.reg
+  }
+
+  // CHECK: [[aux:%.+]] = quantum.alloc_qb : !quantum.bit
+  // CHECK: [[cnot:%.+]]:2 = quantum.custom "CNOT"() {{%.+}}, [[aux]] adj : !quantum.bit, !quantum.bit
+  // CHECK: quantum.dealloc_qb [[cnot]]#1 : !quantum.bit
+  return %out : !quantum.reg
+}
+
+// -----
+
+// Test adjoint lowering through a dynamic register allocation/deallocation pair.
+
+// CHECK-LABEL: @adjoint_dynamic_register
+func.func private @adjoint_dynamic_register(%r: !quantum.reg) -> !quantum.reg {
+  // CHECK-NOT: quantum.adjoint
+  %out = quantum.adjoint(%r) : !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %q0 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+    %scratch = quantum.alloc( 1) : !quantum.reg
+    %aux = quantum.extract %scratch[ 0] : !quantum.reg -> !quantum.bit
+    %g:2 = quantum.custom "CNOT"() %q0, %aux : !quantum.bit, !quantum.bit
+    %sc2 = quantum.insert %scratch[ 0], %g#1 : !quantum.reg, !quantum.bit
+    quantum.dealloc %sc2 : !quantum.reg
+    %ins = quantum.insert %arg0[ 0], %g#0 : !quantum.reg, !quantum.bit
+    quantum.yield %ins : !quantum.reg
+  }
+
+  // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+  // CHECK: [[aux:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+  // CHECK: [[cnot:%.+]]:2 = quantum.custom "CNOT"() {{%.+}}, [[aux]] adj : !quantum.bit, !quantum.bit
+  // CHECK: [[reg2:%.+]] = quantum.insert [[reg]][ 0], [[cnot]]#1 : !quantum.reg, !quantum.bit
+  // CHECK: quantum.dealloc [[reg2]] : !quantum.reg
+  return %out : !quantum.reg
+}
+
+// -----
+
+// Test adjoint lowering through a dynamic register allocation/deallocation pair with dyn size.
+
+// CHECK-LABEL: @adjoint_dynamic_register_dynamic_size
+func.func private @adjoint_dynamic_register_dynamic_size(%r: !quantum.reg, %n: i64) -> !quantum.reg {
+  // CHECK-NOT: quantum.adjoint
+  %out = quantum.adjoint(%r) : !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %q0 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+    %scratch = quantum.alloc(%n) : !quantum.reg
+    %aux = quantum.extract %scratch[ 0] : !quantum.reg -> !quantum.bit
+    %g:2 = quantum.custom "CNOT"() %q0, %aux : !quantum.bit, !quantum.bit
+    %sc2 = quantum.insert %scratch[ 0], %g#1 : !quantum.reg, !quantum.bit
+    quantum.dealloc %sc2 : !quantum.reg
+    %ins = quantum.insert %arg0[ 0], %g#0 : !quantum.reg, !quantum.bit
+    quantum.yield %ins : !quantum.reg
+  }
+
+  // CHECK: [[reg:%.+]] = quantum.alloc(%arg1) : !quantum.reg
+  // CHECK: [[aux:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+  // CHECK: [[cnot:%.+]]:2 = quantum.custom "CNOT"() {{%.+}}, [[aux]] adj : !quantum.bit, !quantum.bit
+  // CHECK: [[reg2:%.+]] = quantum.insert [[reg]][ 0], [[cnot]]#1 : !quantum.reg, !quantum.bit
+  // CHECK: quantum.dealloc [[reg2]] : !quantum.reg
+  return %out : !quantum.reg
+}

@@ -23,7 +23,7 @@
 
 #include <vector>
 #include <cassert>
-#include <cmath> // for std::fmod, std::abs
+#include <cmath> // for std::abs
 
 using namespace llvm;
 using namespace mlir;
@@ -42,8 +42,9 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     llvm::DenseMap<mlir::Value, size_t> ssaToWireMap;
     llvm::DenseMap<mlir::Value, size_t> qregToBaseMap;
 
-    std::vector<quantum::CustomOp> phaseOps;
+    std::vector<CustomOp> phaseOps;
 
+    // Gate Statistics:
     void updateStats(Gate gate, int incr) {
         insertedGateCount[static_cast<size_t>(gate)] += incr;
     }
@@ -61,6 +62,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
 
+    // Qubit Indices:
     void allocateRegister(mlir::Value qreg, auto regSize,  SymbolicCircuit& symCirc) {
         qregToBaseMap[qreg] = symCirc.qubitNum;
         symCirc.extendQubitsBy(static_cast<size_t>(regSize.value_or(0)));
@@ -112,7 +114,6 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
                 ssaToWireMap.erase(it);
             } else {                        // first gate on the wire
                 index = getIndexFromExtractOp(inValue);
-                llvm::outs() << "> " << inValue << " ... " << index << "\n";
             }
 
             indices.push_back(index);
@@ -132,6 +133,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
 
+    // Gate Recognitions:
     Gate gateFromName(llvm::StringRef gateName) {
         for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
             if ((GATE_NAME[i] == gateName)) {
@@ -141,7 +143,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         return Gate::U;
     }
 
-    Gate extractCliffTGate(quantum::CustomOp& op) {
+    Gate extractCliffTGate(CustomOp& op) {
         Gate gate = gateFromName(op.getGateName());
         if (!op.getInCtrlQubits().empty() || !op.getInCtrlValues().empty()) {
             if (isPhaseGate(gate)) {
@@ -156,7 +158,8 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
 
-    double getPhase(quantum::CustomOp& op) {
+    // Rotation Angle Computations:
+    double getPhase(CustomOp& op) {
         double c = (op.getAdjointFlag() ? -1 : 1);
         double angle = rotAngle(gateFromName(op.getGateName()));
 
@@ -190,7 +193,8 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
 
-    void updateTargetOp(quantum::CustomOp& targetOp, double sumAngle) {
+    // IR Modifications:
+    void updateTargetOp(CustomOp& targetOp, double sumAngle) {
         double normAngle = normalizeAngle(sumAngle);
         bool isAdjoint = (normAngle < 0.0);
         normAngle = std::abs(normAngle);
@@ -203,7 +207,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }
     }
 
-    void removePhaseOp(quantum::CustomOp& op) {
+    void removePhaseOp(CustomOp& op) {
         if (gateFromName(op.getGateName()) == Gate::Y) {
             replaceOpWith(op, Gate::X, false, 0.0);
         } else {
@@ -211,7 +215,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }       
     }
 
-    void replaceOpWith(quantum::CustomOp& preOp, Gate newGate, bool isAdjoint, double angle) {
+    void replaceOpWith(CustomOp& preOp, Gate newGate, bool isAdjoint, double angle) {
         updateStats(gateFromName(preOp.getGateName()), -1);
 
         mlir::IRRewriter rewriter(preOp.getContext());
@@ -221,7 +225,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             angleVal = arith::ConstantOp::create(rewriter, preOp.getLoc(), rewriter.getF64FloatAttr(angle));
         }
 
-        quantum::CustomOp newOp = quantum::CustomOp::create(
+        CustomOp newOp = CustomOp::create(
                             rewriter,
                             preOp.getLoc(),
             /*gate_name=*/  GATE_NAME[static_cast<size_t>(newGate)],
@@ -234,7 +238,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         updateStats(newGate, +1);
     }
 
-    void killOp(quantum::CustomOp& op) {
+    void killOp(CustomOp& op) {
         assert(op.getInCtrlQubits().empty() && op.getInCtrlValues().empty());   // move to somewhere better        
         updateStats(gateFromName(op.getGateName()), -1);
       
@@ -244,6 +248,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
     
+    // Phase-folding Algorithm
     void phaseAnalysis(CustomOp customOp, SymbolicCircuit& symCirc, GateID& gateID) {
         // getting affected wires
         llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(customOp.getInQubits(), customOp.getOutQubits()));
@@ -264,7 +269,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         for (auto& [parity, contributors] : symCirc.phasePoly.terms) {
             if (contributors.gateCount() > 1) {
                 double angleSum = sumAngles(contributors);
-                GateID targetOpID = contributors.mergeTarget(); 
+                GateID targetOpID = contributors.getMergeTarget(); 
 
                 if (!contributors.isMergeTargetAffineZero()) {
                     angleSum *= -1.0;
@@ -280,6 +285,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }
     }
 
+    
     void runOnOperation() override {
         llvm::outs() << "Hello phase-folding world!\n";
 
@@ -290,13 +296,13 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             if (CustomOp customOp = dyn_cast<CustomOp>(op)) {
                 phaseAnalysis(customOp, symCirc, gateID);
             }
-            else if (quantum::AllocQubitOp allocQbOp = dyn_cast<AllocQubitOp>(op)){
+            else if (AllocQubitOp allocQbOp = dyn_cast<AllocQubitOp>(op)){
                 allocateQubit(allocQbOp.getResult(), symCirc);
             }
             else if (quantum::AllocOp allocOp = dyn_cast<AllocOp>(op)){
                 allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), symCirc);
             }
-            else if (quantum::SetBasisStateOp basisOp = dyn_cast<quantum::SetBasisStateOp>(op)) {
+            else if (quantum::SetBasisStateOp basisOp = dyn_cast<SetBasisStateOp>(op)) {
                 llvm::outs() << "Set Basis State Operation! " << "\n";
             }
         });
@@ -317,8 +323,6 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 /*
 TODO: 
 ancila initialization (0/1) (SetBasisStateOp)
-
-change getRow to getRowMutable in AffineTrans
 
 testttt
 if (isa<AllocOp>(op)){}

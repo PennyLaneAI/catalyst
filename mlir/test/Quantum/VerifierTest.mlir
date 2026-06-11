@@ -145,6 +145,14 @@ func.func @test_paulirot_bad_pauli_word(%1 : !quantum.bit, %angle: f64) {
 
 // -----
 
+func.func @adjoint_with_no_args_good() {
+    quantum.adjoint() {
+    }
+    return
+}
+
+// -----
+
 //////////////////
 // Measurements //
 //////////////////

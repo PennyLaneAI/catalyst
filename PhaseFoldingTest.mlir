@@ -94,7 +94,7 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
     // %q20 = quantum.custom "T"() %q19 : !quantum.bit
 
     %p2 = quantum.custom "T"() %p0 : !quantum.bit
-    %p3 = quantum.custom "H"() %p1 : !quantum.bit
+    %p3 = quantum.custom "Hadamard"() %p1 : !quantum.bit
     %p4:2 = quantum.custom "CNOT"() %p3, %p2 : !quantum.bit, !quantum.bit
     %p5 = quantum.custom "T"() %p4#1 : !quantum.bit
     %p6:2 = quantum.custom "CNOT"() %p4#0, %p5 : !quantum.bit, !quantum.bit

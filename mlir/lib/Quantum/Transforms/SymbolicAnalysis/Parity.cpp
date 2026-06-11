@@ -1,6 +1,5 @@
-// #include <ostream>
-#include <cassert>
 #include "Parity.h"
+#include <cassert>
 
 #include "llvm/ADT/Hashing.h"
 
@@ -8,9 +7,9 @@ using Index = std::pair<size_t, size_t>;   // block index, bit index
 
 static const Index AFFINE_VALUE_INDEX = {0, 0};   // it's LSB. for MSB would be varNum.
 
-/*.................
+/*
     Constructors:
-...................*/
+*/
 // parityStr[0] corresponds to x_1 and parityStr[n-1] corresponds to x_n. Not the most efficient way, but only for testing purpose.
 // Precondition: parityStr should not be empty.
 Parity::Parity(const std::string& parityStr) : Parity(parityStr.size() - 1) {
@@ -29,9 +28,9 @@ Parity Parity::eVec(size_t varNum, size_t pos) {    // e_i, starting from 1 (0 i
     return res;
 }
 
-/*.................
+/*
     Operators:
-...................*/
+*/
 bool Parity::operator==(const Parity& rhs) const {
     if (state != rhs.state) { return false; }
     if (state != State::Valid) { return true; }
@@ -64,17 +63,15 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Parity& par) {
     return os;
 }
 
-/*.................
+/*
     Getters:
-...................*/
-// It's not efficient, but is only for testing right now.
+*/
 llvm::SmallVector<uint64_t, 8> Parity::getLinearPart() const {
     Parity linearPart = *this;
     linearPart.setAffineValue(0);
     return linearPart.getBits();
 }
 
-// very inefficient. only for testing now.
 std::string Parity::getLinearPartString() const {
     std::string res;
     res.reserve(varNum);
@@ -94,9 +91,9 @@ bool Parity::getAffineValue() const {
     return getBitAtBlock(AFFINE_VALUE_INDEX);
 }
 
-/*.................
+/*
     Setters:
-...................*/
+*/
 void Parity::setBitAt(size_t pos, bool value) {
     assert(pos <= varNum);
     setBitAtBlock(getIndex(pos), value);
@@ -135,9 +132,9 @@ void Parity::extendBitsAtWith(size_t pos, bool value) {
     setBitAt(pos, value);
 }
 
-/*.................
+/*
     Checks:
-...................*/
+*/
 bool Parity::isIdenticalWith(const Parity& rhs) const {
     return varNum == rhs.varNum && bits == rhs.bits;
 }
@@ -150,7 +147,7 @@ bool Parity::isLinearEquivalentWith(const Parity& rhs) const {
 }
 
 // check if they are the same up to adding some 0 bits in the end. 
-// (so they can be considered equal if we had added some path vaiables and now their 0)
+// (so they can be considered equal if we had added some path or new vaiables and now their 0)
 bool Parity::isEquivalentWithFromBlock(const Parity& rhs, size_t fstBlock) const {
     size_t minBlockNum = std::min(bits.size(), rhs.bits.size());
 
@@ -209,9 +206,9 @@ bool Parity::isLinearZero() const {
     return true;
 }
 
-/*.................
+/*
     Helper Methods: 
-...................*/
+*/
 bool Parity::getBitAtBlock(Index ind) const {
     auto [blockInd, bitInd] = ind;
     assert(blockInd < bits.size());
@@ -256,7 +253,7 @@ void Parity::extendBitsTo(size_t newVarNum) {
     }
 }
 
-std::string Parity::algebraicView(size_t qubitNum) const {
+std::string Parity::algebraicView(size_t qubitNum) const {  // wrong
     std::string res = "";
     size_t n = 0;
     for (size_t i = 1; i <= varNum; i++) {

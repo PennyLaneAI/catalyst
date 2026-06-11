@@ -1,6 +1,5 @@
 #pragma once
 
-// #include <iosfwd>
 #include <vector>
 #include <string_view>
 #include <utility>
@@ -26,7 +25,8 @@ public:
     // Getters
     [[nodiscard]] size_t getRowNum() const;
     [[nodiscard]] size_t getColNum(size_t row) const;
-    [[nodiscard]] Parity& getRow(size_t row) const;
+    [[nodiscard]] const Parity& getRow(size_t row) const;
+    [[nodiscard]] Parity& getRowMutable(size_t row) const;
     
     // Setters
     void setRow(size_t row, const Parity& parity);
@@ -53,7 +53,11 @@ inline size_t AffineTransform::getColNum(size_t row) const {
     return getRow(row).getVarNum();
 }
 
-inline Parity& AffineTransform::getRow(size_t row) const {
+inline const Parity& AffineTransform::getRow(size_t row) const {
     assert(row > 0 && row <= getRowNum());
-    return const_cast<Parity&>(exprMatrix[row - 1]);
+    return exprMatrix[row - 1];
+}
+
+inline Parity& AffineTransform::getRowMutable(size_t row) const {
+    return const_cast<Parity&>(static_cast<const AffineTransform&>(*this).getRow(row));
 }

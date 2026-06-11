@@ -1,22 +1,20 @@
 #pragma once
 
-// #include <iosfwd>
-#include <utility>
 #include "PhasePolynomial.h"
 #include "AffineTransform.h"
 #include "Gate.h"
+#include <utility>
 
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/ArrayRef.h"
 
 
-// PathSum?
 struct SymbolicCircuit {    // indices are 1-based
     size_t qubitNum;
     size_t auxVarNum;
     // std::vector<bool> isAux;
     PhasePolynomial phasePoly;
-    AffineTransform stateTrans; // row i corresponds to qubit i, but not col i!
+    AffineTransform stateTrans; // row i corresponds to qubit i, but col i doesn't!
     
     // Constructors
     SymbolicCircuit() = default;
@@ -30,10 +28,11 @@ struct SymbolicCircuit {    // indices are 1-based
     // Operators
     friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SymbolicCircuit& circ);
 
-    // Gate Applications
+    // Dimension Handling
     void ensureCapacity(llvm::ArrayRef<size_t> qubitIndices);
-    void extendQubitsTo(size_t newQubitNum);
     void extendQubitsBy(size_t newQubitNum);
+    
+    // Gate Applications
     void applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices, GateID gateId);
     void applyGateRZ(size_t qubitIndex, GateID gateId);
     void applyGateX(size_t qubitIndex);

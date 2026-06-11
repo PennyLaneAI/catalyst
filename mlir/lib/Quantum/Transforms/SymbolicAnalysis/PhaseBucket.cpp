@@ -1,9 +1,8 @@
-// #include <ostream>
 #include "PhaseBucket.h"
 
-/*.................
+/*
     Operators:
-...................*/
+*/
 // how about redundancy? I guess we can't have a single gate in 2 different buckets, so probably doesn't matter.
 PhaseBucket& PhaseBucket::operator+=(const PhaseBucket& rhs) {
     zeroAffineRZs.reserve(zeroAffineRZs.size() + rhs.zeroAffineRZs.size());
@@ -74,7 +73,10 @@ std::string PhaseBucket::algebraicView() const {
     return res;
 }
 
-GateID PhaseBucket::mergeTarget() const {
+/*
+    Methods:
+*/
+GateID PhaseBucket::getMergeTarget() const {
     if (!zeroAffineRZs.empty()) {
         return zeroAffineRZs[0];
     }

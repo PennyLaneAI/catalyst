@@ -1,14 +1,13 @@
 #pragma once
 
-// #include <iosfwd>
 #include <string>
 #include <utility>
 #include <functional>
 #include <string>
 
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMapInfo.h" // Needed for DenseMapInfo
-#include "llvm/ADT/Hashing.h"      // Needed for hash_combine_range
+#include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/Support/raw_ostream.h"
 
 class Parity {
@@ -27,7 +26,7 @@ public:
     static Parity eVec(size_t varNum, size_t pos);
 
     // Operators
-    bool operator==(const Parity& rhs) const;    // their affine values are being checked too.
+    bool operator==(const Parity& rhs) const;
     Parity& operator+=(const Parity& rhs);
     Parity operator+(const Parity& rhs) const;   // XOR
 
