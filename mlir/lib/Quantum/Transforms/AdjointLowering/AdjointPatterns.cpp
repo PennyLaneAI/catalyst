@@ -40,7 +40,8 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
 #include "Quantum/Transforms/Patterns.h"
-#include "Quantum/Utils/QuantumSplitting.h"
+
+#include "QuantumSplitting.hpp"
 
 using llvm::dbgs;
 using namespace mlir;

@@ -8,8 +8,9 @@ file(GLOB SRC
     quantum_to_llvm.cpp
     emit_catalyst_pyface.cpp
     cp_global_buffers.cpp
-    adjoint_lowering.cpp
-    AdjointPatterns.cpp
+    AdjointLowering/adjoint_lowering.cpp
+    AdjointLowering/AdjointPatterns.cpp
+    AdjointLowering/QuantumSplitting.cpp
     CancelInversesPatterns.cpp
     cancel_inverses.cpp
     SplitMultipleTapes.cpp
@@ -60,4 +61,5 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            .
                            ${PROJECT_SOURCE_DIR}/include
                            ${CMAKE_BINARY_DIR}/include
+                           AdjointLowering/
                            DecompGraphSolver/)
