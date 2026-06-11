@@ -187,6 +187,9 @@
   data dependencies through insert to extract chains instead of textual op ordering.
   [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
 
+* Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
+  [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
+
 <h3>Internal changes ⚙️</h3>
 
 * The frontend now generates MLIR in reference semantics when capture is enabled.
