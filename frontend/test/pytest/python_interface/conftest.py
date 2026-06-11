@@ -72,7 +72,7 @@ def print_dbg_banner(message: str, max_text_len: int = 80, **kwargs):
 
     message = f" {message} "
 
-    print_dbg(f"{message.center(_max_len, "=")}", **kwargs)
+    print_dbg(message.center(_max_len, "="), **kwargs)
 
 
 @contextmanager
