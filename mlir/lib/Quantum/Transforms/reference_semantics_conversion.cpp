@@ -479,7 +479,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
 {
     assert(r.hasOneBlock() && "Expected region to have a single block");
-    assert(r.front().getTerminator() && "Expected region to have a terminator");
+    assert(r.front().getTerminator() && "Expected the region body to have a terminator");
 
     SmallVector<Operation *> erasureWorklist;
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
