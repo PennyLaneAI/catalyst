@@ -784,7 +784,6 @@ The operation has two mutually exclusive representations:
   Use this when the operator acts on a statically known set of wires. Qubits are
   threaded through the op explicitly and can carry per-control values through
   `in_ctrl_qubits` / `in_ctrl_values` (with matching `out_ctrl_qubits`).
-  This is the natural representation for fixed-arity gates and operators.
 
 * **Register mode** (`in_qreg` / `out_qreg` + index arrays):
   Use this when the operator acts on a dynamic number of wires. The operation receives

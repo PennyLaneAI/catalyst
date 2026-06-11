@@ -525,14 +525,16 @@ func.func private @wrong_attribute_value() attributes {quantum.node = "wrong"}
 
 // -----
 
-func.func @operator_basic_qubits(%q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %o0, %o1 = "quantum.operator"(%q0, %q1) <{op_name = "basic_qubits", operandSegmentSizes = array<i32: 0, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
-    return
-}
 
 //////////////////////
 // quantum.operator //
 //////////////////////
+
+
+func.func @operator_basic_qubits(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %o0, %o1 = "quantum.operator"(%q0, %q1) <{op_name = "basic_qubits", operandSegmentSizes = array<i32: 0, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    return
+}
 
 // -----
 

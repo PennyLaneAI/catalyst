@@ -543,7 +543,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
         The `quantum.operator` is a generic representation for arbitrary quantum operations
         that cannot be expressed by the simpler `quantum.custom` op and don't have a dedicated
         operation.
-        It's purpose is to represent high-level operations from frontend languages such as
+        Its purpose is to represent high-level operations from frontend languages such as
         PennyLane — in particular templates and operators parametrized by Python (or
         frontend-language) data. The signature allows for an arbitrary number of dynamic data
         arguments (of arbitrary MLIR type), as well as limited static data (e.g. Pauli-word
@@ -556,7 +556,6 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
           Use this when the operator acts on a statically known set of wires. Qubits are
           threaded through the op explicitly and can carry per-control values through
           `in_ctrl_qubits` / `in_ctrl_values` (with matching `out_ctrl_qubits`).
-          This is the natural representation for fixed-arity gates and operators.
 
         * **Register mode** (`in_qreg` / `out_qreg` + index arrays):
           Use this when the operator acts on a dynamic number of wires. The operation receives
