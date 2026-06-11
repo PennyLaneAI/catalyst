@@ -43,16 +43,6 @@ using namespace catalyst;
 
 namespace {
 
-void eraseAllVOps(Region &r, SmallVector<Operation *> &erasureWorklist)
-{
-    if (isa<quantum::YieldOp>(r.front().getTerminator())) {
-        erasureWorklist.push_back(r.front().getTerminator());
-    }
-    for (auto op : llvm::reverse(erasureWorklist)) {
-        op->erase();
-    }
-}
-
 void eraseSCFYieldQuantumOperands(scf::YieldOp yieldOp)
 {
     // scf.yield can yield both classical and quantum values
@@ -529,7 +519,12 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker)
             .Default([](Operation *) {});
     });
 
-    eraseAllVOps(r, erasureWorklist);
+    if (isa<quantum::YieldOp>(r.front().getTerminator())) {
+        erasureWorklist.push_back(r.front().getTerminator());
+    }
+    for (auto op : llvm::reverse(erasureWorklist)) {
+        op->erase();
+    }
 }
 
 } // namespace

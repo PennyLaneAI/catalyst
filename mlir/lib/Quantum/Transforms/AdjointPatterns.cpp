@@ -49,6 +49,24 @@ using namespace catalyst::quantum;
 
 namespace {
 
+/// Trace the value-semantic register use-def chain backwards to the `quantum.alloc` operation that
+/// originally produced it, following straight-line `quantum.insert` operations. Returns a null op
+/// if the allocation cannot be determined statically, i.e. the register crosses the block boundary.
+quantum::AllocOp findSourceAllocOp(Value qreg)
+{
+    while (Operation *defOp = qreg.getDefiningOp()) {
+        if (auto allocOp = dyn_cast<quantum::AllocOp>(defOp)) {
+            return allocOp;
+        }
+        if (auto insertOp = dyn_cast<quantum::InsertOp>(defOp)) {
+            qreg = insertOp.getInQreg();
+            continue;
+        }
+        break;
+    }
+    return quantum::AllocOp();
+}
+
 /// Clone the region of the adjoint operation `op` to the insertion point specified by the
 /// `builder`. Build and return the value mapping `mapping`.
 void cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping,
@@ -121,6 +139,35 @@ class AdjointGenerator {
                     remappedValues.lookup(extractOp.getQreg()), dynamicWire,
                     extractOp.getIdxAttrAttr(), remappedValues.lookup(extractOp.getQubit()));
                 remappedValues.map(extractOp.getQreg(), insertOp.getResult());
+            }
+            else if (auto allocOp = dyn_cast<quantum::AllocOp>(op)) {
+                quantum::DeallocOp::create(builder, allocOp.getLoc(),
+                                           remappedValues.lookup(allocOp.getQreg()));
+            }
+            else if (auto deallocOp = dyn_cast<quantum::DeallocOp>(op)) {
+                quantum::AllocOp sourceAlloc = findSourceAllocOp(deallocOp.getQreg());
+                if (!sourceAlloc) {
+                    deallocOp.emitError("Unable to reverse dynamic register deallocation in the "
+                                        "adjoint region: allocation size could not be determined");
+                    generationFailed = true;
+                    return;
+                }
+                Value nqubits = sourceAlloc.getNqubits();
+                if (nqubits) {
+                    nqubits = remappedValues.lookupOrDefault(nqubits);
+                }
+                auto newAlloc = quantum::AllocOp::create(builder, deallocOp.getLoc(),
+                                                         deallocOp.getQreg().getType(), nqubits,
+                                                         sourceAlloc.getNqubitsAttrAttr());
+                remappedValues.map(deallocOp.getQreg(), newAlloc.getQreg());
+            }
+            else if (auto allocQubitOp = dyn_cast<quantum::AllocQubitOp>(op)) {
+                quantum::DeallocQubitOp::create(builder, allocQubitOp.getLoc(),
+                                                remappedValues.lookup(allocQubitOp.getQubit()));
+            }
+            else if (auto deallocQubitOp = dyn_cast<quantum::DeallocQubitOp>(op)) {
+                auto newAlloc = quantum::AllocQubitOp::create(builder, deallocQubitOp.getLoc());
+                remappedValues.map(deallocQubitOp.getQubit(), newAlloc.getQubit());
             }
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
                 visitOperation(gate, builder);
