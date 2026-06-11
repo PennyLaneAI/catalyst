@@ -713,9 +713,8 @@ LogicalResult AdjointOp::verify()
 void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
                        ValueRange params, ValueRange in_qubits, ValueRange in_ctrl_qubits,
                        ValueRange in_ctrl_values, ValueRange forward_args, bool adjoint,
-                       std::optional<int64_t> UID, ArrayAttr decompositions,
-                       DictionaryAttr static_data, DictionaryAttr param_map,
-                       DictionaryAttr qubit_map)
+                       std::optional<int64_t> UID, DictionaryAttr static_data,
+                       DictionaryAttr param_map, DictionaryAttr qubit_map)
 {
     SmallVector<Type> resultTypes;
     TypeRange qubitTypes = TypeRange(in_qubits);
@@ -737,7 +736,6 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_values=*/Value(),
           /*adjoint=*/adjoint,
           /*UID=*/UID,
-          /*decompositions=*/decompositions,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -746,9 +744,8 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
 void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
                        ValueRange params, Value in_qreg, ValueRange arr_qubit_indices,
                        Value arr_ctrl_indices, Value arr_ctrl_values, ValueRange forward_args,
-                       bool adjoint, std::optional<int64_t> UID, ArrayAttr decompositions,
-                       DictionaryAttr static_data, DictionaryAttr param_map,
-                       DictionaryAttr qubit_map)
+                       bool adjoint, std::optional<int64_t> UID, DictionaryAttr static_data,
+                       DictionaryAttr param_map, DictionaryAttr qubit_map)
 {
     SmallVector<Type> resultTypes = {in_qreg.getType()};
 
@@ -766,7 +763,6 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_values=*/arr_ctrl_values,
           /*adjoint=*/adjoint,
           /*UID=*/UID,
-          /*decompositions=*/decompositions,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -821,8 +817,7 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 5. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {"decompositions",      "static_data",
-                                          "param_map",           "qubit_map",
+    SmallVector<StringRef> elidedAttrs = {"static_data", "param_map", "qubit_map",
                                           "operandSegmentSizes", "resultSegmentSizes"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
@@ -869,14 +864,7 @@ void OperatorOp::print(OpAsmPrinter &p)
         p << "static_data = " << getStaticData();
     }
 
-    // 10. Decomposition
-    if (getDecompositionsAttr()) {
-        p.printNewline();
-        p << "decompositions = ";
-        p << getDecompositions();
-    }
-
-    // 11. Optional metadata
+    // 10. Optional metadata
     if (getParamMapAttr() || getQubitMapAttr()) {
         p.printNewline();
     }
@@ -1103,14 +1091,6 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 
     // 9. Optional inherent metadata blocks.
     while (true) {
-        if (succeeded(parser.parseOptionalKeyword("decompositions"))) {
-            ArrayAttr decompositions;
-            if (parser.parseEqual() || parser.parseAttribute(decompositions)) {
-                return failure();
-            }
-            result.addAttribute("decompositions", decompositions);
-            continue;
-        }
         if (succeeded(parser.parseOptionalKeyword("static_data"))) {
             DictionaryAttr staticData;
             if (parser.parseEqual() || parser.parseAttribute(staticData)) {

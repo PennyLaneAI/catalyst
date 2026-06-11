@@ -648,21 +648,6 @@ func.func @operator_custom_basic_with_static_data(%p : f64, %q : !quantum.bit) {
 
 // -----
 
-func.func @operator_with_decompositions(%q : !quantum.bit) {
-    %out = "quantum.operator"(%q) <{op_name = "with_decompositions", decompositions = [@decomp_a, @decomp_b], operandSegmentSizes = array<i32: 0, 0, 1, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 1, 0, 0>}> : (!quantum.bit) -> !quantum.bit
-    return
-}
-
-// -----
-
-func.func @operator_custom_with_decompositions(%q : !quantum.bit) {
-    %out = quantum.operator "custom_with_decompositions"() qubits(%q)
-      decompositions = [@decomp_a, @decomp_b]
-    return
-}
-
-// -----
-
 func.func @operator_custom_with_uid_and_forward(%fwd : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
     %o0, %o1 = quantum.operator "custom_uid_forward"() qubits(%q0, %q1)
       UID(7) forward(%fwd : i64)
