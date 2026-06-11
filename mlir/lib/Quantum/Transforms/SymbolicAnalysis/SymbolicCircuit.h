@@ -14,7 +14,7 @@
 struct SymbolicCircuit {    // indices are 1-based
     size_t qubitNum;
     size_t auxVarNum;
-    // vactor<bool> isAux;
+    // std::vector<bool> isAux;
     PhasePolynomial phasePoly;
     AffineTransform stateTrans; // row i corresponds to qubit i, but not col i!
     

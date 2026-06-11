@@ -93,12 +93,21 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
     // %q19 = quantum.custom "T"() %q18 : !quantum.bit
     // %q20 = quantum.custom "T"() %q19 : !quantum.bit
 
-    %p3 = quantum.custom "T"() %p0 : !quantum.bit
+    %p2 = quantum.custom "T"() %p0 : !quantum.bit
+    %p3 = quantum.custom "H"() %p1 : !quantum.bit
+    %p4:2 = quantum.custom "CNOT"() %p3, %p2 : !quantum.bit, !quantum.bit
+    %p5 = quantum.custom "T"() %p4#1 : !quantum.bit
+    %p6:2 = quantum.custom "CNOT"() %p4#0, %p5 : !quantum.bit, !quantum.bit
+    %p7 = quantum.custom "T"() %p6#1 : !quantum.bit
 
+    %q17 = quantum.custom "PauliY"() %q16 : !quantum.bit
+
+    %qb = quantum.alloc_qb : !quantum.bit
+    %h = quantum.custom "PauliX"() %qb : !quantum.bit
     // func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit
     func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit
 }
 
 // 3.9269908169872414 : f64
 
-// test y and wsap
+// test y and swap

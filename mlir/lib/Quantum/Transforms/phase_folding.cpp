@@ -39,7 +39,9 @@ namespace quantum {
 struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     using PhaseFoldingPassBase::PhaseFoldingPassBase;
     
-    llvm::DenseMap<mlir::Value, size_t> ssaToWireMap;   // handle multiple registers
+    llvm::DenseMap<mlir::Value, size_t> ssaToWireMap;
+    llvm::DenseMap<mlir::Value, size_t> qregToBaseMap;
+
     std::vector<quantum::CustomOp> phaseOps;
 
     void updateStats(Gate gate, int incr) {
@@ -59,16 +61,33 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
 
-    size_t getIndexFromExtractOp(mlir::Value value) {  // handle multiple registers
+    void allocateRegister(mlir::Value qreg, auto regSize,  SymbolicCircuit& symCirc) {
+        qregToBaseMap[qreg] = symCirc.qubitNum;
+        symCirc.extendQubitsBy(static_cast<size_t>(regSize.value_or(0)));
+    }
+
+    void allocateQubit(mlir::Value qubit, SymbolicCircuit& symCirc) {
+        ssaToWireMap[qubit] = symCirc.qubitNum;
+        symCirc.extendQubitsBy(1);
+    }
+
+    size_t getIndexFromExtractOp(mlir::Value value) {
         if (auto extractOp = llvm::cast<quantum::ExtractOp>(value.getDefiningOp())) {
+            mlir::Value qreg = extractOp.getQreg();
+            auto regIt = qregToBaseMap.find(qreg);
+            if (regIt == qregToBaseMap.end()) {
+                llvm::errs() << "Error: ExtractOp references an untracked register.\n";
+                assert(false);
+            }
+            size_t baseIndex = regIt->second;
+
             auto staticIdx = extractOp.getIdxAttr();
-            if (staticIdx.has_value()) {
-                return static_cast<size_t>(staticIdx.value_or(0));
-            } else {
+            if (!staticIdx.has_value()) {
                 // auto dynamicIdx = extractOp.getIdx();
                 llvm::errs() << "Error: Dynamic qubit extraction indices are not supported.\n";
                 assert(false);
             }
+            return baseIndex + static_cast<size_t>(staticIdx.value_or(0));
         } else {
             llvm::errs() << "Error: Found an untracked qubit not originating from a quantum.extract.\n";
             assert(false);
@@ -225,38 +244,20 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
     
-    void phaseAnalysis(SymbolicCircuit& symCirc) {
-        GateID gateID = -1;
-        getOperation()->walk([&](Operation *op) {
-            // if (isa<AllocOp>(op)){
+    void phaseAnalysis(CustomOp customOp, SymbolicCircuit& symCirc, GateID& gateID) {
+        // getting affected wires
+        llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(customOp.getInQubits(), customOp.getOutQubits()));
 
-            // }
-            if (AllocOp allocOp = dyn_cast<AllocOp>(op)){
-                auto regSize = allocOp.getNqubitsAttr();
-                symCirc.extendQubitsBy(static_cast<size_t>(regSize.value_or(0)));
+        // tracking phase gates
+        Gate gate = extractCliffTGate(customOp);
+        if (isPhaseGate(gate)) {
+            phaseOps.push_back(customOp);
+            gateID++;
+        }
+        initialGateCount[static_cast<size_t>(gate)]++;
 
-                llvm::outs() << "Allocation Operation! " << allocOp.getNqubitsAttr() << "\n";
-                op->dump();
-            }
-            else if (quantum::SetBasisStateOp basisOp = dyn_cast<quantum::SetBasisStateOp>(op)) {
-                llvm::outs() << "Set Basis State Operation! " << "\n";
-            }
-            else if (CustomOp customOp = dyn_cast<CustomOp>(op)) {
-                // getting affected wires
-                llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(customOp.getInQubits(), customOp.getOutQubits()));
-
-                // tracking phase gates
-                Gate gate = extractCliffTGate(customOp);
-                if (isPhaseGate(gate)) {
-                    phaseOps.push_back(customOp);
-                    gateID++;
-                }
-                initialGateCount[static_cast<size_t>(gate)]++;
-
-                // updating symbolic circuit
-                symCirc.applyGate(gate, customOp.getAdjointFlag(), qubitIndices, gateID);
-            }
-        });
+        // updating symbolic circuit
+        symCirc.applyGate(gate, customOp.getAdjointFlag(), qubitIndices, gateID);
     }
 
     void phaseMerge(SymbolicCircuit& symCirc) {
@@ -283,9 +284,23 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         llvm::outs() << "Hello phase-folding world!\n";
 
         SymbolicCircuit symCirc = SymbolicCircuit();
-        // llvm::outs() << symCirc << "\n";
+        GateID gateID = -1;
 
-        phaseAnalysis(symCirc);
+        getOperation()->walk([&](Operation *op) {
+            if (CustomOp customOp = dyn_cast<CustomOp>(op)) {
+                phaseAnalysis(customOp, symCirc, gateID);
+            }
+            else if (quantum::AllocQubitOp allocQbOp = dyn_cast<AllocQubitOp>(op)){
+                allocateQubit(allocQbOp.getResult(), symCirc);
+            }
+            else if (quantum::AllocOp allocOp = dyn_cast<AllocOp>(op)){
+                allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), symCirc);
+            }
+            else if (quantum::SetBasisStateOp basisOp = dyn_cast<quantum::SetBasisStateOp>(op)) {
+                llvm::outs() << "Set Basis State Operation! " << "\n";
+            }
+        });
+
         llvm::outs() << symCirc << "\n";
 
         phaseMerge(symCirc);
@@ -301,18 +316,12 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 
 /*
 TODO: 
-initialize qubitNum when got a register allocation op   (what are you going to do with auxVars? nothing!)
-define another variable for number of registers, and another map between reg names and a starting index (previous reg st index + prev reg size), 
-then the qubit index (when the first gate is being applied) is that st index + index in register
-a mini memory allocation handling task
-
-
 ancila initialization (0/1) (SetBasisStateOp)
 
 change getRow to getRowMutable in AffineTrans
 
 testttt
+if (isa<AllocOp>(op)){}
 
 is the current 1-based indexing of qubits in SymbolicCircuit good?
-is the current merge phase efficient?
 */

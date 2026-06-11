@@ -50,7 +50,7 @@ std::string PhaseBucket::algebraicView() const {
             if (i > 0) {
                 res += ", ";
             }
-            res += ("l" + std::to_string(zeroAffineRZs[i] + 1));
+            res += (std::to_string(zeroAffineRZs[i] + 1));
         }
         res += ")";
 
@@ -67,7 +67,7 @@ std::string PhaseBucket::algebraicView() const {
             if (i > 0) {
                 res += ", ";
             }
-            res += ("l" + std::to_string(oneAffineRZs[i] + 1));
+            res += (std::to_string(oneAffineRZs[i] + 1));
         }
         res += ")]";        
     }
