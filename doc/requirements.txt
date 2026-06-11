@@ -1,6 +1,6 @@
 docutils==0.20
 sphinxcontrib-bibtex==2.6.3
-sphinx==8.1
+sphinx==9.0
 sphinxcontrib-applehelp==2.0.0
 sphinxcontrib-devhelp==2.0.0
 sphinxcontrib-qthelp==2.0.0
