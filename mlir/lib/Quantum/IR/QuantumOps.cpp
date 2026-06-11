@@ -289,39 +289,26 @@ LogicalResult OperatorOp::verify()
 
     auto qubitMap = getQubitMap();
     if (qubitMap) {
-        if (hasQregMode) {
-            if (getQubitMapAttr() && qubitMap.size() != getArrQubitIndices().size()) {
-                return emitOpError()
-                       << "qubit_map must cover all index arrays when provided: expected "
-                       << getArrQubitIndices().size() << " entries, got " << qubitMap.size();
-            }
-            for (NamedAttribute namedAttr : qubitMap) {
-                auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
-                if (denseArray.size() != 1) {
-                    return emitOpError() << "each qubit_map entry can only contain one index "
-                                            "in register mode";
+        const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
+        const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
+        const char *coverageNoun =
+            hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
+
+        llvm::SmallDenseSet<int64_t> coveredTargets;
+        for (NamedAttribute namedAttr : qubitMap) {
+            auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
+            for (int64_t idx : denseArray.asArrayRef()) {
+                if (idx < 0 || idx >= static_cast<int64_t>(numTargets)) {
+                    return emitOpError()
+                           << "qubit_map index is out of bounds with respect to " << boundsNoun
+                           << ": " << idx << " is not in [0, " << numTargets << ")";
                 }
+                coveredTargets.insert(idx);
             }
         }
-        else {
-            const size_t numInputQubits = getInQubits().size();
-            llvm::SmallDenseSet<int64_t> coveredQubits;
-            for (NamedAttribute namedAttr : qubitMap) {
-                auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
-                for (int64_t idx : denseArray.asArrayRef()) {
-                    if (idx < 0 || idx >= static_cast<int64_t>(numInputQubits)) {
-                        return emitOpError()
-                               << "qubit_map index is out of bounds with respect to qubits: " << idx
-                               << " is not in [0, " << numInputQubits << ")";
-                    }
-                    coveredQubits.insert(idx);
-                }
-            }
-            if (getQubitMapAttr() && coveredQubits.size() != numInputQubits) {
-                return emitOpError()
-                       << "qubit_map must cover all qubit values in qubit mode: expected "
-                       << numInputQubits << ", got " << coveredQubits.size();
-            }
+        if (getQubitMapAttr() && coveredTargets.size() != numTargets) {
+            return emitOpError() << "qubit_map must cover all " << coverageNoun << ": expected "
+                                 << numTargets << ", got " << coveredTargets.size();
         }
     }
 
