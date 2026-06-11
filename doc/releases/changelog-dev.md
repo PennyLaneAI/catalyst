@@ -162,8 +162,7 @@
   data dependencies through insert to extract chains instead of textual op ordering.
   [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
 
-* The `quantum.adjoint` op can now take in an empty list of qubit and qreg operands and results.
-  Previously, this was impossible due to a bad custom assembly format.
+* Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
