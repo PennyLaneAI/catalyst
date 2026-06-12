@@ -13,11 +13,11 @@
 # limitations under the License.
 
 """
-This module provides infrastructure for lowering decomposition rules using compiler callbacks.
+This module provides infrastructure for compile-time lowering of decomposition rules via python.
 
-Callback functions should adhere to the following specifications:
-    The callback (python) function:
-        - Is named `{op name}_callback_wrapper`.
+Python decomposition wrappers should adhere to the following specifications:
+    The wrapper:
+        - Is named `{op name}_decomposition_wrapper`.
         - Has a signature identical to the named parameters of the associated PL operator; dynamic
           arguments may be unused, but should still be included for compatibility.
         - Is able to AOT lower the decomposition rule to MLIR without invoking the compiler, e.g.
@@ -42,7 +42,7 @@ import jax.numpy as jnp
 import pennylane as qp
 
 
-def paulirot_callback_wrapper(theta, pauli_word, wires):
+def paulirot_decomposition_wrapper(theta, pauli_word, wires):
     """Wraps the paulirot decomp rule for compile-time lowering with a static pauli word.
 
     The decomposition rule is identifiable by the name `paulirot_decomp_rule`.

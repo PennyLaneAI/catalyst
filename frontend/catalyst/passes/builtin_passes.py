@@ -1803,7 +1803,7 @@ def graph_decomposition_setup_inputs(
     alt_decomps: dict | None = None,
     bytecode_rules: str | None = None,
     _builtin_rule_path: str = BYTECODE_FILE_PATH,
-    callback_plugin_path: Path | None = None,
+    libQPD_path: Path | None = None,
     libpython_path: Path | None = None,
 ):  # pylint: disable=unused-argument, too-many-arguments, too-many-positional-arguments
     R"""
@@ -1901,16 +1901,12 @@ def graph_decomposition_setup_inputs(
     else:
         gate_set = {to_name(op): float(cost) for op, cost in gate_set.items()}
 
-    libQPC_path = ""
-    if callback_plugin_path:
-        libQPC_path = str(callback_plugin_path)
-    elif libpath := get_lib_path("callbacks_lib", "CATALYST_LIB_DIR"):  # pragma: no cover
-        libQPC_path = libpath
-
     options: dict[str, dict | tuple | str] = {
         "gate_set": gate_set,
         "bytecode_rules": _builtin_rule_path,
-        "callback_plugin_path": libQPC_path,
+        "libQPD_path": str(
+            libQPD_path if libQPD_path else get_lib_path("catalyst", "CATALYST_LIB_DIR")
+        ),
         "libpython_path": str(libpython_path if libpython_path else get_libpython_path()),
     }
 

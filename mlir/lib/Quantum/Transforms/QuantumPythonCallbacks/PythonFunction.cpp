@@ -27,8 +27,8 @@ std::string pythonLowerPauliRot(double theta, const std::string &pauliWord, std:
 {
     QuantumPythonCallbacks::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
-        const char *moduleName = "catalyst.python_callbacks";
-        const char *functionName = "paulirot_callback_wrapper";
+        const char *moduleName = "catalyst.device.python_decompositions";
+        const char *functionName = "paulirot_decomposition_wrapper";
 
         try {
             nb::module_ wrapperModule = nb::module_::import_(moduleName);

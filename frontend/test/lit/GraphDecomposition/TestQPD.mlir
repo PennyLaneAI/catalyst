@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Test that decomposition chooses cheapest decomposition path
+// Test that decomposition is able to use compile-time python decompositions
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,Hadamard=1.0,MultiRZ=1.0,GlobalPhase=1.0})' %s | FileCheck %s
 

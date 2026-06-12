@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for the python callbacks module."""
+"""Unit tests for the python decompositions module."""
 
-from catalyst.python_callbacks import paulirot_callback_wrapper
+from catalyst.device.python_decompositions import paulirot_decomposition_wrapper
 
 
-class TestQPCCallbacks:
-    """Test the python wrapper functions used for decomposition callbacks."""
+class TestQPD:
+    """Test the python wrapper functions used for compile-time decomposition rule lowering."""
 
     def test_paulirot_wrapper(self):
-        """Test that the QPC paulirot callback wrapper correctly returns the IR as a string."""
-        result = paulirot_callback_wrapper(0.4, "XZZ", [0, 1, 2])
+        """Test that the paulirot QPD wrapper correctly returns the IR as a string."""
+        result = paulirot_decomposition_wrapper(0.4, "XZZ", [0, 1, 2])
         assert isinstance(result, str)
         assert "paulirot_decomp_rule" in result
         assert "Hadamard" in result
