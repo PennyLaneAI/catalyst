@@ -71,7 +71,8 @@ void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValu
                    SmallVector<Operation *> &erasureWorklist);
 // void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
 // void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
-// void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker);
+void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker,
+               SmallVector<Operation *> &erasureWorklist);
 // void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker);
 // void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 //                       const SetVector<Value> &rValuesUsedBySubroutine);
