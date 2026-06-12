@@ -1405,6 +1405,7 @@ class TestMeasurementProcesses:
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
         def circuit():
+            # pylint: disable=line-too-long
             # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
             # CHECK-NOT: builtin.unrealized_conversion_cast
             # CHECK-NOT: quantum.compbasis

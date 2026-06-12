@@ -836,7 +836,7 @@ class ComputationalBasisOpConversion(RewritePattern):
             rewriter.replace_uses_with_if(
                 qubit_owner_op.results[0],
                 cast_to_qubit_op.results[0],
-                lambda use: use.operation is not conv_cast_op,
+                lambda use, _op=conv_cast_op: use.operation is not _op,
             )
 
             meas_results.append(measure_op.mres)
