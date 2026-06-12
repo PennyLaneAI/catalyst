@@ -524,7 +524,6 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
 void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker,
                   SmallVector<Operation *> &erasureWorklist)
 {
-
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(switchOp);
     Location loc = switchOp->getLoc();
