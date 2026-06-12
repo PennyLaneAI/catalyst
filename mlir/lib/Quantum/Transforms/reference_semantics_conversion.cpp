@@ -549,10 +549,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
     SmallVector<Value> conditionOpArgSave(newConditionOp.getArgs());
     BitVector conditionOpEraseIndices(newConditionOp->getNumOperands());
     for (auto [i, arg] : llvm::enumerate(newConditionOp.getArgs())) {
-        if (isa<quantum::QuregType>(arg.getType())) {
-            conditionOpEraseIndices.set(i + 1);
-        }
-        else if (isa<quantum::QubitType>(arg.getType())) {
+        if (isa<quantum::QuregType, quantum::QubitType>(arg.getType())) {
             conditionOpEraseIndices.set(i + 1);
         }
     }
