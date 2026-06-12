@@ -101,9 +101,7 @@ add_mlir_library(CatalystCompilerDriver
     MLIRSupport
 )
 
-if (CATALYST_ENABLE_PYTHON_CALLBACKS)
-    add_dependencies(CatalystCompilerDriver QuantumPythonCallbacks)
-endif()
+add_dependencies(CatalystCompilerDriver QuantumPythonCallbacks)
 
 #########################################################
 ## importable module with default pipeline definitions ##

@@ -1,9 +1,3 @@
-option(CATALYST_ENABLE_PYTHON_CALLBACKS
-       "Build the embedded-interpreter callback plugin" ON)
-if (NOT CATALYST_ENABLE_PYTHON_CALLBACKS)
-    return()
-endif()
-
 # nanobind suggests including these lines to configure CMake to perform an optimized release build
 # by default unless another build type is specified. Without this addition, binding code may run
 # slowly and produce large binaries.
