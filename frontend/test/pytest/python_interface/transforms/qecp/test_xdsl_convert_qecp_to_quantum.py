@@ -675,10 +675,7 @@ class TestQECPassIntegration:
             qp.Hadamard(0)
             qp.CNOT([0, 1])
             qp.CNOT([1, 2])
-            m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            m2 = qp.measure(2)
-            return qp.sample([m0, m1, m2])
+            return qp.sample(wires=[0, 1, 2])
 
         run_filecheck_qjit(ghz)
         samples = np.atleast_2d(np.asarray(ghz()))
@@ -702,10 +699,7 @@ class TestQECPassIntegration:
             qp.Hadamard(0)
             qp.CNOT([0, 1])
             qp.CNOT([1, 2])
-            m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            m2 = qp.measure(2)
-            return qp.sample([m0, m1, m2])
+            return qp.sample(wires=[0, 1, 2])
 
         ghz()
 
@@ -751,8 +745,7 @@ class TestQECPassIntegration:
             for gate in gates:
                 gate(0)
             qp.H(0)
-            m0 = qp.measure(0)
-            return qp.sample(m0)
+            return qp.sample(wires=[0])
 
         @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=456)
         @qec_conversion_and_noise_passes
@@ -764,8 +757,7 @@ class TestQECPassIntegration:
             qp.Z(0)
             qp.S(0)
             qp.H(0)
-            m0 = qp.measure(0)
-            return qp.sample(m0)
+            return qp.sample(wires=[0])
 
         @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=789)
         @qec_conversion_and_noise_passes
@@ -774,8 +766,7 @@ class TestQECPassIntegration:
         def z_circ():
             for gate in gates:
                 gate(0)
-            m0 = qp.measure(0)
-            return qp.sample(m0)
+            return qp.sample(wires=[0])
 
         all_samples = x_circ(), y_circ(), z_circ()
 
@@ -783,6 +774,28 @@ class TestQECPassIntegration:
             eigvals = [-1 if s else 1 for s in samples]
             # the tolerance is a bit high, but it keeps number of shots down
             assert np.isclose(np.mean(eigvals), res, atol=0.1)
+
+    def test_sample_on_mcm(self):
+        """Test that sampling on MCMs returns correct results."""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=42)
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            qp.Z(0)
+            qp.X(1)
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            return qp.sample([m0, m1])
+
+        samples = circ()
+        assert np.all(samples[:, 0] == 0)
+        assert np.all(samples[:, 1] == 1)
 
     # pylint: disable=too-many-positional-arguments, too-many-arguments
     @pytest.mark.parametrize(
@@ -821,8 +834,7 @@ class TestQECPassIntegration:
                 qp.T(0)
             for op in diagonalizing_gates:
                 op(0)
-            m0 = qp.measure(0)
-            return qp.sample(m0)
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circ)
         samples = circ()
