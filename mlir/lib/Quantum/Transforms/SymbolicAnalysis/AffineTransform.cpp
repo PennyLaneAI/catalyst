@@ -58,7 +58,6 @@ void AffineTransform::addRows(size_t sourceRow, size_t targetRow) {    // E_i,j
     getRowMutable(targetRow) += getRow(sourceRow);
 }
 
-// TODO: Test
 void AffineTransform::swapRows(size_t row1, size_t row2) {
     std::swap(getRowMutable(row1), getRowMutable(row2));
 }

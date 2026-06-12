@@ -20,22 +20,24 @@ PhaseBucket PhaseBucket::operator+(const PhaseBucket& rhs) const {
     return res;
 }
 
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const std::vector<GateID>& gates) {
+    os << ": (";
+    for (size_t i = 0; i < gates.size(); i++) {
+        if (i > 0) {
+            os << ", ";
+        }
+        os << gates[i];
+    }
+    os << ")";
+    return os;
+}
+
 llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const PhaseBucket& bucket) {
-    if (!bucket.zeroAffineRZs.empty()) {
-        os << "(";
-        for (const GateID& gate : bucket.zeroAffineRZs) {
-            os << gate << ", ";
-        }
-        os << "0) ";
-    }
-    
-    if (!bucket.oneAffineRZs.empty()) {
-        os << "(";
-        for (const GateID& gate : bucket.oneAffineRZs) {
-            os << gate << ", ";
-        }
-        os << "1)";
-    }
+    os << '[';
+    os << "0" << bucket.zeroAffineRZs;
+    os << " __ ";
+    os << "1" << bucket.oneAffineRZs;
+    os << ']';
     return os;
 }
 

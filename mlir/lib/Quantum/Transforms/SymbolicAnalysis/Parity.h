@@ -23,7 +23,7 @@ public:
         Parity(linearPart + (affineValue ? "1" : "0")) {}
     
     // Static Factories
-    static Parity eVec(size_t varNum, size_t pos);
+    static Parity eVec(size_t varNum, size_t pos);  // e_i, starting from 1 (0 is affVal).
 
     // Operators
     bool operator==(const Parity& rhs) const;
@@ -45,19 +45,16 @@ public:
     [[nodiscard]] size_t getVarNum() const;
     [[nodiscard]] size_t getLen() const;
     [[nodiscard]] const llvm::SmallVector<uint64_t, 8>& getBits() const;
-    [[nodiscard]] llvm::SmallVector<uint64_t, 8> getLinearPart() const;  // inefficient, but is only for testing
-    [[nodiscard]] std::string getLinearPartString() const;      // inefficient, but is only for testing
+    [[nodiscard]] std::string getLinearPartString() const;  // inefficient, but is only for testing
     [[nodiscard]] bool getBitAt(size_t pos) const;
     [[nodiscard]] bool getAffineValue() const;
 
     // Setters
     void reset();
-    void setBitAt(size_t pos, bool value);
-    void setAffineValue(bool value);
-    void onBitAt(size_t pos);
-    void offBitAt(size_t pos);
+    void assignBitAt(size_t pos, bool value);
+    void assignAffineValue(bool value);
+    void setBitAt(size_t pos);
     void clearAffineValue();
-    void flipBitAt(size_t pos);
     void flipAffineValue();
     void extendBitsAtWith(size_t pos, bool value);
     
@@ -81,9 +78,9 @@ private:
     [[nodiscard]] bool isTrivialFromBlock(size_t fstBlock) const;
     [[nodiscard]] bool isEquivalentWithFromBlock(const Parity& rhs, size_t fstBlock) const;
     [[nodiscard]] bool getBitAtBlock(Index ind) const;
-    void setBitAtBlock(Index ind, bool value);
-    void onBitAtBlock(Index ind);
-    void offBitAtBlock(Index ind);
+    void assignBitAtBlock(Index ind, bool value);
+    void setBitAtBlock(Index ind);
+    void clearBitAtBlock(Index ind);
     void flipBitAtBlock(Index ind);
     void extendBitsTo(size_t newVarNum);
 };
@@ -106,6 +103,10 @@ inline size_t Parity::requiredBlockNum() const {
 
 inline Parity::Index Parity::getIndex(size_t pos) const {
     return {pos / BLOCK_SIZE, pos % BLOCK_SIZE};
+}
+
+inline bool Parity::isIdenticalWith(const Parity& rhs) const {
+    return varNum == rhs.varNum && bits == rhs.bits;
 }
 
 namespace llvm {

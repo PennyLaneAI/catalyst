@@ -86,7 +86,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
     void initQubitsState(SetBasisStateOp basisOp, SymbolicCircuit& symCirc) {
-        llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(basisOp.getInQubits(), basisOp.getOutQubits()));
+        llvm::SmallVector<size_t, 4> qubitIndices = getQubitIndices(basisOp.getInQubits(), basisOp.getOutQubits());
         mlir::DenseElementsAttr basisState = extractBasisState(basisOp);
 
         assert(static_cast<size_t>(basisState.getNumElements()) == qubitIndices.size());
@@ -145,16 +145,6 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             ssaToWireMap[outValue] = index;
         }
         return indices;
-    }
-
-    llvm::SmallVector<size_t, 4> convertIndicesBase(llvm::ArrayRef<size_t> indices) {
-        llvm::SmallVector<size_t, 4> oneBasedIndices;
-        oneBasedIndices.reserve(indices.size());
-        
-        for (size_t idx : indices) {
-            oneBasedIndices.push_back(idx + 1);
-        }
-        return oneBasedIndices;
     }
 
 
@@ -275,7 +265,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     
     // Phase-folding Algorithm:
     void phaseAnalysis(CustomOp customOp, SymbolicCircuit& symCirc, GateID& gateID) {
-        llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(customOp.getInQubits(), customOp.getOutQubits()));
+        llvm::SmallVector<size_t, 4> qubitIndices = getQubitIndices(customOp.getInQubits(), customOp.getOutQubits());
 
         Gate gate = extractCliffTGate(customOp);
         if (isPhaseGate(gate)) {
@@ -347,10 +337,3 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 } // namespace catalyst
 
 // Currently ignoring any blocks or dynamic allocations, only capturing pure quantum circuits.
-
-/*  TEST
-Do I need to handle DeallocOps?
-is the current 1-based indexing of qubits in SymbolicCircuit good?
-
-if (isa<AllocOp>(op)){}
-*/

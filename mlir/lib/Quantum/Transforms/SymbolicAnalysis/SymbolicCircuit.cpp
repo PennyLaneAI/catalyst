@@ -5,13 +5,12 @@
     Operators:
 */
 llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SymbolicCircuit& circ) {
-    // os << "Phase polynomial:\n" << circ.phasePoly;
-    // os << "Affine transformation:\n" << circ.stateTrans;
-    os << "Phase polynomial:\n" << circ.phasePoly.algebraicView(circ.qubitNum);
-    os << "State transformation:\n" << circ.stateTrans.algebraicView(circ.qubitNum);
+    os << "Phase polynomial:\n" << circ.phasePoly;
+    os << "Affine transformation:\n" << circ.stateTrans;
+    // os << "Phase polynomial:\n" << circ.phasePoly.algebraicView(circ.qubitNum);
+    // os << "State transformation:\n" << circ.stateTrans.algebraicView(circ.qubitNum);
     return os;
 }
-
 
 /*
     Dimension Handling:
@@ -23,7 +22,7 @@ void SymbolicCircuit::ensureCapacity(llvm::ArrayRef<size_t> indices) {
             maxIndex = idx;
         }
     }
-    assert(maxIndex <= qubitNum);
+    assert(maxIndex < qubitNum);
 }
 
 void SymbolicCircuit::extendQubitsBy(size_t addQubitNum) {
@@ -67,7 +66,7 @@ void SymbolicCircuit::applyGateRZ(size_t qubitIndex, GateID gateId) {
     
     parity.clearAffineValue();
     phasePoly.insertContributor(parity, contributor);
-    parity.setAffineValue(affineVal);
+    parity.assignAffineValue(affineVal);
 }
 
 void SymbolicCircuit::applyGateX(size_t qubitIndex) {
@@ -108,8 +107,8 @@ void SymbolicCircuit::applyGateU(llvm::ArrayRef<size_t> qubitIndices) {
     llvm::outs() << ":\n";
     size_t n = qubitIndices.size();
     auxVarNum += n;
-    for (size_t i = 0; i < n; i++) {
-        stateTrans.setRow(qubitIndices[i], Parity::eVec(qubitNum + auxVarNum, qubitNum + auxVarNum - n + i)); // are the indices correct?
+    for (size_t i = 1; i <= n; i++) {
+        stateTrans.setRow(qubitIndices[i], Parity::eVec(qubitNum + auxVarNum, qubitNum + auxVarNum - n + i));
     }
 }   // make sure nothing leads to segment fault and index out of bounds.
 

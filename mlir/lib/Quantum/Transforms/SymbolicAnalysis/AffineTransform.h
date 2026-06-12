@@ -8,7 +8,7 @@
 
 #include "llvm/Support/raw_ostream.h"
 
-class AffineTransform { // indices are 1-based
+class AffineTransform {
 public:
     // Constructors
     AffineTransform() = default;
@@ -55,8 +55,8 @@ inline size_t AffineTransform::getColNum(size_t row) const {
 }
 
 inline const Parity& AffineTransform::getRow(size_t row) const {
-    assert(row > 0 && row <= getRowNum());
-    return exprMatrix[row - 1];
+    assert(row >= 0 && row < getRowNum());
+    return exprMatrix[row];
 }
 
 inline Parity& AffineTransform::getRowMutable(size_t row) const {

@@ -15,16 +15,16 @@ static const Index AFFINE_VALUE_INDEX = {0, 0};   // it's LSB. for MSB would be 
 Parity::Parity(const std::string& parityStr) : Parity(parityStr.size() - 1) {
     for (size_t i = 0; i < parityStr.size(); i++) {
         if (parityStr[i] == '1') {
-            onBitAt(i + 1);
+            setBitAt(i + 1);
         }
     }
 }
 
-Parity Parity::eVec(size_t varNum, size_t pos) {    // e_i, starting from 1 (0 is affVal).
+Parity Parity::eVec(size_t varNum, size_t pos) {
     assert(pos <= varNum);
     
     Parity res = Parity(varNum);
-    res.onBitAt(pos);
+    res.setBitAt(pos);
     return res;
 }
 
@@ -58,7 +58,7 @@ Parity Parity::operator+(const Parity& rhs) const {
 }
 
 llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Parity& par) {
-    os << par.getLinearPartString() << " " << par.getAffineValue();
+    os << par.getLinearPartString() << " | " << par.getAffineValue();
     // os << "  (" << par.algebraicView() << ")";
     return os;
 }
@@ -66,12 +66,6 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Parity& par) {
 /*
     Getters:
 */
-llvm::SmallVector<uint64_t, 8> Parity::getLinearPart() const {
-    Parity linearPart = *this;
-    linearPart.setAffineValue(0);
-    return linearPart.getBits();
-}
-
 std::string Parity::getLinearPartString() const {
     std::string res;
     res.reserve(varNum);
@@ -98,32 +92,22 @@ void Parity::reset() {
     bits.assign(1, 0);
 }
 
-void Parity::setBitAt(size_t pos, bool value) {
+void Parity::assignBitAt(size_t pos, bool value) {
     assert(pos <= varNum);
-    setBitAtBlock(getIndex(pos), value);
+    assignBitAtBlock(getIndex(pos), value);
 }
 
-void Parity::setAffineValue(bool value) {
-    setBitAtBlock(AFFINE_VALUE_INDEX, value);
+void Parity::assignAffineValue(bool value) {
+    assignBitAtBlock(AFFINE_VALUE_INDEX, value);
 }
 
-void Parity::onBitAt(size_t pos) {
+void Parity::setBitAt(size_t pos) {
     assert(pos <= varNum);
-    onBitAtBlock(getIndex(pos));
-}
-
-void Parity::offBitAt(size_t pos) {
-    assert(pos > varNum);
-    offBitAtBlock(getIndex(pos));
+    setBitAtBlock(getIndex(pos));
 }
 
 void Parity::clearAffineValue() {
-    offBitAtBlock(AFFINE_VALUE_INDEX);
-}
-
-void Parity::flipBitAt(size_t pos) {
-    assert(pos > varNum);
-    flipBitAtBlock(getIndex(pos));
+    clearBitAtBlock(AFFINE_VALUE_INDEX);
 }
 
 void Parity::flipAffineValue() {
@@ -133,16 +117,12 @@ void Parity::flipAffineValue() {
 void Parity::extendBitsAtWith(size_t pos, bool value) {
     assert(pos > varNum);
     extendBitsTo(pos);
-    setBitAt(pos, value);
+    assignBitAt(pos, value);
 }
 
 /*
     Checks:
 */
-bool Parity::isIdenticalWith(const Parity& rhs) const {
-    return varNum == rhs.varNum && bits == rhs.bits;
-}
-
 bool Parity::isLinearEquivalentWith(const Parity& rhs) const {
     uint64_t blockL = bits.empty() ? 0 : bits[0];
     uint64_t blockR = rhs.bits.empty() ? 0 : rhs.bits[0];
@@ -205,7 +185,7 @@ bool Parity::getBitAtBlock(Index ind) const {
     return bits[blockInd] & (1ULL << bitInd);
 }
 
-void Parity::setBitAtBlock(Index ind, bool value) {
+void Parity::assignBitAtBlock(Index ind, bool value) {
     auto [blockInd, bitInd] = ind;
     assert(blockInd < bits.size());
 
@@ -213,14 +193,14 @@ void Parity::setBitAtBlock(Index ind, bool value) {
     bits[blockInd] = (bits[blockInd] & ~mask) | (static_cast<uint64_t>(value) << bitInd);
 }
 
-void Parity::onBitAtBlock(Index ind) {
+void Parity::setBitAtBlock(Index ind) {
     auto [blockInd, bitInd] = ind;
     assert(blockInd < bits.size());
 
     bits[blockInd] |= (1ULL << bitInd);
 }
 
-void Parity::offBitAtBlock(Index ind) {
+void Parity::clearBitAtBlock(Index ind) {
     auto [blockInd, bitInd] = ind;
     assert(blockInd < bits.size());
 

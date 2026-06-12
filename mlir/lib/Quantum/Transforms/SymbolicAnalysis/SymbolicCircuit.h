@@ -9,7 +9,7 @@
 #include "llvm/ADT/ArrayRef.h"
 
 
-struct SymbolicCircuit { // indices are 1-based
+struct SymbolicCircuit {
     size_t qubitNum;
     size_t auxVarNum;
     // std::vector<bool> isAux;
