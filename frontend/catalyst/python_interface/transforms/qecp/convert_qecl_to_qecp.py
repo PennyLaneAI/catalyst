@@ -20,11 +20,21 @@ To apply this pass, the QEC code must be know.
 Known Limitations
 -----------------
 
-The convert-qecl-to-qecp pass does not support the following cases:
+The convert-qecl-to-qecp pass has the following known limitations:
 
-  * QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
+  * No support for QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
+  * No support for non-CSS codes
+  * Only supports the transversal gates defined in the `QecCode` + T gates
   * Only logical Pauli Z observables (computational basis) are supported for lowering `qecl.measure`
     operations.
+  * Support for control flow in the user program is not fully implemented or tested
+  * The generated QEC-cycles are not fault-tolerant - they don't account for potential errors in
+    the syndrome qubits/measurements
+  * For terminal measurements, only sampling of MCMs is supported
+  * The encoding procedure to create the logical zero state in a codeblock is not optimized for
+    efficiency
+  * Only thoroughly tested with the Steane code, but should be generalizable to other k=1 CSS
+    stabilizer codes.
 """
 
 from collections.abc import Callable, Iterable
@@ -59,6 +69,8 @@ from catalyst.utils.exceptions import CompileError
 from ..qecl.convert_quantum_to_qecl import _get_idx_value_or_attr_from_extract_or_insert_op
 from .convert_qecl_noise_to_qec_noise import ConvertQECLNoiseOpToQECPNoisePass
 from .qec_code_lib import QecCode
+
+# pylint: disable=too-many-lines
 
 
 class CheckType(StrEnum):
@@ -100,8 +112,8 @@ class HyperRegisterTypeConversion(TypeConversionPattern):
         """Type conversion rewrite pattern for physical codeblock types."""
         if typ.k.value.data != self.qec_code.k:
             raise CompileError(
-                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; hyper-register has "
-                f"k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
+                f"Failed to convert type {typ} with QEC code '{self.qec_code}'; hyper-register "
+                f"has k = {typ.k.value.data} but QEC code has k = {self.qec_code.k}"
             )
 
         return qecp.PhysicalHyperRegisterType(typ.width, typ.k, self.qec_code.n)
@@ -128,6 +140,16 @@ class DeallocationConversion(RewritePattern):
     def match_and_rewrite(self, op: qecl.DeallocOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
         rewriter.replace_op(op, qecp.DeallocOp(op.hyper_reg))
+
+
+@dataclass
+class DeallocCodeBlockConversion(RewritePattern):
+    """Op conversion pattern from qecl.dealloc_cb -> qecp.dealloc_cb."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.DeallocCodeblockOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate codeblocks."""
+        rewriter.replace_op(op, qecp.DeallocCodeblockOp(op.codeblock))
 
 
 # MARK: Extract/Insert Patterns
@@ -169,7 +191,7 @@ class EncodeOpConversion(RewritePattern):
     def match_and_rewrite(self, op: qecl.EncodeOp, rewriter: PatternRewriter):
         """Rewrite pattern for `qecl.encode [zero]` op"""
 
-        if not op.init_state.data == "zero":
+        if not op.init_state.data == "zero":  # pragma: no cover
             raise NotImplementedError(
                 "Lowering qecl.EncodeOp to the qecp dialect is only implemented "
                 "for init_state 'zero'"
@@ -179,7 +201,7 @@ class EncodeOpConversion(RewritePattern):
             qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
         )
 
-        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
@@ -190,6 +212,38 @@ class EncodeOpConversion(RewritePattern):
         return_types = self.encode_subroutine.function_type.outputs.data
         callOp = func.CallOp(callee, arguments, return_types)
 
+        rewriter.replace_op(op, callOp)
+
+
+# MARK: Fabricate Op Pattern
+
+
+@dataclass
+class FabricateOpConversion(RewritePattern):
+    """Converts qecl.fabricate to the equivalent subroutine of qecp gates"""
+
+    qec_code: QecCode
+    fabricate_subroutine: func.FuncOp
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecl.FabricateOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `qecl.fabricate [magic]` op"""
+
+        if not op.init_state.data == "magic":  # pragma: no cover
+            raise NotImplementedError(
+                "Lowering qecl.FabricateOp to the qecp dialect is only implemented "
+                "for init_state 'magic'"
+            )
+
+        if (k := op.out_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
+            raise CompileError(
+                f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
+                f"lowering to a code with k={self.qec_code.k}"
+            )
+
+        callee = builtin.SymbolRefAttr(self.fabricate_subroutine.sym_name)
+        return_types = self.fabricate_subroutine.function_type.outputs.data
+        callOp = func.CallOp(callee, arguments=(), return_types=return_types)
         rewriter.replace_op(op, callOp)
 
 
@@ -211,7 +265,7 @@ class QecCycleOpConversion(RewritePattern):
             qecl.LogicalCodeBlockSSAValue | qecp.PhysicalCodeBlockSSAValue, op.in_codeblock
         )
 
-        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:
+        if (k := in_codeblock.type.k.value.data) != self.qec_code.k:  # pragma: no cover
             raise CompileError(
                 f"Circuit expressed in the qecl dialect with k={k} is not compatible with "
                 f"lowering to a code with k={self.qec_code.k}"
@@ -317,6 +371,9 @@ class TransversalGateConversion(RewritePattern):
 
         gate_name = op.name.split(".")[1]  # op.name is "qecl.gate_name"
 
+        if getattr(op, "adjoint", None):
+            gate_name = f"{gate_name}_adj"
+
         op_codeblocks = (
             (op.in_ctrl_codeblock, op.in_trgt_codeblock)
             if gate_name in self.qec_code.transversal_2q_gates
@@ -351,6 +408,21 @@ class TransversalGateConversion(RewritePattern):
         )
 
         rewriter.replace_op(op, subroutine_call_op)
+
+
+# MARK: Signature update
+
+
+@dataclass(frozen=True)
+class UpdateFunctionSignatures(RewritePattern):
+    """Update types for any FuncOps in the IR whose input/output types have changed."""
+
+    # pylint: disable=unused-argument
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, funcop: func.FuncOp, rewriter: PatternRewriter):
+        """Match all FuncOps and call their update_function_type method"""
+
+        funcop.update_function_type()
 
 
 # MARK: Conversion Pass
@@ -403,11 +475,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         assert module_block is not None, "Module has no block"
 
         # Insert subroutines that implement the QEC protocols
-        encode_funcop = self.create_encode_subroutine()
-        module_block.add_op(encode_funcop)
+        encode_subroutine = self.create_encode_subroutine()
+        module_block.add_op(encode_subroutine)
 
-        qec_cycle_funcop = self.create_qec_cycle_subroutine()
-        module_block.add_op(qec_cycle_funcop)
+        qec_cycle_subroutine = self.create_qec_cycle_subroutine()
+        module_block.add_op(qec_cycle_subroutine)
 
         measure_subroutine = self.create_measure_subroutine()
         module_block.add_op(measure_subroutine)
@@ -415,6 +487,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         physical_meas_decode_subroutine = self.create_physical_meas_decode_subroutine()
         module_block.add_op(physical_meas_decode_subroutine)
 
+        fabricate_subroutine = self.create_fabricate_subroutine()
+        module_block.add_op(fabricate_subroutine)
+
+        # 1Q gate and 2Q gate subroutines are returned as dicts storing
+        # {"gate_name": subroutine_funcop}
         transversal_gate_subroutines = (
             self.create_transversal_1Qgate_subroutines()
             | self.create_transversal_2Qgate_subroutines()
@@ -429,11 +506,15 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                     HyperRegisterTypeConversion(qec_code=self.qec_code),
                     AllocationConversion(),
                     DeallocationConversion(),
+                    DeallocCodeBlockConversion(),
                     InsertBlockConversion(),
                     ExtractBlockConversion(),
-                    EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_funcop),
+                    EncodeOpConversion(qec_code=self.qec_code, encode_subroutine=encode_subroutine),
+                    FabricateOpConversion(
+                        qec_code=self.qec_code, fabricate_subroutine=fabricate_subroutine
+                    ),
                     QecCycleOpConversion(
-                        qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_funcop
+                        qec_code=self.qec_code, qec_cycle_subroutine=qec_cycle_subroutine
                     ),
                     MeasureOpConversion(
                         qec_code=self.qec_code,
@@ -444,9 +525,12 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         qec_code=self.qec_code,
                         gate_subroutines=transversal_gate_subroutines,
                     ),
+                    UpdateFunctionSignatures(),
                 ]
             )
         ).rewrite_module(op)
+
+    # MARK: Insert tanner graphs
 
     def insert_tanner_graph_ops_into_block(
         self, block: Block
@@ -520,8 +604,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return assemble_x_tanner_op.tanner_graph, assemble_z_tanner_op.tanner_graph
 
+    # MARK: Measure subroutine
+
     def create_measure_subroutine(self) -> func.FuncOp:
-        """Create the subroutine that performs the transversal measurement of a physical codeblock.
+        """Create the subroutine that performs the transversal measurement of a physical codeblock
+        in the computational basis. All qubits in the codeblock are measured directly.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
@@ -599,9 +686,17 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return measure_subroutine
 
+    # MARK: Meas_decode subroutine
+
     def create_physical_meas_decode_subroutine(self) -> func.FuncOp:
         """Create the subroutine that performs the physical-measurement decoding of a transversal
-        measurement and returns the corresponding k logical measurement outcomes.
+        measurement in the computational basis, and returns the corresponding k logical measurement
+        outcomes.
+
+        The logical measurement outcome is determined by a parity check of the physical measurements
+        corresponding to the indices of the PauliZ operation - i.e. for a code where a transversal
+        Z gate is applied on indices [1, 2, 4], a logical Z measurement is determined by a parity
+        check of physical measurements at indices [1, 2, 4] of the codeblock.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
@@ -670,6 +765,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return physical_meas_decode_subroutine
 
+    # MARK: Encode subroutine
+
     def create_encode_subroutine(self) -> func.FuncOp:
         """Create a subroutine that takes in a codeblock, encodes it in the zero state for
         the QEC code (based on the tanner graph), and returns the encoded codeblock. This
@@ -717,11 +814,103 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return funcOp
 
+    # MARK: Fabricate subroutine
+
+    def create_fabricate_subroutine(self) -> func.FuncOp:
+        """Create a subroutine that allocates a codeblock and encodes it in the magic state for
+        the QEC code (based on the tanner graph), and returns the encoded codeblock. This is a
+        non-fault tolerant encoding intended for use on a simulator, and not a distillation process
+        for generating a magic state from many noisy copies.
+
+        The encoding process follows the third option for magic state encoding described in
+        https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that the correction is
+        SX as decribed in Nielsen & Chuang, (Section 10.6.2), rather than a single NOT gate.
+        This was found to produce the correct result for circuit simulations.
+
+        The encoding method involves putting the initial QEC physical qubit in the desired state
+        via application of a Hadamard and physical T gate, and then using the gate encoding for the
+        zero state to create the desired state for the codeblock. Note that we do not use the
+        syndrome-measurement based encoding that we use for `encode [zero]`; the unitary
+        encoder maps an arbitrary input |psi> -> |psi_L>, whereas the stabilizer-measurement
+        enocding procedure only projects the input state onto the codespace.
+
+        Note that this method does not insert the subroutine into the module op. Instead it
+        returns the built func.FuncOp object that can then be subsequently inserted where desired.
+        """
+        unitary_encoding_info = self.qec_code.unitary_encoding
+
+        required_keys = {"state_prep_index", "hadamard_indices", "cnot_indices"}
+        if not required_keys.issubset(unitary_encoding_info):  # pragma: no cover
+            raise CompileError(
+                f"QEC code '{self.qec_code.name}' does not define a unitary encoding "
+                f"(missing {required_keys - set(unitary_encoding_info)}); cannot lower "
+                f"qecl.fabricate [magic] for this code."
+            )
+
+        codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+        input_types = ()
+        output_types = (codeblock_type,)
+
+        block = Block(arg_types=input_types)
+
+        with ImplicitBuilder(block):
+            codeblock = qecp.AllocCodeblockOp(
+                codeblock_type=qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
+            )
+
+            # extract qubits
+            extract_ops = [qecp.ExtractQubitOp(codeblock, i) for i in range(self.qec_code.n)]
+            magic_state_qubits = {i: ext_op.results[0] for i, ext_op in enumerate(extract_ops)}
+
+            # apply H and T to the state prep input qubit
+            state_prep_index = unitary_encoding_info["state_prep_index"]
+            h_op = qecp.HadamardOp(magic_state_qubits[state_prep_index])
+            t_op = qecp.TOp(h_op.results[0])
+            magic_state_qubits[state_prep_index] = t_op.results[0]
+
+            # Perform unitary encoding circuit for the code
+            hadamards = unitary_encoding_info["hadamard_indices"]
+            cnot_pairs = unitary_encoding_info["cnot_indices"]
+
+            for idx in hadamards:
+                h = qecp.HadamardOp(magic_state_qubits[idx])
+                magic_state_qubits[idx] = h.results[0]
+
+            for ctrl_idx, trgt_idx in cnot_pairs:
+                cnot_op = qecp.CnotOp(magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx])
+                magic_state_qubits[ctrl_idx] = cnot_op.results[0]
+                magic_state_qubits[trgt_idx] = cnot_op.results[1]
+
+            # insert data qubits back into the codeblock
+            encoded_codeblock = codeblock
+            for i in range(self.qec_code.n):
+                insert_op = qecp.InsertQubitOp(encoded_codeblock, i, magic_state_qubits[i])
+                encoded_codeblock = insert_op.results[0]
+
+            # return the encoded codeblock
+            func.ReturnOp(encoded_codeblock)
+
+        funcOp = func.FuncOp(
+            name=f"fabricate_magic_state_{self.qec_code.name}",
+            function_type=(input_types, output_types),
+            visibility="private",
+            region=Region([block]),
+        )
+
+        return funcOp
+
+    # MARK: 1Q gate subroutines
+
     def create_transversal_1Qgate_subroutines(self) -> dict[str, func.FuncOp]:
         """Create the subroutines that performs transversal 1-qubit gates on a physical codeblock.
 
+        The subroutines are built based on the gate and codeblock indices defined in the specified
+        ``QecCode``. For example, a code that specifies ``{"x": (qecp.PauliXOp, [2, 3])}`` as a
+        transversal gate will lower ``qecl.x`` to ``qecp.x`` at indices 2 and 3. The `qecp.identity`
+        operator is applied at all other indices in the codeblock.
+
         Note that this method does not insert the subroutine into the module op. Instead it returns
-        a dict of built func.FuncOp objects that can then be subsequently inserted where desired.
+        a dict containing func.FuncOp objects that can then be subsequently inserted where desired.
         """
         subroutines = {}
         single_qubit_gates = self.qec_code.transversal_1q_gates
@@ -771,11 +960,16 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         return subroutines
 
+    # MARK: 2Q gate subroutines
+
     def create_transversal_2Qgate_subroutines(self) -> dict[str, func.FuncOp]:
-        """Create the subroutinew that performs transversal 2-qubit gates on a physical codeblock.
+        """Create the subroutines that perform transversal 2-qubit gates on a physical codeblock.
+
+        This implementation assumes the gate is applied transversally between all corresponding
+        qubit pairs in the two codeblocks.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
-        a dict of built func.FuncOp objects that can then be subsequently inserted where desired.
+        a dict containing func.FuncOp objects that can then be subsequently inserted where desired.
         """
         subroutines = {}
 
@@ -832,6 +1026,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             subroutines[gate_name] = funcOp
 
         return subroutines
+
+    # MARK: Check pattern
 
     def check_pattern(
         self,
@@ -929,6 +1125,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             )
 
         return tanner_graph, cnot_fn
+
+    # MARK: QEC cycle subroutine
 
     def create_qec_cycle_subroutine(self) -> func.FuncOp:
         """Create a subroutine that performs a cycle of QEC on an input physical codeblock.

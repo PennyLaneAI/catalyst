@@ -32,6 +32,7 @@ from jax.core import AbstractValue
 from pennylane import QueuingManager
 from pennylane.tape import QuantumTape
 
+import catalyst
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTracer,
@@ -810,10 +811,13 @@ class CondCallable:
 
         if not self._is_any_boolean(pred):
             try:
-                pred = jnp.astype(pred, bool, copy=False)
-            except TypeError as e:
+                if isinstance(pred, jax.core.Tracer):
+                    pred = jnp.astype(pred, bool, copy=False)
+                else:
+                    pred = bool(pred)
+            except (TypeError, ValueError) as e:
                 raise TypeError(
-                    "Conditional predicates are required to be of bool, integer or float type"
+                    "Conditional predicates are required to be cast-able to bool."
                 ) from e
 
         return pred
@@ -942,6 +946,10 @@ class CondCallable:
         self.otherwise_fn = _make_argless_function(self.otherwise_fn, args, kwargs)
 
         mode = EvaluationContext.get_evaluation_mode()
+        if catalyst.compile_without_static_conditionals:
+            if not any(isinstance(pred, jax.core.Tracer) for pred in self.preds):
+                mode = EvaluationMode.INTERPRETATION  # override
+
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx()
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
@@ -1130,6 +1138,13 @@ class ForLoopCallable:
 
     def __call__(self, *init_state):
         mode = EvaluationContext.get_evaluation_mode()
+        if catalyst.compile_without_static_loops:
+            if not any(
+                isinstance(b, jax.core.Tracer)
+                for b in (self.lower_bound, self.upper_bound, self.step)
+            ):
+                mode = EvaluationMode.INTERPRETATION  # override
+
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx(*init_state)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:

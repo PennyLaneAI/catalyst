@@ -205,7 +205,7 @@ def compile_op_decomp_rules(
     return mlir_modules
 
 
-def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
+def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
     """
     Compile PennyLane built-in decomposition rules to MLIR Bytecode.
 
@@ -214,7 +214,7 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
     Args:
         decomp_file_path (Path): path to compile rules to.
     """
-    decomp_file_path.parent.mkdir(parents=True, exist_ok=True)
+    Path(decomp_file_path).parent.mkdir(parents=True, exist_ok=True)
 
     mlir_rules = "".join(
         str(mlir).replace("@rule_wrapper", f"@__builtin_{name}")
@@ -224,6 +224,9 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
 
     bytecode = _quantum_opt(
         "--emit-bytecode",
+        "--canonicalize",
+        "--convert-to-value-semantics",
+        "--canonicalize",
         "--register-decomp-rule-resource",
         stdin=mlir_rules.encode("utf-8"),
         text=None,
@@ -234,4 +237,4 @@ def precompile_decomp_rules(decomp_file_path: Path = BYTECODE_FILE_PATH):
 
 
 if __name__ == "__main__":  # pragma: no cover
-    precompile_decomp_rules()  # pragma: no cover
+    precompile_decomp_rules()

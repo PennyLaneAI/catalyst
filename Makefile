@@ -235,7 +235,7 @@ wheel:
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	for file in gradient quantum _ods_common catalyst mbqc mitigation pbc _transform; do \
+	for file in gradient qref quantum _ods_common catalyst mbqc mitigation pbc _transform; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
 	mkdir -p $(MK_DIR)/frontend/bin
@@ -291,8 +291,9 @@ clean:
 	find frontend/catalyst -name "*.so" -not -path "*/third_party/*" -exec rm -v {} +
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
-	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
+	rm -rf $(MK_DIR)/frontend/catalyst/include $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/bin
 	rm -rf $(MK_DIR)/frontend/catalyst/resources
+	rm -rf $(MK_DIR)/frontend/mlir_quantum
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks

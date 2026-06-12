@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,16 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Dummy module for testing"""
 
+"""MLIR Dialect for Qref dialect."""
 
-def dummy_func(x):
-    """Simple function with if statements for testing the 'auto_include' option of @qjit.
-    The parent 'catalayst' module is excluded for autograph conversion by default, hence
-    adding this module explicitely to the inclusion list will override that restriction"""
-
-    if x > 5:
-        y = x**2
-    else:
-        y = x**3
-    return y
+# pylint: disable=relative-beyond-top-level
+from ._qref_ops_gen import *  # noqa: F401

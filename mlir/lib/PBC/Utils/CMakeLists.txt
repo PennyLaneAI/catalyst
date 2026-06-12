@@ -33,4 +33,4 @@ target_compile_options(PBCUtils PRIVATE
     -fexceptions     # Enable exceptions
 )
 
-target_link_libraries(PBCUtils PRIVATE libstim ExternalStablehloLib)
+target_link_libraries(PBCUtils PRIVATE libstim ExternalStablehloLib MLIRSCFDialect)
