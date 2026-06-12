@@ -231,7 +231,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         for (auto rule : llvm::make_early_inc_range(moduleOp.get().getOps<mlir::func::FuncOp>())) {
             rule->remove();
-            ruleRegistry.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(rule));
+            ruleRegistry.push_back(std::move(rule));
         }
         return;
     }
@@ -271,7 +271,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         for (auto rule : llvm::make_early_inc_range(userRules)) {
             rule->remove();
-            rules.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(rule));
+            rules.push_back(std::move(rule));
         }
         return success();
     }
@@ -338,7 +338,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 funcOp->setAttr("resources", buildResourceDict(context, *flat));
             }
 
-            ruleRegistry.push_back(outOp.release());
+            ruleRegistry.push_back(std::move(outOp));
         }
 
         return success();
