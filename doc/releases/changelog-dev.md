@@ -208,6 +208,9 @@
 * A new pass `--convert-to-reference-semantics` has been added. The pass takes in MLIR in value
   semantics `quantum` dialect, and converts them to reference semantics `qref` dialect.
   [(#2920)](https://github.com/PennyLaneAI/catalyst/pull/2920)
+  [(#2930)](https://github.com/PennyLaneAI/catalyst/pull/2930)
+  [(#2931)](https://github.com/PennyLaneAI/catalyst/pull/2931)
+  [(#2937)](https://github.com/PennyLaneAI/catalyst/pull/2937)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -265,6 +268,10 @@
   dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
   [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
 
+* A new operation has been added to the Quantum dialect to represent generic and high-level
+  quantum operators, including operators with frontend-end specific data.
+  [(#2883)](https://github.com/PennyLaneAI/catalyst/pull/2883)
+
 * In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
   operations have been added:
 
@@ -314,6 +321,7 @@ Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
+David Ittah,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,

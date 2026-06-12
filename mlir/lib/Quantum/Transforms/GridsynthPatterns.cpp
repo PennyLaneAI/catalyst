@@ -380,12 +380,12 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
             return failure();
         }
 
-        assert(op.getQubitOperands().size() == 1 && op.getAllParams().size() == 1 &&
+        assert(op.getQubitOperands().size() == 1 && op.getParams().size() == 1 &&
                "only RZ and PhaseShift are allowed in Gridsynth decomposition");
 
         // Directly grab the SSA value of the qubit. No need to look up ExtractOps.
         Value qbitOperand = op.getQubitOperands()[0];
-        Value angle = op.getAllParams()[0];
+        Value angle = op.getParams()[0];
 
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         Location loc = op.getLoc();
