@@ -45,16 +45,6 @@ using namespace catalyst;
 
 namespace {
 
-void eraseAllVOps(Region &r, SmallVector<Operation *> &erasureWorklist)
-{
-    if (isa<quantum::YieldOp>(r.front().getTerminator())) {
-        erasureWorklist.push_back(r.front().getTerminator());
-    }
-    for (auto op : llvm::reverse(erasureWorklist)) {
-        op->erase();
-    }
-}
-
 void eraseSCFYieldQuantumOperands(scf::YieldOp yieldOp)
 {
     // scf.yield can yield both classical and quantum values
@@ -63,10 +53,8 @@ void eraseSCFYieldQuantumOperands(scf::YieldOp yieldOp)
     // Somewhat unfortunately, the operand erasure API does not have a lambda version
     // So we need to be a bit manual here
     BitVector eraseIndices(yieldOp->getNumOperands());
-    for (auto [i, argType] : llvm::enumerate(yieldOp->getOperandTypes())) {
-        if (isa<quantum::QuregType, quantum::QubitType>(argType)) {
-            eraseIndices.set(i);
-        }
+    for (auto [i, argType] : llvm::enumerate(yieldOp.getOperandTypes())) {
+        eraseIndices[i] = isa<quantum::QuregType, quantum::QubitType>(argType);
     }
     yieldOp->eraseOperands(eraseIndices);
 }
@@ -79,6 +67,13 @@ struct QubitValueTracker {
     {
         assert(isa<quantum::QuregType>(vQreg.getType()) && "Expected quantum.reg type");
         assert(isa<qref::QuregType>(rQreg.getType()) && "Expected qref.reg type");
+        if (failed(this->checkReferenceIsVisible(vQreg, rQreg))) {
+            vQreg.getDefiningOp()->emitError(
+                "The value semantics quantum value is referring to a quantum reference that is not "
+                "visible to its scope. The reference must exist in the same scope, or a parent "
+                "scope as the value.");
+        }
+
         this->qreg_map[vQreg] = rQreg;
     }
 
@@ -95,6 +90,14 @@ struct QubitValueTracker {
     {
         assert(isa<quantum::QubitType>(vQubit.getType()) && "Expected quantum.bit type");
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
+
+        if (failed(this->checkReferenceIsVisible(vQubit, rQubit))) {
+            vQubit.getDefiningOp()->emitError(
+                "The value semantics quantum value is referring to a quantum reference that is not "
+                "visible to its scope. The reference must exist in the same scope, or a parent "
+                "scope as the value.");
+        }
+
         this->qubit_map[vQubit] = rQubit;
     }
 
@@ -110,6 +113,18 @@ struct QubitValueTracker {
   private:
     llvm::DenseMap<Value, Value> qreg_map;
     llvm::DenseMap<Value, Value> qubit_map;
+
+    // We need to make sure that any value semantics quantum Value is only referring to a reference
+    // that is actually scope-visible.
+    LogicalResult checkReferenceIsVisible(Value vVal, Value rVal)
+    {
+        Region *vRegion = vVal.getParentRegion();
+        Region *rRegion = rVal.getParentRegion();
+        if (!rRegion->isAncestor(vRegion)) {
+            return failure();
+        }
+        return success();
+    }
 }; // struct QubitValueTracker
 
 void cascadeMapAhead(Operation *vOp, QubitValueTracker &tracker)
@@ -628,7 +643,12 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
     });
 
     if (erase) {
-        eraseAllVOps(r, erasureWorklist);
+        if (isa<quantum::YieldOp>(r.front().getTerminator())) {
+            erasureWorklist.push_back(r.front().getTerminator());
+        }
+        for (auto op : llvm::reverse(erasureWorklist)) {
+            op->erase();
+        }
         return std::nullopt;
     }
     else {
