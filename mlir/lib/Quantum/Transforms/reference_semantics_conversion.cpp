@@ -602,7 +602,7 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                                                      QubitValueTracker &tracker, bool erase)
 {
     assert(r.hasOneBlock() && "Expected region to have a single block");
-    assert(r.front().getTerminator() && "Expected region to have a terminator");
+    assert(r.front().getTerminator() && "Expected the region body to have a terminator");
 
     SmallVector<Operation *> erasureWorklist;
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
