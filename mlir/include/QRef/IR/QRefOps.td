@@ -334,12 +334,11 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
     let hasVerifier = 1;
 }
 
-def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
-                                             AttrSizedOperandSegments, AttrSizedResultSegments]> {
+def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandSegments]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
-        The `quantum.operator` is a generic representation for arbitrary quantum operations
-        that cannot be expressed by the simpler `quantum.custom` op and don't have a dedicated
+        The `qref.operator` is a generic representation for arbitrary quantum operations
+        that cannot be expressed by the simpler `qref.custom` op and don't have a dedicated
         operation.
         Its purpose is to represent high-level operations from frontend languages such as
         PennyLane — in particular templates and operators parametrized by Python (or
@@ -350,12 +349,12 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
 
         The operation has two mutually exclusive representations:
 
-        * **Qubit mode** (`in_qubits` / `out_qubits`):
+        * **Qubit mode** (`qubits`):
           Use this when the operator acts on a statically known set of wires. Qubits are
           threaded through the op explicitly and can carry per-control values through
-          `in_ctrl_qubits` / `in_ctrl_values` (with matching `out_ctrl_qubits`).
+          `ctrl_qubits` / `ctrl_values`.
 
-        * **Register mode** (`in_qreg` / `out_qreg` + index arrays):
+        * **Register mode** (`qreg` / `qreg` + index arrays):
           Use this when the operator acts on a dynamic number of wires. The operation receives
           one register and one or more index arrays selecting which qubits in that register
           are targeted. Controls are expressed with matching control index/value arrays.
@@ -382,14 +381,14 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
         modifier acting on a single qubit:
 
         ```mlir
-        %out = quantum.operator "MyOp"(%theta: f64) adj qubits(%q)
+        %out = qref.operator "MyOp"(%theta: f64) adj qubits(%q)
             static_data = {pauli_word = "XYZ", greedy = true}
         ```
 
         An operator with two qubit-mode controls:
 
         ```mlir
-        %oq, %ocq:2 = quantum.operator "MyOp"() qubits(%q)
+        qref.operator "MyOp"() qubits(%q)
             ctrls(%cq0, %cq1) ctrl_vals(%cv0, %cv1)
         ```
 
@@ -397,7 +396,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
         with explicit name-to-position maps for its parameters and wire arguments:
 
         ```mlir
-        %out_qreg = quantum.operator "MyOp"(%state: tensor<?xcomplex<f64>>)
+        qref.operator "MyOp"(%state: tensor<?xcomplex<f64>>)
             quregs(%qreg) indices(%w0: tensor<?xi64>, %w1: tensor<1xi64>)
             param_map = {state_vector = [0]}
             qubit_map = {wires = [0], precision_wire = [1]}
@@ -407,7 +406,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
         extra dynamic data forwarded into those rules via `forward(...)`:
 
         ```mlir
-        %out:3 = quantum.operator "MyOp"(%state: tensor<8xcomplex<f64>>) qubits(%q0, %q1, %q2)
+        qref.operator "MyOp"(%state: tensor<8xcomplex<f64>>) qubits(%q0, %q1, %q2)
             UID(324958) forward(%phi: f64, %delta: f64)
         ```
     }];
@@ -418,12 +417,12 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
         Variadic<AnyType>:$forward_args,
 
         // traditional qubit specification
-        Variadic<QubitType>:$in_qubits,
-        Variadic<QubitType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values,
+        Variadic<QubitRefType>:$qubits,
+        Variadic<QubitRefType>:$ctrl_qubits,
+        Variadic<I1>:$ctrl_values,
 
         // alternative spec for acting on a dynamic number of qubits
-        Optional<QuregType>:$in_qreg,
+        Optional<QuregRefType>:$qreg,
         Variadic<1DTensorOf<[I64]>>:$arr_qubit_indices,
         Optional<1DTensorOf<[I64]>>:$arr_ctrl_indices,
         Optional<1DTensorOf<[I1]>>:$arr_ctrl_values,
@@ -435,12 +434,6 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
         DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
-    );
-
-    let results = (outs
-        Variadic<QubitType>:$out_qubits,
-        Variadic<QubitType>:$out_ctrl_qubits,
-        Optional<QuregType>:$out_qreg
     );
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{

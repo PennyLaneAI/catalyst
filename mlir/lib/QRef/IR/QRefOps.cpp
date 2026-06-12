@@ -226,29 +226,19 @@ LogicalResult CustomOp::verify()
 
 LogicalResult OperatorOp::verify()
 {
-    const bool hasQregInput = static_cast<bool>(getInQreg());
-    const bool hasQregOutput = static_cast<bool>(getOutQreg());
-    const bool hasQregMode = hasQregInput || hasQregOutput;
-
-    const bool hasQubitInput = !getInQubits().empty();
-    const bool hasQubitOutput = !getOutQubits().empty();
-    const bool hasQubitMode = hasQubitInput || hasQubitOutput;
+    const bool hasQregMode = static_cast<bool>(getQreg());
+    const bool hasQubitMode = !getQubits().empty();
 
     // Exactly one mode must be used: explicit qubits or qreg-based addressing.
     if (hasQregMode == hasQubitMode) {
         return emitOpError() << "must use either qubits or registers, but not both";
     }
 
-    if (hasQregInput != hasQregOutput) {
-        return emitOpError() << "in_qreg and out_qreg must either both be present or absent";
-    }
-
     if (!getForwardArgs().empty() && !getUID()) {
         return emitOpError() << "forward_args can only be present when UID is provided";
     }
 
-    const bool hasQubitControls =
-        !getInCtrlQubits().empty() || !getInCtrlValues().empty() || !getOutCtrlQubits().empty();
+    const bool hasQubitControls = !getCtrlQubits().empty() || !getCtrlValues().empty();
     const bool hasQregControls =
         static_cast<bool>(getArrCtrlIndices()) || static_cast<bool>(getArrCtrlValues());
 
@@ -299,7 +289,7 @@ LogicalResult OperatorOp::verify()
 
     auto qubitMap = getQubitMap();
     if (qubitMap) {
-        const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
+        const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getQubits().size();
         const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
         const char *coverageNoun =
             hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
