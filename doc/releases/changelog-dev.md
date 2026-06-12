@@ -306,6 +306,10 @@
   - For loops (`scf.for`)
     [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
 
+* The experimental QEC pipeline now supports programs that sample wires, where before it only
+  supported sampling mid-circuit measurements.
+  [(#2941)](https://github.com/PennyLaneAI/catalyst/pull/2941)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
