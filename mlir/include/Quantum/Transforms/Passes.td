@@ -168,7 +168,7 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"libQPD-path",
             /*Type*/"std::string",
             /*Default*/[{ "" }],
-            /*Description*/"A path to the QuantumPythonCallbacks dynamic library.">,
+            /*Description*/"A path to the QuantumPythonDecompositions dynamic library.">,
         Option<
             /*C++ name*/"libpythonPath",
             /*CLI name*/"libpython-path",
