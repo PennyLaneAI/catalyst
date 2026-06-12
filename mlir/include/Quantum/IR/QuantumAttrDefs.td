@@ -40,4 +40,21 @@ def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_obser
 
 def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
 
+class DictValuesOfType<string attrCppType> : AttrConstraint<
+    CPred<"::llvm::all_of("
+            "::llvm::cast<::mlir::DictionaryAttr>($_self),"
+            "[](::mlir::NamedAttribute na) {"
+              "return ::llvm::isa<::mlir::" # attrCppType # ">(na.getValue());"
+            "}"
+          ")">,
+    "dictionary with " # attrCppType # " values"
+>;
+
+def I64ArrayDictAttr : ConfinedAttr<DictionaryAttr, [DictValuesOfType<"DenseI64ArrayAttr">]>;
+
+def FunctionRefArrayAttr : TypedArrayAttrBase<FlatSymbolRefAttr,
+                                              "FlatSymbolRefArrayAttr with const builder"> {
+    let constBuilderCall = "$_builder.getArrayAttr($0)";
+}
+
 #endif // QUANTUM_ATTR_DEFS
