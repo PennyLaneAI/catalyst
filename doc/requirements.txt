@@ -1,6 +1,6 @@
 docutils==0.20
-sphinxcontrib-bibtex==2.6.3
-sphinx==8.1
+sphinxcontrib-bibtex==2.7.0
+sphinx==9.0
 sphinxcontrib-applehelp==2.0.0
 sphinxcontrib-devhelp==2.0.0
 sphinxcontrib-qthelp==2.0.0
@@ -8,7 +8,7 @@ sphinxcontrib-htmlhelp==2.1.0
 sphinxcontrib-serializinghtml==2.0.0
 sphinx-copybutton
 ipykernel
-nbsphinx==0.9.7
+nbsphinx==0.9.8
 Jinja2==3.1.6
 version_information
 sphinx-copybutton
