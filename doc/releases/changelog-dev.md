@@ -192,9 +192,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Upgrade Sphinx to version 9.0.
-  [(#2940)](https://github.com/PennyLaneAI/catalyst/pull/2940)
-
 * The frontend now generates MLIR in reference semantics when capture is enabled.
   [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
   [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
