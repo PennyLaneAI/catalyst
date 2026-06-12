@@ -1469,14 +1469,13 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.qec
             # CHECK: apply_T
             # CHECK: qecl.measure {{%.+}}[0]
-            # CHECK: qecl.insert_block
             # CHECK: quantum.mcmobs
+            # CHECK: qecl.insert_block
             # CHECK: quantum.sample
             # CHECK: qecl.dealloc
             qp.H(0)
             qp.T(0)
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -1507,16 +1506,13 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.measure
             # CHECK: qecl.measure
             # CHECK: qecl.measure
-            # CHECK: qecl.insert_block
             # CHECK: quantum.mcmobs
+            # CHECK: qecl.insert_block
             # CHECK: quantum.sample
             # CHECK: qecl.dealloc
             qp.H(0)
             qp.CNOT([0, 1])
             qp.CNOT([1, 2])
-            m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            m2 = qp.measure(2)
-            return qp.sample([m0, m1, m2])
+            return qp.sample(wires=[0, 1, 2])
 
         run_filecheck_qjit(circuit)
