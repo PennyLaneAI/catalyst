@@ -530,3 +530,326 @@ func.func @qnode_without_measurement(%q : !quantum.bit) attributes {quantum.node
 
 // expected-error@+1 {{'quantum.node' must be a unit attribute}}
 func.func private @wrong_attribute_value() attributes {quantum.node = "wrong"}
+
+// -----
+
+
+//////////////////////
+// quantum.operator //
+//////////////////////
+
+
+func.func @operator_basic_qubits(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %o0, %o1 = "quantum.operator"(%q0, %q1) <{op_name = "basic_qubits", operandSegmentSizes = array<i32: 0, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    return
+}
+
+// -----
+
+func.func @operator_custom_basic_qubits(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %o0, %o1 = quantum.operator "custom_basic_qubits"() qubits(%q0, %q1)
+    return
+}
+
+// -----
+
+func.func @operator_with_control_qubits(%q : !quantum.bit, %cq : !quantum.bit, %cv : i1) {
+    %oq, %ocq = "quantum.operator"(%q, %cq, %cv) <{op_name = "ctrl_qubits", operandSegmentSizes = array<i32: 0, 0, 1, 1, 1, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 1, 1, 0>}> : (!quantum.bit, !quantum.bit, i1) -> (!quantum.bit, !quantum.bit)
+    return
+}
+
+// -----
+
+func.func @operator_custom_with_control_qubits(%q : !quantum.bit, %cq : !quantum.bit, %cv : i1) {
+    %oq, %ocq = quantum.operator "custom_ctrl_qubits"() qubits(%q)
+      ctrls(%cq) ctrl_vals(%cv)
+    return
+}
+
+// -----
+
+func.func @operator_with_registers(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+    %out = "quantum.operator"(%r, %idx0, %idx1) <{op_name = "with_registers", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 1, 2, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 1>}> : (!quantum.reg, tensor<2xi64>, tensor<1xi64>) -> !quantum.reg
+    return
+}
+
+// -----
+
+func.func @operator_custom_with_registers(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+    %out = quantum.operator "custom_with_registers"()
+      quregs(%r) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+    return
+}
+
+// -----
+
+func.func @operator_with_registers_and_controls(%r : !quantum.reg, %idx : tensor<2xi64>, %cidx : tensor<2xi64>, %cval : tensor<2xi1>) {
+    %out = "quantum.operator"(%r, %idx, %cidx, %cval) <{op_name = "reg_ctrls", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 1, 1, 1, 1>, resultSegmentSizes = array<i32: 0, 0, 1>}> : (!quantum.reg, tensor<2xi64>, tensor<2xi64>, tensor<2xi1>) -> !quantum.reg
+    return
+}
+
+// -----
+
+func.func @operator_custom_with_registers_and_controls(%r : !quantum.reg, %idx : tensor<2xi64>, %cidx : tensor<2xi64>, %cval : tensor<2xi1>) {
+    %out = quantum.operator "custom_reg_ctrls"()
+      quregs(%r) indices(%idx : tensor<2xi64>)
+      ctrls(%cidx : tensor<2xi64>) ctrl_vals(%cval : tensor<2xi1>)
+    return
+}
+
+// -----
+
+func.func @operator_qubits_with_maps(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %o0, %o1 = "quantum.operator"(%p0, %p1, %q0, %q1) <{op_name = "qubit_maps", param_map = {p0 = array<i64: 0>, p1 = array<i64: 1>}, qubit_map = {pair = array<i64: 0, 1>}, operandSegmentSizes = array<i32: 2, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (f64, i64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    return
+}
+
+// -----
+
+func.func @operator_custom_qubits_with_maps(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %o0, %o1 = quantum.operator "custom_qubit_maps"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
+      param_map = {p0 = [0], p1 = [1]}
+      qubit_map = {pair = [0, 1]}
+    return
+}
+
+// -----
+
+func.func @operator_registers_with_maps(%p0 : f64, %p1 : i64, %r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+    %out = "quantum.operator"(%p0, %p1, %r, %idx0, %idx1) <{op_name = "reg_maps", param_map = {p0 = array<i64: 0>, p1 = array<i64: 1>}, qubit_map = {qi0 = array<i64: 0>, qi1 = array<i64: 1>}, operandSegmentSizes = array<i32: 2, 0, 0, 0, 0, 1, 2, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 1>}> : (f64, i64, !quantum.reg, tensor<2xi64>, tensor<1xi64>) -> !quantum.reg
+    return
+}
+
+// -----
+
+func.func @operator_custom_registers_with_maps(%p0 : f64, %p1 : i64, %r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+    %out = quantum.operator "custom_reg_maps"(%p0 : f64, %p1 : i64)
+      quregs(%r) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+      param_map = {p0 = [0], p1 = [1]}
+      qubit_map = {qi0 = [0], qi1 = [1]}
+    return
+}
+
+// -----
+
+func.func @operator_register_multi_index_entry(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+    %out = quantum.operator "custom_multi_index_entry"() quregs(%r)
+      indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+      qubit_map = {wires = [0, 1]}
+    return
+}
+
+// -----
+
+func.func @operator_custom_multi_param_entry(%p0 : f64, %p1 : f64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %o0, %o1 = quantum.operator "custom_multi_param_entry"(%p0 : f64, %p1 : f64) qubits(%q0, %q1)
+      param_map = {angles = [0, 1]}
+      qubit_map = {pair = [0, 1]}
+    return
+}
+
+// -----
+
+func.func @operator_basic_with_static_data(%p : f64, %q : !quantum.bit) {
+    %out = "quantum.operator"(%p, %q) <{op_name = "with_static_data", static_data = {pauli_string = "XYZ", conditioning = 1 : i64}, adjoint = unit, operandSegmentSizes = array<i32: 1, 0, 1, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 1, 0, 0>}> : (f64, !quantum.bit) -> !quantum.bit
+    return
+}
+
+// -----
+
+func.func @operator_custom_basic_with_static_data(%p : f64, %q : !quantum.bit) {
+    %out = quantum.operator "custom_with_static_data"(%p : f64) adj qubits(%q)
+      static_data = {pauli_string = "XYZ", conditioning = 1 : i64}
+    return
+}
+
+// -----
+
+func.func @operator_custom_with_uid_and_forward(%fwd : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %o0, %o1 = quantum.operator "custom_uid_forward"() qubits(%q0, %q1)
+      UID(7) forward(%fwd : i64)
+    return
+}
+
+// -----
+
+func.func @operator_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
+    %o0, %o1 = "quantum.operator"(%p0, %p1, %q0, %q1) <{op_name = "bad_param_map", param_map = {p0 = array<i64: 0>}, qubit_map = {}, operandSegmentSizes = array<i32: 2, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (f64, i64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    return
+}
+
+// -----
+
+func.func @operator_custom_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
+    %o0, %o1 = quantum.operator "custom_bad_param_map"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
+      param_map = {p0 = [0]}
+      qubit_map = {}
+    return
+}
+
+// -----
+
+func.func @operator_invalid_qubit_map_coverage(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+    // expected-error@+1 {{qubit_map must cover all index arrays in register mode: expected 2, got 1}}
+    %out = "quantum.operator"(%r, %idx0, %idx1) <{op_name = "bad_qubit_map", param_map = {}, qubit_map = {qi0 = array<i64: 0>}, operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 1, 2, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 1>}> : (!quantum.reg, tensor<2xi64>, tensor<1xi64>) -> !quantum.reg
+    return
+}
+
+// -----
+
+func.func @operator_custom_invalid_qubit_map_coverage(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+    // expected-error@+1 {{qubit_map must cover all index arrays in register mode: expected 2, got 1}}
+    %out = quantum.operator "custom_bad_qubit_map"() quregs(%r)
+      indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+      param_map = {}
+      qubit_map = {qi0 = [0]}
+    return
+}
+
+// -----
+
+func.func @operator_invalid_qubit_map_sum(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
+    %o0, %o1 = "quantum.operator"(%q0, %q1) <{op_name = "bad_qubit_map_sum", param_map = {}, qubit_map = {pair = array<i64: 0>}, operandSegmentSizes = array<i32: 0, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    return
+}
+
+// -----
+
+func.func @operator_custom_invalid_qubit_map_sum(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
+    %o0, %o1 = quantum.operator "custom_bad_qubit_map_sum"() qubits(%q0, %q1)
+      param_map = {}
+      qubit_map = {pair = [0]}
+    return
+}
+
+// -----
+
+func.func @operator_invalid_qubit_map_union(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
+    %o0, %o1 = "quantum.operator"(%q0, %q1) <{op_name = "bad_qubit_map_union", param_map = {}, qubit_map = {a = array<i64: 0>, b = array<i64: 0>}, operandSegmentSizes = array<i32: 0, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    return
+}
+
+// -----
+
+func.func @operator_custom_invalid_qubit_map_union(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
+    %o0, %o1 = quantum.operator "custom_bad_qubit_map_union"() qubits(%q0, %q1)
+      param_map = {}
+      qubit_map = {a = [0], b = [0]}
+    return
+}
+
+// -----
+
+func.func @operator_invalid_register_qubit_map_oob(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+    // expected-error@+1 {{qubit_map index is out of bounds with respect to index arrays: 2 is not in [0, 2)}}
+    %out = "quantum.operator"(%r, %idx0, %idx1) <{op_name = "bad_register_map_oob", param_map = {}, qubit_map = {qi0 = array<i64: 0>, qi1 = array<i64: 2>}, operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 1, 2, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 1>}> : (!quantum.reg, tensor<2xi64>, tensor<1xi64>) -> !quantum.reg
+    return
+}
+
+// -----
+
+func.func @operator_custom_invalid_register_qubit_map_oob(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+    // expected-error@+1 {{qubit_map index is out of bounds with respect to index arrays: 2 is not in [0, 2)}}
+    %out = quantum.operator "custom_bad_register_map_oob"() quregs(%r)
+      indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+      param_map = {}
+      qubit_map = {qi0 = [0], qi1 = [2]}
+    return
+}
+
+// -----
+
+func.func @operator_invalid_forward_args_without_uid(%fwd : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // expected-error@+1 {{forward_args can only be present when UID is provided}}
+    %o0, %o1 = "quantum.operator"(%fwd, %q0, %q1) <{op_name = "bad_forward_no_uid", operandSegmentSizes = array<i32: 0, 1, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (i64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    return
+}
+
+// -----
+
+func.func @operator_invalid_both_modes(%q : !quantum.bit, %r : !quantum.reg, %idx : tensor<2xi64>) {
+    // expected-error@+1 {{must use either qubits or registers, but not both}}
+    %out_q, %out_r = "quantum.operator"(%q, %r, %idx) <{op_name = "bad_both", operandSegmentSizes = array<i32: 0, 0, 1, 0, 0, 1, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0, 1>}> : (!quantum.bit, !quantum.reg, tensor<2xi64>) -> (!quantum.bit, !quantum.reg)
+    return
+}
+
+// -----
+
+func.func @operator_invalid_no_mode() {
+    // expected-error@+1 {{must use either qubits or registers, but not both}}
+    "quantum.operator"() <{op_name = "bad_none", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 0>}> : () -> ()
+    return
+}
+
+// -----
+
+func.func @operator_invalid_qubit_io_mismatch(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
+    %out = "quantum.operator"(%q0, %q1) <{op_name = "bad_qio", operandSegmentSizes = array<i32: 0, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 1, 0, 0>}> : (!quantum.bit, !quantum.bit) -> !quantum.bit
+    return
+}
+
+// -----
+
+func.func @operator_invalid_qreg_io_mismatch(%r : !quantum.reg, %idx : tensor<2xi64>) {
+    // expected-error@+1 {{in_qreg and out_qreg must either both be present or absent}}
+    "quantum.operator"(%r, %idx) <{op_name = "bad_rio", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 1, 1, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 0>}> : (!quantum.reg, tensor<2xi64>) -> ()
+    return
+}
+
+// -----
+
+func.func @operator_invalid_ctrl_qubit_io_mismatch(%q : !quantum.bit, %cq0 : !quantum.bit, %cq1 : !quantum.bit, %cv0 : i1, %cv1 : i1) {
+    // expected-error@+1 {{number of controlling qubits in input (2) and output (1) must be the same}}
+    %oq0, %oq1, %ocq = "quantum.operator"(%q, %cq0, %cq1, %cv0, %cv1) <{op_name = "bad_ctrl_qio", operandSegmentSizes = array<i32: 0, 0, 1, 2, 2, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 1, 0>}> : (!quantum.bit, !quantum.bit, !quantum.bit, i1, i1) -> (!quantum.bit, !quantum.bit, !quantum.bit)
+    return
+}
+
+// -----
+
+func.func @operator_invalid_ctrl_qubit_value_mismatch(%q : !quantum.bit, %cq0 : !quantum.bit, %cq1 : !quantum.bit, %cv : i1) {
+    // expected-error@+1 {{number of controlling qubits in input (2) and controlling values (1) must be the same}}
+    %oq, %ocq0, %ocq1 = "quantum.operator"(%q, %cq0, %cq1, %cv) <{op_name = "bad_ctrl_qval", operandSegmentSizes = array<i32: 0, 0, 1, 2, 1, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 1, 2, 0>}> : (!quantum.bit, !quantum.bit, !quantum.bit, i1) -> (!quantum.bit, !quantum.bit, !quantum.bit)
+    return
+}
+
+// -----
+
+func.func @operator_invalid_control_mode_mix(%cq : !quantum.bit, %ctrlv : i1, %r : !quantum.reg, %idx : tensor<2xi64>, %cidx : tensor<2xi64>, %cval : tensor<2xi1>) {
+    // expected-error@+1 {{cannot mix qubit controls (in_ctrl_qubits/in_ctrl_values/out_ctrl_qubits) with register controls (arr_ctrl_indices/arr_ctrl_values)}}
+    %out_cq, %out_r = "quantum.operator"(%cq, %ctrlv, %r, %idx, %cidx, %cval) <{op_name = "bad_ctrl_mix", operandSegmentSizes = array<i32: 0, 0, 0, 1, 1, 1, 1, 1, 1>, resultSegmentSizes = array<i32: 0, 1, 1>}> : (!quantum.bit, i1, !quantum.reg, tensor<2xi64>, tensor<2xi64>, tensor<2xi1>) -> (!quantum.bit, !quantum.reg)
+    return
+}
+
+// -----
+
+func.func @operator_invalid_ctrl_pair_presence(%r : !quantum.reg, %idx : tensor<2xi64>, %cidx : tensor<2xi64>) {
+    // expected-error@+1 {{arr_ctrl_indices and arr_ctrl_values must either both be present or both absent}}
+    %out = "quantum.operator"(%r, %idx, %cidx) <{op_name = "bad_ctrl_pair", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 1, 1, 1, 0>, resultSegmentSizes = array<i32: 0, 0, 1>}> : (!quantum.reg, tensor<2xi64>, tensor<2xi64>) -> !quantum.reg
+    return
+}
+
+// -----
+
+func.func @operator_invalid_ctrl_static_length(%r : !quantum.reg, %idx : tensor<2xi64>, %cidx : tensor<2xi64>, %cval : tensor<1xi1>) {
+    // expected-error@+1 {{number of input control qubits (2) and control values (1) must be the same}}
+    %out = "quantum.operator"(%r, %idx, %cidx, %cval) <{op_name = "bad_ctrl_len", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 1, 1, 1, 1>, resultSegmentSizes = array<i32: 0, 0, 1>}> : (!quantum.reg, tensor<2xi64>, tensor<2xi64>, tensor<1xi1>) -> !quantum.reg
+    return
+}
+
+// -----
+
+func.func @operator_custom_invalid_ctrl_static_length(%r : !quantum.reg, %idx : tensor<2xi64>, %cidx : tensor<2xi64>, %cval : tensor<1xi1>) {
+    // expected-error@+1 {{number of input control qubits (2) and control values (1) must be the same}}
+    %out = quantum.operator "custom_bad_ctrl_len"() quregs(%r) indices(%idx : tensor<2xi64>)
+      ctrls(%cidx : tensor<2xi64>) ctrl_vals(%cval : tensor<1xi1>)
+    return
+}
+
+// -----
