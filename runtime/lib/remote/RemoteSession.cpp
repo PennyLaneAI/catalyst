@@ -78,6 +78,58 @@ void initialize_targets()
     (void)inited;
 }
 
+// A SimpleRemoteEPC transport that wraps the stock FDSimpleRemoteEPCTransport and adds a
+// shutdown() in disconnect().
+//
+// Teardown of a socket-backed session otherwise deadlocks: SimpleRemoteEPC::disconnect() (called
+// from ExecutionSession::endSession()) does `T->disconnect()` then waits for the transport's
+// listenLoop to observe end-of-stream and call handleDisconnect. FDSimpleRemoteEPCTransport's
+// disconnect() only close()s the socket fd — but on Linux close() neither wakes a read() already
+// in flight on the listener thread nor sends a FIN while that read holds a reference, so the
+// listener never returns and the wait blocks forever (and the peer never sees EOF either).
+//
+// shutdown(SHUT_RDWR) forces the in-flight read() to return and sends FIN to the peer. Doing it
+// here — inside disconnect(), which runs only after endSession() has finished its executor
+// messaging (e.g. deallocating JIT'd memory) — avoids tearing the socket down prematurely.
+class ShutdownFDTransport : public SimpleRemoteEPCTransport {
+  public:
+    static Expected<std::unique_ptr<ShutdownFDTransport>>
+    Create(SimpleRemoteEPCTransportClient &C, int InFD, int OutFD)
+    {
+        auto Inner = FDSimpleRemoteEPCTransport::Create(C, InFD, OutFD);
+        if (!Inner) {
+            return Inner.takeError();
+        }
+        return std::make_unique<ShutdownFDTransport>(std::move(*Inner), InFD, OutFD);
+    }
+
+    ShutdownFDTransport(std::unique_ptr<FDSimpleRemoteEPCTransport> inner, int inFD, int outFD)
+        : Inner(std::move(inner)), InFD(inFD), OutFD(outFD)
+    {
+    }
+
+    Error start() override { return Inner->start(); }
+
+    Error sendMessage(SimpleRemoteEPCOpcode OpC, uint64_t SeqNo, ExecutorAddr TagAddr,
+                      ArrayRef<char> ArgBytes) override
+    {
+        return Inner->sendMessage(OpC, SeqNo, TagAddr, ArgBytes);
+    }
+
+    void disconnect() override
+    {
+        ::shutdown(InFD, SHUT_RDWR);
+        if (OutFD != InFD) {
+            ::shutdown(OutFD, SHUT_RDWR);
+        }
+        Inner->disconnect();
+    }
+
+  private:
+    std::unique_ptr<FDSimpleRemoteEPCTransport> Inner;
+    int InFD, OutFD;
+};
+
 // For avoiding the error message being overwritten by subsequent errors in async jobs.
 // We use thread_local to store the error message.
 thread_local std::string g_last_error;
@@ -234,7 +286,9 @@ struct RemoteSession {
 
         auto setup = SimpleRemoteEPC::Setup();
         setup.CreateMemoryManager = createSimpleRemoteMemoryManager;
-        auto EPC = SimpleRemoteEPC::Create<FDSimpleRemoteEPCTransport>(
+        // ShutdownFDTransport instead of FDSimpleRemoteEPCTransport so teardown shutdown()s the
+        // socket and doesn't deadlock — see the class comment above.
+        auto EPC = SimpleRemoteEPC::Create<ShutdownFDTransport>(
             std::make_unique<DynamicThreadPoolTaskDispatcher>(std::nullopt), std::move(setup),
             *SockFD, *SockFD);
         if (!EPC) {
