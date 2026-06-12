@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/STLExtras.h>
 #define DEBUG_TYPE "reference-semantics-conversion"
+
+#include "reference_semantics_conversion.h"
 
 #include <optional>
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -35,8 +37,6 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
-
-#include "reference_semantics_conversion.h"
 
 using namespace mlir;
 using namespace catalyst;
