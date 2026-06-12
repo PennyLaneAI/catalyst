@@ -31,7 +31,6 @@ nanobind_add_module(QuantumPythonDecompositions
     PythonFunction.cpp
 )
 
-# TODO: move MLIR parsing back to quantum-transforms, let QPD only handle calling python
 target_link_libraries(QuantumPythonDecompositions PRIVATE)
 
 if (APPLE)

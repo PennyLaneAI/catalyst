@@ -129,6 +129,9 @@
 * Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
+* `graph-decomposition` can now decompose `quantum.paulirot` operators.
+  [(#2769)](https://github.com/PennyLaneAI/catalyst/pull/2769)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
