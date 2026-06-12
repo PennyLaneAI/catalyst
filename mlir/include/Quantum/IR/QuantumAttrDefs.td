@@ -49,6 +49,7 @@ class DictValuesOfType<string attrCppType> : AttrConstraint<
           ")">,
     "dictionary with " # attrCppType # " values"
 >;
+
 def I64ArrayDictAttr : ConfinedAttr<DictionaryAttr, [DictValuesOfType<"DenseI64ArrayAttr">]>;
 
 def FunctionRefArrayAttr : TypedArrayAttrBase<FlatSymbolRefAttr,

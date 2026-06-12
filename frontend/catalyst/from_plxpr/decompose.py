@@ -237,22 +237,25 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                     requires_copy=requires_copy,
                     pauli_word=pauli_word,
                 )
-            elif not any(
-                keyword in getattr(op.op, "name", "")
-                for keyword in (
-                    "Adjoint",
-                    "Controlled",
-                    "TemporaryAND",
-                    "ChangeOpBasis",
-                    "Prod",
+            elif not (
+                (op_type := getattr(op.op, "op_type", None)) is not None
+                and issubclass(
+                    op_type,
+                    (
+                        qp.ops.Adjoint,
+                        qp.ops.Controlled,
+                        qp.ops.ChangeOpBasis,
+                        qp.ops.Prod,
+                        qp.TemporaryAND,
+                    ),
                 )
-            ):  # pragma: no cover
+            ):
                 # Note that the graph-decomposition returns abstracted rules
                 # for Adjoint and Controlled operations, so we skip them here.
                 # These abstracted rules cannot be captured and lowered.
                 # We use MLIR AdjointOp and ControlledOp primitives
                 # to deal with decomposition of symbolic operations at PLxPR.
-                raise ValueError(f"Could not capture {op} without the number of wires.")
+                raise ValueError(f"Could not capture {op.op} without the number of wires.")
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments

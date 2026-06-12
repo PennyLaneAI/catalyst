@@ -53,7 +53,7 @@ test_subroutine_classical()
 
 
 def test_quantum_subroutine_identity_restore_wires():
-    """Test that a subroutine receives a register as a parameter and returns a register"""
+    """Test that a subroutine receiving a register as a parameter"""
 
     @subroutine
     def identity(): ...
@@ -64,18 +64,20 @@ def test_quantum_subroutine_identity_restore_wires():
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @main
     def main():
+        # CHECK: [[QREG:%.+]] = qref.alloc( 1) : !qref.reg<1>
+        # CHECK: [[QUBIT:%.+]] = qref.get [[QREG]][ 0] : !qref.reg<1> -> !qref.bit
+        # CHECK: qref.custom "Hadamard"() [[QUBIT]] : !qref.bit
+        # CHECK: call @identity([[QREG]]) : (!qref.reg<1>) -> ()
+        # CHECK: [[QUBIT:%.+]] = qref.get [[QREG]][ 0] : !qref.reg<1> -> !qref.bit
+        # CHECK: qref.custom "Hadamard"() [[QUBIT]] : !qref.bit
+
         qp.Hadamard(wires=[0])
-        # CHECK: [[QUBIT:%.+]] = quantum.custom "Hadamard"
-        # CHECK: [[QREG:%.+]] = quantum.insert {{.*}}
-        # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
-        # CHECK: [[QUBIT_1:%.+]] = quantum.extract [[QREG_1]][ 0]
-        # CHECK: quantum.custom "Hadamard"() [[QUBIT_1]]
         identity()
         qp.Hadamard(wires=[0])
         return qp.probs()
 
-    # CHECK: func.func private @identity([[REG:%.+]]: !quantum.reg) -> !quantum.reg
-    # CHECK-NEXT: return [[REG]] : !quantum.reg
+    # CHECK: func.func private @identity([[REG:%.+]]: !qref.reg<1>)
+    # CHECK-NEXT: return
 
     print(main.mlir)
     qp.capture.disable()
@@ -85,7 +87,7 @@ test_quantum_subroutine_identity_restore_wires()
 
 
 def test_quantum_subroutine_identity():
-    """Test that a subroutine receives a register as a parameter and returns a register"""
+    """Test that a subroutine receiving a register as a parameter"""
 
     @subroutine
     def identity(): ...
@@ -96,14 +98,14 @@ def test_quantum_subroutine_identity():
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @main
     def main():
-        # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
-        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        # CHECK: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @identity([[QREG]]) : (!qref.reg<1>) -> ()
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         identity()
         return qp.probs()
 
-    # CHECK: func.func private @identity([[REG:%.+]]: !quantum.reg) -> !quantum.reg
-    # CHECK-NEXT: return [[REG]] : !quantum.reg
+    # CHECK: func.func private @identity([[REG:%.+]]: !qref.reg<1>)
+    # CHECK-NEXT: return
 
     print(main.mlir)
     qp.capture.disable()
@@ -126,19 +128,17 @@ def test_quantum_subroutine_wire_param():
     # CHECK: module @subroutine_test
     def subroutine_test(c: int):
         # CHECK: func.func public @subroutine_test([[ARG0:%.+]]
-        # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @Hadamard0([[QREG]], [[ARG0:%.+]]) : (!quantum.reg, tensor<i64>) -> !quantum.reg
-        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        # CHECK: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @Hadamard0([[QREG]], [[ARG0:%.+]]) : (!qref.reg<1>, tensor<i64>) -> ()
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         Hadamard0(c)
         return qp.probs()
 
-    # CHECK: func.func private @Hadamard0([[REG:%.+]]: !quantum.reg, [[WIRE_IDX_TENSOR:%.+]]: tensor<i64>) -> !quantum.reg
+    # CHECK: func.func private @Hadamard0([[REG:%.+]]: !qref.reg<1>, [[WIRE_IDX_TENSOR:%.+]]: tensor<i64>)
     # CHECK-NEXT: [[WIRE_IDX:%.+]] = tensor.extract [[WIRE_IDX_TENSOR]][] : tensor<i64>
-    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[REG]][[[WIRE_IDX]]] : !quantum.reg -> !quantum.bit
-    # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT]] : !quantum.bit
-    # CHECK-NEXT: [[WIRE_IDX:%.+]] = tensor.extract [[WIRE_IDX_TENSOR]][] : tensor<i64>
-    # CHECK-NEXT: [[REG_1:%.+]] = quantum.insert [[REG]][[[WIRE_IDX]]], [[QUBIT_1]] : !quantum.reg, !quantum.bit
-    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
+    # CHECK-NEXT: [[QUBIT:%.+]] = qref.get [[REG]][[[WIRE_IDX]]] : !qref.reg<1>, i64 -> !qref.bit
+    # CHECK-NEXT: qref.custom "Hadamard"() [[QUBIT]] : !qref.bit
+    # CHECK-NEXT: return
 
     print(subroutine_test.mlir)
 
@@ -162,18 +162,17 @@ def test_quantum_subroutine_gate_param_param():
     # CHECK: module @subroutine_test_2
     def subroutine_test_2():
         # CHECK-DAG: [[CST:%.+]] = stablehlo.constant dense<3.140000e+00>
-        # CHECK-DAG: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @RX_on_wire_0([[QREG]], [[CST]]) : (!quantum.reg, tensor<f64>) -> !quantum.reg
-        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        # CHECK-DAG: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @RX_on_wire_0([[QREG]], [[CST]]) : (!qref.reg<1>, tensor<f64>) -> ()
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         RX_on_wire_0(3.14)
         return qp.probs()
 
-    # CHECK: func.func private @RX_on_wire_0([[REG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>) -> !quantum.reg
-    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[REG]][ 0] : !quantum.reg -> !quantum.bit
+    # CHECK: func.func private @RX_on_wire_0([[REG:%.+]]: !qref.reg<1>, [[PARAM_TENSOR:%.+]]: tensor<f64>)
+    # CHECK-NEXT: [[QUBIT:%.+]] = qref.get [[REG]][ 0] : !qref.reg<1> -> !qref.bit
     # CHECK-NEXT: [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
-    # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
-    # CHECK-NEXT: [[REG_1:%.+]] = quantum.insert [[REG]][ 0], [[QUBIT_1]] : !quantum.reg, !quantum.bit
-    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
+    # CHECK-NEXT: qref.custom "RX"([[PARAM]]) [[QUBIT]] : !qref.bit
+    # CHECK-NEXT: return
     print(subroutine_test_2.mlir)
 
     qp.capture.disable()
@@ -202,25 +201,21 @@ def test_quantum_subroutine_with_control_flow():
     # CHECK: module @subroutine_test_3
     def subroutine_test_3():
         # CHECK-DAG: [[CST:%.+]] = stablehlo.constant dense<3.140000e+00>
-        # CHECK-DAG: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @conditional_RX([[QREG]], [[CST]]) : (!quantum.reg, tensor<f64>) -> !quantum.reg
-        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        # CHECK-DAG: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @conditional_RX([[QREG]], [[CST]]) : (!qref.reg<1>, tensor<f64>) -> ()
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         conditional_RX(3.14)
         return qp.probs()
 
-    # CHECK: func.func private @conditional_RX([[QREG:%.+]]: !quantum.reg, [[PARAM_TENSOR:%.+]]: tensor<f64>)
+    # CHECK: func.func private @conditional_RX([[QREG:%.+]]: !qref.reg<1>, [[PARAM_TENSOR:%.+]]: tensor<f64>)
     # CHECK-NEXT: [[ZERO:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
     # CHECK-NEXT: [[COND_TENSOR:%.+]] = stablehlo.compare  NE, [[PARAM_TENSOR]], [[ZERO]],  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
     # CHECK-NEXT: [[COND:%.+]] = tensor.extract [[COND_TENSOR]][] : tensor<i1>
-    # CHECK-NEXT: [[RETVAL:%.+]] = scf.if [[COND]]
-    # CHECK-DAG:        [[QUBIT:%.+]] = quantum.extract [[QREG]][ 0] : !quantum.reg -> !quantum.bit
-    # CHECK-DAG:        [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
-    # CHECK:            [[QUBIT_0:%.+]] = quantum.custom "RX"([[PARAM]]) [[QUBIT]] : !quantum.bit
-    # CHECK-NEXT:       [[QREG_0:%.+]] = quantum.insert [[QREG]][ 0], [[QUBIT_0]] : !quantum.reg, !quantum.bit
-    # CHECK-NEXT:       scf.yield [[QREG_0]] : !quantum.reg
-    # CHECK-NEXT: else
-    # CHECK:            scf.yield [[QREG]] : !quantum.reg
-    # CHECK:      return [[RETVAL]]
+    # CHECK-NEXT: scf.if [[COND]]
+    # CHECK:        [[QUBIT:%.+]] = qref.get [[QREG]][ 0] : !qref.reg<1> -> !qref.bit
+    # CHECK:        [[PARAM:%.+]] = tensor.extract [[PARAM_TENSOR]][] : tensor<f64>
+    # CHECK:        qref.custom "RX"([[PARAM]]) [[QUBIT]] : !qref.bit
+    # CHECK:      return
     print(subroutine_test_3.mlir)
     qp.capture.disable()
 
@@ -245,21 +240,20 @@ def test_nested_subroutine_call():
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_4
     def subroutine_test_4():
-        # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @Hadamard_caller([[QREG]]) : (!quantum.reg) -> !quantum.reg
-        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        # CHECK: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @Hadamard_caller([[QREG]]) : (!qref.reg<1>) -> ()
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         Hadamard_caller()
         return qp.probs()
 
-    # CHECK: func.func private @Hadamard_caller([[QREG:%.+]]: !quantum.reg) -> !quantum.reg
-    # CHECK-NEXT: [[QREG_1:%.+]] = call @Hadamard_subroutine([[QREG]]) : (!quantum.reg) -> !quantum.reg
-    # CHECK-NEXT: return [[QREG_1]]
+    # CHECK: func.func private @Hadamard_caller([[QREG:%.+]]: !qref.reg<1>)
+    # CHECK-NEXT: call @Hadamard_subroutine([[QREG]]) : (!qref.reg<1>) -> ()
+    # CHECK-NEXT: return
 
-    # CHECK: func.func private @Hadamard_subroutine([[QREG:%.+]]: !quantum.reg) -> !quantum.reg
-    # CHECK-NEXT: [[QUBIT:%.+]] = quantum.extract [[QREG]][ 0] : !quantum.reg -> !quantum.bit
-    # CHECK-NEXT: [[QUBIT_1:%.+]] = quantum.custom "Hadamard"() [[QUBIT]] : !quantum.bit
-    # CHECK-NEXT: [[QREG_1:%.+]] = quantum.insert [[QREG]][ 0], [[QUBIT_1]] : !quantum.reg, !quantum.bit
-    # CHECK-NEXT: return [[QREG_1]] : !quantum.reg
+    # CHECK: func.func private @Hadamard_subroutine([[QREG:%.+]]: !qref.reg<1>)
+    # CHECK-NEXT: [[QUBIT:%.+]] = qref.get [[QREG]][ 0] : !qref.reg<1> -> !qref.bit
+    # CHECK-NEXT: qref.custom "Hadamard"() [[QUBIT]] : !qref.bit
+    # CHECK-NEXT: return
     print(subroutine_test_4.mlir)
     qp.capture.disable()
 
@@ -303,12 +297,12 @@ def test_two_callsites_quantum():
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_6
     def subroutine_test_6():
-        # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
+        # CHECK: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @identity([[QREG]]) : (!qref.reg<1>) -> ()
         identity()
-        # CHECK: [[QREG_2:%.+]] = call @identity([[QREG_1]]) : (!quantum.reg) -> !quantum.reg
+        # CHECK: call @identity([[QREG]]) : (!qref.reg<1>) -> ()
         identity()
-        # CHECK: quantum.compbasis qreg [[QREG_2]] : !quantum.obs
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         return qp.probs()
 
     # CHECK-NOT: func.func private @identity_0
@@ -330,21 +324,22 @@ def test_two_qnodes_one_subroutine():
 
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def subroutine_test_7():
-        # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @identity([[QREG]]) : (!quantum.reg) -> !quantum.reg
+        # CHECK: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @identity([[QREG]]) : (!qref.reg<1>) -> ()
         identity()
-        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         return qp.probs()
 
         # CHECK: func.func private @identity
 
     @qp.qnode(qp.device("null.qubit", wires=1))
     def subroutine_test_8():
-        # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @identity_0([[QREG]]) : (!quantum.reg) -> !quantum.reg
+        # CHECK: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @identity_0([[QREG]]) : (!qref.reg<1>) -> ()
         identity()
-        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         return qp.probs()
+
         # CHECK: func.func private @identity_0
 
     qp.capture.enable()
@@ -398,17 +393,22 @@ def test_basic_subroutine():
     @qp.qnode(qp.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit(x):
-        # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @f([[QREG]], %arg0, %1) : (!quantum.reg, tensor<f64>, tensor<1xi64>) -> !quantum.reg
-
-        # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
+        # CHECK: [[zero:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+        # CHECK: [[QREG:%.+]] = qref.alloc
+        # CHECK: [[zero_tensor:%.+]] = stablehlo.broadcast_in_dim [[zero]], dims = [] : (tensor<i64>) -> tensor<1xi64>
+        # CHECK: call @f([[QREG]], %arg0, [[zero_tensor]]) : (!qref.reg<1>, tensor<f64>, tensor<1xi64>)
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         f(x, 0)
         return qp.probs()
 
-    # CHECK: func.func private @f(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
-    # CHECK: [[QUBIT_1:%.+]] = quantum.custom "RX"
-    # CHECK: [[REG_1:%.+]] = quantum.insert
-    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
+    # CHECK: func.func private @f(%arg0: !qref.reg<1>, %arg1: tensor<f64>, %arg2: tensor<1xi64>)
+    # CHECK: [[IDX:%.+]] = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    # CHECK: [[reshape:%.+]] = stablehlo.reshape [[IDX]] : (tensor<1xi64>) -> tensor<i64>
+    # CHECK: [[extract:%.+]] = tensor.extract [[reshape]][] : tensor<i64>
+    # CHECK: [[qubit:%.+]] = qref.get %arg0[[[extract]]] : !qref.reg<1>, i64 -> !qref.bit
+    # CHECK: [[angle:%.+]] = tensor.extract %arg1[] : tensor<f64>
+    # CHECK: qref.custom "RX"([[angle]]) [[qubit]] : !qref.bit
+    # CHECK-NEXT: return
     circuit(0.5)
     print(circuit.mlir)
 
@@ -435,33 +435,29 @@ def test_multiple_metadata():
     @qp.qnode(qp.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit():
-        # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @f([[QREG]], %1) : (!quantum.reg, tensor<1xi64>) -> !quantum.reg
-        # CHECK: [[QREG_2:%.+]] = call @f_0([[QREG_1]], %3) : (!quantum.reg, tensor<1xi64>) -> !quantum.reg
-        # CHECK: [[QREG_3:%.+]] = call @f_1([[QREG_2]], %5) : (!quantum.reg, tensor<1xi64>) -> !quantum.reg
-        # CHECK: [[QREG_4:%.+]] = call @f([[QREG_3]], %7) : (!quantum.reg, tensor<1xi64>) -> !quantum.reg
-
-        # CHECK: quantum.compbasis qreg [[QREG_4]] : !quantum.obs
+        # CHECK: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @f([[QREG]], {{%.+}}) : (!qref.reg<1>, tensor<1xi64>)
+        # CHECK: call @f_0([[QREG]], {{%.+}}) : (!qref.reg<1>, tensor<1xi64>)
+        # CHECK: call @f_1([[QREG]], {{%.+}}) : (!qref.reg<1>, tensor<1xi64>)
+        # CHECK: call @f([[QREG]], {{%.+}}) : (!qref.reg<1>, tensor<1xi64>)
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         f(0, "X")
         f(0, "Y")
         f(0, "Z")
         f(0, "X")  # check reusing the first call to the function
         return qp.probs()
 
-    # CHECK: func.func private @f(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
-    # CHECK: [[QUBIT_1:%.+]] = quantum.custom "PauliX"
-    # CHECK: [[REG_1:%.+]] = quantum.insert
-    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
+    # CHECK: func.func private @f(%arg0: !qref.reg<1>, %arg1: tensor<1xi64>)
+    # CHECK: qref.custom "PauliX"
+    # CHECK-NEXT: return
 
-    # CHECK: func.func private @f_0(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
-    # CHECK: [[QUBIT_1:%.+]] = quantum.custom "PauliY"
-    # CHECK: [[REG_1:%.+]] = quantum.insert
-    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
+    # CHECK: func.func private @f_0(%arg0: !qref.reg<1>, %arg1: tensor<1xi64>)
+    # CHECK: qref.custom "PauliY"
+    # CHECK-NEXT: return
 
-    # CHECK: func.func private @f_1(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
-    # CHECK: [[QUBIT_1:%.+]] = quantum.custom "PauliZ"
-    # CHECK: [[REG_1:%.+]] = quantum.insert
-    # CHECK-NEXT: return [[REG_1]] : !quantum.reg
+    # CHECK: func.func private @f_1(%arg0: !qref.reg<1>, %arg1: tensor<1xi64>)
+    # CHECK: qref.custom "PauliZ"
+    # CHECK-NEXT: return
     print(circuit.mlir)
 
 
@@ -483,25 +479,25 @@ def test_different_shapes():
     @qp.qnode(qp.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit():
-        # CHECK: [[QREG:%.+]] = quantum.alloc
-        # CHECK: [[QREG_1:%.+]] = call @my_subroutine([[QREG]], %arg0, %4) : (!quantum.reg, tensor<3xf64>, tensor<3xi64>) -> !quantum.reg
-        # CHECK: [[QREG_2:%.+]] = call @my_subroutine([[QREG_1]], %arg1, %9) : (!quantum.reg, tensor<3xf64>, tensor<3xi64>) -> !quantum.reg
-        # CHECK: [[QREG_3:%.+]] = call @my_subroutine_0([[QREG_2]], %arg2, %14) : (!quantum.reg, tensor<2xf64>, tensor<3xi64>) -> !quantum.reg
-
-        # CHECK: quantum.compbasis qreg [[QREG_3]] : !quantum.obs
+        # CHECK: [[QREG:%.+]] = qref.alloc
+        # CHECK: call @my_subroutine([[QREG]], %arg0, {{%.+}}) : (!qref.reg<1>, tensor<3xf64>, tensor<3xi64>)
+        # CHECK: call @my_subroutine([[QREG]], %arg1, {{%.+}}) : (!qref.reg<1>, tensor<3xf64>, tensor<3xi64>)
+        # CHECK: call @my_subroutine_0([[QREG]], %arg2, {{%.+}}) : (!qref.reg<1>, tensor<2xf64>, tensor<3xi64>)
+        # CHECK: qref.compbasis(qreg [[QREG]] : !qref.reg<1>) : !quantum.obs
         my_subroutine(jnp.array([0.0, 0.1, 0.2]), [0, 1, 2])
         my_subroutine(jnp.array([0.0, 0.1, 0.2]), [0, 1, 2])
         my_subroutine(jnp.array([0.5, 1.2]), [0, 1, 2])
         return qp.probs()
 
-    # CHECK: func.func private @my_subroutine(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<3xi64>) -> !quantum.reg
+    # CHECK: func.func private @my_subroutine(%arg0: !qref.reg<1>, %arg1: tensor<3xf64>, %arg2: tensor<3xi64>)
     # CHECK:   [[ub:%.+]] = arith.constant 3 : index
     # CHECK:   scf.for {{%.+}} = {{%.+}} to [[ub]] step {{%.+}}
+    # CHECK:   qref.custom "RX"
 
-    # CHECK: func.func private @my_subroutine_0(%arg0: !quantum.reg, %arg1: tensor<2xf64>, %arg2: tensor<3xi64>) -> !quantum.reg
+    # CHECK: func.func private @my_subroutine_0(%arg0: !qref.reg<1>, %arg1: tensor<2xf64>, %arg2: tensor<3xi64>)
     # CHECK: arith.constant 2 : index
     # CHECK: scf.for
-    # CHECK: [[QUBIT_1:%.+]] = quantum.custom "RX"
+    # CHECK: qref.custom "RX"
 
     print(circuit.mlir)
 

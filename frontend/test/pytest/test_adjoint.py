@@ -889,11 +889,6 @@ class TestProperties:
 
         assert op.has_diagonalizing_gates is False
 
-    def test_queue_category(self):
-        """Test that the queue category `"_ops"` carries over."""
-        op = adjoint(qp.PauliX(0))
-        assert op._queue_category == "_ops"  # pylint: disable=protected-access
-
     @pytest.mark.parametrize("value", (True, False))
     def test_is_verified_hermitian(self, value):
         """Test `is_verified_hermitian` property mirrors that of the base."""
@@ -1076,11 +1071,13 @@ class TestAdjointOperation:
         base = qp.RX(param, wires=0)
         op = adjoint(base)
 
-        base_angles = base.single_qubit_rot_angles()
-        angles = op.single_qubit_rot_angles()
+        *base_angles, base_phase = qp.single_qubit_zyz_angles(base)
+        *angles, phase = qp.single_qubit_zyz_angles(op)
 
         for angle1, angle2 in zip(angles, reversed(base_angles)):
             assert angle1 == -angle2
+
+        assert base_phase == phase
 
     def test_control_wires(self):
         """Test the control_wires of an adjoint are the same as the base op."""
