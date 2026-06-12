@@ -75,6 +75,8 @@ The convert-quantum-to-qecl pass does not support the following cases:
   * Programs with non-Clifford gates; specifically any gates other than I, X, Y, Z, Hadamard, S or
     CNOT.
   * Programs with control-flow operations other than `scf.for` and `scf.if`.
+  * Programs that implicitly sample all wires on the device, e.g. `return qp.sample()`. However,
+    sampling an explicit list of wires is supported, e.g. `return qp.sample(wires=[0, 1, 2])`.
 """
 
 import math
@@ -794,10 +796,35 @@ class ScfForConversion(ScfConversionPattern):
         return yield_op
 
 
+# MARK: Compbasis Op Pattern
+
+
 class ComputationalBasisOpConversion(RewritePattern):
     """Converts `quantum.compbasis` ops to sets of `qecl.measure` and `quantum.mcmobs` ops.
 
-    TODO (more explanation; do we assume k = 1?)
+    As with the `quantum.measure` conversion pattern, this conversion also assumes that k = 1, and
+    as such always applies the logical measurement operation to the codeblock at index 0.
+
+    Example
+    -------
+
+    Input:
+
+        %b0 = ... : !qecl.codeblock<1>
+        %q0 = builtin.unrealized_conversion_cast %b0 : !qecl.codeblock<1> to !quantum.bit
+        %b1 = ... : !qecl.codeblock<1>
+        %q1 = builtin.unrealized_conversion_cast %b1 : !qecl.codeblock<1> to !quantum.bit
+        %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+        %samples = quantum.sample %obs : tensor<100x2xf64>
+
+    Output (after applying `reconcile-unrealized-casts`):
+
+        %b0 = ... : !qecl.codeblock<1>
+        %b1 = ... : !qecl.codeblock<1>
+        %mres0, %b01 = qecl.measure %b0[0] : i1, !qecl.codeblock<1>
+        %mres1, %b11 = qecl.measure %b1[0] : i1, !qecl.codeblock<1>
+        %obs = quantum.mcmobs %mres0, %mres1 : !quantum.obs
+        %samples = quantum.sample %obs : tensor<100x2xf64>
     """
 
     @op_type_rewrite_pattern
@@ -813,7 +840,9 @@ class ComputationalBasisOpConversion(RewritePattern):
     def _convert_qubit_compbasis_to_mcm_obs(
         cls, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter
     ):
-        """TODO"""
+        """Helper function to match_and_rewrite() that handles the conversion of a
+        `quantum.compbasis` op acting on qubits.
+        """
         meas_results: list[OpResult] = []
 
         for qubit in op.qubits:
@@ -851,8 +880,14 @@ class ComputationalBasisOpConversion(RewritePattern):
     def _convert_qreg_compbasis_to_mcm_obs(
         cls, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter
     ):
-        """TODO"""
-        raise NotImplementedError("support for `quantum.compbasis qreg` is not yet implemented")
+        """Helper function to match_and_rewrite() that handles the conversion of a
+        `quantum.compbasis` op acting on the global quantum register.
+        """
+        raise CompileError(
+            "Implicitly sampling all wires on the device is not supported in the QEC pipeline. "
+            "Instead, please provide an explicit list of wires to sample, e.g. "
+            "`qp.sample(wires=[0, 1, 2])`."
+        )
 
 
 # MARK: Helpers
