@@ -65,14 +65,14 @@ struct QubitValueTracker {
     {
         assert(isa<quantum::QuregType>(vQreg.getType()) && "Expected quantum.reg type");
         assert(isa<qref::QuregType>(rQreg.getType()) && "Expected qref.reg type");
-        this->qreg_map[vQreg] = rQreg;
-
         if (failed(this->checkReferenceIsVisible(vQreg, rQreg))) {
             vQreg.getDefiningOp()->emitError(
                 "The value semantics quantum value is referring to a quantum reference that is not "
                 "visible to its scope. The reference must exist in the same scope, or a parent "
                 "scope as the value.");
         }
+
+        this->qreg_map[vQreg] = rQreg;
     }
 
     Value getRQreg(Value vQreg)
@@ -88,7 +88,6 @@ struct QubitValueTracker {
     {
         assert(isa<quantum::QubitType>(vQubit.getType()) && "Expected quantum.bit type");
         assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
-        this->qubit_map[vQubit] = rQubit;
 
         if (failed(this->checkReferenceIsVisible(vQubit, rQubit))) {
             vQubit.getDefiningOp()->emitError(
@@ -96,6 +95,8 @@ struct QubitValueTracker {
                 "visible to its scope. The reference must exist in the same scope, or a parent "
                 "scope as the value.");
         }
+
+        this->qubit_map[vQubit] = rQubit;
     }
 
     Value getRQubit(Value vQubit)
