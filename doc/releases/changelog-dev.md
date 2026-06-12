@@ -164,9 +164,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Added permissions to all GitHub Actions workflows.
-  [(#2778)](https://github.com/PennyLaneAI/catalyst/pull/2778)
-  
 * The frontend now generates MLIR in reference semantics when capture is enabled.
   [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
   [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
