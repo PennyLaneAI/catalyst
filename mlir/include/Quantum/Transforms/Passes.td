@@ -164,7 +164,7 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*Default*/[{ "" }],
             /*Description*/"A path to a bytecode file of compiled decomposition rules.">,
         Option<
-            /*C++ name*/"callbackPluginPath",
+            /*C++ name*/"libQPDPath",
             /*CLI name*/"libQPD-path",
             /*Type*/"std::string",
             /*Default*/[{ "" }],

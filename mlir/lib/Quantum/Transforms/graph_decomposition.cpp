@@ -34,8 +34,8 @@
 #include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/DecompCallbacksLoader.h"
 #include "Quantum/Transforms/Passes.h"
+#include "Quantum/Transforms/QPDLoader.h"
 
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
@@ -56,7 +56,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
-        loadPythonCallbackPlugin(callbackPluginPath, libpythonPath);
+        loadQPD(libQPDPath, libpythonPath);
 
         // Debugging output for command-line options
         LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");
@@ -125,8 +125,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         insertChosenRules(solution, ruleNameToFuncOp);
 
         ///////////////////////////
-        // Step 4: Convert callbacks from reference to value semantics and run decompose-lowering to
-        // apply the chosen decomposition rules
+        // Step 4: Convert python-decompositions from reference to value semantics and run
+        // decompose-lowering to apply the chosen decomposition rules
         ModuleOp module = getOperation();
         OpPassManager pm("builtin.module");
         pm.addPass(qref::createValueSemanticsConversionPass());
@@ -309,7 +309,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             mlir::ParserConfig config(context);
             auto moduleOp = mlir::parseSourceString(llvm::StringRef(mlirText), config);
             if (!moduleOp) {
-                llvm::errs() << "failed to parse MLIR from python callback\n";
+                llvm::errs() << "failed to parse MLIR from python-decomposition\n";
                 return failure();
             }
 

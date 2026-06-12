@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum/Transforms/DecompCallbacksLoader.h"
+#include "Quantum/Transforms/QPDLoader.h"
 
 #include <atomic>
 #include <dlfcn.h>
@@ -38,16 +38,16 @@ namespace {
 // the symbol lookup cost.
 std::atomic<bool> resolutionAttempted{false};
 
-static const std::string pluginName = "libQuantumPythonCallbacks.so";
+static const std::string pluginName = "libQuantumPythonDecompositions.so";
 
 // Resolve the plugin path. Search order:
-// 1. $CATALYST_PYTHON_CALLBACK_PLUGIN (explicit override).
+// 1. $CATALYST_QPD (explicit override).
 // 2. function parameter
-// 3. <exe_dir>/../lib/libQuantumPythonCallbacks.so (build & install)
-// 4. <exe_dir>/libQuantumPythonCallbacks.so (alongside)
-std::string resolvePluginPath(std::string callbackPluginPath)
+// 3. <exe_dir>/../lib/libQuantumPythonDecompositions.so (build & install)
+// 4. <exe_dir>/libQuantumPythonDecompositions.so (alongside)
+std::string resolvePluginPath(std::string libQPDPath)
 {
-    if (auto override_ = llvm::sys::Process::GetEnv("CATALYST_PYTHON_CALLBACK_PLUGIN")) {
+    if (auto override_ = llvm::sys::Process::GetEnv("CATALYST_QPD")) {
         return *override_;
     }
 
@@ -67,10 +67,10 @@ std::string resolvePluginPath(std::string callbackPluginPath)
         return std::string(path);
     };
 
-    llvm::SmallString<256> inputPath(callbackPluginPath);
+    llvm::SmallString<256> inputPath(libQPDPath);
     std::string result = checkCandidate(inputPath);
     if (!result.empty()) {
-        LDBG(2) << "Found libQuantumPythonCallbacks path from function parameter:" << result
+        LDBG(2) << "Found libQuantumPythonDecompositions path from function parameter:" << result
                 << "\n";
         return result;
     }
@@ -102,11 +102,10 @@ bool tryLoadLibpython(llvm::StringRef where)
 
     auto h = ::dlopen(where.str().c_str(), RTLD_GLOBAL | RTLD_LAZY);
     if (!h) {
-        llvm::errs() << "[decomp-callbacks-loader] libpython dlopen failed: " << ::dlerror()
-                     << "\n";
+        llvm::errs() << "[QPD-loader] libpython dlopen failed: " << ::dlerror() << "\n";
         return false;
     }
-    LDBG() << "[decomp-callbacks-loader] libpython loaded from: " << where << "\n";
+    LDBG() << "[QPD-loader] libpython loaded from: " << where << "\n";
     return true;
 }
 
@@ -137,19 +136,19 @@ void ensureLibpythonLoaded(std::string libpythonPath)
     if (tryLoadLibpython(CATALYST_LIBPYTHON_SONAME))
         return;
 #endif
-    llvm::errs() << "[decomp-callbacks-loader] libpython could not be resolved, "
+    llvm::errs() << "[QPD-loader] libpython could not be resolved, "
                     "the plugin will likely "
                     "fail with undefined symbols.\n";
 }
 
-LowerPauliRotFn loadAndResolve(std::string callbackPluginPath, std::string libpythonPath)
+LowerPauliRotFn loadAndResolve(std::string libQPDPath, std::string libpythonPath)
 {
-    std::string path = resolvePluginPath(callbackPluginPath);
+    std::string path = resolvePluginPath(libQPDPath);
     if (path.empty()) {
-        llvm::errs() << "[decomp-callbacks-loader] The plugin path could not be resolved.\n";
+        llvm::errs() << "[QPD-loader] The plugin path could not be resolved.\n";
         return nullptr;
     }
-    LDBG() << "[decomp-callbacks-loader] plugin resolved at: " << path << "\n";
+    LDBG() << "[QPD-loader] plugin resolved at: " << path << "\n";
 
     ensureLibpythonLoaded(libpythonPath);
 
@@ -157,23 +156,24 @@ LowerPauliRotFn loadAndResolve(std::string callbackPluginPath, std::string libpy
     // memory space
     void *libHandle = ::dlopen(path.c_str(), RTLD_GLOBAL | RTLD_LAZY);
     if (!libHandle) {
-        llvm::errs() << "[decomp-callbacks-loader] dlopen('" << path << "') failed: " << ::dlerror()
-                     << "\n";
+        llvm::errs() << "[QPD-loader] dlopen('" << path << "') failed: " << ::dlerror() << "\n";
         return nullptr;
     }
 
-    // use a c-safe function for getting the callback to allow cpp types in the python caller
-    auto *getCallback = reinterpret_cast<void *(*)()>(::dlsym(libHandle, "getPythonLowerPauliRot"));
-    if (!getCallback) {
-        llvm::errs() << "[decomp-callbacks-loader] dlopen succeeded but symbol "
+    // use a c-safe function for getting the lowering function to allow cpp types in the python
+    // caller
+    auto *getLoweringFunction =
+        reinterpret_cast<void *(*)()>(::dlsym(libHandle, "getPythonLowerPauliRot"));
+    if (!getLoweringFunction) {
+        llvm::errs() << "[QPD-loader] dlopen succeeded but symbol "
                         "'getPythonLowerPauliRot' not found in '"
                      << path << "'\n";
     }
 
     // resolve the proper python-decomposition lowering function via the getter
-    auto *sym = reinterpret_cast<LowerPauliRotFn>(getCallback());
+    auto *sym = reinterpret_cast<LowerPauliRotFn>(getLoweringFunction());
     if (!sym) {
-        llvm::errs() << "[decomp-callbacks-loader] dlopen succeeded but symbol "
+        llvm::errs() << "[QPD-loader] dlopen succeeded but symbol "
                         "'pythonLowerPauliRot' not found in '"
                      << path << "'\n";
     }
@@ -182,7 +182,7 @@ LowerPauliRotFn loadAndResolve(std::string callbackPluginPath, std::string libpy
 
 } // namespace
 
-bool loadPythonCallbackPlugin(std::string callbackPluginPath, std::string libpythonPath)
+bool loadQPD(std::string libQPDPath, std::string libpythonPath)
 {
     if (pythonLowerPauliRot) {
         return true;
@@ -194,7 +194,7 @@ bool loadPythonCallbackPlugin(std::string callbackPluginPath, std::string libpyt
         return pythonLowerPauliRot != nullptr;
     }
 
-    pythonLowerPauliRot = loadAndResolve(callbackPluginPath, libpythonPath);
+    pythonLowerPauliRot = loadAndResolve(libQPDPath, libpythonPath);
 
     return pythonLowerPauliRot != nullptr;
 }

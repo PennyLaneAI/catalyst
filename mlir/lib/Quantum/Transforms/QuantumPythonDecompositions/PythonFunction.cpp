@@ -19,13 +19,13 @@
 
 #include "PythonDriverUtils.hpp"
 
-#define DEBUG_TYPE "[QPC] "
+#define DEBUG_TYPE "[QPD] "
 
 namespace nb = nanobind;
 
 std::string pythonLowerPauliRot(double theta, const std::string &pauliWord, std::vector<int> wires)
 {
-    QuantumPythonCallbacks::PyInterpreterGuard guard;
+    QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
         const char *moduleName = "catalyst.device.python_decompositions";
         const char *functionName = "paulirot_decomposition_wrapper";
@@ -44,8 +44,8 @@ std::string pythonLowerPauliRot(double theta, const std::string &pauliWord, std:
             return nb::borrow<nb::str>(pythonResult).c_str();
         }
         catch (const nb::python_error &error) {
-            throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
-                                                       error.what());
+            throw QuantumPythonDecompositions::TracingError(moduleName, functionName, pauliWord,
+                                                            error.what());
         }
         catch (const std::exception &error) {
             throw;

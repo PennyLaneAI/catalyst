@@ -8,8 +8,7 @@ file(GLOB SRC
     CancelInversesPatterns.cpp
     ConversionPatterns.cpp
     DecomposeLoweringPatterns.cpp
-    DecompCallbacks.cpp
-    DecompCallbacksLoader.cpp
+    QPDLoader.cpp
     DisentangleCNOT.cpp
     DisentangleSWAP.cpp
     GridsynthPatterns.cpp
@@ -66,7 +65,7 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                        )
 
 # Discover the libpython SHARED-library filename the active Python uses at
-# runtime so the decomp-callbacks loader can dlopen it before opening the
+# runtime so the QPD loader can dlopen it before opening the
 # plugin .so.
 #
 # Note that we need the SONAME of the shared library, NOT the link-time name.
@@ -102,7 +101,7 @@ print(full)
 if (NOT _libpython_query_rc EQUAL 0 OR _libpython_query_out STREQUAL "")
     message(FATAL_ERROR
             "Could not determine libpython shared-library filename. "
-            "The decomp-callbacks loader needs this to dlopen libpython at runtime.")
+            "The QPD loader needs this to dlopen libpython at runtime.")
 endif()
 # Split the two-line output into SONAME (line 1) and absolute path (line 2).
 string(REPLACE "\n" ";" _libpython_query_lines "${_libpython_query_out}")
@@ -113,9 +112,9 @@ if (_libpython_query_n GREATER_EQUAL 2)
     list(GET _libpython_query_lines 1 _libpython_path)
 endif()
 
-message(STATUS "Catalyst decomp-callbacks loader libpython SONAME: ${_libpython_soname}")
+message(STATUS "Catalyst QPD loader libpython SONAME: ${_libpython_soname}")
 if (_libpython_path)
-    message(STATUS "Catalyst decomp-callbacks loader libpython path:   ${_libpython_path}")
+    message(STATUS "Catalyst QPD loader libpython path:   ${_libpython_path}")
 endif()
 
 # Build the set of -D defines for the loader TU.
@@ -123,6 +122,6 @@ set(_loader_defines "CATALYST_LIBPYTHON_SONAME=\"${_libpython_soname}\"")
 if (_libpython_path)
     list(APPEND _loader_defines "CATALYST_LIBPYTHON_PATH=\"${_libpython_path}\"")
 endif()
-set_source_files_properties(DecompCallbacksLoader.cpp PROPERTIES
+set_source_files_properties(QPDLoader.cpp PROPERTIES
         COMPILE_DEFINITIONS "${_loader_defines}"
     )

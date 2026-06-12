@@ -24,6 +24,6 @@ using LowerPauliRotFn = std::string (*)(double theta, std::string pauliWord,
 
 extern LowerPauliRotFn pythonLowerPauliRot;
 
-bool loadPythonCallbackPlugin(std::string callbackPluginPath, std::string libpythonPath);
+bool loadQPD(std::string libQPDPath, std::string libpythonPath);
 
 } // namespace catalyst::quantum

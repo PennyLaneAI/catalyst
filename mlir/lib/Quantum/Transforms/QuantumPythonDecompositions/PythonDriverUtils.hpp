@@ -39,18 +39,18 @@ if venv_path:
 
 namespace nb = nanobind;
 
-namespace QuantumPythonCallbacks {
+namespace QuantumPythonDecompositions {
 
-class QPCError : public std::runtime_error {
+class QPDError : public std::runtime_error {
   public:
-    explicit QPCError(std::string message) : std::runtime_error(std::move(message)) {}
+    explicit QPDError(std::string message) : std::runtime_error(std::move(message)) {}
 };
 
-class TracingError : public QPCError {
+class TracingError : public QPDError {
   public:
     TracingError(std::string moduleName, std::string functionName, std::string args,
                  std::string error)
-        : QPCError("An error occurred while tracing " + functionName + " from module " +
+        : QPDError("An error occurred while tracing " + functionName + " from module " +
                    moduleName + " with args " + args + ": " + error)
     {
     }
@@ -89,7 +89,7 @@ class PyInterpreterGuard {
             return std::invoke(std::forward<T>(func));
         }
         catch (const nb::python_error &e) {
-            throw QPCError(e.what());
+            throw QPDError(e.what());
         }
     }
 
@@ -111,4 +111,4 @@ class PyInterpreterGuard {
     }
 };
 
-} // namespace QuantumPythonCallbacks
+} // namespace QuantumPythonDecompositions

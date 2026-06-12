@@ -24,28 +24,28 @@ find_package(nanobind CONFIG REQUIRED)
 # Ignore all warnings from nanobind library sources (headers are not enough).
 add_compile_options("-w")
 
-nanobind_add_module(QuantumPythonCallbacks
+nanobind_add_module(QuantumPythonDecompositions
     STABLE_ABI
     NB_SUPPRESS_WARNINGS
     PythonDriverUtils.hpp
     PythonFunction.cpp
 )
 
-# TODO: move MLIR parsing back to quantum-transforms, let callbacks only handle calling python
-target_link_libraries(QuantumPythonCallbacks PRIVATE)
+# TODO: move MLIR parsing back to quantum-transforms, let QPD only handle calling python
+target_link_libraries(QuantumPythonDecompositions PRIVATE)
 
 if (APPLE)
-    target_link_options(QuantumPythonCallbacks PRIVATE "LINKER:-undefined,dynamic_lookup")
+    target_link_options(QuantumPythonDecompositions PRIVATE "LINKER:-undefined,dynamic_lookup")
 else()
-    target_link_options(QuantumPythonCallbacks PRIVATE "LINKER:--allow-shlib-undefined")
+    target_link_options(QuantumPythonDecompositions PRIVATE "LINKER:--allow-shlib-undefined")
 endif()
 
-target_include_directories(QuantumPythonCallbacks PUBLIC
+target_include_directories(QuantumPythonDecompositions PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Use a constant suffix to simplify locating the library
-set_target_properties(QuantumPythonCallbacks PROPERTIES
+set_target_properties(QuantumPythonDecompositions PROPERTIES
     PREFIX "lib"
     SUFFIX ".so"
     POSITION_INDEPENDENT_CODE ON

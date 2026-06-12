@@ -480,7 +480,7 @@ class TestGraphDecomposition:
             circuit()
 
     def test_paulirot_python_decomp(self):
-        """Test that paulirot callbacks successfully decompose a circuit."""
+        """Test that paulirot is successfully decomposed by compile-time lowered rules."""
 
         def circuit():
             qp.PauliRot(0.3, "YXZ", [0, 1, 2])
