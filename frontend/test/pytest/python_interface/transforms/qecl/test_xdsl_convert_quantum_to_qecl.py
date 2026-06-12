@@ -1425,9 +1425,7 @@ class TestMeasurementProcesses:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.xfail(
-        reason="Sampling quantum register not implemented", raises=CompileError
-    )
+    @pytest.mark.xfail(reason="Sampling quantum register not implemented", raises=CompileError)
     def test_sample_register_integration(self, run_filecheck_qjit):
         """Test the convert-quantum-to-qecl pass on a program whose terminal measurement is a sample
         on the quantum register.

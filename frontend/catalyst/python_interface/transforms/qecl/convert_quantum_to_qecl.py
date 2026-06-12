@@ -515,6 +515,100 @@ class MeasureOpConversion(RewritePattern):
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
 
 
+# MARK: Compbasis Op Pattern
+
+
+class ComputationalBasisOpConversion(RewritePattern):
+    """Converts `quantum.compbasis` ops to sets of `qecl.measure` and `quantum.mcmobs` ops.
+
+    As with the `quantum.measure` conversion pattern, this conversion also assumes that k = 1, and
+    as such always applies the logical measurement operation to the codeblock at index 0.
+
+    Example
+    -------
+
+    Input:
+
+        %b0 = ... : !qecl.codeblock<1>
+        %q0 = builtin.unrealized_conversion_cast %b0 : !qecl.codeblock<1> to !quantum.bit
+        %b1 = ... : !qecl.codeblock<1>
+        %q1 = builtin.unrealized_conversion_cast %b1 : !qecl.codeblock<1> to !quantum.bit
+        %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
+        %samples = quantum.sample %obs : tensor<100x2xf64>
+
+    Output (after applying `reconcile-unrealized-casts`):
+
+        %b0 = ... : !qecl.codeblock<1>
+        %b1 = ... : !qecl.codeblock<1>
+        %mres0, %b01 = qecl.measure %b0[0] : i1, !qecl.codeblock<1>
+        %mres1, %b11 = qecl.measure %b1[0] : i1, !qecl.codeblock<1>
+        %obs = quantum.mcmobs %mres0, %mres1 : !quantum.obs
+        %samples = quantum.sample %obs : tensor<100x2xf64>
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `quantum.compbasis` ops."""
+
+        if op.qreg is not None:
+            self._convert_qreg_compbasis_to_mcm_obs(op, rewriter)
+        else:
+            self._convert_qubit_compbasis_to_mcm_obs(op, rewriter)
+
+    @classmethod
+    def _convert_qubit_compbasis_to_mcm_obs(
+        cls, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter
+    ):
+        """Helper function to match_and_rewrite() that handles the conversion of a
+        `quantum.compbasis` op acting on qubits.
+        """
+        meas_results: list[OpResult] = []
+
+        for qubit in op.qubits:
+            qubit_owner_op = qubit.owner
+            if not _is_type_convertible(
+                qubit_owner_op, qecl.LogicalCodeblockType
+            ):  # pragma: no cover
+                _raise_failed_to_convert_op_compile_error(op)
+
+            conv_cast_op = builtin.UnrealizedConversionCastOp.get(
+                (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
+            )
+            measure_op = qecl.MeasureOp(in_codeblock=conv_cast_op.results[0], idx=0)
+            cast_to_qubit_op = _cast_to_qubit(measure_op.out_codeblock)
+
+            rewriter.insert_op(conv_cast_op, insertion_point=InsertPoint.before(op))
+            rewriter.insert_op(measure_op, insertion_point=InsertPoint.after(conv_cast_op))
+            rewriter.insert_op(cast_to_qubit_op, insertion_point=InsertPoint.after(measure_op))
+
+            rewriter.replace_uses_with_if(
+                qubit_owner_op.results[0],
+                cast_to_qubit_op.results[0],
+                lambda use, _op=conv_cast_op: use.operation is not _op,
+            )
+
+            meas_results.append(measure_op.mres)
+
+        mcmobs_op = quantum.MCMObsOp(
+            operands=(meas_results,), result_types=(quantum.ObservableType(),)
+        )
+
+        rewriter.replace_op(op, mcmobs_op)
+
+    @classmethod
+    def _convert_qreg_compbasis_to_mcm_obs(
+        cls, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter
+    ):
+        """Helper function to match_and_rewrite() that handles the conversion of a
+        `quantum.compbasis` op acting on the global quantum register.
+        """
+        raise CompileError(
+            "Implicitly sampling all wires on the device is not supported in the QEC pipeline. "
+            "Instead, please provide an explicit list of wires to sample, e.g. "
+            "`qp.sample(wires=[0, 1, 2])`."
+        )
+
+
 # MARK: SCF Yield Pattern
 
 
@@ -796,100 +890,6 @@ class ScfForConversion(ScfConversionPattern):
         return yield_op
 
 
-# MARK: Compbasis Op Pattern
-
-
-class ComputationalBasisOpConversion(RewritePattern):
-    """Converts `quantum.compbasis` ops to sets of `qecl.measure` and `quantum.mcmobs` ops.
-
-    As with the `quantum.measure` conversion pattern, this conversion also assumes that k = 1, and
-    as such always applies the logical measurement operation to the codeblock at index 0.
-
-    Example
-    -------
-
-    Input:
-
-        %b0 = ... : !qecl.codeblock<1>
-        %q0 = builtin.unrealized_conversion_cast %b0 : !qecl.codeblock<1> to !quantum.bit
-        %b1 = ... : !qecl.codeblock<1>
-        %q1 = builtin.unrealized_conversion_cast %b1 : !qecl.codeblock<1> to !quantum.bit
-        %obs = quantum.compbasis qubits %q0, %q1 : !quantum.obs
-        %samples = quantum.sample %obs : tensor<100x2xf64>
-
-    Output (after applying `reconcile-unrealized-casts`):
-
-        %b0 = ... : !qecl.codeblock<1>
-        %b1 = ... : !qecl.codeblock<1>
-        %mres0, %b01 = qecl.measure %b0[0] : i1, !qecl.codeblock<1>
-        %mres1, %b11 = qecl.measure %b1[0] : i1, !qecl.codeblock<1>
-        %obs = quantum.mcmobs %mres0, %mres1 : !quantum.obs
-        %samples = quantum.sample %obs : tensor<100x2xf64>
-    """
-
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter):
-        """Rewrite pattern for `quantum.compbasis` ops."""
-
-        if op.qreg is not None:
-            self._convert_qreg_compbasis_to_mcm_obs(op, rewriter)
-        else:
-            self._convert_qubit_compbasis_to_mcm_obs(op, rewriter)
-
-    @classmethod
-    def _convert_qubit_compbasis_to_mcm_obs(
-        cls, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter
-    ):
-        """Helper function to match_and_rewrite() that handles the conversion of a
-        `quantum.compbasis` op acting on qubits.
-        """
-        meas_results: list[OpResult] = []
-
-        for qubit in op.qubits:
-            qubit_owner_op = qubit.owner
-            if not _is_type_convertible(
-                qubit_owner_op, qecl.LogicalCodeblockType
-            ):  # pragma: no cover
-                _raise_failed_to_convert_op_compile_error(op)
-
-            conv_cast_op = builtin.UnrealizedConversionCastOp.get(
-                (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
-            )
-            measure_op = qecl.MeasureOp(in_codeblock=conv_cast_op.results[0], idx=0)
-            cast_to_qubit_op = _cast_to_qubit(measure_op.out_codeblock)
-
-            rewriter.insert_op(conv_cast_op, insertion_point=InsertPoint.before(op))
-            rewriter.insert_op(measure_op, insertion_point=InsertPoint.after(conv_cast_op))
-            rewriter.insert_op(cast_to_qubit_op, insertion_point=InsertPoint.after(measure_op))
-
-            rewriter.replace_uses_with_if(
-                qubit_owner_op.results[0],
-                cast_to_qubit_op.results[0],
-                lambda use, _op=conv_cast_op: use.operation is not _op,
-            )
-
-            meas_results.append(measure_op.mres)
-
-        mcmobs_op = quantum.MCMObsOp(
-            operands=(meas_results,), result_types=(quantum.ObservableType(),)
-        )
-
-        rewriter.replace_op(op, mcmobs_op)
-
-    @classmethod
-    def _convert_qreg_compbasis_to_mcm_obs(
-        cls, op: quantum.ComputationalBasisOp, rewriter: PatternRewriter
-    ):
-        """Helper function to match_and_rewrite() that handles the conversion of a
-        `quantum.compbasis` op acting on the global quantum register.
-        """
-        raise CompileError(
-            "Implicitly sampling all wires on the device is not supported in the QEC pipeline. "
-            "Instead, please provide an explicit list of wires to sample, e.g. "
-            "`qp.sample(wires=[0, 1, 2])`."
-        )
-
-
 # MARK: Helpers
 
 
@@ -1009,10 +1009,10 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                     DeallocOpConversion(),
                     CustomOpConversion(t_subroutine=t_subroutine),
                     MeasureOpConversion(),
+                    ComputationalBasisOpConversion(),
                     ScfYieldConversion(),
                     ScfIfConversion(),
                     ScfForConversion(),
-                    ComputationalBasisOpConversion(),
                 ]
             )
         ).rewrite_module(op)
