@@ -22,6 +22,7 @@ from pennylane.core import Operator2
 from pennylane.pytrees import PyTreeStructure, unflatten
 
 
+# pylint: disable=too-many-arguments,too-many-positional-arguments
 def generate_uid(
     all_dynamic_args: tuple[Any, ...],
     op_cls: type[Operator2],
