@@ -477,13 +477,13 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 4. Qubits
-    if (!getInQubits().empty()) {
-        p << " qubits(" << getInQubits() << ")";
+    if (!getQubits().empty()) {
+        p << " qubits(" << getQubits() << ")";
     }
 
     // 5. Attribute Dictionary
     SmallVector<StringRef> elidedAttrs = {"static_data", "param_map", "qubit_map",
-                                          "operandSegmentSizes", "resultSegmentSizes"};
+                                          "operandSegmentSizes"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
@@ -502,9 +502,9 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 7. Quantum register
-    if (getInQreg()) {
+    if (getQreg()) {
         p.printNewline();
-        p << "quregs(" << getInQreg() << ") indices(";
+        p << "quregs(" << getQreg() << " : " << getQreg().getType() << ") indices(";
         llvm::interleaveComma(
             llvm::zip(getArrQubitIndices(), getArrQubitIndices().getTypes()), p,
             [&](auto pair) { p << std::get<0>(pair) << ": " << std::get<1>(pair); });
@@ -512,10 +512,10 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 8. Control qubits
-    if (!getInCtrlQubits().empty()) {
+    if (!getCtrlQubits().empty()) {
         p.printNewline();
-        p << "ctrls(" << getInCtrlQubits() << ") ";
-        p << "ctrl_vals(" << getInCtrlValues() << ")";
+        p << "ctrls(" << getCtrlQubits() << ") ";
+        p << "ctrl_vals(" << getCtrlValues() << ")";
     }
     else if (getArrCtrlIndices()) {
         p.printNewline();
@@ -620,12 +620,13 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         opProperties.setAdjoint(true);
     }
 
-    SmallVector<OpAsmParser::UnresolvedOperand> inQubits;
+    SmallVector<OpAsmParser::UnresolvedOperand> qubits;
     SmallVector<OpAsmParser::UnresolvedOperand> forwardArgs;
     SmallVector<Type> forwardArgTypes;
-    SmallVector<OpAsmParser::UnresolvedOperand> inCtrlQubits;
-    SmallVector<OpAsmParser::UnresolvedOperand> inCtrlValues;
-    std::optional<OpAsmParser::UnresolvedOperand> inQreg;
+    SmallVector<OpAsmParser::UnresolvedOperand> ctrlQubits;
+    SmallVector<OpAsmParser::UnresolvedOperand> ctrlValues;
+    std::optional<OpAsmParser::UnresolvedOperand> qreg;
+    std::optional<Type> qregType;
     SmallVector<OpAsmParser::UnresolvedOperand> arrQubitIndices;
     SmallVector<Type> arrQubitIndexTypes;
     std::optional<OpAsmParser::UnresolvedOperand> arrCtrlIndices;
@@ -640,7 +641,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
             if (parser.parseOperand(operand)) {
                 return failure();
             }
-            inQubits.push_back(operand);
+            qubits.push_back(operand);
             return success();
         };
         if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseQubitOperand)) {
@@ -684,10 +685,13 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
     // 7. Optional qreg section.
     if (succeeded(parser.parseOptionalKeyword("quregs"))) {
         OpAsmParser::UnresolvedOperand operand;
-        if (parser.parseLParen() || parser.parseOperand(operand) || parser.parseRParen()) {
+        Type type;
+        if (parser.parseLParen() || parser.parseOperand(operand) || parser.parseColon() ||
+            parser.parseType(type) || parser.parseRParen()) {
             return failure();
         }
-        inQreg = operand;
+        qreg = operand;
+        qregType = type;
 
         auto parseIndexAndType = [&]() -> ParseResult {
             OpAsmParser::UnresolvedOperand indexOperand;
@@ -707,7 +711,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 
     // 8. Optional controls section (qubit controls or register controls).
     if (succeeded(parser.parseOptionalKeyword("ctrls"))) {
-        if (inQreg) {
+        if (qreg) {
             OpAsmParser::UnresolvedOperand ctrlIndices;
             Type ctrlIndicesTy;
             if (parser.parseLParen() || parseOperandTypePair(parser, ctrlIndices, ctrlIndicesTy) ||
@@ -732,7 +736,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
                 if (parser.parseOperand(operand)) {
                     return failure();
                 }
-                inCtrlQubits.push_back(operand);
+                ctrlQubits.push_back(operand);
                 return success();
             };
             if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseCtrlQubit) ||
@@ -745,7 +749,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
                 if (parser.parseOperand(operand)) {
                     return failure();
                 }
-                inCtrlValues.push_back(operand);
+                ctrlValues.push_back(operand);
                 return success();
             };
             if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseCtrlValue)) {
@@ -785,16 +789,16 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
                                result.operands)) {
         return failure();
     }
-    if (parser.resolveOperands(inQubits, QubitType::get(ctx), result.operands)) {
+    if (parser.resolveOperands(qubits, QubitType::get(ctx), result.operands)) {
         return failure();
     }
-    if (parser.resolveOperands(inCtrlQubits, QubitType::get(ctx), result.operands)) {
+    if (parser.resolveOperands(ctrlQubits, QubitType::get(ctx), result.operands)) {
         return failure();
     }
-    if (parser.resolveOperands(inCtrlValues, builder.getI1Type(), result.operands)) {
+    if (parser.resolveOperands(ctrlValues, builder.getI1Type(), result.operands)) {
         return failure();
     }
-    if (inQreg && parser.resolveOperand(*inQreg, QuregType::get(ctx), result.operands)) {
+    if (qreg && parser.resolveOperand(*qreg, *qregType, result.operands)) {
         return failure();
     }
     if (parser.resolveOperands(arrQubitIndices, arrQubitIndexTypes, parser.getCurrentLocation(),
@@ -810,26 +814,15 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         return failure();
     }
 
-    // 11. Add inferred results in segment order.
-    result.addTypes(SmallVector<Type>(inQubits.size(), QubitType::get(ctx)));
-    result.addTypes(SmallVector<Type>(inCtrlQubits.size(), QubitType::get(ctx)));
-    if (inQreg) {
-        result.addTypes(QuregType::get(ctx));
-    }
-
     // 12. Add explicit segment sizes.
     result.addAttribute(
         "operandSegmentSizes",
         builder.getDenseI32ArrayAttr(
             {static_cast<int32_t>(params.size()), static_cast<int32_t>(forwardArgs.size()),
-             static_cast<int32_t>(inQubits.size()), static_cast<int32_t>(inCtrlQubits.size()),
-             static_cast<int32_t>(inCtrlValues.size()), inQreg ? 1 : 0,
+             static_cast<int32_t>(qubits.size()), static_cast<int32_t>(ctrlQubits.size()),
+             static_cast<int32_t>(ctrlValues.size()), qreg ? 1 : 0,
              static_cast<int32_t>(arrQubitIndices.size()), arrCtrlIndices ? 1 : 0,
              arrCtrlValues ? 1 : 0}));
-    result.addAttribute(
-        "resultSegmentSizes",
-        builder.getDenseI32ArrayAttr({static_cast<int32_t>(inQubits.size()),
-                                      static_cast<int32_t>(inCtrlQubits.size()), inQreg ? 1 : 0}));
 
     return success();
 }
