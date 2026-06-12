@@ -25,32 +25,32 @@ namespace nb = nanobind;
 
 std::string pythonLowerPauliRot(double theta, const std::string &pauliWord, std::vector<int> wires)
 {
-    std::string mlirText =
-        QuantumPythonCallbacks::PyInterpreterGuard::ensure().withGil([&] -> std::string {
-            const char *moduleName = "catalyst.python_callbacks";
-            const char *functionName = "paulirot_callback_wrapper";
+    QuantumPythonCallbacks::PyInterpreterGuard guard;
+    std::string mlirText = guard.withGil([&] -> std::string {
+        const char *moduleName = "catalyst.python_callbacks";
+        const char *functionName = "paulirot_callback_wrapper";
 
-            try {
-                nb::module_ wrapperModule = nb::module_::import_(moduleName);
-                nb::object wrapperFunction = wrapperModule.attr(functionName);
+        try {
+            nb::module_ wrapperModule = nb::module_::import_(moduleName);
+            nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-                nb::list pyWires;
-                for (int w : wires) {
-                    pyWires.append(w);
-                }
-
-                nb::object pythonResult = wrapperFunction(theta, pauliWord.c_str(), pyWires);
-
-                return nb::borrow<nb::str>(pythonResult).c_str();
+            nb::list pyWires;
+            for (int w : wires) {
+                pyWires.append(w);
             }
-            catch (const nb::python_error &error) {
-                throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
-                                                           error.what());
-            }
-            catch (const std::exception &error) {
-                throw;
-            }
-        });
+
+            nb::object pythonResult = wrapperFunction(theta, pauliWord.c_str(), pyWires);
+
+            return nb::borrow<nb::str>(pythonResult).c_str();
+        }
+        catch (const nb::python_error &error) {
+            throw QuantumPythonCallbacks::TracingError(moduleName, functionName, pauliWord,
+                                                       error.what());
+        }
+        catch (const std::exception &error) {
+            throw;
+        }
+    });
 
     return mlirText;
 }

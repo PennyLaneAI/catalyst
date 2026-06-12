@@ -33,8 +33,8 @@ add_compile_options("-w")
 nanobind_add_module(QuantumPythonCallbacks
     STABLE_ABI
     NB_SUPPRESS_WARNINGS
+    PythonDriverUtils.hpp
     PythonFunction.cpp
-    PythonDriverUtils.cpp
 )
 
 # TODO: move MLIR parsing back to quantum-transforms, let callbacks only handle calling python

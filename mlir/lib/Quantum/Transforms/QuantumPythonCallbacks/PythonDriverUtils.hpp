@@ -15,11 +15,26 @@
 #pragma once
 
 #include <functional>
-#include <memory>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 
+#include "nanobind/eval.h"
 #include "nanobind/nanobind.h"
+
+constexpr const char sitePackagesScript[] = R"(
+import os
+import sys
+import site
+
+venv_path = os.environ.get('VIRTUAL_ENV')
+if venv_path:
+    py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    site_packages = os.path.join(venv_path, "lib", f"python{py_version}", "site-packages")
+
+    if os.path.exists(site_packages):
+        site.addsitedir(site_packages)
+)";
 
 namespace nb = nanobind;
 
@@ -42,20 +57,32 @@ class TracingError : public QPCError {
 
 class PyInterpreterGuard {
   public:
-    static PyInterpreterGuard &ensure();
+    bool createdInterpreter = false;
+    std::optional<nb::gil_scoped_release> release;
+
+    PyInterpreterGuard(const PyInterpreterGuard &) = delete;
+    PyInterpreterGuard &operator=(const PyInterpreterGuard &) = delete;
+
+    PyInterpreterGuard()
+    {
+        if (!Py_IsInitialized()) {
+            Py_Initialize();
+            createdInterpreter = true;
+        }
+
+        // scoped control of acquire
+        {
+            nb::gil_scoped_acquire acquire;
+            syncSitePackages();
+        }
+
+        if (createdInterpreter) {
+            release.emplace();
+        }
+    };
 
     template <class T> decltype(auto) withGil(T &&func)
     {
-        static thread_local int depth = 0;
-        if (depth > 0) {
-            throw QPCError("Recursive call to withGil detected.");
-        }
-        ++depth;
-        struct DepthGuard {
-            int &d;
-            ~DepthGuard() { --d; }
-        } guard{depth};
-
         nb::gil_scoped_acquire acquire;
         try {
             return std::invoke(std::forward<T>(func));
@@ -65,15 +92,22 @@ class PyInterpreterGuard {
         }
     }
 
-    PyInterpreterGuard(const PyInterpreterGuard &) = delete;
-    PyInterpreterGuard &operator=(const PyInterpreterGuard &) = delete;
-
   private:
-    PyInterpreterGuard();
-    ~PyInterpreterGuard();
+    /**
+     * @brief Ensure that site-packages are synced for the spawned interpreter.
+     */
+    void syncSitePackages()
+    {
+        try {
+            nb::object scope = nb::module_::import_("__main__").attr("__dict__");
 
-    struct Impl;
-    std::unique_ptr<Impl> impl;
+            nb::exec(sitePackagesScript, scope);
+        }
+        catch (const nb::python_error &e) {
+            std::cerr << "Failed to load site-packages: " << e.what();
+            return;
+        }
+    }
 };
 
 } // namespace QuantumPythonCallbacks
