@@ -108,6 +108,9 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
     %qb = quantum.alloc_qb : !quantum.bit
     %h = quantum.custom "PauliX"() %qb : !quantum.bit
 
+    %p8:2 = quantum.custom "SWAP"() %p7, %h : !quantum.bit, !quantum.bit
+    %p9 = quantum.custom "S"() %p8#1 : !quantum.bit
+
     // %tens01 = arith.constant dense<[false, true]> : tensor<2xi1>
     // %q18:2 = quantum.set_basis_state(%tens01) %q12#1, %q17 : (tensor<2xi1>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
 
@@ -116,5 +119,3 @@ func.func @ex_424() -> (!quantum.bit, !quantum.bit) {
 }
 
 // 3.9269908169872414 : f64
-
-// test y and swap

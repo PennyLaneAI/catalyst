@@ -150,6 +150,34 @@ bool Parity::isLinearEquivalentWith(const Parity& rhs) const {
     return ((blockL ^ blockR) > 1) ? false : isEquivalentWithFromBlock(rhs, 1);
 }
 
+bool Parity::isTrivial() const {
+    return isTrivialFromBlock(0);
+}
+
+bool Parity::isUnsat() const {
+    assert(bits.size() > 0);
+    size_t affineBlockInd = AFFINE_VALUE_INDEX.first;
+    return (bits[affineBlockInd] != 1) ? false : isTrivialFromBlock(1);   // affine value is LSB
+}   // currently unsat is 0..01, but we can change it to empty bits.
+
+bool Parity::isLinearZero() const {
+    assert(bits.size() > 0);
+    size_t affineBlockInd = AFFINE_VALUE_INDEX.first;
+    return (bits[affineBlockInd] > 1) ? false : isTrivialFromBlock(1);   // affine value is LSB
+}
+
+/*
+    Helper Methods: 
+*/
+bool Parity::isTrivialFromBlock(size_t fstBlock) const {
+    for (size_t i = fstBlock; i < bits.size(); i++) {
+        if (bits[i] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // check if they are the same up to adding some 0 bits in the end. 
 // (so they can be considered equal if we had added some path or new vaiables and now their 0)
 bool Parity::isEquivalentWithFromBlock(const Parity& rhs, size_t fstBlock) const {
@@ -170,58 +198,6 @@ bool Parity::isEquivalentWithFromBlock(const Parity& rhs, size_t fstBlock) const
     return true;
 }
 
-bool Parity::isZero() const {
-    for (size_t i = 0; i < bits.size(); i++) {
-        if (bits[i] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool Parity::isUnsat() const {
-    assert(bits.size() > 0);
-    
-    size_t affineBlockInd = AFFINE_VALUE_INDEX.first;
-    for (size_t i = 0; i < bits.size(); i++) {
-        if (i == affineBlockInd) {
-            if (bits[i] != 1) { // affine value is LSB
-                return false;
-            }
-        }
-        else {
-            if (bits[i] != 0) {
-                return false;
-            }
-        }
-    }
-    return true;
-    
-    // return bits.size() > 0 && getAffineValue() && isLinearZero();
-}   // currently unsat is 0..01, but we can change it to empty bits.
-
-bool Parity::isLinearZero() const {
-    assert(bits.size() > 0);
-    
-    size_t affineBlockInd = AFFINE_VALUE_INDEX.first;
-    for (size_t i = 0; i < bits.size(); i++) {
-        if (i == affineBlockInd) {
-            if (bits[i] > 1) { // affine value is LSB
-                return false;
-            }
-        }
-        else {
-            if (bits[i] != 0) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-/*
-    Helper Methods: 
-*/
 bool Parity::getBitAtBlock(Index ind) const {
     auto [blockInd, bitInd] = ind;
     assert(blockInd < bits.size());

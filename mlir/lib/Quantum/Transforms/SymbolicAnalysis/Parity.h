@@ -37,7 +37,7 @@ public:
     // Checks & Inspections
     [[nodiscard]] bool isIdenticalWith(const Parity& rhs) const;
     [[nodiscard]] bool isLinearEquivalentWith(const Parity& rhs) const;
-    [[nodiscard]] bool isZero() const;
+    [[nodiscard]] bool isTrivial() const;
     [[nodiscard]] bool isUnsat() const;
     [[nodiscard]] bool isLinearZero() const;
 
@@ -78,8 +78,9 @@ private:
     // Helper Methods
     [[nodiscard]] size_t requiredBlockNum() const;
     [[nodiscard]] Index getIndex(size_t pos) const;
-    [[nodiscard]] bool getBitAtBlock(Index ind) const;
+    [[nodiscard]] bool isTrivialFromBlock(size_t fstBlock) const;
     [[nodiscard]] bool isEquivalentWithFromBlock(const Parity& rhs, size_t fstBlock) const;
+    [[nodiscard]] bool getBitAtBlock(Index ind) const;
     void setBitAtBlock(Index ind, bool value);
     void onBitAtBlock(Index ind);
     void offBitAtBlock(Index ind);

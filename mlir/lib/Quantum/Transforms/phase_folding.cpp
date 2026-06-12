@@ -2,18 +2,13 @@
 
 #include "llvm/Support/Debug.h"
 #include "mlir/Pass/Pass.h"
-
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"   // mlir::matchPattern, mlir::m_Constant
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/Dialect/Arith/IR/Arith.h" // For arith::ConstantOp
+#include "mlir/Dialect/Arith/IR/Arith.h" // arith::ConstantOp
 #include "llvm/ADT/StringRef.h"
-// #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/STLExtras.h" // For llvm::concat<>
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -23,7 +18,7 @@
 
 #include <vector>
 #include <cassert>
-#include <cmath> // for std::abs
+#include <cmath> // std::abs
 
 using namespace llvm;
 using namespace mlir;
@@ -280,10 +275,8 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     
     // Phase-folding Algorithm:
     void phaseAnalysis(CustomOp customOp, SymbolicCircuit& symCirc, GateID& gateID) {
-        // getting affected wires
         llvm::SmallVector<size_t, 4> qubitIndices = convertIndicesBase(getQubitIndices(customOp.getInQubits(), customOp.getOutQubits()));
 
-        // tracking phase gates
         Gate gate = extractCliffTGate(customOp);
         if (isPhaseGate(gate)) {
             phaseOps.push_back(customOp);
@@ -291,34 +284,34 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }
         initialGateCount[static_cast<size_t>(gate)]++;
 
-        // updating symbolic circuit
         symCirc.applyGate(gate, customOp.getAdjointFlag(), qubitIndices, gateID);
     }
 
     void phaseMerge(SymbolicCircuit& symCirc) {
-        for (auto& [parity, contributors] : symCirc.phasePoly.terms) {
-            if (contributors.gateCount() > 1) {
-                double angleSum = sumAngles(contributors);
-                GateID targetOpID = contributors.getMergeTarget(); 
-
-                if (!contributors.isMergeTargetAffineZero()) {
-                    angleSum *= -1.0;
-                }
-                updateTargetOp(phaseOps[targetOpID], angleSum);                
-
-                for (GateID id : llvm::concat<GateID>(contributors.zeroAffineRZs, contributors.oneAffineRZs)) {
-                    if (id != targetOpID) {
-                        removePhaseOp(phaseOps[id]);
-                    }
-                }
-            }
-            if (parity.isZero()) {
-                for (GateID id : llvm::concat<GateID>(contributors.zeroAffineRZs, contributors.oneAffineRZs)) {
+        auto removeGates = [&](PhaseBucket& contributors, std::optional<GateID> skipID = std::nullopt) {
+            for (GateID id : contributors.getAllGatesMutable()) {
+                if (id != skipID) {
                     removePhaseOp(phaseOps[id]);
                 }
             }
+        };
+
+        for (auto& [parity, contributors] : symCirc.phasePoly.terms) {
+            if (parity.isTrivial()) {
+                removeGates(contributors);
+            }
+            else if (contributors.gateCount() > 1) {
+                double angleSum = sumAngles(contributors);
+                if (!contributors.isMergeTargetAffineZero()) {
+                    angleSum = -angleSum;
+                }
+
+                GateID targetOpID = contributors.getMergeTarget();
+                updateTargetOp(phaseOps[targetOpID], angleSum);
+                removeGates(contributors, targetOpID);
+            }
         }
-    }   // clean
+    }
 
 
     void runOnOperation() override {

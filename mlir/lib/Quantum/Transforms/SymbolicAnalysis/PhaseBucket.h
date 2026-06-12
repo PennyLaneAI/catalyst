@@ -5,11 +5,12 @@
 #include <string>
 
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/STLExtras.h" // llvm::concat<>
 
 using GateID = int; // index of Operation pointers vector! (It's Loc in feynman and l in thesis)
 
 struct PhaseBucket {
-    std::vector<GateID> zeroAffineRZs;    // small_vector in mlir
+    std::vector<GateID> zeroAffineRZs;
     std::vector<GateID> oneAffineRZs;
 
     // Constructors
@@ -31,12 +32,17 @@ struct PhaseBucket {
 
     // Methods
     size_t gateCount() const;
+    auto getAllGatesMutable();
     GateID getMergeTarget() const;
     bool isMergeTargetAffineZero() const;
 };
 
 inline size_t PhaseBucket::gateCount() const {
     return zeroAffineRZs.size() + oneAffineRZs.size();
+}
+
+inline auto PhaseBucket::getAllGatesMutable() {
+    return llvm::concat<GateID>(zeroAffineRZs, oneAffineRZs);
 }
 
 inline bool PhaseBucket::isMergeTargetAffineZero() const {
