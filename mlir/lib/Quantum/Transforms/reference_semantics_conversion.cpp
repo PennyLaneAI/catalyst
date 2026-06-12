@@ -52,9 +52,7 @@ void eraseSCFYieldQuantumOperands(scf::YieldOp yieldOp)
     // So we need to be a bit manual here
     BitVector eraseIndices(yieldOp->getNumOperands());
     for (auto [i, argType] : llvm::enumerate(yieldOp.getOperandTypes())) {
-        if (isa<quantum::QuregType, quantum::QubitType>(argType)) {
-            eraseIndices.set(i);
-        }
+        eraseIndices[i] = isa<quantum::QuregType, quantum::QubitType>(argType);
     }
     yieldOp->eraseOperands(eraseIndices);
 }
