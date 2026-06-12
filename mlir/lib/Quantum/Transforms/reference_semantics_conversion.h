@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <optional>
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
@@ -73,10 +75,12 @@ void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValu
 // void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker,
                SmallVector<Operation *> &erasureWorklist);
-// void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker);
+void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker,
+                 SmallVector<Operation *> &erasureWorklist);
 // void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 //                       const SetVector<Value> &rValuesUsedBySubroutine);
 
 // Main driver
-void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker);
+std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region &r,
+                                                     QubitValueTracker &tracker, bool erase = true);
 } // anonymous namespace
