@@ -377,7 +377,6 @@ func.func @operator_custom_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 
     // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
     qref.operator "custom_bad_param_map"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
       param_map = {p0 = [0]}
-      qubit_map = {}
     return
 }
 
@@ -393,9 +392,8 @@ func.func @operator_invalid_qubit_map_coverage(%r : !qref.reg<3>, %idx0 : tensor
 
 func.func @operator_custom_invalid_qubit_map_coverage(%r : !qref.reg<?>, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
     // expected-error@+1 {{qubit_map must cover all index arrays in register mode: expected 2, got 1}}
-    qref.operator "custom_bad_qubit_map"() quregs(%r : !qref.reg<?>)
-      indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
-      param_map = {}
+    qref.operator "custom_bad_qubit_map"()
+      quregs(%r : !qref.reg<?>) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
       qubit_map = {qi0 = [0]}
     return
 }
@@ -413,7 +411,6 @@ func.func @operator_invalid_qubit_map_sum(%q0 : !qref.bit, %q1 : !qref.bit) {
 func.func @operator_custom_invalid_qubit_map_sum(%q0 : !qref.bit, %q1 : !qref.bit) {
     // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
     qref.operator "custom_bad_qubit_map_sum"() qubits(%q0, %q1)
-      param_map = {}
       qubit_map = {pair = [0]}
     return
 }
@@ -431,7 +428,6 @@ func.func @operator_invalid_qubit_map_union(%q0 : !qref.bit, %q1 : !qref.bit) {
 func.func @operator_custom_invalid_qubit_map_union(%q0 : !qref.bit, %q1 : !qref.bit) {
     // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
     qref.operator "custom_bad_qubit_map_union"() qubits(%q0, %q1)
-      param_map = {}
       qubit_map = {a = [0], b = [0]}
     return
 }
@@ -448,9 +444,8 @@ func.func @operator_invalid_register_qubit_map_oob(%r : !qref.reg<3>, %idx0 : te
 
 func.func @operator_custom_invalid_register_qubit_map_oob(%r : !qref.reg<?>, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
     // expected-error@+1 {{qubit_map index is out of bounds with respect to index arrays: 2 is not in [0, 2)}}
-    qref.operator "custom_bad_register_map_oob"() quregs(%r : !qref.reg<?>)
-      indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
-      param_map = {}
+    qref.operator "custom_bad_register_map_oob"()
+      quregs(%r : !qref.reg<?>) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
       qubit_map = {qi0 = [0], qi1 = [2]}
     return
 }

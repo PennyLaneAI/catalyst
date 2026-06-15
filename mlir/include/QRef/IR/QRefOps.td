@@ -381,7 +381,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
         modifier acting on a single qubit:
 
         ```mlir
-        %out = qref.operator "MyOp"(%theta: f64) adj qubits(%q)
+        qref.operator "MyOp"(%theta: f64) adj qubits(%q)
             static_data = {pauli_word = "XYZ", greedy = true}
         ```
 
