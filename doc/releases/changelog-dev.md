@@ -69,9 +69,9 @@
   ```python
   import pennylane as qp
   import catalyst
-  
+
   catalyst.compile_without_static_loops = True
-  
+
   @qp.qjit
   @qp.qnode(qp.device("lightning.qubit", wires=2))
   def f():
@@ -145,6 +145,31 @@
   checks with strict type-based checking.
   [(#2873)](https://github.com/PennyLaneAI/catalyst/pull/2873)
 
+* Fixed support of region-based adjoint (`qp.adjoint(qfunc)()`) when used in conjunction with
+  dynamic qubit allocation.
+  [(#2933)](https://github.com/PennyLaneAI/catalyst/pull/2933)
+
+  For instance, the following would previously fail:
+  ```py
+  def fun(w):
+    with qp.allocate(1) as qs:
+        qp.S(qs[0])
+    qp.X(w)
+
+  @qp.qjit(capture=True)
+  @qp.qnode(qp.device("null.qubit", wires=1))
+  def circuit():
+      qp.adjoint(fun)(0)
+      return qp.probs()
+  ```
+  with the error message:
+  ```
+  catalyst.utils.exceptions.CompileError: catalyst failed with error code 1: Failed to run pipeline: QuantumCompilationStage
+  Compilation failed:
+  circuit:31:9: error: Unhandled operation in adjoint region
+  circuit:31:9: note: see current operation: "quantum.dealloc"(%13) : (!quantum.reg) -> ()
+  ```
+
 * Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
   folder being created and the files printed outside in the main directory.
   [(#2807)](https://github.com/PennyLaneAI/catalyst/pull/2807)
@@ -162,6 +187,9 @@
   data dependencies through insert to extract chains instead of textual op ordering.
   [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
 
+* Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
+  [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
+
 <h3>Internal changes ⚙️</h3>
 
 * The frontend now generates MLIR in reference semantics when capture is enabled.
@@ -176,6 +204,13 @@
   [(#2781)](https://github.com/PennyLaneAI/catalyst/pull/2781)
   [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
   [(#2911)](https://github.com/PennyLaneAI/catalyst/pull/2911)
+
+* A new pass `--convert-to-reference-semantics` has been added. The pass takes in MLIR in value
+  semantics `quantum` dialect, and converts them to reference semantics `qref` dialect.
+  [(#2920)](https://github.com/PennyLaneAI/catalyst/pull/2920)
+  [(#2930)](https://github.com/PennyLaneAI/catalyst/pull/2930)
+  [(#2931)](https://github.com/PennyLaneAI/catalyst/pull/2931)
+  [(#2937)](https://github.com/PennyLaneAI/catalyst/pull/2937)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -235,6 +270,10 @@
   dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
   [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
 
+* A new operation has been added to the Quantum dialect to represent generic and high-level
+  quantum operators, including operators with frontend-end specific data.
+  [(#2883)](https://github.com/PennyLaneAI/catalyst/pull/2883)
+
 * In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
   operations have been added:
 
@@ -250,12 +289,12 @@
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
-* The experimental `convert-qecl-to-qecp` pass has been extended to support lowering 
-  `qecl.fabricate [magic]` to a subroutine that prepares a magic state through a simple, 
+* The experimental `convert-qecl-to-qecp` pass has been extended to support lowering
+  `qecl.fabricate [magic]` to a subroutine that prepares a magic state through a simple,
   non-fault tolerant encoding.
   [(#2894)](https://github.com/PennyLaneAI/catalyst/pull/2894)
 
-* The experimental QEC pipeline now supports compilation and execution of circuits that only 
+* The experimental QEC pipeline now supports compilation and execution of circuits that only
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
@@ -284,6 +323,7 @@ Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
+David Ittah,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
