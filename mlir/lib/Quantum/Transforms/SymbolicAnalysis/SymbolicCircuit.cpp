@@ -92,10 +92,7 @@ void SymbolicCircuit::applyGateRZ(size_t qubitIndex, GateID gateId)
     parity.assignAffineValue(affineVal);
 }
 
-void SymbolicCircuit::applyGateX(size_t qubitIndex)
-{
-    stateTrans.flipAffineValueAtRow(qubitIndex);
-}
+void SymbolicCircuit::applyGateX(size_t qubitIndex) { stateTrans.flipAffineValueAtRow(qubitIndex); }
 
 void SymbolicCircuit::applyGateY(size_t qubitIndex, GateID gateId)
 {
