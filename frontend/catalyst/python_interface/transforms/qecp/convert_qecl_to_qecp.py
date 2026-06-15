@@ -232,7 +232,7 @@ class FabricateOpConversion(RewritePattern):
         supported_states = list(self.fabricate_subroutines)
         if op.init_state.data not in supported_states:  # pragma: no cover
             raise NotImplementedError(
-                "Lowering qecl.FabricateOp to the qecp dialect is only implemented "
+                f"Lowering qecl.FabricateOp to the qecp dialect is only implemented "
                 f"for the following init_states: {supported_states}"
             )
 
@@ -307,8 +307,8 @@ class MeasureOpConversion(RewritePattern):
 
     qec_code: QecCode
 
-    measure_subroutine: func.FuncOp
-    physical_meas_decode_subroutine: func.FuncOp
+    measure_subroutine: func.FuncOp | None
+    physical_meas_decode_subroutine: func.FuncOp | None
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.MeasureOp, rewriter: PatternRewriter):
@@ -322,6 +322,15 @@ class MeasureOpConversion(RewritePattern):
         assert k == self.qec_code.k, (
             f"Value mismatch: codeblock {op.out_codeblock} has k = {k} but QEC code has "
             f"k = {self.qec_code.k}"
+        )
+
+        assert (
+            self.measure_subroutine is not None
+        ), f"Program contains at least one '{op.name}' op but the measurement subroutine is None"
+
+        assert self.physical_meas_decode_subroutine is not None, (
+            f"Program contains at least one '{op.name}' op but the decode-physical-measurement "
+            "subroutine is None"
         )
 
         ops_to_insert = (
@@ -851,7 +860,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         The encoding process follows the third option for magic state encoding described in
         https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that when using it to
-        apply a T-gate, the correction is SX as decribed in Nielsen & Chuang, (Section 10.6.2),
+        apply a T-gate, the correction is SX as described in Nielsen & Chuang, (Section 10.6.2),
         rather than a single NOT gate. This produces the correct result for circuit simulations.
 
         The encoding method involves putting the initial QEC physical qubit in the desired state
@@ -859,7 +868,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         zero state to create the desired state for the codeblock. Note that we do not use the
         syndrome-measurement based encoding that we use for `encode [zero]`; the unitary
         encoder maps an arbitrary input |psi> -> |psi_L>, whereas the stabilizer-measurement
-        enocding procedure only projects the input state onto the codespace.
+        encoding procedure only projects the input state onto the codespace.
 
         Note that this method does not insert the subroutine into the module op. Instead it
         returns the built func.FuncOp object that can then be subsequently inserted where desired.
@@ -878,10 +887,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         for init_state in used_init_states:
 
-            assert init_state in [
+            assert init_state in {
                 "magic",
                 "magic_conj",
-            ], "only magic and magic_conj are implemented for qecl.fabricate"
+            }, "Only initial states 'magic' and 'magic_conj' are implemented for qecl.fabricate"
 
             codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
             input_types = ()
@@ -974,7 +983,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         for gate_name, gate_info in single_qubit_gates.items():
 
             if gate_name not in circuit_gate_ops:
-                # skip this one if its not included in the circuit ops
+                # skip this one if it's not included in the circuit ops
                 continue
 
             gate_op, gate_indices = gate_info
@@ -1040,7 +1049,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         for gate_name, gate_op in self.qec_code.transversal_2q_gates.items():
 
             if gate_name not in circuit_gate_ops:
-                # skip this one if its not included in the circuit ops
+                # skip this one if it's not included in the circuit ops
                 continue
 
             block = Block(arg_types=input_types)
