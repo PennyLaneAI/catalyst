@@ -56,8 +56,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
-        loadQPD(libQPDPath, libpythonPath);
-
         // Debugging output for command-line options
         LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");
         LLVM_DEBUG({
@@ -292,6 +290,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         llvm::SmallVector<quantum::PauliRotOp> pauliRotOps;
         module.walk([&](quantum::PauliRotOp op) { pauliRotOps.push_back(op); });
+
+        if (!pauliRotOps.empty()) {
+            loadQPD(libQPDPath, libpythonPath);
+        }
 
         for (quantum::PauliRotOp pauliRot : pauliRotOps) {
             std::string pauliWord = pauliRot.getPauliWord();
