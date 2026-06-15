@@ -633,8 +633,8 @@ func.func @operator_custom_registers_with_maps(%p0 : f64, %p1 : i64, %r : !quant
 // -----
 
 func.func @operator_register_multi_index_entry(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
-    %out = quantum.operator "custom_multi_index_entry"() quregs(%r)
-      indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+    %out = quantum.operator "custom_multi_index_entry"()
+      quregs(%r) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
       qubit_map = {wires = [0, 1]}
     return
 }
@@ -685,7 +685,6 @@ func.func @operator_custom_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 
     // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
     %o0, %o1 = quantum.operator "custom_bad_param_map"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
       param_map = {p0 = [0]}
-      qubit_map = {}
     return
 }
 
@@ -701,9 +700,8 @@ func.func @operator_invalid_qubit_map_coverage(%r : !quantum.reg, %idx0 : tensor
 
 func.func @operator_custom_invalid_qubit_map_coverage(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
     // expected-error@+1 {{qubit_map must cover all index arrays in register mode: expected 2, got 1}}
-    %out = quantum.operator "custom_bad_qubit_map"() quregs(%r)
-      indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
-      param_map = {}
+    %out = quantum.operator "custom_bad_qubit_map"()
+      quregs(%r) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
       qubit_map = {qi0 = [0]}
     return
 }
@@ -721,7 +719,6 @@ func.func @operator_invalid_qubit_map_sum(%q0 : !quantum.bit, %q1 : !quantum.bit
 func.func @operator_custom_invalid_qubit_map_sum(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
     %o0, %o1 = quantum.operator "custom_bad_qubit_map_sum"() qubits(%q0, %q1)
-      param_map = {}
       qubit_map = {pair = [0]}
     return
 }
@@ -739,7 +736,6 @@ func.func @operator_invalid_qubit_map_union(%q0 : !quantum.bit, %q1 : !quantum.b
 func.func @operator_custom_invalid_qubit_map_union(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
     %o0, %o1 = quantum.operator "custom_bad_qubit_map_union"() qubits(%q0, %q1)
-      param_map = {}
       qubit_map = {a = [0], b = [0]}
     return
 }
@@ -756,8 +752,8 @@ func.func @operator_invalid_register_qubit_map_oob(%r : !quantum.reg, %idx0 : te
 
 func.func @operator_custom_invalid_register_qubit_map_oob(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
     // expected-error@+1 {{qubit_map index is out of bounds with respect to index arrays: 2 is not in [0, 2)}}
-    %out = quantum.operator "custom_bad_register_map_oob"() quregs(%r)
-      indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+    %out = quantum.operator "custom_bad_register_map_oob"()
+      quregs(%r) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
       param_map = {}
       qubit_map = {qi0 = [0], qi1 = [2]}
     return
@@ -847,7 +843,8 @@ func.func @operator_invalid_ctrl_static_length(%r : !quantum.reg, %idx : tensor<
 
 func.func @operator_custom_invalid_ctrl_static_length(%r : !quantum.reg, %idx : tensor<2xi64>, %cidx : tensor<2xi64>, %cval : tensor<1xi1>) {
     // expected-error@+1 {{number of input control qubits (2) and control values (1) must be the same}}
-    %out = quantum.operator "custom_bad_ctrl_len"() quregs(%r) indices(%idx : tensor<2xi64>)
+    %out = quantum.operator "custom_bad_ctrl_len"()
+      quregs(%r) indices(%idx : tensor<2xi64>)
       ctrls(%cidx : tensor<2xi64>) ctrl_vals(%cval : tensor<1xi1>)
     return
 }

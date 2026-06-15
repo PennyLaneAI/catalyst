@@ -52,9 +52,4 @@ class DictValuesOfType<string attrCppType> : AttrConstraint<
 
 def I64ArrayDictAttr : ConfinedAttr<DictionaryAttr, [DictValuesOfType<"DenseI64ArrayAttr">]>;
 
-def FunctionRefArrayAttr : TypedArrayAttrBase<FlatSymbolRefAttr,
-                                              "FlatSymbolRefArrayAttr with const builder"> {
-    let constBuilderCall = "$_builder.getArrayAttr($0)";
-}
-
 #endif // QUANTUM_ATTR_DEFS
