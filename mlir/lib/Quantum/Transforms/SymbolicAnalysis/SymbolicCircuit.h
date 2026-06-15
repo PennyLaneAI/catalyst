@@ -1,13 +1,13 @@
 #pragma once
 
-#include "PhasePolynomial.h"
-#include "AffineTransform.h"
-#include "Gate.h"
 #include <utility>
 
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/raw_ostream.h"
 
+#include "AffineTransform.h"
+#include "Gate.h"
+#include "PhasePolynomial.h"
 
 struct SymbolicCircuit {
     size_t qubitNum;
@@ -15,23 +15,28 @@ struct SymbolicCircuit {
     // std::vector<bool> isAux;
     PhasePolynomial phasePoly;
     AffineTransform stateTrans; // row i corresponds to qubit i, but col i doesn't!
-    
+
     // Constructors
     SymbolicCircuit() = default;
-    SymbolicCircuit(size_t qubitNum) :
-        qubitNum(qubitNum), auxVarNum(0), 
-        phasePoly(PhasePolynomial()), stateTrans(AffineTransform::identity(qubitNum)) {}
-    SymbolicCircuit(size_t qubitNum, size_t auxVarNum, PhasePolynomial phasePoly, AffineTransform stateTrans) :
-        qubitNum(qubitNum), auxVarNum(auxVarNum), 
-        phasePoly(std::move(phasePoly)), stateTrans(std::move(stateTrans)) {}
+    SymbolicCircuit(size_t qubitNum)
+        : qubitNum(qubitNum), auxVarNum(0), phasePoly(PhasePolynomial()),
+          stateTrans(AffineTransform::identity(qubitNum))
+    {
+    }
+    SymbolicCircuit(size_t qubitNum, size_t auxVarNum, PhasePolynomial phasePoly,
+                    AffineTransform stateTrans)
+        : qubitNum(qubitNum), auxVarNum(auxVarNum), phasePoly(std::move(phasePoly)),
+          stateTrans(std::move(stateTrans))
+    {
+    }
 
     // Operators
-    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SymbolicCircuit& circ);
+    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SymbolicCircuit &circ);
 
     // Dimension Handling
     void ensureCapacity(llvm::ArrayRef<size_t> qubitIndices);
     void extendQubitsBy(size_t newQubitNum);
-    
+
     // Gate Applications
     void applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices, GateID gateId);
     void applyGateRZ(size_t qubitIndex, GateID gateId);

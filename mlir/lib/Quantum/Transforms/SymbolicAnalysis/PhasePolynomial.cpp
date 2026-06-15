@@ -3,32 +3,36 @@
 /*
     Operators:
 */
-PhasePolynomial& PhasePolynomial::operator+=(const PhasePolynomial& rhs) {
+PhasePolynomial &PhasePolynomial::operator+=(const PhasePolynomial &rhs)
+{
     if (terms.empty()) {
         terms.reserve(rhs.terms.size());
     }
-    for (const auto& [parity, contributors] : rhs.terms) {
+    for (const auto &[parity, contributors] : rhs.terms) {
         insertContributor(parity, contributors);
     }
     return *this;
 }
 
-PhasePolynomial PhasePolynomial::operator+(const PhasePolynomial& rhs) const {
+PhasePolynomial PhasePolynomial::operator+(const PhasePolynomial &rhs) const
+{
     PhasePolynomial res = *this;
     res += rhs;
     return res;
 }
 
-llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const PhasePolynomial& pp) {
-    for (const auto& [parity, contributors] : pp.terms) {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const PhasePolynomial &pp)
+{
+    for (const auto &[parity, contributors] : pp.terms) {
         os << parity << " -> " << contributors << "\n";
     }
     return os;
 }
 
-std::string PhasePolynomial::algebraicView(size_t qubitNum) const {
+std::string PhasePolynomial::algebraicView(size_t qubitNum) const
+{
     std::string res = "";
-    for (const auto& [parity, contributors] : terms) {
+    for (const auto &[parity, contributors] : terms) {
         res += (parity.algebraicView(qubitNum) + " -> " + contributors.algebraicView() + "\n");
     }
     return res;
@@ -37,7 +41,8 @@ std::string PhasePolynomial::algebraicView(size_t qubitNum) const {
 /*
     Methods:
 */
-void PhasePolynomial::insertContributor(const Parity& parity, const PhaseBucket& contributor) {
+void PhasePolynomial::insertContributor(const Parity &parity, const PhaseBucket &contributor)
+{
     // auto [it, inserted] = poly.try_emplace(parity, term);
     // if (!inserted) {
     //     it->second += term;
@@ -46,7 +51,8 @@ void PhasePolynomial::insertContributor(const Parity& parity, const PhaseBucket&
     auto it = terms.find(parity);
     if (it != terms.end()) {
         it->second += contributor;
-    } else {
+    }
+    else {
         terms[parity] = contributor;
     }
 }

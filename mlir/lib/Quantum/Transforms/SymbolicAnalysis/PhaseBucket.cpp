@@ -3,8 +3,10 @@
 /*
     Operators:
 */
-// how about redundancy? I guess we can't have a single gate in 2 different buckets, so probably doesn't matter.
-PhaseBucket& PhaseBucket::operator+=(const PhaseBucket& rhs) {
+// how about redundancy? I guess we can't have a single gate in 2 different buckets, so probably
+// doesn't matter.
+PhaseBucket &PhaseBucket::operator+=(const PhaseBucket &rhs)
+{
     zeroAffineRZs.reserve(zeroAffineRZs.size() + rhs.zeroAffineRZs.size());
     oneAffineRZs.reserve(oneAffineRZs.size() + rhs.oneAffineRZs.size());
 
@@ -14,13 +16,15 @@ PhaseBucket& PhaseBucket::operator+=(const PhaseBucket& rhs) {
     return *this;
 }
 
-PhaseBucket PhaseBucket::operator+(const PhaseBucket& rhs) const {
+PhaseBucket PhaseBucket::operator+(const PhaseBucket &rhs) const
+{
     PhaseBucket res = *this;
     res += rhs;
     return res;
 }
 
-llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const std::vector<GateID>& gates) {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const std::vector<GateID> &gates)
+{
     os << ": (";
     for (size_t i = 0; i < gates.size(); i++) {
         if (i > 0) {
@@ -32,7 +36,8 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const std::vector<GateID>& 
     return os;
 }
 
-llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const PhaseBucket& bucket) {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const PhaseBucket &bucket)
+{
     os << '[';
     os << "0" << bucket.zeroAffineRZs;
     os << " __ ";
@@ -41,7 +46,8 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const PhaseBucket& bucket) 
     return os;
 }
 
-std::string PhaseBucket::algebraicView() const {
+std::string PhaseBucket::algebraicView() const
+{
     std::string res = "";
 
     if (!zeroAffineRZs.empty()) {
@@ -57,7 +63,7 @@ std::string PhaseBucket::algebraicView() const {
 
         res += (oneAffineRZs.empty() ? "]" : ", ");
     }
-    
+
     if (!oneAffineRZs.empty()) {
 
         res += (zeroAffineRZs.empty() ? "[" : "");
@@ -70,7 +76,7 @@ std::string PhaseBucket::algebraicView() const {
             }
             res += (std::to_string(oneAffineRZs[i] + 1));
         }
-        res += ")]";        
+        res += ")]";
     }
     return res;
 }
@@ -78,7 +84,8 @@ std::string PhaseBucket::algebraicView() const {
 /*
     Methods:
 */
-GateID PhaseBucket::getMergeTarget() const {
+GateID PhaseBucket::getMergeTarget() const
+{
     if (!zeroAffineRZs.empty()) {
         return zeroAffineRZs[0];
     }
