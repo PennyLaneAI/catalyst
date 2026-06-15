@@ -192,6 +192,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `/benchmark` GitHub comment trigger can now accept additional arguments and has been renamed to `!benchmark`.
+  [(#2947)](https://github.com/PennyLaneAI/catalyst/pull/2947)
+
 * The frontend now generates MLIR in reference semantics when capture is enabled.
   [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
   [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
