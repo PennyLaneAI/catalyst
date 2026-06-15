@@ -1110,6 +1110,8 @@ class TestLoweringTransversalGates:
                 // CHECK: func.func private @hadamard_Steane
                 // CHECK: func.func private @s_adj_Steane
                 // CHECK-NOT: func.func private @x_Steane
+                // CHECK-NOT: func.func private @y_Steane
+                // CHECK-NOT: func.func private @z_Steane
                 // CHECK-NOT: func.func private @s_Steane
             }
             """
