@@ -1,5 +1,6 @@
 name: Build Catalyst Wheel on macOS (arm64)
-
+permissions:
+  contents: read
 on:
   pull_request:
     types:

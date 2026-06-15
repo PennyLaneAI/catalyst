@@ -358,6 +358,7 @@ class CustomOpConversion(RewritePattern):
     """
 
     t_subroutine: func.FuncOp
+    t_adj_subroutine: func.FuncOp
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: quantum.CustomOp, rewriter: PatternRewriter):
@@ -371,6 +372,7 @@ class CustomOpConversion(RewritePattern):
                 ops_to_insert = self._get_qecl_ops_for_single_qubit_gate(op)
 
             case "T":
+                subroutine = self.t_adj_subroutine if op.adjoint else self.t_subroutine
                 qubit_owner_op = op.in_qubits[0].owner
                 if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
                     _raise_failed_to_convert_op_compile_error(op)
@@ -379,7 +381,7 @@ class CustomOpConversion(RewritePattern):
                         (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
                     ),
                     t_gate_subroutine := func.CallOp(
-                        callee=SymbolRefAttr(self.t_subroutine.sym_name),
+                        callee=SymbolRefAttr(subroutine.sym_name),
                         arguments=conv_cast_op.results[0],
                         return_types=conv_cast_op.results[0].type,
                     ),
@@ -902,7 +904,9 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
         module_block = op.regions[0].blocks.first
         assert module_block is not None, "Module has no block"
         t_subroutine = self.create_t_subroutine()
+        t_adj_subroutine = self.create_t_subroutine(adj=True)
         module_block.add_op(t_subroutine)
+        module_block.add_op(t_adj_subroutine)
 
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
@@ -911,7 +915,9 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                     ExtractOpConversion(),
                     InsertOpConversion(),
                     DeallocOpConversion(),
-                    CustomOpConversion(t_subroutine=t_subroutine),
+                    CustomOpConversion(
+                        t_subroutine=t_subroutine, t_adj_subroutine=t_adj_subroutine
+                    ),
                     MeasureOpConversion(),
                     ScfYieldConversion(),
                     ScfIfConversion(),
@@ -924,7 +930,7 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
         # this pass removes them
         ReconcileUnrealizedCastsPass().apply(ctx, op)
 
-    def create_t_subroutine(self):
+    def create_t_subroutine(self, adj=False):
         """Create a subroutine that takes in a codeblock in state |φ>, and outputs a codeblock
         in state T|φ>. The subroutine includes instructions to fabricate a codeblock in the
         magic state, entangle it with the input codeblock and perform measurements and corrections.
@@ -938,6 +944,11 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                             |        ║
             |input_state> ──╰X──┤↗├──║── deallocate
                                  ╚═══╝
+
+        The corresponding subroutine for T-adjoint uses a conjugate magic state, and applies
+        S-adj instead of S in the correction. The correction is derived in Zhou, Leung & Chuang,
+        Phys. Rev. A 62, 052316 (2000), arXiv:quant-ph/0002039, Sec. IV.A, Eqs. (13)-(15).
+        Replacing T in these equations with T-adjoint yields the correction used here.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
@@ -953,7 +964,8 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
             (in_codeblock,) = block.args
 
             # fabricate aux codeblock in magic state
-            fabricate_op = qecl.FabricateOp("magic", qecl.LogicalCodeblockType(k=self.k))
+            init_state = "magic_conj" if adj else "magic"
+            fabricate_op = qecl.FabricateOp(init_state, qecl.LogicalCodeblockType(k=self.k))
             magic_state_block = fabricate_op.results[0]
 
             # apply cnot between aux codeblock and input data codeblock
@@ -985,8 +997,9 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
             with ImplicitBuilder(if_apply_corr_op.true_region):
                 # the correction operator "SX" is applied via applying its component gates
                 # right to left, i.e. with X, followed by S
+                # for the adjoint_T subroutine, S is adjoint
                 corrected_cb1 = qecl.PauliXOp(magic_state1, idx=0)
-                corr_cb_out = qecl.SOp(corrected_cb1, idx=0)
+                corr_cb_out = qecl.SOp(corrected_cb1, idx=0, adjoint=adj)
                 scf.YieldOp(corr_cb_out)
 
             with ImplicitBuilder(if_apply_corr_op.false_region):
@@ -998,8 +1011,10 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                 if_apply_corr_op.results[0],
             )
 
+        func_name = "apply_T_adj" if adj else "apply_T"
+
         funcOp = func.FuncOp(
-            name="apply_T",
+            name=func_name,
             function_type=(input_types, output_types),
             visibility="private",
             region=Region([block]),
