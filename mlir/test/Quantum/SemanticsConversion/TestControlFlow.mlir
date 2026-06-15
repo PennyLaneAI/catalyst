@@ -289,6 +289,11 @@ func.func public @test_for_loop_with_dynamic_allocation() attributes {quantum.no
 // -----
 
 
+//
+// while loop
+//
+
+
 // CHECK-LABEL: test_basic_while_loop
 func.func @test_basic_while_loop(%arg0: f64) attributes {quantum.node} {
 
@@ -458,6 +463,11 @@ func.func @test_while_loop_nested(%arg0: i1) attributes {quantum.node} {
 
 
 // -----
+
+
+//
+// if
+//
 
 
 // CHECK-LABEL: test_if_non_root_no_else
@@ -677,6 +687,11 @@ func.func @test_if_nested_for(%arg0: i1) attributes {quantum.node} {
 
 
 // -----
+
+
+//
+// switch
+//
 
 
 // CHECK-LABEL: test_switch
