@@ -1223,12 +1223,23 @@ class TestLoweringFabricateOp:
 
                 // CHECK: [[cb1:%.+]] = func.call @apply_T([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
                 %2 = func.call @apply_T(%0) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+
+                // CHECK: [[cb2:%.+]] = func.call @apply_T_adj([[cb1]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                %3 = func.call @apply_T_adj(%2) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                return
             }
             //      CHECK-LABEL: func.func private @apply_T([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
             // CHECK: func.call @fabricate_magic_Steane() : () -> !qecp.codeblock<1 x 7>
             // CHECK: qecp.dealloc_cb
             func.func private @apply_T(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
                 %1 = qecl.fabricate[magic] : !qecl.codeblock<1>
+                qecl.dealloc_cb %0 : !qecl.codeblock<1>
+                func.return %1 : !qecl.codeblock<1>
+            }
+            //      CHECK-LABEL: func.func private @apply_T_adj([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
+            // CHECK: func.call @fabricate_magic_conj_Steane() : () -> !qecp.codeblock<1 x 7>
+            func.func private @apply_T_adj(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
+                %1 = qecl.fabricate[magic_conj] : !qecl.codeblock<1>
                 qecl.dealloc_cb %0 : !qecl.codeblock<1>
                 func.return %1 : !qecl.codeblock<1>
             }
