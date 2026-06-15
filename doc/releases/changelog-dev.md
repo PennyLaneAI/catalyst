@@ -192,6 +192,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `/benchmark` GitHub comment trigger can now accept additional arguments and has been renamed to `!benchmark`.
+  [(#2947)](https://github.com/PennyLaneAI/catalyst/pull/2947)
+
 * The frontend now generates MLIR in reference semantics when capture is enabled.
   [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
   [(#2664)](https://github.com/PennyLaneAI/catalyst/pull/2664)
@@ -234,9 +237,11 @@
   [(#2871)](https://github.com/PennyLaneAI/catalyst/pull/2871)
   [(#2922)](https://github.com/PennyLaneAI/catalyst/pull/2922)
 
-* The experimental compiler pass `convert-quantum-to-qecl` has been extended to lower
-  `quantum.custom "T"` gates to the `qecl` layer as a subroutine using a magic state.
+* The experimental compiler pass `convert-quantum-to-qecl` has been extended to lower the
+  `quantum.custom "T"` gate to the `qecl` layer as a subroutine using a magic state (or conjugate
+  magic state in the case of the adjoint).
   [(#2870)](https://github.com/PennyLaneAI/catalyst/pull/2870)
+  [(#2921)](https://github.com/PennyLaneAI/catalyst/pull/2921)
 
 * The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
   [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
@@ -270,9 +275,10 @@
   dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
   [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
 
-* A new operation has been added to the Quantum dialect to represent generic and high-level
+* A new operation has been added to the Quantum dialects to represent generic and high-level
   quantum operators, including operators with frontend-end specific data.
   [(#2883)](https://github.com/PennyLaneAI/catalyst/pull/2883)
+  [(#2943)](https://github.com/PennyLaneAI/catalyst/pull/2943)
 
 * In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
   operations have been added:
