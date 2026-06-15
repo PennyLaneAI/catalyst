@@ -855,7 +855,6 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 
     // Add new qref arguments
     QubitValueTracker regionTracker;
-    size_t originalNumArgs = f.getFunctionType().getNumInputs();
     SmallVector<unsigned> indicesToInsertArgs;
     SmallVector<Type> typesToInsertArgs;
     SmallVector<DictionaryAttr> attrsToInsertArgs;
@@ -871,17 +870,17 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 
         if (isa<quantum::QubitType>(t)) {
             typesToInsertArgs.push_back(qref::QubitType::get(ctx));
-            newRargIndices.push_back(originalNumArgs + (numNewArgsAdded++));
+            newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         }
         else if (isa<quantum::QuregType>(t)) {
             typesToInsertArgs.push_back(
                 qref::QuregType::get(ctx, qregSizesAtCallsite[qregSizeIdx++]));
-            newRargIndices.push_back(originalNumArgs + (numNewArgsAdded++));
+            newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         }
 
-        indicesToInsertArgs.push_back(originalNumArgs);
+        indicesToInsertArgs.push_back(i);
         attrsToInsertArgs.push_back(DictionaryAttr::get(ctx));
         locsToInsertArgs.push_back(loc);
     }
