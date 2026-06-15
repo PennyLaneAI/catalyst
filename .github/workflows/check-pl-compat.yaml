@@ -70,7 +70,7 @@ jobs:
 
     - name: Upperbound 'pytest' when testing with stable Catalyst
       if: ${{ inputs.catalyst == 'stable' }}
-      runs: |
+      run: |
         # Stable Catalyst (v0.15.0) contains a test
         # that fails to collect with pytest 9.1.
         #
