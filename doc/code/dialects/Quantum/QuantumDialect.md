@@ -16,33 +16,3 @@ In this dialect, quantum operations are expressed using value semantics. That is
 qubit values are consumed and produced by operations, instead of operations merely acting on
 qubit references. This exposes the dataflow of the quantum program in the SSA graph of the
 MLIR. See [QIRO: An SSA-based Quantum IR for Optimization](https://doi.org/10.1145/3491247).
-
-## Types
-
-### ObservableType
-
-_A quantum observable for use in measurements._
-
-Syntax: `!quantum.obs`
-
-
-### QubitType
-
-_A value-semantic qubit (state)._
-
-Syntax: `!quantum.bit`
-
-
-### QuregType
-
-_An array of value-semantic qubits (i.e. quantum register)._
-
-Syntax: `!quantum.reg`
-
-
-### ResultType
-
-_A quantum measurement result._
-
-Syntax: `!quantum.res`
-
