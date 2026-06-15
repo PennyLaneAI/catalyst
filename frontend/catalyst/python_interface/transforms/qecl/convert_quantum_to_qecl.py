@@ -357,8 +357,8 @@ class CustomOpConversion(RewritePattern):
     quantum-to-qecl dialect conversion supports arbitrary values of k >= 1.
     """
 
-    t_subroutine: func.FuncOp
-    t_adj_subroutine: func.FuncOp
+    t_subroutine: func.FuncOp | None
+    t_adj_subroutine: func.FuncOp | None
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: quantum.CustomOp, rewriter: PatternRewriter):
@@ -373,9 +373,16 @@ class CustomOpConversion(RewritePattern):
 
             case "T":
                 subroutine = self.t_adj_subroutine if op.adjoint else self.t_subroutine
+                assert (
+                    subroutine is not None
+                ), "Program contains at least one T gate but the T subroutine is None"
+
                 qubit_owner_op = op.in_qubits[0].owner
-                if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):
+                if not _is_type_convertible(
+                    qubit_owner_op, qecl.LogicalCodeblockType
+                ):  # pragma: no cover
                     _raise_failed_to_convert_op_compile_error(op)
+
                 ops_to_insert = (
                     conv_cast_op := builtin.UnrealizedConversionCastOp.get(
                         (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
@@ -905,13 +912,19 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
         assert module_block is not None, "Module has no block"
 
         # only build and add the T-gate subroutines when the circuit contains a T gate
-        t_gates = [
-            inner_op
-            for inner_op in op.walk()
-            if isinstance(inner_op, quantum.CustomOp) and inner_op.gate_name.data == "T"
-        ]
-        has_t_gate = any(gate.adjoint is None for gate in t_gates)
-        has_adjoint_t_gate = any(gate.adjoint is not None for gate in t_gates)
+        has_t_gate = False
+        has_adjoint_t_gate = False
+
+        for inner_op in op.walk():
+            if isinstance(inner_op, quantum.CustomOp) and inner_op.gate_name.data == "T":
+                if inner_op.adjoint is None:
+                    has_t_gate = True
+                else:
+                    has_adjoint_t_gate = True
+
+                if has_t_gate and has_adjoint_t_gate:
+                    # Early exit from walk
+                    break
 
         t_subroutine = None
         t_adj_subroutine = None
@@ -945,7 +958,7 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
         # this pass removes them
         ReconcileUnrealizedCastsPass().apply(ctx, op)
 
-    def create_t_subroutine(self, adj=False):
+    def create_t_subroutine(self, adj=False) -> func.FuncOp:
         """Create a subroutine that takes in a codeblock in state |φ>, and outputs a codeblock
         in state T|φ>. The subroutine includes instructions to fabricate a codeblock in the
         magic state, entangle it with the input codeblock and perform measurements and corrections.
