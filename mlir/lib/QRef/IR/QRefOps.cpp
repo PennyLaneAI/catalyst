@@ -243,9 +243,8 @@ LogicalResult OperatorOp::verify()
         static_cast<bool>(getArrCtrlIndices()) || static_cast<bool>(getArrCtrlValues());
 
     if (hasQubitControls && hasQregControls) {
-        return emitOpError()
-               << "cannot mix qubit controls (in_ctrl_qubits/in_ctrl_values/out_ctrl_qubits) "
-               << "with register controls (arr_ctrl_indices/arr_ctrl_values)";
+        return emitOpError() << "cannot mix qubit controls (ctrl_qubits/ctrl_values) "
+                             << "with register controls (arr_ctrl_indices/arr_ctrl_values)";
     }
 
     if (static_cast<bool>(getArrCtrlIndices()) != static_cast<bool>(getArrCtrlValues())) {

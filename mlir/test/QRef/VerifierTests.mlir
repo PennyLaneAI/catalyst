@@ -490,7 +490,7 @@ func.func @operator_invalid_ctrl_qubit_value_mismatch(%q : !qref.bit, %cq0 : !qr
 // -----
 
 func.func @operator_invalid_control_mode_mix(%cq : !qref.bit, %ctrlv : i1, %r : !qref.reg<4>, %idx : tensor<2xi64>, %cidx : tensor<2xi64>, %cval : tensor<2xi1>) {
-    // expected-error@+1 {{cannot mix qubit controls (in_ctrl_qubits/in_ctrl_values/out_ctrl_qubits) with register controls (arr_ctrl_indices/arr_ctrl_values)}}
+    // expected-error@+1 {{cannot mix qubit controls (ctrl_qubits/ctrl_values) with register controls (arr_ctrl_indices/arr_ctrl_values)}}
     "qref.operator"(%cq, %ctrlv, %r, %idx, %cidx, %cval) <{op_name = "bad_ctrl_mix", operandSegmentSizes = array<i32: 0, 0, 0, 1, 1, 1, 1, 1, 1>}> : (!qref.bit, i1, !qref.reg<4>, tensor<2xi64>, tensor<2xi64>, tensor<2xi1>) -> ()
     return
 }
