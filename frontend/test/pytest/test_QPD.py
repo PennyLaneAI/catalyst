@@ -14,6 +14,8 @@
 
 """Unit tests for the python decompositions module."""
 
+import pytest
+
 from catalyst.device.python_decompositions import paulirot_decomposition_wrapper
 
 
@@ -27,3 +29,7 @@ class TestQPD:
         assert "paulirot_decomp_rule" in result
         assert "Hadamard" in result
         assert "multirz" in result
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
