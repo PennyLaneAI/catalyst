@@ -68,6 +68,17 @@ jobs:
         pip install amazon-braket-pennylane-plugin
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
+    - name: Upperbound 'pytest' when testing with stable Catalyst
+      if: ${{ inputs.catalyst == 'stable' }}
+      runs: |
+        # Stable Catalyst (v0.15.0) contains a test
+        # that fails to collect with pytest 9.1.
+        #
+        # This is a work-around to get SSS green again.
+        #
+        # TODO: Remove once v0.16.0 has been released.
+        python3 -m pip install "pytest<9.1"
+
     - name: Get Catalyst Build Dependencies (latest)
       uses: actions/cache/restore@v4
       if: ${{ inputs.catalyst == 'latest' }}
