@@ -1102,7 +1102,7 @@ class TestLoweringFabricateOp:
                 %0 = qecl.fabricate[{init_state}] : !qecl.codeblock<1>
                 return
             }}
-            // CHECK-LABEL: func.func private @fabricate_{init_state}_TestCode() -> !qecp.codeblock<1 x 3> 
+            // CHECK-LABEL: func.func private @fabricate_{init_state}_TestCode() -> !qecp.codeblock<1 x 3>
             //       CHECK:   [[cb:%.+]] = qecp.alloc_cb : !qecp.codeblock<1 x 3>
             // Extract qubits
             //       CHECK-DAG:   [[q0:%.+]] = qecp.extract [[cb]][0] : !qecp.codeblock<1 x 3> -> !qecp.qubit<data>
@@ -1283,7 +1283,7 @@ class TestControlFlow:
             #      CHECK:     scf.yield {{%.+}} : !qecp.codeblock<1 x 7>
             #      CHECK: func.call @measure_transversal_Steane([[cb_out]])
             @qp.for_loop(0, 4, 1)
-            def loop_pauli_x(i):
+            def loop_pauli_x(i):  # pylint: disable=unused-argument
                 qp.PauliX(0)
 
             loop_pauli_x()
