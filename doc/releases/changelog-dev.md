@@ -190,6 +190,10 @@
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
+* The `--decompose-lowering` pass no longer crashes on qreg-mode decomposition rules whose wire
+  indices are passed as separate scalar arguments, e.g. `(qreg, *params, idx0, idx1, ...)`.
+  [(#2952)](https://github.com/PennyLaneAI/catalyst/pull/2952)
+
 <h3>Internal changes ⚙️</h3>
 
 * The `/benchmark` GitHub comment trigger can now accept additional arguments and has been renamed to `!benchmark`.
