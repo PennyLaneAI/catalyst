@@ -16,7 +16,6 @@
 
 #include <functional>
 #include <iostream>
-#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -58,8 +57,6 @@ class TracingError : public QPDError {
 
 class PyInterpreterGuard {
   public:
-    std::optional<nb::gil_scoped_release> release;
-
     PyInterpreterGuard(const PyInterpreterGuard &) = delete;
     PyInterpreterGuard &operator=(const PyInterpreterGuard &) = delete;
 
