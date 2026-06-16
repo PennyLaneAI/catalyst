@@ -1,5 +1,8 @@
 name: Build nightly Catalyst releases for TestPyPI
 
+permissions:
+  contents: write
+
 on:
   schedule:
     # Run every weekday at 23:40 EDT (cron is in UTC)

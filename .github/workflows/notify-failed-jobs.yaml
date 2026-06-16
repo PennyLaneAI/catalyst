@@ -12,6 +12,8 @@ on:
       - Build nightly Catalyst releases for TestPyPI
       - Run Catalyst pytests for weekly flaky test checking
 
+permissions: {}
+
 jobs:
   on-failure:
     runs-on: ubuntu-24.04
