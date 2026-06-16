@@ -868,8 +868,8 @@ class TestDefaultAvailableIR:
         """Test that AbstractArray and AbstractWires can be used to specify the input shapes for AOT compilation."""
 
         @qp.qjit(capture=True)
-        @qp.qnode(qp.device('lightning.qubit', wires=4))
-        def c(x : qp.typing.AbstractArray((3, ), float), wires : qp.wires.Wires[4]):
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        def c(x: qp.typing.AbstractArray((3,), float), wires: qp.wires.Wires[4]):
             @qp.for_loop(x.shape[0])
             def loop(i):
                 qp.RX(x[i], wires[i])

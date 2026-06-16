@@ -1441,12 +1441,11 @@ class TestMarkerIntegration:
         check_specs_same(actual, expected)
 
 
-
 def test_abstract_array_inputs():
     """Test that AbstractArray and AbstractWires can be used with specs when level!= device."""
 
     @qp.qjit(capture=True)
-    @qp.qnode(qp.device('lightning.qubit', wires=4))
+    @qp.qnode(qp.device("lightning.qubit", wires=4))
     def c(x, wires):
         @qp.for_loop(x.shape[0])
         def loop(i):
@@ -1461,8 +1460,8 @@ def test_abstract_array_inputs():
         return qp.expval(qp.Z(0))
 
     s = qp.specs(c, level=0)(qp.typing.AbstractArray((3,), float), qp.wires.Wires[3])
-    assert s.resources.gate_types['PauliX'] == 3
-    assert s.resources.gate_types['RX'] == 3
+    assert s.resources.gate_types["PauliX"] == 3
+    assert s.resources.gate_types["RX"] == 3
 
 
 if __name__ == "__main__":

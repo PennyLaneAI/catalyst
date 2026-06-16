@@ -60,7 +60,10 @@ def params_are_annotated(fn: Callable):
     are_annotated = all(annotation is not inspect.Parameter.empty for annotation in annotations)
     if not are_annotated:
         return False
-    return all(isinstance(annotation, (type, AbstractValue, AbstractArray, AbstractWires)) for annotation in annotations)
+    return all(
+        isinstance(annotation, (type, AbstractValue, AbstractArray, AbstractWires))
+        for annotation in annotations
+    )
 
 
 def get_type_annotations(fn: Callable):
