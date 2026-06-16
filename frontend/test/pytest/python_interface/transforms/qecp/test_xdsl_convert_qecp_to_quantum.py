@@ -573,8 +573,158 @@ class TestSubroutineConversion:
 class TestHyperRegisterLowering:
     """Unit test for hyperreg related type and operations lowering."""
 
-    def test_hyperregister_lowering(self, run_filecheck):
-        """Test for hyperreg related type and operations lowering."""
+    def test_encode_loop_unrolling_1cb(self, run_filecheck):
+        """Test the step in the hyper-register lowering that unrolls the loop that encodes each
+        codeblock in the hyper-register. This test is for the case where the hyper-register contains
+        a single physical codeblock.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: @test_program()
+        func.func public @test_program() -> () attributes {quantum.node} {
+            // CHECK: [[reg0:%.+]] = quantum.alloc(7) : !quantum.reg
+            // CHECK: [[reg1:%.+]] = func.call @encode_zero_TestCode([[reg0]]) : (!quantum.reg) -> !quantum.reg
+            // CHECK: "test.op"([[reg1]]) : (!quantum.reg) -> ()
+
+            %0 = qecp.alloc() : !qecp.hyperreg<1 x 1 x 7>
+            %1 = arith.constant 0 : index
+            %2 = arith.constant 1 : index
+            %3 = arith.constant 1 : index
+            %4 = scf.for %5 = %1 to %2 step %3 iter_args(%6 = %0) -> (!qecp.hyperreg<1 x 1 x 7>) {
+                %7 = qecp.extract_block %6[%5] : !qecp.hyperreg<1 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                %8 = func.call @encode_zero_TestCode(%7) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                %9 = qecp.insert_block %6[%5], %8 : !qecp.hyperreg<1 x 1 x 7>, !qecp.codeblock<1 x 7>
+                scf.yield %9 : !qecp.hyperreg<1 x 1 x 7>
+            }
+            %10 = qecp.extract_block %4[0] : !qecp.hyperreg<1 x 1 x 7> -> !qecp.codeblock<1 x 7>
+            "test.op"(%10) : (!qecp.codeblock<1 x 7>) -> ()  // To prevent DCE
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_encode_loop_unrolling_2cb(self, run_filecheck):
+        """Test the step in the hyper-register lowering that unrolls the loop that encodes each
+        codeblock in the hyper-register. This test is for the case where the hyper-register contains
+        two physical codeblocks.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: @test_program()
+        func.func public @test_program() -> () attributes {quantum.node} {
+            // CHECK: [[reg00:%.+]] = quantum.alloc(7) : !quantum.reg
+            // CHECK: [[reg01:%.+]] = func.call @encode_zero_TestCode([[reg00]]) : (!quantum.reg) -> !quantum.reg
+            // CHECK: [[reg10:%.+]] = quantum.alloc(7) : !quantum.reg
+            // CHECK: [[reg11:%.+]] = func.call @encode_zero_TestCode([[reg10]]) : (!quantum.reg) -> !quantum.reg
+            // CHECK: "test.op"([[reg01]]) : (!quantum.reg) -> ()
+            // CHECK: "test.op"([[reg11]]) : (!quantum.reg) -> ()
+
+            %0 = qecp.alloc() : !qecp.hyperreg<2 x 1 x 7>
+            %1 = arith.constant 0 : index
+            %2 = arith.constant 2 : index
+            %3 = arith.constant 1 : index
+            %4 = scf.for %5 = %1 to %2 step %3 iter_args(%6 = %0) -> (!qecp.hyperreg<2 x 1 x 7>) {
+                %7 = qecp.extract_block %6[%5] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                %8 = func.call @encode_zero_TestCode(%7) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                %9 = qecp.insert_block %6[%5], %8 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+                scf.yield %9 : !qecp.hyperreg<2 x 1 x 7>
+            }
+            %10 = qecp.extract_block %4[0] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+            "test.op"(%10) : (!qecp.codeblock<1 x 7>) -> ()  // To prevent DCE
+            %11 = qecp.extract_block %4[1] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+            "test.op"(%11) : (!qecp.codeblock<1 x 7>) -> ()  // To prevent DCE
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_alloc_extract_insert_dealloc_chain_1cb(self, run_filecheck):
+        """Test the hyper-register lowering pattern where the input program has a typical chain of
+        alloc, extract_block, operations on the physical codeblock, insert_block and dealloc ops.
+        Note that the 'quantum.device_release' op at the end of the program is necessary, since this
+        is what triggers the insertion of the 'quantum.dealloc' ops into the program.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: @test_program()
+        func.func public @test_program() -> () attributes {quantum.node} {
+            //      CHECK: [[reg0:%.+]] = quantum.alloc(7) : !quantum.reg
+            //      CHECK: [[reg1:%.+]] = func.call @encode_zero_TestCode([[reg0]]) : (!quantum.reg) -> !quantum.reg
+            //      CHECK: [[reg2:%.+]] = func.call @gate_op([[reg1]]) : (!quantum.reg) -> !quantum.reg
+            //      CHECK: quantum.dealloc [[reg2]] : !quantum.reg
+            // CHECK-NEXT: quantum.device_release
+
+            %0 = qecp.alloc() : !qecp.hyperreg<1 x 1 x 7>
+            %1 = arith.constant 0 : index
+            %2 = arith.constant 1 : index
+            %3 = arith.constant 1 : index
+            %4 = scf.for %5 = %1 to %2 step %3 iter_args(%6 = %0) -> (!qecp.hyperreg<1 x 1 x 7>) {
+                %7 = qecp.extract_block %6[%5] : !qecp.hyperreg<1 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                %8 = func.call @encode_zero_TestCode(%7) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                %9 = qecp.insert_block %6[%5], %8 : !qecp.hyperreg<1 x 1 x 7>, !qecp.codeblock<1 x 7>
+                scf.yield %9 : !qecp.hyperreg<1 x 1 x 7>
+            }
+            %10 = qecp.extract_block %4[0] : !qecp.hyperreg<1 x 1 x 7> -> !qecp.codeblock<1 x 7>
+            %11 = func.call @gate_op(%10) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            %12 = qecp.insert_block %4[0], %11 : !qecp.hyperreg<1 x 1 x 7>, !qecp.codeblock<1 x 7>
+            qecp.dealloc %12 : !qecp.hyperreg<1 x 1 x 7>
+            quantum.device_release
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_extract_after_insert_2cb(self, run_filecheck):
+        """Test the hyper-register lowering pattern where the input program has a
+        'qecp.extract_block' op after a 'qecp.insert_block' op on the same index. This pattern is
+        less common in simple programs, but does appear in some cases, e.g. after a control-flow
+        region acting on multiple qubits.
+        """
+        program = """
+        builtin.module {
+        // CHECK-LABEL: @test_program()
+        func.func public @test_program() -> () attributes {quantum.node} {
+            //      CHECK: [[reg00:%.+]] = quantum.alloc(7) : !quantum.reg
+            //      CHECK: [[reg01:%.+]] = func.call @encode_zero_TestCode([[reg00]]) : (!quantum.reg) -> !quantum.reg
+            //      CHECK: [[reg10:%.+]] = quantum.alloc(7) : !quantum.reg
+            //      CHECK: [[reg11:%.+]] = func.call @encode_zero_TestCode([[reg10]]) : (!quantum.reg) -> !quantum.reg
+            //      CHECK: [[reg02:%.+]] = func.call @gate_op1([[reg01]]) : (!quantum.reg) -> !quantum.reg
+            //      CHECK: [[reg12:%.+]] = func.call @gate_op2([[reg11]]) : (!quantum.reg) -> !quantum.reg
+            //      CHECK: [[reg03:%.+]] = func.call @gate_op3([[reg02]]) : (!quantum.reg) -> !quantum.reg
+            //  CHECK-DAG: quantum.dealloc [[reg03]] : !quantum.reg
+            //  CHECK-DAG: quantum.dealloc [[reg12]] : !quantum.reg
+            // CHECK-NEXT: quantum.device_release
+
+            %0 = qecp.alloc() : !qecp.hyperreg<2 x 1 x 7>
+            %1 = arith.constant 0 : index
+            %2 = arith.constant 2 : index
+            %3 = arith.constant 1 : index
+            %4 = scf.for %5 = %1 to %2 step %3 iter_args(%6 = %0) -> (!qecp.hyperreg<2 x 1 x 7>) {
+                %7 = qecp.extract_block %6[%5] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+                %8 = func.call @encode_zero_TestCode(%7) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                %9 = qecp.insert_block %6[%5], %8 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+                scf.yield %9 : !qecp.hyperreg<2 x 1 x 7>
+            }
+            %10 = qecp.extract_block %4[0] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+            %11 = qecp.extract_block %4[1] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+            %12 = func.call @gate_op1(%10) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            %13 = func.call @gate_op2(%11) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            %14 = qecp.insert_block %4[0], %12 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+            %15 = qecp.insert_block %14[1], %13 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+            %16 = qecp.extract_block %15[0] : !qecp.hyperreg<2 x 1 x 7> -> !qecp.codeblock<1 x 7>
+            %17 = func.call @gate_op3(%16) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+            %18 = qecp.insert_block %15[0], %17 : !qecp.hyperreg<2 x 1 x 7>, !qecp.codeblock<1 x 7>
+            qecp.dealloc %18 : !qecp.hyperreg<2 x 1 x 7>
+            quantum.device_release
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
+
+    def test_hyperreg_lowering_integration(self, run_filecheck):
+        """Integration test for hyperreg related type and operations lowering."""
         program = """
             builtin.module {
             // CHECK-LABEL: @circuit()
