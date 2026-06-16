@@ -531,6 +531,8 @@ jobs:
         # Install graphviz for testing the mlir-op-graph integration
         sudo apt-get install -y graphviz
         make frontend
+        # needed for compile-time python-decompositions lit tests in frontend
+        echo "CATALYST_LIBPYTHON=$(python3 -c 'from catalyst.utils.runtime_environment import get_libpython_path; print(get_libpython_path())')" >> $GITHUB_ENV
 
     - name: Verify Graphviz installation
       run: |
@@ -539,8 +541,6 @@ jobs:
 
     - name: Run Python Pytest/Lit Tests
       run: |
-        # needed for compile-time python-decompositions lit tests in frontend
-        echo "CATALYST_LIBPYTHON=$(python3 -c 'from catalyst.utils.runtime_environment import get_libpython_path; print(get_libpython_path())')" >> $GITHUB_ENV
         COVERAGE_REPORT="xml" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
