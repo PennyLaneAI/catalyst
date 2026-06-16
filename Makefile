@@ -337,7 +337,7 @@ coverage: coverage-frontend coverage-runtime
 
 lit-coverage:
 	@echo "Running lit tests with coverage"
-	CATALYST_LIBPYTHON="$$($(PYTHON) -c 'from catalyst.utils.runtime_environment import get_libpython_path; print(get_libpython_path())') ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+	CATALYST_LIBPYTHON=$$($(PYTHON) -c 'from catalyst.utils.runtime_environment import get_libpython_path; print(get_libpython_path())') ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 
 coverage-frontend:
 ifeq ($(ENABLE_ASAN),ON)
