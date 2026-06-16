@@ -105,8 +105,9 @@ LogicalResult FabricateOp::verify()
 LogicalResult EncodeOp::verify()
 {
     auto initState = getInitState();
-    if (initState == LogicalCodeblockInitState::Magic) {
-        return emitOpError() << "cannot encode a logical codeblock to the magic state, use '"
+    if (initState == LogicalCodeblockInitState::Magic ||
+        initState == LogicalCodeblockInitState::Magic_conj) {
+        return emitOpError() << "cannot encode a logical codeblock to a magic state, use '"
                              << FabricateOp::getOperationName() << "' instead.";
     }
     return success();

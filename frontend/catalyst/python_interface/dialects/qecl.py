@@ -67,6 +67,7 @@ class LogicalCodeblockInitState(StrEnum):
 
     Zero = "zero"  # |0⟩
     Magic = "magic"  # |m⟩ = |0⟩ + e^{iπ/4}|1⟩  (Magic state)
+    Magic_conj = "magic_conj"  # |m̄⟩ = |0⟩ + e^{-iπ/4}|1⟩  (Magic state conjugated)
 
 
 @irdl_attr_definition
