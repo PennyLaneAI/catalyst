@@ -128,7 +128,7 @@ requirements = [
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "numpy>2.0.0",
-    "scipy-openblas32>=0.3.26,<0.3.33",  # symbol and library name
+    "scipy-openblas32>=0.3.26,!=0.3.33",  # symbol and library name
     "diastatic-malt==2.15.3",
     "xdsl==0.63.0",
     "xdsl-jax==0.5.2",
@@ -331,7 +331,7 @@ class CustomBuildExtMacos(UnifiedBuildExt):
         build_path = glob.glob(os.path.join("build", "**", library_name), recursive=True)
         lib_with_r_path = "@rpath/libcustom_calls.so"
 
-        original_path = build_path[0] if build_path else frontend_path[0]
+        original_path = frontend_path[0] if frontend_path else build_path[0]
 
         # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
         subprocess.run(
