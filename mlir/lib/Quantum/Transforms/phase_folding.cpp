@@ -372,7 +372,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         });
 
         llvm::outs() << symCirc << "\n";
-        
+
         phaseMerge(symCirc);
         reportStats();
     }

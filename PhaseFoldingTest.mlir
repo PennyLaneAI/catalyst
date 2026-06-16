@@ -1,32 +1,3 @@
-// func.func @test() {
-//     %reg = quantum.alloc( 2) : !quantum.reg
-//     %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
-//     %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
-
-//     %c0 = arith.constant 0 : index
-//     %c4 = arith.constant 4 : index
-//     %c1 = arith.constant 1 : index
-
-//     %c = arith.constant 1.1212 : f64
-    
-//     %q2:2 = quantum.custom "CNOT"() %q0, %q1 : !quantum.bit, !quantum.bit
-//     %q3 = quantum.custom "RZ"(%c) %q2#0 : !quantum.bit
-//     %q4 = quantum.custom "T"() %q2#1 : !quantum.bit
-//     %q5 = quantum.custom "Hadamard"() %q3 : !quantum.bit
-//     %q6 = quantum.custom "PauliX"() %q4 : !quantum.bit
-//     %q7 = quantum.custom "PauliY"() %q5 : !quantum.bit
-//     %q8 = quantum.custom "PauliZ"() %q6 : !quantum.bit
-    
-
-//     // %r = scf.for %i = %c0 to %c4 step %c1 iter_args(%x = %q1) -> !quantum.bit {
-//     //     %q1_1 = quantum.custom "PauliX"() %x : !quantum.bit
-//     //     scf.yield %q1_1 : !quantum.bit
-//     // }
-
-
-//     func.return
-// }
-
 func.func @ex_425(%arg0: tensor<2xi64>) -> (!quantum.bit, !quantum.bit) {
     %reg = quantum.alloc( 2) : !quantum.reg
     %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
@@ -35,7 +6,6 @@ func.func @ex_425(%arg0: tensor<2xi64>) -> (!quantum.bit, !quantum.bit) {
     // %2 = stablehlo.convert %arg0 : (tensor<2xi64>) -> tensor<2xcomplex<f64>>
     // %3 = quantum.set_state(%2) %q1 : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
     // %q3 = quantum.custom "T"() %3 : !quantum.bit
-
 
     %tens01 = arith.constant dense<[false]> : tensor<1xi1>
     %q2 = quantum.set_basis_state(%tens01) %q1 : (tensor<1xi1>, !quantum.bit) -> !quantum.bit
@@ -116,3 +86,31 @@ func.func @ex_1() -> (!quantum.bit, !quantum.bit) {
     func.return %q12#1, %q12#0 : !quantum.bit, !quantum.bit
 }
 
+// func.func @test() {
+//     %reg = quantum.alloc( 2) : !quantum.reg
+//     %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+//     %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+
+//     %c0 = arith.constant 0 : index
+//     %c4 = arith.constant 4 : index
+//     %c1 = arith.constant 1 : index
+
+//     %c = arith.constant 1.1212 : f64
+    
+//     %q2:2 = quantum.custom "CNOT"() %q0, %q1 : !quantum.bit, !quantum.bit
+//     %q3 = quantum.custom "RZ"(%c) %q2#0 : !quantum.bit
+//     %q4 = quantum.custom "T"() %q2#1 : !quantum.bit
+//     %q5 = quantum.custom "Hadamard"() %q3 : !quantum.bit
+//     %q6 = quantum.custom "PauliX"() %q4 : !quantum.bit
+//     %q7 = quantum.custom "PauliY"() %q5 : !quantum.bit
+//     %q8 = quantum.custom "PauliZ"() %q6 : !quantum.bit
+    
+
+//     // %r = scf.for %i = %c0 to %c4 step %c1 iter_args(%x = %q1) -> !quantum.bit {
+//     //     %q1_1 = quantum.custom "PauliX"() %x : !quantum.bit
+//     //     scf.yield %q1_1 : !quantum.bit
+//     // }
+
+
+//     func.return
+// }
