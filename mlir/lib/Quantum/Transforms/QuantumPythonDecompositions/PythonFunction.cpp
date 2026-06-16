@@ -15,9 +15,9 @@
 #include <string>
 #include <vector>
 
-#include "nanobind/STL/string.h" // for automatic string conversion
-#include "nanobind/STL/vector.h" // for automatic vector conversion
 #include "nanobind/nanobind.h"
+#include "nanobind/stl/string.h" // for automatic string conversion
+#include "nanobind/stl/vector.h" // for automatic vector conversion
 
 #include "PythonDriverUtils.hpp"
 
