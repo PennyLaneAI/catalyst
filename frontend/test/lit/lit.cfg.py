@@ -71,6 +71,7 @@ config.substitutions.append(("%PYTHON", python_executable))
 
 # allow virtual env for embedded interpreter
 config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", "")
+config.environment["CATALYST_LIBPYTHON"] = os.getenv("CATALYST_LIBPYTHON", "")
 
 # Define PATH when running frontend tests from an mlir build target.
 try:

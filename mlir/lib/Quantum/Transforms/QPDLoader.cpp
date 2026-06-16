@@ -112,9 +112,6 @@ bool tryLoadLibpython(llvm::StringRef where)
 // Try, in order:
 //   1. $CATALYST_LIBPYTHON: explicit user override (any deployment)
 //   2. function parameter
-//   3. CATALYST_LIBPYTHON_PATH: absolute path the configure-time Python uses
-//   4. CATALYST_LIBPYTHON_SONAME: bare SONAME via the dynamic loader search
-//   (manylinux wheels)
 void ensureLibpythonLoaded(std::string libpythonPath)
 {
     if (auto over = llvm::sys::Process::GetEnv("CATALYST_LIBPYTHON")) {
@@ -128,17 +125,10 @@ void ensureLibpythonLoaded(std::string libpythonPath)
         return;
     }
 
-#ifdef CATALYST_LIBPYTHON_PATH
-    if (tryLoadLibpython(CATALYST_LIBPYTHON_PATH))
-        return;
-#endif
-#ifdef CATALYST_LIBPYTHON_SONAME
-    if (tryLoadLibpython(CATALYST_LIBPYTHON_SONAME))
-        return;
-#endif
-    llvm::errs() << "[QPD-loader] libpython could not be resolved, "
-                    "the plugin will likely "
-                    "fail with undefined symbols.\n";
+    llvm::errs() << "[QPD-loader] libpython could not be resolved, the plugin will likely fail "
+                    "with undefined symbols.\n"
+                    "Set the `CATALYST_LIBPYTHON` environment variable to your libpython shared "
+                    "library path to prevent this.\n";
 }
 
 LowerPauliRotFn loadAndResolve(std::string libQPDPath, std::string libpythonPath)
