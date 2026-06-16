@@ -58,7 +58,6 @@ class TracingError : public QPDError {
 
 class PyInterpreterGuard {
   public:
-    bool createdInterpreter = false;
     std::optional<nb::gil_scoped_release> release;
 
     PyInterpreterGuard(const PyInterpreterGuard &) = delete;
@@ -68,18 +67,11 @@ class PyInterpreterGuard {
     {
         if (!Py_IsInitialized()) {
             Py_Initialize();
-            createdInterpreter = true;
+            PyEval_SaveThread(); // release the GIL
         }
 
-        // scoped control of acquire
-        {
-            nb::gil_scoped_acquire acquire;
-            syncSitePackages();
-        }
-
-        if (createdInterpreter) {
-            release.emplace();
-        }
+        nb::gil_scoped_acquire acquire;
+        syncSitePackages();
     };
 
     template <class T> decltype(auto) withGil(T &&func)
