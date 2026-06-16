@@ -68,6 +68,25 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         symCirc.extendQubitsBy(1);
     }
 
+    void extractFromQreg(ExtractOp extractOp)
+    {
+        mlir::Value qreg = extractOp.getQreg();
+        auto regIt = qregToBaseMap.find(qreg);
+        if (regIt == qregToBaseMap.end()) {
+            llvm::errs() << "Error: ExtractOp references an untracked register.\n";
+            assert(false);
+        }
+        size_t baseIndex = regIt->second;
+
+        auto staticIdx = extractOp.getIdxAttr();
+        if (!staticIdx.has_value()) {
+            // auto dynamicIdx = extractOp.getIdx();
+            llvm::errs() << "Error: Dynamic qubit extraction indices are not supported.\n";
+            assert(false);
+        }
+        ssaToWireMap[extractOp.getQubit()] = baseIndex + static_cast<size_t>(staticIdx.value_or(0));
+    }
+
     mlir::DenseElementsAttr extractBasisState(SetBasisStateOp basisOp)
     {
         mlir::Value basisStateTensor = basisOp.getBasisState();
@@ -101,32 +120,24 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             symCirc.initQubit(qubitIndices[i], val.getBoolValue());
             i++;
         }
-    } // should I assert that no gate has been applied to this qubit?
+    }
 
-    size_t getIndexFromExtractOp(mlir::Value value)
+    void applyUndefinedOp(Operation *op, SymbolicCircuit &symCirc)
     {
-        if (auto extractOp = llvm::cast<quantum::ExtractOp>(value.getDefiningOp())) {
-            mlir::Value qreg = extractOp.getQreg();
-            auto regIt = qregToBaseMap.find(qreg);
-            if (regIt == qregToBaseMap.end()) {
-                llvm::errs() << "Error: ExtractOp references an untracked register.\n";
-                assert(false);
-            }
-            size_t baseIndex = regIt->second;
-
-            auto staticIdx = extractOp.getIdxAttr();
-            if (!staticIdx.has_value()) {
-                // auto dynamicIdx = extractOp.getIdx();
-                llvm::errs() << "Error: Dynamic qubit extraction indices are not supported.\n";
-                assert(false);
-            }
-            return baseIndex + static_cast<size_t>(staticIdx.value_or(0));
+        llvm::SmallVector<size_t, 4> qubitIndices;
+        if (auto qGate = dyn_cast<QuantumGate>(op)) {
+            qubitIndices =
+                getQubitIndices(qGate.getNonCtrlQubitOperands(), qGate.getNonCtrlQubitResults());
+        }
+        else if (auto stateOp = dyn_cast<SetStateOp>(op)) {
+            qubitIndices = getQubitIndices(stateOp.getInQubits(), stateOp.getOutQubits());
         }
         else {
-            llvm::errs()
-                << "Error: Found an untracked qubit not originating from a quantum.extract.\n";
-            assert(false);
+            return;
         }
+
+        Gate gate = (isa<MultiRZOp>(op) || isa<PCPhaseOp>(op)) ? Gate::I : Gate::U;
+        symCirc.applyGate(gate, false, qubitIndices);
     }
 
     llvm::SmallVector<size_t, 4> getQubitIndices(mlir::ValueRange ins, mlir::ResultRange outs)
@@ -143,15 +154,13 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 
             size_t index;
             auto it = ssaToWireMap.find(inValue);
-            if (it != ssaToWireMap.end()) { // inVal is the result of a prev. op.
-                index = it->second;
-                ssaToWireMap.erase(it);
+            if (it == ssaToWireMap.end()) {
+                llvm::errs() << "Error: Operation references an untracked value.\n";
+                assert(false);
             }
-            else { // first gate on the wire
-                index = getIndexFromExtractOp(inValue);
-            }
-
+            index = it->second;
             indices.push_back(index);
+            ssaToWireMap.erase(it);
             ssaToWireMap[outValue] = index;
         }
         return indices;
@@ -313,7 +322,6 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
                 }
             }
         };
-
         for (auto &[parity, contributors] : symCirc.phasePoly.terms) {
             if (parity.isTrivial()) {
                 removeGates(contributors);
@@ -342,6 +350,9 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             if (auto customOp = dyn_cast<CustomOp>(op)) {
                 phaseAnalysis(customOp, symCirc, gateID);
             }
+            else if (auto extractOp = dyn_cast<ExtractOp>(op)) {
+                extractFromQreg(extractOp);
+            }
             else if (auto allocQbOp = dyn_cast<AllocQubitOp>(op)) {
                 allocateQubit(allocQbOp.getResult(), symCirc);
             }
@@ -351,10 +362,17 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             else if (auto basisOp = dyn_cast<SetBasisStateOp>(op)) {
                 initQubitsState(basisOp, symCirc);
             }
+            else if (auto gpOp = dyn_cast<GlobalPhaseOp>(op)) {
+                llvm::outs() << "GlobalPhaseOp\n";
+            }
+            else {
+                // llvm::outs() << "QuantumOperation\n";
+                applyUndefinedOp(op, symCirc);
+            }
         });
 
         llvm::outs() << symCirc << "\n";
-
+        
         phaseMerge(symCirc);
         reportStats();
     }

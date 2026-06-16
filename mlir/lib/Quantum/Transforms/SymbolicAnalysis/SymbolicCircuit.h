@@ -38,7 +38,8 @@ struct SymbolicCircuit {
     void extendQubitsBy(size_t newQubitNum);
 
     // Gate Applications
-    void applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices, GateID gateId);
+    void applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices,
+                   std::optional<GateID> gateId = std::nullopt);
     void applyGateRZ(size_t qubitIndex, GateID gateId);
     void applyGateX(size_t qubitIndex);
     void applyGateY(size_t qubitIndex, GateID gateId);
