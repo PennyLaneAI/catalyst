@@ -338,6 +338,16 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
         rGateOp = migrateOpToReferenceSemantics<qref::SetBasisStateOp>(builder, vSetBasisStateOp,
                                                                        tracker);
     }
+    else if (auto vOperatorOp = dyn_cast<quantum::OperatorOp>(_vGateOp)) {
+        auto rGateOp =
+            migrateOpToReferenceSemantics<qref::OperatorOp>(builder, vOperatorOp, tracker);
+        rGateOp->removeAttr("resultSegmentSizes");
+
+        // Properties are not handled via the generic attribute fields, so we set them separately.
+        rGateOp.setOpName(vOperatorOp.getOpName());
+        rGateOp.setAdjoint(vOperatorOp.getAdjoint());
+        rGateOp.setUID(vOperatorOp.getUID());
+    }
     else {
         vGateOp->emitOpError("unknown gate op in quantum dialect");
     }

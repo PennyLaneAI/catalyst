@@ -277,6 +277,7 @@
   quantum operators, including operators with frontend-end specific data.
   [(#2883)](https://github.com/PennyLaneAI/catalyst/pull/2883)
   [(#2943)](https://github.com/PennyLaneAI/catalyst/pull/2943)
+  [(#2951)](https://github.com/PennyLaneAI/catalyst/pull/2951)
 
 * In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
   operations have been added:
