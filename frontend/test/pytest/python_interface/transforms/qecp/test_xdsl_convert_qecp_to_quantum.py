@@ -34,7 +34,7 @@ from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
     QecPhysicalQubitTypeConversion,
 )
 
-# pylint: disable=line-too-long
+# pylint: disable=line-too-long,too-many-lines
 
 pytestmark = pytest.mark.xdsl
 
