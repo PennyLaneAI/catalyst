@@ -71,7 +71,6 @@ config.substitutions.append(("%PYTHON", python_executable))
 
 # allow virtual env for embedded interpreter
 config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", "")
-config.environment["CATALYST_LIBPYTHON"] = os.getenv("CATALYST_LIBPYTHON", "")
 
 # Define PATH when running frontend tests from an mlir build target.
 try:
@@ -88,6 +87,7 @@ try:
         "CATALYST_BIN_DIR", config.mlir_lib_dir + "/../..", append_path=True
     )
     llvm_config.with_environment("CATALYST_LIB_DIR", config.quantum_lib_dir, append_path=True)
+    llvm_config.with_environment("CATALYST_LIBPYTHON", "", append_path=True)
 
     catalyst_frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     llvm_config.with_environment(
@@ -118,6 +118,7 @@ except AttributeError:
     llvm_config.with_system_environment("MLIR_LIB_DIR")
     llvm_config.with_system_environment("CATALYST_BIN_DIR")
     llvm_config.with_system_environment("CATALYST_LIB_DIR")
+    llvm_config.with_system_environment("CATALYST_LIBPYTHON")
     llvm_config.with_system_environment("ENZYME_LIB_DIR")
 
     catalyst_bin_dir = os.getenv("CATALYST_BIN_DIR", "")
