@@ -47,6 +47,9 @@ from jax._src.pjit import _out_type, _pjit_forwarding, jit_p
 from jax._src.sharding_impls import UnspecifiedValue
 from jax.core import AbstractValue, Tracer
 
+from pennylane.typing import AbstractArray
+from pennylane.wires import AbstractWires
+
 from catalyst.utils.patching import DictPatchWrapper
 
 __all__ = (
@@ -99,6 +102,8 @@ def _drop_unused_vars2(
 def get_aval2(x):
     """An extended version of `jax.core.get_aval` which also accepts AbstractValues."""
     # TODO: remove this patch when https://github.com/google/jax/pull/18579 is merged
+    if isinstance(x, (AbstractArray, AbstractWires)):
+        x = jax.core.ShapedArray(x.shape, x.dtype)
     if isinstance(x, AbstractValue):
         return x
     elif isinstance(x, Tracer):
