@@ -1339,6 +1339,119 @@ class TestControlFlow:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_while_loop_gate(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with an `scf.while` loop, which applies gates on each iteration of
+        the loop and increments a counter variable. The loop terminates when the counter variable
+        no longer satisfies the condition.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        //  CHECK-SAME:     [[arg0:%.+]]: f64
+        func.func @test_program(%arg0: f64) {
+            // CHECK: [[c2:%.+]] = arith.constant 2
+            // CHECK: [[c9:%.+]] = arith.constant 9
+            %c2 = arith.constant 2.000000e+00 : f64
+            %c9 = arith.constant 9.000000e+00 : f64
+
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            //      CHECK: [[c_out:%.+]], [[hreg_out:%.+]] = scf.while
+            // CHECK-SAME:         ([[c_arg_0:%.+]] = [[arg0]], [[hreg_arg_0:%.+]] = {{%.+}}) :
+            // CHECK-SAME:         (f64, !qecl.hyperreg<1 x 1>) -> (f64, !qecl.hyperreg<1 x 1>)
+            //      CHECK:     [[cond:%.+]] = arith.cmpf
+            //      CHECK:     scf.condition([[cond]]) [[c_arg_0]], [[hreg_arg_0]] : f64, !qecl.hyperreg<1 x 1>
+            //      CHECK: do
+            //      CHECK: ^bb0([[c_arg_1:%.+]]: f64, [[hreg_arg_1:%.+]]: !qecl.hyperreg<1 x 1>):
+            //      CHECK:     [[cb0:%.+]] = qecl.extract_block [[hreg_arg_1]][0]
+            //        COM:     <qec cycle>
+            //      CHECK:     qecl.x
+            //        COM:     <qec cycle>
+            //      CHECK:     [[fres:%.+]] = arith.addf
+            //      CHECK:     [[hreg_1:%.+]] = qecl.insert_block [[hreg_arg_1]][0]
+            //      CHECK:     scf.yield [[fres]], [[hreg_1]] : f64, !qecl.hyperreg<1 x 1>
+            %1, %2 = scf.while (%arg1 = %arg0, %arg2 = %0) : (f64, !quantum.reg) -> (f64, !quantum.reg) {
+                %5 = arith.cmpf olt, %arg1, %c9 : f64
+                scf.condition(%5) %arg1, %arg2 : f64, !quantum.reg
+            } do {
+            ^bb0(%arg1: f64, %arg2: !quantum.reg):
+                %5 = quantum.extract %arg2[ 0] : !quantum.reg -> !quantum.bit
+                %6 = quantum.custom "PauliX"() %5 : !quantum.bit
+                %7 = arith.addf %arg1, %c2 : f64
+                %8 = quantum.insert %arg2[ 0], %6 : !quantum.reg, !quantum.bit
+                scf.yield %7, %8 : f64, !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[hreg_out]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %2 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_while_loop_gate_without_register_packing(
+        self, run_filecheck, quantum_to_qecl_pipeline_k_1
+    ):
+        """Test a simple program with an `scf.while` loop, which applies gates on each iteration of
+        the loop and increments a counter variable. The loop terminates when the counter variable
+        no longer satisfies the condition.
+
+        This program does not pack qubits back into a register before entering the `scf.while`
+        region, which allows testing the case where the return type of the `scf.while` op is a
+        !quantum.bit in the input program, rather than a !quantum.reg.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        //  CHECK-SAME:     [[arg0:%.+]]: f64
+        func.func @test_program(%arg0: f64) {
+            // CHECK: [[c2:%.+]] = arith.constant 2
+            // CHECK: [[c9:%.+]] = arith.constant 9
+            %c2 = arith.constant 2.000000e+00 : f64
+            %c9 = arith.constant 9.000000e+00 : f64
+
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: {{%.+}} = qecl.extract_block [[hreg0:%.+]][0]
+            //   COM: <qecl.qec>
+            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+            //      CHECK: [[c_out:%.+]], [[cb_out:%.+]] = scf.while
+            // CHECK-SAME:         ([[c_arg_0:%.+]] = [[arg0]], [[cb_arg_0:%.+]] = {{%.+}}) :
+            // CHECK-SAME:         (f64, !qecl.codeblock<1>) -> (f64, !qecl.codeblock<1>)
+            //      CHECK:     [[cond:%.+]] = arith.cmpf
+            //      CHECK:     scf.condition([[cond]]) [[c_arg_0]], [[cb_arg_0]] : f64, !qecl.codeblock<1>
+            //      CHECK: do
+            //      CHECK: ^bb0([[c_arg_1:%.+]]: f64, [[cb_arg_1:%.+]]: !qecl.codeblock<1>):
+            //      CHECK:     qecl.x
+            //        COM:     <qec cycle>
+            //      CHECK:     [[fres:%.+]] = arith.addf
+            //      CHECK:     scf.yield [[fres]], {{%.+}} : f64, !qecl.codeblock<1>
+            %2, %3 = scf.while (%arg1 = %arg0, %arg2 = %1) : (f64, !quantum.bit) -> (f64, !quantum.bit) {
+                %5 = arith.cmpf olt, %arg1, %c9 : f64
+                scf.condition(%5) %arg1, %arg2 : f64, !quantum.bit
+            } do {
+            ^bb0(%arg1: f64, %arg2: !quantum.bit):
+                %6 = quantum.custom "PauliX"() %1 : !quantum.bit
+                %7 = arith.addf %arg1, %c2 : f64
+                scf.yield %7, %6 : f64, !quantum.bit
+            }
+
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[cb_out]]
+            // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
+            %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+            quantum.dealloc %4 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
 
 # MARK: Measurement Processes
 

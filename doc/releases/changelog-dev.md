@@ -277,6 +277,7 @@
   quantum operators, including operators with frontend-end specific data.
   [(#2883)](https://github.com/PennyLaneAI/catalyst/pull/2883)
   [(#2943)](https://github.com/PennyLaneAI/catalyst/pull/2943)
+  [(#2951)](https://github.com/PennyLaneAI/catalyst/pull/2951)
 
 * In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
   operations have been added:
@@ -312,6 +313,8 @@
     [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
   - For loops (`scf.for`)
     [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
+  - While loops (`scf.while`)
+    [(#2905)](https://github.com/PennyLaneAI/catalyst/pull/2905)
 
 * The experimental QEC pipeline now supports programs that sample wires, where before it only
   supported sampling mid-circuit measurements.
