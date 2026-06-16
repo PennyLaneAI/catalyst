@@ -865,7 +865,8 @@ class TestTracingQJITAnnotatedFunctions:
 class TestDefaultAvailableIR:
 
     def test_AbstractArray_AbstractWires_AOT(self):
-        """Test that AbstractArray and AbstractWires can be used to specify the input shapes for AOT compilation."""
+        """Test that AbstractArray and AbstractWires can be used to specify the input
+        shapes for AOT compilation."""
 
         @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=4))
