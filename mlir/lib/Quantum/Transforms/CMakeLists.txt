@@ -8,9 +8,10 @@ file(GLOB SRC
     quantum_to_llvm.cpp
     emit_catalyst_pyface.cpp
     cp_global_buffers.cpp
-    AdjointLowering/adjoint_lowering.cpp
-    AdjointLowering/AdjointPatterns.cpp
-    AdjointLowering/QuantumSplitting.cpp
+    AdjointLowering/AdjointLowering.cpp
+    AdjointLowering/QuantumCache.cpp
+    AdjointLowering/ForwardPass.cpp
+    AdjointLowering/ReversePass.cpp
     CancelInversesPatterns.cpp
     cancel_inverses.cpp
     SplitMultipleTapes.cpp

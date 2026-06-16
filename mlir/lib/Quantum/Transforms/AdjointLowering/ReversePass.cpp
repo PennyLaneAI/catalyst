@@ -19,10 +19,7 @@
 #include <string>
 #include <vector>
 
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -39,11 +36,10 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
-#include "Quantum/Transforms/Patterns.h"
 
-#include "QuantumSplitting.hpp"
+#include "AdjointLowering.hpp"
+#include "QuantumCache.hpp"
 
-using llvm::dbgs;
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::quantum;
@@ -107,7 +103,6 @@ class AdjointGenerator {
                "Expected only structured control flow (each region should have a single block)");
 
         for (Operation &op : llvm::reverse(region.front().without_terminator())) {
-            LLVM_DEBUG(dbgs() << "generating adjoint for: " << op << "\n");
             if (auto callOp = dyn_cast<func::CallOp>(op)) {
                 visitOperation(callOp, builder);
             }
@@ -727,54 +722,16 @@ class AdjointGenerator {
     bool generationFailed = false;
 };
 
-struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
-    using OpRewritePattern<AdjointOp>::OpRewritePattern;
-
-    /// We build a map from values mentioned in the source data flow to the values of
-    /// the program where quantum control flow is reversed. Most of the time, there is a 1-to-1
-    /// correspondence with a notable exception caused by `insert`/`extract` API asymmetry.
-    LogicalResult matchAndRewrite(AdjointOp adjoint, PatternRewriter &rewriter) const override
-    {
-        LLVM_DEBUG(dbgs() << "Adjointing the following:\n" << adjoint << "\n");
-        auto cache = QuantumCache::initialize(adjoint.getRegion(), rewriter, adjoint.getLoc());
-        // First, copy the classical computations directly to the target insertion point.
-        IRMapping oldToCloned;
-        AugmentedCircuitGenerator augmentedGenerator{oldToCloned, cache};
-        augmentedGenerator.generate(adjoint.getRegion(), rewriter);
-
-        // Initialize the backward pass with the operand of the quantum.yield
-        auto yieldOp = cast<quantum::YieldOp>(adjoint.getRegion().front().getTerminator());
-        for (auto [yieldVal, adjointOperand] :
-             llvm::zip_equal(yieldOp.getOperands(), adjoint.getArgs())) {
-            oldToCloned.map(yieldVal, adjointOperand);
-        }
-
-        // Emit the adjoint quantum operations and reversed control flow, using cached values.
-        AdjointGenerator adjointGenerator{oldToCloned, cache};
-        if (failed(adjointGenerator.generate(adjoint.getRegion(), rewriter))) {
-            return failure();
-        }
-
-        // Explicitly free the memory of the caches.
-        cache.emitDealloc(rewriter, adjoint.getLoc());
-        // The final quantum values are the re-mapped region arguments of the original adjoint op.
-        SmallVector<Value> reversedOutputs;
-        for (BlockArgument arg : adjoint.getRegion().getArguments()) {
-            reversedOutputs.push_back(oldToCloned.lookup(arg));
-        }
-        rewriter.replaceOp(adjoint, reversedOutputs);
-        return success();
-    }
-};
-
 } // namespace
 
 namespace catalyst {
 namespace quantum {
 
-void populateAdjointPatterns(RewritePatternSet &patterns)
+LogicalResult generateAdjointReversePass(Region &region, OpBuilder &builder,
+                                         IRMapping &remappedValues, QuantumCache &cache)
 {
-    patterns.add<AdjointSingleOpRewritePattern>(patterns.getContext(), 1);
+    AdjointGenerator generator{remappedValues, cache};
+    return generator.generate(region, builder);
 }
 
 } // namespace quantum
