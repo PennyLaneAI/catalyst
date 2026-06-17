@@ -3,6 +3,9 @@ name: Build Release Branch Nightly for TestPyPI
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   setup:
     name: Setup the release

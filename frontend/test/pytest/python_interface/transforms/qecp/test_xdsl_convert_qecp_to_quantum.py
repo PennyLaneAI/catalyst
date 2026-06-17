@@ -838,6 +838,81 @@ class TestQECPassIntegration:
 
         ghz()
 
+    @pytest.mark.parametrize(
+        "gates, expected_results",
+        [
+            # expected results are (expval(X), expval(Y) expval(Z))
+            # pauli ops all behave as expected from ground state
+            ([qp.X], (0, 0, -1)),
+            ([qp.Y], (0, 0, -1)),
+            ([qp.Z], (0, 0, 1)),
+            # hadamard projects onto x-axis
+            ([qp.H], (1, 0, 0)),
+            # x after hadamard does nothing, y and z flip expval(X)
+            ([qp.H, qp.X], (1, 0, 0)),
+            ([qp.H, qp.Y], (-1, 0, 0)),
+            ([qp.H, qp.Z], (-1, 0, 0)),
+            # adjoint and S adjoint rotate onto y axis in expected directions
+            ([qp.H, qp.S], (0, 1, 0)),
+            ([qp.H, lambda w: qp.adjoint(qp.S(w))], (0, -1, 0)),
+            # hadamard is self-inverse
+            ([qp.H, qp.H], (0, 0, 1)),
+        ],
+    )
+    def test_qec_single_clifford_gate_ops_integration(self, gates, expected_results):
+        """Integration tests for combinations of single Clifford gate ops."""
+
+        dev = qp.device("lightning.qubit", wires=1)
+
+        qec_conversion_and_noise_passes = qp.CompilePipeline(
+            convert_quantum_to_qecl_pass(k=1),
+            qp.transform(pass_name="symbol-dce"),
+            inject_noise_to_qecl_pass,
+            convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1),
+            convert_qecp_to_quantum_pass,
+        )
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=123)
+        @qec_conversion_and_noise_passes
+        @qp.set_shots(700)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def x_circ():
+            for gate in gates:
+                gate(0)
+            qp.H(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=456)
+        @qec_conversion_and_noise_passes
+        @qp.set_shots(700)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def y_circ():
+            for gate in gates:
+                gate(0)
+            qp.Z(0)
+            qp.S(0)
+            qp.H(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=789)
+        @qec_conversion_and_noise_passes
+        @qp.set_shots(700)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def z_circ():
+            for gate in gates:
+                gate(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        all_samples = x_circ(), y_circ(), z_circ()
+
+        for samples, res in zip(all_samples, expected_results):
+            eigvals = [-1 if s else 1 for s in samples]
+            # the tolerance is a bit high, but it keeps number of shots down
+            assert np.isclose(np.mean(eigvals), res, atol=0.1)
+
     # pylint: disable=too-many-positional-arguments, too-many-arguments
     @pytest.mark.parametrize(
         "n, diagonalizing_gates, expected_res, shots",
@@ -866,7 +941,7 @@ class TestQECPassIntegration:
         def circ():
             # CHECK: quantum.alloc
             # CHECK: func.call @apply_T
-            # CHECK: fabricate_magic_state_Steane
+            # CHECK: fabricate_magic_Steane
             # CHECK: qecp.assemble_tanner
             # CHECK: qecp.decode_esm_css
             # CHECK: quantum.custom "Hadamard"
@@ -891,10 +966,6 @@ class TestQECPassIntegration:
         dev = qp.device("null.qubit", wires=1)
 
         @qp.qjit(capture=True, pipelines=qec_pipeline())
-        @convert_qecp_to_quantum_pass
-        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
-        @inject_noise_to_qecl_pass
-        @convert_quantum_to_qecl_pass(k=1)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method="one-shot")
         def circ():
@@ -908,3 +979,47 @@ class TestQECPassIntegration:
             return qp.sample([m0])
 
         circ()
+
+    @pytest.mark.parametrize(
+        "n, diagonalizing_gates, expected_res, shots",
+        [
+            (1, [qp.H], 0.707, 1000),
+            (1, [qp.Z, qp.S, qp.H], -0.707, 1000),
+            # with 2 adj-T gates, expval(Y) is -1 for every shot, so we can use fewer shots
+            (2, [qp.Z, qp.S, qp.H], -1, 20),
+        ],
+    )
+    def test_T_adj_gate_integration(
+        self, n, diagonalizing_gates, expected_res, shots, run_filecheck_qjit
+    ):
+        """Integration test for adjoint(T) gates."""
+
+        dev = qp.device("lightning.qubit", wires=1)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=6)
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(shots)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            # CHECK: quantum.alloc
+            # CHECK: func.call @apply_T_adj
+            # CHECK: fabricate_magic_conj_Steane
+            # CHECK: qecp.assemble_tanner
+            # CHECK: qecp.decode_esm_css
+            # CHECK: quantum.custom "Hadamard"
+            qp.Hadamard(0)
+            for _ in range(n):
+                qp.adjoint(qp.T(0))
+            for op in diagonalizing_gates:
+                op(0)
+            m0 = qp.measure(0)
+            return qp.sample(m0)
+
+        run_filecheck_qjit(circ)
+        samples = circ()
+        eigenvalues = [-1 if s else 1 for s in samples]
+        # could have a lower atol with more shots, but given test duration, not worth it
+        assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.07)
