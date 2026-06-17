@@ -1001,8 +1001,8 @@ struct ReferenceSemanticsConversionPass
                                 qregSizesAtCallsite.push_back(qrefQuregType.getSize());
                             }
                         }
+                        break;
                     }
-                    break;
                 }
             }
             QubitValueTracker tracker;
