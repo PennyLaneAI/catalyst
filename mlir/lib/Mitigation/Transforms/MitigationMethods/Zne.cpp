@@ -306,7 +306,8 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
 
-static func::FuncOp getOrInsertRandomDecl(PatternRewriter &rewriter, ModuleOp moduleOp, Location loc)
+static func::FuncOp getOrInsertRandomDecl(PatternRewriter &rewriter, ModuleOp moduleOp,
+                                          Location loc)
 {
     StringRef rngName = "__catalyst__rt__random_double";
     if (auto existing = moduleOp.lookupSymbol<func::FuncOp>(rngName)) {
