@@ -1122,6 +1122,26 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
         vGateOp = migrateOpToValueSemantics<quantum::SetBasisStateOp>(builder, rSetBasisStateOp,
                                                                       tracker, qubitResultsType);
     }
+    else if (auto rOperatorOp = dyn_cast<qref::OperatorOp>(_rGateOp)) {
+        // Special case for the register mode of this op (existing vector only gathers qubits).
+        if (rOperatorOp.getQreg()) {
+            qubitResultsType.push_back(quantum::QuregType::get(ctx));
+        }
+
+        auto vGateOp = migrateOpToValueSemantics<quantum::OperatorOp>(builder, rOperatorOp, tracker,
+                                                                      qubitResultsType);
+        // quantum.operator has three result segments: out_qubits, out_ctrl_qubits, out_qreg.
+        int32_t nTargets = rOperatorOp.getNonCtrlQubitOperands().size();
+        int32_t nCtrls = rOperatorOp.getCtrlQubitOperands().size();
+        int32_t nQreg = rOperatorOp.getQreg() ? 1 : 0;
+        vGateOp->setAttr("resultSegmentSizes",
+                         builder.getDenseI32ArrayAttr({nTargets, nCtrls, nQreg}));
+
+        // Properties are not handled via the generic attribute fields, so we set them separately.
+        vGateOp.setOpName(rOperatorOp.getOpName());
+        vGateOp.setAdjoint(rOperatorOp.getAdjoint());
+        vGateOp.setUID(rOperatorOp.getUID());
+    }
     else {
         rGateOp->emitOpError("unknown gate op in qref dialect");
     }
