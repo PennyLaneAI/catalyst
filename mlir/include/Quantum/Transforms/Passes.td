@@ -218,6 +218,12 @@ def CombineGlobalPhasesPass : Pass<"combine-global-phases", "mlir::ModuleOp"> {
     let summary = "Scope-wise merging of global phase operators (safe).";
 }
 
+def PhaseFoldingPass : Pass<"phase-folding"> {
+    let summary = "Perform phase-folding optimization on pure quantum blocks to reduce T-count.";
+
+    // let constructor = "catalyst::createMyHelloWorldPass()";
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
