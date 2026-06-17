@@ -87,7 +87,6 @@ try:
         "CATALYST_BIN_DIR", config.mlir_lib_dir + "/../..", append_path=True
     )
     llvm_config.with_environment("CATALYST_LIB_DIR", config.quantum_lib_dir, append_path=True)
-    llvm_config.with_environment("CATALYST_LIBPYTHON", "", append_path=True)
 
     catalyst_frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     llvm_config.with_environment(
