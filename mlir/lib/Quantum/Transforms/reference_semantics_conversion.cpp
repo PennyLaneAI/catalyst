@@ -842,7 +842,8 @@ bool isQuantumSubroutine(func::FuncOp f)
     }
 
     WalkResult walkResult = f.walk([](Operation *op) {
-        if (isa<quantum::QuantumDialect>(op->getDialect())) {
+        if (isa<quantum::QuantumDialect>(op->getDialect()) ||
+            isa<pbc::PPMeasurementOp, mbqc::MeasureInBasisOp, mbqc::GraphStatePrepOp>(op)) {
             return WalkResult::interrupt();
         }
         if (func::CallOp callOp = dyn_cast<func::CallOp>(op)) {
