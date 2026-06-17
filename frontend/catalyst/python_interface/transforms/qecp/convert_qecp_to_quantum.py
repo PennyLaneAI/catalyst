@@ -21,8 +21,8 @@ Known Limitations
 
   * The current hyper-register lowering implementation does not support control-flow operations that
     iterate over physical hyper-registers, except for the encoding loop after allocating the
-    hyper-register. However, control-flow ops that iterate over types, like physical codeblocks, are
-    supported.
+    hyper-register. However, control-flow ops that iterate over other types, like physical
+    codeblocks, are supported.
 """
 
 from dataclasses import dataclass
