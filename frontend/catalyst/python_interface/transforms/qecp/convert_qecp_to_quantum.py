@@ -26,7 +26,7 @@ Known Limitations
 """
 
 from dataclasses import dataclass
-from typing import cast
+from typing import NoReturn, cast
 
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, scf
@@ -48,6 +48,7 @@ from catalyst.python_interface.dialects import qecp, quantum
 from catalyst.python_interface.dialects.quantum.attributes import QubitType, QuregType
 from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
+from catalyst.utils.exceptions import CompileError
 
 _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.hadamard": "Hadamard",
@@ -364,6 +365,8 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                             qecp_ops_to_remove.append(quantum_op)
                             if quantum_op.idx is not None:
                                 idx = resolve_constant_params(quantum_op.idx)
+                                if not isinstance(idx, int):
+                                    self._emit_non_const_extract_idx_error(quantum_op)
                             else:
                                 assert quantum_op.idx_attr is not None
                                 idx = quantum_op.idx_attr.value.data
@@ -406,6 +409,21 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
 
                 # Remove dead code
                 region_dce(op_.body)
+
+    @classmethod
+    def _emit_non_const_extract_idx_error(
+        cls, extract_block_op: qecp.ExtractCodeblockOp
+    ) -> NoReturn:
+        """Emit an op error if the 'idx' value of a qecp.extract_block op is not statically
+        known.
+        """
+        assert isinstance(extract_block_op, qecp.ExtractCodeblockOp)
+        extract_block_op.emit_error(
+            f"'{extract_block_op.name}' operand 'idx' could not be folded or traced back to a "
+            f"constant operation. This index value must be a known statically in order to convert "
+            f"this operation into its equivalent quantum-dialect operations.",
+            CompileError(f"Failed to apply pass '{cls.name}'"),
+        )
 
     # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:

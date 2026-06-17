@@ -33,6 +33,7 @@ from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
     ConvertQecPhysicalToQuantumPass,
     QecPhysicalQubitTypeConversion,
 )
+from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=line-too-long,too-many-lines
 
@@ -899,6 +900,34 @@ class TestControlFlow:
 
             m0 = qp.measure(0)
             return qp.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.xfail(
+        reason="Control flow over hyper-registers not supported", raises=CompileError
+    )
+    def test_scf_for_each_wire(self, run_filecheck_qjit):
+        """Test the QEC pipeline ending in the convert-qecp-to-quantum pass on a more complex
+        program with multiple control-flow operations.
+        """
+        N_WIRES = 2
+
+        dev = qp.device("null.qubit", wires=N_WIRES)
+
+        @qp.qjit(capture=True, target="mlir", autograph=True)
+        @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def circuit():
+            for i in range(N_WIRES):
+                qp.H(i)
+
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            return qp.sample([m0, m1])
 
         run_filecheck_qjit(circuit)
 
