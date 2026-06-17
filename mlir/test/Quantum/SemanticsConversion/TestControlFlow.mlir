@@ -520,8 +520,8 @@ func.func @test_if_non_root_with_else(%arg0: i1) attributes {quantum.node} {
         %out_qubits:2 = quantum.custom "CNOT"() %1, %2 : !quantum.bit, !quantum.bit
         scf.yield %out_qubits#0, %out_qubits#1 : !quantum.bit, !quantum.bit
     } else {
-        %out_qubits = quantum.custom "Y"() %2 : !quantum.bit
-        scf.yield %1, %out_qubits : !quantum.bit, !quantum.bit
+        %out_qubit = quantum.custom "Y"() %2 : !quantum.bit
+        scf.yield %1, %out_qubit : !quantum.bit, !quantum.bit
     }
 
     // CHECK-NOT: quantum.insert
