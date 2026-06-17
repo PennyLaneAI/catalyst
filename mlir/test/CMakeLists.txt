@@ -43,7 +43,7 @@ endif()
 
 list(APPEND DIALECT_TESTS_DEPEND CatalystUnitTests)
 
-add_custom_target(create_test_bytecode 
+add_custom_target(create_test_bytecode
     quantum-opt --emit-bytecode --register-decomp-rule-resource ${CMAKE_CURRENT_SOURCE_DIR}/Quantum/GraphDecomposition/test_rules.mlir -o ${BYTECODE_PATH}
     DEPENDS quantum-opt
     BYPRODUCTS ${BYTECODE_PATH}

@@ -211,7 +211,6 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
             return failure();
         }
         func::FuncOp decompFunc = it->second;
-        decompFunc.dump();
 
         // Here is the assumption that the decomposition function must have at least one input
         // and one result
@@ -228,9 +227,6 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
         assert(analyzer && "Analyzer should be valid");
 
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
-        for (auto operand : callOperands) {
-            operand.dump();
-        }
         auto callOp =
             func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
                                  decompFunc.getSymName(), callOperands);

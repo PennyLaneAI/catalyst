@@ -346,30 +346,51 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
 
                 for quantum_op in op_.walk():
                     rewriter = PatternRewriter(quantum_op)
+
                     match quantum_op:
                         case qecp.AllocOp():
                             qecp_alloc_op = quantum_op
                             qecp_ops_to_remove.append(quantum_op)
+
                         case func.CallOp() if "encode_zero_" in quantum_op.callee.string_value():
                             regs.append(quantum_op.results[0])
+
                         case qecp.ExtractCodeblockOp():
                             assert (quantum_op.idx is not None) ^ (quantum_op.idx_attr is not None)
                             qecp_ops_to_remove.append(quantum_op)
                             if quantum_op.idx is not None:
                                 idx = resolve_constant_params(quantum_op.idx)
                             else:
+                                assert quantum_op.idx_attr is not None
                                 idx = quantum_op.idx_attr.value.data
-                            quantum_op.codeblock.replace_all_uses_with(regs[idx])
+
+                            if idx not in dealloced_regs:
+                                # This is the first time we extract_block on this index, so replace
+                                # all the uses of the extracted codeblock with the corresponding
+                                # register returned after the encoding step.
+                                quantum_op.codeblock.replace_all_uses_with(regs[idx])
+                            else:
+                                # This handles the case where an extract_block follows an
+                                # insert_block on the same index. In this case, undo the
+                                # deallocation (by removing it from the 'dealloced_regs' dictionary)
+                                # and replace all uses of the extracted codeblock with the register
+                                # that was given as input to the (now undone) quantum.dealloc op.
+                                dealloc_op = dealloced_regs.pop(idx)
+                                quantum_op.codeblock.replace_all_uses_with(dealloc_op.operands[0])
+
                         case qecp.InsertCodeblockOp():
                             qecp_ops_to_remove.append(quantum_op)
                             if quantum_op.idx is not None:
                                 idx = resolve_constant_params(quantum_op.idx)
                             elif quantum_op.idx_attr is not None:
                                 idx = quantum_op.idx_attr.value.data
+
                             dealloced_regs[idx] = quantum.DeallocOp(quantum_op.codeblock)
                             quantum_op.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
+
                         case qecp.DeallocOp():
                             rewriter.erase_op(quantum_op)
+
                         case quantum.DeviceReleaseOp():
                             # Dealloc qregs before device release
                             for _, dealloced_reg in dealloced_regs.items():
