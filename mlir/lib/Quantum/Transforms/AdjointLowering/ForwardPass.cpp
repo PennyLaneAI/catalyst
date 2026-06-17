@@ -18,6 +18,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -232,9 +233,14 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &buil
         }
     }
 
-    // Store the start, stop, and step to this op's control flow tape.
+    // Store the start, stop, and step to this op's control flow tape, but only when dynamic.
+    // Constant values can be rematerialized directly in the backward pass, which preverses the
+    // static info.
     Value tape = cache.controlFlowTapes.at(forOp);
     for (Value param : {forOp.getLowerBound(), forOp.getUpperBound(), forOp.getStep()}) {
+        if (getConstantIntValue(param).has_value()) {
+            continue;
+        }
         ListPushOp::create(builder, forOp.getLoc(), oldToCloned.lookupOrDefault(param), tape);
     }
 

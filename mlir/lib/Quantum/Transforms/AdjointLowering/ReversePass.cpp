@@ -26,6 +26,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/Verifier.h"
@@ -491,11 +492,16 @@ class AdjointGenerator {
         }
 
         Value tape = cache.controlFlowTapes.at(forOp);
-        // Popping the start, stop, and step implies that these are backwards relative to
-        // the order they were pushed.
-        Value step = ListPopOp::create(builder, forOp.getLoc(), tape);
-        Value stop = ListPopOp::create(builder, forOp.getLoc(), tape);
-        Value start = ListPopOp::create(builder, forOp.getLoc(), tape);
+        // Re-materialize constant loop bounds directly to preserve static information.
+        auto recoverBound = [&](Value original) -> Value {
+            if (std::optional<int64_t> constant = getConstantIntValue(original)) {
+                return index::ConstantOp::create(builder, forOp.getLoc(), *constant);
+            }
+            return ListPopOp::create(builder, forOp.getLoc(), tape);
+        };
+        Value step = recoverBound(forOp.getStep());
+        Value stop = recoverBound(forOp.getUpperBound());
+        Value start = recoverBound(forOp.getLowerBound());
 
         SmallVector<Value> reversedResults;
         for (auto v : getQuantumValues(forOp.getResults())) {
