@@ -14,6 +14,8 @@
 
 """Tests for the convert-qecp-to-quantum xDSL dialect-conversion pass."""
 
+from functools import partial
+
 import numpy as np
 import pennylane as qp
 import pytest
@@ -21,6 +23,7 @@ import pytest
 from catalyst.ftqc import qec_pipeline
 from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.dialects.quantum.attributes import QubitType
+from catalyst.python_interface.transforms import measurements_from_samples_pass
 from catalyst.python_interface.transforms.qecl import (
     convert_quantum_to_qecl_pass,
     inject_noise_to_qecl_pass,
@@ -946,6 +949,76 @@ class TestQECPassIntegration:
         samples = circ()
         assert np.all(samples[:, 0] == 0)
         assert np.all(samples[:, 1] == 1)
+
+    def test_expval(self):
+        """Test that expectation-value terminal measurements return correct results."""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            qp.X(1)
+            return qp.expval(qp.Z(0)), qp.expval(qp.Z(1))
+
+        expval0, expval1 = circ()
+        assert np.allclose(expval0, np.array(1.0))
+        assert np.allclose(expval1, np.array(-1.0))
+
+    def test_var(self):
+        """Test that variance terminal measurements return correct results."""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            qp.X(1)
+            return qp.var(qp.Z(0)), qp.var(qp.Z(1))
+
+        expval0, expval1 = circ()
+        assert np.allclose(expval0, np.array(0.0))
+        assert np.allclose(expval1, np.array(0.0))
+
+    @pytest.mark.parametrize(
+        "ops, wires, expected_probs",
+        [
+            ([], [], np.array([1.0, 0.0, 0.0, 0.0])),
+            ([qp.X], [1], np.array([0.0, 1.0, 0.0, 0.0])),
+            ([qp.X], [0], np.array([0.0, 0.0, 1.0, 0.0])),
+            ([qp.X, qp.X], [0, 1], np.array([0.0, 0.0, 0.0, 1.0])),
+        ],
+    )
+    def test_probs(self, ops, wires, expected_probs):
+        """Test that probability terminal measurements return correct results."""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            for op, w in zip(ops, wires):
+                op(wires=w)
+
+            return qp.probs(wires=[0, 1])
+
+        probs = circ()
+        assert np.allclose(probs, expected_probs)
 
     # pylint: disable=too-many-positional-arguments, too-many-arguments
     @pytest.mark.parametrize(
