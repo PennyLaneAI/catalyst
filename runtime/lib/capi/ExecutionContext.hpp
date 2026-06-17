@@ -315,6 +315,13 @@ class ExecutionContext final {
         return memory_man_ptr;
     }
 
+    // Uniform random number in [0, 1) from the PRNG (used by ZNE random local folding).
+    [[nodiscard]] double getRandomNumber()
+    {
+        std::uniform_real_distribution<double> distribution(0.0, 1.0);
+        return distribution(gen);
+    }
+
     [[nodiscard]] auto getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,
                                          std::string_view rtd_kwargs, bool auto_qubit_management)
         -> const std::shared_ptr<RTDevice> &

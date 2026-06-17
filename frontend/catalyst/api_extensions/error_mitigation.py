@@ -75,6 +75,9 @@ def mitigate_with_zne(
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
             - global: the global unitary of the input circuit is folded
             - local-all: per-gate folding sequences replace original gates in-place in the circuit
+            - local-random: like ``local-all``, but each per-gate folding pair is inserted
+              only when a runtime pseudo-random draw selects it, so the number of foldings per
+              gate is randomized at run time (reproducible when ``qjit(seed=...)`` is set)
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`~.QNode`
@@ -205,9 +208,6 @@ class ZNECallable(CatalystCallable):
             folding = Folding(self.folding)
         except ValueError as e:
             raise ValueError(f"Folding type must be one of {list(map(str, Folding))}") from e
-        # TODO: remove the following check once #755 is completed
-        if folding == Folding.RANDOM:
-            raise NotImplementedError(f"Folding type {folding.value} is being developed")
 
         # Certain callables, like QNodes, may introduce additional wrappers during tracing.
         # Make sure to grab the top-level callable object in the traced function.

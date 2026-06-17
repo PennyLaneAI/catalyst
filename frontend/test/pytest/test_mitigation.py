@@ -264,24 +264,35 @@ def test_folding_type_not_supported():
         catalyst.qjit(mitigated_qnode)
 
 
-def test_folding_type_not_implemented():
-    """Test value of folding argument supported but not yet developed"""
+def test_local_random_folding_runs():
+    r"""Test that the local-random folding type compiles and runs.
+
+    On a noiseless simulator every folding pair $G G^\dagger$ is the identity, so the
+    mitigated result must match the unfolded circuit regardless of which gates
+    the runtime randomly selects for folding.
+    """
     dev = qp.device("lightning.qubit", wires=2)
 
     @qp.qnode(device=dev)
     def circuit():
-        return 0.0
+        qp.Hadamard(wires=0)
+        qp.RZ(0.3, wires=0)
+        qp.CNOT(wires=[1, 0])
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.PauliY(wires=0))
 
+    @catalyst.qjit(seed=42)
     def mitigated_qnode():
-        return catalyst.mitigate_with_zne(circuit, scale_factors=[], folding="local-random")()
+        return catalyst.mitigate_with_zne(
+            circuit, scale_factors=[1, 3, 5], folding="local-random"
+        )()
 
-    with pytest.raises(NotImplementedError):
-        catalyst.qjit(mitigated_qnode)
+    assert np.allclose(mitigated_qnode(), circuit())
 
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 @pytest.mark.parametrize("extrapolation", [quadratic_extrapolation, exponential_extrapolate])
-@pytest.mark.parametrize("folding", ["global", "local-all"])
+@pytest.mark.parametrize("folding", ["global", "local-all", "local-random"])
 def test_zne_usage_patterns(params, extrapolation, folding):
     """Test usage patterns of catalyst.zne."""
     skip_if_exponential_extrapolation_unstable(params, extrapolation, threshold=0.2)

@@ -305,16 +305,85 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     func::ReturnOp::create(rewriter, loc, funcFolded);
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
-// In *.cpp module only, to keep extraneous headers out of *.hpp
+
+static func::FuncOp getOrInsertRandomDecl(PatternRewriter &rewriter, ModuleOp moduleOp, Location loc)
+{
+    StringRef rngName = "__catalyst__rt__random_double";
+    if (auto existing = moduleOp.lookupSymbol<func::FuncOp>(rngName)) {
+        return existing;
+    }
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(moduleOp.getBody());
+    auto rngType = FunctionType::get(rewriter.getContext(), /*inputs=*/{},
+                                     /*results=*/rewriter.getF64Type());
+    func::FuncOp rngFunc = func::FuncOp::create(rewriter, loc, rngName, rngType);
+    rngFunc.setPrivate();
+    return rngFunc;
+}
+
+// Random local folding: like `allLocalFolding`, but each fold iteration flips a
+// runtime coin (`__catalyst__rt__random_double() < 0.5`) and only inserts the
+// $G G^\dagger$ pair when it succeeds, randomizing the fold count per gate.
 FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
                                      func::FuncOp fnFoldedOp, Value c0, Value c1)
 {
-    // TODO: Implement.
+    int64_t sizeArgs = fnFoldedOp.getArguments().size();
+    Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
-    // Can't throw, because disabled by compilation.
-    // throw std::logic_error("Random local folding not implemented!");
+    ModuleOp moduleOp = fnFoldedOp->getParentOfType<ModuleOp>();
+    func::FuncOp rngFunc = getOrInsertRandomDecl(rewriter, moduleOp, fnFoldedOp.getLoc());
 
-    return FlatSymbolRefAttr();
+    // Collect candidate gates first so in-place edits don't disturb the walk.
+    SmallVector<quantum::QuantumGate> gates;
+    fnFoldedOp.walk([&](quantum::QuantumGate op) { gates.push_back(op); });
+
+    for (quantum::QuantumGate op : gates) {
+        rewriter.setInsertionPoint(op);
+        auto loc = op->getLoc();
+        const std::vector<Value> opQubitArgs = op.getQubitOperands();
+
+        const auto forVal =
+            scf::ForOp::create(
+                rewriter, loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
+                [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                    // Runtime coin flip deciding whether to fold on this iteration.
+                    Value randVal =
+                        func::CallOp::create(builder, loc, rngFunc, ValueRange{}).getResult(0);
+                    Value half =
+                        arith::ConstantOp::create(builder, loc, builder.getF64FloatAttr(0.5));
+                    Value coin = arith::CmpFOp::create(builder, loc, arith::CmpFPredicate::OLT,
+                                                       randVal, half);
+
+                    auto ifOp = scf::IfOp::create(
+                        builder, loc, coin,
+                        [&](OpBuilder &thenBuilder, Location thenLoc) {
+                            // Fold: apply $G G^\dagger$ (identity, adds noise).
+                            quantum::QuantumGate origOp =
+                                dyn_cast<quantum::QuantumGate>(thenBuilder.clone(*op));
+                            origOp.setQubitOperands(iterArgs);
+                            auto origOpVal = origOp->getResults();
+
+                            quantum::QuantumGate adjointOp =
+                                dyn_cast<quantum::QuantumGate>(thenBuilder.clone(*origOp));
+                            adjointOp.setQubitOperands(origOpVal);
+                            adjointOp.setAdjointFlag(!adjointOp.getAdjointFlag());
+
+                            scf::YieldOp::create(thenBuilder, thenLoc, adjointOp->getResults());
+                        },
+                        [&](OpBuilder &elseBuilder, Location elseLoc) {
+                            // Skip folding: pass the qubits through unchanged.
+                            scf::YieldOp::create(elseBuilder, elseLoc, iterArgs);
+                        });
+
+                    scf::YieldOp::create(builder, loc, ifOp.getResults());
+                })
+                .getResults();
+
+        op.setQubitOperands(forVal);
+    }
+
+    // Return the function symbol reference
+    return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
 // In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
