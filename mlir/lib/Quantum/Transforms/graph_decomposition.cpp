@@ -17,6 +17,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -28,10 +29,13 @@
 #include "mlir/Pass/PassManager.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
+#include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Transforms/Passes.h"
+#include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
+#include "Quantum/Transforms/QPDLoader.h"
 
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
@@ -44,6 +48,7 @@ using namespace DecompGraph::Solver;
 
 namespace catalyst {
 namespace quantum {
+
 #define GEN_PASS_DEF_GRAPHDECOMPOSITIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
@@ -75,7 +80,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 1: Gather inputs for graph
-        ModuleOp module = getOperation();
         std::vector<OperatorNode> setOfOps;
         std::vector<RuleNode> setOfRules;
         llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> ruleNameToFuncOp;
@@ -119,11 +123,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         insertChosenRules(solution, ruleNameToFuncOp);
 
         ///////////////////////////
-        // Step 4: Run decompose-lowering to apply the decomposition rules
-        PassManager pm(&getContext());
+        // Step 4: Convert python-decompositions from reference to value semantics and run
+        // decompose-lowering to apply the chosen decomposition rules
+        ModuleOp module = getOperation();
+        OpPassManager pm("builtin.module");
+        pm.addPass(qref::createValueSemanticsConversionPass());
         pm.addPass(createDecomposeLoweringPass());
 
-        if (failed(pm.run(module))) {
+        if (failed(runPipeline(pm, module))) {
             return signalPassFailure();
         }
 
@@ -132,9 +139,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         for (auto &rule : allUserRules) {
             module.getBody()->push_back(rule.release());
         }
-
-        // TODO: insert a "clean-up" pass after the last graph-decomposition pass to remove user
-        // functions
     }
 
   private:
@@ -225,7 +229,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         for (auto rule : llvm::make_early_inc_range(moduleOp.get().getOps<mlir::func::FuncOp>())) {
             rule->remove();
-            ruleRegistry.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(rule));
+            ruleRegistry.push_back(std::move(rule));
         }
         return;
     }
@@ -265,8 +269,80 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         for (auto rule : llvm::make_early_inc_range(userRules)) {
             rule->remove();
-            rules.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(rule));
+            rules.push_back(std::move(rule));
         }
+        return success();
+    }
+
+    /**
+     * @brief
+     * Use python to lower decomposition rules for all `quantum.paulirot` operations in the circuit,
+     * annotating the lowered decomposition rules with resources and target gates. The target gate
+     * for the decomposition rule associated with Pauli word `ABC` will be `paulirotABC`.
+     */
+    mlir::LogicalResult
+    loadPauliRotRules(llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &ruleRegistry)
+    {
+        mlir::ModuleOp module = getOperation();
+        MLIRContext *context = &getContext();
+
+        llvm::StringSet<> addedWords;
+
+        llvm::SmallVector<quantum::PauliRotOp> pauliRotOps;
+        module.walk([&](quantum::PauliRotOp op) { pauliRotOps.push_back(op); });
+
+        if (!pauliRotOps.empty()) {
+            loadQPD(libQPDPath, libpythonPath);
+        }
+
+        for (quantum::PauliRotOp pauliRot : pauliRotOps) {
+            std::string pauliWord = pauliRot.getPauliWord();
+
+            if (addedWords.contains(pauliWord)) {
+                continue;
+            }
+            addedWords.insert(pauliWord);
+
+            std::vector<int> wires(pauliRot.getInQubits().size());
+            std::iota(wires.begin(), wires.end(), 0);
+
+            std::string mlirText = pythonLowerPauliRot(0.2, pauliWord, wires);
+
+            mlir::ParserConfig config(context);
+            auto moduleOp = mlir::parseSourceString(llvm::StringRef(mlirText), config);
+            if (!moduleOp) {
+                llvm::errs() << "failed to parse MLIR from python-decomposition\n";
+                return failure();
+            }
+
+            mlir::OwningOpRef<mlir::func::FuncOp> outOp;
+            moduleOp->walk([&](mlir::func::FuncOp func) {
+                // TODO: enable multiple decomposition rules for the same operator
+                if (func.getName() == "paulirot_decomp_rule") {
+                    func->remove();
+                    outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
+                    return mlir::WalkResult::interrupt();
+                }
+                return mlir::WalkResult::advance();
+            });
+
+            if (!outOp) {
+                llvm::errs() << "failed to find paulirot_decomp_rule in parsed MLIR\n";
+                return failure();
+            }
+
+            mlir::func::FuncOp funcOp = outOp.get();
+            outOp->setName((outOp->getName() + "_" + pauliWord).str()); // unique name per pauliword
+            funcOp->setAttr("target_gate", mlir::StringAttr::get(context, "paulirot" + pauliWord));
+
+            auto analysis = ResourceAnalysis(funcOp);
+            if (const ResourceResult *flat = analysis.getFlattenedResource(funcOp.getName())) {
+                funcOp->setAttr("resources", buildResourceDict(context, *flat));
+            }
+
+            ruleRegistry.push_back(std::move(outOp));
+        }
+
         return success();
     }
 
@@ -280,10 +356,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (auto customOp = llvm::dyn_cast<quantum::CustomOp>(op.getOperation())) {
                 node.name = customOp.getGateName().str();
             }
+            // Name handling for non-custom ops
             else {
                 std::string name = op->getName().stripDialect().str();
                 if (name == "gphase") {
                     name = "GlobalPhase";
+                }
+                else if (name == "paulirot") {
+                    name = "paulirot" + cast<quantum::PauliRotOp>(op.getOperation()).getPauliWord();
                 }
                 node.name = name;
             }
@@ -357,8 +437,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     {
         llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> graphRules;
 
-        // Load rules from bytecode and user-defined passes
+        // Load rules from bytecode and user-defined rules
         loadBuiltInDecompositionRules(filename, graphRules);
+        if (failed(loadPauliRotRules(graphRules))) {
+            return signalPassFailure();
+        }
         if (failed(loadUserDecompositionRules(userRuleNames, graphRules, userRules))) {
             return signalPassFailure();
         }

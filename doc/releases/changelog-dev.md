@@ -2,15 +2,6 @@
 
 <h3>New features since last release</h3>
 
-* A new, experimental compiler pass `convert-qecp-to-quantum` has been added to lower operations
-  from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
-  [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
-  [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
-  [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
-  [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
-  [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
-  [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
-
 
 <h3>Improvements 🛠</h3>
 
@@ -129,6 +120,12 @@
 * Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
+* Introduced compile-time python-decompositions, allowing compiler passes to lower decomposition
+  rules instantiated with static data (ex. pauli strings). Using this, the `graph-decomposition`
+  pass can now decompose `quantum.paulirot` operations using the decomposition rule defined in
+  PennyLane.
+  [(#2769)](https://github.com/PennyLaneAI/catalyst/pull/2769)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -227,6 +224,16 @@
 * Fix build failures when using clang with GCC ≤ 13 libstdc++ by replacing
   `std::views::filter`/`std::views::transform` with `std::copy_if`/`std::transform`
   [(#2801)](https://github.com/PennyLaneAI/catalyst/pull/2801)
+
+* A new, experimental compiler pass `convert-qecp-to-quantum` has been added to lower operations
+  from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
+  [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
+  [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
+  [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
+  [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
+  [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
+  [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
+  [(#2955)](https://github.com/PennyLaneAI/catalyst/pull/2955)
 
 * The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower
   transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
