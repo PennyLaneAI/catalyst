@@ -481,8 +481,7 @@ func.func @test_if_non_root_no_else(%arg0: i1) attributes {quantum.node} {
     // CHECK: scf.if %arg0 {
     // CHECK:   qref.custom "Hadamard"() [[q0]] : !qref.bit
     // CHECK:   qref.custom "X"() [[q0]] : !qref.bit
-    // CHECK: } else {
-    // CHECK-NEXT: }
+    // CHECK-NOT: else
     %2 = scf.if %arg0 -> (!quantum.bit) {
         %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
         %out_qubits_0 = quantum.custom "X"() %out_qubits : !quantum.bit
@@ -546,8 +545,7 @@ func.func @test_if_root_no_else(%arg0: i1) attributes {quantum.node} {
 
     // CHECK: scf.if %arg0 {
     // CHECK:   qref.custom "Hadamard"() [[qb]] : !qref.bit
-    // CHECK: } else {
-    // CHECK-NEXT: }
+    // CHECK-NOT: else
     %1 = scf.if %arg0 -> (!quantum.bit) {
         %out_qubits = quantum.custom "Hadamard"() %0 : !quantum.bit
         scf.yield %out_qubits : !quantum.bit
@@ -674,8 +672,7 @@ func.func @test_if_nested_for(%arg0: i1) attributes {quantum.node} {
         // CHECK-NOT: scf.yield
         scf.yield %6 : !quantum.reg
 
-    // CHECK: } else {
-    // CHECK-NEXT: }
+    // CHECK-NOT: else
     } else {
         scf.yield %0 : !quantum.reg
     }
