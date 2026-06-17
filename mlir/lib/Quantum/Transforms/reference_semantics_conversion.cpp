@@ -342,6 +342,16 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
         rGateOp = migrateOpToReferenceSemantics<qref::SetBasisStateOp>(builder, vSetBasisStateOp,
                                                                        tracker);
     }
+    else if (auto vOperatorOp = dyn_cast<quantum::OperatorOp>(_vGateOp)) {
+        auto rGateOp =
+            migrateOpToReferenceSemantics<qref::OperatorOp>(builder, vOperatorOp, tracker);
+        rGateOp->removeAttr("resultSegmentSizes");
+
+        // Properties are not handled via the generic attribute fields, so we set them separately.
+        rGateOp.setOpName(vOperatorOp.getOpName());
+        rGateOp.setAdjoint(vOperatorOp.getAdjoint());
+        rGateOp.setUID(vOperatorOp.getUID());
+    }
     else {
         vGateOp->emitOpError("unknown gate op in quantum dialect");
     }
@@ -486,30 +496,14 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
     builder.setInsertionPoint(ifOp);
     Location loc = ifOp->getLoc();
 
-    // Collect classical returns of the old if op
-    SmallVector<unsigned> classicalReturnIndices;
-    SmallVector<Type> classicalReturnTypes;
-    for (auto [i, t] : llvm::enumerate(ifOp.getResultTypes())) {
-        if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
-            classicalReturnTypes.push_back(t);
-            classicalReturnIndices.push_back(i);
-        }
-    }
-    auto newIfOp = scf::IfOp::create(builder, loc, classicalReturnTypes, ifOp.getCondition(),
-                                     /*withElseRegion=*/true);
-
     // Handle Then region
     // Cannot just use `cascadeMapAhead` util to update the outside flow, since if op does not take
     // in operands. We get the references from the yield op on the thenRegion
-    builder.eraseBlock(newIfOp.thenBlock());
-    builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
-                               newIfOp.getThenRegion().end());
     QubitValueTracker thenRegionTracker = tracker;
-    SmallVector<Value> yieldOpArgSave(newIfOp.thenYield().getResults());
-    eraseSCFYieldQuantumOperands(
-        cast<scf::YieldOp>(newIfOp.getThenRegion().front().getTerminator()));
+    SmallVector<Value> yieldOpArgSave(ifOp.thenYield().getResults());
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getThenRegion().front().getTerminator()));
     SmallVector<Operation *> thenRegionErasureWorklist =
-        handleRegion(builder, newIfOp.getThenRegion(), thenRegionTracker, false).value();
+        handleRegion(builder, ifOp.getThenRegion(), thenRegionTracker, false).value();
     for (auto [vqo, vqr] : llvm::zip_equal(yieldOpArgSave, ifOp.getResults())) {
         if (isa<quantum::QubitType>(vqo.getType())) {
             tracker.setRQubit(vqr, thenRegionTracker.getRQubit(vqo));
@@ -521,21 +515,40 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
     for (auto op : llvm::reverse(thenRegionErasureWorklist)) {
         op->erase();
     }
-    newIfOp.getThenRegion().front().eraseArguments([](BlockArgument arg) {
+    ifOp.getThenRegion().front().eraseArguments([](BlockArgument arg) {
         return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
     });
 
     // Handle Else region
-    builder.eraseBlock(newIfOp.elseBlock());
-    builder.inlineRegionBefore(ifOp.getElseRegion(), newIfOp.getElseRegion(),
-                               newIfOp.getElseRegion().end());
     QubitValueTracker elseRegionTracker = tracker;
-    eraseSCFYieldQuantumOperands(
-        cast<scf::YieldOp>(newIfOp.getElseRegion().front().getTerminator()));
-    handleRegion(builder, newIfOp.getElseRegion(), elseRegionTracker);
-    newIfOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
+    handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
+    ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
         return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
     });
+
+    // The else block is empty if the only remaining op is the mandatory scf.yield terminator
+    bool hasElseRegion = &(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator();
+
+    // Collect classical returns of the old if op
+    SmallVector<unsigned> classicalReturnIndices;
+    SmallVector<Type> classicalReturnTypes;
+    for (auto [i, t] : llvm::enumerate(ifOp.getResultTypes())) {
+        if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
+            classicalReturnTypes.push_back(t);
+            classicalReturnIndices.push_back(i);
+        }
+    }
+    auto newIfOp = scf::IfOp::create(builder, loc, classicalReturnTypes, ifOp.getCondition(),
+                                     /*withElseRegion=*/hasElseRegion);
+    builder.eraseBlock(newIfOp.thenBlock());
+    builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
+                               newIfOp.getThenRegion().end());
+    if (hasElseRegion) {
+        builder.eraseBlock(newIfOp.elseBlock());
+        builder.inlineRegionBefore(ifOp.getElseRegion(), newIfOp.getElseRegion(),
+                                   newIfOp.getElseRegion().end());
+    }
 
     // Update connection with outside
     erasureWorklist.push_back(ifOp);
