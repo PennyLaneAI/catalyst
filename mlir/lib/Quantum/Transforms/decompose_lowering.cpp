@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/ADT/SmallSet.h>
 #define DEBUG_TYPE "decompose-lowering"
 
-// When we read the decomposition rules module from file,
-// StablehloDialect may not be registered from start.
+#include <string>
+
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
@@ -24,14 +25,18 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/WalkResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
-#include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/dialect/StablehloOps.h" // When we read the decomposition rules module from file, StablehloDialect may not be registered from start.
 
+#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
@@ -96,9 +101,15 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     // Function to discover and register decomposition functions from a module
     // It's bookkeeping the targetOp and the decomposition function that can decompose the targetOp
     void discoverAndRegisterDecompositions(ModuleOp module,
-                                           llvm::StringMap<func::FuncOp> &decompositionRegistry)
+                                           llvm::StringMap<func::FuncOp> &decompositionRegistry,
+                                           llvm::StringSet<> targetRules)
     {
         module.walk([&](func::FuncOp func) {
+            // if targetRules is provided, only add requested rules
+            if (!targetRules.empty() && !targetRules.contains(func.getName())) {
+                return WalkResult::skip();
+            }
+
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
                 removeUnusedFuncArgs(func);
                 if (targetOp == "MultiRZ") {
@@ -183,7 +194,11 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         ModuleOp module = cast<ModuleOp>(getOperation());
 
         // Step 1: Discover and register all decomposition functions in the module
-        discoverAndRegisterDecompositions(module, decompositionRegistry);
+        llvm::StringSet<> targetRules;
+        for (auto rule : targetRulesOption) {
+            targetRules.insert(rule);
+        }
+        discoverAndRegisterDecompositions(module, decompositionRegistry, targetRules);
         if (decompositionRegistry.empty()) {
             return;
         }
