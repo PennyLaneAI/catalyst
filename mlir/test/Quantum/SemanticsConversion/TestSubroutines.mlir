@@ -325,8 +325,7 @@ func.func @main(%arg0: i1) attributes {quantum.node} {
     // CHECK: scf.if %arg0 {
     // CHECK:   func.call @test_cond_callsite([[q]], [[q0]]) : (!qref.bit, !qref.bit) -> ()
     // CHECK:   func.call @test_cond_callsite([[q]], [[q1]]) : (!qref.bit, !qref.bit) -> ()
-    // CHECK: } else {
-    // CHECK: }
+    // CHECK-NOT: else
     %6:3 = scf.if %arg0 -> (!quantum.bit, !quantum.bit, !quantum.bit) {
         %9:2 = func.call @test_cond_callsite(%0, %4) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
         %10:2 = func.call @test_cond_callsite(%9#0, %5) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
@@ -380,8 +379,7 @@ func.func @main(%arg0: i1) attributes {quantum.node} {
     // CHECK:     func.call @test_callsite_in_nested_region([[q]], [[q0]]) : (!qref.bit, !qref.bit) -> ()
     // CHECK:     func.call @test_callsite_in_nested_region([[q]], [[q1]]) : (!qref.bit, !qref.bit) -> ()
     // CHECK:   }
-    // CHECK: } else {
-    // CHECK: }
+    // CHECK-NOT: else
     %6:3 = scf.if %arg0 -> (!quantum.bit, !quantum.bit, !quantum.bit) {
         %9:3 = scf.for %arg1 = %c0 to %c37 step %c1 iter_args(%arg2 = %0, %arg3 = %4, %arg4 = %5) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
         %10:2 = func.call @test_callsite_in_nested_region(%arg2, %arg3) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
