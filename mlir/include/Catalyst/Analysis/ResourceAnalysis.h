@@ -15,6 +15,7 @@
 #pragma once
 
 #include "llvm/ADT/StringMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
@@ -29,6 +30,7 @@ class ResourceAnalysis {
   public:
     // walk all func::FuncOps within the operation.
     explicit ResourceAnalysis(ModuleOp moduleOp);
+    explicit ResourceAnalysis(func::FuncOp funcOp);
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 

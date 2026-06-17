@@ -12,13 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: not --crash quantum-opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=PauliX=1.0 bytecode-rules="%BYTECODE_PATH"})' %s 2>&1 | FileCheck %s
+#pragma once
 
-func.func @circuit(%q0: !quantum.bit) {
-    %pi = arith.constant 3.14 : f64
-    %dim = arith.constant 3.0 : f64
-    %out = quantum.pcphase (%pi, %dim) %q0 : !quantum.bit
-    // CHECK: GraphSolverFailedError
-    // CHECK: Decomposition rule not found for operator 'pcphase
-    return
-}
+#include <string>
+#include <vector>
+
+namespace catalyst::quantum {
+
+using LowerPauliRotFn = std::string (*)(double theta, std::string pauliWord,
+                                        std::vector<int> wires);
+
+extern LowerPauliRotFn pythonLowerPauliRot;
+
+bool loadQPD(std::string libQPDPath, std::string libpythonPath);
+
+} // namespace catalyst::quantum

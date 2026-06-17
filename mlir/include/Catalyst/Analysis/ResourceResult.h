@@ -19,6 +19,8 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/MLIRContext.h"
 
 namespace catalyst {
 
@@ -78,5 +80,7 @@ struct ResourceResult {
 
     std::string toJson(int indent = 4) const;
 };
+
+mlir::DictionaryAttr buildResourceDict(mlir::MLIRContext *ctx, const ResourceResult &result);
 
 } // namespace catalyst
