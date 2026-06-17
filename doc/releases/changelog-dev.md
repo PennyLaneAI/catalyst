@@ -11,6 +11,11 @@
   [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
   [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
 
+* The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented.
+  Like `local-all`, but each per-gate :math:`G G^\dagger` pair is only inserted when a runtime
+  pseudo-random draw selects it, randomizing the fold count per gate the pattern is reproducible
+  under ``qjit(seed=...)``.
+  [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
 
