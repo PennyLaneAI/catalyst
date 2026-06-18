@@ -30,7 +30,6 @@ pytestmark = pytest.mark.usefixtures("disable_capture")
 def circuit_aot_builder(dev):
     """Test AOT builder."""
 
-
     @qjit(capture=True)
     @qp.qnode(device=dev)
     def catalyst_circuit_aot(x: float):
@@ -40,7 +39,6 @@ def circuit_aot_builder(dev):
         qp.CNOT(wires=[1, 0])
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
-
 
     return catalyst_circuit_aot
 
@@ -152,7 +150,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(device=dev)
         def captured_circuit(x):
@@ -164,7 +161,6 @@ class TestCapture:
             return qp.expval(qp.PauliY(wires=0))
 
         capture_result = captured_circuit(theta**2)
-
 
         # Capture disabled
 
@@ -197,7 +193,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(dev)
         def captured_circuit(_basis_state):
@@ -205,7 +200,6 @@ class TestCapture:
             return qp.state()
 
         capture_result = captured_circuit(basis_state)
-
 
         # Capture disabled
 
@@ -235,7 +229,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(dev)
         def captured_circuit(init_state):
@@ -243,7 +236,6 @@ class TestCapture:
             return qp.state()
 
         capture_result = captured_circuit(init_state)
-
 
         # Capture disabled
 
@@ -262,7 +254,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(device)
         def captured_circuit(theta, val):
@@ -271,7 +262,6 @@ class TestCapture:
             return qp.state()
 
         capture_result = captured_circuit(theta, val)
-
 
         # Capture disabled
 
@@ -291,7 +281,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(device)
         def captured_circuit(theta):
@@ -300,7 +289,6 @@ class TestCapture:
             return qp.state()
 
         capture_result = captured_circuit(theta)
-
 
         # Capture disabled
 
@@ -322,7 +310,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qp.qnode(device)
         def circuit(theta):
             qp.ctrl(qp.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
@@ -331,7 +318,6 @@ class TestCapture:
         capture_result = qjit(circuit, capture=True)(theta)
 
         # Capture disabled
-
 
         assert jnp.allclose(capture_result, circuit(theta))
 
@@ -349,7 +335,6 @@ class TestCapture:
         """
         device = qp.device(backend, wires=1)
 
-
         @qjit(capture=True)
         @qp.qnode(device)
         def captured_circuit():
@@ -358,7 +343,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit()
-
 
         assert jnp.allclose(capture_result, expected)
 
@@ -369,7 +353,6 @@ class TestCapture:
         """
         device = qp.device(backend, wires=1)
 
-
         @qjit(capture=True)
         @qp.qnode(device)
         def captured_circuit():
@@ -378,7 +361,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit()
-
 
         expected_result = -1
 
@@ -391,7 +373,6 @@ class TestCapture:
         """
         device = qp.device(backend, wires=1)
 
-
         @qjit(capture=True, autograph=True)
         @qp.qnode(device)
         def captured_circuit():
@@ -402,7 +383,6 @@ class TestCapture:
 
         capture_result = captured_circuit()
 
-
         assert jnp.allclose(capture_result, -1)
 
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
@@ -410,7 +390,6 @@ class TestCapture:
         """Test the integration for a circuit with a for loop."""
 
         # Capture enabled
-
 
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=4))
@@ -426,7 +405,6 @@ class TestCapture:
             return qp.expval(qp.Z(2))
 
         capture_result = captured_circuit(theta)
-
 
         # Capture disabled
 
@@ -446,7 +424,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(n, x):
@@ -462,7 +439,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(10, 0.3)
-
 
         # Capture disabled
 
@@ -486,7 +462,6 @@ class TestCapture:
         """Test the integration for a circuit with a nested for loop primitive."""
 
         # Capture enabled
-
 
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=4))
@@ -514,7 +489,6 @@ class TestCapture:
             return qp.state()
 
         capture_result = captured_circuit(4)
-
 
         # Capture disabled
 
@@ -553,7 +527,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def capturted_circuit(x: float):
@@ -575,7 +548,6 @@ class TestCapture:
         capture_result_10_iterations = capturted_circuit(0)
         capture_result_1_iteration = capturted_circuit(9)
         capture_result_0_iterations = capturted_circuit(11)
-
 
         # Capture disabled
 
@@ -607,7 +579,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, step: float):
@@ -627,7 +598,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0, 2)
-
 
         # Capture disabled
 
@@ -656,7 +626,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
@@ -683,7 +652,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0, 0)
-
 
         # Capture disabled
 
@@ -719,7 +687,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -736,7 +703,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
-
 
         # Capture disabled
 
@@ -762,7 +728,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -776,7 +741,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(1.5)
-
 
         # Capture disabled
 
@@ -800,7 +764,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -819,7 +782,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
-
 
         # Capture disabled
 
@@ -848,7 +810,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -867,7 +828,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
-
 
         # Capture disabled
 
@@ -896,7 +856,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -915,7 +874,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
-
 
         # Capture disabled
 
@@ -943,7 +901,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
@@ -967,7 +924,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1, 1.5)
-
 
         # Capture disabled
 
@@ -1001,7 +957,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -1011,7 +966,6 @@ class TestCapture:
             return qp.expval(qp.Z(0))
 
         capture_result = captured_circuit(0.1)
-
 
         # Capture disabled
 
@@ -1069,7 +1023,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device(backend, wires=1))
@@ -1081,7 +1034,6 @@ class TestCapture:
 
         capture_result = captured_circuit(0.1)
         assert 'transform.apply_registered_pass "cancel-inverses"' in captured_circuit.mlir
-
 
         # Capture disabled
 
@@ -1101,7 +1053,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.transforms.merge_rotations
         @qp.qnode(qp.device(backend, wires=1))
@@ -1113,7 +1064,6 @@ class TestCapture:
 
         capture_result = captured_circuit(0.1)
         assert 'transform.apply_registered_pass "merge-rotations"' in captured_circuit.mlir
-
 
         # Capture disabled
 
@@ -1133,7 +1083,6 @@ class TestCapture:
         and 'cancel_inverses' transforms."""
 
         # Capture enabled
-
 
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -1156,7 +1105,6 @@ class TestCapture:
         )
         captured_rotations_inverses_result = captured_rotations_inverses(0.1)
         assert has_catalyst_transforms(captured_rotations_inverses.mlir)
-
 
         # Capture disabled
 
@@ -1187,7 +1135,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
         @qp.qnode(qp.device(backend, wires=2))
@@ -1197,7 +1144,6 @@ class TestCapture:
 
         capture_result = captured_circuit(1.5, 2.5, 3.5)
         assert is_rot_decomposed(captured_circuit.mlir)
-
 
         # Capture disabled
 
@@ -1259,7 +1205,6 @@ class TestCapture:
 
         # Capture enabled
 
-
         @qjit(capture=True)
         @qp.set_shots(10)
         @qp.qnode(qp.device(backend, wires=2))
@@ -1275,7 +1220,6 @@ class TestCapture:
 
         capture_result = captured_circuit()
         assert "shots(%" in captured_circuit.mlir
-
 
         @qjit
         @qp.set_shots(10)
@@ -1294,7 +1238,6 @@ class TestCapture:
 
     def test_static_variable_qnode(self, backend):
         """Test the integration for a circuit with a static variable."""
-
 
         # Basic test
         @qjit(capture=True, static_argnums=(0,))
@@ -1343,14 +1286,12 @@ class TestCapture:
         assert 'qref.custom "RX"(%cst)' in captured_circuit_3_mlir
 
 
-
 class TestControlFlow:
     """Integration tests for control flow."""
 
     @pytest.mark.parametrize("reverse", (True, False))
     def test_for_loop_outside_qnode(self, reverse):
         """Test that a for loop outside qnode can be executed."""
-
 
         if reverse:
             start, stop, step = 6, 0, -2  # 6, 4, 2
@@ -1402,7 +1343,6 @@ class TestControlFlow:
         """This tests for kinda a weird edge case bug where the consts where getting
         reordered when translating the inner jaxpr."""
 
-
         @qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit(x, n):
@@ -1430,7 +1370,6 @@ class TestControlFlow:
     def test_for_loop_consts_outside_qnode(self):
         """Similar test as above for weird edge case, but not using a qnode."""
 
-
         @qjit(capture=True)
         def f(x, n):
             @qp.for_loop(3)
@@ -1451,7 +1390,6 @@ class TestControlFlow:
 def test_adjoint_transform_integration():
     """Test that adjoint transforms can be used with capture enabled."""
 
-
     def f(x):
         qp.IsingXX(2 * x, wires=(0, 1))
         qp.H(0)
@@ -1471,7 +1409,6 @@ def test_adjoint_transform_integration():
 @pytest.mark.parametrize("separate_funcs", (True, False))
 def test_ctrl_transform_integration(separate_funcs):
     """Test that the ctrl transform can be applied."""
-
 
     def f(x, y):
         qp.RY(3 * y, wires=3)
@@ -1496,7 +1433,6 @@ def test_ctrl_transform_integration(separate_funcs):
 
 def test_different_static_argnums():
     """Test that the same qnode can be called different times with different static argnums."""
-
 
     @qp.qnode(qp.device("lightning.qubit", wires=1), static_argnums=1)
     def c(x, pauli):
