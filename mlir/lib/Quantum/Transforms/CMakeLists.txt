@@ -3,36 +3,37 @@ set(LIBRARY_NAME quantum-transforms)
 add_subdirectory(DecompGraphSolver)
 
 file(GLOB SRC
-    BufferizableOpInterfaceImpl.cpp
-    ConversionPatterns.cpp
-    quantum_to_llvm.cpp
-    emit_catalyst_pyface.cpp
-    cp_global_buffers.cpp
     AdjointLowering/AdjointLowering.cpp
-    AdjointLowering/QuantumCache.cpp
     AdjointLowering/ForwardPass.cpp
+    AdjointLowering/QuantumCache.cpp
     AdjointLowering/ReversePass.cpp
+    BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
-    cancel_inverses.cpp
+    ConversionPatterns.cpp
+    DecomposeLoweringPatterns.cpp
+    DisentangleCNOT.cpp
+    DisentangleSWAP.cpp
+    GridsynthPatterns.cpp
+    IonsDecompositionPatterns.cpp
+    LoopBoundaryOptimizationPatterns.cpp
+    MergeRotationsPatterns.cpp
+    QPDLoader.cpp
     SplitMultipleTapes.cpp
+    cancel_inverses.cpp
+    cp_global_buffers.cpp
+    decompose_lowering.cpp
+    dynamic_one_shot.cpp
+    emit_catalyst_pyface.cpp
+    graph_decomposition.cpp
+    gridsynth.cpp
+    ions_decompositions.cpp
+    loop_boundary_optimization.cpp
+    merge_global_phase.cpp
+    merge_rotation.cpp
+    quantum_to_llvm.cpp
+    reference_semantics_conversion.cpp
     split_non_commuting.cpp
     split_to_single_terms.cpp
-    merge_rotation.cpp
-    MergeRotationsPatterns.cpp
-    decompose_lowering.cpp
-    DecomposeLoweringPatterns.cpp
-    dynamic_one_shot.cpp
-    graph_decomposition.cpp
-    merge_global_phase.cpp
-    gridsynth.cpp
-    GridsynthPatterns.cpp
-    DisentangleSWAP.cpp
-    DisentangleCNOT.cpp
-    ions_decompositions.cpp
-    IonsDecompositionPatterns.cpp
-    loop_boundary_optimization.cpp
-    LoopBoundaryOptimizationPatterns.cpp
-    reference_semantics_conversion.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -59,8 +60,9 @@ add_mlir_library(${LIBRARY_NAME} STATIC
 )
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
-                           .
-                           ${PROJECT_SOURCE_DIR}/include
-                           ${CMAKE_BINARY_DIR}/include
-                           AdjointLowering/
-                           DecompGraphSolver/)
+    .
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_BINARY_DIR}/include
+    AdjointLowering/
+    DecompGraphSolver/
+)

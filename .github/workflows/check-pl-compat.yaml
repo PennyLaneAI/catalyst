@@ -132,6 +132,11 @@ jobs:
         sudo apt-get install -y graphviz
         pip install pennylane-catalyst
 
+        # A test on stable (v0.15.0) fails due to an upstream openblas update
+        # We set an upper bound for the upstream package, so SSS can pass again
+        # TODO: remove once v0.16.0 has been released.
+        pip install "scipy-openblas32<0.3.33"
+
     - name: Add Frontend Dependencies to PATH
       if: ${{ inputs.catalyst == 'latest' }}
       run: |
