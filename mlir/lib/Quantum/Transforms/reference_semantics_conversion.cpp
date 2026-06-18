@@ -15,6 +15,8 @@
 #define DEBUG_TYPE "reference-semantics-conversion"
 #define VALUE_SEMANTICS_GATE_OPS                                                                   \
     quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp
+#define VALUE_SEMANTICS_OBSERVABLE_OPS                                                             \
+    quantum::ComputationalBasisOp, quantum::HermitianOp, quantum::NamedObsOp
 
 #include "reference_semantics_conversion.h"
 
@@ -54,7 +56,7 @@ namespace {
 LogicalResult ensureNoValueSemanticsOps(Operation *op)
 {
     WalkResult walkResult = op->walk([](Operation *op) {
-        if (isa<VALUE_SEMANTICS_GATE_OPS>(op)) {
+        if (isa<VALUE_SEMANTICS_GATE_OPS, VALUE_SEMANTICS_OBSERVABLE_OPS>(op)) {
             return WalkResult::interrupt();
         }
         return WalkResult::advance();
