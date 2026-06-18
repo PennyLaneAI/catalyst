@@ -74,13 +74,14 @@ The convert-quantum-to-qecl pass does not support the following cases:
   * `quantum.alloc` ops with a dynamic number of qubits.
   * Programs with non-Clifford gates; specifically any gates other than I, X, Y, Z, Hadamard, S or
     CNOT.
-  * Programs with control-flow operations other than `scf.for` and `scf.if`.
+  * Programs with control-flow operations other than `scf.for`, `scf.if`, and `scf.while`.
 """
 
 import math
 from abc import abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import NoReturn, TypeGuard, cast
+from typing import Generic, NoReturn, TypeGuard, TypeVar, cast
 
 from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
@@ -522,29 +523,35 @@ class MeasureOpConversion(RewritePattern):
         rewriter.replace_op(op, ops_to_insert, new_results=new_results)
 
 
-# MARK: SCF Yield Pattern
+# MARK: Terminator Base Pattern
 
 
-class ScfYieldConversion(RewritePattern):
-    """Handles conversion of `scf.yield` ops."""
+class TerminatorConversion(RewritePattern):
+    """Base class for conversion of terminator ops, e.g. `scf.yield`, `scf.condition`,
+    `func.return`, etc.
+    """
 
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: scf.YieldOp, rewriter: PatternRewriter):
-        """Rewrite pattern for `scf.yield` ops."""
-        new_yield_operands = []
+    def match_and_rewrite(self, op: Operation, rewriter: PatternRewriter):
+        """Rewrite pattern for terminator ops.
+
+        Each subclass of `TerminatorConversion` must implement its own `match_and_rewrite()` with
+        the `@op_type_rewrite_pattern` decorator and call `super().match_and_rewrite(...)`.
+        """
+        new_operands = []
+        op_is_modified = False
 
         for operand in op.operands:
             operand_owner = operand.owner
             if isinstance(operand.type, quantum.QuregType):
-                # Expect `!quantum.reg `types to be convertible to `!qecl.hyperreg` types
+                # Expect `!quantum.reg` types to be convertible to `!qecl.hyperreg` types
                 if not _is_type_convertible(
                     operand_owner, qecl.LogicalHyperRegisterType
                 ):  # pragma: no cover
                     _raise_failed_to_convert_op_compile_error(op)
 
                 conv_cast_op = self._insert_conv_cast_op(operand_owner, rewriter)
-                new_yield_operands.append(conv_cast_op.results[0])
-                self._notify_parent_op_modified(op, rewriter)
+                new_operands.append(conv_cast_op.results[0])
+                op_is_modified = True
 
             elif isinstance(operand.type, quantum.QubitType):
                 # Expect `!quantum.bit` types to be convertible to `!qecl.codeblock` types
@@ -554,15 +561,17 @@ class ScfYieldConversion(RewritePattern):
                     _raise_failed_to_convert_op_compile_error(op)
 
                 conv_cast_op = self._insert_conv_cast_op(operand_owner, rewriter)
-                new_yield_operands.append(conv_cast_op.results[0])
-                self._notify_parent_op_modified(op, rewriter)
+                new_operands.append(conv_cast_op.results[0])
+                op_is_modified = True
 
             else:
                 # Not a quantum type, no need to convert
-                new_yield_operands.append(operand)
+                new_operands.append(operand)
 
-        # Update the yield op's operands
-        op.operands = new_yield_operands
+        # Update the terminator op's operands
+        if op_is_modified:
+            op.operands = new_operands
+            self._notify_parent_op_modified(op, rewriter)
 
     @classmethod
     def _insert_conv_cast_op(
@@ -580,21 +589,38 @@ class ScfYieldConversion(RewritePattern):
         return conv_cast_op
 
     @classmethod
-    def _notify_parent_op_modified(cls, op: scf.YieldOp, rewriter: PatternRewriter):
-        """Notify the rewriter that the parent op of the matched `scf.yield` op (typically another
-        `scf` op, like `scf.if`, `scf.for`, etc.) was modified (this triggers the rewrite pattern
-        for the parent op, which updates the return types(s) corresponding to the new yield types).
+    def _notify_parent_op_modified(cls, op: Operation, rewriter: PatternRewriter):
+        """Notify the rewriter that the parent op of the matched terminator op was modified (this
+        triggers the rewrite pattern for the parent op, which updates the return types(s)
+        corresponding to the new yield types).
         """
         parent_op = op.parent_op()
-        assert parent_op is not None, "Op 'scf.yield': expected parent op, but found none"
+        assert parent_op is not None, f"Op '{op.name}': expected parent op, but found none"
         rewriter.notify_op_modified(parent_op)
 
 
-# MARK: SCF Base Pattern
+# MARK: SCF Terminator Patterns
 
 
-class ScfConversionPattern(RewritePattern):
-    """Base class for conversion of `scf` ops (except `scf.yield`)."""
+class ScfTerminatorConversion(TerminatorConversion):
+    """Handles conversion of `scf.yield` and `scf.condition` terminator ops."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: scf.YieldOp | scf.ConditionOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.yield` and `scf.condition` ops."""
+        super().match_and_rewrite(op, rewriter)
+
+
+# MARK: SCF Op Base Pattern
+
+
+OpType = TypeVar("OpType", bound=Operation)
+
+
+class ScfConversionPattern(RewritePattern, Generic[OpType]):
+    """Base class for conversion of `scf` ops (except terminator ops, such as `scf.yield`,
+    `scf.condition`, etc.; for those ops, use `TerminatorConversion` instead).
+    """
 
     def match_and_rewrite(self, op: Operation, rewriter: PatternRewriter):
         """Rewrite pattern for `scf` ops.
@@ -602,48 +628,63 @@ class ScfConversionPattern(RewritePattern):
         Each subclass of `ScfConversionPattern` must implement its own `match_and_rewrite()` with
         the `@op_type_rewrite_pattern` decorator and call `super().match_and_rewrite(...)`.
         """
-        yield_op = self._get_yield_op(op)
+        self._convert_op_results(op, rewriter)
 
-        for i_res, result in enumerate(op.results):
-            # The yield operand that corresponds to the current scf op's return value
-            yield_operand = yield_op.operands[i_res]
+    @classmethod
+    def _convert_op_results(cls, op: OpType, rewriter: PatternRewriter):
+        """Convert the matched op's result types based on the types of the terminator operands that
+        are passed to the op's results.
+        """
+        terminator_operands = cls._get_terminator_operands_passed_to_results(op)
+
+        for result, terminator_operand in zip(op.results, terminator_operands, strict=True):
+            # `zip` drops type information here, hence the cast
+            result = cast(OpResult, result)
+            terminator_operand = cast(SSAValue, terminator_operand)
 
             # If the result type of an 'scf' op is a `quantum` type, but the corresponding
-            # 'scf.yield' operand is not the same `quantum` type (i.e. because it has been converted
+            # terminator operand is not the same `quantum` type (i.e. because it has been converted
             # to a `qecl` type), then we replace the result value with one that has the type of the
-            # yield operand. We also must insert unrealized_conversion_cast ops that convert the new
-            # result back to the `quantum` type so that subsequent, unconverted `quantum` ops still
-            # receive inputs of the correct type.
+            # terminator operand. We also must insert `unrealized_conversion_cast` ops that convert
+            # the new result back to the `quantum` type so that subsequent, unconverted `quantum`
+            # ops still receive inputs of the correct type.
 
             for quantum_type in (quantum.QuregType, quantum.QubitType):
                 if isinstance(result.type, quantum_type) and not isinstance(
-                    yield_operand.type, quantum_type
+                    terminator_operand.type, quantum_type
                 ):
-                    self._convert_quantum_type_result(result, yield_operand, quantum_type, rewriter)
+                    cls._convert_quantum_type_result(
+                        result, terminator_operand, quantum_type, rewriter
+                    )
                     break
 
     @classmethod
     @abstractmethod
-    def _get_yield_op(cls, op) -> scf.YieldOp:
-        """Abstract method that gets the `scf.yield` op from its parent scf `op`."""
+    def _get_terminator_operands_passed_to_results(cls, op: OpType) -> Sequence[SSAValue]:
+        """Helper method to `_convert_op_results()` that gets the operands of the matched `scf`
+        op's terminator that are passed to the op's results.
+
+        Since different `scf` ops have different terminator ops, each subclass of
+        `ScfConversionPattern` must implement its own `_get_terminator_operand()` method.
+        """
         ...
 
     @classmethod
     def _convert_quantum_type_result(
         cls,
         result: OpResult,
-        yield_operand: SSAValue,
+        terminator_operand: SSAValue,
         quantum_type: type[Attribute],
         rewriter: PatternRewriter,
     ):
         """Helper function that converts `result` from a quantum-dialect type to the type of
-        `yield_operand`.
+        `terminator_operand`.
         """
         assert isinstance(
             result.type, quantum_type
         ), f"Expected `result` to have type '{quantum_type.name}'"
 
-        new_result = rewriter.replace_value_with_new_type(result, new_type=yield_operand.type)
+        new_result = rewriter.replace_value_with_new_type(result, new_type=terminator_operand.type)
 
         # Cast back to `quantum` type for compatibility with subsequent `quantum` ops (to be
         # resolved by other rewrite patterns).
@@ -667,140 +708,147 @@ class ScfConversionPattern(RewritePattern):
 # MARK: SCF If Pattern
 
 
-class ScfIfConversion(ScfConversionPattern):
+class ScfIfConversion(ScfConversionPattern[scf.IfOp]):
     """Handles conversion of `scf.if` conditional ops."""
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: scf.IfOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.if` ops."""
         super().match_and_rewrite(op, rewriter)
 
     @classmethod
-    def _get_yield_op(cls, op: scf.IfOp) -> scf.YieldOp:
-        """Get the `scf.yield` op from the `true` region of an `scf.if` op."""
+    def _get_terminator_operands_passed_to_results(cls, op: scf.IfOp) -> Sequence[SSAValue]:
+        """Get the operands of the `scf.yield` op from the `true` region of an `scf.if` op."""
         yield_block = op.true_region.last_block
         assert (
             yield_block is not None
-        ), "Op 'scf.if': expected at least one block in `true_region`, but found none"
+        ), f"Op '{op.name}': expected at least one block in `true_region`, but found none"
 
         yield_op = yield_block.last_op
         assert isinstance(yield_op, scf.YieldOp), (
-            f"Op 'scf.if': expected last op in `true_region` to be 'scf.yield', but got "
+            f"Op '{op.name}': expected last op in `true_region` to be 'scf.yield', but got "
             f"{type(yield_op).__name__}"
         )
 
-        return yield_op
+        return yield_op.operands
 
 
 # MARK: SCF For Pattern
 
 
-class ScfForConversion(ScfConversionPattern):
+class ScfForConversion(ScfConversionPattern[scf.ForOp]):
     """Handles conversion of `scf.for` loop ops."""
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: scf.ForOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.for` ops."""
         super().match_and_rewrite(op, rewriter)
 
         first_block = self._get_first_block(op)
 
         for i, iter_arg in enumerate(op.iter_args):
-            iter_arg = cast(SSAValue, iter_arg)  # `enumerate` drops type information
+            iter_arg = cast(SSAValue, iter_arg)  # `enumerate` drops type information here
 
             # The block arg that corresponds to the current iter_arg.
             # Recall that the first block arg in a for loop is the iteration index (hence i + 1).
             block_arg = first_block.args[i + 1]
 
-            match iter_arg.type:
-                case quantum.QuregType():
-                    if not _is_type_convertible(
-                        iter_arg.owner, qecl.LogicalHyperRegisterType
-                    ):  # pragma: no cover
-                        _raise_failed_to_convert_op_compile_error(op)
-
-                    self._convert_iter_and_block_args(iter_arg, block_arg, op, rewriter)
-
-                case quantum.QubitType():
-                    if not _is_type_convertible(
-                        iter_arg.owner, qecl.LogicalCodeblockType
-                    ):  # pragma: no cover
-                        _raise_failed_to_convert_op_compile_error(op)
-
-                    self._convert_iter_and_block_args(iter_arg, block_arg, op, rewriter)
-
-                case _:
-                    # Not a quantum type, no need to convert
-                    continue
+            _convert_value_passed_to_block_args(iter_arg, [block_arg], op, rewriter)
 
     @classmethod
-    def _convert_iter_and_block_args(
-        cls,
-        iter_arg: SSAValue,
-        block_arg: BlockArgument,
-        matched_for_op: scf.ForOp,
-        rewriter: PatternRewriter,
-    ):
-        """Helper method that handles the conversion of a single pair of an `scf.for` op's iteration
-        arguments (`iter_arg`) and block input arguments (`block_arg`) from `quantum` types to
-        `qecl` types.
-        """
-        iter_arg_owner = iter_arg.owner
-        assert isinstance(iter_arg_owner, Operation), (
-            f"Expected owner of `iter_arg` to be an Operation, but got "
-            f"{type(iter_arg_owner).__name__}"
-        )
-
-        # Convert the iter arg type by inserting a conv-cast op (quantum type -> qecl type)
-        # immediately before the matched `scf.for` op. This assumes that the owner op of the iter
-        # arg is the opposite conv-cast op (qecl type -> quantum type), which should be checked by
-        # the caller of this method.
-        conv_cast_op = builtin.UnrealizedConversionCastOp.get(
-            (iter_arg,), (iter_arg_owner.operands[0].type,)
-        )
-        rewriter.insert_op(conv_cast_op, insertion_point=InsertPoint.before(matched_for_op))
-        rewriter.replace_uses_with_if(
-            iter_arg, conv_cast_op.results[0], lambda use: use.operation is matched_for_op
-        )
-
-        # Convert the block arg by first changing its type from quantum -> qecl, and then insert a
-        # conv-cast op converting this value back from qecl -> quantum. This ensures unconverted
-        # quantum ops within the `scf.for` op body still receive the correct quantum types (to be
-        # converted later by other rewrite patterns).
-        new_block_arg = rewriter.replace_value_with_new_type(
-            block_arg, new_type=iter_arg_owner.operands[0].type
-        )
-        conv_cast_op = builtin.UnrealizedConversionCastOp.get((new_block_arg,), (block_arg.type,))
-        rewriter.insert_op(
-            conv_cast_op, insertion_point=InsertPoint.at_start(cls._get_first_block(matched_for_op))
-        )
-        rewriter.replace_uses_with_if(
-            new_block_arg, conv_cast_op.results[0], lambda use: use.operation is not conv_cast_op
-        )
-
-    @classmethod
-    def _get_first_block(cls, for_op: scf.ForOp) -> Block:
+    def _get_first_block(cls, op: scf.ForOp) -> Block:
         """Returns the first block in the region of the `scf.for` op."""
-        first_block = for_op.body.first_block
+        first_block = op.body.first_block
         assert (
             first_block is not None
-        ), "Op 'scf.for': expect at least one block in `body`, but found none"
+        ), f"Op '{op.name}': expect at least one block in `body`, but found none"
 
         return first_block
 
     @classmethod
-    def _get_yield_op(cls, op: scf.ForOp) -> scf.YieldOp:
-        """Get the `scf.yield` op from the region of an `scf.for` op."""
+    def _get_terminator_operands_passed_to_results(cls, op: scf.ForOp) -> Sequence[SSAValue]:
+        """Get the operands of the `scf.yield` op from the `body` region of an `scf.for` op."""
         yield_block = op.body.last_block
         assert (
             yield_block is not None
-        ), "Op 'scf.for': expected at least one block in `body`, but found none"
+        ), f"Op '{op.name}': expected at least one block in `body`, but found none"
 
         yield_op = yield_block.last_op
         assert isinstance(yield_op, scf.YieldOp), (
-            f"Op 'scf.for': expected last op in `body` to be 'scf.yield', but got "
+            f"Op '{op.name}': expected last op in `body` to be 'scf.yield', but got "
             f"{type(yield_op).__name__}"
         )
 
-        return yield_op
+        return yield_op.operands
+
+
+# MARK: SCF While Pattern
+
+
+class ScfWhileConversion(ScfConversionPattern[scf.WhileOp]):
+    """Handles conversion of `scf.while` loop ops."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: scf.WhileOp, rewriter: PatternRewriter):
+        """Rewrite pattern for `scf.while` ops."""
+        super().match_and_rewrite(op, rewriter)
+
+        before_block = self._get_first_block_in_before_region(op)
+        after_block = self._get_first_block_in_after_region(op)
+
+        for i, argument in enumerate(op.arguments):
+            argument = cast(SSAValue, argument)  # `enumerate` drops type information
+
+            # The block arg that corresponds to the current `while` argument.
+            before_block_arg = before_block.args[i]
+            after_block_arg = after_block.args[i]
+
+            _convert_value_passed_to_block_args(
+                argument, [before_block_arg, after_block_arg], op, rewriter
+            )
+
+    @classmethod
+    def _get_first_block_in_before_region(cls, op: scf.WhileOp) -> Block:
+        """Returns the first block in the `before` region of the `scf.while` op."""
+        first_block = op.before_region.first_block
+        assert (
+            first_block is not None
+        ), f"Op '{op.name}': expected at least one block in `before_region`, but found none"
+
+        return first_block
+
+    @classmethod
+    def _get_first_block_in_after_region(cls, op: scf.WhileOp) -> Block:
+        """Returns the first block in the `after` region of the `scf.while` op."""
+        first_block = op.after_region.first_block
+        assert (
+            first_block is not None
+        ), f"Op '{op.name}': expected at least one block in `after_region`, but found none"
+
+        return first_block
+
+    @classmethod
+    def _get_terminator_operands_passed_to_results(cls, op: scf.WhileOp) -> Sequence[SSAValue]:
+        """Get the operands of the `scf.condition` op from the `before` region of an `scf.while` op.
+
+        Recall that while the terminator of the `after` region is an `scf.yield` op, it is the
+        operands of the `scf.condition` op in the `before` region that are passed to the results of
+        the `scf.while` op.
+
+        https://mlir.llvm.org/docs/Dialects/SCFDialect/#scfwhile-scfwhileop
+        """
+        condition_block = op.before_region.last_block
+        assert (
+            condition_block is not None
+        ), f"Op '{op.name}': expected at least one block in `before_region`, but found none"
+
+        condition_op = condition_block.last_op
+        assert isinstance(condition_op, scf.ConditionOp), (
+            f"Op '{op.name}': expected last op in `before_region` to be 'scf.condition', but got "
+            f"{type(condition_op).__name__}"
+        )
+
+        return condition_op.operands[1:]
 
 
 # MARK: Helpers
@@ -887,6 +935,72 @@ def _raise_failed_to_convert_op_compile_error(op: Operation) -> NoReturn:
     )
 
 
+def _convert_value_passed_to_block_args(
+    value: SSAValue,
+    block_args: Sequence[BlockArgument],
+    matched_op: Operation,
+    rewriter: PatternRewriter,
+):
+    """Helper function for rewriting operations with one or more regions that converts a value
+    passed as an operand to `matched_op` from a quantum-dialect type to a qecl-dialect type, where
+    that operand is passed to one or more block arguments within the `matched_op`'s region(s). It
+    also converts the block arg types accordingly.
+
+    Args:
+        value (SSAValue): A value passed as an operand to `matched_op` that is used as an
+            initializer value for `block_args`.
+        block_args (Sequence[BlockArgument]): A sequence of block arguments that are all initialized
+            by `value` when `value` is passed to the respective blocks. Importantly, this parameter
+            is *not* the sequence of block args for a single block; generally, it should be the list
+            of block args, one from each block in `matched_op`, that correspond to `value`.
+        matched_op (Operation): The matched operation currently being rewritten, to which `value`
+            was passed as an operand.
+        rewriter (PatternRewriter): The pattern rewriter.
+    """
+
+    match value.type:
+        case quantum.QuregType():
+            if not _is_type_convertible(
+                value.owner, qecl.LogicalHyperRegisterType
+            ):  # pragma: no cover
+                _raise_failed_to_convert_op_compile_error(matched_op)
+
+        case quantum.QubitType():
+            if not _is_type_convertible(value.owner, qecl.LogicalCodeblockType):  # pragma: no cover
+                _raise_failed_to_convert_op_compile_error(matched_op)
+
+        case _:
+            # Not a quantum type, no need to convert
+            return
+
+    # Convert the type of `value` by inserting a conv-cast op (quantum type -> qecl type)
+    # immediately before `matched_op``. This assumes that `value`'s owner op is the opposite
+    # conv-cast op (qecl type -> quantum type), which was just checked above.
+
+    conv_cast_op = builtin.UnrealizedConversionCastOp.get((value,), (value.owner.operands[0].type,))
+    rewriter.insert_op(conv_cast_op, insertion_point=InsertPoint.before(matched_op))
+    rewriter.replace_uses_with_if(
+        value, conv_cast_op.results[0], lambda use: use.operation is matched_op
+    )
+
+    # Convert each block arg by first changing its type from quantum -> qecl, and then insert a
+    # conv-cast op converting this value back from qecl -> quantum. This ensures unconverted quantum
+    # ops within the `scf.for` op body still receive the correct quantum types (to be converted
+    # later by other rewrite patterns).
+
+    for block_arg in block_args:
+        new_block_arg = rewriter.replace_value_with_new_type(
+            block_arg, new_type=value.owner.operands[0].type
+        )
+        conv_cast_op = builtin.UnrealizedConversionCastOp.get((new_block_arg,), (block_arg.type,))
+        rewriter.insert_op(conv_cast_op, insertion_point=InsertPoint.at_start(block_arg.owner))
+        rewriter.replace_uses_with_if(
+            new_block_arg,
+            conv_cast_op.results[0],
+            lambda use, op=conv_cast_op: use.operation is not op,
+        )
+
+
 # MARK: Conversion Pass
 
 
@@ -947,9 +1061,10 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                         t_subroutine=t_subroutine, t_adj_subroutine=t_adj_subroutine
                     ),
                     MeasureOpConversion(),
-                    ScfYieldConversion(),
+                    ScfTerminatorConversion(),
                     ScfIfConversion(),
                     ScfForConversion(),
+                    ScfWhileConversion(),
                 ]
             )
         ).rewrite_module(op)
