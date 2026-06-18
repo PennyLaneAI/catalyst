@@ -189,6 +189,8 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update tests to not use global capture toggle where possible.
+
 * The `/benchmark` GitHub comment trigger can now accept additional arguments and has been renamed to `!benchmark`.
   [(#2947)](https://github.com/PennyLaneAI/catalyst/pull/2947)
 
