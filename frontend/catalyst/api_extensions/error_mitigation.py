@@ -48,6 +48,32 @@ def _check_is_odd_positive(numbers_list):
             raise ValueError(msg)
 
 
+def _check_is_real_ge_one(numbers_list):
+    for n in numbers_list:
+        if not isinstance(n, (int, float)):
+            msg = f"Found non-numeric {n} in scale_factors {numbers_list}.\n"
+            msg += "local-random folding requires real scale_factors >= 1"
+            raise TypeError(msg)
+        if n < 1:
+            msg = f"Found {n} < 1 in scale_factors {numbers_list}.\n"
+            msg += "local-random folding requires real scale_factors >= 1"
+            raise ValueError(msg)
+
+
+def _check_scale_factors(scale_factors, folding):
+    """Validate scale_factors against the folding method.
+
+    ``local-random`` accepts any real scale factor >= 1 (the fractional part is
+    realized at run time as a probabilistic extra fold). All other folding
+    methods scale the circuit by an exact integer factor and therefore still
+    require odd positive integers.
+    """
+    if folding == "local-random":
+        _check_is_real_ge_one(scale_factors)
+    else:
+        _check_is_odd_positive(scale_factors)
+
+
 ## API ##
 def mitigate_with_zne(
     fn=None, *, scale_factors, extrapolate=None, extrapolate_kwargs=None, folding="global"
@@ -65,7 +91,9 @@ def mitigate_with_zne(
 
     Args:
         fn (qp.QNode): the circuit to be mitigated.
-        scale_factors (list[int]): the range of noise scale factors used.
+        scale_factors (list[int] | list[float]): the range of noise scale factors used. Must be
+            odd positive integers for ``global``/``local-all`` folding. ``local-random`` folding
+            additionally accepts non-integer real scale factors >= 1.
         extrapolate (Callable): A qjit-compatible function taking two sequences as arguments (scale
             factors, and results), and returning a float by performing a fitting procedure.
             By default, perfect polynomial fitting :func:`~.polynomial_extrapolate` will be used,
@@ -75,9 +103,13 @@ def mitigate_with_zne(
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
             - global: the global unitary of the input circuit is folded
             - local-all: per-gate folding sequences replace original gates in-place in the circuit
-            - local-random: like ``local-all``, but each per-gate folding pair is inserted
-              only when a runtime pseudo-random draw selects it, so the number of foldings per
-              gate is randomized at run time (reproducible when ``qjit(seed=...)`` is set)
+            - local-random: reproduces Mitiq's ``fold_gates_at_random``. Every gate is folded
+              ``base = floor((scale_factor-1)/2)`` times, and then exactly
+              ``k = round(((scale_factor-1)/2 - base) * n)`` of the ``n`` gates are folded once
+              more, chosen uniformly at random *without replacement* (using the runtime PRNG,
+              reproducible when ``qjit(seed=...)`` is set). For odd-integer scale factors ``k == 0``,
+              so this reduces to ``local-all`` and scales the gate count exactly by ``scale_factor``;
+              non-integer scale factors scale the gate count by ``scale_factor`` (approximately).
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`~.QNode`
@@ -158,7 +190,7 @@ def mitigate_with_zne(
     elif extrapolate_kwargs is not None:
         extrapolate = functools.partial(extrapolate, **extrapolate_kwargs)
 
-    _check_is_odd_positive(scale_factors)
+    _check_scale_factors(scale_factors, folding)
 
     return ZNECallable(fn, scale_factors, extrapolate, folding)
 
@@ -221,7 +253,15 @@ class ZNECallable(CatalystCallable):
             callable_fn
         ), "expected callable set as param on the first operation in zne target"
 
-        fold_numbers = (jnp.asarray(self.scale_factors, dtype=int) - 1) // 2
+        # Number of per-gate folds is (scale_factor - 1) / 2. For integer folding
+        # methods this is an exact integer count. For ``local-random`` we keep it as
+        # a float so the fractional remainder survives to the runtime, where it
+        # becomes the probability of an extra fold per gate (matching the
+        # ``scale_factor * n`` gate count Mitiq targets for fractional factors).
+        if self.folding == "local-random":
+            fold_numbers = (jnp.asarray(self.scale_factors, dtype=float) - 1) / 2
+        else:
+            fold_numbers = (jnp.asarray(self.scale_factors, dtype=int) - 1) // 2
         fold_results = zne_p.bind(
             *args_data, fold_numbers, folding=folding, jaxpr=jaxpr, fn=callable_fn
         )

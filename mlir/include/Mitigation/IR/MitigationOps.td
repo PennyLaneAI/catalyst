@@ -48,7 +48,12 @@ def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
         FoldingAttr:$folding,
-        RankedTensorOf<[AnySignlessIntegerOrIndex]>:$numFolds,
+        // Integer entries hold an exact per-circuit fold count `(scale_factor - 1) / 2`
+        // (used by `global`/`all`). Floating-point entries carry the same quantity but
+        // keep its fractional part so `random` folding can support non-integer
+        // scale factors (base folds + one extra fold sampled with probability = frac).
+        AnyTypeOf<[RankedTensorOf<[AnySignlessIntegerOrIndex]>,
+                   RankedTensorOf<[AnyFloat]>]>:$numFolds,
         OptionalAttr<DictArrayAttr>:$arg_attrs,
         OptionalAttr<DictArrayAttr>:$res_attrs
     );

@@ -50,14 +50,13 @@ bool containsQnodes(func::FuncOp funcOp)
     return containsQnodes;
 }
 
-func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter)
+func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter, Type foldCountType)
 {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     auto loc = funcOp.getLoc();
     TypeRange originalTypes = funcOp.getArgumentTypes();
     SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
-    Type indexType = rewriter.getIndexType();
-    typesFolded.push_back(indexType);
+    typesFolded.push_back(foldCountType);
     FunctionType fnFoldedType = FunctionType::get(funcOp.getContext(),
                                                   /*inputs=*/typesFolded,
                                                   /*outputs=*/funcOp.getResultTypes());
@@ -87,6 +86,13 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
     auto foldingAlgorithm = op.getFolding();
     auto calleeOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
+    // `random` folding carries the (possibly fractional) fold count `(scale_factor-1)/2`
+    // as an f64 so the fractional remainder survives to the folded circuit; the other
+    // methods use an exact integer count threaded as an `index`.
+    const bool randomFolding = foldingAlgorithm == Folding::random;
+    Type foldCountType =
+        randomFolding ? Type(rewriter.getF64Type()) : Type(rewriter.getIndexType());
+
     func::FuncOp fnFoldedOp;
 
     if (!calleeOp->hasAttr("qnode")) {
@@ -95,7 +101,7 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
             if (!funcOp->hasAttr("qnode")) {
                 // Copy the function and create a .zne counter part and add the scale factor as last
                 // argument
-                auto currentFnFoldedOp = createZneFunc(funcOp, rewriter);
+                auto currentFnFoldedOp = createZneFunc(funcOp, rewriter, foldCountType);
                 // Folding of the qnodes and replace their calls with the folded version
                 if (containsQnodes(currentFnFoldedOp)) {
                     currentFnFoldedOp.walk([&](func::CallOp callOp) {
@@ -170,9 +176,15 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
                 std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
                 SmallVector<Value> index = {i};
                 Value numFold = tensor::ExtractOp::create(builder, loc, numFolds, index);
-                Value numFoldCasted =
-                    index::CastSOp::create(builder, loc, builder.getIndexType(), numFold);
-                newArgs.push_back(numFoldCasted);
+                if (randomFolding) {
+                    // Already an f64 fold count; pass it through unchanged.
+                    newArgs.push_back(numFold);
+                }
+                else {
+                    Value numFoldCasted =
+                        index::CastSOp::create(builder, loc, builder.getIndexType(), numFold);
+                    newArgs.push_back(numFoldCasted);
+                }
                 func::CallOp callOp = func::CallOp::create(builder, loc, fnFoldedOp, newArgs);
 
                 int64_t numResults = callOp.getNumResults();
@@ -322,9 +334,28 @@ static func::FuncOp getOrInsertRandomDecl(PatternRewriter &rewriter, ModuleOp mo
     return rngFunc;
 }
 
-// Random local folding: like `allLocalFolding`, but each fold iteration flips a
-// runtime coin (`__catalyst__rt__random_double() < 0.5`) and only inserts the
-// $G G^\dagger$ pair when it succeeds, randomizing the fold count per gate.
+// Helper: clone `op` as a folding pair $G G^\dagger$ acting on `inQubits`, returning
+// the qubit values produced by the adjoint gate.
+static ValueRange cloneFoldingPair(OpBuilder &builder, quantum::QuantumGate op,
+                                   ValueRange inQubits)
+{
+    quantum::QuantumGate origOp = dyn_cast<quantum::QuantumGate>(builder.clone(*op));
+    origOp.setQubitOperands(inQubits);
+    quantum::QuantumGate adjointOp = dyn_cast<quantum::QuantumGate>(builder.clone(*origOp));
+    adjointOp.setQubitOperands(origOp->getResults());
+    adjointOp.setAdjointFlag(!adjointOp.getAdjointFlag());
+    return adjointOp->getResults();
+}
+
+// Random local folding, reproducing Mitiq's `fold_gates_at_random` (equal-weight case).
+// The fold count `(scale_factor - 1) / 2` arrives as an f64 `size`. Of `n` gates, every gate
+// is folded `base = floor(size)` times, and then exactly `k = round((size - base) * n)` gates
+// are folded once more, giving `n + 2*(base*n + k) ~= scale_factor * n` gates. Odd-integer
+// scale factors yield `k == 0`, matching `allLocalFolding`.
+// The `k`-of-`n` subset is drawn at run time with Knuth's selection sampling (Algorithm S):
+// gate `i`, with `chosen` already selected, is folded when `random_double() < (k - chosen) /
+// (n - i)`; this picks exactly `k` gates, each `k`-subset equally likely. Fidelity-weighted
+// folding (Mitiq's optional `fidelities` argument) is not modelled.
 FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
                                      func::FuncOp fnFoldedOp, Value c0, Value c1)
 {
@@ -337,50 +368,76 @@ FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFo
     // Collect candidate gates first so in-place edits don't disturb the walk.
     SmallVector<quantum::QuantumGate> gates;
     fnFoldedOp.walk([&](quantum::QuantumGate op) { gates.push_back(op); });
+    const int64_t numGates = static_cast<int64_t>(gates.size());
 
-    for (quantum::QuantumGate op : gates) {
+    // Entry-block setup: split `size` into an integer base count and the number of extra
+    // folds `k = round((size - base) * numGates)`, and seed the `chosen` counter.
+    Location entryLoc = fnFoldedOp.getLoc();
+    Type f64Ty = rewriter.getF64Type();
+    Type i64Ty = rewriter.getI64Type();
+    rewriter.setInsertionPointToStart(&fnFoldedOp.getBody().front());
+    // `size >= 0`, so truncation toward zero equals floor.
+    Value baseI64 = arith::FPToSIOp::create(rewriter, entryLoc, i64Ty, size);
+    Value baseIndex = index::CastSOp::create(rewriter, entryLoc, rewriter.getIndexType(), baseI64);
+    Value baseF64 = arith::SIToFPOp::create(rewriter, entryLoc, f64Ty, baseI64);
+    Value delta = arith::SubFOp::create(rewriter, entryLoc, size, baseF64);
+    Value numGatesF64 =
+        arith::ConstantOp::create(rewriter, entryLoc, rewriter.getF64FloatAttr(numGates));
+    Value half = arith::ConstantOp::create(rewriter, entryLoc, rewriter.getF64FloatAttr(0.5));
+    Value oneI64 = arith::ConstantOp::create(rewriter, entryLoc, rewriter.getI64IntegerAttr(1));
+    // k = round(delta * numGates) = floor(delta * numGates + 0.5).
+    Value deltaN = arith::MulFOp::create(rewriter, entryLoc, delta, numGatesF64);
+    Value deltaNRounded = arith::AddFOp::create(rewriter, entryLoc, deltaN, half);
+    Value kI64 = arith::FPToSIOp::create(rewriter, entryLoc, i64Ty, deltaNRounded);
+    Value chosen = arith::ConstantOp::create(rewriter, entryLoc, rewriter.getI64IntegerAttr(0));
+
+    for (int64_t gateIdx = 0; gateIdx < numGates; ++gateIdx) {
+        quantum::QuantumGate op = gates[gateIdx];
         rewriter.setInsertionPoint(op);
         auto loc = op->getLoc();
         const std::vector<Value> opQubitArgs = op.getQubitOperands();
 
+        // Unconditional base folds: apply $G G^\dagger$ `base` times.
         const auto forVal =
             scf::ForOp::create(
-                rewriter, loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
+                rewriter, loc, c0, baseIndex, c1, /*iterArgsInit=*/opQubitArgs,
                 [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                    // Runtime coin flip deciding whether to fold on this iteration.
-                    Value randVal =
-                        func::CallOp::create(builder, loc, rngFunc, ValueRange{}).getResult(0);
-                    Value half =
-                        arith::ConstantOp::create(builder, loc, builder.getF64FloatAttr(0.5));
-                    Value coin = arith::CmpFOp::create(builder, loc, arith::CmpFPredicate::OLT,
-                                                       randVal, half);
-
-                    auto ifOp = scf::IfOp::create(
-                        builder, loc, coin,
-                        [&](OpBuilder &thenBuilder, Location thenLoc) {
-                            // Fold: apply $G G^\dagger$ (identity, adds noise).
-                            quantum::QuantumGate origOp =
-                                dyn_cast<quantum::QuantumGate>(thenBuilder.clone(*op));
-                            origOp.setQubitOperands(iterArgs);
-                            auto origOpVal = origOp->getResults();
-
-                            quantum::QuantumGate adjointOp =
-                                dyn_cast<quantum::QuantumGate>(thenBuilder.clone(*origOp));
-                            adjointOp.setQubitOperands(origOpVal);
-                            adjointOp.setAdjointFlag(!adjointOp.getAdjointFlag());
-
-                            scf::YieldOp::create(thenBuilder, thenLoc, adjointOp->getResults());
-                        },
-                        [&](OpBuilder &elseBuilder, Location elseLoc) {
-                            // Skip folding: pass the qubits through unchanged.
-                            scf::YieldOp::create(elseBuilder, elseLoc, iterArgs);
-                        });
-
-                    scf::YieldOp::create(builder, loc, ifOp.getResults());
+                    scf::YieldOp::create(builder, loc, cloneFoldingPair(builder, op, iterArgs));
                 })
                 .getResults();
 
-        op.setQubitOperands(forVal);
+        // Selection-sampling probability for this gate: (k - chosen) / (numGates - gateIdx).
+        Value remainingF64 = arith::ConstantOp::create(
+            rewriter, loc, rewriter.getF64FloatAttr(numGates - gateIdx));
+        Value neededI64 = arith::SubIOp::create(rewriter, loc, kI64, chosen);
+        Value neededF64 = arith::SIToFPOp::create(rewriter, loc, f64Ty, neededI64);
+        Value prob = arith::DivFOp::create(rewriter, loc, neededF64, remainingF64);
+        Value randVal =
+            func::CallOp::create(rewriter, loc, rngFunc, ValueRange{}).getResult(0);
+        Value coin =
+            arith::CmpFOp::create(rewriter, loc, arith::CmpFPredicate::OLT, randVal, prob);
+
+        // if selectedfold once more and increment `chosen`; otherwise pass through
+        // updated `chosen` is yielded as the last result so it threads to the next gate.
+        auto ifOp = scf::IfOp::create(
+            rewriter, loc, coin,
+            [&](OpBuilder &thenBuilder, Location thenLoc) {
+                ValueRange folded = cloneFoldingPair(thenBuilder, op, forVal);
+                Value chosenNext = arith::AddIOp::create(thenBuilder, thenLoc, chosen, oneI64);
+                SmallVector<Value> yields(folded.begin(), folded.end());
+                yields.push_back(chosenNext);
+                scf::YieldOp::create(thenBuilder, thenLoc, yields);
+            },
+            [&](OpBuilder &elseBuilder, Location elseLoc) {
+                SmallVector<Value> yields(forVal.begin(), forVal.end());
+                yields.push_back(chosen);
+                scf::YieldOp::create(elseBuilder, elseLoc, yields);
+            });
+
+        SmallVector<Value> ifResults(ifOp.getResults().begin(), ifOp.getResults().end());
+        chosen = ifResults.back();
+        ifResults.pop_back();
+        op.setQubitOperands(ifResults);
     }
 
     // Return the function symbol reference
@@ -460,8 +517,12 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     TypeRange originalTypes = op.getArgumentTypes();
     SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
-    Type indexType = rewriter.getIndexType();
-    typesFolded.push_back(indexType);
+    // `random` folding receives an f64 fold count to retain the fractional part of
+    // `(scale_factor-1)/2`; the integer folding methods use an `index` count.
+    Type foldCountType = foldingAlgorithm == Folding::random
+                             ? Type(rewriter.getF64Type())
+                             : Type(rewriter.getIndexType());
+    typesFolded.push_back(foldCountType);
 
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 

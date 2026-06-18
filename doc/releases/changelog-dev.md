@@ -11,6 +11,17 @@
   [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
   [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
 
+* The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
+  reproducing Mitiq's ``fold_gates_at_random``. Every gate is folded
+  ``base = floor((scale_factor - 1) / 2)`` times (like `local-all`), and then exactly
+  ``k = round(((scale_factor - 1) / 2 - base) * n)`` of the ``n`` gates are folded once more,
+  selected uniformly at random *without replacement* via the runtime PRNG (reproducible under
+  ``qjit(seed=...)``) using Knuth's selection sampling. Odd-integer scale factors give ``k = 0``,
+  so folding reduces to `local-all` and scales the gate count exactly by ``scale_factor``; non-integer
+  scale factors (now also accepted for `local-random`) scale the gate count by ``scale_factor``.
+  Fidelity-weighted selection (Mitiq's optional ``fidelities`` argument) is not modelled.
+  [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
+
 
 <h3>Improvements 🛠</h3>
 
@@ -277,7 +288,6 @@
   quantum operators, including operators with frontend-end specific data.
   [(#2883)](https://github.com/PennyLaneAI/catalyst/pull/2883)
   [(#2943)](https://github.com/PennyLaneAI/catalyst/pull/2943)
-  [(#2951)](https://github.com/PennyLaneAI/catalyst/pull/2951)
 
 * In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
   operations have been added:
@@ -313,8 +323,6 @@
     [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
   - For loops (`scf.for`)
     [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
-  - While loops (`scf.while`)
-    [(#2905)](https://github.com/PennyLaneAI/catalyst/pull/2905)
 
 <h3>Documentation 📝</h3>
 
