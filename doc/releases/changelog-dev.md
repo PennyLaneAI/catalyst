@@ -9,7 +9,7 @@
   static index, rewriting the extract to read from the register feeding the insert. This
   removes the false data dependency between wires that act on different qubits of the same
   register.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2965)](https://github.com/PennyLaneAI/catalyst/pull/2965)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
