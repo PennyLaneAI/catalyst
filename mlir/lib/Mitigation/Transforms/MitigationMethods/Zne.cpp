@@ -73,10 +73,158 @@ func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter, Type 
 
 // TODO: Optimize the traversal of call graphs (currently used twice)
 // Also all functions exploree in the call graph get their ZNE version.
+func::FuncOp ZneLowering::getOrCreateFoldedCallee(Location loc, PatternRewriter &rewriter,
+                                                  mitigation::ZneOp op, func::FuncOp calleeOp,
+                                                  Folding foldingAlgorithm, Type foldCountType)
+{
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+
+    if (calleeOp->hasAttr("qnode")) {
+        // Create the folded circuit function
+        FlatSymbolRefAttr foldedOpRefAttr =
+            getOrInsertFoldedCircuit(loc, rewriter, calleeOp, foldingAlgorithm);
+        return SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(calleeOp, foldedOpRefAttr);
+    }
+
+    // Traverse the callgraph, copy all the function to a `.zne` version and fold qnodes
+    traverseCallGraph(calleeOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
+        if (!funcOp->hasAttr("qnode")) {
+            // Copy the function and create a .zne counter part and add the scale factor as last
+            // argument
+            auto currentFnFoldedOp = createZneFunc(funcOp, rewriter, foldCountType);
+            // Folding of the qnodes and replace their calls with the folded version
+            if (containsQnodes(currentFnFoldedOp)) {
+                currentFnFoldedOp.walk([&](func::CallOp callOp) {
+                    PatternRewriter::InsertionGuard insertGuard(rewriter);
+                    func::FuncOp funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                        op, callOp.getCalleeAttr());
+                    std::string foldedName = callOp.getCalleeAttrName().str() + ".folded";
+                    func::FuncOp foldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                        moduleOp, rewriter.getStringAttr(foldedName));
+                    if (funcOp->hasAttr("qnode") and !foldedOp) {
+                        // Create the folded circuit function
+                        auto foldedCircuitAttr =
+                            getOrInsertFoldedCircuit(loc, rewriter, funcOp, foldingAlgorithm);
+                        foldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                            moduleOp, foldedCircuitAttr);
+                    }
+                    if (foldedOp) {
+                        std::vector<Value> args = {callOp.getArgOperands().begin(),
+                                                   callOp.getArgOperands().end()};
+                        args.push_back(currentFnFoldedOp.getArguments().back());
+                        rewriter.setInsertionPoint(callOp);
+                        rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
+                    }
+                });
+            }
+        }
+    });
+
+    std::string fnName = calleeOp.getName().str() + ".zne";
+    FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
+    func::FuncOp fnFoldedOp =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
+    // Traverse the call graph a second time, in orderd to replace the function calls to their
+    // .zne counterparts.
+    traverseCallGraph(fnFoldedOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
+        funcOp.walk([&](func::CallOp callOp) {
+            PatternRewriter::InsertionGuard insertionGuard(rewriter);
+            std::string fnName = callOp.getCallee().str() + ".zne";
+            FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
+            auto currentFnFoldedOp =
+                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
+            if (currentFnFoldedOp) {
+                rewriter.modifyOpInPlace(callOp, [&] {
+                    callOp.setCallee(currentFnFoldedOp.getName());
+                    auto parentFunc = callOp->getParentOfType<func::FuncOp>();
+                    callOp.getOperandsMutable().append(parentFunc.getArguments().back());
+                });
+            }
+        });
+    });
+
+    return fnFoldedOp;
+}
+
+Value ZneLowering::buildFoldedResultsLoop(Location loc, PatternRewriter &rewriter,
+                                          mitigation::ZneOp op, func::FuncOp fnFoldedOp,
+                                          Value numFolds, bool randomFolding,
+                                          int64_t numScaleFactors, RankedTensorType resultType)
+{
+    // Loop over the num fold to create a folded circuit per factor
+    Value c0 = index::ConstantOp::create(rewriter, loc, 0);
+    Value c1 = index::ConstantOp::create(rewriter, loc, 1);
+    Value size = index::ConstantOp::create(rewriter, loc, numScaleFactors);
+    // Initialize the results as empty tensor
+
+    Value results =
+        tensor::EmptyOp::create(rewriter, loc, resultType.getShape(), resultType.getElementType());
+    return scf::ForOp::create(
+               rewriter, loc, c0, size, c1, /*iterArgsInit=*/results,
+               [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                   std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
+                   SmallVector<Value> index = {i};
+                   Value numFold = tensor::ExtractOp::create(builder, loc, numFolds, index);
+                   if (randomFolding) {
+                       // Already an f64 fold count; pass it through unchanged.
+                       newArgs.push_back(numFold);
+                   }
+                   else {
+                       Value numFoldCasted =
+                           index::CastSOp::create(builder, loc, builder.getIndexType(), numFold);
+                       newArgs.push_back(numFoldCasted);
+                   }
+                   func::CallOp callOp = func::CallOp::create(builder, loc, fnFoldedOp, newArgs);
+
+                   int64_t numResults = callOp.getNumResults();
+
+                   // Measurements
+                   ValueRange resultValuesMulti = callOp.getResults();
+                   SmallVector<Value> vectorResultsMulti;
+                   // Create a tensor
+                   for (Value resultValue : resultValuesMulti) {
+                       Value resultExtracted;
+                       if (isa<RankedTensorType>(resultValue.getType())) {
+                           resultExtracted = tensor::ExtractOp::create(builder, loc, resultValue);
+                       }
+                       else {
+                           resultExtracted = resultValue;
+                       }
+                       vectorResultsMulti.push_back(resultExtracted);
+                   }
+                   SmallVector<int64_t> resShape = {numResults};
+                   Type type = RankedTensorType::get(resShape, vectorResultsMulti[0].getType());
+                   auto tensorResults =
+                       tensor::FromElementsOp::create(builder, loc, type, vectorResultsMulti);
+                   Value sizeResultsValue = index::ConstantOp::create(rewriter, loc, numResults);
+                   Value resultValuesFor =
+                       scf::ForOp::create(
+                           rewriter, loc, c0, sizeResultsValue, c1,
+                           /*iterArgsInit=*/iterArgs.front(),
+                           [&](OpBuilder &builder, Location loc, Value j, ValueRange iterArgsIn) {
+                               Value resultExtracted =
+                                   tensor::ExtractOp::create(builder, loc, tensorResults, j);
+                               SmallVector<Value> indices;
+                               if (numResults == 1) {
+                                   indices = {i};
+                               }
+                               else {
+                                   indices = {i, j};
+                               }
+                               Value resultInserted = tensor::InsertOp::create(
+                                   builder, loc, resultExtracted, iterArgsIn.front(), indices);
+
+                               scf::YieldOp::create(builder, loc, resultInserted);
+                           })
+                           .getResult(0);
+                   scf::YieldOp::create(builder, loc, resultValuesFor);
+               })
+        .getResult(0);
+}
+
 LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
-    auto moduleOp = op->getParentOfType<ModuleOp>();
     // Number of folds
     auto numFolds = op.getNumFolds();
     RankedTensorType numFoldType = cast<RankedTensorType>(numFolds.getType());
@@ -93,144 +241,15 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
     Type foldCountType =
         randomFolding ? Type(rewriter.getF64Type()) : Type(rewriter.getIndexType());
 
-    func::FuncOp fnFoldedOp;
+    // Resolve (creating as needed) the folded callee, then evaluate it once per scale factor.
+    func::FuncOp fnFoldedOp =
+        getOrCreateFoldedCallee(loc, rewriter, op, calleeOp, foldingAlgorithm, foldCountType);
 
-    if (!calleeOp->hasAttr("qnode")) {
-        // Traverse the callgraph, copy all the function to a `.zne` version and fold qnodes
-        traverseCallGraph(calleeOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
-            if (!funcOp->hasAttr("qnode")) {
-                // Copy the function and create a .zne counter part and add the scale factor as last
-                // argument
-                auto currentFnFoldedOp = createZneFunc(funcOp, rewriter, foldCountType);
-                // Folding of the qnodes and replace their calls with the folded version
-                if (containsQnodes(currentFnFoldedOp)) {
-                    currentFnFoldedOp.walk([&](func::CallOp callOp) {
-                        PatternRewriter::InsertionGuard insertGuard(rewriter);
-                        func::FuncOp funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-                            op, callOp.getCalleeAttr());
-                        std::string foldedName = callOp.getCalleeAttrName().str() + ".folded";
-                        func::FuncOp foldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-                            moduleOp, rewriter.getStringAttr(foldedName));
-                        if (funcOp->hasAttr("qnode") and !foldedOp) {
-                            // Create the folded circuit function
-                            auto foldedCircuitAttr =
-                                getOrInsertFoldedCircuit(loc, rewriter, funcOp, foldingAlgorithm);
-                            foldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-                                moduleOp, foldedCircuitAttr);
-                        }
-                        if (foldedOp) {
-                            std::vector<Value> args = {callOp.getArgOperands().begin(),
-                                                       callOp.getArgOperands().end()};
-                            args.push_back(currentFnFoldedOp.getArguments().back());
-                            rewriter.setInsertionPoint(callOp);
-                            rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
-                        }
-                    });
-                }
-            }
-        });
-
-        std::string fnName = calleeOp.getName().str() + ".zne";
-        FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
-        fnFoldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
-        // Traverse the call graph a second time, in orderd to replace the function calls to their
-        // .zne counterparts.
-        traverseCallGraph(fnFoldedOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
-            funcOp.walk([&](func::CallOp callOp) {
-                PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                std::string fnName = callOp.getCallee().str() + ".zne";
-                FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
-                auto currentFnFoldedOp =
-                    SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
-                if (currentFnFoldedOp) {
-                    rewriter.modifyOpInPlace(callOp, [&] {
-                        callOp.setCallee(currentFnFoldedOp.getName());
-                        auto parentFunc = callOp->getParentOfType<func::FuncOp>();
-                        callOp.getOperandsMutable().append(parentFunc.getArguments().back());
-                    });
-                }
-            });
-        });
-    }
-    else {
-        // Create the folded circuit function
-        FlatSymbolRefAttr foldedOpRefAttr =
-            getOrInsertFoldedCircuit(loc, rewriter, calleeOp, foldingAlgorithm);
-        fnFoldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(calleeOp, foldedOpRefAttr);
-    }
     rewriter.setInsertionPoint(op);
     RankedTensorType resultType = cast<RankedTensorType>(op.getResultTypes().front());
+    Value resultValues = buildFoldedResultsLoop(loc, rewriter, op, fnFoldedOp, numFolds,
+                                                randomFolding, sizeInt, resultType);
 
-    // Loop over the num fold to create a folded circuit per factor
-    Value c0 = index::ConstantOp::create(rewriter, loc, 0);
-    Value c1 = index::ConstantOp::create(rewriter, loc, 1);
-    Value size = index::ConstantOp::create(rewriter, loc, sizeInt);
-    // Initialize the results as empty tensor
-
-    Value results =
-        tensor::EmptyOp::create(rewriter, loc, resultType.getShape(), resultType.getElementType());
-    Value resultValues =
-        scf::ForOp::create(
-            rewriter, loc, c0, size, c1, /*iterArgsInit=*/results,
-            [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
-                SmallVector<Value> index = {i};
-                Value numFold = tensor::ExtractOp::create(builder, loc, numFolds, index);
-                if (randomFolding) {
-                    // Already an f64 fold count; pass it through unchanged.
-                    newArgs.push_back(numFold);
-                }
-                else {
-                    Value numFoldCasted =
-                        index::CastSOp::create(builder, loc, builder.getIndexType(), numFold);
-                    newArgs.push_back(numFoldCasted);
-                }
-                func::CallOp callOp = func::CallOp::create(builder, loc, fnFoldedOp, newArgs);
-
-                int64_t numResults = callOp.getNumResults();
-
-                // Measurements
-                ValueRange resultValuesMulti = callOp.getResults();
-                SmallVector<Value> vectorResultsMulti;
-                // Create a tensor
-                for (Value resultValue : resultValuesMulti) {
-                    Value resultExtracted;
-                    if (isa<RankedTensorType>(resultValue.getType())) {
-                        resultExtracted = tensor::ExtractOp::create(builder, loc, resultValue);
-                    }
-                    else {
-                        resultExtracted = resultValue;
-                    }
-                    vectorResultsMulti.push_back(resultExtracted);
-                }
-                SmallVector<int64_t> resShape = {numResults};
-                Type type = RankedTensorType::get(resShape, vectorResultsMulti[0].getType());
-                auto tensorResults =
-                    tensor::FromElementsOp::create(builder, loc, type, vectorResultsMulti);
-                Value sizeResultsValue = index::ConstantOp::create(rewriter, loc, numResults);
-                Value resultValuesFor =
-                    scf::ForOp::create(
-                        rewriter, loc, c0, sizeResultsValue, c1,
-                        /*iterArgsInit=*/iterArgs.front(),
-                        [&](OpBuilder &builder, Location loc, Value j, ValueRange iterArgsIn) {
-                            Value resultExtracted =
-                                tensor::ExtractOp::create(builder, loc, tensorResults, j);
-                            SmallVector<Value> indices;
-                            if (numResults == 1) {
-                                indices = {i};
-                            }
-                            else {
-                                indices = {i, j};
-                            }
-                            Value resultInserted = tensor::InsertOp::create(
-                                builder, loc, resultExtracted, iterArgsIn.front(), indices);
-
-                            scf::YieldOp::create(builder, loc, resultInserted);
-                        })
-                        .getResult(0);
-                scf::YieldOp::create(builder, loc, resultValuesFor);
-            })
-            .getResult(0);
     // Replace the original results
     rewriter.replaceOp(op, resultValues);
 
@@ -336,8 +355,7 @@ static func::FuncOp getOrInsertRandomDecl(PatternRewriter &rewriter, ModuleOp mo
 
 // Helper: clone `op` as a folding pair $G G^\dagger$ acting on `inQubits`, returning
 // the qubit values produced by the adjoint gate.
-static ValueRange cloneFoldingPair(OpBuilder &builder, quantum::QuantumGate op,
-                                   ValueRange inQubits)
+static ValueRange cloneFoldingPair(OpBuilder &builder, quantum::QuantumGate op, ValueRange inQubits)
 {
     quantum::QuantumGate origOp = dyn_cast<quantum::QuantumGate>(builder.clone(*op));
     origOp.setQubitOperands(inQubits);
@@ -399,23 +417,21 @@ FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFo
 
         // Unconditional base folds: apply $G G^\dagger$ `base` times.
         const auto forVal =
-            scf::ForOp::create(
-                rewriter, loc, c0, baseIndex, c1, /*iterArgsInit=*/opQubitArgs,
-                [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                    scf::YieldOp::create(builder, loc, cloneFoldingPair(builder, op, iterArgs));
-                })
+            scf::ForOp::create(rewriter, loc, c0, baseIndex, c1, /*iterArgsInit=*/opQubitArgs,
+                               [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                                   scf::YieldOp::create(builder, loc,
+                                                        cloneFoldingPair(builder, op, iterArgs));
+                               })
                 .getResults();
 
         // Selection-sampling probability for this gate: (k - chosen) / (numGates - gateIdx).
-        Value remainingF64 = arith::ConstantOp::create(
-            rewriter, loc, rewriter.getF64FloatAttr(numGates - gateIdx));
+        Value remainingF64 =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(numGates - gateIdx));
         Value neededI64 = arith::SubIOp::create(rewriter, loc, kI64, chosen);
         Value neededF64 = arith::SIToFPOp::create(rewriter, loc, f64Ty, neededI64);
         Value prob = arith::DivFOp::create(rewriter, loc, neededF64, remainingF64);
-        Value randVal =
-            func::CallOp::create(rewriter, loc, rngFunc, ValueRange{}).getResult(0);
-        Value coin =
-            arith::CmpFOp::create(rewriter, loc, arith::CmpFPredicate::OLT, randVal, prob);
+        Value randVal = func::CallOp::create(rewriter, loc, rngFunc, ValueRange{}).getResult(0);
+        Value coin = arith::CmpFOp::create(rewriter, loc, arith::CmpFPredicate::OLT, randVal, prob);
 
         // if selectedfold once more and increment `chosen`; otherwise pass through
         // updated `chosen` is yielded as the last result so it threads to the next gate.
@@ -519,9 +535,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
     // `random` folding receives an f64 fold count to retain the fractional part of
     // `(scale_factor-1)/2`; the integer folding methods use an `index` count.
-    Type foldCountType = foldingAlgorithm == Folding::random
-                             ? Type(rewriter.getF64Type())
-                             : Type(rewriter.getIndexType());
+    Type foldCountType = foldingAlgorithm == Folding::random ? Type(rewriter.getF64Type())
+                                                             : Type(rewriter.getIndexType());
     typesFolded.push_back(foldCountType);
 
     rewriter.setInsertionPointToStart(moduleOp.getBody());

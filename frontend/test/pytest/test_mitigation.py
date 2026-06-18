@@ -325,9 +325,7 @@ def test_local_random_rejects_scale_factor_below_one():
         qp.Hadamard(wires=0)
         return qp.expval(qp.PauliZ(wires=0))
 
-    with pytest.raises(
-        ValueError, match=".*local-random folding requires real scale_factors >= 1"
-    ):
+    with pytest.raises(ValueError, match=".*local-random folding requires real scale_factors >= 1"):
         catalyst.mitigate_with_zne(circuit, scale_factors=[0.5], folding="local-random")
 
 

@@ -298,7 +298,8 @@ class ExecutionContext final {
         if (this->seed != nullptr) {
             this->gen = std::mt19937(*seed);
             // Derive a decoupled (but reproducible) stream for folding.
-            this->foldGen = std::mt19937(*seed ^ 0x9e3779b9U);
+            std::seed_seq foldSeq{static_cast<uint32_t>(*seed), static_cast<uint32_t>(0x9e3779b9U)};
+            this->foldGen = std::mt19937(foldSeq);
         }
         else {
             // No user seed: make folding non-deterministic across runs.

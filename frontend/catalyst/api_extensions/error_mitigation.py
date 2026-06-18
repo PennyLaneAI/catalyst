@@ -107,9 +107,10 @@ def mitigate_with_zne(
               ``base = floor((scale_factor-1)/2)`` times, and then exactly
               ``k = round(((scale_factor-1)/2 - base) * n)`` of the ``n`` gates are folded once
               more, chosen uniformly at random *without replacement* (using the runtime PRNG,
-              reproducible when ``qjit(seed=...)`` is set). For odd-integer scale factors ``k == 0``,
-              so this reduces to ``local-all`` and scales the gate count exactly by ``scale_factor``;
-              non-integer scale factors scale the gate count by ``scale_factor`` (approximately).
+              reproducible when ``qjit(seed=...)`` is set). Odd-integer scale factors give
+              ``k == 0``, reducing to ``local-all`` and scaling the gate count exactly by
+              ``scale_factor``; non-integer scale factors (also accepted here) scale it
+              approximately by ``scale_factor``.
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`~.QNode`
