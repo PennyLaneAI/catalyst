@@ -55,7 +55,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang
-          python3 -m pip install nanobind pybind11
+          python3 -m pip install "nanobind<2.13" pybind11
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -160,7 +160,7 @@ jobs:
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
 
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy pybind11 nanobind PyYAML
+        python3 -m pip install numpy pybind11 "nanobind<2.13" PyYAML
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -346,7 +346,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy nanobind pybind11
+        python3 -m pip install numpy "nanobind<2.13" pybind11
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -450,6 +450,7 @@ jobs:
           quantum-build/python_packages/*
           quantum-build/lib/StandalonePlugin.so
           quantum-build/lib/default_pipelines.*
+          quantum-build/lib/libQuantumPythonDecompositions.*
         retention-days: 1
 
     - name: Cache CCache on main branch
@@ -506,6 +507,7 @@ jobs:
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+        echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
@@ -696,7 +698,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build
-          python3 -m pip install nanobind pybind11
+          python3 -m pip install "nanobind<2.13" pybind11
 
       - name: Download Catalyst-Runtime Artifact
         uses: actions/download-artifact@v4
@@ -729,7 +731,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build
-          python3 -m pip install nanobind pybind11
+          python3 -m pip install "nanobind<2.13" pybind11
 
       - name: Install lcov # Manually install lcov_1.15-1_all
         run: |
