@@ -849,7 +849,7 @@ class TestControlFlow:
             #      CHECK:     scf.yield {{%.+}} : !quantum.reg
             #      CHECK: func.call @measure_transversal_Steane([[reg_out]])
             @qp.for_loop(0, 4, 1)
-            def loop_pauli_x(i):
+            def loop_pauli_x(i):  # pylint: disable=unused-argument
                 qp.PauliX(0)
 
             loop_pauli_x()
