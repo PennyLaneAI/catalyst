@@ -162,11 +162,20 @@ LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
 
+        bool staticallyDistinct = bothStatic && extract.getIdxAttrAttr() != insert.getIdxAttrAttr();
         bool inSameBlock = extract->getBlock() == insert->getBlock();
 
         if ((staticallyEqual || dynamicallyEqual) && inSameBlock) {
             rewriter.replaceOp(extract, insert.getQubit());
             rewriter.replaceOp(insert, insert.getInQreg());
+            return success();
+        }
+
+        bool insertOnRegisterChain = llvm::any_of(
+            insert.getResult().getUsers(), [](Operation *user) { return !isa<ExtractOp>(user); });
+        if (staticallyDistinct && inSameBlock && insertOnRegisterChain) {
+            rewriter.modifyOpInPlace(extract,
+                                     [&] { extract.getQregMutable().assign(insert.getInQreg()); });
             return success();
         }
     }
