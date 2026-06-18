@@ -76,7 +76,9 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         std::string jsonStr = "";
 
         if (outputJson) {
-            jsonStr = buildJsonString(results, computeDepths(analysis));
+            llvm::StringMap<ResourceResult> resultsWithDepth = results;
+            populatePBCDepths(resultsWithDepth, analysis);
+            jsonStr = buildJsonString(resultsWithDepth);
 
             if (outputFname.empty()) {
                 printJsonOutput(jsonStr);
@@ -90,11 +92,10 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     }
 
   private:
-    /// PBC worst-case depth per function and lifted loop body.
-    llvm::StringMap<pbc::PBCDepths> computeDepths(const ResourceAnalysis &analysis)
+    /// Populate PBC worst-case depth on each function and lifted loop body entry.
+    void populatePBCDepths(llvm::StringMap<ResourceResult> &results,
+                           const ResourceAnalysis &analysis)
     {
-        llvm::StringMap<pbc::PBCDepths> depths;
-
         // Swallow expected errors
         // Happens when the depth is counter in dynamic loops.
         ScopedDiagnosticHandler depthDiagHandler(
@@ -112,17 +113,16 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
                 return;
 
             pbc::PBCLayerContext layerContext;
-            depths[funcOp.getName()] = layerContext.computePBCDepth(&funcOp.getBody().front());
+            results[funcOp.getName()].pbcDepth =
+                layerContext.computePBCDepth(&funcOp.getBody().front());
         });
 
         // Handle dynamic loop bodies.
         for (const auto &entry : analysis.getSyntheticLoopBodies()) {
             scf::ForOp forOp = entry.getValue();
             pbc::PBCLayerContext layerContext;
-            depths[entry.getKey()] = layerContext.computePBCDepth(forOp.getBody());
+            results[entry.getKey()].pbcDepth = layerContext.computePBCDepth(forOp.getBody());
         }
-
-        return depths;
     }
 
     /// Sum a ResourceResult's content into the pass's
@@ -150,8 +150,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     }
 
     /// Serialize a single ResourceResult into a JSON object.
-    static llvm::json::Object resultToJson(const ResourceResult &result,
-                                           const pbc::PBCDepths &depth)
+    static llvm::json::Object resultToJson(const ResourceResult &result)
     {
         llvm::json::Object funcObj;
 
@@ -202,9 +201,9 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
             funcObj["auto_qubit_management"] = *result.autoQubitManagement;
         }
         llvm::json::Object depthObj;
-        if (depth) {
-            depthObj["depth_0"] = depth->first;
-            depthObj["depth_1"] = depth->second;
+        if (result.pbcDepth) {
+            depthObj["depth_0"] = result.pbcDepth->first;
+            depthObj["depth_1"] = result.pbcDepth->second;
         }
         funcObj["pbc_depth"] = std::move(depthObj);
 
@@ -214,27 +213,18 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     /// Serialize all per-function ResourceResults into a JSON string.
     /// qnode functions are inserted first so that the PennyLane reader
     /// (which uses the first entry) picks the correct function.
-    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results,
-                                const llvm::StringMap<pbc::PBCDepths> &depths) const
+    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results) const
     {
         llvm::json::Object root;
 
-        auto addEntry = [&](StringRef name, const ResourceResult &result) {
-            pbc::PBCDepths depth;
-            if (auto it = depths.find(name); it != depths.end()) {
-                depth = it->second;
-            }
-            root[name] = resultToJson(result, depth);
-        };
-
         for (const auto &funcEntry : results) {
             if (funcEntry.getValue().isQnode) {
-                addEntry(funcEntry.getKey(), funcEntry.getValue());
+                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
             }
         }
         for (const auto &funcEntry : results) {
             if (!funcEntry.getValue().isQnode) {
-                addEntry(funcEntry.getKey(), funcEntry.getValue());
+                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
             }
         }
 

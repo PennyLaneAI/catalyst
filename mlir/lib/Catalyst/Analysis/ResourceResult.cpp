@@ -169,6 +169,13 @@ std::string ResourceResult::toJson(int indent) const
         root["auto_qubit_management"] = *autoQubitManagement;
     }
 
+    llvm::json::Object depthObj;
+    if (pbcDepth) {
+        depthObj["depth_0"] = pbcDepth->first;
+        depthObj["depth_1"] = pbcDepth->second;
+    }
+    root["pbc_depth"] = std::move(depthObj);
+
     llvm::json::Value jsonValue(std::move(root));
     std::string result;
     llvm::raw_string_ostream os(result);
