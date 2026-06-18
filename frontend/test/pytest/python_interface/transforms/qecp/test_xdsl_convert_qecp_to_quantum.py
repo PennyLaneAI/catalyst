@@ -33,6 +33,7 @@ from catalyst.python_interface.transforms.qecp.convert_qecp_to_quantum import (
     ConvertQecPhysicalToQuantumPass,
     QecPhysicalQubitTypeConversion,
 )
+from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=line-too-long,too-many-lines
 
@@ -774,6 +775,225 @@ class TestHyperRegisterLowering:
         run_filecheck(program, (ConvertQecPhysicalToQuantumPass(),))
 
 
+# MARK: Control Flow
+
+
+class TestControlFlow:
+    """Test suite for control-flow conversion patterns in the convert-qecp-to-quantum pass."""
+
+    def test_scf_if_integration_1q(self, run_filecheck_qjit):
+        """Test the QEC pipeline ending in the convert-qecp-to-quantum pass on a simple, one-qubit
+        program with an if statement.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def circuit(x: float):
+            # CHECK-LABEL: func.func public @circuit(
+            #  CHECK-SAME:     [[cond_arg:%.+]]: tensor<f64>
+
+            # CHECK-DAG: [[c0:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+            # CHECK-DAG: [[cond_t:%.+]] = stablehlo.compare GT, [[cond_arg]], [[c0]] {{.*}} -> tensor<i1>
+            # CHECK-DAG: [[cond:%.+]] = tensor.extract [[cond_t]]
+            # CHECK-DAG: [[reg0:%.+]] = quantum.alloc
+            # CHECK-DAG: [[reg1:%.+]] = func.call @encode_zero_Steane([[reg0]])
+            # CHECK-DAG: [[reg2:%.+]] = func.call @qec_cycle_Steane([[reg1]])
+
+            # CHECK: [[reg_out:%.+]] = scf.if [[cond]] -> (!quantum.reg)
+            # CHECK:     [[reg3:%.+]] = func.call @x_Steane([[reg2]])
+            # CHECK:     [[reg4:%.+]] = func.call @qec_cycle_Steane([[reg3]])
+            # CHECK:     scf.yield [[reg4]] : !quantum.reg
+            # CHECK: else
+            # CHECK:     [[reg5:%.+]] = func.call @z_Steane([[reg2]])
+            # CHECK:     [[reg6:%.+]] = func.call @qec_cycle_Steane([[reg5]])
+            # CHECK:     scf.yield [[reg6]] : !quantum.reg
+            # CHECK: func.call @measure_transversal_Steane([[reg_out]])
+            def true_branch():
+                qp.X(0)
+
+            def false_branch():
+                qp.Z(0)
+
+            qp.cond(x > 0, true_branch, false_branch)()
+
+            m0 = qp.measure(0)
+            return qp.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    def test_scf_if_integration_2q(self, run_filecheck_qjit):
+        """Test the QEC pipeline ending in the convert-qecp-to-quantum pass on a simple, two-qubit
+        program with an if statement.
+        """
+        dev = qp.device("null.qubit", wires=2)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def circuit(x: float):
+            # CHECK-LABEL: func.func public @circuit(
+            #  CHECK-SAME:     [[cond_arg:%.+]]: tensor<f64>
+
+            # CHECK-DAG: [[c0:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+            # CHECK-DAG: [[cond_t:%.+]] = stablehlo.compare GT, [[cond_arg]], [[c0]] {{.*}} -> tensor<i1>
+            # CHECK-DAG: [[cond:%.+]] = tensor.extract [[cond_t]]
+            # CHECK-DAG: [[reg00:%.+]] = quantum.alloc
+            # CHECK-DAG: [[reg01:%.+]] = func.call @encode_zero_Steane([[reg00]])
+            # CHECK-DAG: [[reg02:%.+]] = func.call @qec_cycle_Steane([[reg01]])
+            # CHECK-DAG: [[reg10:%.+]] = quantum.alloc
+            # CHECK-DAG: [[reg11:%.+]] = func.call @encode_zero_Steane([[reg10]])
+            # CHECK-DAG: [[reg12:%.+]] = func.call @qec_cycle_Steane([[reg11]])
+
+            # CHECK: [[reg0_out:%.+]], [[reg1_out:%.+]] = scf.if [[cond]] -> (!quantum.reg, !quantum.reg)
+            # CHECK:     [[reg03:%.+]] = func.call @x_Steane([[reg02]])
+            # CHECK:     [[reg04:%.+]] = func.call @qec_cycle_Steane([[reg03]])
+            # CHECK:     [[reg13:%.+]] = func.call @z_Steane([[reg12]])
+            # CHECK:     [[reg14:%.+]] = func.call @qec_cycle_Steane([[reg13]])
+            # CHECK:     scf.yield [[reg04]], [[reg14]] : !quantum.reg, !quantum.reg
+            # CHECK: else
+            # CHECK:     [[reg15:%.+]] = func.call @x_Steane([[reg12]])
+            # CHECK:     [[reg16:%.+]] = func.call @qec_cycle_Steane([[reg15]])
+            # CHECK:     scf.yield [[reg02]], [[reg16]] : !quantum.reg, !quantum.reg
+            #   COM: Because of upstream `quantum.extract` ops, QEC cycles are inserted here.
+            #   COM: This behaviour can be improved so we don't check for them here.
+            # CHECK: func.call @measure_transversal_Steane({{%.+}})
+            # CHECK: func.call @measure_transversal_Steane({{%.+}})
+            def true_branch():
+                qp.X(0)
+                qp.Z(1)
+
+            def false_branch():
+                qp.X(1)
+
+            qp.cond(x > 0, true_branch, false_branch)()
+
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            return qp.sample([m0, m1])
+
+        run_filecheck_qjit(circuit)
+
+    def test_scf_for_integration(self, run_filecheck_qjit):
+        """Test the QEC pipeline ending in the convert-qecp-to-quantum pass on a simple program with
+        a for loop.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def circuit():
+            # CHECK-LABEL: func.func public @circuit(
+
+            #  CHECK-DAG: [[c1:%.+]] = arith.constant 1 : index
+            #  CHECK-DAG: [[c4:%.+]] = arith.constant 4 : index
+            #  CHECK-DAG: [[c0:%.+]] = arith.constant 0 : index
+            #      CHECK: quantum.alloc(7) : !quantum.reg
+            #      CHECK: [[reg_out:%.+]] = scf.for {{%.+}} = [[c0]] to [[c4]] step [[c1]]
+            # CHECK-SAME:         iter_args([[reg_arg:%.+]] = {{%.+}}) -> (!quantum.reg)
+            #      CHECK:     func.call @x_Steane([[reg_arg]]) : (!quantum.reg)
+            # CHECK-SAME:         -> !quantum.reg
+            #        COM:     <qec
+            #      CHECK:     scf.yield {{%.+}} : !quantum.reg
+            #      CHECK: func.call @measure_transversal_Steane([[reg_out]])
+            @qp.for_loop(0, 4, 1)
+            def loop_pauli_x(i):  # pylint: disable=unused-argument
+                qp.PauliX(0)
+
+            loop_pauli_x()
+            m0 = qp.measure(0)
+            return qp.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    def test_scf_while_integration(self, run_filecheck_qjit):
+        """Test the QEC pipeline ending in the convert-qecp-to-quantum pass on a simple program with
+        a while loop.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def circuit(value: float):
+            # CHECK-LABEL: func.func public @circuit(
+            #  CHECK-SAME:     [[top_arg:%.+]]: tensor<f64>
+
+            #      CHECK: [[c2:%.+]] = stablehlo.constant dense<2.000000e+00> : tensor<f64>
+            #      CHECK: {{%.+}}, [[reg_out:%.+]] = scf.while
+            # CHECK-SAME:         ([[while_arg_b:%.+]] = [[top_arg]], [[reg_arg_b:%.+]] = {{%.+}}) :
+            # CHECK-SAME:         (tensor<f64>, !quantum.reg) -> (tensor<f64>, !quantum.reg)
+            #      CHECK:    [[cond_t:%.+]] = stablehlo.compare LT, [[while_arg_b]], [[c2]]
+            #      CHECK:    [[cond:%.+]] = tensor.extract [[cond_t]]
+            #      CHECK:    scf.condition([[cond]]) [[while_arg_b]], [[reg_arg_b]] :
+            # CHECK-SAME:        tensor<f64>, !quantum.reg
+            #      CHECK: do
+            #      CHECK: ^bb0([[while_arg_a:%.+]]: tensor<f64>, [[reg_arg_a:%.+]]: !quantum.reg):
+            #      CHECK:     func.call @x_Steane([[reg_arg_a]]) : (!quantum.reg)
+            # CHECK-SAME:         -> !quantum.reg
+            #      CHECK:     stablehlo.add [[while_arg_a]], [[c2]] : tensor<f64>
+            #      CHECK:     scf.yield {{%.+}}, {{%.+}} : tensor<f64>, !quantum.reg
+            #      CHECK: func.call @measure_transversal_Steane([[reg_out]])
+            @qp.while_loop(lambda x: x < 2.0)
+            def loop_rx(x):
+                qp.PauliX(0)
+                return x + 2
+
+            # apply the while loop
+            loop_rx(value)
+
+            m0 = qp.measure(0)
+            return qp.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.xfail(
+        reason="Control flow over hyper-registers not supported", raises=CompileError
+    )
+    def test_scf_for_each_wire(self, run_filecheck_qjit):
+        """Test the QEC pipeline ending in the convert-qecp-to-quantum pass on a more complex
+        program with multiple control-flow operations.
+        """
+        N_WIRES = 2
+
+        dev = qp.device("null.qubit", wires=N_WIRES)
+
+        @qp.qjit(capture=True, target="mlir", autograph=True)
+        @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def circuit():
+            for i in range(N_WIRES):
+                qp.H(i)
+
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            return qp.sample([m0, m1])
+
+        run_filecheck_qjit(circuit)
+
+
 # MARK: Integration tests
 
 
@@ -976,6 +1196,27 @@ class TestQECPassIntegration:
         eigenvalues = [-1 if s else 1 for s in samples]
         # could have a lower atol with more shots, but given test duration, not worth it
         assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.07)
+
+    def test_control_flow_null_qubit_Steane(self):
+        """Integration test for lowering a simple circuit with control flow through the QEC pipeline
+        and executing on null.qubit.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            @qp.for_loop(0, 10, 1)
+            def loop(i):
+                qp.cond(i % 2 == 0, qp.X, qp.Z)(0)
+
+            loop()
+            m0 = qp.measure(0)
+
+            return qp.sample([m0])
+
+        circ()
 
     @pytest.mark.parametrize(
         "n, diagonalizing_gates, expected_res, shots",
