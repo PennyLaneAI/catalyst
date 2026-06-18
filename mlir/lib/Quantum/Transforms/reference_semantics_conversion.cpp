@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "reference-semantics-conversion"
+#define VALUE_SEMANTICS_GATE_OPS                                                                   \
+    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp
 
 #include "reference_semantics_conversion.h"
 
@@ -48,6 +50,23 @@ using namespace catalyst;
 // and variable names like "rQubit" stand for "qubits in reference semantics".
 
 namespace {
+
+LogicalResult ensureNoValueSemanticsOps(Operation *op)
+{
+    WalkResult walkResult = op->walk([](Operation *op) {
+        if (isa<VALUE_SEMANTICS_GATE_OPS>(op)) {
+            return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+    });
+
+    if (walkResult.wasInterrupted()) {
+        return failure();
+    }
+    else {
+        return success();
+    }
+}
 
 void eraseSCFYieldQuantumOperands(scf::YieldOp yieldOp)
 {
@@ -197,8 +216,7 @@ OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitVal
 
     Operation *newOp = builder.create(state);
 
-    if (isa<quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp,
-            mbqc::MeasureInBasisOp, func::CallOp>(vOp)) {
+    if (isa<VALUE_SEMANTICS_GATE_OPS, func::CallOp>(vOp)) {
         cascadeMapAhead(vOp, tracker);
     }
 
@@ -842,8 +860,7 @@ bool isQuantumSubroutine(func::FuncOp f)
     }
 
     WalkResult walkResult = f.walk([](Operation *op) {
-        if (isa<quantum::QuantumDialect>(op->getDialect()) ||
-            isa<pbc::PPMeasurementOp, mbqc::MeasureInBasisOp, mbqc::GraphStatePrepOp>(op)) {
+        if (isa<quantum::QuantumDialect>(op->getDialect()) || isa<VALUE_SEMANTICS_GATE_OPS>(op)) {
             return WalkResult::interrupt();
         }
         if (func::CallOp callOp = dyn_cast<func::CallOp>(op)) {
@@ -959,6 +976,11 @@ struct ReferenceSemanticsConversionPass
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
             handleRegion(builder, targetFunc.getBody(), tracker);
+            if (failed(ensureNoValueSemanticsOps(targetFunc))) {
+                targetFunc.emitOpError(
+                    "Detected remaining value semantics operations after conversion");
+                return signalPassFailure();
+            }
         }
 
         const CallGraph callGraph(mod);
@@ -1008,6 +1030,11 @@ struct ReferenceSemanticsConversionPass
             }
             QubitValueTracker tracker;
             handleSubroutine(builder, subroutine, qregSizesAtCallsite);
+            if (failed(ensureNoValueSemanticsOps(subroutine))) {
+                subroutine.emitOpError(
+                    "Detected remaining value semantics operations after conversion");
+                return signalPassFailure();
+            }
         }
     }
 };
