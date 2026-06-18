@@ -1836,3 +1836,28 @@ def test_cpp_decomp_user_rule_cleanup():
 
 
 test_cpp_decomp_user_rule_cleanup()
+
+
+def test_paulirot_python_decomposition():
+    """Test that paulirots are decomposed by the mlir graph."""
+
+    @qjit(capture=True)
+    @graph_decomposition(gate_set={qp.H, qp.MultiRZ, qp.GlobalPhase, qp.RX})
+    @qp.qnode(qp.device("null.qubit", wires=4))
+    def circuit():
+        qp.PauliRot(0.9, "XZXY", [0, 1, 2, 3])
+        return qp.probs()
+
+    print(circuit.mlir_opt)
+
+    # CHECK-NOT: quantum.paulirot
+    # CHECK: Hadamard
+    # CHECK: Hadamard
+    # CHECK: RX
+    # CHECK: MultiRZ
+    # CHECK: Hadamard
+    # CHECK: Hadamard
+    # CHECK: RX
+
+
+test_paulirot_python_decomposition()

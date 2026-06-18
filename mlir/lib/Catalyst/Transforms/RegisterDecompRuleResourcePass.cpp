@@ -56,69 +56,6 @@ struct RegisterDecompRuleResourcePass
 
         markAllAnalysesPreserved();
     }
-
-  private:
-    /**
-     * @brief Build a DictionaryAttr from a ResourceResult for annotating functions.
-     *
-     * The structure of the DictionaryAttr will mirror the JSON output,
-     * but with MLIR attributes.
-     *
-     * Note that this is a simplified version of the ResourceResult
-     * only including operations, measurements, and num_qubits,
-     * but it can be extended to include more fields such as
-     * classical instructions and function calls as needed
-     * for the decomposition framework.
-     *
-     * @param ctx MLIRContext for creating attributes
-     * @param result The ResourceResult to convert into attributes
-     * @return DictionaryAttr representing the resource counts
-     *
-     */
-    DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result) const
-    {
-        SmallVector<NamedAttribute> entries;
-
-        // operations
-        SmallVector<NamedAttribute> opsEntries;
-        for (const auto &opEntry : result.operations) {
-            llvm::StringRef opName = opEntry.getKey();
-            for (const auto &sizeEntry : opEntry.getValue()) {
-                auto &[nQubits, nParams] = sizeEntry.first;
-                int64_t count = sizeEntry.second;
-                std::string key =
-                    (opName + "(" + std::to_string(nQubits) + "," + std::to_string(nParams) + ")")
-                        .str();
-                opsEntries.push_back(NamedAttribute(
-                    StringAttr::get(ctx, key), IntegerAttr::get(IntegerType::get(ctx, 64), count)));
-            }
-        }
-        entries.push_back(NamedAttribute(StringAttr::get(ctx, "operations"),
-                                         DictionaryAttr::get(ctx, opsEntries)));
-
-        // measurements
-        SmallVector<NamedAttribute> measEntries;
-        for (const auto &entry : result.measurements) {
-            measEntries.push_back(
-                NamedAttribute(StringAttr::get(ctx, entry.getKey()),
-                               IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
-        }
-        entries.push_back(NamedAttribute(StringAttr::get(ctx, "measurements"),
-                                         DictionaryAttr::get(ctx, measEntries)));
-
-        // scalars
-        entries.push_back(
-            NamedAttribute(StringAttr::get(ctx, "num_qubits"),
-                           IntegerAttr::get(IntegerType::get(ctx, 64), result.numQubits())));
-        entries.push_back(
-            NamedAttribute(StringAttr::get(ctx, "num_arg_qubits"),
-                           IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
-        entries.push_back(
-            NamedAttribute(StringAttr::get(ctx, "num_alloc_qubits"),
-                           IntegerAttr::get(IntegerType::get(ctx, 64), result.numAllocQubits)));
-
-        return DictionaryAttr::get(ctx, entries);
-    }
 };
 
 } // namespace catalyst
