@@ -781,9 +781,9 @@ class TestHyperRegisterLowering:
 class TestControlFlow:
     """Test suite for control-flow conversion patterns in the convert-qecp-to-quantum pass."""
 
-    def test_scf_if_integration(self, run_filecheck_qjit):
-        """Test the QEC pipeline ending in the convert-qecp-to-quantum pass on a simple program with
-        an if statement.
+    def test_scf_if_integration_1q(self, run_filecheck_qjit):
+        """Test the QEC pipeline ending in the convert-qecp-to-quantum pass on a simple, one-qubit
+        program with an if statement.
         """
         dev = qp.device("null.qubit", wires=1)
 
@@ -798,15 +798,21 @@ class TestControlFlow:
             # CHECK-LABEL: func.func public @circuit(
             #  CHECK-SAME:     [[cond_arg:%.+]]: tensor<f64>
 
-            # CHECK: [[c0:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
-            # CHECK: [[cond_t:%.+]] = stablehlo.compare GT, [[cond_arg]], [[c0]] {{.*}} -> tensor<i1>
-            # CHECK: [[cond:%.+]] = tensor.extract [[cond_t]]
+            # CHECK-DAG: [[c0:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+            # CHECK-DAG: [[cond_t:%.+]] = stablehlo.compare GT, [[cond_arg]], [[c0]] {{.*}} -> tensor<i1>
+            # CHECK-DAG: [[cond:%.+]] = tensor.extract [[cond_t]]
+            # CHECK-DAG: [[reg0:%.+]] = quantum.alloc
+            # CHECK-DAG: [[reg1:%.+]] = func.call @encode_zero_Steane([[reg0]])
+            # CHECK-DAG: [[reg2:%.+]] = func.call @qec_cycle_Steane([[reg1]])
+
             # CHECK: [[reg_out:%.+]] = scf.if [[cond]] -> (!quantum.reg)
-            # CHECK:     func.call @x_Steane({{%.+}}) : {{.*}} -> !quantum.reg
-            # CHECK:     scf.yield {{%.+}} : !quantum.reg
+            # CHECK:     [[reg3:%.+]] = func.call @x_Steane([[reg2]])
+            # CHECK:     [[reg4:%.+]] = func.call @qec_cycle_Steane([[reg3]])
+            # CHECK:     scf.yield [[reg4]] : !quantum.reg
             # CHECK: else
-            # CHECK:     func.call @z_Steane({{%.+}}) : {{.*}} -> !quantum.reg
-            # CHECK:     scf.yield {{%.+}} : !quantum.reg
+            # CHECK:     [[reg5:%.+]] = func.call @z_Steane([[reg2]])
+            # CHECK:     [[reg6:%.+]] = func.call @qec_cycle_Steane([[reg5]])
+            # CHECK:     scf.yield [[reg6]] : !quantum.reg
             # CHECK: func.call @measure_transversal_Steane([[reg_out]])
             def true_branch():
                 qp.X(0)
@@ -818,6 +824,62 @@ class TestControlFlow:
 
             m0 = qp.measure(0)
             return qp.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    def test_scf_if_integration_2q(self, run_filecheck_qjit):
+        """Test the QEC pipeline ending in the convert-qecp-to-quantum pass on a simple, two-qubit
+        program with an if statement.
+        """
+        dev = qp.device("null.qubit", wires=2)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_qecp_to_quantum_pass
+        @qp.transform(pass_name="symbol-dce")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @qp.transform(pass_name="symbol-dce")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=1)
+        def circuit(x: float):
+            # CHECK-LABEL: func.func public @circuit(
+            #  CHECK-SAME:     [[cond_arg:%.+]]: tensor<f64>
+
+            # CHECK-DAG: [[c0:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+            # CHECK-DAG: [[cond_t:%.+]] = stablehlo.compare GT, [[cond_arg]], [[c0]] {{.*}} -> tensor<i1>
+            # CHECK-DAG: [[cond:%.+]] = tensor.extract [[cond_t]]
+            # CHECK-DAG: [[reg00:%.+]] = quantum.alloc
+            # CHECK-DAG: [[reg01:%.+]] = func.call @encode_zero_Steane([[reg00]])
+            # CHECK-DAG: [[reg02:%.+]] = func.call @qec_cycle_Steane([[reg01]])
+            # CHECK-DAG: [[reg10:%.+]] = quantum.alloc
+            # CHECK-DAG: [[reg11:%.+]] = func.call @encode_zero_Steane([[reg10]])
+            # CHECK-DAG: [[reg12:%.+]] = func.call @qec_cycle_Steane([[reg11]])
+
+            # CHECK: [[reg0_out:%.+]], [[reg1_out:%.+]] = scf.if [[cond]] -> (!quantum.reg, !quantum.reg)
+            # CHECK:     [[reg03:%.+]] = func.call @x_Steane([[reg02]])
+            # CHECK:     [[reg04:%.+]] = func.call @qec_cycle_Steane([[reg03]])
+            # CHECK:     [[reg13:%.+]] = func.call @z_Steane([[reg12]])
+            # CHECK:     [[reg14:%.+]] = func.call @qec_cycle_Steane([[reg13]])
+            # CHECK:     scf.yield [[reg04]], [[reg14]] : !quantum.reg, !quantum.reg
+            # CHECK: else
+            # CHECK:     [[reg15:%.+]] = func.call @x_Steane([[reg12]])
+            # CHECK:     [[reg16:%.+]] = func.call @qec_cycle_Steane([[reg15]])
+            # CHECK:     scf.yield [[reg02]], [[reg16]] : !quantum.reg, !quantum.reg
+            #   COM: Because of upstream `quantum.extract` ops, QEC cycles are inserted here.
+            #   COM: This behaviour can be improved so we don't check for them here.
+            # CHECK: func.call @measure_transversal_Steane({{%.+}})
+            # CHECK: func.call @measure_transversal_Steane({{%.+}})
+            def true_branch():
+                qp.X(0)
+                qp.Z(1)
+
+            def false_branch():
+                qp.X(1)
+
+            qp.cond(x > 0, true_branch, false_branch)()
+
+            m0 = qp.measure(0)
+            m1 = qp.measure(1)
+            return qp.sample([m0, m1])
 
         run_filecheck_qjit(circuit)
 
