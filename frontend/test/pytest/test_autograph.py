@@ -1919,11 +1919,9 @@ class TestAutographInclude:
     def test_error_if_capture_and_autograph_include(self):
         """Test that an error is raised if autograph include is set."""
 
-        qp.capture.enable()
-
         with pytest.raises(NotImplementedError, match="autograph_include"):
 
-            @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"])
+            @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"], capture=True)
             def included(x: float, n: int):
                 for _ in range(n):
                     x = x + dummy_func(6)
