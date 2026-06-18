@@ -17,7 +17,7 @@
 
 * The `resource-analysis` pass JSON output now includes worst-case PBC layer depth
   (`depth_0` / `depth_1`) per function and lifted loop entry.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
