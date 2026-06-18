@@ -851,9 +851,8 @@ class TestPlxPRDecomposition:
         result_with_qjit = with_qjit()
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
 
-        with qp.capture.pause():
-            result_without_qjit = circuit()
-            expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        result_without_qjit = circuit()
+        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
 
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         assert qp.math.allclose(result_without_qjit, result_with_qjit)
