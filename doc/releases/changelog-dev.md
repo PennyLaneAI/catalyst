@@ -2,15 +2,6 @@
 
 <h3>New features since last release</h3>
 
-* A new, experimental compiler pass `convert-qecp-to-quantum` has been added to lower operations
-  from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
-  [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
-  [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
-  [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
-  [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
-  [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
-  [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
-
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
@@ -299,6 +290,7 @@
   quantum operators, including operators with frontend-end specific data.
   [(#2883)](https://github.com/PennyLaneAI/catalyst/pull/2883)
   [(#2943)](https://github.com/PennyLaneAI/catalyst/pull/2943)
+  [(#2951)](https://github.com/PennyLaneAI/catalyst/pull/2951)
 
 * In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
   operations have been added:
@@ -338,6 +330,8 @@
     [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
   - For loops (`scf.for`)
     [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
+  - While loops (`scf.while`)
+    [(#2905)](https://github.com/PennyLaneAI/catalyst/pull/2905)
 
 <h3>Documentation 📝</h3>
 
@@ -354,6 +348,7 @@ Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+Jacob Kitchen,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
