@@ -233,6 +233,7 @@
   [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
   [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
   [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
+  [(#2927)](https://github.com/PennyLaneAI/catalyst/pull/2927)
   [(#2955)](https://github.com/PennyLaneAI/catalyst/pull/2955)
 
 * The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower
