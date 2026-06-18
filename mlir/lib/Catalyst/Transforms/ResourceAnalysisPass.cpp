@@ -91,9 +91,9 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
   private:
     /// PBC worst-case depth per function and lifted loop body.
-    llvm::StringMap<pbc::BothWorstCaseDepth> computeDepths(const ResourceAnalysis &analysis)
+    llvm::StringMap<pbc::PBCDepths> computeDepths(const ResourceAnalysis &analysis)
     {
-        llvm::StringMap<pbc::BothWorstCaseDepth> depths;
+        llvm::StringMap<pbc::PBCDepths> depths;
 
         // Swallow expected errors
         // Happens when the depth is counter in dynamic loops.
@@ -112,15 +112,14 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
                 return;
 
             pbc::PBCLayerContext layerContext;
-            depths[funcOp.getName()] =
-                layerContext.computeBothWorstCaseDepths(&funcOp.getBody().front());
+            depths[funcOp.getName()] = layerContext.computePBCDepth(&funcOp.getBody().front());
         });
 
         // Handle dynamic loop bodies.
         for (const auto &entry : analysis.getSyntheticLoopBodies()) {
             scf::ForOp forOp = entry.getValue();
             pbc::PBCLayerContext layerContext;
-            depths[entry.getKey()] = layerContext.computeBothWorstCaseDepths(forOp.getBody());
+            depths[entry.getKey()] = layerContext.computePBCDepth(forOp.getBody());
         }
 
         return depths;
@@ -152,7 +151,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
     /// Serialize a single ResourceResult into a JSON object.
     static llvm::json::Object resultToJson(const ResourceResult &result,
-                                           const pbc::BothWorstCaseDepth &depth)
+                                           const pbc::PBCDepths &depth)
     {
         llvm::json::Object funcObj;
 
@@ -207,7 +206,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
             depthObj["depth_0"] = depth->first;
             depthObj["depth_1"] = depth->second;
         }
-        funcObj["depth"] = std::move(depthObj);
+        funcObj["pbc_depth"] = std::move(depthObj);
 
         return funcObj;
     }
@@ -216,12 +215,12 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     /// qnode functions are inserted first so that the PennyLane reader
     /// (which uses the first entry) picks the correct function.
     std::string buildJsonString(const llvm::StringMap<ResourceResult> &results,
-                                const llvm::StringMap<pbc::BothWorstCaseDepth> &depths) const
+                                const llvm::StringMap<pbc::PBCDepths> &depths) const
     {
         llvm::json::Object root;
 
         auto addEntry = [&](StringRef name, const ResourceResult &result) {
-            pbc::BothWorstCaseDepth depth;
+            pbc::PBCDepths depth;
             if (auto it = depths.find(name); it != depths.end()) {
                 depth = it->second;
             }

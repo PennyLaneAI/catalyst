@@ -29,7 +29,7 @@ namespace catalyst {
 namespace pbc {
 
 // (depth_0, depth_1), or nullopt if there is nothing to report.
-using BothWorstCaseDepth = std::optional<std::pair<int64_t, int64_t>>;
+using PBCDepths = std::optional<std::pair<int64_t, int64_t>>;
 
 class PBCLayer;
 /// Each pass instance creates its own context to ensure
@@ -69,7 +69,7 @@ class PBCLayerContext {
                                bool skipDynamic = false);
 
     // Returns (depth_0, depth_1), or nullopt. Falls back to skip-dynamic on strict failure.
-    BothWorstCaseDepth computeBothWorstCaseDepths(mlir::Block *block);
+    PBCDepths computePBCDepth(mlir::Block *block);
 
   private:
     mlir::FailureOr<int64_t> ifWorstCaseDepth(mlir::scf::IfOp ifOp, bool onlyOnDisjointQubit,

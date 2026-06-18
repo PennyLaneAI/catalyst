@@ -15,7 +15,7 @@
 * The `ResourceAnalysis` pass now supports IR in reference semantics natively, rather than requiring a conversion step.
   [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
 
-* The `resource-analysis` pass JSON output now includes worst-case PBC layer depth
+* The `resource-analysis` pass JSON output now includes `pbc_depth` for worst-case PBC layer depth
   (`depth_0` / `depth_1`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 

@@ -225,7 +225,7 @@ PBCLayerContext::computeBlockWorstCaseDepth(Block *block, bool onlyOnDisjointQub
     return std::optional<int64_t>(*depth);
 }
 
-BothWorstCaseDepth PBCLayerContext::computeBothWorstCaseDepths(Block *block)
+PBCDepths PBCLayerContext::computePBCDepth(Block *block)
 {
     // Try to calcuate the depth with static first, then fallback to skip-dynamic.
     auto d0 = computeWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false);

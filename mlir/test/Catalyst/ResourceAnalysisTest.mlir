@@ -67,9 +67,6 @@ func.func @mbqc_gates() {
 // PBC operations (PPR and PPM)
 
 // CHECK-LABEL: "pbc_operations"
-// CHECK: "depth"
-// CHECK-DAG: "depth_0": 4
-// CHECK-DAG: "depth_1": 4
 // CHECK:   "num_alloc_qubits": 2
 // CHECK:   "num_arg_qubits": 0
 // CHECK:   "num_qubits": 2
@@ -77,6 +74,9 @@ func.func @mbqc_gates() {
 // CHECK-DAG: "PPR-pi/4(1)": 3
 // CHECK-DAG: "PPR-pi/8(1)": 1
 // CHECK-DAG: "PPM(1)": 2
+// CHECK: "pbc_depth"
+// CHECK-DAG: "depth_0": 4
+// CHECK-DAG: "depth_1": 4
 func.func @pbc_operations() {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -154,13 +154,13 @@ func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
 // reports single-iteration depth.
 
 // CHECK-LABEL: "dyn_for_loop_1": {
-// CHECK: "depth"
+// CHECK-DAG: "PPR-pi/4(1)": 1
+// CHECK: "pbc_depth"
 // CHECK-DAG: "depth_0": 1
 // CHECK-DAG: "depth_1": 1
-// CHECK-DAG: "PPR-pi/4(1)": 1
 
 // CHECK-LABEL: "pbc_in_dyn_loop"
-// CHECK: "depth": {}
+// CHECK: "pbc_depth": {}
 func.func @pbc_in_dyn_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -179,16 +179,16 @@ func.func @pbc_in_dyn_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
 // post-loop ops; loop body depth stays in dyn_for_loop_<N>.
 
 // CHECK-LABEL: "dyn_for_loop_1": {
-// CHECK: "depth"
+// CHECK-DAG: "PPR-pi/4(1)": 1
+// CHECK: "pbc_depth"
 // CHECK-DAG: "depth_0": 1
 // CHECK-DAG: "depth_1": 1
-// CHECK-DAG: "PPR-pi/4(1)": 1
 
 // CHECK-LABEL: "pbc_in_dyn_loop_post_ppr": {
-// CHECK: "depth"
+// CHECK-DAG: "PPR-pi/4(1)": 1
+// CHECK: "pbc_depth"
 // CHECK-DAG: "depth_0": 1
 // CHECK-DAG: "depth_1": 1
-// CHECK-DAG: "PPR-pi/4(1)": 1
 // CHECK: "var_function_calls"
 // CHECK: "dyn_for_loop_1"
 func.func @pbc_in_dyn_loop_post_ppr(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
@@ -211,7 +211,7 @@ func.func @pbc_in_dyn_loop_post_ppr(%arg0: !quantum.bit, %n: index) -> !quantum.
 // estimate as a static trip count (same rule as resource counting).
 
 // CHECK-LABEL: "pbc_estimated_iterations_loop"
-// CHECK: "depth"
+// CHECK: "pbc_depth"
 // CHECK-DAG: "depth_0": 10
 // CHECK-DAG: "depth_1": 10
 func.func @pbc_estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
@@ -232,12 +232,12 @@ func.func @pbc_estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !qua
 // even when they call a helper that contains PBC ops.
 
 // CHECK-LABEL: "pbc_depth_caller": {
-// CHECK: "depth": {}
 // CHECK: "function_calls"
 // CHECK: "pbc_depth_helper": 1
+// CHECK: "pbc_depth": {}
 
 // CHECK-LABEL: "pbc_depth_helper": {
-// CHECK: "depth"
+// CHECK: "pbc_depth"
 // CHECK-DAG: "depth_0": 1
 // CHECK-DAG: "depth_1": 1
 func.func private @pbc_depth_helper(%arg0: !quantum.bit) -> !quantum.bit {
@@ -755,9 +755,6 @@ func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 // Mixed quantum and PBC ops
 
 // CHECK-LABEL: "mixed_ops"
-// CHECK: "depth"
-// CHECK-DAG: "depth_0": 1
-// CHECK-DAG: "depth_1": 2
 // CHECK: "num_alloc_qubits": 2
 // CHECK: "num_arg_qubits": 0
 // CHECK: "num_qubits": 2
@@ -765,6 +762,9 @@ func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 // CHECK-DAG: "Hadamard(1)": 1
 // CHECK-DAG: "PPR-pi/4(1)": 1
 // CHECK-DAG: "PPM(1)": 1
+// CHECK: "pbc_depth"
+// CHECK-DAG: "depth_0": 1
+// CHECK-DAG: "depth_1": 2
 func.func @mixed_ops() {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
