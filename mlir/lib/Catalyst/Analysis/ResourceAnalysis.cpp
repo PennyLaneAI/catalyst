@@ -344,6 +344,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         // The name is always new, so we don't overwrite an old entry.
         std::string name = makeUniqueSyntheticName("for_loop_", forLoopCounter);
         funcResults[name] = std::move(bodyResult);
+        syntheticLoopBodies[name] = forOp;
         result.functionCalls[name] = tripCount.value();
         return;
     }
@@ -352,6 +353,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     // and store a fixed number (hash) so each such loop has its own id in the output.
     std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
     funcResults[name] = std::move(bodyResult);
+    syntheticLoopBodies[name] = forOp;
     result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
     result.hasDynLoop = true;
 }

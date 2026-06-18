@@ -67,6 +67,9 @@ func.func @mbqc_gates() {
 // PBC operations (PPR and PPM)
 
 // CHECK-LABEL: "pbc_operations"
+// CHECK: "depth"
+// CHECK-DAG: "depth_0": 4
+// CHECK-DAG: "depth_1": 4
 // CHECK:   "num_alloc_qubits": 2
 // CHECK:   "num_arg_qubits": 0
 // CHECK:   "num_qubits": 2
@@ -143,6 +146,108 @@ func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     }
 
     return %q : !quantum.bit
+}
+
+// -----
+
+// PBC ops inside a dynamic for loop: parent reports empty depth; lifted body
+// reports single-iteration depth.
+
+// CHECK-LABEL: "dyn_for_loop_1": {
+// CHECK: "depth"
+// CHECK-DAG: "depth_0": 1
+// CHECK-DAG: "depth_1": 1
+// CHECK-DAG: "PPR-pi/4(1)": 1
+
+// CHECK-LABEL: "pbc_in_dyn_loop"
+// CHECK: "depth": {}
+func.func @pbc_in_dyn_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+        scf.yield %out : !quantum.bit
+    }
+
+    return %q : !quantum.bit
+}
+
+// -----
+
+// Inline PBC ops after a dynamic for loop: parent depth covers only the
+// post-loop ops; loop body depth stays in dyn_for_loop_<N>.
+
+// CHECK-LABEL: "dyn_for_loop_1": {
+// CHECK: "depth"
+// CHECK-DAG: "depth_0": 1
+// CHECK-DAG: "depth_1": 1
+// CHECK-DAG: "PPR-pi/4(1)": 1
+
+// CHECK-LABEL: "pbc_in_dyn_loop_post_ppr": {
+// CHECK: "depth"
+// CHECK-DAG: "depth_0": 1
+// CHECK-DAG: "depth_1": 1
+// CHECK-DAG: "PPR-pi/4(1)": 1
+// CHECK: "var_function_calls"
+// CHECK: "dyn_for_loop_1"
+func.func @pbc_in_dyn_loop_post_ppr(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+        scf.yield %out : !quantum.bit
+    }
+
+    %q3 = pbc.ppr ["X"](4) %q : !quantum.bit
+
+    return %q3 : !quantum.bit
+}
+
+// -----
+
+// PBC ops inside a dynamic for loop with estimated_iterations: depth uses the
+// estimate as a static trip count (same rule as resource counting).
+
+// CHECK-LABEL: "pbc_estimated_iterations_loop"
+// CHECK: "depth"
+// CHECK-DAG: "depth_0": 10
+// CHECK-DAG: "depth_1": 10
+func.func @pbc_estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+        scf.yield %out : !quantum.bit
+    } {estimated_iterations = 10 : i16}
+
+    return %q : !quantum.bit
+}
+
+// -----
+
+// PBC depth is per-function only; callers without inline PBC ops report no depth
+// even when they call a helper that contains PBC ops.
+
+// CHECK-LABEL: "pbc_depth_caller": {
+// CHECK: "depth": {}
+// CHECK: "function_calls"
+// CHECK: "pbc_depth_helper": 1
+
+// CHECK-LABEL: "pbc_depth_helper": {
+// CHECK: "depth"
+// CHECK-DAG: "depth_0": 1
+// CHECK-DAG: "depth_1": 1
+func.func private @pbc_depth_helper(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = pbc.ppr ["Z"](4) %arg0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+func.func @pbc_depth_caller(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = func.call @pbc_depth_helper(%arg0) : (!quantum.bit) -> !quantum.bit
+    return %out : !quantum.bit
 }
 
 // -----
@@ -650,6 +755,9 @@ func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 // Mixed quantum and PBC ops
 
 // CHECK-LABEL: "mixed_ops"
+// CHECK: "depth"
+// CHECK-DAG: "depth_0": 1
+// CHECK-DAG: "depth_1": 2
 // CHECK: "num_alloc_qubits": 2
 // CHECK: "num_arg_qubits": 0
 // CHECK: "num_qubits": 2

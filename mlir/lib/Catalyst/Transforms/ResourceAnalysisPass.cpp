@@ -18,10 +18,12 @@
 #include <string>
 
 #include "llvm/Support/JSON.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "PBC/Utils/PBCLayer.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -74,7 +76,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         std::string jsonStr = "";
 
         if (outputJson) {
-            jsonStr = buildJsonString(results);
+            jsonStr = buildJsonString(results, computeDepths(analysis));
 
             if (outputFname.empty()) {
                 printJsonOutput(jsonStr);
@@ -88,6 +90,43 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     }
 
   private:
+    /// PBC worst-case depth per function and lifted loop body.
+    llvm::StringMap<pbc::BothWorstCaseDepth> computeDepths(const ResourceAnalysis &analysis)
+    {
+        llvm::StringMap<pbc::BothWorstCaseDepth> depths;
+
+        // Swallow expected errors
+        // Happens when the depth is counter in dynamic loops.
+        ScopedDiagnosticHandler depthDiagHandler(
+            getOperation()->getContext(), [](Diagnostic &diag) {
+                if (diag.getSeverity() == DiagnosticSeverity::Error &&
+                    diag.str().find("worst-case depth") != std::string::npos) {
+                    return success();
+                }
+                return failure();
+            });
+
+        // Handle static loop bodies.
+        getOperation()->walk([&](func::FuncOp funcOp) {
+            if (funcOp.isDeclaration())
+                return;
+
+            pbc::PBCLayerContext layerContext;
+            depths[funcOp.getName()] =
+                layerContext.computeBothWorstCaseDepths(&funcOp.getBody().front());
+        });
+
+        // Handle dynamic loop bodies.
+        for (const auto &entry : analysis.getSyntheticLoopBodies()) {
+            llvm::outs() << "Synthetic loop body: " << entry.getKey() << "\n";
+            scf::ForOp forOp = entry.getValue();
+            pbc::PBCLayerContext layerContext;
+            depths[entry.getKey()] = layerContext.computeBothWorstCaseDepths(forOp.getBody());
+        }
+
+        return depths;
+    }
+
     /// Sum a ResourceResult's content into the pass's
     /// Statistic counters. Caller is responsible for choosing whether to
     /// pass a per-function or flattened result.
@@ -113,7 +152,8 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     }
 
     /// Serialize a single ResourceResult into a JSON object.
-    static llvm::json::Object resultToJson(const ResourceResult &result)
+    static llvm::json::Object resultToJson(const ResourceResult &result,
+                                           const pbc::BothWorstCaseDepth &depth)
     {
         llvm::json::Object funcObj;
 
@@ -163,6 +203,12 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         if (result.autoQubitManagement.has_value()) {
             funcObj["auto_qubit_management"] = *result.autoQubitManagement;
         }
+        llvm::json::Object depthObj;
+        if (depth) {
+            depthObj["depth_0"] = depth->first;
+            depthObj["depth_1"] = depth->second;
+        }
+        funcObj["depth"] = std::move(depthObj);
 
         return funcObj;
     }
@@ -170,18 +216,27 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     /// Serialize all per-function ResourceResults into a JSON string.
     /// qnode functions are inserted first so that the PennyLane reader
     /// (which uses the first entry) picks the correct function.
-    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results) const
+    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results,
+                                const llvm::StringMap<pbc::BothWorstCaseDepth> &depths) const
     {
         llvm::json::Object root;
 
+        auto addEntry = [&](StringRef name, const ResourceResult &result) {
+            pbc::BothWorstCaseDepth depth;
+            if (auto it = depths.find(name); it != depths.end()) {
+                depth = it->second;
+            }
+            root[name] = resultToJson(result, depth);
+        };
+
         for (const auto &funcEntry : results) {
             if (funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                addEntry(funcEntry.getKey(), funcEntry.getValue());
             }
         }
         for (const auto &funcEntry : results) {
             if (!funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                addEntry(funcEntry.getKey(), funcEntry.getValue());
             }
         }
 
