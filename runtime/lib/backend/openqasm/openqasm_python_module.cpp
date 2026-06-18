@@ -14,6 +14,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -95,10 +96,16 @@ extern "C" NB_EXPORT double var(const char *_circuit, const char *_device, size_
     std::string device(_device);
     std::string kwargs(_kwargs);
 
-    // Evaluate in scope of main module
-    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
-    nb::exec(nb::str(program.c_str()), scope);
-    return nb::cast<double>(scope["py_var"](circuit, device, kwargs, shots).attr("__getitem__")(0));
+    try {
+        // Evaluate in scope of main module
+        nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+        nb::exec(nb::str(program.c_str()), scope);
+        return nb::cast<double>(
+            scope["py_var"](circuit, device, kwargs, shots).attr("__getitem__")(0));
+    }
+    catch (const nb::python_error &error) {
+        throw std::runtime_error("Unable to compute variance");
+    }
 }
 
 extern "C" NB_EXPORT double expval(const char *_circuit, const char *_device, size_t shots,
@@ -111,11 +118,16 @@ extern "C" NB_EXPORT double expval(const char *_circuit, const char *_device, si
     std::string device(_device);
     std::string kwargs(_kwargs);
 
-    // Evaluate in scope of main module
-    nb::object scope = nb::module_::import_("__main__").attr("__dict__");
-    nb::exec(nb::str(program.c_str()), scope);
-    return nb::cast<double>(
-        scope["py_expval"](circuit, device, kwargs, shots).attr("__getitem__")(0));
+    try {
+        // Evaluate in scope of main module
+        nb::object scope = nb::module_::import_("__main__").attr("__dict__");
+        nb::exec(nb::str(program.c_str()), scope);
+        return nb::cast<double>(
+            scope["py_expval"](circuit, device, kwargs, shots).attr("__getitem__")(0));
+    }
+    catch (nb::python_error &error) {
+        throw std::runtime_error("Unable to compute expectation value");
+    }
 }
 
 extern "C" NB_EXPORT void samples(const char *_circuit, const char *_device, size_t shots,
