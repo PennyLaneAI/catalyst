@@ -118,7 +118,6 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
         // Handle dynamic loop bodies.
         for (const auto &entry : analysis.getSyntheticLoopBodies()) {
-            llvm::outs() << "Synthetic loop body: " << entry.getKey() << "\n";
             scf::ForOp forOp = entry.getValue();
             pbc::PBCLayerContext layerContext;
             depths[entry.getKey()] = layerContext.computeBothWorstCaseDepths(forOp.getBody());
