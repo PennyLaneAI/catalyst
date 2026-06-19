@@ -414,7 +414,7 @@ bool PBCLayer::commuteToLayer(PBCOpInterface op)
 
 bool PBCLayer::isSameBlock(PBCOpInterface op) const
 {
-    if (ops.empty()){
+    if (ops.empty()) {
         return true;
     }
     return op->getBlock() == ops.back()->getBlock();
