@@ -1225,6 +1225,7 @@ class TestLoweringFabricateOp:
 
                 // CHECK: [[cb1:%.+]] = func.call @apply_T([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
                 %2 = func.call @apply_T(%0) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                return
             }
             //      CHECK-LABEL: func.func private @apply_T([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
             // CHECK: func.call @fabricate_magic_Steane() : () -> !qecp.codeblock<1 x 7>
