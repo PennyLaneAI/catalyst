@@ -342,7 +342,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             if (parity.isTrivial()) {
                 removeGates(contributors);
             }
-            else if (contributors.gateCount() > 1) {
+            else if (!parity.isUnsat() && contributors.gateCount() > 1) {
                 double angleSum = sumAngles(contributors);
                 if (!contributors.isMergeTargetAffineZero()) {
                     angleSum = -angleSum;
@@ -398,3 +398,4 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 } // namespace catalyst
 
 // Currently ignoring any blocks or dynamic allocations, only capturing pure quantum circuits.
+// quantum.insert?
