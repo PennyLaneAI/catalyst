@@ -1738,7 +1738,7 @@ class TestMeasurementProcesses:
         inserting the appropriate post-processing functions to recover the expectation value
         measurement from the samples.
         """
-        dev = qp.device("null.qubit", wires=1)
+        dev = qp.device("null.qubit", wires=2)
 
         @qp.qjit(capture=True, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
