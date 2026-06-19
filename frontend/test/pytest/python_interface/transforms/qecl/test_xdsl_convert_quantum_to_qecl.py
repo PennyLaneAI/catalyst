@@ -790,6 +790,65 @@ class TestMeasurePattern:
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
 
+# MARK: TestCompBasisPattern
+
+
+class TestCompBasisPattern:
+    """Unit tests for the `compbasis` op conversion pattern of the convert-quantum-to-qecl pass."""
+
+    def test_compbasis_qubits_1_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that computational-basis observable ops (`quantum.compbasis`) acting on qubits are
+        converted to `qecl.measure` and `quantum.mcmobs` where the number of qubits is 1, and for
+        k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[mres:%.+]], [[cb1:%.+]] = qecl.measure [[cb0]][0] : i1, !qecl.codeblock<1>
+            // CHECK: [[obs:%.+]] = quantum.mcmobs %1 : !quantum.obs
+            %obs = quantum.compbasis qubits %1 : !quantum.obs
+
+            // CHECK: quantum.sample [[obs]] : tensor<100x1xf64>
+            %samples = quantum.sample %obs : tensor<100x1xf64>
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_compbasis_qubits_2_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that computational-basis observable ops (`quantum.compbasis`) acting on qubits are
+        converted to `qecl.measure` and `quantum.mcmobs` where the number of qubits is 2, and for
+        k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %2 = "test.op"() : () -> !qecl.codeblock<1>
+            %3 = builtin.unrealized_conversion_cast %2 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK-DAG: [[mres2:%.+]], [[cb2:%.+]] = qecl.measure [[cb0]][0] : i1, !qecl.codeblock<1>
+            // CHECK-DAG: [[mres3:%.+]], [[cb3:%.+]] = qecl.measure [[cb1]][0] : i1, !qecl.codeblock<1>
+            //     CHECK: [[obs:%.+]] = quantum.mcmobs [[mres2]], [[mres3]] : !quantum.obs
+            %obs = quantum.compbasis qubits %1, %3 : !quantum.obs
+
+            // CHECK: quantum.sample [[obs]] : tensor<100x1xf64>
+            %samples = quantum.sample %obs : tensor<100x1xf64>
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+
 # MARK: TestInvalidInputIR
 
 
@@ -1418,6 +1477,117 @@ class TestControlFlow:
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
 
+# MARK: Measurement Processes
+
+
+class TestMeasurementProcesses:
+    """Unit/integration tests for input quantum-dialect programs with various terminal measurement
+    processes.
+
+    In all the tests below, we use the dynamic-one-shot MCM method, which creates a kernel function
+    in the IR that computes the result for a single shot, with a post-processing function to pack
+    these results into a tensor that contains the results of all shots. When the observable to the
+    sampling op is an MCM observable, the MCM results are used directly (after casting to the
+    appropriate type) and the `quantum.sample` op is removed.
+    """
+
+    def test_sample_mcms_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program whose terminal measurement is a sample
+        on a single MCM.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            # CHECK-NOT: quantum.measure
+            # CHECK-NOT: quantum.mcmobs
+            # CHECK-NOT: quantum.sample
+            # CHECK: qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui {{%.+}} : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+            m0 = qp.measure(0)
+            return qp.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    def test_sample_qubit_1_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program whose terminal measurement is a sample
+        on a single qubit.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            # CHECK-NOT: quantum.compbasis
+            # CHECK-NOT: quantum.sample
+            # CHECK: [[mres:%.+]], [[cb0:%.+]] = qecl.measure
+            # CHECK: [[hreg:%.+]] = qecl.insert_block {{.*}}, [[cb0]]
+            # CHECK: qecl.dealloc [[hreg]]
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+            return qp.sample(wires=[0])
+
+        run_filecheck_qjit(circuit)
+
+    def test_sample_qubit_2_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program whose terminal measurement is a sample
+        on two qubits.
+        """
+        dev = qp.device("null.qubit", wires=2)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # pylint: disable=line-too-long
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            # CHECK-NOT: quantum.compbasis
+            # CHECK-NOT: quantum.sample
+            # CHECK: [[mres0:%.+]], [[cb0:%.+]] = qecl.measure
+            # CHECK: [[mres1:%.+]], [[cb1:%.+]] = qecl.measure
+            # CHECK: [[hreg0:%.+]] = qecl.insert_block {{.*}}, [[cb0]]
+            # CHECK: [[hreg1:%.+]] = qecl.insert_block {{.*}}, [[cb1]]
+            # CHECK: qecl.dealloc [[hreg1]]
+            # CHECK: [[mres0_i64:%.+]] = arith.extui [[mres0]] : i1 to i64
+            # CHECK: [[mres0_f64:%.+]] = arith.sitofp [[mres0_i64]] : i64 to f64
+            # CHECK: [[mres1_i64:%.+]] = arith.extui [[mres1]] : i1 to i64
+            # CHECK: [[mres1_f64:%.+]] = arith.sitofp [[mres1_i64]] : i64 to f64
+            # CHECK: [[mres_1x2xf64:%.+]] = tensor.from_elements [[mres0_f64]], [[mres1_f64]] : tensor<1x2xf64>
+            # CHECK: return [[mres_1x2xf64]] : tensor<1x2xf64>
+            return qp.sample(wires=[0, 1])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.xfail(reason="Sampling quantum register not implemented", raises=CompileError)
+    def test_sample_register_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program whose terminal measurement is a sample
+        on the quantum register.
+        """
+        dev = qp.device("null.qubit", wires=2)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            return qp.sample()
+
+        run_filecheck_qjit(circuit)
+
+
 # MARK: Integration Tests
 
 
@@ -1445,14 +1615,13 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.qec
             # CHECK: apply_T
             # CHECK: qecl.measure {{%.+}}[0]
-            # CHECK: qecl.insert_block
             # CHECK: quantum.mcmobs
+            # CHECK: qecl.insert_block
             # CHECK: quantum.sample
             # CHECK: qecl.dealloc
             qp.H(0)
             qp.T(0)
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -1483,16 +1652,13 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.measure
             # CHECK: qecl.measure
             # CHECK: qecl.measure
-            # CHECK: qecl.insert_block
             # CHECK: quantum.mcmobs
+            # CHECK: qecl.insert_block
             # CHECK: quantum.sample
             # CHECK: qecl.dealloc
             qp.H(0)
             qp.CNOT([0, 1])
             qp.CNOT([1, 2])
-            m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            m2 = qp.measure(2)
-            return qp.sample([m0, m1, m2])
+            return qp.sample(wires=[0, 1, 2])
 
         run_filecheck_qjit(circuit)
