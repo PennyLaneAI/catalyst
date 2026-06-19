@@ -72,6 +72,7 @@ with Patcher(
         MeasureOp,
         MultiRZOp,
         NamedObsOp,
+        OperatorOp,
         PauliRotOp,
         PCPhaseOp,
         QubitUnitaryOp,
@@ -164,6 +165,7 @@ qref_measure_in_basis_p = Primitive("qref_measure_in_basis")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
+qref_operator_op = Primitive("qref_operator")
 
 
 #
@@ -797,6 +799,29 @@ def _qref_named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value,
 
     return NamedObsOp(result_type, qubit, obsId).results
 
+qref_operator_op.multiple_results = True
+
+@qref_operator_op.def_abstract_eval
+def _qref_operator_op_abstract_eval(*args, **kwargs):
+    return []
+
+def _operator_op_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, hybrid_lens, hybrid_trees, wire_lens, **static_args):
+    params = args[:len(op_cls.dynamic_argnames)]
+    qubits = args[len(op_cls.dynamic_argnames):]
+    
+    name_attr = ir.StringAttr.get(op_cls.__name__)
+    
+    OperatorOp(op_name=name_attr,
+               params = params,
+               qubits = qubits,
+               forward_args=[],
+               ctrl_qubits=[],
+               ctrl_values=[],
+               adjoint=False,
+               UID=None,
+               arr_qubit_indices=[]
+               )
+    return []
 
 #
 # hermitian observable
@@ -821,6 +846,7 @@ def _qref_hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value
 
 
 CUSTOM_LOWERING_RULES = (
+    (qref_operator_op, _operator_op_lowering),
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
     (qref_get_p, _qref_get_lowering),

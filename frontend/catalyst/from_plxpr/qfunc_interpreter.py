@@ -25,6 +25,7 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.sharding_impls import UNSPECIFIED
 from pennylane.capture import PlxprInterpreter, pause
+from pennylane.core.operator.operator2 import operator_p
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
@@ -51,6 +52,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_set_basis_state_p,
     qref_set_state_p,
     qref_unitary_p,
+    qref_operator_op,
 )
 from catalyst.jax_primitives import (
     counts_p,
@@ -288,6 +290,26 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         and no **kwargs) and the results is a sequence of values
         """
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
+def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
+
+    if hybrid_lens or hybrid_trees:
+        raise NotImplementedError
+
+    wire_inputs = args[len(op_cls.dynamic_argnames):]
+    new_wires = [w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs]
+
+    qref_operator_op.bind(
+        *args[:len(op_cls.dynamic_argnames)],
+        *new_wires,
+        op_cls=op_cls,
+        hybrid_lens=hybrid_lens,
+        hybrid_trees=hybrid_trees,
+        **kwargs
+    )
+    return []
 
 
 # pylint: disable=unused-argument, too-many-arguments
