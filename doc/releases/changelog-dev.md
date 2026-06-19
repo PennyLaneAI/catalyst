@@ -142,6 +142,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
+  the top-level module. Functions inside nested modules, such as kernels called through
+  `catalyst.launch_kernel`, are now included in the output.
+  [(#2961)](https://github.com/PennyLaneAI/catalyst/pull/2961)
+
 * Fixed a bug in `DecompRuleInterpreter.cleanup` by replacing fragile string-based operator
   checks with strict type-based checking.
   [(#2873)](https://github.com/PennyLaneAI/catalyst/pull/2873)
@@ -332,6 +337,10 @@
     [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
   - While loops (`scf.while`)
     [(#2905)](https://github.com/PennyLaneAI/catalyst/pull/2905)
+
+* The experimental QEC pipeline now supports programs that sample wires, where before it only
+  supported sampling mid-circuit measurements.
+  [(#2941)](https://github.com/PennyLaneAI/catalyst/pull/2941)
 
 <h3>Documentation 📝</h3>
 

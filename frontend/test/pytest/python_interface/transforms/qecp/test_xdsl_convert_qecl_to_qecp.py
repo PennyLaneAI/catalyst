@@ -1441,17 +1441,14 @@ class TestQECPLoweringIntegration:
             # CHECK: func.call @measure_transversal_Steane
             # CHECK: func.call @measure_transversal_Steane
             # CHECK: func.call @measure_transversal_Steane
-            # CHECK: qecp.insert_block
             # CHECK: quantum.mcmobs
+            # CHECK: qecp.insert_block
             # CHECK: quantum.sample
             # CHECK: qecp.dealloc
             qp.H(0)
             qp.CNOT([0, 1])
             qp.CNOT([1, 2])
-            m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            m2 = qp.measure(2)
-            return qp.sample([m0, m1, m2])
+            return qp.sample(wires=[0, 1, 2])
 
         run_filecheck_qjit(circuit)
 
@@ -1478,7 +1475,6 @@ class TestQECPLoweringIntegration:
             # CHECK: func.call @noise_subroutine_code
             # CHECK: func.call @qec_cycle_Steane
             # CHECK: func.call @measure_transversal_Steane
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)

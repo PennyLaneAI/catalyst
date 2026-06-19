@@ -1012,3 +1012,32 @@ func.func @qref(%arg0: !qref.bit, %arg1: !qref.reg<2>) {
     qref.dealloc %0 : !qref.reg<2>
     return
 }
+
+// -----
+
+// Resource analysis should include functions inside nested modules.
+
+// CHECK-LABEL: "circuit"
+// CHECK: "num_alloc_qubits": 1
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 1
+
+// CHECK-LABEL: "jit_circuit"
+// CHECK: "catalyst.launch_kernel": 1
+module @nested_resource_module {
+  func.func public @jit_circuit() attributes {llvm.emit_c_interface} {
+    catalyst.launch_kernel @module_circuit::@circuit() : () -> ()
+    return
+  }
+
+  module @module_circuit {
+    func.func public @circuit() attributes {quantum.node} {
+      %0 = quantum.alloc( 1) : !quantum.reg
+      %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+      %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
+      %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+      quantum.dealloc %3 : !quantum.reg
+      return
+    }
+  }
+}
