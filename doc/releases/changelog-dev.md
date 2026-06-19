@@ -235,6 +235,7 @@
   [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
   [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
   [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
+  [(#2927)](https://github.com/PennyLaneAI/catalyst/pull/2927)
   [(#2955)](https://github.com/PennyLaneAI/catalyst/pull/2955)
 
 * The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower
@@ -311,6 +312,10 @@
 * The experimental QEC pipeline now supports compilation and execution of circuits that only
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
+* The experimental QEC pipeline now only generates subroutines for operations present in the
+  compiled circuit, rather than generating all QEC subroutines.
+  [(#2929)](https://github.com/PennyLaneAI/catalyst/pull/2929)
 
 * More conservative casting to tracer arrays in conditionals to preserve constant (static) values
   better. This can be useful for optimizations that depend on values being static.
