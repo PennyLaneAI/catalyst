@@ -232,7 +232,7 @@ class FabricateOpConversion(RewritePattern):
         supported_states = list(self.fabricate_subroutines)
         if op.init_state.data not in supported_states:  # pragma: no cover
             raise NotImplementedError(
-                "Lowering qecl.FabricateOp to the qecp dialect is only implemented "
+                f"Lowering qecl.FabricateOp to the qecp dialect is only implemented "
                 f"for the following init_states: {supported_states}"
             )
 
@@ -307,8 +307,8 @@ class MeasureOpConversion(RewritePattern):
 
     qec_code: QecCode
 
-    measure_subroutine: func.FuncOp
-    physical_meas_decode_subroutine: func.FuncOp
+    measure_subroutine: func.FuncOp | None
+    physical_meas_decode_subroutine: func.FuncOp | None
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: qecl.MeasureOp, rewriter: PatternRewriter):
@@ -322,6 +322,15 @@ class MeasureOpConversion(RewritePattern):
         assert k == self.qec_code.k, (
             f"Value mismatch: codeblock {op.out_codeblock} has k = {k} but QEC code has "
             f"k = {self.qec_code.k}"
+        )
+
+        assert (
+            self.measure_subroutine is not None
+        ), f"Program contains at least one '{op.name}' op but the measurement subroutine is None"
+
+        assert self.physical_meas_decode_subroutine is not None, (
+            f"Program contains at least one '{op.name}' op but the decode-physical-measurement "
+            "subroutine is None"
         )
 
         ops_to_insert = (
@@ -473,6 +482,22 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             n=self.qec_code.n, number_errors=self.number_errors
         ).apply(ctx, op)
 
+        # establish which optional subroutines will be needed for this circuit
+        uses_measure = False
+        circuit_gate_ops = set()
+        used_init_states = set()
+
+        for inner_op in op.walk():
+            if isinstance(inner_op, (qecl.SingleQubitLogicalGateOp, qecl.CnotOp)):
+                gate_name = inner_op.name.split(".")[1]
+                if getattr(inner_op, "adjoint", False):
+                    gate_name += "_adj"
+                circuit_gate_ops.add(gate_name)
+            elif isinstance(inner_op, qecl.FabricateOp):
+                used_init_states.add(inner_op.init_state.data)
+            elif isinstance(inner_op, qecl.MeasureOp):
+                uses_measure = True
+
         module_block = op.regions[0].blocks.first
         assert module_block is not None, "Module has no block"
 
@@ -483,22 +508,26 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         qec_cycle_subroutine = self.create_qec_cycle_subroutine()
         module_block.add_op(qec_cycle_subroutine)
 
-        measure_subroutine = self.create_measure_subroutine()
-        module_block.add_op(measure_subroutine)
+        # Insert measurement subroutines
+        measure_subroutine = None
+        physical_meas_decode_subroutine = None
 
-        physical_meas_decode_subroutine = self.create_physical_meas_decode_subroutine()
-        module_block.add_op(physical_meas_decode_subroutine)
+        if uses_measure:
+            measure_subroutine = self.create_measure_subroutine()
+            physical_meas_decode_subroutine = self.create_physical_meas_decode_subroutine()
+            module_block.add_op(measure_subroutine)
+            module_block.add_op(physical_meas_decode_subroutine)
 
-        fabricate_subroutines = self.create_fabricate_subroutines()
+        # Insert subroutines for state evolution ops
+        fabricate_subroutines = self.create_fabricate_subroutines(used_init_states)
         for subroutine in fabricate_subroutines.values():
             module_block.add_op(subroutine)
 
         # 1Q gate and 2Q gate subroutines are returned as dicts storing
         # {"gate_name": subroutine_funcop}
-        transversal_gate_subroutines = (
-            self.create_transversal_1Qgate_subroutines()
-            | self.create_transversal_2Qgate_subroutines()
-        )
+        transversal_gate_subroutines = self.create_transversal_1Qgate_subroutines(
+            circuit_gate_ops
+        ) | self.create_transversal_2Qgate_subroutines(circuit_gate_ops)
         for subroutine in transversal_gate_subroutines.values():
             module_block.add_op(subroutine)
 
@@ -819,23 +848,27 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     # MARK: Fabricate subroutines
 
-    def create_fabricate_subroutines(self) -> dict[str, func.FuncOp]:
+    def create_fabricate_subroutines(self, used_init_states: set[str]) -> dict[str, func.FuncOp]:
         """Create a subroutine that allocates a codeblock and encodes it in the magic state for
         the QEC code (based on the tanner graph), and returns the encoded codeblock. This is a
         non-fault tolerant encoding intended for use on a simulator, and not a distillation process
         for generating a magic state from many noisy copies.
 
+        Args:
+            used_init_states (set[str]): the init_states used in the circuit being compiled.
+                The function will create only the subroutines relevant to the current circuit.
+
         The encoding process follows the third option for magic state encoding described in
-        https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that the correction is
-        SX as decribed in Nielsen & Chuang, (Section 10.6.2), rather than a single NOT gate.
-        This was found to produce the correct result for circuit simulations.
+        https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that when using it to
+        apply a T-gate, the correction is SX as described in Nielsen & Chuang, (Section 10.6.2),
+        rather than a single NOT gate. This produces the correct result for circuit simulations.
 
         The encoding method involves putting the initial QEC physical qubit in the desired state
         via application of a Hadamard and physical T gate, and then using the gate encoding for the
         zero state to create the desired state for the codeblock. Note that we do not use the
         syndrome-measurement based encoding that we use for `encode [zero]`; the unitary
         encoder maps an arbitrary input |psi> -> |psi_L>, whereas the stabilizer-measurement
-        enocding procedure only projects the input state onto the codespace.
+        encoding procedure only projects the input state onto the codespace.
 
         Note that this method does not insert the subroutine into the module op. Instead it
         returns the built func.FuncOp object that can then be subsequently inserted where desired.
@@ -852,7 +885,12 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         subroutines = {}
 
-        for init_state in ["magic", "magic_conj"]:
+        for init_state in used_init_states:
+
+            assert init_state in {
+                "magic",
+                "magic_conj",
+            }, "Only initial states 'magic' and 'magic_conj' are implemented for qecl.fabricate"
 
             codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
             input_types = ()
@@ -915,8 +953,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     # MARK: 1Q gate subroutines
 
-    def create_transversal_1Qgate_subroutines(self) -> dict[str, func.FuncOp]:
+    def create_transversal_1Qgate_subroutines(
+        self, circuit_gate_ops: set[str]
+    ) -> dict[str, func.FuncOp]:
         """Create the subroutines that performs transversal 1-qubit gates on a physical codeblock.
+
+        Args:
+            circuit_gate_ops (set[str]): the gate ops found in the circuit being compiled.
+                The function will create only the subroutines relevant to the current circuit.
 
         The subroutines are built based on the gate and codeblock indices defined in the specified
         ``QecCode``. For example, a code that specifies ``{"x": (qecp.PauliXOp, [2, 3])}`` as a
@@ -937,6 +981,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         output_types = (codeblock_type,)
 
         for gate_name, gate_info in single_qubit_gates.items():
+
+            if gate_name not in circuit_gate_ops:
+                # skip this one if it's not included in the circuit ops
+                continue
+
             gate_op, gate_indices = gate_info
 
             block = Block(arg_types=input_types)
@@ -976,8 +1025,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     # MARK: 2Q gate subroutines
 
-    def create_transversal_2Qgate_subroutines(self) -> dict[str, func.FuncOp]:
+    def create_transversal_2Qgate_subroutines(
+        self, circuit_gate_ops: set[str]
+    ) -> dict[str, func.FuncOp]:
         """Create the subroutines that perform transversal 2-qubit gates on a physical codeblock.
+
+        Args:
+            circuit_gate_ops (set[str]): the gate ops found in the circuit being compiled.
+                The function will create only the subroutines relevant to the current circuit.
 
         This implementation assumes the gate is applied transversally between all corresponding
         qubit pairs in the two codeblocks.
@@ -992,6 +1047,10 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         output_types = (codeblock_type, codeblock_type)
 
         for gate_name, gate_op in self.qec_code.transversal_2q_gates.items():
+
+            if gate_name not in circuit_gate_ops:
+                # skip this one if it's not included in the circuit ops
+                continue
 
             block = Block(arg_types=input_types)
 
