@@ -946,6 +946,26 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     assert(succeeded(f.eraseArguments(eraseArgsIndices)));
 }
 
+SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, Operation *mod)
+{
+    SmallVector<IntegerAttr> qregSizesAtCallsite;
+    auto uses = SymbolTable::getSymbolUses(subroutine, mod);
+    if (uses) {
+        for (auto use : *uses) {
+            Operation *user = use.getUser();
+            if (auto callOp = dyn_cast<func::CallOp>(user)) {
+                for (Type t : callOp.getOperandTypes()) {
+                    if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
+                        qregSizesAtCallsite.push_back(qrefQuregType.getSize());
+                    }
+                }
+                break;
+            }
+        }
+    }
+    return qregSizesAtCallsite;
+}
+
 } // namespace
 
 namespace catalyst {
@@ -1014,23 +1034,8 @@ struct ReferenceSemanticsConversionPass
         // By default, scc iterates call graph in post order (callee before caller), so we reverse
         // the visit order.
         for (func::FuncOp subroutine : llvm::reverse(subroutinesPostOrder)) {
-            SmallVector<IntegerAttr> qregSizesAtCallsite;
-            auto uses = SymbolTable::getSymbolUses(subroutine, mod);
-            if (uses) {
-                for (auto use : *uses) {
-                    Operation *user = use.getUser();
-                    if (auto callOp = dyn_cast<func::CallOp>(user)) {
-                        for (Type t : callOp.getOperandTypes()) {
-                            if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
-                                qregSizesAtCallsite.push_back(qrefQuregType.getSize());
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
             QubitValueTracker tracker;
-            handleSubroutine(builder, subroutine, qregSizesAtCallsite);
+            handleSubroutine(builder, subroutine, collectQregSizesAtCallsite(subroutine, mod));
             if (failed(ensureNoValueSemanticsOps(subroutine))) {
                 subroutine.emitOpError(
                     "Detected remaining value semantics operations after conversion");
