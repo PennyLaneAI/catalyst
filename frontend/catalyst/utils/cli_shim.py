@@ -30,4 +30,9 @@ from catalyst.utils.runtime_environment import get_cli_path
 def main():
     """Run the Catalyst CLI."""
     binary = get_cli_path()
+    if not os.path.isfile(binary):  # pragma: nocover
+        raise FileNotFoundError(
+            f"Could not locate the `catalyst` executable at {binary}. "
+            "Please verify your installation or report the issue on GitHub."
+        )
     os.execv(binary, [binary, *sys.argv[1:]])

@@ -72,25 +72,27 @@ def get_libpython_path() -> str:  # pragma: no cover
 
 def get_lib_path(project, env_var):
     """Get the path to Catalyst's shared libraries."""
-    if INSTALLED:
-        return os.path.join(package_root, "lib")  # pragma: no cover
+    if INSTALLED:  # pragma: no cover
+        return os.path.join(package_root, "lib")
+
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
 def get_include_path():
     """Return the path to Catalyst's include directory."""
-    if INSTALLED:
-        return os.path.join(package_root, "include")  # pragma: no cover
+    if INSTALLED:  # pragma: no cover
+        return os.path.join(package_root, "include")
+
     return os.getenv("CATALYST_INCLUDE_DIRS", DEFAULT_INCLUDE_PATHS.get("mlir", ""))
 
 
-def get_cli_path() -> str:  # pragma: nocover
+def get_cli_path() -> str:
     """Method to obtain the Catalyst CLI path whether installed or locally built."""
     catalyst_cli = "catalyst"
 
-    if not INSTALLED:
-        return os.path.join(
-            os.getenv("CATALYST_BIN_DIR", DEFAULT_BIN_PATHS.get("cli", "")), catalyst_cli
-        )
+    if INSTALLED:  # pragma: nocover
+        return os.path.join(package_root, "bin", catalyst_cli)
 
-    return os.path.join(package_root, "bin", catalyst_cli)
+    return os.path.join(
+        os.getenv("CATALYST_BIN_DIR", DEFAULT_BIN_PATHS.get("cli", "")), catalyst_cli
+    )
