@@ -27,7 +27,8 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.tree_util import tree_flatten
 
-from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, zne_p
+from catalyst.api_extensions.rem_postprocessing import rem_apply_to_samples, rem_calibrate
+from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, rem_p, zne_p
 from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
 
@@ -160,6 +161,25 @@ def mitigate_with_zne(
     return ZNECallable(fn, scale_factors, extrapolate, folding)
 
 
+def mitigate_with_rem(fn=None, *, compute_all_zeroes_ones: bool = False):
+    """A qjit-compatible frontend that emits a `mitigation.rem` operation.
+
+    Takes a boolean ``compute_all_zeroes_ones`` flag that is forwarded to the
+    lowering as an attribute on the `mitigation.rem` op. When ``True``, the
+    mitigation-lowering pass also emits the all-zeros and all-ones calibration
+    circuits and this callable runs the classical REM post-processing on the
+    three resulting sample arrays.
+    """
+
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(mitigate_with_rem, **kwargs)
+
+    return RemCallable(fn, compute_all_zeroes_ones=compute_all_zeroes_ones)
+
+
 ## IMPL ##
 class ZNECallable(CatalystCallable):
     """An object that specifies how a circuit is mitigated with ZNE.
@@ -233,6 +253,97 @@ class ZNECallable(CatalystCallable):
         if len(zne_results.shape):
             zne_results = tuple(zne_results)
         return zne_results
+
+
+class RemCallable(CatalystCallable):
+    """An object that specifies how a circuit is mitigated with REM.
+
+    Args:
+        fn (Callable): the circuit to be mitigated with REM.
+        compute_all_zeroes_ones (bool): forwarded to the lowering as an
+            attribute on the ``mitigation.rem`` op. When ``True``, the pass
+            emits the all-zeros and all-ones calibration circuits next to the
+            user circuit and this callable applies classical post-processing
+            to the three sample arrays. SampleMP is currently the only
+            measurement type whose post-processing is wired up; for ProbsMP
+            and CountsMP the three raw outputs are returned as a tuple.
+
+    Raises:
+        TypeError: Non-QNode object was passed as ``fn``.
+    """
+
+    def __init__(self, fn: Callable, compute_all_zeroes_ones: bool = False):
+        functools.update_wrapper(self, fn)
+        self.fn = fn
+        self.__name__ = f"rem.{getattr(fn, '__name__', 'unknown')}"
+        self.compute_all_zeroes_ones = bool(compute_all_zeroes_ones)
+        super().__init__("fn")
+
+    def __call__(self, *args, **kwargs):
+        callable_fn = _wrap_callable(self.fn)
+        jaxpr = jax.make_jaxpr(callable_fn)(*args)
+
+        args_data, _ = tree_flatten(args)
+
+        assert jaxpr.eqns, "expected non-empty jaxpr for rem target"
+        assert jaxpr.eqns[0].primitive in {func_p, quantum_kernel_p}, (
+            "expected func_p or quantum_kernel_p as first operation in rem target"
+        )
+        callable_fn = jaxpr.eqns[0].params.get("fn", callable_fn)
+        assert callable(callable_fn), (
+            "expected callable set as param on the first operation in rem target"
+        )
+
+        # Identify the measurement process by walking the inner jaxpr, matching
+        # the logic in `_rem_abstract_eval`.
+        mp_kind = None
+        for eqn in jaxpr.eqns:
+            inner = eqn.params.get("call_jaxpr", None)
+            if inner is None:
+                continue
+            for op_eq in inner.eqns:
+                pname = str(op_eq.primitive)
+                if pname in ("probs", "sample", "counts"):
+                    mp_kind = pname
+                    break
+            if mp_kind is not None:
+                break
+
+        rem_results = rem_p.bind(
+            *args_data,
+            compute_all_zeroes_ones=self.compute_all_zeroes_ones,
+            jaxpr=jaxpr,
+            fn=callable_fn,
+        )
+
+        # With calibration disabled the lowering forwards only the callee
+        # result plus two placeholder zero tensors, so surface just the result.
+        if not self.compute_all_zeroes_ones:
+            return rem_results[0]
+
+        if mp_kind == "sample":
+            qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
+            assert qnode_obj is not None, (
+                "REM SampleMP post-processing requires a QNode target"
+            )
+            n_qubits = len(qnode_obj.device.wires)
+
+            # quantum.sample returns f64 in catalyst; the REM helpers index
+            # confusion matrices by bit value and need an integer dtype.
+            user_samples = rem_results[0].astype(jnp.int32)
+            zeros_samples = rem_results[1].astype(jnp.int32)
+            ones_samples = rem_results[2].astype(jnp.int32)
+            measured_qubits = jnp.arange(n_qubits, dtype=jnp.int32)
+
+            confusion_matrices = rem_calibrate(zeros_samples, ones_samples)
+            unique_bitstrings, mitigated_counts = rem_apply_to_samples(
+                user_samples, confusion_matrices, measured_qubits, n_qubits
+            )
+            return unique_bitstrings, mitigated_counts
+
+        # ProbsMP / CountsMP post-processing is not yet wired up; return the
+        # three raw outputs as a tuple so user code can post-process them.
+        return tuple(rem_results)
 
 
 def polynomial_extrapolation(degree):

@@ -26,7 +26,7 @@ import jax
 import numpy as np
 import pennylane as qp
 from jax._src import core, source_info_util, util
-from jax._src.core import pytype_aval_mappings
+from jax._src.core import pytype_aval_mappings, subjaxprs
 from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
@@ -86,7 +86,7 @@ with Patcher(
         ValueAndGradOp,
         VJPOp,
     )
-    from mlir_quantum.dialects.mitigation import ZneOp
+    from mlir_quantum.dialects.mitigation import RemOp, ZneOp
     from mlir_quantum.dialects.pbc import PPMeasurementOp
     from mlir_quantum.dialects.quantum import (
         AdjointOp,
@@ -276,6 +276,8 @@ class Folding(Enum):
 ##############
 
 zne_p = Primitive("zne")
+rem_p = Primitive("rem")
+rem_p.multiple_results = True
 device_init_p = Primitive("device_init")
 device_init_p.multiple_results = True
 device_release_p = Primitive("device_release")
@@ -1081,6 +1083,99 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
         _folding_attribute(ctx, folding),
         num_folds,
     ).results
+
+
+@rem_p.def_impl
+def _rem_def_impl(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@rem_p.def_abstract_eval
+def _rem_abstract_eval(*args, compute_all_zeroes_ones, jaxpr, fn):  # pylint: disable=unused-argument
+    """Abstract eval for the REM primitive.
+
+    Returns a 3-tuple of avals matching the lowering's three results:
+    the callee's measurement result, an all-zeros calibration result, and
+    an all-ones calibration result. Calibration shapes/dtypes are derived
+    from the QNode's device size and the measurement-process kind on the
+    inner jaxpr (probs vs. sample).
+    """
+    qnode = jaxpr.eqns[0].params['qnode']
+    device_qubit_count = len(qnode.device.wires)
+    device_shot_count = qnode.shots.total_shots
+
+    mp = None
+    for eqn in subjaxprs(jaxpr):
+        for op_eq in eqn.eqns:
+            if str(op_eq.primitive) in ("probs", "sample"):
+                mp = str(op_eq.primitive)
+                break
+        if mp is not None:
+            break
+
+    if mp == "probs":
+        prob_size = 2 << (device_qubit_count - 1)
+        prob_aval = core.ShapedArray((prob_size,), dtype=jax.numpy.dtype("float64"))
+        return (jaxpr.out_avals[0], prob_aval, prob_aval)
+    elif mp == "sample":
+        # Catalyst's quantum.sample lowering produces an f64 tensor (see
+        # `_sample_lowering`). The Mitigation pass also creates calibration
+        # sample tensors as f64, so the abstract dtype here must match -
+        # mismatched dtypes would fail MLIR verification when wiring up the
+        # RemOp result types.
+        sample_aval = core.ShapedArray(
+            (device_shot_count, device_qubit_count), dtype=jax.numpy.dtype("float64")
+        )
+        return (jaxpr.out_avals[0], sample_aval, sample_aval)
+    raise NotImplementedError(
+        f"REM only supports probs/sample measurements; got {mp!r}"
+    )
+
+            
+
+
+def _rem_lowering(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):
+    """Lowering function for the REM primitive.
+
+    Emits a ``mitigation.rem`` op with the callee symbol-ref + the boolean
+    ``computeAllZeroesOnes`` attribute. The op has one variadic callee result
+    plus two fixed-shape calibration results (zeros / ones), matching the
+    three avals produced by :func:`_rem_abstract_eval`.
+    """
+    func_op = lower_jaxpr(ctx, jaxpr)
+    symbol_ref = get_symbolref(ctx, func_op)
+    callee_output_types = list(map(mlir.aval_to_ir_types, [ctx.avals_out[0]]))
+    zeros_output_types = list(map(mlir.aval_to_ir_types, [ctx.avals_out[1]]))
+    ones_output_types = list(map(mlir.aval_to_ir_types, [ctx.avals_out[2]]))
+    flat_callee_output_types = util.flatten(callee_output_types)
+    # The zeros/ones operands are non-variadic in the .td, so a single type
+    # (not a list) is what the op constructor expects.
+    flat_zeros_output_types = util.flatten(zeros_output_types)[0]
+    flat_ones_output_types = util.flatten(ones_output_types)[0]
+
+    constants = []
+    for const in jaxpr.consts:
+        const_type = ir.RankedTensorType.get(const.shape, mlir.dtype_to_ir_type(const.dtype))
+        nparray = np.asarray(const)
+        if const.dtype == bool:
+            nparray = np.packbits(nparray, bitorder="little")
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
+
+    args_and_consts = constants + list(args)
+    bool_attr = ir.BoolAttr.get(bool(compute_all_zeroes_ones))
+
+    rem_op = RemOp(
+        flat_callee_output_types,
+        flat_zeros_output_types,
+        flat_ones_output_types,
+        symbol_ref,
+        mlir.flatten_ir_values(args_and_consts),
+        computeAllZeroesOnes=bool_attr,
+    )
+
+    return rem_op.results
 
 
 #
@@ -3068,6 +3163,7 @@ def subroutine_lowering(*args, **kwargs):
 
 CUSTOM_LOWERING_RULES = (
     (zne_p, _zne_lowering),
+    (rem_p, _rem_lowering),
     (device_init_p, _device_init_lowering),
     (device_release_p, _device_release_lowering),
     (qalloc_p, _qalloc_lowering),
