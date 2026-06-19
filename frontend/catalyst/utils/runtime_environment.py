@@ -16,7 +16,6 @@
 
 import os
 import os.path
-import sys
 import sysconfig
 
 from catalyst._configuration import INSTALLED
@@ -86,7 +85,7 @@ def get_include_path():
 
 
 def get_cli_path() -> str:  # pragma: nocover
-    """Method to obtain the Catalyst CLI path packaged via the data_files mechanism."""
+    """Method to obtain the Catalyst CLI path whether installed or locally built."""
     catalyst_cli = "catalyst"
 
     if not INSTALLED:
@@ -94,28 +93,4 @@ def get_cli_path() -> str:  # pragma: nocover
             os.getenv("CATALYST_BIN_DIR", DEFAULT_BIN_PATHS.get("cli", "")), catalyst_cli
         )
 
-    # Default path
-    path = os.path.join(sysconfig.get_path("scripts"), catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    # User path
-    user_scheme = sysconfig.get_preferred_scheme("user")
-    path = os.path.join(sysconfig.get_path("scripts", scheme=user_scheme), catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    # Fallback to python location
-    path = os.path.join(os.path.dirname(sys.executable), catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    # Check the old bin directory location, which in rare scenarios may still be used
-    # (e.g. the configuration after `make wheel` has been run).
-    path = os.path.join(package_root, "..", "bin", catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    raise RuntimeError(
-        "Could not locate the Catalyst executable, please report this issue on GitHub."
-    )
+    return os.path.join(package_root, "bin", catalyst_cli)

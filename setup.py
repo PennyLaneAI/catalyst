@@ -167,6 +167,9 @@ entry_points = {
     "pennylane.drawer": [
         "draw_graph = catalyst:draw_graph",
     ],
+    "console_scripts": [
+        "catalyst = catalyst.utils.cli_shim:main",
+    ],
 }
 
 classifiers = [
@@ -391,15 +394,6 @@ options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x03
 # - `ops`: Path to the compiler operations module.
 # - `qjit`: Path to the JIT compiler decorator provided by the compiler.
 
-# Install the `catalyst` binary into the user's Python environment so it is accessible on the PATH.
-# Does not work with editable installs. Requires the Catalyst mlir module to be built.
-if os.path.exists("frontend/bin/catalyst"):
-    catalyst_cli = ["frontend/bin/catalyst"]
-elif os.path.exists("mlir/build/bin/catalyst"):
-    catalyst_cli = ["mlir/build/bin/catalyst"]
-else:
-    catalyst_cli = []
-
 setup(
     classifiers=classifiers,
     name="pennylane_catalyst",
@@ -418,9 +412,6 @@ setup(
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
-    data_files=[
-        ("bin", catalyst_cli),
-    ],
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     **description,
