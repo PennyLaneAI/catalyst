@@ -844,7 +844,7 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
     }
 }
 
-bool isQuantumSubroutine(func::FuncOp f)
+bool funcOpHasValueSemanticsOps(func::FuncOp f)
 {
     // quantum.node is not a subroutine
     if (f->hasAttrOfType<UnitAttr>("quantum.node")) {
@@ -869,7 +869,7 @@ bool isQuantumSubroutine(func::FuncOp f)
             auto funcOp = mlir::SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
                 callOp, callOp.getCalleeAttr());
             assert(funcOp && "calling a non-existent subroutine");
-            if (isQuantumSubroutine(funcOp)) {
+            if (funcOpHasValueSemanticsOps(funcOp)) {
                 return WalkResult::interrupt();
             }
         }
@@ -881,7 +881,6 @@ bool isQuantumSubroutine(func::FuncOp f)
 void handleSubroutine(IRRewriter &builder, func::FuncOp f,
                       const SmallVector<IntegerAttr> &qregSizesAtCallsite)
 {
-
     MLIRContext *ctx = f.getContext();
     OpBuilder::InsertionGuard guard(builder);
     Location loc = f->getLoc();
@@ -1003,7 +1002,7 @@ struct ReferenceSemanticsConversionPass
                 return signalPassFailure();
             }
 
-            if (!isQuantumSubroutine(subroutine)) {
+            if (!funcOpHasValueSemanticsOps(subroutine)) {
                 continue;
             }
 
