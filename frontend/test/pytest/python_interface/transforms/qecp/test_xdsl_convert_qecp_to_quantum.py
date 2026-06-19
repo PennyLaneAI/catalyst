@@ -1355,4 +1355,3 @@ class TestQECPassIntegration:
         eigenvalues = [-1 if s else 1 for s in samples]
         # could have a lower atol with more shots, but given test duration, not worth it
         assert np.isclose(np.mean(eigenvalues), expected_res, atol=0.07)
-
