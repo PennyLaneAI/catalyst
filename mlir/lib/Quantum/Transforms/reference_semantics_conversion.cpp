@@ -19,6 +19,7 @@
 #include <optional>
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -464,6 +465,141 @@ void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValu
     });
 }
 
+void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
+              SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(ifOp);
+    Location loc = ifOp->getLoc();
+
+    // Handle Then region
+    // Cannot just use `cascadeMapAhead` util to update the outside flow, since if op does not take
+    // in operands. We get the references from the yield op on the thenRegion
+    QubitValueTracker thenRegionTracker = tracker;
+    SmallVector<Value> yieldOpArgSave(ifOp.thenYield().getResults());
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getThenRegion().front().getTerminator()));
+    SmallVector<Operation *> thenRegionErasureWorklist =
+        handleRegion(builder, ifOp.getThenRegion(), thenRegionTracker, false).value();
+    for (auto [vqo, vqr] : llvm::zip_equal(yieldOpArgSave, ifOp.getResults())) {
+        if (isa<quantum::QubitType>(vqo.getType())) {
+            tracker.setRQubit(vqr, thenRegionTracker.getRQubit(vqo));
+        }
+        else if (isa<quantum::QuregType>(vqo.getType())) {
+            tracker.setRQreg(vqr, thenRegionTracker.getRQreg(vqo));
+        }
+    }
+    for (auto op : llvm::reverse(thenRegionErasureWorklist)) {
+        op->erase();
+    }
+    ifOp.getThenRegion().front().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+
+    // Handle Else region
+    QubitValueTracker elseRegionTracker = tracker;
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
+    handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
+    ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+
+    // The else block is empty if the only remaining op is the mandatory scf.yield terminator
+    bool hasElseRegion = &(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator();
+
+    // Collect classical returns of the old if op
+    SmallVector<unsigned> classicalReturnIndices;
+    SmallVector<Type> classicalReturnTypes;
+    for (auto [i, t] : llvm::enumerate(ifOp.getResultTypes())) {
+        if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
+            classicalReturnTypes.push_back(t);
+            classicalReturnIndices.push_back(i);
+        }
+    }
+    auto newIfOp = scf::IfOp::create(builder, loc, classicalReturnTypes, ifOp.getCondition(),
+                                     /*withElseRegion=*/hasElseRegion);
+    builder.eraseBlock(newIfOp.thenBlock());
+    builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
+                               newIfOp.getThenRegion().end());
+    if (hasElseRegion) {
+        builder.eraseBlock(newIfOp.elseBlock());
+        builder.inlineRegionBefore(ifOp.getElseRegion(), newIfOp.getElseRegion(),
+                                   newIfOp.getElseRegion().end());
+    }
+
+    // Update connection with outside
+    erasureWorklist.push_back(ifOp);
+    for (auto [oldResultIdx, newResult] :
+         llvm::zip_equal(classicalReturnIndices, newIfOp->getResults())) {
+        builder.replaceAllUsesWith(ifOp->getResult(oldResultIdx), newResult);
+    }
+}
+
+void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker,
+                  SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(switchOp);
+    Location loc = switchOp->getLoc();
+
+    // Collect classical returns of the old switch op
+    SmallVector<unsigned> classicalReturnIndices;
+    SmallVector<Type> classicalReturnTypes;
+    for (auto [i, t] : llvm::enumerate(switchOp.getResultTypes())) {
+        if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
+            classicalReturnTypes.push_back(t);
+            classicalReturnIndices.push_back(i);
+        }
+    }
+    auto newSwitchOp =
+        scf::IndexSwitchOp::create(builder, loc, classicalReturnTypes, switchOp.getArg(),
+                                   switchOp.getCases(), switchOp.getNumCases());
+
+    // Handle the default region
+    // Cannot just use `cascadeMapAhead` util to update the outside flow, since switch op does not
+    // take in operands. We get the references from the yield op on the default region
+    builder.inlineRegionBefore(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion(),
+                               newSwitchOp.getDefaultRegion().end());
+    QubitValueTracker defaultRegionTracker = tracker;
+    SmallVector<Value> yieldOpArgSave(newSwitchOp.getDefaultBlock().getTerminator()->getOperands());
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(newSwitchOp.getDefaultBlock().getTerminator()));
+    SmallVector<Operation *> defaultRegionErasureWorklist =
+        handleRegion(builder, newSwitchOp.getDefaultRegion(), defaultRegionTracker, false).value();
+    for (auto [vqo, vqr] : llvm::zip_equal(yieldOpArgSave, switchOp.getResults())) {
+        if (isa<quantum::QubitType>(vqo.getType())) {
+            tracker.setRQubit(vqr, defaultRegionTracker.getRQubit(vqo));
+        }
+        else if (isa<quantum::QuregType>(vqo.getType())) {
+            tracker.setRQreg(vqr, defaultRegionTracker.getRQreg(vqo));
+        }
+    }
+    for (auto op : llvm::reverse(defaultRegionErasureWorklist)) {
+        op->erase();
+    }
+    newSwitchOp.getDefaultBlock().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+
+    // Handle case regions
+    for (auto [oldCaseRegion, newCaseRegion] :
+         llvm::zip_equal(switchOp.getCaseRegions(), newSwitchOp.getCaseRegions())) {
+        // builder.eraseBlock(&(newCaseRegion.front()));
+        builder.inlineRegionBefore(oldCaseRegion, newCaseRegion, newCaseRegion.end());
+        QubitValueTracker caseRegionTracker = tracker;
+        eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(newCaseRegion.front().getTerminator()));
+        handleRegion(builder, newCaseRegion, caseRegionTracker);
+        newCaseRegion.front().eraseArguments([](BlockArgument arg) {
+            return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+        });
+    }
+
+    // Update connection with outside
+    erasureWorklist.push_back(switchOp);
+    for (auto [oldResultIdx, newResult] :
+         llvm::zip_equal(classicalReturnIndices, newSwitchOp->getResults())) {
+        builder.replaceAllUsesWith(switchOp->getResult(oldResultIdx), newResult);
+    }
+}
+
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker,
                SmallVector<Operation *> &erasureWorklist)
 {
@@ -640,8 +776,9 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
             .Case<quantum::AdjointOp>(
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
-            // .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
-            // .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
+            .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker, erasureWorklist); })
+            .Case<scf::IndexSwitchOp>(
+                [&](auto o) { handleSwitch(builder, o, tracker, erasureWorklist); })
             .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker, erasureWorklist); })
             .Case<scf::WhileOp>([&](auto o) { handleWhile(builder, o, tracker, erasureWorklist); })
             .Case<mbqc::GraphStatePrepOp>(
