@@ -233,19 +233,23 @@ PBCDepths PBCLayerContext::computePBCDepth(Block *block)
     if (failed(d0)) {
         auto p0 = computeBlockWorstCaseDepthNonzero(block, /*onlyOnDisjointQubit=*/false,
                                                     /*skipDynamic=*/true);
-        if (failed(p0) || !p0->has_value())
+        if (failed(p0) || !p0->has_value()) {
             return std::nullopt;
+        }
         auto p1 = computeBlockWorstCaseDepthNonzero(block, /*onlyOnDisjointQubit=*/true,
                                                     /*skipDynamic=*/true);
-        if (failed(p1) || !p1->has_value())
+        if (failed(p1) || !p1->has_value()) {
             return std::nullopt;
+        }
         return {{**p0, **p1}};
     }
-    if (*d0 == 0)
+    if (*d0 == 0) {
         return std::nullopt;
+    }
     auto d1 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/true);
-    if (failed(d1) || *d1 == 0)
+    if (failed(d1) || *d1 == 0) {
         return std::nullopt;
+    }
     return {{*d0, *d1}};
 }
 
@@ -410,8 +414,9 @@ bool PBCLayer::commuteToLayer(PBCOpInterface op)
 
 bool PBCLayer::isSameBlock(PBCOpInterface op) const
 {
-    if (ops.empty())
+    if (ops.empty()){
         return true;
+    }
     return op->getBlock() == ops.back()->getBlock();
 }
 
