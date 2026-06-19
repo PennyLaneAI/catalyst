@@ -109,8 +109,9 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
         // Handle static loop bodies.
         getOperation()->walk([&](func::FuncOp funcOp) {
-            if (funcOp.isDeclaration())
+            if (funcOp.isDeclaration()) {
                 return;
+            }
 
             pbc::PBCLayerContext layerContext;
             results[funcOp.getName()].pbcDepth =
