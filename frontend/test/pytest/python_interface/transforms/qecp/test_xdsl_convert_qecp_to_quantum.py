@@ -823,8 +823,7 @@ class TestControlFlow:
 
             qp.cond(x > 0, true_branch, false_branch)()
 
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -878,9 +877,7 @@ class TestControlFlow:
 
             qp.cond(x > 0, true_branch, false_branch)()
 
-            m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            return qp.sample([m0, m1])
+            return qp.sample(wires=[0, 1])
 
         run_filecheck_qjit(circuit)
 
@@ -916,8 +913,7 @@ class TestControlFlow:
                 qp.PauliX(0)
 
             loop_pauli_x()
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -961,8 +957,7 @@ class TestControlFlow:
             # apply the while loop
             loop_rx(value)
 
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -988,9 +983,7 @@ class TestControlFlow:
             for i in range(N_WIRES):
                 qp.H(i)
 
-            m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            return qp.sample([m0, m1])
+            return qp.sample(wires=[0, 1])
 
         run_filecheck_qjit(circuit)
 
@@ -1165,6 +1158,26 @@ class TestQECPassIntegration:
         assert np.all(samples[:, 0] == 0)
         assert np.all(samples[:, 1] == 1)
 
+    def test_sample_on_wires(self):
+        """Test that sampling on MCMs returns correct results."""
+        dev = qp.device("lightning.qubit", wires=2)
+
+        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=42)
+        @convert_qecp_to_quantum_pass
+        @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
+        @inject_noise_to_qecl_pass
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circ():
+            qp.Z(0)
+            qp.X(1)
+            return qp.sample(wires=[0, 1])
+
+        samples = circ()
+        assert np.all(samples[:, 0] == 0)
+        assert np.all(samples[:, 1] == 1)
+
     def test_expval(self):
         """Test that expectation-value terminal measurements return correct results."""
         dev = qp.device("lightning.qubit", wires=2)
@@ -1295,9 +1308,8 @@ class TestQECPassIntegration:
                 qp.cond(i % 2 == 0, qp.X, qp.Z)(0)
 
             loop()
-            m0 = qp.measure(0)
 
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         circ()
 
@@ -1336,8 +1348,7 @@ class TestQECPassIntegration:
                 qp.adjoint(qp.T(0))
             for op in diagonalizing_gates:
                 op(0)
-            m0 = qp.measure(0)
-            return qp.sample(m0)
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circ)
         samples = circ()
