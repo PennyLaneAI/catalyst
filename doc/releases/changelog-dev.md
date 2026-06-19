@@ -338,6 +338,10 @@
   supported sampling mid-circuit measurements.
   [(#2941)](https://github.com/PennyLaneAI/catalyst/pull/2941)
 
+  The QEC pipeline also now supports `qp.expval`, `qp.var` and `qp.probs` measurement processes when
+  used in conjunction with the `measurements-from-samples` pass.
+  [(#2958)](https://github.com/PennyLaneAI/catalyst/pull/2958)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
