@@ -35,15 +35,15 @@ FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp, bool onlyOn
                                                      bool skipDynamic)
 {
     FailureOr<int64_t> thenDepth =
-        computeWorstCaseDepth(&ifOp.getThenRegion().front(), onlyOnDisjointQubit, skipDynamic);
+        computeBlockWorstCaseDepth(&ifOp.getThenRegion().front(), onlyOnDisjointQubit, skipDynamic);
     if (failed(thenDepth)) {
         return failure();
     }
 
     int64_t elseDepth = 0;
     if (!ifOp.getElseRegion().empty()) {
-        FailureOr<int64_t> elseD =
-            computeWorstCaseDepth(&ifOp.getElseRegion().front(), onlyOnDisjointQubit, skipDynamic);
+        FailureOr<int64_t> elseD = computeBlockWorstCaseDepth(&ifOp.getElseRegion().front(),
+                                                              onlyOnDisjointQubit, skipDynamic);
         if (failed(elseD)) {
             return failure();
         }
@@ -56,7 +56,7 @@ FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp swit
                                                          bool onlyOnDisjointQubit, bool skipDynamic)
 {
     FailureOr<int64_t> defaultDepth =
-        computeWorstCaseDepth(&switchOp.getDefaultBlock(), onlyOnDisjointQubit, skipDynamic);
+        computeBlockWorstCaseDepth(&switchOp.getDefaultBlock(), onlyOnDisjointQubit, skipDynamic);
     if (failed(defaultDepth)) {
         return failure();
     }
@@ -65,7 +65,7 @@ FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp swit
 
     for (unsigned i = 0, n = switchOp.getNumCases(); i < n; ++i) {
         FailureOr<int64_t> caseDepth =
-            computeWorstCaseDepth(&switchOp.getCaseBlock(i), onlyOnDisjointQubit, skipDynamic);
+            computeBlockWorstCaseDepth(&switchOp.getCaseBlock(i), onlyOnDisjointQubit, skipDynamic);
         if (failed(caseDepth)) {
             return failure();
         }
@@ -103,15 +103,16 @@ FailureOr<int64_t> PBCLayerContext::forWorstCaseDepth(scf::ForOp forOp, bool onl
     }
 
     FailureOr<int64_t> bodyDepth =
-        computeWorstCaseDepth(forOp.getBody(), onlyOnDisjointQubit, skipDynamic);
+        computeBlockWorstCaseDepth(forOp.getBody(), onlyOnDisjointQubit, skipDynamic);
     if (failed(bodyDepth)) {
         return failure();
     }
     return *tripCount * (*bodyDepth);
 }
 
-FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onlyOnDisjointQubit,
-                                                          bool skipDynamic)
+FailureOr<int64_t> PBCLayerContext::computeBlockWorstCaseDepth(Block *block,
+                                                               bool onlyOnDisjointQubit,
+                                                               bool skipDynamic)
 {
     int64_t depth = 0;
     PBCLayer layer(this);
@@ -199,7 +200,7 @@ FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onl
 
         flushLayer();
         FailureOr<int64_t> innerDepth =
-            computeWorstCaseDepth(&region.front(), onlyOnDisjointQubit, skipDynamic);
+            computeBlockWorstCaseDepth(&region.front(), onlyOnDisjointQubit, skipDynamic);
         if (failed(innerDepth)) {
             return failure();
         }
@@ -212,10 +213,10 @@ FailureOr<int64_t> PBCLayerContext::computeWorstCaseDepth(Block *block, bool onl
 }
 
 FailureOr<std::optional<int64_t>>
-PBCLayerContext::computeBlockWorstCaseDepth(Block *block, bool onlyOnDisjointQubit,
-                                            bool skipDynamic)
+PBCLayerContext::computeBlockWorstCaseDepthNonzero(Block *block, bool onlyOnDisjointQubit,
+                                                   bool skipDynamic)
 {
-    FailureOr<int64_t> depth = computeWorstCaseDepth(block, onlyOnDisjointQubit, skipDynamic);
+    FailureOr<int64_t> depth = computeBlockWorstCaseDepth(block, onlyOnDisjointQubit, skipDynamic);
     if (failed(depth)) {
         return failure();
     }
@@ -228,21 +229,21 @@ PBCLayerContext::computeBlockWorstCaseDepth(Block *block, bool onlyOnDisjointQub
 PBCDepths PBCLayerContext::computePBCDepth(Block *block)
 {
     // Try to calcuate the depth with static first, then fallback to skip-dynamic.
-    auto d0 = computeWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false);
+    auto d0 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false);
     if (failed(d0)) {
-        auto p0 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false,
-                                             /*skipDynamic=*/true);
+        auto p0 = computeBlockWorstCaseDepthNonzero(block, /*onlyOnDisjointQubit=*/false,
+                                                    /*skipDynamic=*/true);
         if (failed(p0) || !p0->has_value())
             return std::nullopt;
-        auto p1 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/true,
-                                             /*skipDynamic=*/true);
+        auto p1 = computeBlockWorstCaseDepthNonzero(block, /*onlyOnDisjointQubit=*/true,
+                                                    /*skipDynamic=*/true);
         if (failed(p1) || !p1->has_value())
             return std::nullopt;
         return {{**p0, **p1}};
     }
     if (*d0 == 0)
         return std::nullopt;
-    auto d1 = computeWorstCaseDepth(block, /*onlyOnDisjointQubit=*/true);
+    auto d1 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/true);
     if (failed(d1) || *d1 == 0)
         return std::nullopt;
     return {{*d0, *d1}};

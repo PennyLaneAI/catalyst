@@ -59,14 +59,14 @@ class PBCLayerContext {
 
     // Worst-case layer depth in `block`. Fails on `scf.while` and unresolved dynamic `scf.for`
     // unless `skipDynamic` is true (dynamic loops then contribute 0).
-    mlir::FailureOr<int64_t> computeWorstCaseDepth(mlir::Block *block,
-                                                   bool onlyOnDisjointQubit = false,
-                                                   bool skipDynamic = false);
+    mlir::FailureOr<int64_t> computeBlockWorstCaseDepth(mlir::Block *block,
+                                                        bool onlyOnDisjointQubit = false,
+                                                        bool skipDynamic = false);
 
-    // Like `computeWorstCaseDepth`, but maps depth 0 to nullopt.
+    // Like `computeBlockWorstCaseDepth`, but maps depth 0 to nullopt.
     mlir::FailureOr<std::optional<int64_t>>
-    computeBlockWorstCaseDepth(mlir::Block *block, bool onlyOnDisjointQubit = false,
-                               bool skipDynamic = false);
+    computeBlockWorstCaseDepthNonzero(mlir::Block *block, bool onlyOnDisjointQubit = false,
+                                      bool skipDynamic = false);
 
     // Returns (depth_0, depth_1), or nullopt. Falls back to skip-dynamic on strict failure.
     PBCDepths computePBCDepth(mlir::Block *block);
