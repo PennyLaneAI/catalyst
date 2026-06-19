@@ -14,8 +14,6 @@
 
 """Tests for the convert-qecp-to-quantum xDSL dialect-conversion pass."""
 
-from functools import partial
-
 import numpy as np
 import pennylane as qp
 import pytest
