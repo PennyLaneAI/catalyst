@@ -2,15 +2,6 @@
 
 <h3>New features since last release</h3>
 
-* A new, experimental compiler pass `convert-qecp-to-quantum` has been added to lower operations
-  from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
-  [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
-  [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
-  [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
-  [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
-  [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
-  [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
-
 
 <h3>Improvements 🛠</h3>
 
@@ -69,9 +60,9 @@
   ```python
   import pennylane as qp
   import catalyst
-  
+
   catalyst.compile_without_static_loops = True
-  
+
   @qp.qjit
   @qp.qnode(qp.device("lightning.qubit", wires=2))
   def f():
@@ -129,6 +120,12 @@
 * Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
+* Introduced compile-time python-decompositions, allowing compiler passes to lower decomposition
+  rules instantiated with static data (ex. pauli strings). Using this, the `graph-decomposition`
+  pass can now decompose `quantum.paulirot` operations using the decomposition rule defined in
+  PennyLane.
+  [(#2769)](https://github.com/PennyLaneAI/catalyst/pull/2769)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -141,9 +138,39 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
+  the top-level module. Functions inside nested modules, such as kernels called through
+  `catalyst.launch_kernel`, are now included in the output.
+  [(#2961)](https://github.com/PennyLaneAI/catalyst/pull/2961)
+
 * Fixed a bug in `DecompRuleInterpreter.cleanup` by replacing fragile string-based operator
   checks with strict type-based checking.
   [(#2873)](https://github.com/PennyLaneAI/catalyst/pull/2873)
+
+* Fixed support of region-based adjoint (`qp.adjoint(qfunc)()`) when used in conjunction with
+  dynamic qubit allocation.
+  [(#2933)](https://github.com/PennyLaneAI/catalyst/pull/2933)
+
+  For instance, the following would previously fail:
+  ```py
+  def fun(w):
+    with qp.allocate(1) as qs:
+        qp.S(qs[0])
+    qp.X(w)
+
+  @qp.qjit(capture=True)
+  @qp.qnode(qp.device("null.qubit", wires=1))
+  def circuit():
+      qp.adjoint(fun)(0)
+      return qp.probs()
+  ```
+  with the error message:
+  ```
+  catalyst.utils.exceptions.CompileError: catalyst failed with error code 1: Failed to run pipeline: QuantumCompilationStage
+  Compilation failed:
+  circuit:31:9: error: Unhandled operation in adjoint region
+  circuit:31:9: note: see current operation: "quantum.dealloc"(%13) : (!quantum.reg) -> ()
+  ```
 
 * Fixed a bug where using `keep_intermediate=True` with `target="mlir"` resulted in an empty workspace
   folder being created and the files printed outside in the main directory.
@@ -162,7 +189,13 @@
   data dependencies through insert to extract chains instead of textual op ordering.
   [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
 
+* Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
+  [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
+
 <h3>Internal changes ⚙️</h3>
+
+* The `/benchmark` GitHub comment trigger can now accept additional arguments and has been renamed to `!benchmark`.
+  [(#2947)](https://github.com/PennyLaneAI/catalyst/pull/2947)
 
 * The frontend now generates MLIR in reference semantics when capture is enabled.
   [(#2663)](https://github.com/PennyLaneAI/catalyst/pull/2663)
@@ -177,6 +210,14 @@
   [(#2834)](https://github.com/PennyLaneAI/catalyst/pull/2834)
   [(#2911)](https://github.com/PennyLaneAI/catalyst/pull/2911)
 
+* A new pass `--convert-to-reference-semantics` has been added. The pass takes in MLIR in value
+  semantics `quantum` dialect, and converts them to reference semantics `qref` dialect.
+  [(#2920)](https://github.com/PennyLaneAI/catalyst/pull/2920)
+  [(#2930)](https://github.com/PennyLaneAI/catalyst/pull/2930)
+  [(#2931)](https://github.com/PennyLaneAI/catalyst/pull/2931)
+  [(#2937)](https://github.com/PennyLaneAI/catalyst/pull/2937)
+  [(#2945)](https://github.com/PennyLaneAI/catalyst/pull/2945)
+
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
 
@@ -190,6 +231,17 @@
   `std::views::filter`/`std::views::transform` with `std::copy_if`/`std::transform`
   [(#2801)](https://github.com/PennyLaneAI/catalyst/pull/2801)
 
+* A new, experimental compiler pass `convert-qecp-to-quantum` has been added to lower operations
+  from the QEC Physical (`qecp`) dialect into the Quantum (`quantum`) dialect.
+  [(#2822)](https://github.com/PennyLaneAI/catalyst/pull/2822)
+  [(#2809)](https://github.com/PennyLaneAI/catalyst/pull/2809)
+  [(#2824)](https://github.com/PennyLaneAI/catalyst/pull/2824)
+  [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
+  [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
+  [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
+  [(#2927)](https://github.com/PennyLaneAI/catalyst/pull/2927)
+  [(#2955)](https://github.com/PennyLaneAI/catalyst/pull/2955)
+
 * The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower
   transversal gate operations from the QEC Logical (`qecl`) dialect into the QEC
   Physical (`qecp`) dialect.
@@ -198,10 +250,10 @@
   [(#2922)](https://github.com/PennyLaneAI/catalyst/pull/2922)
 
 * The experimental compiler pass `convert-quantum-to-qecl` has been extended to lower the
-  `quantum.custom "T"` gate to the `qecl` layer as a subroutine using a magic state (or conjugate magic state in the case of the adjoint).
+  `quantum.custom "T"` gate to the `qecl` layer as a subroutine using a magic state (or conjugate
+  magic state in the case of the adjoint).
   [(#2870)](https://github.com/PennyLaneAI/catalyst/pull/2870)
   [(#2921)](https://github.com/PennyLaneAI/catalyst/pull/2921)
-
 
 * The reference semantics Pauli Product Measurement operation `pbc.ref.ppm` was added.
   [(#2773)](https://github.com/PennyLaneAI/catalyst/pull/2773)
@@ -235,6 +287,12 @@
   dialect. They are now accessible as `mbqc.ref.measure_in_basis` and `mbqc.ref.graph_state_prep`.
   [(#2829)](https://github.com/PennyLaneAI/catalyst/pull/2829)
 
+* A new operation has been added to the Quantum dialects to represent generic and high-level
+  quantum operators, including operators with frontend-end specific data.
+  [(#2883)](https://github.com/PennyLaneAI/catalyst/pull/2883)
+  [(#2943)](https://github.com/PennyLaneAI/catalyst/pull/2943)
+  [(#2951)](https://github.com/PennyLaneAI/catalyst/pull/2951)
+
 * In order to support T gates and π/8 PPRs in the experimental QEC pipeline, the following new
   operations have been added:
 
@@ -250,14 +308,18 @@
   - `qecp.t`, which performs a T gate on a single physical qubit.
     [(#2888)](https://github.com/PennyLaneAI/catalyst/pull/2888)
 
-* The experimental `convert-qecl-to-qecp` pass has been extended to support lowering 
-  `qecl.fabricate [magic]` to a subroutine that prepares a magic state through a simple, 
+* The experimental `convert-qecl-to-qecp` pass has been extended to support lowering
+  `qecl.fabricate [magic]` to a subroutine that prepares a magic state through a simple,
   non-fault tolerant encoding.
   [(#2894)](https://github.com/PennyLaneAI/catalyst/pull/2894)
 
-* The experimental QEC pipeline now supports compilation and execution of circuits that only 
+* The experimental QEC pipeline now supports compilation and execution of circuits that only
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
+* The experimental QEC pipeline now only generates subroutines for operations present in the 
+  compiled circuit, rather than generating all QEC subroutines.
+  [(#2929)](https://github.com/PennyLaneAI/catalyst/pull/2929)
 
 * More conservative casting to tracer arrays in conditionals to preserve constant (static) values
   better. This can be useful for optimizations that depend on values being static.
@@ -269,6 +331,16 @@
     [(#2872)](https://github.com/PennyLaneAI/catalyst/pull/2872)
   - For loops (`scf.for`)
     [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
+  - While loops (`scf.while`)
+    [(#2905)](https://github.com/PennyLaneAI/catalyst/pull/2905)
+
+* The experimental QEC pipeline now supports programs that sample wires, where before it only
+  supported sampling mid-circuit measurements.
+  [(#2941)](https://github.com/PennyLaneAI/catalyst/pull/2941)
+
+  The QEC pipeline also now supports `qp.expval`, `qp.var` and `qp.probs` measurement processes when
+  used in conjunction with the `measurements-from-samples` pass.
+  [(#2958)](https://github.com/PennyLaneAI/catalyst/pull/2958)
 
 <h3>Documentation 📝</h3>
 
@@ -284,6 +356,7 @@ Joey Carter,
 Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
+David Ittah,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,

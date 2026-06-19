@@ -25,7 +25,7 @@ from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_lib_path, get_libpython_path
 
 # pylint: disable=line-too-long, too-many-lines
 
@@ -1803,7 +1803,9 @@ def graph_decomposition_setup_inputs(
     alt_decomps: dict | None = None,
     bytecode_rules: str | None = None,
     _builtin_rule_path: str = BYTECODE_FILE_PATH,
-):  # pylint: disable=unused-argument
+    libQPD_path: Path | None = None,
+    libpython_path: Path | None = None,
+):  # pylint: disable=unused-argument, too-many-arguments, too-many-positional-arguments
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
     decomposition should be applied to the decorated QNode during :func:`~.qjit` compilation.
@@ -1894,7 +1896,6 @@ def graph_decomposition_setup_inputs(
     >>> qp.specs(circuit, level="device")(1.23, 4.56).resources.gate_types
     {'Rot': 2}
     """
-
     if not isinstance(gate_set, dict):
         gate_set = {to_name(op): 1.0 for op in gate_set}
     else:
@@ -1903,6 +1904,10 @@ def graph_decomposition_setup_inputs(
     options: dict[str, dict | tuple | str] = {
         "gate_set": gate_set,
         "bytecode_rules": _builtin_rule_path,
+        "libQPD_path": str(
+            libQPD_path if libQPD_path else get_lib_path("catalyst", "CATALYST_LIB_DIR")
+        ),
+        "libpython_path": str(libpython_path if libpython_path else get_libpython_path()),
     }
 
     if fixed_decomps:

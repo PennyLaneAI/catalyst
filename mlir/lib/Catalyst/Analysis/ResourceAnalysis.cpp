@@ -232,11 +232,11 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
 
     SmallVector<func::FuncOp> definedFuncOps;
-    for (func::FuncOp funcOp : moduleOp.getOps<func::FuncOp>()) {
+    moduleOp.walk([&](func::FuncOp funcOp) {
         if (!funcOp.isDeclaration()) {
             definedFuncOps.push_back(funcOp);
         }
-    }
+    });
 
     // Reserve every user function's name in `funcResults`. This
     // ensures `makeUniqueSyntheticName` will skip past names like
@@ -286,6 +286,20 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
         result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
         funcResults[funcOp.getName()] = std::move(result);
     }
+}
+
+ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp)
+{
+    ResourceResult result;
+
+    for (auto &region : funcOp->getRegions()) {
+        analyzeRegion(region, result, /*isAdjoint*/ false);
+    }
+
+    // TODO: Additional handling for entrypoint functions
+
+    result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
+    funcResults[funcOp.getName()] = std::move(result);
 }
 
 std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t &counter)
