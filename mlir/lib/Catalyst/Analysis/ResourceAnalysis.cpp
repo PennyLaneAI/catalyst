@@ -232,11 +232,11 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
 
     SmallVector<func::FuncOp> definedFuncOps;
-    for (func::FuncOp funcOp : moduleOp.getOps<func::FuncOp>()) {
+    moduleOp.walk([&](func::FuncOp funcOp) {
         if (!funcOp.isDeclaration()) {
             definedFuncOps.push_back(funcOp);
         }
-    }
+    });
 
     // Reserve every user function's name in `funcResults`. This
     // ensures `makeUniqueSyntheticName` will skip past names like
