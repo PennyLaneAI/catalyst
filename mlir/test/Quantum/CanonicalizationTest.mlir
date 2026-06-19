@@ -73,9 +73,9 @@ func.func @test_extract_insert_fold(%r1: !quantum.reg, %i: i64) -> !quantum.reg 
 
 // CHECK-LABEL: test_extract_insert_distinct_static_folds
 func.func @test_extract_insert_distinct_static_folds(%r1: !quantum.reg, %i1: i64, %i2: i64) -> !quantum.reg {
-    // CHECK: %[[Q:.+]] = quantum.extract %arg0[ 0]
-    // CHECK: %[[R2:.+]] = quantum.insert %arg0[ 1], %[[Q]]
-    // CHECK: quantum.insert %[[R2]][%arg2], %[[Q]]
+    // CHECK: [[Q:%.+]] = quantum.extract %arg0[ 0]
+    // CHECK: [[R2:%.+]] = quantum.insert %arg0[ 1], [[Q]]
+    // CHECK: quantum.insert [[R2]][%arg2], [[Q]]
     %q1 = quantum.extract %r1[0] : !quantum.reg -> !quantum.bit
     %r2 = quantum.insert %r1[1], %q1 : !quantum.reg, !quantum.bit
 
@@ -91,7 +91,11 @@ func.func @test_extract_insert_distinct_static_folds(%r1: !quantum.reg, %i1: i64
 
 // CHECK-LABEL: test_extract_no_redirect_when_insert_is_leaf
 func.func @test_extract_no_redirect_when_insert_is_leaf(%r0: !quantum.reg) -> !quantum.bit {
-    // CHECK: quantum.custom "PauliX"
+    // CHECK: [[Q0:%.+]] = quantum.extract %arg0[ 0]
+    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[Q0]]
+    // CHECK: [[INS:%.+]] = quantum.insert %arg0[ 0], [[X]]
+    // CHECK: [[Q1:%.+]] = quantum.extract [[INS]][ 1]
+    // CHECK: return [[Q1]]
     %q0 = quantum.extract %r0[0] : !quantum.reg -> !quantum.bit
     %x = quantum.custom "PauliX"() %q0 : !quantum.bit
     %r1 = quantum.insert %r0[0], %x : !quantum.reg, !quantum.bit
@@ -101,10 +105,16 @@ func.func @test_extract_no_redirect_when_insert_is_leaf(%r0: !quantum.reg) -> !q
 
 // CHECK-LABEL: test_extract_through_insert_distinct_index
 func.func @test_extract_through_insert_distinct_index(%r0: !quantum.reg) -> !quantum.reg {
+    // CHECK: [[Q0:%.+]] = quantum.extract %arg0[ 0]
+    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[Q0]]
+    // CHECK: [[INS0:%.+]] = quantum.insert %arg0[ 0], [[X]]
+    // CHECK: [[Q1:%.+]] = quantum.extract %arg0[ 1]
+    // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() [[Q1]]
+    // CHECK: [[INS1:%.+]] = quantum.insert [[INS0]][ 1], [[Z]]
+    // CHECK: return [[INS1]]
     %q0 = quantum.extract %r0[0] : !quantum.reg -> !quantum.bit
     %x = quantum.custom "PauliX"() %q0 : !quantum.bit
     %r1 = quantum.insert %r0[0], %x : !quantum.reg, !quantum.bit
-    // CHECK: quantum.extract %arg0[ 1]
     %q1 = quantum.extract %r1[1] : !quantum.reg -> !quantum.bit
     %z = quantum.custom "PauliZ"() %q1 : !quantum.bit
     %r2 = quantum.insert %r1[1], %z : !quantum.reg, !quantum.bit

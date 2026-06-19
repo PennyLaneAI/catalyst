@@ -171,9 +171,9 @@ LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &
             return success();
         }
 
-        bool insertOnRegisterChain = llvm::any_of(
+        bool insertHasNonExtractUser = llvm::any_of(
             insert.getResult().getUsers(), [](Operation *user) { return !isa<ExtractOp>(user); });
-        if (staticallyDistinct && inSameBlock && insertOnRegisterChain) {
+        if (staticallyDistinct && inSameBlock && insertHasNonExtractUser) {
             rewriter.modifyOpInPlace(extract,
                                      [&] { extract.getQregMutable().assign(insert.getInQreg()); });
             return success();
