@@ -14,15 +14,29 @@
 
 """Utility code for keeping paths."""
 
+import importlib.util
 import os
 import os.path
 import sysconfig
 
-from catalyst._configuration import INSTALLED
-from catalyst._revision import __revision__
-from catalyst._version import __version__
-
 package_root = os.path.join(os.path.dirname(__file__), "..")
+
+
+def _load_config(filename, attr):
+    """Read Catalyst config flags without importing Catalyst via the usual machinery.
+
+    This enables us to use this utility module from outside the Catalyst package as well.
+    """
+    path = os.path.join(package_root, filename)
+    spec = importlib.util.spec_from_file_location("", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return getattr(mod, attr)
+
+
+INSTALLED = _load_config("_configuration.py", "INSTALLED")
+__revision__ = _load_config("_revision.py", "__revision__")
+__version__ = _load_config("_version.py", "__version__")
 
 # Default paths to dep libraries
 DEFAULT_LIB_PATHS = {

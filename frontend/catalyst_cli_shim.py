@@ -17,19 +17,40 @@
 Console scripts are automatically installed by Python package managers such that they are
 available on PATH, however the exact location is system-dependent. Using a shim allows us
 to place the real Catalyst executable into a known location within the package/wheel,
-making it easier for us to find, and distribute shared library dependencies for
-(predictable RPATH).
+making it easier for us to find and handle dynamically linked dependencies.
+
+This module deliberately lives outside the ``catalyst`` package and loads Catalyst
+functionality only via importlib, in order to avoid the expensive overhead of importing
+all of Catalyst and all its dependencies.
 """
 
+import importlib.util
 import os
 import sys
 
-from catalyst.utils.runtime_environment import get_cli_path
+
+def _get_cli_path() -> str:
+    """Resolve the Catalyst CLI path without importing Catalyst via the usual machinery.
+
+    Relies on the runtime_environment module not importing Catalyst directly either.
+    """
+    spec = importlib.util.find_spec("catalyst")
+    if spec is None or spec.origin is None:
+        raise ImportError(
+            "Could not locate the 'catalyst' package, please make sure it is installed."
+        )
+    catalyst_path = os.path.dirname(spec.origin)
+
+    runtime_env_path = os.path.join(catalyst_path, "utils", "runtime_environment.py")
+    spec = importlib.util.spec_from_file_location("", runtime_env_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.get_cli_path()
 
 
 def main():
     """Run the Catalyst CLI."""
-    binary = get_cli_path()
+    binary = _get_cli_path()
     if not os.path.isfile(binary):  # pragma: nocover
         raise FileNotFoundError(
             f"Could not locate the `catalyst` executable at {binary}. "

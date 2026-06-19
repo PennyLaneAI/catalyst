@@ -168,7 +168,7 @@ entry_points = {
         "draw_graph = catalyst:draw_graph",
     ],
     "console_scripts": [
-        "catalyst = catalyst.utils.cli_shim:main",
+        "catalyst = catalyst_cli_shim:main",
     ],
 }
 
@@ -411,6 +411,7 @@ setup(
         ],
     ),
     package_dir={"": "frontend"},
+    py_modules=["catalyst_cli_shim"],
     include_package_data=True,
     ext_modules=ext_modules,
     cmdclass=cmdclass,
