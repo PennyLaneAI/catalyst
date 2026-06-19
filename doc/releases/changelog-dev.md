@@ -120,6 +120,12 @@
 * Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
+* Introduced compile-time python-decompositions, allowing compiler passes to lower decomposition
+  rules instantiated with static data (ex. pauli strings). Using this, the `graph-decomposition`
+  pass can now decompose `quantum.paulirot` operations using the decomposition rule defined in
+  PennyLane.
+  [(#2769)](https://github.com/PennyLaneAI/catalyst/pull/2769)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -205,6 +211,7 @@
   [(#2930)](https://github.com/PennyLaneAI/catalyst/pull/2930)
   [(#2931)](https://github.com/PennyLaneAI/catalyst/pull/2931)
   [(#2937)](https://github.com/PennyLaneAI/catalyst/pull/2937)
+  [(#2945)](https://github.com/PennyLaneAI/catalyst/pull/2945)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -227,6 +234,7 @@
   [(#2835)](https://github.com/PennyLaneAI/catalyst/pull/2835)
   [(#2839)](https://github.com/PennyLaneAI/catalyst/pull/2839)
   [(#2849)](https://github.com/PennyLaneAI/catalyst/pull/2849)
+  [(#2927)](https://github.com/PennyLaneAI/catalyst/pull/2927)
   [(#2955)](https://github.com/PennyLaneAI/catalyst/pull/2955)
 
 * The experimental compiler pass `convert-qecl-to-qecp` has been extended to lower
@@ -303,6 +311,10 @@
 * The experimental QEC pipeline now supports compilation and execution of circuits that only
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
+
+* The experimental QEC pipeline now only generates subroutines for operations present in the 
+  compiled circuit, rather than generating all QEC subroutines.
+  [(#2929)](https://github.com/PennyLaneAI/catalyst/pull/2929)
 
 * More conservative casting to tracer arrays in conditionals to preserve constant (static) values
   better. This can be useful for optimizations that depend on values being static.
