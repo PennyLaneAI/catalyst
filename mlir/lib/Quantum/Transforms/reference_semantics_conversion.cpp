@@ -862,7 +862,8 @@ bool funcOpHasValueSemanticsOps(func::FuncOp f)
     }
 
     WalkResult walkResult = f.walk([](Operation *op) {
-        if (isa<quantum::QuantumDialect>(op->getDialect()) || isa<VALUE_SEMANTICS_GATE_OPS>(op)) {
+        if (isa<quantum::QuantumDialect>(op->getDialect()) ||
+            isa<VALUE_SEMANTICS_GATE_OPS, VALUE_SEMANTICS_OBSERVABLE_OPS>(op)) {
             return WalkResult::interrupt();
         }
         if (func::CallOp callOp = dyn_cast<func::CallOp>(op)) {
