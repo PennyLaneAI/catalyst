@@ -220,6 +220,7 @@
   [(#2931)](https://github.com/PennyLaneAI/catalyst/pull/2931)
   [(#2937)](https://github.com/PennyLaneAI/catalyst/pull/2937)
   [(#2945)](https://github.com/PennyLaneAI/catalyst/pull/2945)
+  [(#2948)](https://github.com/PennyLaneAI/catalyst/pull/2948)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -320,7 +321,7 @@
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
-* The experimental QEC pipeline now only generates subroutines for operations present in the 
+* The experimental QEC pipeline now only generates subroutines for operations present in the
   compiled circuit, rather than generating all QEC subroutines.
   [(#2929)](https://github.com/PennyLaneAI/catalyst/pull/2929)
 
