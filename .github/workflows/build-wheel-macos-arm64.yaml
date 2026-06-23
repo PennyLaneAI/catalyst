@@ -69,7 +69,7 @@ jobs:
         python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: macos-14
+    runs-on: macos-15
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
@@ -238,7 +238,7 @@ jobs:
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
     - name: Checkout Catalyst repo
@@ -425,7 +425,7 @@ jobs:
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on Mac arm64
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
     - name: Checkout Catalyst repo
