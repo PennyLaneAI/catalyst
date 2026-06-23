@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/SmallSet.h>
-#define DEBUG_TYPE "decompose-lowering"
-
 #include <string>
 
 #include "llvm/ADT/DenseSet.h"
@@ -40,11 +37,16 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
+#include <llvm/ADT/SmallSet.h>
+
 using namespace mlir;
 using namespace catalyst::quantum;
 
+#define DEBUG_TYPE "decompose-lowering"
+
 namespace catalyst {
 namespace quantum {
+
 #define GEN_PASS_DEF_DECOMPOSELOWERINGPASS
 #define GEN_PASS_DECL_DECOMPOSELOWERINGPASS
 #include "Quantum/Transforms/Passes.h.inc"
