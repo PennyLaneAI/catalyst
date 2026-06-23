@@ -15,6 +15,7 @@
 #include <string>
 
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
@@ -36,8 +37,6 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
-
-#include <llvm/ADT/SmallSet.h>
 
 using namespace mlir;
 using namespace catalyst::quantum;
