@@ -24,6 +24,7 @@ module @test_module {
         return %out : !quantum.bit
     }
 
+    // CHECK: func.func private @my_Y_decomp
     func.func private @my_Y_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="Y"} {
         %angle = arith.constant 1.57 : f64
         %out = quantum.custom "RY"(%angle) %q : !quantum.bit
@@ -37,10 +38,10 @@ module @test_module {
         return %out : !quantum.bit
     }
 
-    // CHECK: [[q_alloc:%.+]] = quantum.alloc_qb
-    // CHECK: [[x_out:%.+]] = func.call @my_X_decomp([[q_alloc]])
+    // CHECK: [[q:%.+]] = quantum.alloc_qb
+    // CHECK: [[x_out:%.+]] = quantum.custom "RX"(%{{.+}}) [[q]]
     // CHECK: [[y_out:%.+]] = quantum.custom "Y"() [[x_out]]
-    // CHECK: [[z_out:%.+]] = func.call @my_Z_decomp([[y_out]])
+    // CHECK: [[z_out:%.+]] = quantum.custom "RZ"(%{{.+}}) [[y_out]]
     // CHECK: quantum.dealloc_qb [[z_out]]
     %0 = quantum.alloc_qb : !quantum.bit
     %1 = quantum.custom "X"() %0 : !quantum.bit
