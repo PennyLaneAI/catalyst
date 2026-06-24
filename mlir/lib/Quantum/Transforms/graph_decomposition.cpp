@@ -136,8 +136,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 5: Re-introduce (all) user rules for future decompositions
+        SymbolTable symbolTable(module);
         for (auto &rule : allUserRules) {
-            module.getBody()->push_back(rule.release());
+            if (!symbolTable.lookup<func::FuncOp>(rule->getName())) {
+                module.getBody()->push_back(rule.release());
+            }
         }
     }
 
