@@ -650,3 +650,46 @@ module @if_circuit {
     return %alloc_9, %alloc : memref<4xi64>, memref<4xi64>
   }
 }
+
+// -----
+
+// measure_pulse
+// CHECK-LABEL: func.func @__kernel__()
+module @measure_ion_to_rtio {
+  func.func public @circuit_measure() -> i32 attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    %0 = ion.ion {charge = -1.000000e+00 : f64, levels = [#ion.level<label = "downstate", principal = 6 : i64, spin = 5.000000e-01 : f64, orbital = 0.000000e+00 : f64, nuclear = 5.000000e-01 : f64, spin_orbital = 5.000000e-01 : f64, spin_orbital_nuclear = 0.000000e+00 : f64, spin_orbital_nuclear_magnetization = 0.000000e+00 : f64, energy = 0.000000e+00 : f64>, #ion.level<label = "upstate", principal = 6 : i64, spin = 5.000000e-01 : f64, orbital = 0.000000e+00 : f64, nuclear = 5.000000e-01 : f64, spin_orbital = 5.000000e-01 : f64, spin_orbital_nuclear = 1.000000e+00 : f64, spin_orbital_nuclear_magnetization = 0.000000e+00 : f64, energy = 79438311838.671509 : f64>, #ion.level<label = "estate", principal = 6 : i64, spin = 5.000000e-01 : f64, orbital = 1.000000e+00 : f64, nuclear = 5.000000e-01 : f64, spin_orbital = 5.000000e-01 : f64, spin_orbital_nuclear = 1.000000e+00 : f64, spin_orbital_nuclear_magnetization = -1.000000e+00 : f64, energy = 0x43321C22CEFBBBDF : f64>, #ion.level<label = "estate2", principal = 6 : i64, spin = 5.000000e-01 : f64, orbital = 1.000000e+00 : f64, nuclear = 5.000000e-01 : f64, spin_orbital = 5.000000e-01 : f64, spin_orbital_nuclear = 1.000000e+00 : f64, spin_orbital_nuclear_magnetization = 1.000000e+00 : f64, energy = 0x433456BB2DC221F8 : f64>], mass = 1.710000e+02 : f64, name = "Yb171", position = array<f64: 0.000000e+00, 0.000000e+00, 0.000000e+00>, transitions = [#ion.transition<level_0 = "downstate", level_1 = "estate", einstein_a = 1.000000e+00 : f64, multipole = "E1">, #ion.transition<level_0 = "downstate", level_1 = "estate2", einstein_a = 1.000000e+00 : f64, multipole = "E1">, #ion.transition<level_0 = "upstate", level_1 = "estate", einstein_a = 1.000000e+00 : f64, multipole = "E1">, #ion.transition<level_0 = "upstate", level_1 = "estate2", einstein_a = 1.000000e+00 : f64, multipole = "E1">]} : !ion.ion
+    ion.mode {modes = [#ion.phonon<energy = 6283185.307179586 : f64, eigenvector = [7.071068e-01, 0.000000e+00, 0.000000e+00, 7.071068e-01, 0.000000e+00, 0.000000e+00]>]}
+    %c1_i64 = arith.constant 1 : i64
+    quantum.device shots(%c1_i64) ["/path/to/device.dylib", "oqd", "{}"]
+    %reg = quantum.alloc(1) : !quantum.reg
+    %qb = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
+    %iq = builtin.unrealized_conversion_cast %qb : !quantum.bit to !ion.qubit
+    %dur = arith.constant 1.000000e-04 : f64
+    %pp = ion.parallelprotocol(%iq) : !ion.qubit {
+    ^bb0(%q: !ion.qubit):
+      %mp = ion.measure_pulse(%dur : f64) %q {
+        beam = #ion.beam<
+          transition_index = 1 : i64,
+          rabi = 1.500000e+00 : f64,
+          detuning = 2.500000e+00 : f64,
+          polarization = [1, 0, 0],
+          wavevector = [0, 1, 0]>,
+        phase = 0.000000e+00 : f64
+      } : !ion.pulse
+      ion.yield %q : !ion.qubit
+    }
+    %out_ion, %cnt = ion.readout_bit %pp : !ion.qubit, i32
+    %out_q = builtin.unrealized_conversion_cast %out_ion : !ion.qubit to !quantum.bit
+    %reg2 = quantum.insert %reg[0], %out_q : !quantum.reg, !quantum.bit
+    quantum.dealloc %reg2 : !quantum.reg
+    quantum.device_release
+    return %cnt : i32
+  }
+}
+
+// CHECK: rtio.pulse {{.*}} {_measurement
+// CHECK: rtio.readout {{.*}} : !rtio.event -> i32
+// CHECK: func.func private @__rtio_init_dataset()
+// CHECK: rtio.rpc @init_dataset
+// CHECK: func.func private @__rtio_transfer_measurement_results
+// CHECK: rtio.rpc @transfer_measurement_result
