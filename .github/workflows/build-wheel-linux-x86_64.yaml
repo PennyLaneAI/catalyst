@@ -314,7 +314,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.11-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.12-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Stablehlo Source
