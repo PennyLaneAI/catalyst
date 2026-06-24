@@ -15,12 +15,61 @@
 """This module contains a library of QEC codes."""
 
 from dataclasses import dataclass, fields
+from enum import StrEnum
 from functools import partial
-from typing import Any, Self
+from typing import Any, Callable, Self
 
 import numpy as np
+from xdsl.ir import Operation
 
 from catalyst.python_interface.dialects import qecp
+
+
+class SupportedGates(StrEnum):
+    """Enum of gate string identifiers that are supported for QEC code definition."""
+
+    I = "I"  # Identity  # noqa: E741
+    X = "X"  # Pauli X
+    Y = "Y"  # Pauli Y
+    Z = "Z"  # Pauli Z
+    H = "H"  # Hadamard
+    S = "S"  # S phase
+    Sa = "Sa"  # Adjoint of S phase
+    CNOT = "CNOT"  # CNOT
+
+
+def qecp_gate_op_from_string(gate_str: str) -> Callable[..., Operation]:
+    """Parse a gate string identifier from a QEC code definition and return the corresponding
+    constructible qecp operation type. In cases where the gate string identifier specifies the
+    adjoint of a gate, a `functools.partial` wrapper object is returned with the `adjoint=True`
+    parameter set.
+
+    Raises a ValueError for invalid gate string identifiers.
+    """
+    match gate_str:
+        case SupportedGates.I:
+            return qecp.IdentityOp
+        case SupportedGates.X:
+            return qecp.PauliXOp
+        case SupportedGates.Y:
+            return qecp.PauliYOp
+        case SupportedGates.Z:
+            return qecp.PauliZOp
+        case SupportedGates.H:
+            return qecp.HadamardOp
+        case SupportedGates.S:
+            return qecp.SOp
+        case SupportedGates.Sa:
+            return partial(qecp.SOp, adjoint=True)
+        case SupportedGates.CNOT:
+            return qecp.CnotOp
+        case _:
+            supported_gates_str = ", ".join(gate for gate in SupportedGates)
+            raise ValueError(
+                f"Invalid gate in QEC code definition: '{gate_str}'. Supported gates are: "
+                f"{supported_gates_str}"
+            )
+
 
 _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
     # the indices/ordering for the operators and encodings in the Steane code are those used
@@ -34,19 +83,19 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         np.array([[1, 1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1, 1]]),
         #### Transversal gates ####
         {
-            # keys need to match the names of the corresponding qecl.gate gates; if any adjoint
-            # gates are supported, they should be included as a separate entry with key "gatename_adj"
-            # values are a tuple of the qecp gate, and the indices its applied at in the codeblock
-            # will need to be refactored for k>1
-            "x": (qecp.PauliXOp, [4, 5, 6]),
-            "y": (qecp.PauliYOp, [4, 5, 6]),
-            "z": (qecp.PauliZOp, [4, 5, 6]),
-            "hadamard": (qecp.HadamardOp, [0, 1, 2, 3, 4, 5, 6]),
-            "s": (partial(qecp.SOp, adjoint=True), [0, 1, 2, 3, 4, 5, 6]),
-            "s_adj": (qecp.SOp, [0, 1, 2, 3, 4, 5, 6]),
+            # Keys need to match the names of the corresponding qecl.gate gates; if any adjoint
+            # gates are supported, they should be included as a separate entry with key
+            # "gatename_adj". Values are a tuple of the qecp gate, and the indices its applied at in
+            # the codeblock will need to be refactored for k>1
+            "x": ("I", "I", "I", "I", "X", "X", "X"),
+            "y": ("I", "I", "I", "I", "Y", "Y", "Y"),
+            "z": ("I", "I", "I", "I", "Z", "Z", "Z"),
+            "hadamard": ("H", "H", "H", "H", "H", "H", "H"),
+            "s": ("Sa", "Sa", "Sa", "Sa", "Sa", "Sa", "Sa"),
+            "s_adj": ("S", "S", "S", "S", "S", "S", "S"),
         },
         {
-            "cnot": qecp.CnotOp,
+            "cnot": "CNOT",
         },
         #### Unitary encoding circuit ####
         {
@@ -55,20 +104,20 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
             # one that maps an input to the logical version of that input, rather
             # than just encoding logical 0
             "ops": [
-                (qecp.HadamardOp, [1]),
-                (qecp.HadamardOp, [2]),
-                (qecp.HadamardOp, [3]),
-                (qecp.CnotOp, [1, 0]),
-                (qecp.CnotOp, [2, 4]),
-                (qecp.CnotOp, [6, 5]),
-                (qecp.CnotOp, [2, 0]),
-                (qecp.CnotOp, [3, 5]),
-                (qecp.CnotOp, [6, 4]),
-                (qecp.CnotOp, [2, 6]),
-                (qecp.CnotOp, [3, 4]),
-                (qecp.CnotOp, [1, 5]),
-                (qecp.CnotOp, [1, 6]),
-                (qecp.CnotOp, [3, 0]),
+                ("H", [1]),
+                ("H", [2]),
+                ("H", [3]),
+                ("CNOT", [1, 0]),
+                ("CNOT", [2, 4]),
+                ("CNOT", [6, 5]),
+                ("CNOT", [2, 0]),
+                ("CNOT", [3, 5]),
+                ("CNOT", [6, 4]),
+                ("CNOT", [2, 6]),
+                ("CNOT", [3, 4]),
+                ("CNOT", [1, 5]),
+                ("CNOT", [1, 6]),
+                ("CNOT", [3, 0]),
             ],
             # The state_prep_index is the index of the physical qubit that the state is
             # injected on (i.e. for a magic state, -H-T is applied here pre-encoding).
@@ -97,28 +146,34 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         ),
         #### Transversal gates ####
         # X: physical Z on a single qubit from each set of 3, make +|111> into -|111> and vice-versa
-        # Z: X-flip on the all the bits on one set of 3: doesn't modify |0>, generates overall -1 sign for |1>
+        # Z: X-flip on the all the bits on one set of 3: doesn't modify |0>, generates overall -1
+        #    sign for |1>
+        # Y: Y = iXZ (we ignore global phase so can use Y ~ XZ)
         # CNOT is transversal for all CSS codes
         # There are no transversal Hadamard or S gates for this code
-        {"x": (qecp.PauliZOp, [0, 3, 6]), "z": (qecp.PauliXOp, [0, 1, 2])},
-        {"cnot": qecp.CnotOp},
+        {
+            "x": ("Z", "I", "I", "Z", "I", "I", "Z", "I", "I"),
+            "y": ("Y", "X", "X", "Z", "I", "I", "Z", "I", "I"),
+            "z": ("X", "X", "X", "I", "I", "I", "I", "I", "I"),
+        },
+        {"cnot": "CNOT"},
         #### Unitary encoding circuit ####
         # jukebox generated this and verified it in simulation
         # see simulation to validate here:
         # https://app.notion.com/p/xanaduai/Shor-9-1-3-code-37bbc6bd17648058841aed64f771ee9c
         {
             "ops": [
-                (qecp.CnotOp, [0, 3]),
-                (qecp.CnotOp, [0, 6]),
-                (qecp.HadamardOp, [0]),
-                (qecp.HadamardOp, [3]),
-                (qecp.HadamardOp, [6]),
-                (qecp.CnotOp, [0, 1]),
-                (qecp.CnotOp, [0, 2]),
-                (qecp.CnotOp, [3, 4]),
-                (qecp.CnotOp, [3, 5]),
-                (qecp.CnotOp, [6, 7]),
-                (qecp.CnotOp, [6, 8]),
+                ("CNOT", [0, 3]),
+                ("CNOT", [0, 6]),
+                ("H", [0]),
+                ("H", [3]),
+                ("H", [6]),
+                ("CNOT", [0, 1]),
+                ("CNOT", [0, 2]),
+                ("CNOT", [3, 4]),
+                ("CNOT", [3, 5]),
+                ("CNOT", [6, 7]),
+                ("CNOT", [6, 8]),
             ],
             "state_prep_index": 0,
         },
@@ -139,19 +194,18 @@ class QecCode:
         x_tanner (np.ndarray): The code's X Tanner graph
         z_tanner (np.ndarray): The code's Z Tanner graph
         transversal_1q_gates (dict): A dictionary of single-qubit transversal gates. The
-            key should match the gate name in the qecl dialect, and the value is a tuple
-            containing the qecp op to be applied, and the indices. Assumes k=1.
+            key should match the gate name in the qecl dialect, and the value is a tuple of gate
+            string identifiers specifying the qecp ops to be applied. Assumes k=1.
         transversal_2q_gates (dict): A dictionary of two-qubit transversal gates. The
-            key should match the gate name in the qecl dialect, and the value is the qecp
-            op to be applied, and the indices. Assumes k=1. Does not specify indices - for
-            now, we assume 2-qubit gates between two codeblocks, where the gate is applied
-            between all pairs of corresponding qubits.
+            key should match the gate name in the qecl dialect, and the value is string identifier
+            of the qecp op to be applied. Assumes k=1 and that two-qubit gates are applied between
+            two codeblocks, where the gate is applied between all pairs of corresponding qubits.
         unitary_encoding (dict): A dictionary defining the unitary encoding for the code words.
             It includes 'ops' (a list of tuples that each indicate a qecp gate and the codeblock
             indices it should be applied to), and a state-prep index. The state-prep index is the
-            index to apply physical gates to before encoding, in order to encode a non-zero state
-            - for example, applying H-T at this index before unitary encoding generates a magic
-            state (not fault-tolerantly). For this to work, the chosen encoder should be an isometric
+            index to apply physical gates to before encoding, in order to encode a non-zero state -
+            for example, applying H-T at this index before unitary encoding generates a magic state
+            (not fault-tolerantly). For this to work, the chosen encoder should be an isometric
             encoder, i.e. it should map the input on one of the wires to the codespace, rather than
             just encoding zero.
     """
@@ -162,9 +216,9 @@ class QecCode:
     d: int
     x_tanner: np.ndarray
     z_tanner: np.ndarray
-    transversal_1q_gates: dict
-    transversal_2q_gates: dict
-    unitary_encoding: dict
+    transversal_1q_gates: dict[str, tuple[str, ...]]
+    transversal_2q_gates: dict[str, str]
+    unitary_encoding: dict[str, Any]
 
     def __str__(self):
         if self.name == "" or str.isspace(self.name):
@@ -182,6 +236,29 @@ class QecCode:
 
         return f"QecCode(name='{name}', n={self.n}, k={self.k}, d={self.d})"
 
+    def __post_init__(self):
+        invalid_transversal_gates: list[str] = []
+
+        for gate_name, gate_ops in self.transversal_1q_gates.items():
+            if len(gate_ops) != self.n:
+                invalid_transversal_gates.append(gate_name)
+
+        if invalid_transversal_gates:
+            err_msg = (
+                f"Invalid single-qubit transversal gate definition(s): attempting to instantiate a "
+                f"QEC code '{self.name}' with physical codeblock size n = {self.n}, but with "
+                f"transversal "
+            )
+
+            err_msg += ", ".join(
+                [
+                    f"gate '{gate_name}' of length {len(self.transversal_1q_gates[gate_name])}"
+                    for gate_name in invalid_transversal_gates
+                ]
+            )
+
+            raise ValueError(err_msg)
+
     @classmethod
     def from_dict(cls, data: dict) -> Self:
         """A builder function that returns a `QecCode` instance from a dictionary.
@@ -192,16 +269,16 @@ class QecCode:
         -------
 
         >>> QecCode.from_dict({
-        ...    'name': "Steane",
-        ...    'n': 7,
-        ...    'k': 1,
-        ...    'd': 3,
-        ...    "x_tanner": np.eye(7),
-        ...    "z_tanner": np.eye(7),
-        ...    "transversal_1q_gates": {},
-        ...    "transversal_2q_gates": {},
-        ...    "unitary_encoding": {}
-        ...    })
+        ...     'name': "Steane",
+        ...     'n': 7,
+        ...     'k': 1,
+        ...     'd': 3,
+        ...     "x_tanner": np.eye(7),
+        ...     "z_tanner": np.eye(7),
+        ...     "transversal_1q_gates": {},
+        ...     "transversal_2q_gates": {},
+        ...     "unitary_encoding": {}
+        ... })
         QecCode(name='Steane', n=7, k=1, d=3)
         """
         # Filter dictionary to keep only keys that are fields of this dataclass
