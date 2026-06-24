@@ -36,6 +36,8 @@ file(GLOB SRC
     SymbolicAnalysis/PhaseBucket.cpp
     SymbolicAnalysis/Parity.h
     SymbolicAnalysis/Parity.cpp
+    SymbolicAnalysis/BinaryMatrix.h
+    SymbolicAnalysis/BinaryMatrix.cpp
     SymbolicAnalysis/PhasePolynomial.h
     SymbolicAnalysis/PhasePolynomial.cpp
     SymbolicAnalysis/AffineTransform.h

@@ -14,63 +14,77 @@
 
 #pragma once
 
-#include <cassert>
-#include <string_view>
-#include <utility>
-#include <vector>
-
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "Parity.h"
+#include "BinaryMatrix.h"
+
+#include <vector>
+#include <cassert>
+
+struct TransformLayout {
+  std::vector<size_t> inVars;
+  std::vector<size_t> auxVars;
+
+  TransformLayout() = default;
+  explicit TransformLayout(size_t n);
+};
 
 class AffineTransform {
   public:
     // Constructors
     AffineTransform() = default;
-    AffineTransform(const Parity *rows, size_t n) : exprMatrix(rows, rows + n) {}
-
-    // Static Factories
-    static AffineTransform identity(size_t n);
-
+    explicit AffineTransform(size_t n) : layout(TransformLayout(n)), mat(BinaryMatrix::identity(n)) {} // Identity matrix by default
+    
     // Operators
     friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AffineTransform &trans);
-    std::string algebraicView(size_t qubitNum) const;
+    std::string algebraicView() const;
 
     // Getters
-    [[nodiscard]] size_t getRowNum() const;
-    [[nodiscard]] size_t getColNum(size_t row) const;
-    [[nodiscard]] const Parity &getRow(size_t row) const;
-    [[nodiscard]] Parity &getRowMutable(size_t row) const;
+    [[nodiscard]] size_t getQubitNum() const;
+    [[nodiscard]] size_t getAuxVarNum() const;
+    [[nodiscard]] size_t getVarNum() const;
+    [[nodiscard]] const Parity &getExpr(size_t qubitInd) const;
+    [[nodiscard]] Parity &getExprMutable(size_t qubitInd) const;
 
     // Setters
-    void setRow(size_t row, const Parity &parity);
-    void resetRow(size_t row);
-    void flipAffineValueAtRow(size_t row);
-
+    
     // Methods
-    void extendTo(size_t newRowNum, size_t auxVarNum);
-    void swapRows(size_t row1, size_t row2);
-    void addRows(size_t sourceRow, size_t targetRow);
-    void addRowWithParity(size_t row, const Parity &parity);
-
+    void extendQubitsTo(size_t newQubitNum);
+    void initQubit(size_t qubitIndex, bool basisState);
+    void applyGateX(size_t qubitIndex);
+    void applyGateCNOT(size_t controlIndex, size_t targetIndex);
+    void applyGateSWAP(size_t qubitIndex1, size_t qubitIndex2);
+    void applyGateH(size_t qubitIndex);
+    void applyGateU(llvm::ArrayRef<size_t> qubitIndices);
+    
   private:
-    std::vector<Parity> exprMatrix; // n x (n + m + 1) binary matrix
-
-    // Helper Methods
-    explicit AffineTransform(size_t n); // Identity matrix by default
+    TransformLayout layout;
+    BinaryMatrix mat;
 };
 
-inline size_t AffineTransform::getRowNum() const { return exprMatrix.size(); }
-
-inline size_t AffineTransform::getColNum(size_t row) const { return getRow(row).getVarNum(); }
-
-inline const Parity &AffineTransform::getRow(size_t row) const
+inline size_t AffineTransform::getQubitNum() const
 {
-    assert(row >= 0 && row < getRowNum());
-    return exprMatrix[row];
+  assert(layout.inVars.size() == mat.getRowNum());
+  return layout.inVars.size();
 }
 
-inline Parity &AffineTransform::getRowMutable(size_t row) const
+inline size_t AffineTransform::getAuxVarNum() const
 {
-    return const_cast<Parity &>(static_cast<const AffineTransform &>(*this).getRow(row));
+  return layout.auxVars.size();
+}
+
+inline size_t AffineTransform::getVarNum() const
+{
+  return getQubitNum() + getAuxVarNum();
+}
+
+inline const Parity &AffineTransform::getExpr(size_t qubitInd) const
+{
+    return mat.getRow(qubitInd);
+}
+
+inline Parity &AffineTransform::getExprMutable(size_t qubitInd) const
+{
+    return mat.getRowMutable(qubitInd);
 }

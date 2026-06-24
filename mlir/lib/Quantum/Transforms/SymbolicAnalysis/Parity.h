@@ -76,7 +76,7 @@ class Parity {
 
     static const size_t BLOCK_SIZE = 64;
 
-    size_t varNum;
+    size_t varNum;  // shall be removed?
     llvm::SmallVector<uint64_t, 8> bits;
     // Least significant bit (pos = 0) is the affine value. pos = i corresponds to x_i (not anymore,
     // there may be path variables in between)

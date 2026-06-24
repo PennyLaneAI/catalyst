@@ -74,13 +74,13 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     // Qubit Extraction:
     void allocateRegister(mlir::Value qreg, auto regSize, SymbolicCircuit &symCirc)
     {
-        qregToBaseMap[qreg] = symCirc.qubitNum;
+        qregToBaseMap[qreg] = symCirc.getQubitNum();
         symCirc.extendQubitsBy(static_cast<size_t>(regSize.value_or(0)));
     }
 
     void allocateQubit(mlir::Value qubit, SymbolicCircuit &symCirc)
     {
-        ssaToWireMap[qubit] = symCirc.qubitNum;
+        ssaToWireMap[qubit] = symCirc.getQubitNum();
         symCirc.extendQubitsBy(1);
     }
 
@@ -149,6 +149,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
             qubitIndices = getQubitIndices(stateOp.getInQubits(), stateOp.getOutQubits());
         }
         else {
+            // op->emitError("Not supported");
             return;
         }
 

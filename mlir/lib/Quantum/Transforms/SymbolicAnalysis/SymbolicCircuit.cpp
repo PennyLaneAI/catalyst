@@ -31,7 +31,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SymbolicCircuit &circ
 /*
     Dimension Handling:
 */
-void SymbolicCircuit::ensureCapacity(llvm::ArrayRef<size_t> indices)
+bool SymbolicCircuit::areIndsInBound(llvm::ArrayRef<size_t> indices)
 {
     size_t maxIndex = 0;
     for (size_t idx : indices) {
@@ -39,24 +39,27 @@ void SymbolicCircuit::ensureCapacity(llvm::ArrayRef<size_t> indices)
             maxIndex = idx;
         }
     }
-    assert(maxIndex < qubitNum);
+    return (maxIndex < getQubitNum());
 }
 
 void SymbolicCircuit::extendQubitsBy(size_t addQubitNum)
 {
-    size_t newQubitNum = qubitNum + addQubitNum;
-    stateTrans.extendTo(newQubitNum, auxVarNum);
-    qubitNum = newQubitNum;
+    stateTrans.extendQubitsTo(stateTrans.getQubitNum() + addQubitNum);
 }
 
 /*
     Gate Applications:
 */
+void SymbolicCircuit::initQubit(size_t qubitIndex, bool basisState)
+{
+    assert(qubitIndex < getQubitNum()); // or +-1?
+    stateTrans.initQubit(qubitIndex, basisState);
+}
+
 void SymbolicCircuit::applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices,
                                 std::optional<GateID> gateId)
 {
-    ensureCapacity(qubitIndices);
-
+    assert(areIndsInBound(qubitIndices));
     assert(arity(gate) == DYNAMIC_ARITY || qubitIndices.size() == arity(gate));
     assert(!isPhaseGate(gate) || gateId.has_value());
 
@@ -64,10 +67,10 @@ void SymbolicCircuit::applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t
     case Gate::I:
         break;
     case Gate::H:
-        applyGateH(qubitIndices[0]);
+        stateTrans.applyGateH(qubitIndices[0]);
         break;
     case Gate::X:
-        applyGateX(qubitIndices[0]);
+        stateTrans.applyGateX(qubitIndices[0]);
         break;
     case Gate::Y:
         if (isAdjoint)
@@ -82,13 +85,13 @@ void SymbolicCircuit::applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t
         applyGateRZ(qubitIndices[0], gateId.value());
         break;
     case Gate::CNOT:
-        applyGateCNOT(qubitIndices[0], qubitIndices[1]);
+        stateTrans.applyGateCNOT(qubitIndices[0], qubitIndices[1]);
         break;
     case Gate::SWAP:
-        applyGateSWAP(qubitIndices[0], qubitIndices[1]);
+        stateTrans.applyGateSWAP(qubitIndices[0], qubitIndices[1]);
         break;
     case Gate::U:
-        applyGateU(qubitIndices);
+        stateTrans.applyGateU(qubitIndices);
         break;
     case Gate::GP:
         break; // figure out later.
@@ -97,7 +100,7 @@ void SymbolicCircuit::applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t
 
 void SymbolicCircuit::applyGateRZ(size_t qubitIndex, GateID gateId)
 {
-    Parity &parity = stateTrans.getRowMutable(qubitIndex);
+    Parity &parity = stateTrans.getExprMutable(qubitIndex);
 
     bool affineVal = parity.getAffineValue();
     PhaseBucket contributor = PhaseBucket(gateId, affineVal);
@@ -107,11 +110,9 @@ void SymbolicCircuit::applyGateRZ(size_t qubitIndex, GateID gateId)
     parity.assignAffineValue(affineVal);
 }
 
-void SymbolicCircuit::applyGateX(size_t qubitIndex) { stateTrans.flipAffineValueAtRow(qubitIndex); }
-
 void SymbolicCircuit::applyGateY(size_t qubitIndex, GateID gateId)
 {
-    applyGateX(qubitIndex);
+    stateTrans.applyGateX(qubitIndex);
     applyGateRZ(qubitIndex, gateId);
     // global phase of +i.
 }
@@ -119,47 +120,6 @@ void SymbolicCircuit::applyGateY(size_t qubitIndex, GateID gateId)
 void SymbolicCircuit::applyGateY_dag(size_t qubitIndex, GateID gateId)
 {
     applyGateRZ(qubitIndex, gateId);
-    applyGateX(qubitIndex);
+    stateTrans.applyGateX(qubitIndex);
     // global phase of -i.
-}
-
-void SymbolicCircuit::applyGateCNOT(size_t controlIndex, size_t targetIndex)
-{
-    stateTrans.addRows(controlIndex, targetIndex);
-}
-
-void SymbolicCircuit::applyGateSWAP(size_t qubitIndex1, size_t qubitIndex2)
-{
-    stateTrans.swapRows(qubitIndex1, qubitIndex2);
-}
-
-void SymbolicCircuit::applyGateH(size_t qubitIndex)
-{
-    auxVarNum++;
-    stateTrans.setRow(qubitIndex, Parity::eVec(qubitNum + auxVarNum, qubitNum + auxVarNum));
-}
-
-// uninterpreted gates.
-void SymbolicCircuit::applyGateU(llvm::ArrayRef<size_t> qubitIndices)
-{
-    llvm::outs() << "U on qubits ";
-    for (size_t index : qubitIndices) {
-        llvm::outs() << index << ", ";
-    }
-    llvm::outs() << ":\n";
-
-    size_t n = qubitIndices.size();
-    auxVarNum += n;
-    for (size_t i = 0; i < n; i++) {
-        stateTrans.setRow(qubitIndices[i],
-                          Parity::eVec(qubitNum + auxVarNum, qubitNum + auxVarNum - n + i + 1));
-    }
-} // make sure nothing leads to segment fault and index out of bounds.
-
-void SymbolicCircuit::initQubit(size_t qubitIndex, bool basisState)
-{
-    stateTrans.resetRow(qubitIndex);
-    if (basisState) {
-        stateTrans.flipAffineValueAtRow(qubitIndex);
-    }
 }

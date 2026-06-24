@@ -19,13 +19,11 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "AffineTransform.h"
 #include "Gate.h"
+#include "AffineTransform.h"
 #include "PhasePolynomial.h"
 
 struct SymbolicCircuit {
-    size_t qubitNum;
-    size_t auxVarNum;
     // std::vector<bool> isAux;
     PhasePolynomial phasePoly;
     AffineTransform stateTrans; // row i corresponds to qubit i, but col i doesn't!
@@ -33,35 +31,35 @@ struct SymbolicCircuit {
     // Constructors
     SymbolicCircuit() = default;
     SymbolicCircuit(size_t qubitNum)
-        : qubitNum(qubitNum), auxVarNum(0), phasePoly(PhasePolynomial()),
-          stateTrans(AffineTransform::identity(qubitNum))
+        : phasePoly(PhasePolynomial()), stateTrans(AffineTransform(qubitNum))
     {
     }
-    SymbolicCircuit(size_t qubitNum, size_t auxVarNum, PhasePolynomial phasePoly,
-                    AffineTransform stateTrans)
-        : qubitNum(qubitNum), auxVarNum(auxVarNum), phasePoly(std::move(phasePoly)),
-          stateTrans(std::move(stateTrans))
+    SymbolicCircuit(PhasePolynomial phasePoly, AffineTransform stateTrans)
+        : phasePoly(std::move(phasePoly)), stateTrans(std::move(stateTrans))
     {
     }
 
     // Operators
     friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SymbolicCircuit &circ);
 
+    // Getters
+    [[nodiscard]] size_t getQubitNum() const;
+
     // Dimension Handling
-    void ensureCapacity(llvm::ArrayRef<size_t> qubitIndices);
+    bool areIndsInBound(llvm::ArrayRef<size_t> qubitIndices);
     void extendQubitsBy(size_t newQubitNum);
 
     // Gate Applications
     void applyGate(Gate gate, bool isAdjoint, llvm::ArrayRef<size_t> qubitIndices,
                    std::optional<GateID> gateId = std::nullopt);
     void applyGateRZ(size_t qubitIndex, GateID gateId);
-    void applyGateX(size_t qubitIndex);
     void applyGateY(size_t qubitIndex, GateID gateId);
     void applyGateY_dag(size_t qubitIndex, GateID gateId);
-    void applyGateCNOT(size_t controlIndex, size_t targetIndex);
-    void applyGateSWAP(size_t qubitIndex1, size_t qubitIndex2);
-    void applyGateH(size_t qubitIndex);
-    void applyGateU(llvm::ArrayRef<size_t> qubitIndices);
 
     void initQubit(size_t qubitIndex, bool basisState);
 };
+
+inline size_t SymbolicCircuit::getQubitNum() const
+{
+  return stateTrans.getQubitNum();
+}

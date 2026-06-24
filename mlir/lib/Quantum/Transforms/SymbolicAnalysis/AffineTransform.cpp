@@ -17,71 +17,87 @@
 /*
     Constructors:
 */
-AffineTransform::AffineTransform(size_t n)
+TransformLayout::TransformLayout(size_t n)
 {
-    exprMatrix.reserve(n);
-    for (size_t i = 0; i < n; i++) {
-        exprMatrix.push_back(Parity::eVec(n, i + 1));
-    }
+    inVars.reserve(n);
+    std::iota(inVars.begin(), inVars.end(), 0); 
 }
-
-AffineTransform AffineTransform::identity(size_t n) { return AffineTransform(n); }
-
 /*
     Operators:
 */
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AffineTransform &trans)
 {
-    for (auto it = trans.exprMatrix.begin(); it != trans.exprMatrix.end(); it++) {
-        os << *it << '\n';
-    }
+    os << trans.mat;
     return os;
 }
 
-std::string AffineTransform::algebraicView(size_t qubitNum) const
+std::string AffineTransform::algebraicView() const
 {
-    std::string res = "";
-    for (size_t i = 0; i < exprMatrix.size(); i++) {
-        res +=
-            ("x'" + std::to_string(i + 1) + " = " + exprMatrix[i].algebraicView(qubitNum) + '\n');
-    }
-    return res;
+    return mat.algebraicView(getQubitNum());
 }
-
-/*
-    Getters and Setters:
-*/
-void AffineTransform::setRow(size_t row, const Parity &parity) { getRowMutable(row) = parity; }
-
-void AffineTransform::resetRow(size_t row) { getRowMutable(row).reset(); }
-
-void AffineTransform::flipAffineValueAtRow(size_t row) { getRowMutable(row).flipAffineValue(); }
 
 /*
     Methods:
 */
-void AffineTransform::addRowWithParity(size_t row, const Parity &parity)
+void AffineTransform::extendQubitsTo(size_t newQubitNum)
 {
-    getRowMutable(row) += parity;
+    size_t curQubitNum = getQubitNum();
+    size_t auxVarNum = getAuxVarNum();
+
+    mat.extendRowsTo(newQubitNum, auxVarNum);
+    
+    layout.inVars.reserve(newQubitNum);
+    for (size_t i = curQubitNum + 1; i <= newQubitNum; i++) {
+        layout.inVars.push_back(i + auxVarNum);
+    }
 }
 
-void AffineTransform::addRows(size_t sourceRow, size_t targetRow)
-{ // E_i,j
-    getRowMutable(targetRow) += getRow(sourceRow);
+void AffineTransform::initQubit(size_t qubitIndex, bool basisState)
+{
+    mat.resetRow(qubitIndex);
+    if (basisState == 1) {
+        mat.flipAffineValueAtRow(qubitIndex);
+    }
 }
 
-void AffineTransform::swapRows(size_t row1, size_t row2)
+void AffineTransform::applyGateX(size_t qubitIndex) 
 {
-    std::swap(getRowMutable(row1), getRowMutable(row2));
+    mat.flipAffineValueAtRow(qubitIndex);
 }
 
-void AffineTransform::extendTo(size_t newRowNum, size_t auxVarNum)
+void AffineTransform::applyGateCNOT(size_t controlIndex, size_t targetIndex)
 {
-    if (newRowNum > getRowNum()) {
-        exprMatrix.reserve(newRowNum);
-        for (size_t i = getRowNum() + 1; i <= newRowNum; i++) {
-            exprMatrix.push_back(Parity::eVec(newRowNum + auxVarNum, i + auxVarNum));
-        }
-    } // it might be more efficient to resize to newRowNum, and then just turn the eVec bits on for
-      // the new rows.
+    mat.addRowToRow(controlIndex, targetIndex);
 }
+
+void AffineTransform::applyGateSWAP(size_t qubitIndex1, size_t qubitIndex2)
+{
+    mat.swapRows(qubitIndex1, qubitIndex2);
+}
+
+void AffineTransform::applyGateH(size_t qubitIndex)
+{   
+    size_t lastInd = getQubitNum() + getAuxVarNum() + 1;
+    mat.setRow(qubitIndex, Parity::eVec(lastInd, lastInd));
+    layout.auxVars.push_back(lastInd);
+}
+
+// uninterpreted gates.
+void AffineTransform::applyGateU(llvm::ArrayRef<size_t> qubitIndices)
+{
+    llvm::outs() << "U on qubits ";
+    for (size_t index : qubitIndices) {
+        llvm::outs() << index << ", ";
+    }
+    llvm::outs() << ":\n";
+    
+    size_t n = qubitIndices.size();
+    size_t lastInd = getQubitNum() + getAuxVarNum();
+
+    layout.auxVars.reserve(getAuxVarNum() + n);
+    for (size_t i = 0; i < n; i++) {
+        mat.setRow(qubitIndices[i],
+                          Parity::eVec(lastInd + n, lastInd + i + 1));
+        layout.auxVars.push_back(lastInd + i + 1);
+    }
+} // make sure nothing leads to segment fault and index out of bounds.
