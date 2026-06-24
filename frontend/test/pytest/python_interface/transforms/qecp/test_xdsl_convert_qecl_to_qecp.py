@@ -754,6 +754,32 @@ class TestLoweringMeasure:
         ):
             run_filecheck(program, pipeline)
 
+    def test_no_subroutine_if_no_measure(self, get_generic_qec_code, run_filecheck):
+        """Test that the measure subroutine isn't generated and added to the code if it isn't needed"""
+
+        program = """
+        builtin.module {
+        // CHECK-LABEL: test_program
+        // CHECK-NOT: func.call @measure_transversal_TestCode
+        func.func @test_program() {
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = qecl.x %0[0] : !qecl.codeblock<1>
+            return
+        }
+        }
+        """
+
+        qec_code = get_generic_qec_code(
+            n=7,
+            k=1,
+            d=3,
+            transversal_1q_gates={"x": (qecp.PauliXOp, [])},
+        )
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
+
+        # no z operator defined, a program with measure would fail with a compilation error
+        run_filecheck(program, pipeline)
+
 
 # MARK: TransversalGates
 
@@ -1070,6 +1096,28 @@ class TestLoweringTransversalGates:
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
         run_filecheck(program, pipeline)
 
+    def test_only_needed_op_subroutines(self, qecl_to_qecp_steane_pipeline, run_filecheck):
+        """Test that only the needed gate subroutine are generated for the circuit"""
+
+        program = """
+        builtin.module @module_circuit {
+                func.func @test_func() attributes {quantum.node} {
+                    %0 = "test.op"() : () -> !qecl.codeblock<1>
+                    %1 = qecl.hadamard %0[0] : !qecl.codeblock<1>
+                    %2 = qecl.s %1[0] adj : !qecl.codeblock<1>
+                    return
+                }
+                // CHECK: func.func private @hadamard_Steane
+                // CHECK: func.func private @s_adj_Steane
+                // CHECK-NOT: func.func private @x_Steane
+                // CHECK-NOT: func.func private @y_Steane
+                // CHECK-NOT: func.func private @z_Steane
+                // CHECK-NOT: func.func private @s_Steane
+            }
+            """
+
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
 
 # Mark: FabricateOp
 
@@ -1177,9 +1225,6 @@ class TestLoweringFabricateOp:
 
                 // CHECK: [[cb1:%.+]] = func.call @apply_T([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
                 %2 = func.call @apply_T(%0) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
-
-                // CHECK: [[cb2:%.+]] = func.call @apply_T_adj([[cb1]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
-                %3 = func.call @apply_T_adj(%2) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
                 return
             }
             //      CHECK-LABEL: func.func private @apply_T([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
@@ -1190,13 +1235,6 @@ class TestLoweringFabricateOp:
                 qecl.dealloc_cb %0 : !qecl.codeblock<1>
                 func.return %1 : !qecl.codeblock<1>
             }
-            //      CHECK-LABEL: func.func private @apply_T_adj([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
-            // CHECK: func.call @fabricate_magic_conj_Steane() : () -> !qecp.codeblock<1 x 7>
-            func.func private @apply_T_adj(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
-                %1 = qecl.fabricate[magic_conj] : !qecl.codeblock<1>
-                qecl.dealloc_cb %0 : !qecl.codeblock<1>
-                func.return %1 : !qecl.codeblock<1>
-            }
             //      CHECK-LABEL: func.func private @fabricate_magic_Steane
             // CHECK: qecp.alloc_cb
             // CHECK: qecp.h
@@ -1204,10 +1242,39 @@ class TestLoweringFabricateOp:
             // CHECK-NOT: qecp.t [[qb:%.+]] adj
             // CHECK: qecp.h
             // CHECK: qecp.cnot
+            // CHECK-NOT: func.func private @fabricate_magic_conj_Steane()
+        }
+        """
+        run_filecheck(program, qecl_to_qecp_steane_pipeline)
+
+    def test_apply_adj_t_steane(self, run_filecheck, qecl_to_qecp_steane_pipeline):
+        """Test that the call signature for the apply_T_adj subroutine is updated as expected."""
+
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 7>
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+
+                // CHECK: [[cb1:%.+]] = func.call @apply_T_adj([[cb0]]) : (!qecp.codeblock<1 x 7>) -> !qecp.codeblock<1 x 7>
+                %1 = func.call @apply_T_adj(%0) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                return
+            }
+            //      CHECK-LABEL: func.func private @apply_T_adj([[in_codeblock:%.+]]: !qecp.codeblock<1 x 7>)
+            // CHECK: func.call @fabricate_magic_conj_Steane() : () -> !qecp.codeblock<1 x 7>
+            func.func private @apply_T_adj(%0: !qecl.codeblock<1>) -> !qecl.codeblock<1> {
+                %1 = qecl.fabricate[magic_conj] : !qecl.codeblock<1>
+                qecl.dealloc_cb %0 : !qecl.codeblock<1>
+                func.return %1 : !qecl.codeblock<1>
+            }
+            // CHECK-NOT: func.func private @fabricate_magic_Steane
             //      CHECK-LABEL: func.func private @fabricate_magic_conj_Steane
             // CHECK: qecp.alloc_cb
+            // CHECK: qecp.h
             // CHECK: qecp.t [[qb:%.+]] adj
             // CHECK-NOT: qecp.t [[qb:%.+]] :
+            // CHECK: qecp.h
+            // CHECK: qecp.cnot
         }
         """
         run_filecheck(program, qecl_to_qecp_steane_pipeline)
@@ -1252,8 +1319,7 @@ class TestControlFlow:
 
             qp.cond(x > 0, true_branch, false_branch)()
 
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -1287,8 +1353,7 @@ class TestControlFlow:
                 qp.PauliX(0)
 
             loop_pauli_x()
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -1330,8 +1395,7 @@ class TestControlFlow:
             # apply the while loop
             loop_rx(value)
 
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -1349,7 +1413,6 @@ class TestQECPLoweringIntegration:
 
         @qp.qjit(capture=True, target="mlir")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
-        @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
@@ -1375,17 +1438,14 @@ class TestQECPLoweringIntegration:
             # CHECK: func.call @measure_transversal_Steane
             # CHECK: func.call @measure_transversal_Steane
             # CHECK: func.call @measure_transversal_Steane
-            # CHECK: qecp.insert_block
             # CHECK: quantum.mcmobs
+            # CHECK: qecp.insert_block
             # CHECK: quantum.sample
             # CHECK: qecp.dealloc
             qp.H(0)
             qp.CNOT([0, 1])
             qp.CNOT([1, 2])
-            m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            m2 = qp.measure(2)
-            return qp.sample([m0, m1, m2])
+            return qp.sample(wires=[0, 1, 2])
 
         run_filecheck_qjit(circuit)
 
@@ -1397,7 +1457,6 @@ class TestQECPLoweringIntegration:
         @qp.qjit(target="mlir", capture=True)
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
-        @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
@@ -1413,7 +1472,6 @@ class TestQECPLoweringIntegration:
             # CHECK: func.call @noise_subroutine_code
             # CHECK: func.call @qec_cycle_Steane
             # CHECK: func.call @measure_transversal_Steane
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)

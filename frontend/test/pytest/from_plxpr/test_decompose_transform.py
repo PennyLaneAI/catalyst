@@ -479,6 +479,23 @@ class TestGraphDecomposition:
 
             circuit()
 
+    def test_paulirot_python_decomp(self):
+        """Test that paulirot is successfully decomposed by compile-time lowered rules."""
+
+        def circuit():
+            qp.PauliRot(0.3, "YXZ", [0, 1, 2])
+            return qp.state()
+
+        qnode = qp.QNode(circuit, qp.device("null.qubit", wires=3))
+
+        without_qjit = qnode()
+
+        with_qjit = qp.qjit(
+            graph_decomposition(qnode, gate_set={qp.H, qp.RX, qp.MultiRZ, qp.GlobalPhase})
+        )()
+
+        assert np.allclose(without_qjit, with_qjit)
+
 
 class TestPlxPRDecomposition:
     """Test the PLxPR-based graph-based decomposition integration with from_plxpr."""
@@ -834,9 +851,8 @@ class TestPlxPRDecomposition:
         result_with_qjit = with_qjit()
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
 
-        with qp.capture.pause():
-            result_without_qjit = circuit()
-            expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        result_without_qjit = circuit()
+        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
 
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         assert qp.math.allclose(result_without_qjit, result_with_qjit)
