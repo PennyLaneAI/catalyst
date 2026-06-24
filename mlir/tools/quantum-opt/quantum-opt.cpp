@@ -50,6 +50,8 @@
 
 #include "RegisterAllPasses.h"
 
+#include "Remote/IR/RemoteDialect.h"
+
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
@@ -77,6 +79,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::pauli_frame::PauliFrameDialect>();
     registry.insert<catalyst::ion::IonDialect>();
     registry.insert<catalyst::rtio::RTIODialect>();
+    registry.insert<catalyst::remote::RemoteDialect>();
     registry.insert<catalyst::qecl::QecLogicalDialect>();
     registry.insert<catalyst::qecp::QecPhysicalDialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();

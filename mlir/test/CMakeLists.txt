@@ -31,6 +31,7 @@ set(TEST_SUITES
     PauliFrame
     cli
     PBC
+    Remote
     RTIO
     QecLogical
     QecPhysical
