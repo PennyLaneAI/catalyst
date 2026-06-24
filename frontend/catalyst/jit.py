@@ -614,8 +614,13 @@ class QJIT(CatalystCallable):
         return capture_option
 
     @property
-    def mlir(self):
-        """Obtain the MLIR representation after canonicalization"""
+    def mlir(self) -> str | None:
+        """The canonicalized MLIR representation of the QJIT object after lowering, if available.
+
+        Returns:
+            str: The textual MLIR module for the QJIT object.
+            None: If compilation has not yet occurred.
+        """
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         if not self.mlir_module:
             return None
@@ -626,8 +631,13 @@ class QJIT(CatalystCallable):
         return canonicalize(stdin=stdin, options=self.compile_options)
 
     @property
-    def mlir_opt(self):
-        """Obtain the MLIR representation after optimization"""
+    def mlir_opt(self) -> str | None:
+        """The MLIR representation of the QJIT object after optimization, if available.
+
+        Returns:
+            str: The textual MLIR module after applying user passes and the default pipeline.
+            None: If compilation has not yet occurred.
+        """
         if not self.mlir_module:
             return None
         using_python_compiler = self.compiler.is_using_python_compiler(self.mlir_module)
