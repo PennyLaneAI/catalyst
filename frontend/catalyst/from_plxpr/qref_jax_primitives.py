@@ -30,6 +30,7 @@ from jaxlib.mlir.dialects.arith import (
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.wires import AbstractQubit
+from pennylane.pytrees import unflatten
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -38,6 +39,7 @@ from pennylane.wires import AbstractQubit
 # once JAX updates to a compatible MLIR version
 # pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import mock_attributes
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_primitives import (
     AbstractObs,
     _named_obs_attribute,
@@ -815,12 +817,26 @@ def _operator_op_lowering(
     hybrid_lens,
     hybrid_trees,
     wire_lens,
-    **static_args,
+    **static_data,
 ):
     params = args[: len(op_cls.dynamic_argnames)]
     qubits = args[len(op_cls.dynamic_argnames) :]
 
-    name_attr = ir.StringAttr.get(op_cls.__name__)
+    name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
+
+    repack_static_data = {k: unflatten(*v) for k, v in static_data.items()}
+    processed_static_data = get_mlir_attribute_from_pyval(repack_static_data)
+
+    param_map = {name: ir.DenseI64ArrayAttr.get([ind]) for ind, name in enumerate(op_cls.dynamic_argnames)}
+    processed_param_map = get_mlir_attribute_from_pyval(param_map)
+
+    qubit_map = {}
+    ind = 0
+    for name, size in zip(op_cls.wire_argnames, wire_lens):
+        qubit_map[name] = ir.DenseI64ArrayAttr.get(list(range(ind, ind+size)))
+        ind += size
+
+    processed_qubit_map = get_mlir_attribute_from_pyval(qubit_map)
 
     OperatorOp(
         op_name=name_attr,
@@ -832,6 +848,9 @@ def _operator_op_lowering(
         adjoint=False,
         UID=None,
         arr_qubit_indices=[],
+        param_map=processed_param_map,
+        static_data=processed_static_data,
+        qubit_map=processed_qubit_map,
     )
     return []
 

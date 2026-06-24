@@ -295,7 +295,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
 def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
 
-    if hybrid_lens or hybrid_trees:
+    if hybrid_lens or hybrid_trees or op_cls.static_argnames:
+        # only support compilable_argnames for the moment
         raise NotImplementedError
 
     wire_inputs = args[len(op_cls.dynamic_argnames) :]
