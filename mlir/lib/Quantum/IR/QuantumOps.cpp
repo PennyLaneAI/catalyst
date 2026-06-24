@@ -785,8 +785,8 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 5. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {"static_data", "param_map", "qubit_map",
-                                          "operandSegmentSizes", "resultSegmentSizes"};
+    SmallVector<StringRef> elidedAttrs = {"static_data",         "param_map",          "qubit_map",
+                                          "operandSegmentSizes", "resultSegmentSizes", "op_name"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
