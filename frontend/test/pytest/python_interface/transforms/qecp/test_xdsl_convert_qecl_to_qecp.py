@@ -1319,8 +1319,7 @@ class TestControlFlow:
 
             qp.cond(x > 0, true_branch, false_branch)()
 
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -1354,8 +1353,7 @@ class TestControlFlow:
                 qp.PauliX(0)
 
             loop_pauli_x()
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -1397,8 +1395,7 @@ class TestControlFlow:
             # apply the while loop
             loop_rx(value)
 
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 

@@ -52,7 +52,6 @@ def test_global_phase_in_region(backend, inp, capture_mode):
         return qp.state()
 
     observed = qjit(qnn, capture=capture_mode)(inp)
-    qp.capture.disable()
     expected = qnn(inp)
     assert np.allclose(expected, observed)
 

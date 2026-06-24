@@ -19,6 +19,7 @@
 import pennylane as qp
 import pytest
 
+from catalyst.python_interface.transforms import measurements_from_samples_pass
 from catalyst.python_interface.transforms.qecl import (
     ConvertQuantumToQecLogicalPass,
     convert_quantum_to_qecl_pass,
@@ -1492,8 +1493,8 @@ class TestMeasurementProcesses:
     """
 
     def test_sample_mcms_integration(self, run_filecheck_qjit):
-        """Test the convert-quantum-to-qecl pass on a program whose terminal measurement is a sample
-        on a single MCM.
+        """Test the convert-quantum-to-qecl pass on a program with a samples terminal measurement on
+        a single MCM.
         """
         dev = qp.device("null.qubit", wires=1)
 
@@ -1517,8 +1518,8 @@ class TestMeasurementProcesses:
         run_filecheck_qjit(circuit)
 
     def test_sample_qubit_1_integration(self, run_filecheck_qjit):
-        """Test the convert-quantum-to-qecl pass on a program whose terminal measurement is a sample
-        on a single qubit.
+        """Test the convert-quantum-to-qecl pass on a program with a samples terminal measurement on
+        a single qubit.
         """
         dev = qp.device("null.qubit", wires=1)
 
@@ -1542,8 +1543,8 @@ class TestMeasurementProcesses:
         run_filecheck_qjit(circuit)
 
     def test_sample_qubit_2_integration(self, run_filecheck_qjit):
-        """Test the convert-quantum-to-qecl pass on a program whose terminal measurement is a sample
-        on two qubits.
+        """Test the convert-quantum-to-qecl pass on a program with a samples terminal measurement on
+        two qubits.
         """
         dev = qp.device("null.qubit", wires=2)
 
@@ -1573,8 +1574,8 @@ class TestMeasurementProcesses:
 
     @pytest.mark.xfail(reason="Sampling quantum register not implemented", raises=CompileError)
     def test_sample_register_integration(self, run_filecheck_qjit):
-        """Test the convert-quantum-to-qecl pass on a program whose terminal measurement is a sample
-        on the quantum register.
+        """Test the convert-quantum-to-qecl pass on a program with a samples terminal measurement on
+        the quantum register.
         """
         dev = qp.device("null.qubit", wires=2)
 
@@ -1584,6 +1585,168 @@ class TestMeasurementProcesses:
         def circuit():
             # CHECK-NOT: builtin.unrealized_conversion_cast
             return qp.sample()
+
+        run_filecheck_qjit(circuit)
+
+    def test_expval_pauli_z_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with an expectation-value terminal
+        measurement of a Pauli Z observable.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: qecl.hadamard
+            # CHECK: [[mres:%.+]], {{%.+}} = qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+
+            # CHECK-LABEL: func.func public @circuit() -> tensor<f64>
+            # CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<100x1xf64>
+            # CHECK: [[expval:%.+]] = func.call @expval_from_samples{{.*}}([[samples]])
+            # CHECK: func.return [[expval]] : tensor<f64>
+            return qp.expval(qp.PauliZ(0))
+
+        run_filecheck_qjit(circuit)
+
+    def test_expval_pauli_x_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with an expectation-value terminal
+        measurement of a Pauli X observable.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+
+        The output IR should be the same as for the Pauli-Z observable, except that the
+        measurements-from-samples pass inserts the diagonalizing Hadamard gate before measuring the
+        target qubit (codeblock).
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK: qecl.hadamard
+            # CHECK: [[mres:%.+]], {{%.+}} = qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+
+            # CHECK-LABEL: func.func public @circuit() -> tensor<f64>
+            # CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<100x1xf64>
+            # CHECK: [[expval:%.+]] = func.call @expval_from_samples{{.*}}([[samples]])
+            # CHECK: func.return [[expval]] : tensor<f64>
+            return qp.expval(qp.PauliX(0))
+
+        run_filecheck_qjit(circuit)
+
+    def test_var_pauli_z_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with an variance terminal measurement
+        of a Pauli Z observable.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: qecl.hadamard
+            # CHECK: [[mres:%.+]], {{%.+}} = qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+
+            # CHECK-LABEL: func.func public @circuit() -> tensor<f64>
+            # CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<100x1xf64>
+            # CHECK: [[var:%.+]] = func.call @var_from_samples{{.*}}([[samples]])
+            # CHECK: func.return [[var]] : tensor<f64>
+            return qp.var(qp.PauliZ(0))
+
+        run_filecheck_qjit(circuit)
+
+    def test_probs_qubit_1_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with a probabilities terminal
+        measurement on a single qubit.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: qecl.hadamard
+            # CHECK: [[mres:%.+]], {{%.+}} = qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+
+            # CHECK-LABEL: func.func public @circuit() -> tensor<2xf64>
+            # CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<100x1xf64>
+            # CHECK: [[probs:%.+]] = func.call @probs_from_samples{{.*}}([[samples]])
+            # CHECK: func.return [[probs]] : tensor<2xf64>
+            return qp.probs(wires=0)
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.xfail(reason="Sampling quantum register not implemented", raises=CompileError)
+    def test_probs_register_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with a probabilities terminal
+        measurement on two qubits.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+        """
+        dev = qp.device("null.qubit", wires=2)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            return qp.probs()
 
         run_filecheck_qjit(circuit)
 
