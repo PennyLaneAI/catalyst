@@ -594,8 +594,9 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
     if (parser.parseString(&opName)) {
         return failure();
     }
+    result.addAttribute("op_name", builder.getStringAttr(opName));
     auto &opProperties = result.getOrAddProperties<OperatorOp::Properties>();
-    opProperties.setOpName(opName);
+    
 
     // 2. Parse variadic params: (%arg0: type, ...)
     SmallVector<OpAsmParser::UnresolvedOperand> params;
