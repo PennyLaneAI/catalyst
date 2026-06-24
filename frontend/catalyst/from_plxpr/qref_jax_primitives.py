@@ -799,29 +799,42 @@ def _qref_named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value,
 
     return NamedObsOp(result_type, qubit, obsId).results
 
+
 qref_operator_op.multiple_results = True
+
 
 @qref_operator_op.def_abstract_eval
 def _qref_operator_op_abstract_eval(*args, **kwargs):
     return []
 
-def _operator_op_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, hybrid_lens, hybrid_trees, wire_lens, **static_args):
-    params = args[:len(op_cls.dynamic_argnames)]
-    qubits = args[len(op_cls.dynamic_argnames):]
-    
+
+def _operator_op_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *args,
+    op_cls,
+    hybrid_lens,
+    hybrid_trees,
+    wire_lens,
+    **static_args,
+):
+    params = args[: len(op_cls.dynamic_argnames)]
+    qubits = args[len(op_cls.dynamic_argnames) :]
+
     name_attr = ir.StringAttr.get(op_cls.__name__)
-    
-    OperatorOp(op_name=name_attr,
-               params = params,
-               qubits = qubits,
-               forward_args=[],
-               ctrl_qubits=[],
-               ctrl_values=[],
-               adjoint=False,
-               UID=None,
-               arr_qubit_indices=[]
-               )
+
+    OperatorOp(
+        op_name=name_attr,
+        params=params,
+        qubits=qubits,
+        forward_args=[],
+        ctrl_qubits=[],
+        ctrl_values=[],
+        adjoint=False,
+        UID=None,
+        arr_qubit_indices=[],
+    )
     return []
+
 
 #
 # hermitian observable

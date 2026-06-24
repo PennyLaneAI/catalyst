@@ -298,16 +298,18 @@ def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
     if hybrid_lens or hybrid_trees:
         raise NotImplementedError
 
-    wire_inputs = args[len(op_cls.dynamic_argnames):]
-    new_wires = [w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs]
+    wire_inputs = args[len(op_cls.dynamic_argnames) :]
+    new_wires = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs
+    ]
 
     qref_operator_op.bind(
-        *args[:len(op_cls.dynamic_argnames)],
+        *args[: len(op_cls.dynamic_argnames)],
         *new_wires,
         op_cls=op_cls,
         hybrid_lens=hybrid_lens,
         hybrid_trees=hybrid_trees,
-        **kwargs
+        **kwargs,
     )
     return []
 
