@@ -14,15 +14,10 @@
 
 """Test module for the convert-qecl-to-qecp dialect-conversion transform."""
 
-from functools import partial
-from typing import Callable
-
 import numpy as np
 import pennylane as qp
 import pytest
-from xdsl.ir import Operation
 
-from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.transforms.qecl import (
     convert_quantum_to_qecl_pass,
     inject_noise_to_qecl_pass,
@@ -87,8 +82,8 @@ def fixture_get_generic_qec_code():
             transversal_2q_gates = {"cnot": "CNOT"}
 
         if unitary_encoding is None:
-            hadamard_ops = tuple([("H", [i]) for i in range(n) if i % 2])
-            cnot_ops = tuple([("CNOT", [i, i + 1]) for i in range(n - 1)])
+            hadamard_ops = tuple(("H", [i]) for i in range(n) if i % 2)
+            cnot_ops = tuple(("CNOT", [i, i + 1]) for i in range(n - 1))
 
             unitary_encoding = {
                 "state_prep_index": rng.integers(n),
@@ -96,8 +91,6 @@ def fixture_get_generic_qec_code():
                 # "hadamard_indices": [i for i in range(n) if i % 2],
                 # "cnot_indices": [[i, i + 1] for i in range(n - 1)],
             }
-
-        transversal_1q_gates
 
         return QecCode(
             name=name,

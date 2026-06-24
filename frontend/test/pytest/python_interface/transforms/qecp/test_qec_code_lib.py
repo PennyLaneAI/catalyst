@@ -24,7 +24,6 @@ from xdsl.ir import Operation
 from catalyst.python_interface.dialects import qecp
 from catalyst.python_interface.transforms.qecp.qec_code_lib import (
     QecCode,
-    SupportedGates,
     qecp_gate_op_from_string,
 )
 

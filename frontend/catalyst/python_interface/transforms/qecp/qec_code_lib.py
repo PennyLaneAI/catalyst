@@ -46,29 +46,33 @@ def qecp_gate_op_from_string(gate_str: str) -> Callable[..., Operation]:
 
     Raises a ValueError for invalid gate string identifiers.
     """
+    op_type: Callable[..., Operation]
+
     match gate_str:
         case SupportedGates.I:
-            return qecp.IdentityOp
+            op_type = qecp.IdentityOp
         case SupportedGates.X:
-            return qecp.PauliXOp
+            op_type = qecp.PauliXOp
         case SupportedGates.Y:
-            return qecp.PauliYOp
+            op_type = qecp.PauliYOp
         case SupportedGates.Z:
-            return qecp.PauliZOp
+            op_type = qecp.PauliZOp
         case SupportedGates.H:
-            return qecp.HadamardOp
+            op_type = qecp.HadamardOp
         case SupportedGates.S:
-            return qecp.SOp
+            op_type = qecp.SOp
         case SupportedGates.Sa:
-            return partial(qecp.SOp, adjoint=True)
+            op_type = partial(qecp.SOp, adjoint=True)
         case SupportedGates.CNOT:
-            return qecp.CnotOp
+            op_type = qecp.CnotOp
         case _:
             supported_gates_str = ", ".join(gate for gate in SupportedGates)
             raise ValueError(
                 f"Invalid gate in QEC code definition: '{gate_str}'. Supported gates are: "
                 f"{supported_gates_str}"
             )
+
+    return op_type
 
 
 _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
