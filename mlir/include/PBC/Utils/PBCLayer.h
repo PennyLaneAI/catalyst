@@ -28,7 +28,7 @@
 namespace catalyst {
 namespace pbc {
 
-// (depth_0, depth_1), or nullopt if there is nothing to report.
+// (any_commuting_depth, qubit_disjoint_depth), or nullopt if there is nothing to report.
 using PBCDepths = std::optional<std::pair<int64_t, int64_t>>;
 
 class PBCLayer;
@@ -68,7 +68,8 @@ class PBCLayerContext {
     computeBlockWorstCaseDepthNonzero(mlir::Block *block, bool onlyOnDisjointQubit = false,
                                       bool skipDynamic = false);
 
-    // Returns (depth_0, depth_1), or nullopt. Falls back to skip-dynamic on strict failure.
+    // Returns (any_commuting_depth, qubit_disjoint_depth), or nullopt.
+    // Falls back to skip-dynamic on strict failure.
     PBCDepths computePBCDepth(mlir::Block *block);
 
   private:

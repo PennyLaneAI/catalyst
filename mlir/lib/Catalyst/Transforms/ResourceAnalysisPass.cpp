@@ -203,10 +203,10 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         }
         llvm::json::Object depthObj;
         if (result.pbcDepth) {
-            depthObj["depth_0"] = result.pbcDepth->first;
-            depthObj["depth_1"] = result.pbcDepth->second;
+            depthObj["any_commuting_depth"] = result.pbcDepth->first;
+            depthObj["qubit_disjoint_depth"] = result.pbcDepth->second;
         }
-        funcObj["pbc_depth"] = std::move(depthObj);
+        funcObj["depth"] = std::move(depthObj);
 
         return funcObj;
     }
