@@ -1292,7 +1292,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
             case CheckType.Z:
                 aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.z_tanner)
-            case _:
+            case _:  # pragma: no cover
                 assert False, f"Unknown CheckType: '{check_type}'"
 
         aux_qubits = [
@@ -1386,7 +1386,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         corr_qubit_op = qecp.PauliZOp(in_qubit=err_qubit)
                     case CheckType.Z:
                         corr_qubit_op = qecp.PauliXOp(in_qubit=err_qubit)
-                    case _:
+                    case _:  # pragma: no cover
                         assert False, f"Unknown CheckType: '{check_type}'"
 
                 insert_err_qubit_op = qecp.InsertQubitOp(
