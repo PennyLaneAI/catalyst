@@ -222,7 +222,7 @@ PBCLayerContext::computeBlockWorstCaseDepthNonzero(Block *block, bool onlyOnDisj
 
 PBCDepths PBCLayerContext::computePBCDepth(Block *block)
 {
-    // Try to calcuate the depth with static first, then fallback to skip-dynamic.
+    // Try to calculate the depth with static first, then fallback to skip-dynamic.
     auto d0 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false);
     if (failed(d0)) {
         auto p0 = computeBlockWorstCaseDepthNonzero(block, /*onlyOnDisjointQubit=*/false,
