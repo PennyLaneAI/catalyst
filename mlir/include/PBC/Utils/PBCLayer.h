@@ -63,11 +63,6 @@ class PBCLayerContext {
                                                         bool onlyOnDisjointQubit = false,
                                                         bool skipDynamic = false);
 
-    // Like `computeBlockWorstCaseDepth`, but maps depth 0 to nullopt.
-    mlir::FailureOr<std::optional<int64_t>>
-    computeBlockWorstCaseDepthNonzero(mlir::Block *block, bool onlyOnDisjointQubit = false,
-                                      bool skipDynamic = false);
-
     // Returns (any_commuting_depth, qubit_disjoint_depth), or nullopt.
     // Falls back to skip-dynamic on strict failure.
     PBCDepths computePBCDepth(mlir::Block *block);

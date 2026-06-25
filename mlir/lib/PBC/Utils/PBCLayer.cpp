@@ -206,36 +206,22 @@ FailureOr<int64_t> PBCLayerContext::computeBlockWorstCaseDepth(Block *block,
     return depth;
 }
 
-FailureOr<std::optional<int64_t>>
-PBCLayerContext::computeBlockWorstCaseDepthNonzero(Block *block, bool onlyOnDisjointQubit,
-                                                   bool skipDynamic)
-{
-    FailureOr<int64_t> depth = computeBlockWorstCaseDepth(block, onlyOnDisjointQubit, skipDynamic);
-    if (failed(depth)) {
-        return failure();
-    }
-    if (*depth == 0) {
-        return std::optional<int64_t>(std::nullopt);
-    }
-    return std::optional<int64_t>(*depth);
-}
-
 PBCDepths PBCLayerContext::computePBCDepth(Block *block)
 {
     // Try to calculate the depth with static first, then fallback to skip-dynamic.
     auto d0 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false);
     if (failed(d0)) {
-        auto p0 = computeBlockWorstCaseDepthNonzero(block, /*onlyOnDisjointQubit=*/false,
-                                                    /*skipDynamic=*/true);
-        if (failed(p0) || !p0->has_value()) {
+        auto p0 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false,
+                                             /*skipDynamic=*/true);
+        if (failed(p0) || *p0 == 0) {
             return std::nullopt;
         }
-        auto p1 = computeBlockWorstCaseDepthNonzero(block, /*onlyOnDisjointQubit=*/true,
-                                                    /*skipDynamic=*/true);
-        if (failed(p1) || !p1->has_value()) {
+        auto p1 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/true,
+                                             /*skipDynamic=*/true);
+        if (failed(p1) || *p1 == 0) {
             return std::nullopt;
         }
-        return {{**p0, **p1}};
+        return {{*p0, *p1}};
     }
     if (*d0 == 0) {
         return std::nullopt;
