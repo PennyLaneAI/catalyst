@@ -13,6 +13,8 @@
 # limitations under the License.
 """Tests for operator in Catalyst."""
 
+# pylint: disable = useless-parent-delegation, missing-function-docstring, missing-class-docstring
+
 # RUN: %PYTHON %s | FileCheck %s
 
 import numpy as np
@@ -143,6 +145,7 @@ class MultiParams(qp.core.Operator2):
 def c_multi_params():
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
 
+    # pylint: disable=line-too-long
     # CHECK: qref.operator "MultiParams"({{%.+}}: tensor<f64>, {{%.+}}: tensor<4x2x1xf64>, {{%.+}}: tensor<3xi64>) qubits([[q0]])
     # CHECK: static_data = {}
     # CHECK: param_map = {a = [0], b = [1], c = [2]} qubit_map = {wires = [0]}
