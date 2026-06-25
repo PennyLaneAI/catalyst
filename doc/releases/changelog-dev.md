@@ -351,6 +351,8 @@
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
   [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
 
+* The documentation for `QJIT.mlir` and `QJIT.mlir_opt` was updated with type hints and docstrings that better reflect the compilation-dependent nature of the properties.
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
