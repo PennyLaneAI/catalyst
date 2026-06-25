@@ -174,7 +174,13 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"libpython-path",
             /*Type*/"std::string",
             /*Default*/[{ "" }],
-            /*Description*/"A path to the python shared library.">
+            /*Description*/"A path to the python shared library.">,
+        Option<
+            /*C++ name*/"estJsonPath",
+            /*CLI name*/"est-json-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A filepath of where to save the JSON. Only saves a JSON if specified.">,
     ];
 
     let dependentDialects = [

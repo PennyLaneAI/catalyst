@@ -1805,6 +1805,7 @@ def graph_decomposition_setup_inputs(
     _builtin_rule_path: str = BYTECODE_FILE_PATH,
     libQPD_path: Path | None = None,
     libpython_path: Path | None = None,
+    est_json_path: str | None = None,
 ):  # pylint: disable=unused-argument, too-many-arguments, too-many-positional-arguments
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
@@ -1908,6 +1909,7 @@ def graph_decomposition_setup_inputs(
             libQPD_path if libQPD_path else get_lib_path("catalyst", "CATALYST_LIB_DIR")
         ),
         "libpython_path": str(libpython_path if libpython_path else get_libpython_path()),
+        "est_json_path": est_json_path,
     }
 
     if fixed_decomps:

@@ -14,10 +14,14 @@
 
 #define DEBUG_TYPE "graph-decomposition"
 
+#include <fstream>
+
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/JSON.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -56,6 +60,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final
     {
+        bool estimateMode = this->estJsonPath != "";
+
+        llvm::outs() << "!!! RUNNING ON OPERATION\n";
+        llvm::outs() << "!!! ESTIMATE_MODE: " << estimateMode << "\n";
+
         // Debugging output for command-line options
         LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");
         LLVM_DEBUG({
@@ -104,6 +113,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             return signalPassFailure();
         }
 
+        llvm::outs() << userRuleNames.size() << " user rules found\n";
+        for (const auto &ruleName : userRuleNames) {
+            llvm::outs() << "\t" << ruleName.getKey() << "\n";
+        }
+
         // NOTE: getOperators must be after getRuleNodes, which removes user rules from the module.
         // This prevents operators in user rules from being added to the graph.
         getRuleNodes(bytecodeRulesFile, setOfRules, userRuleNames, allUserRules, ruleNameToFuncOp);
@@ -138,6 +152,18 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Step 5: Re-introduce (all) user rules for future decompositions
         for (auto &rule : allUserRules) {
             module.getBody()->push_back(rule.release());
+        }
+
+        if (estimateMode) {
+            std::string jsonStr = buildJsonString(solution);
+            std::ofstream ofile(estJsonPath);
+            if (!ofile.is_open()) {
+                llvm::errs() << "Error: could not open resource output file: " << estJsonPath
+                             << "\n";
+                return;
+            }
+            ofile << jsonStr;
+            ofile.close();
         }
     }
 
@@ -579,6 +605,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
         }
         return altDecomps;
+    }
+
+    std::string buildJsonString(const GraphResult &solution) const
+    {
+        llvm::json::Object root;
+
+        for (const auto &[op, chosenRule] : solution) {
+            llvm::json::Object decompResources;
+
+            for (const auto &[basisOp, count] : chosenRule.basisCounts) {
+                decompResources[basisOp.name] = count;
+            }
+            root[op.name] = std::move(decompResources);
+        }
+
+        llvm::json::Value jsonValue(std::move(root));
+        return llvm::formatv("{0:2}", jsonValue).str() + "\n";
     }
 };
 
