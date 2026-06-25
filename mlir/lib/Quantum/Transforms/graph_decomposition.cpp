@@ -104,10 +104,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Step 1: Gather inputs for graph
         std::vector<OperatorNode> setOfOps;
         std::vector<RuleNode> setOfRules;
-        llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> ruleNameToFuncOp;
         llvm::StringSet<> userRuleNames;
-        llvm::SmallVector<mlir::OwningOpRef<func::FuncOp>>
-            allUserRules; // includes rules unused in this decomp
         llvm::StringMap<std::string> opToFixedDecompName;
         llvm::StringMap<llvm::SmallVector<std::string>> opToAltDecompNames;
         WeightedGateset targetGateSet;
@@ -238,17 +235,28 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // 1. Mandatory Attribute Check (Target Gate and Resources)
         auto targetGateAttr = rule->getAttrOfType<StringAttr>("target_gate");
         auto resourcesAttr = rule->getAttrOfType<DictionaryAttr>("resources");
-        if (!targetGateAttr || !resourcesAttr) {
-            llvm::errs() << "Cannot parse decomposition rule without `target_gate` and `resources` "
-                            "attributes.\n";
+        if (!targetGateAttr) {
+            llvm::errs() << "Cannot parse decomposition rule " << ruleName
+                         << " without the `target_gate` attribute.\n";
+            LDBG() << rule;
             return failure();
+        }
+
+        // Ensure resources
+        if (!resourcesAttr) {
+            ResourceAnalysis analysis(rule);
+            if (const ResourceResult *flat = analysis.getFlattenedResource(rule.getName())) {
+                rule->setAttr("resources", buildResourceDict(&getContext(), *flat));
+            }
+            resourcesAttr = rule->getAttrOfType<DictionaryAttr>("resources");
         }
 
         // 2. Extract 'operations' dictionary from resources
         auto operations = mlir::dyn_cast_or_null<DictionaryAttr>(resourcesAttr.get("operations"));
         if (!operations) {
-            llvm::errs()
-                << "Cannot parse decomposition rule resources without `operations` attribute.\n";
+            llvm::errs() << "Cannot parse resource for decomposition rule " << ruleName
+                         << " without `operations` attribute.\n";
+            LDBG() << rule;
             return failure();
         }
 
@@ -300,7 +308,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
     /**
-     * @brief Load the listed user rules into the registry.
+     * @brief Load the listed user rules into the set of RuleNodes for the graph.
      */
     LogicalResult loadUserDecompositionRules(llvm::StringSet<> &userRuleNames,
                                              std::vector<RuleNode> &ruleNodes)
@@ -308,14 +316,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         mlir::ModuleOp module = getOperation();
         if (userRuleNames.empty()) {
             return success();
-        }
-
-        PassManager pm(&getContext());
-        pm.addPass(createRegisterDecompRuleResourcePass());
-        if (failed(pm.run(module))) {
-            module.emitError() << "failed to load user decomposition rules: unable to run resource "
-                                  "annotation pass";
-            return failure();
         }
 
         WalkResult walkResult = module.walk([&](mlir::func::FuncOp func) {
@@ -344,19 +344,21 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      */
     mlir::LogicalResult loadPauliRotRules(std::vector<RuleNode> &ruleNodes)
     {
-        LDBG() << "loading paulirot rules";
         mlir::ModuleOp module = getOperation();
         MLIRContext *context = &getContext();
 
         llvm::StringSet<> addedWords;
+        // Add words from existing paulirot rules
+        module.walk([&](mlir::func::FuncOp func) {
+            if (func->hasAttr("target_gate")) {
+                if (func.getName().starts_with("paulirot_decomp_rule_")) {
+                    addedWords.insert(func.getName().drop_front(21));
+                }
+            }
+        });
 
         llvm::SmallVector<quantum::PauliRotOp> pauliRotOps;
         module.walk([&](quantum::PauliRotOp op) { pauliRotOps.push_back(op); });
-
-        LDBG() << "found the following paulirots:";
-        for (auto op : pauliRotOps) {
-            LDBG() << op;
-        }
 
         if (!pauliRotOps.empty()) {
             if (!loadQPD(libQPDPath, libpythonPath)) {
@@ -364,8 +366,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 return failure();
             }
         }
-
-        LDBG() << "loaded QPD";
 
         for (quantum::PauliRotOp pauliRot : pauliRotOps) {
             std::string pauliWord = pauliRot.getPauliWord();
@@ -406,11 +406,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             mlir::func::FuncOp funcOp = outOp.get();
             outOp->setName((outOp->getName() + "_" + pauliWord).str()); // unique name per pauliword
             funcOp->setAttr("target_gate", mlir::StringAttr::get(context, "paulirot" + pauliWord));
-
-            auto analysis = ResourceAnalysis(funcOp);
-            if (const ResourceResult *flat = analysis.getFlattenedResource(funcOp.getName())) {
-                funcOp->setAttr("resources", buildResourceDict(context, *flat));
-            }
 
             if (failed(addRuleNode(funcOp, ruleNodes))) {
                 return failure();
@@ -524,13 +519,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
                                llvm::StringSet<> &userRuleNames)
     {
-        LDBG() << "getting rule nodes";
-
         // Load pre-compiled rules (ignore failure, we can try to solve without)
         std::ignore = loadBuiltInDecompositionRules(filename, rules);
 
         // Lower and load compile-time rules
-        LDBG() << "loading paulirot rules";
         if (failed(loadPauliRotRules(rules))) {
             return failure();
         }
@@ -580,7 +572,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * For each entry, looks up the corresponding RuleNodes in setOfRules by name.
      * Individual rules not found are skipped with a diagnostic.
      *
-     * @param opToAltDecompNames  Parsed mapping from operator name to alternative-rule names.
+     * @param opToAltDecompNames  Parsed mapping from operator name to alternative-rule
+     * names.
      * @param setOfRules          The full list of available decomposition rules.
      * @return Core::AltDecomps   Mapping from OperatorNode to its alternative RuleNodes.
      */
