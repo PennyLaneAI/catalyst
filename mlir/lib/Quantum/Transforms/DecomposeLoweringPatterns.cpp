@@ -40,16 +40,16 @@
 
 #include "DecomposeLoweringImpl.hpp"
 
+#define DEBUG_TYPE "decompose-lowering"
+
 using namespace mlir;
 using namespace catalyst::quantum;
-
-#define DEBUG_TYPE "decompose-lowering"
 
 namespace catalyst {
 namespace quantum {
 
-SmallVector<Value> inlineDecompositionRule(func::FuncOp rule, ValueRange operands,
-                                           PatternRewriter &rewriter)
+SmallVector<Value> getDecompRuleResults(func::FuncOp rule, ValueRange operands,
+                                        PatternRewriter &rewriter)
 {
     Block &body = rule.front();
     auto returnOp = cast<func::ReturnOp>(body.getTerminator());
@@ -103,6 +103,8 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
             return failure();
         }
 
+        // do not nest decomposition rules, they're applied greedily and this can lead to
+        // cycles/identity rules
         if (isInDecompRule(op)) {
             return failure();
         }
@@ -144,17 +146,17 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunction = inlineDecompositionRule(rule, operands, rewriter);
+        SmallVector<Value> inlinedFunctionResults = getDecompRuleResults(rule, operands, rewriter);
 
         // Replace the op with the inlined function and adjust the insert ops for the qreg mode
-        if (inlinedFunction.size() == 1 &&
-            isa<quantum::QuregType>(inlinedFunction.front().getType())) {
-            auto results =
-                analyzer.prepareResultsForQreg(inlinedFunction.front(), op.getLoc(), rewriter);
+        if (inlinedFunctionResults.size() == 1 &&
+            isa<quantum::QuregType>(inlinedFunctionResults.front().getType())) {
+            auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
+                                                          op.getLoc(), rewriter);
             rewriter.replaceOp(op, results);
         }
         else {
-            rewriter.replaceOp(op, inlinedFunction);
+            rewriter.replaceOp(op, inlinedFunctionResults);
         }
 
         return success();
@@ -183,6 +185,8 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
             return failure();
         }
 
+        // do not nest decomposition rules, they're applied greedily and this can lead to
+        // cycles/identity rules
         if (isInDecompRule(op)) {
             return failure();
         }
@@ -223,18 +227,18 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(decompFunc, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunction =
-            inlineDecompositionRule(decompFunc, operands, rewriter);
+        SmallVector<Value> inlinedFunctionResults =
+            getDecompRuleResults(decompFunc, operands, rewriter);
 
         // Replace the op with the inlined function and adjust the insert ops for the qreg mode
-        if (inlinedFunction.size() == 1 &&
-            isa<quantum::QuregType>(inlinedFunction.front().getType())) {
-            auto results =
-                analyzer.prepareResultsForQreg(inlinedFunction.front(), op.getLoc(), rewriter);
+        if (inlinedFunctionResults.size() == 1 &&
+            isa<quantum::QuregType>(inlinedFunctionResults.front().getType())) {
+            auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
+                                                          op.getLoc(), rewriter);
             rewriter.replaceOp(op, results);
         }
         else {
-            rewriter.replaceOp(op, inlinedFunction);
+            rewriter.replaceOp(op, inlinedFunctionResults);
         }
 
         return success();
@@ -263,6 +267,8 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
             return failure();
         }
 
+        // do not nest decomposition rules, they're applied greedily and this can lead to
+        // cycles/identity rules
         if (isInDecompRule(op)) {
             return failure();
         }
@@ -289,18 +295,18 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(decompFunc, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunction =
-            inlineDecompositionRule(decompFunc, operands, rewriter);
+        SmallVector<Value> inlinedFunctionResults =
+            getDecompRuleResults(decompFunc, operands, rewriter);
 
         // Replace the op with the inlined results and adjust the insert ops for the qreg mode
-        if (inlinedFunction.size() == 1 &&
-            isa<quantum::QuregType>(inlinedFunction.front().getType())) {
-            auto results =
-                analyzer.prepareResultsForQreg(inlinedFunction.front(), op.getLoc(), rewriter);
+        if (inlinedFunctionResults.size() == 1 &&
+            isa<quantum::QuregType>(inlinedFunctionResults.front().getType())) {
+            auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
+                                                          op.getLoc(), rewriter);
             rewriter.replaceOp(op, results);
         }
         else {
-            rewriter.replaceOp(op, inlinedFunction);
+            rewriter.replaceOp(op, inlinedFunctionResults);
         }
 
         return success();

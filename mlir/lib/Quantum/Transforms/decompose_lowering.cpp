@@ -45,10 +45,10 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
+#define DEBUG_TYPE "decompose-lowering"
+
 using namespace mlir;
 using namespace catalyst::quantum;
-
-#define DEBUG_TYPE "decompose-lowering"
 
 namespace catalyst {
 namespace quantum {
