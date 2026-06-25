@@ -23,18 +23,16 @@ Known Limitations
 The convert-qecl-to-qecp pass has the following known limitations:
 
   * No support for QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
-  * No support for non-CSS codes
-  * Only supports the transversal gates defined in the `QecCode` + T gates
+  * No support for non-CSS codes.
+  * Only supports the transversal gates defined in the `QecCode` + T gates.
   * Only logical Pauli Z observables (computational basis) are supported for lowering `qecl.measure`
     operations.
-  * Support for control flow in the user program is not fully implemented or tested
   * The generated QEC-cycles are not fault-tolerant - they don't account for potential errors in
-    the syndrome qubits/measurements
-  * For terminal measurements, only sampling of MCMs is supported
+    the syndrome qubits/measurements.
   * The encoding procedure to create the logical zero state in a codeblock is not optimized for
-    efficiency
-  * Only thoroughly tested with the Steane code, but should be generalizable to other k=1 CSS
-    stabilizer codes.
+    efficiency.
+  * Only thoroughly tested with the [[7, 1, 3]] Steane code, and to a lesser extent the [[9, 1, 3]]
+    Shor code, but it should be generalizable to other k=1 CSS stabilizer codes.
 """
 
 from collections.abc import Callable, Iterable
@@ -978,7 +976,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 The function will create only the subroutines relevant to the current circuit.
 
         The subroutines are built based on the gate and codeblock indices defined in the specified
-        ``QecCode``. For example, a code that specifies ``{"x": (qecp.PauliXOp, [2, 3])}`` as a
+        ``QecCode``. For example, a code that specifies ``{"x": ("I", "I", "X", "X", "I")}`` as a
         transversal gate will lower ``qecl.x`` to ``qecp.x`` at indices 2 and 3. The `qecp.identity`
         operator is applied at all other indices in the codeblock.
 
