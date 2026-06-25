@@ -688,15 +688,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         with ImplicitBuilder(block):
             in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
-            # n = in_codeblock.type.n.value.data
 
             # Extract qubits at indices in codeblock where the op is not Identity
             extract_ops = [qecp.ExtractQubitOp(in_codeblock, i) for i in non_identity_idx]
             qubits = [ext_op.qubit for ext_op in extract_ops]
 
             # Insert diagonalizing gates
-            for i in non_identity_idx:
-                gate_op = pauli_z_gate_ops[i]
+            for i, cb_idx in enumerate(non_identity_idx):
+                gate_op = pauli_z_gate_ops[cb_idx]
                 match gate_op:
                     case "Z":
                         pass

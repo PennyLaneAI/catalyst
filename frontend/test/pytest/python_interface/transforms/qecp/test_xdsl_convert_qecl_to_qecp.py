@@ -675,13 +675,13 @@ class TestLoweringMeasure:
         builtin.module {
         // CHECK-LABEL: test_program
         func.func @test_program() {
-            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 5>
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 6>
             %0 = "test.op"() : () -> !qecl.codeblock<1>
 
             //      CHECK: [[mresp:%.+]], [[cb1:%.+]] = func.call @measure_transversal_TestCode([[cb0]]) :
-            // CHECK-SAME:   (!qecp.codeblock<1 x 5>) -> (tensor<2xi1>, !qecp.codeblock<1 x 5>)
+            // CHECK-SAME:   (!qecp.codeblock<1 x 6>) -> (tensor<4xi1>, !qecp.codeblock<1 x 6>)
             //      CHECK: [[mresl:%.+]] = func.call @decode_physical_measurements_TestCode([[mresp]]) :
-            // CHECK-SAME:   (tensor<2xi1>) -> tensor<1xi1>
+            // CHECK-SAME:   (tensor<4xi1>) -> tensor<1xi1>
             //      CHECK: [[zero:%.+]] = arith.constant 0 : index
             //      CHECK: [[mres0:%.+]] = tensor.extract [[mresl]][[[zero]]] : tensor<1xi1>
             %mres0, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
@@ -692,25 +692,34 @@ class TestLoweringMeasure:
             return
         }
         // CHECK-LABEL: func.func private @measure_transversal_TestCode
-        //  CHECK-SAME:     ([[cb_in:%.+]]: !qecp.codeblock<1 x 5>) -> (tensor<2xi1>, !qecp.codeblock<1 x 5>)
-        //       CHECK:   [[q00:%.+]] = qecp.extract [[cb_in]][0]
-        //       CHECK:   [[q20:%.+]] = qecp.extract [[cb_in]][2]
-        //       CHECK:   [[m0:%.+]], [[q01:%.+]] = qecp.measure [[q00]]
-        //       CHECK:   [[m2:%.+]], [[q21:%.+]] = qecp.measure [[q20]]
+        //  CHECK-SAME:     ([[cb_0:%.+]]: !qecp.codeblock<1 x 6>) -> (tensor<4xi1>, !qecp.codeblock<1 x 6>)
+        //       CHECK:   [[q0_0:%.+]] = qecp.extract [[cb_0]][0]
+        //       CHECK:   [[q2_0:%.+]] = qecp.extract [[cb_0]][2]
+        //       CHECK:   [[q3_0:%.+]] = qecp.extract [[cb_0]][3]
+        //       CHECK:   [[q4_0:%.+]] = qecp.extract [[cb_0]][4]
+        //   CHECK-DAG:   [[m0:%.+]], [[q0_1:%.+]] = qecp.measure [[q0_0]]
+        //   CHECK-DAG:   [[m2:%.+]], [[q2_1:%.+]] = qecp.measure [[q2_0]]
+        //   CHECK-DAG:   [[q3_1:%.+]] = qecp.hadamard [[q3_0]]
+        //   CHECK-DAG:   [[m3:%.+]], [[q3_2:%.+]] = qecp.measure [[q3_1]]
+        //   CHECK-DAG:   [[q4_1:%.+]] = qecp.hadamard [[q4_0]]
+        //   CHECK-DAG:   [[q4_2:%.+]] = qecp.s [[q4_1]] adj
+        //   CHECK-DAG:   [[m4:%.+]], [[q4_3:%.+]] = qecp.measure [[q4_2]]
         //   CHECK-NOT:   qecp.measure
-        //       CHECK:   [[cb1:%.+]] = qecp.insert [[cb_in]][0], [[q01]]
-        //       CHECK:   [[cb2:%.+]] = qecp.insert [[cb1]][2], [[q21]]
-        //       CHECK:   [[m_2xi1:%.+]] = tensor.from_elements [[m0]], [[m2]] : tensor<2xi1>
-        //       CHECK:   func.return [[m_2xi1]], [[cb2]] : tensor<2xi1>, !qecp.codeblock<1 x 5>
+        //       CHECK:   [[cb_1:%.+]] = qecp.insert [[cb_0]][0], [[q0_1]]
+        //       CHECK:   [[cb_2:%.+]] = qecp.insert [[cb_1]][2], [[q2_1]]
+        //       CHECK:   [[cb_3:%.+]] = qecp.insert [[cb_2]][3], [[q3_2]]
+        //       CHECK:   [[cb_4:%.+]] = qecp.insert [[cb_3]][4], [[q4_3]]
+        //       CHECK:   [[m_4xi1:%.+]] = tensor.from_elements [[m0]], [[m2]], [[m3]], [[m4]] : tensor<4xi1>
+        //       CHECK:   func.return [[m_4xi1]], [[cb_4]] : tensor<4xi1>, !qecp.codeblock<1 x 6>
 
         // CHECK-LABEL: func.func private @decode_physical_measurements_TestCode
-        //  CHECK-SAME:     ([[in_mres_2xi1:%.+]]: tensor<2xi1>) -> tensor<1xi1>
+        //  CHECK-SAME:     ([[in_mres_4xi1:%.+]]: tensor<4xi1>) -> tensor<1xi1>
         //       CHECK:   [[c0:%.+]] = arith.constant false
         //       CHECK:   [[empty_i1:%.+]] = tensor.empty() : tensor<i1>
         //       CHECK:   [[init_i1:%.+]] = linalg.fill
         //  CHECK-SAME:     ins([[c0]] : i1) outs([[empty_i1]] : tensor<i1>) -> tensor<i1>
         //       CHECK:   [[reduced_i1:%.+]] = linalg.reduce
-        //  CHECK-SAME:     ins([[in_mres_2xi1]]:tensor<2xi1>) outs([[init_i1]]:tensor<i1>)
+        //  CHECK-SAME:     ins([[in_mres_4xi1]]:tensor<4xi1>) outs([[init_i1]]:tensor<i1>)
         //  CHECK-SAME:     dimensions = [0]
         //       CHECK:   ([[in:%.+]]: i1, [[out:%.+]]: i1) {
         //       CHECK:     [[xor:%.+]] = arith.xori [[in]], [[out]] : i1
@@ -721,10 +730,10 @@ class TestLoweringMeasure:
         }
         """
         qec_code = get_generic_qec_code(
-            n=5,
+            n=6,
             k=1,
             d=3,
-            transversal_1q_gates={"z": ("Z", "I", "Z", "I", "I")},
+            transversal_1q_gates={"z": ("Z", "I", "Z", "X", "Y", "I")},
         )
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=qec_code),)
 
