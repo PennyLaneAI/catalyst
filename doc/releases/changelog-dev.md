@@ -143,6 +143,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
+  the top-level module. Functions inside nested modules, such as kernels called through
+  `catalyst.launch_kernel`, are now included in the output.
+  [(#2961)](https://github.com/PennyLaneAI/catalyst/pull/2961)
+
 * Fixed a bug in `DecompRuleInterpreter.cleanup` by replacing fragile string-based operator
   checks with strict type-based checking.
   [(#2873)](https://github.com/PennyLaneAI/catalyst/pull/2873)
@@ -194,6 +199,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update tests to not use global capture toggle where possible.
+  [(#2964)](https://github.com/PennyLaneAI/catalyst/pull/2964)
+
 * The `/benchmark` GitHub comment trigger can now accept additional arguments and has been renamed to `!benchmark`.
   [(#2947)](https://github.com/PennyLaneAI/catalyst/pull/2947)
 
@@ -216,6 +224,8 @@
   [(#2930)](https://github.com/PennyLaneAI/catalyst/pull/2930)
   [(#2931)](https://github.com/PennyLaneAI/catalyst/pull/2931)
   [(#2937)](https://github.com/PennyLaneAI/catalyst/pull/2937)
+  [(#2945)](https://github.com/PennyLaneAI/catalyst/pull/2945)
+  [(#2948)](https://github.com/PennyLaneAI/catalyst/pull/2948)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -316,7 +326,7 @@
   include a single wire (a previously unsupported edge-case).
   [(#2897)](https://github.com/PennyLaneAI/catalyst/pull/2897)
 
-* The experimental QEC pipeline now only generates subroutines for operations present in the 
+* The experimental QEC pipeline now only generates subroutines for operations present in the
   compiled circuit, rather than generating all QEC subroutines.
   [(#2929)](https://github.com/PennyLaneAI/catalyst/pull/2929)
 
@@ -332,6 +342,14 @@
     [(#2881)](https://github.com/PennyLaneAI/catalyst/pull/2881)
   - While loops (`scf.while`)
     [(#2905)](https://github.com/PennyLaneAI/catalyst/pull/2905)
+
+* The experimental QEC pipeline now supports programs that sample wires, where before it only
+  supported sampling mid-circuit measurements.
+  [(#2941)](https://github.com/PennyLaneAI/catalyst/pull/2941)
+
+  The QEC pipeline also now supports `qp.expval`, `qp.var` and `qp.probs` measurement processes when
+  used in conjunction with the `measurements-from-samples` pass.
+  [(#2958)](https://github.com/PennyLaneAI/catalyst/pull/2958)
 
 <h3>Documentation 📝</h3>
 

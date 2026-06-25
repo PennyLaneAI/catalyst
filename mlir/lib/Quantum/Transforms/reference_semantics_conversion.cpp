@@ -13,15 +13,22 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "reference-semantics-conversion"
+#define VALUE_SEMANTICS_GATE_OPS                                                                   \
+    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp
+#define VALUE_SEMANTICS_OBSERVABLE_OPS                                                             \
+    quantum::ComputationalBasisOp, quantum::HermitianOp, quantum::NamedObsOp
 
 #include "reference_semantics_conversion.h"
 
 #include <optional>
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SCCIterator.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -33,6 +40,7 @@
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
+#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
@@ -44,6 +52,23 @@ using namespace catalyst;
 // and variable names like "rQubit" stand for "qubits in reference semantics".
 
 namespace {
+
+LogicalResult ensureNoValueSemanticsOps(Operation *op)
+{
+    WalkResult walkResult = op->walk([](Operation *op) {
+        if (isa<VALUE_SEMANTICS_GATE_OPS, VALUE_SEMANTICS_OBSERVABLE_OPS>(op)) {
+            return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+    });
+
+    if (walkResult.wasInterrupted()) {
+        return failure();
+    }
+    else {
+        return success();
+    }
+}
 
 void eraseSCFYieldQuantumOperands(scf::YieldOp yieldOp)
 {
@@ -193,8 +218,7 @@ OpTy migrateOpToReferenceSemantics(IRRewriter &builder, Operation *vOp, QubitVal
 
     Operation *newOp = builder.create(state);
 
-    if (isa<quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp,
-            mbqc::MeasureInBasisOp>(vOp)) {
+    if (isa<VALUE_SEMANTICS_GATE_OPS, func::CallOp>(vOp)) {
         cascadeMapAhead(vOp, tracker);
     }
 
@@ -387,6 +411,27 @@ void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTrack
     erasureWorklist.push_back(vPPMOp);
 }
 
+void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
+                SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+
+    auto newCallOp = migrateOpToReferenceSemantics<func::CallOp>(builder, callOp, tracker);
+
+    SmallVector<Value> oldClassicalResults;
+    for (auto v : callOp.getResults()) {
+        if (!isa<quantum::QubitType, quantum::QuregType>(v.getType())) {
+            oldClassicalResults.push_back(v);
+        }
+    }
+
+    for (auto [oldResult, newResult] :
+         llvm::zip_equal(oldClassicalResults, newCallOp->getResults())) {
+        builder.replaceAllUsesWith(oldResult, newResult);
+    }
+    erasureWorklist.push_back(callOp);
+}
+
 void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,
                      QubitValueTracker &tracker)
 {
@@ -462,6 +507,141 @@ void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValu
     rAdjointOp.getRegion().front().eraseArguments([](BlockArgument arg) {
         return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
     });
+}
+
+void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
+              SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(ifOp);
+    Location loc = ifOp->getLoc();
+
+    // Handle Then region
+    // Cannot just use `cascadeMapAhead` util to update the outside flow, since if op does not take
+    // in operands. We get the references from the yield op on the thenRegion
+    QubitValueTracker thenRegionTracker = tracker;
+    SmallVector<Value> yieldOpArgSave(ifOp.thenYield().getResults());
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getThenRegion().front().getTerminator()));
+    SmallVector<Operation *> thenRegionErasureWorklist =
+        handleRegion(builder, ifOp.getThenRegion(), thenRegionTracker, false).value();
+    for (auto [vqo, vqr] : llvm::zip_equal(yieldOpArgSave, ifOp.getResults())) {
+        if (isa<quantum::QubitType>(vqo.getType())) {
+            tracker.setRQubit(vqr, thenRegionTracker.getRQubit(vqo));
+        }
+        else if (isa<quantum::QuregType>(vqo.getType())) {
+            tracker.setRQreg(vqr, thenRegionTracker.getRQreg(vqo));
+        }
+    }
+    for (auto op : llvm::reverse(thenRegionErasureWorklist)) {
+        op->erase();
+    }
+    ifOp.getThenRegion().front().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+
+    // Handle Else region
+    QubitValueTracker elseRegionTracker = tracker;
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
+    handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
+    ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+
+    // The else block is empty if the only remaining op is the mandatory scf.yield terminator
+    bool hasElseRegion = &(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator();
+
+    // Collect classical returns of the old if op
+    SmallVector<unsigned> classicalReturnIndices;
+    SmallVector<Type> classicalReturnTypes;
+    for (auto [i, t] : llvm::enumerate(ifOp.getResultTypes())) {
+        if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
+            classicalReturnTypes.push_back(t);
+            classicalReturnIndices.push_back(i);
+        }
+    }
+    auto newIfOp = scf::IfOp::create(builder, loc, classicalReturnTypes, ifOp.getCondition(),
+                                     /*withElseRegion=*/hasElseRegion);
+    builder.eraseBlock(newIfOp.thenBlock());
+    builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
+                               newIfOp.getThenRegion().end());
+    if (hasElseRegion) {
+        builder.eraseBlock(newIfOp.elseBlock());
+        builder.inlineRegionBefore(ifOp.getElseRegion(), newIfOp.getElseRegion(),
+                                   newIfOp.getElseRegion().end());
+    }
+
+    // Update connection with outside
+    erasureWorklist.push_back(ifOp);
+    for (auto [oldResultIdx, newResult] :
+         llvm::zip_equal(classicalReturnIndices, newIfOp->getResults())) {
+        builder.replaceAllUsesWith(ifOp->getResult(oldResultIdx), newResult);
+    }
+}
+
+void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker,
+                  SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(switchOp);
+    Location loc = switchOp->getLoc();
+
+    // Collect classical returns of the old switch op
+    SmallVector<unsigned> classicalReturnIndices;
+    SmallVector<Type> classicalReturnTypes;
+    for (auto [i, t] : llvm::enumerate(switchOp.getResultTypes())) {
+        if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
+            classicalReturnTypes.push_back(t);
+            classicalReturnIndices.push_back(i);
+        }
+    }
+    auto newSwitchOp =
+        scf::IndexSwitchOp::create(builder, loc, classicalReturnTypes, switchOp.getArg(),
+                                   switchOp.getCases(), switchOp.getNumCases());
+
+    // Handle the default region
+    // Cannot just use `cascadeMapAhead` util to update the outside flow, since switch op does not
+    // take in operands. We get the references from the yield op on the default region
+    builder.inlineRegionBefore(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion(),
+                               newSwitchOp.getDefaultRegion().end());
+    QubitValueTracker defaultRegionTracker = tracker;
+    SmallVector<Value> yieldOpArgSave(newSwitchOp.getDefaultBlock().getTerminator()->getOperands());
+    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(newSwitchOp.getDefaultBlock().getTerminator()));
+    SmallVector<Operation *> defaultRegionErasureWorklist =
+        handleRegion(builder, newSwitchOp.getDefaultRegion(), defaultRegionTracker, false).value();
+    for (auto [vqo, vqr] : llvm::zip_equal(yieldOpArgSave, switchOp.getResults())) {
+        if (isa<quantum::QubitType>(vqo.getType())) {
+            tracker.setRQubit(vqr, defaultRegionTracker.getRQubit(vqo));
+        }
+        else if (isa<quantum::QuregType>(vqo.getType())) {
+            tracker.setRQreg(vqr, defaultRegionTracker.getRQreg(vqo));
+        }
+    }
+    for (auto op : llvm::reverse(defaultRegionErasureWorklist)) {
+        op->erase();
+    }
+    newSwitchOp.getDefaultBlock().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+
+    // Handle case regions
+    for (auto [oldCaseRegion, newCaseRegion] :
+         llvm::zip_equal(switchOp.getCaseRegions(), newSwitchOp.getCaseRegions())) {
+        // builder.eraseBlock(&(newCaseRegion.front()));
+        builder.inlineRegionBefore(oldCaseRegion, newCaseRegion, newCaseRegion.end());
+        QubitValueTracker caseRegionTracker = tracker;
+        eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(newCaseRegion.front().getTerminator()));
+        handleRegion(builder, newCaseRegion, caseRegionTracker);
+        newCaseRegion.front().eraseArguments([](BlockArgument arg) {
+            return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+        });
+    }
+
+    // Update connection with outside
+    erasureWorklist.push_back(switchOp);
+    for (auto [oldResultIdx, newResult] :
+         llvm::zip_equal(classicalReturnIndices, newSwitchOp->getResults())) {
+        builder.replaceAllUsesWith(switchOp->getResult(oldResultIdx), newResult);
+    }
 }
 
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker,
@@ -627,7 +807,7 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handleDeallocQubit(builder, o, tracker, erasureWorklist); })
             .Case<quantum::QuantumOperation>(
                 [&](auto o) { handleGate(builder, o, tracker, erasureWorklist); })
-            // .Case<func::CallOp>([&](auto o) { handleCall(builder, o, tracker); })
+            .Case<func::CallOp>([&](auto o) { handleCall(builder, o, tracker, erasureWorklist); })
             .Case<quantum::ComputationalBasisOp>(
                 [&](auto o) { handleCompbasis(builder, o, tracker); })
             .Case<quantum::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
@@ -640,8 +820,9 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
             .Case<quantum::AdjointOp>(
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
-            // .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
-            // .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
+            .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker, erasureWorklist); })
+            .Case<scf::IndexSwitchOp>(
+                [&](auto o) { handleSwitch(builder, o, tracker, erasureWorklist); })
             .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker, erasureWorklist); })
             .Case<scf::WhileOp>([&](auto o) { handleWhile(builder, o, tracker, erasureWorklist); })
             .Case<mbqc::GraphStatePrepOp>(
@@ -661,6 +842,129 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
     else {
         return erasureWorklist;
     }
+}
+
+bool funcOpHasValueSemanticsOps(func::FuncOp f)
+{
+    // quantum.node is not a subroutine
+    if (f->hasAttrOfType<UnitAttr>("quantum.node")) {
+        return false;
+    }
+
+    // If has a quantum argument, definitely is a quantum subroutine
+    if (llvm::any_of(f.getArgumentTypes(), llvm::IsaPred<quantum::QubitType, quantum::QuregType>)) {
+        return true;
+    }
+
+    // If we don't know from the args, must look at the body
+    if (f.isDeclaration()) {
+        return false;
+    }
+
+    WalkResult walkResult = f.walk([](Operation *op) {
+        if (isa<quantum::QuantumDialect>(op->getDialect()) ||
+            isa<VALUE_SEMANTICS_GATE_OPS, VALUE_SEMANTICS_OBSERVABLE_OPS>(op)) {
+            return WalkResult::interrupt();
+        }
+        if (func::CallOp callOp = dyn_cast<func::CallOp>(op)) {
+            auto funcOp = mlir::SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                callOp, callOp.getCalleeAttr());
+            assert(funcOp && "calling a non-existent subroutine");
+            if (funcOpHasValueSemanticsOps(funcOp)) {
+                return WalkResult::interrupt();
+            }
+        }
+        return WalkResult::advance();
+    });
+    return walkResult.wasInterrupted();
+}
+
+void handleSubroutine(IRRewriter &builder, func::FuncOp f,
+                      const SmallVector<IntegerAttr> &qregSizesAtCallsite)
+{
+    MLIRContext *ctx = f.getContext();
+    OpBuilder::InsertionGuard guard(builder);
+    Location loc = f->getLoc();
+
+    // Add new qref arguments
+    QubitValueTracker regionTracker;
+    SmallVector<unsigned> indicesToInsertArgs;
+    SmallVector<Type> typesToInsertArgs;
+    SmallVector<DictionaryAttr> attrsToInsertArgs;
+    SmallVector<Location> locsToInsertArgs;
+    SmallVector<unsigned> newRargIndices;
+    SmallVector<Value> oldVargs;
+    size_t numNewArgsAdded = 0;
+    int qregSizeIdx = 0;
+    for (auto [i, t] : llvm::enumerate(f.getFunctionType().getInputs())) {
+        if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
+            continue;
+        }
+
+        if (isa<quantum::QubitType>(t)) {
+            typesToInsertArgs.push_back(qref::QubitType::get(ctx));
+            newRargIndices.push_back(i + (numNewArgsAdded++));
+            oldVargs.push_back(f.getBody().front().getArgument(i));
+        }
+        else if (isa<quantum::QuregType>(t)) {
+            typesToInsertArgs.push_back(
+                qref::QuregType::get(ctx, qregSizesAtCallsite[qregSizeIdx++]));
+            newRargIndices.push_back(i + (numNewArgsAdded++));
+            oldVargs.push_back(f.getBody().front().getArgument(i));
+        }
+
+        indicesToInsertArgs.push_back(i);
+        attrsToInsertArgs.push_back(DictionaryAttr::get(ctx));
+        locsToInsertArgs.push_back(loc);
+    }
+    assert(succeeded(f.insertArguments(indicesToInsertArgs, typesToInsertArgs, attrsToInsertArgs,
+                                       locsToInsertArgs)));
+
+    // Add new qref args and handle
+    for (auto [i, vValue] : llvm::zip_equal(newRargIndices, oldVargs)) {
+        if (isa<quantum::QubitType>(vValue.getType())) {
+            regionTracker.setRQubit(vValue, f.getArgument(i));
+        }
+        else if (isa<quantum::QuregType>(vValue.getType())) {
+            regionTracker.setRQreg(vValue, f.getArgument(i));
+        }
+    }
+
+    auto retOp = cast<func::ReturnOp>(f.getBody().front().getTerminator());
+    BitVector retOpEraseIndices(retOp->getNumOperands());
+    for (auto [i, argType] : llvm::enumerate(retOp.getOperandTypes())) {
+        retOpEraseIndices[i] = isa<quantum::QuregType, quantum::QubitType>(argType);
+    }
+    assert(succeeded(f.eraseResults(retOpEraseIndices)));
+    retOp->eraseOperands(retOpEraseIndices);
+    handleRegion(builder, f.getBody(), regionTracker);
+
+    // Erase old quantum args
+    BitVector eraseArgsIndices(f.getNumArguments());
+    for (auto [i, argType] : llvm::enumerate(f.getArgumentTypes())) {
+        eraseArgsIndices[i] = isa<quantum::QuregType, quantum::QubitType>(argType);
+    }
+    assert(succeeded(f.eraseArguments(eraseArgsIndices)));
+}
+
+SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, Operation *mod)
+{
+    SmallVector<IntegerAttr> qregSizesAtCallsite;
+    auto uses = SymbolTable::getSymbolUses(subroutine, mod);
+    if (uses) {
+        for (auto use : *uses) {
+            Operation *user = use.getUser();
+            if (auto callOp = dyn_cast<func::CallOp>(user)) {
+                for (Type t : callOp.getOperandTypes()) {
+                    if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
+                        qregSizesAtCallsite.push_back(qrefQuregType.getSize());
+                    }
+                }
+                break;
+            }
+        }
+    }
+    return qregSizesAtCallsite;
 }
 
 } // namespace
@@ -694,6 +998,50 @@ struct ReferenceSemanticsConversionPass
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
             handleRegion(builder, targetFunc.getBody(), tracker);
+            if (failed(ensureNoValueSemanticsOps(targetFunc))) {
+                targetFunc.emitOpError(
+                    "Detected remaining value semantics operations after conversion");
+                return signalPassFailure();
+            }
+        }
+
+        const CallGraph callGraph(mod);
+        SmallVector<func::FuncOp> subroutinesPostOrder;
+        for (auto scc = llvm::scc_begin(&callGraph); !scc.isAtEnd(); ++scc) {
+            if ((*scc->begin())->isExternal()) {
+                continue;
+            }
+
+            if (!isa<func::FuncOp>((*scc->begin())->getCallableRegion()->getParentOp())) {
+                continue;
+            }
+
+            func::FuncOp subroutine =
+                cast<func::FuncOp>((*scc->begin())->getCallableRegion()->getParentOp());
+            if (scc.hasCycle()) {
+                subroutine.emitOpError("Quantum subroutine call graphs must not have cycles");
+                return signalPassFailure();
+            }
+
+            if (!funcOpHasValueSemanticsOps(subroutine)) {
+                continue;
+            }
+
+            subroutinesPostOrder.push_back(subroutine);
+        }
+
+        // We want to handle the calls before the subroutines, so we know the register sizes on the
+        // subroutine qreg arg type
+        // By default, scc iterates call graph in post order (callee before caller), so we reverse
+        // the visit order.
+        for (func::FuncOp subroutine : llvm::reverse(subroutinesPostOrder)) {
+            QubitValueTracker tracker;
+            handleSubroutine(builder, subroutine, collectQregSizesAtCallsite(subroutine, mod));
+            if (failed(ensureNoValueSemanticsOps(subroutine))) {
+                subroutine.emitOpError(
+                    "Detected remaining value semantics operations after conversion");
+                return signalPassFailure();
+            }
         }
     }
 };
