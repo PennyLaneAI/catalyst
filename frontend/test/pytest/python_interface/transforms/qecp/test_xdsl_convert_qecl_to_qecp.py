@@ -1519,7 +1519,7 @@ class TestGenerality:
             # CHECK: func.call @qec_cycle_Shor913
             # CHECK: func.call @x_Shor913
             # CHECK: func.call @z_Shor913
-            # CHHECK: func.call @cnot_Shor913
+            # CHECK: func.call @cnot_Shor913
             # CHECK: func.call @measure_transversal_Shor913
             qp.X(0)
             qp.Z(1)
@@ -1529,29 +1529,33 @@ class TestGenerality:
         run_filecheck_qjit(circ)
 
     def test_x_shor(self, run_filecheck):
-        """Test that using the Shor913 code lowers PauliX expected. A PauliZ is applied to the first qubit of
-        each set of 3 in the nine-qubit code."""
+        """Test that using the Shor913 code lowers a logical Pauli X gate as expected.
 
+        The logical Pauli X gate in the Shor913 code is realized by applying the following Pauli
+        word to the physical codeblock:
+
+            "ZIIZIIZII"
+        """
         program = """
         builtin.module @module_circuit {
             func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 9>
-                // CHECK-NEXT: [[codeblock2:%.+]] = func.call @x_Shor913([[codeblock]]) : (!qecp.codeblock<1 x 9>) -> !qecp.codeblock<1 x 9>
+                // CHECK: [[codeblock2:%.+]] = func.call @x_Shor913([[codeblock]]) : (!qecp.codeblock<1 x 9>) -> !qecp.codeblock<1 x 9>
                 // CHECK-NOT: qecl.x
                 %0 = "test.op"() : () -> !qecl.codeblock<1>
                 %1 = qecl.x %0[0] : !qecl.codeblock<1>
                 return
             }
-            // CHECK: func.func private @x_Shor913([[codeblock_in:%.+]]: !qecp.codeblock<1 x 9>)
-            // CHECK-NEXT: [[q0:%.+]] = qecp.extract [[codeblock_in]][0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q1:%.+]] = qecp.extract [[codeblock_in]][1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q2:%.+]] = qecp.extract [[codeblock_in]][2] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q3:%.+]] = qecp.extract [[codeblock_in]][3] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q4:%.+]] = qecp.extract [[codeblock_in]][4] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q5:%.+]] = qecp.extract [[codeblock_in]][5] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q6:%.+]] = qecp.extract [[codeblock_in]][6] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q7:%.+]] = qecp.extract [[codeblock_in]][7] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q8:%.+]] = qecp.extract [[codeblock_in]][8] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: func.func private @x_Shor913([[cb_0:%.+]]: !qecp.codeblock<1 x 9>)
+            // CHECK: [[q0:%.+]] = qecp.extract [[cb_0]][0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = qecp.extract [[cb_0]][1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q2:%.+]] = qecp.extract [[cb_0]][2] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q3:%.+]] = qecp.extract [[cb_0]][3] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q4:%.+]] = qecp.extract [[cb_0]][4] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q5:%.+]] = qecp.extract [[cb_0]][5] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q6:%.+]] = qecp.extract [[cb_0]][6] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q7:%.+]] = qecp.extract [[cb_0]][7] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q8:%.+]] = qecp.extract [[cb_0]][8] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
             // CHECK: [[q0_1:%.+]] = qecp.z [[q0]] : !qecp.qubit<data>
             // CHECK: [[q1_1:%.+]] = qecp.identity [[q1]] : !qecp.qubit<data>
             // CHECK: [[q2_1:%.+]] = qecp.identity [[q2]] : !qecp.qubit<data>
@@ -1561,16 +1565,69 @@ class TestGenerality:
             // CHECK: [[q6_1:%.+]] = qecp.z [[q6]] : !qecp.qubit<data>
             // CHECK: [[q7_1:%.+]] = qecp.identity [[q7]] : !qecp.qubit<data>
             // CHECK: [[q8_1:%.+]] = qecp.identity [[q8]] : !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in1:%.+]] = qecp.insert [[codeblock_in]][0], [[q0_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in2:%.+]] = qecp.insert [[codeblock_in1]][1], [[q1_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in3:%.+]] = qecp.insert [[codeblock_in2]][2], [[q2_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in4:%.+]] = qecp.insert [[codeblock_in3]][3], [[q3_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in5:%.+]] = qecp.insert [[codeblock_in4]][4], [[q4_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in6:%.+]] = qecp.insert [[codeblock_in5]][5], [[q5_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in7:%.+]] = qecp.insert [[codeblock_in6]][6], [[q6_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in8:%.+]] = qecp.insert [[codeblock_in7]][7], [[q7_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_out:%.+]] = qecp.insert [[codeblock_in8]][8], [[q8_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: func.return [[codeblock_out]]
+            // CHECK: [[cb_1:%.+]] = qecp.insert [[cb_0]][0], [[q0_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_2:%.+]] = qecp.insert [[cb_1]][1], [[q1_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_3:%.+]] = qecp.insert [[cb_2]][2], [[q2_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_4:%.+]] = qecp.insert [[cb_3]][3], [[q3_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_5:%.+]] = qecp.insert [[cb_4]][4], [[q4_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_6:%.+]] = qecp.insert [[cb_5]][5], [[q5_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_7:%.+]] = qecp.insert [[cb_6]][6], [[q6_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_8:%.+]] = qecp.insert [[cb_7]][7], [[q7_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_9:%.+]] = qecp.insert [[cb_8]][8], [[q8_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: return [[cb_9]] : !qecp.codeblock<1 x 9>
+        }
+        """
+
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Shor913")),)
+        run_filecheck(program, pipeline)
+
+    def test_y_shor(self, run_filecheck):
+        """Test that using the Shor913 code lowers a logical Pauli Y gate as expected.
+
+        The logical Pauli Y gate in the Shor913 code is realized by applying the following Pauli
+        word to the physical codeblock:
+
+            "YXXZIIZII"
+        """
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 9>
+                // CHECK: [[codeblock2:%.+]] = func.call @y_Shor913([[codeblock]]) : (!qecp.codeblock<1 x 9>) -> !qecp.codeblock<1 x 9>
+                // CHECK-NOT: qecl.y
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+                %1 = qecl.y %0[0] : !qecl.codeblock<1>
+                return
+            }
+            // CHECK: func.func private @y_Shor913([[cb_0:%.+]]: !qecp.codeblock<1 x 9>)
+            // CHECK: [[q0:%.+]] = qecp.extract [[cb_0]][0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = qecp.extract [[cb_0]][1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q2:%.+]] = qecp.extract [[cb_0]][2] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q3:%.+]] = qecp.extract [[cb_0]][3] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q4:%.+]] = qecp.extract [[cb_0]][4] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q5:%.+]] = qecp.extract [[cb_0]][5] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q6:%.+]] = qecp.extract [[cb_0]][6] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q7:%.+]] = qecp.extract [[cb_0]][7] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q8:%.+]] = qecp.extract [[cb_0]][8] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q0_1:%.+]] = qecp.y [[q0]] : !qecp.qubit<data>
+            // CHECK: [[q1_1:%.+]] = qecp.x [[q1]] : !qecp.qubit<data>
+            // CHECK: [[q2_1:%.+]] = qecp.x [[q2]] : !qecp.qubit<data>
+            // CHECK: [[q3_1:%.+]] = qecp.z [[q3]] : !qecp.qubit<data>
+            // CHECK: [[q4_1:%.+]] = qecp.identity [[q4]] : !qecp.qubit<data>
+            // CHECK: [[q5_1:%.+]] = qecp.identity [[q5]] : !qecp.qubit<data>
+            // CHECK: [[q6_1:%.+]] = qecp.z [[q6]] : !qecp.qubit<data>
+            // CHECK: [[q7_1:%.+]] = qecp.identity [[q7]] : !qecp.qubit<data>
+            // CHECK: [[q8_1:%.+]] = qecp.identity [[q8]] : !qecp.qubit<data>
+            // CHECK: [[cb_1:%.+]] = qecp.insert [[cb_0]][0], [[q0_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_2:%.+]] = qecp.insert [[cb_1]][1], [[q1_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_3:%.+]] = qecp.insert [[cb_2]][2], [[q2_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_4:%.+]] = qecp.insert [[cb_3]][3], [[q3_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_5:%.+]] = qecp.insert [[cb_4]][4], [[q4_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_6:%.+]] = qecp.insert [[cb_5]][5], [[q5_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_7:%.+]] = qecp.insert [[cb_6]][6], [[q6_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_8:%.+]] = qecp.insert [[cb_7]][7], [[q7_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_9:%.+]] = qecp.insert [[cb_8]][8], [[q8_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: return [[cb_9]] : !qecp.codeblock<1 x 9>
         }
         """
 
@@ -1578,29 +1635,33 @@ class TestGenerality:
         run_filecheck(program, pipeline)
 
     def test_z_shor(self, run_filecheck):
-        """Test that using the Shor913 code lowers PauliZ expected. A PauliX is applied to all the qubits in
-        the first set of 3 in the nine-qubit code."""
+        """Test that using the Shor913 code lowers a logical Pauli Z gate as expected.
 
+        The logical Pauli Z gate in the Shor913 code is realized by applying the following Pauli
+        word to the physical codeblock:
+
+            "XXXIIIIII"
+        """
         program = """
         builtin.module @module_circuit {
             func.func @test_func() attributes {quantum.node} {
                 // CHECK: [[codeblock:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 9>
-                // CHECK-NEXT: [[codeblock2:%.+]] = func.call @z_Shor913([[codeblock]]) : (!qecp.codeblock<1 x 9>) -> !qecp.codeblock<1 x 9>
+                // CHECK: [[codeblock2:%.+]] = func.call @z_Shor913([[codeblock]]) : (!qecp.codeblock<1 x 9>) -> !qecp.codeblock<1 x 9>
                 // CHECK-NOT: qecl.z
                 %0 = "test.op"() : () -> !qecl.codeblock<1>
                 %1 = qecl.z %0[0] : !qecl.codeblock<1>
                 return
             }
-            // CHECK: func.func private @z_Shor913([[codeblock_in:%.+]]: !qecp.codeblock<1 x 9>)
-            // CHECK-NEXT: [[q0:%.+]] = qecp.extract [[codeblock_in]][0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q1:%.+]] = qecp.extract [[codeblock_in]][1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q2:%.+]] = qecp.extract [[codeblock_in]][2] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q3:%.+]] = qecp.extract [[codeblock_in]][3] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q4:%.+]] = qecp.extract [[codeblock_in]][4] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q5:%.+]] = qecp.extract [[codeblock_in]][5] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q6:%.+]] = qecp.extract [[codeblock_in]][6] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q7:%.+]] = qecp.extract [[codeblock_in]][7] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // CHECK-NEXT: [[q8:%.+]] = qecp.extract [[codeblock_in]][8] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: func.func private @z_Shor913([[cb_0:%.+]]: !qecp.codeblock<1 x 9>)
+            // CHECK: [[q0:%.+]] = qecp.extract [[cb_0]][0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q1:%.+]] = qecp.extract [[cb_0]][1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q2:%.+]] = qecp.extract [[cb_0]][2] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q3:%.+]] = qecp.extract [[cb_0]][3] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q4:%.+]] = qecp.extract [[cb_0]][4] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q5:%.+]] = qecp.extract [[cb_0]][5] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q6:%.+]] = qecp.extract [[cb_0]][6] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q7:%.+]] = qecp.extract [[cb_0]][7] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q8:%.+]] = qecp.extract [[cb_0]][8] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
             // CHECK: [[q0_1:%.+]] = qecp.x [[q0]] : !qecp.qubit<data>
             // CHECK: [[q1_1:%.+]] = qecp.x [[q1]] : !qecp.qubit<data>
             // CHECK: [[q2_1:%.+]] = qecp.x [[q2]] : !qecp.qubit<data>
@@ -1610,16 +1671,88 @@ class TestGenerality:
             // CHECK: [[q6_1:%.+]] = qecp.identity [[q6]] : !qecp.qubit<data>
             // CHECK: [[q7_1:%.+]] = qecp.identity [[q7]] : !qecp.qubit<data>
             // CHECK: [[q8_1:%.+]] = qecp.identity [[q8]] : !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in1:%.+]] = qecp.insert [[codeblock_in]][0], [[q0_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in2:%.+]] = qecp.insert [[codeblock_in1]][1], [[q1_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in3:%.+]] = qecp.insert [[codeblock_in2]][2], [[q2_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in4:%.+]] = qecp.insert [[codeblock_in3]][3], [[q3_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in5:%.+]] = qecp.insert [[codeblock_in4]][4], [[q4_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in6:%.+]] = qecp.insert [[codeblock_in5]][5], [[q5_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in7:%.+]] = qecp.insert [[codeblock_in6]][6], [[q6_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_in8:%.+]] = qecp.insert [[codeblock_in7]][7], [[q7_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: [[codeblock_out:%.+]] = qecp.insert [[codeblock_in8]][8], [[q8_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
-            // CHECK-NEXT: func.return [[codeblock_out]]
+            // CHECK: [[cb_1:%.+]] = qecp.insert [[cb_0]][0], [[q0_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_2:%.+]] = qecp.insert [[cb_1]][1], [[q1_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_3:%.+]] = qecp.insert [[cb_2]][2], [[q2_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_4:%.+]] = qecp.insert [[cb_3]][3], [[q3_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_5:%.+]] = qecp.insert [[cb_4]][4], [[q4_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_6:%.+]] = qecp.insert [[cb_5]][5], [[q5_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_7:%.+]] = qecp.insert [[cb_6]][6], [[q6_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_8:%.+]] = qecp.insert [[cb_7]][7], [[q7_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb_9:%.+]] = qecp.insert [[cb_8]][8], [[q8_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: return [[cb_9]] : !qecp.codeblock<1 x 9>
+        }
+        """
+
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Shor913")),)
+        run_filecheck(program, pipeline)
+
+    def test_cnot_shor(self, run_filecheck):
+        """Test that using the Shor913 code lowers a logical CNOT gate as expected.
+
+        The logical CNOT gate in the Shor913 code is realized by transversally applying physical
+        CNOT gates qubit-wise between two codeblocks.
+        """
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 9>
+                // CHECK: [[cb1:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 9>
+                // CHECK: [[cb2:%.+]], [[cb3:%.+]] = func.call @cnot_Shor913([[cb0]], [[cb1]]) :
+                // CHECK-SAME: (!qecp.codeblock<1 x 9>, !qecp.codeblock<1 x 9>) -> (!qecp.codeblock<1 x 9>, !qecp.codeblock<1 x 9>)
+                // CHECK-NOT: qecl.cnot
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+                %1 = "test.op"() : () -> !qecl.codeblock<1>
+                %2, %3 = qecl.cnot %0[0], %1[0] : !qecl.codeblock<1>, !qecl.codeblock<1>
+                return
+            }
+            // CHECK: func.func private @cnot_Shor913([[cb0_0:%.+]]: !qecp.codeblock<1 x 9>, [[cb1_0:%.+]]: !qecp.codeblock<1 x 9>)
+            // CHECK: [[q00_0:%.+]] = qecp.extract [[cb0]][0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q01_0:%.+]] = qecp.extract [[cb0]][1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q02_0:%.+]] = qecp.extract [[cb0]][2] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q03_0:%.+]] = qecp.extract [[cb0]][3] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q04_0:%.+]] = qecp.extract [[cb0]][4] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q05_0:%.+]] = qecp.extract [[cb0]][5] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q06_0:%.+]] = qecp.extract [[cb0]][6] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q07_0:%.+]] = qecp.extract [[cb0]][7] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q08_0:%.+]] = qecp.extract [[cb0]][8] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q10_0:%.+]] = qecp.extract [[cb1]][0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q11_0:%.+]] = qecp.extract [[cb1]][1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q12_0:%.+]] = qecp.extract [[cb1]][2] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q13_0:%.+]] = qecp.extract [[cb1]][3] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q14_0:%.+]] = qecp.extract [[cb1]][4] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q15_0:%.+]] = qecp.extract [[cb1]][5] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q16_0:%.+]] = qecp.extract [[cb1]][6] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q17_0:%.+]] = qecp.extract [[cb1]][7] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q18_0:%.+]] = qecp.extract [[cb1]][8] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            // CHECK: [[q00_1:%.+]], [[q10_1:%.+]] = qecp.cnot [[q00_0]], [[q10_0]]
+            // CHECK: [[q01_1:%.+]], [[q11_1:%.+]] = qecp.cnot [[q01_0]], [[q11_0]]
+            // CHECK: [[q02_1:%.+]], [[q12_1:%.+]] = qecp.cnot [[q02_0]], [[q12_0]]
+            // CHECK: [[q03_1:%.+]], [[q13_1:%.+]] = qecp.cnot [[q03_0]], [[q13_0]]
+            // CHECK: [[q04_1:%.+]], [[q14_1:%.+]] = qecp.cnot [[q04_0]], [[q14_0]]
+            // CHECK: [[q05_1:%.+]], [[q15_1:%.+]] = qecp.cnot [[q05_0]], [[q15_0]]
+            // CHECK: [[q06_1:%.+]], [[q16_1:%.+]] = qecp.cnot [[q06_0]], [[q16_0]]
+            // CHECK: [[q07_1:%.+]], [[q17_1:%.+]] = qecp.cnot [[q07_0]], [[q17_0]]
+            // CHECK: [[q08_1:%.+]], [[q18_1:%.+]] = qecp.cnot [[q08_0]], [[q18_0]]
+            // CHECK: [[cb0_1:%.+]] = qecp.insert [[cb0_0]][0], [[q00_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb0_2:%.+]] = qecp.insert [[cb0_1]][1], [[q01_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb0_3:%.+]] = qecp.insert [[cb0_2]][2], [[q02_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb0_4:%.+]] = qecp.insert [[cb0_3]][3], [[q03_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb0_5:%.+]] = qecp.insert [[cb0_4]][4], [[q04_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb0_6:%.+]] = qecp.insert [[cb0_5]][5], [[q05_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb0_7:%.+]] = qecp.insert [[cb0_6]][6], [[q06_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb0_8:%.+]] = qecp.insert [[cb0_7]][7], [[q07_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb0_9:%.+]] = qecp.insert [[cb0_8]][8], [[q08_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb1_1:%.+]] = qecp.insert [[cb1_0]][0], [[q10_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb1_2:%.+]] = qecp.insert [[cb1_1]][1], [[q11_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb1_3:%.+]] = qecp.insert [[cb1_2]][2], [[q12_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb1_4:%.+]] = qecp.insert [[cb1_3]][3], [[q13_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb1_5:%.+]] = qecp.insert [[cb1_4]][4], [[q14_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb1_6:%.+]] = qecp.insert [[cb1_5]][5], [[q15_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb1_7:%.+]] = qecp.insert [[cb1_6]][6], [[q16_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb1_8:%.+]] = qecp.insert [[cb1_7]][7], [[q17_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: [[cb1_9:%.+]] = qecp.insert [[cb1_8]][8], [[q18_1]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            // CHECK: return [[cb0_9]], [[cb1_9]] : !qecp.codeblock<1 x 9>, !qecp.codeblock<1 x 9>
         }
         """
 
@@ -1780,5 +1913,64 @@ class TestGenerality:
 
         }
         """
+        pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Shor913")),)
+        run_filecheck(program, pipeline)
+
+    def test_measure_shor(self, run_filecheck):
+        """Test that using the Shor913 code lowers a logical measurement as expected.
+
+        Recall that a logical computational-basis measurement amounts to measuring the logical Pauli
+        Z observable, which in the Shor913 code is "XXXIIIIII". In order to perform a physical X
+        measurement, diagonalizing gates are inserted before performing the computational basis
+        measurement (the diagonalizing gate for X measurements is 'H').
+        """
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                //      CHECK: [[cb_0:%.+]] = "test.op"() : () -> !qecp.codeblock<1 x 9>
+                //      CHECK: [[mres_3xi1:%.+]], [[cb_1:%.+]] = func.call @measure_transversal_Shor913([[cb_0]]) :
+                // CHECK-SAME:   (!qecp.codeblock<1 x 9>) -> (tensor<3xi1>, !qecp.codeblock<1 x 9>)
+                //      CHECK: [[mres_1xi1:%.+]] = func.call @decode_physical_measurements_Shor913([[mres_3xi1]]) :
+                // CHECK-SAME:   (tensor<3xi1>) -> tensor<1xi1>
+                //  CHECK-NOT: qecl.measure
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+                %mres, %1 = qecl.measure %0[0] : i1, !qecl.codeblock<1>
+                return
+            }
+            // CHECK-LABEL: func.func private @measure_transversal_Shor913(
+            //  CHECK-SAME:     [[cb_0]]: !qecp.codeblock<1 x 9>) -> (tensor<3xi1>, !qecp.codeblock<1 x 9>)
+            //       CHECK:   [[q0_0:%.+]] = qecp.extract %0[0] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK:   [[q1_0:%.+]] = qecp.extract %0[1] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK:   [[q2_0:%.+]] = qecp.extract %0[2] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
+            //       CHECK:   [[q0_1:%.+]] = qecp.hadamard [[q0_0]] : !qecp.qubit<data>
+            //       CHECK:   [[q1_1:%.+]] = qecp.hadamard [[q1_0]] : !qecp.qubit<data>
+            //       CHECK:   [[q2_1:%.+]] = qecp.hadamard [[q2_0]] : !qecp.qubit<data>
+            //       CHECK:   [[m0:%.+]], [[q0_2:%.+]] = qecp.measure [[q0_1]] : i1, !qecp.qubit<data>
+            //       CHECK:   [[m1:%.+]], [[q1_2:%.+]] = qecp.measure [[q1_1]] : i1, !qecp.qubit<data>
+            //       CHECK:   [[m2:%.+]], [[q2_2:%.+]] = qecp.measure [[q2_1]] : i1, !qecp.qubit<data>
+            //       CHECK:   [[cb_1:%.+]] = qecp.insert [[cb_0]][0], [[q0_2]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            //       CHECK:   [[cb_2:%.+]] = qecp.insert [[cb_1]][1], [[q1_2]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            //       CHECK:   [[cb_3:%.+]] = qecp.insert [[cb_2]][2], [[q2_2]] : !qecp.codeblock<1 x 9>, !qecp.qubit<data>
+            //       CHECK:   [[m_3xi1:%.+]] = tensor.from_elements [[m0]], [[m1]], [[m2]] : tensor<3xi1>
+            //       CHECK:   return [[m_3xi1]], [[cb_3]] : tensor<3xi1>, !qecp.codeblock<1 x 9>
+
+            // CHECK-LABEL: func.func private @decode_physical_measurements_Shor913
+            //  CHECK-SAME:     ([[in_mres_3xi1:%.+]]: tensor<3xi1>) -> tensor<1xi1>
+            //       CHECK:   [[c0:%.+]] = arith.constant false
+            //       CHECK:   [[empty_i1:%.+]] = tensor.empty() : tensor<i1>
+            //       CHECK:   [[init_i1:%.+]] = linalg.fill
+            //  CHECK-SAME:     ins([[c0]] : i1) outs([[empty_i1]] : tensor<i1>) -> tensor<i1>
+            //       CHECK:   [[reduced_i1:%.+]] = linalg.reduce
+            //  CHECK-SAME:     ins([[in_mres_3xi1]]:tensor<3xi1>) outs([[init_i1]]:tensor<i1>)
+            //  CHECK-SAME:     dimensions = [0]
+            //       CHECK:   ([[in:%.+]]: i1, [[out:%.+]]: i1) {
+            //       CHECK:     [[xor:%.+]] = arith.xori [[in]], [[out]] : i1
+            //       CHECK:     linalg.yield [[xor]] : i1
+            //       CHECK:   [[expanded_1xi1:%.+]] = tensor.expand_shape [[reduced_i1]] []
+            //  CHECK-SAME:     output_shape [1] : tensor<i1> into tensor<1xi1>
+            //       CHECK:   return [[expanded_1xi1]] : tensor<1xi1>
+        }
+        """
+
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Shor913")),)
         run_filecheck(program, pipeline)
