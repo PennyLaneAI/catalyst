@@ -5,6 +5,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `decompose-lowering` pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
+  The pass also no longer applies the `inline`, `cse` and `canonicalize` passes to avoid unnecessary IR mutations.
+  Instead, decomposition rules are deterministically inlined by a custom function (`inline` is non-deterministic, using an estimated benefit and threshold as criteria for inlining).
+  Decomposition rules are no longer removed after the `decompose-lowering` pass, which allows them to be used by subsequent passes, namely `graph-decomposition`.
+  Instead, rules are removed by the `symbol-dce` pass at the end of the `QuantumCompilationStage`.
+  [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
+
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
   with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
