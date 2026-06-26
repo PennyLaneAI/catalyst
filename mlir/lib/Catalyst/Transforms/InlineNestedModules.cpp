@@ -61,6 +61,10 @@
  *     ```
  * 5. Cleanup: remove the catalyst.fully_qualified_name attribute
  *
+ * Exception: modules carrying `catalyst.target` are NOT inlined, renamed, or flattened. They are
+ * compiled to standalone objects elsewhere (cross-compile-targets), so their host launch_kernel is
+ * left in place for a later consumer.
+ *
  */
 
 #include <deque>
@@ -206,8 +210,7 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
 {
     bool isSymbolTable = child->hasTrait<OpTrait::SymbolTable>();
     bool hasBeenRenamed = child->hasAttr(hasBeenRenamedAttrName);
-    // TODO: isQnode
-    bool mustRename = isSymbolTable && !hasBeenRenamed;
+    bool mustRename = isSymbolTable && !hasBeenRenamed && !child->hasAttr("catalyst.target");
     if (!mustRename) {
         return failure();
     }
@@ -395,13 +398,14 @@ struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::LaunchKernelO
     LogicalResult matchAndRewrite(catalyst::LaunchKernelOp op,
                                   PatternRewriter &rewriter) const override
     {
-        auto found = _map->find(op.getCallee()) != _map->end();
-        if (!found) {
+        // Dispatch-module entries are excluded from the map (their modules are left intact for
+        // dispatch-remote-targets), so their launch_kernel is not matched here and stays as-is.
+        auto found = _map->find(op.getCallee());
+        if (found == _map->end()) {
             return failure();
         }
 
-        auto newSymbolRefAttr = _map->find(op.getCallee())->getSecond();
-        rewriter.replaceOpWithNewOp<func::CallOp>(op, newSymbolRefAttr, op.getResultTypes(),
+        rewriter.replaceOpWithNewOp<func::CallOp>(op, found->getSecond(), op.getResultTypes(),
                                                   op.getOperands());
         return success();
     }
@@ -517,62 +521,20 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         mlir::DenseMap<SymbolRefAttr, SymbolRefAttr> old_to_new;
-        bool emitDecls = _stopAfterStep >= 4 || _stopAfterStep == 0;
-        SmallVector<func::FuncOp> targetDeclarations;
-        llvm::SmallSet<StringRef, 8> rootSymbols;
-        if (emitDecls) {
-            for (Operation &rootOp : symbolTable->getRegion(0).front()) {
-                if (auto symbol = dyn_cast<SymbolOpInterface>(rootOp))
-                    rootSymbols.insert(symbol.getName());
-            }
-        }
-
         symbolTable->walk<WalkOrder::PreOrder>([&](Operation *nested) {
             if (nested == symbolTable)
                 return WalkResult::advance();
-            // Recurse into target modules (not inlined); skip other nested modules (inlined).
-            if (auto mod = dyn_cast<ModuleOp>(nested))
-                return mod->hasAttr("catalyst.target") ? WalkResult::advance() : WalkResult::skip();
+            // Any module still nested at this point is a catalyst.target module (ordinary ones were
+            // inlined above): leave it and its contents entirely untouched.
+            if (isa<ModuleOp>(nested))
+                return WalkResult::skip();
             if (!isa<SymbolOpInterface>(nested) || !nested->hasAttr(fullyQualifiedNameAttr))
                 return WalkResult::advance();
             SymbolRefAttr old = nested->getAttrOfType<SymbolRefAttr>(fullyQualifiedNameAttr);
             SymbolRefAttr _new = SymbolRefAttr::get(cast<SymbolOpInterface>(nested));
             old_to_new.insert({old, _new});
-            // For functions remaining inside a target module, emit an external declaration in
-            // the root so the flat call inserted by NestedToFlatCallPattern is visible.
-            if (emitDecls && isa<func::FuncOp>(nested) && nested->getParentOp() != symbolTable) {
-                auto func = cast<func::FuncOp>(nested);
-                // The host only calls entry points; helpers stay internal to the object.
-                if (!func->hasAttr("catalyst.entry_point"))
-                    return WalkResult::advance();
-                StringRef name = func.getName();
-                if (!rootSymbols.insert(name).second)
-                    return WalkResult::advance();
-
-                auto decl = cast<func::FuncOp>(func->clone());
-                decl.eraseBody();
-                decl->removeAttr(fullyQualifiedNameAttr);
-                decl.setPrivate();
-                if (auto targetAttr = nested->getParentOp()->getAttr("catalyst.target"))
-                    decl->setAttr("catalyst.target", targetAttr);
-                // Mark tensor-typed arguments as read-only so one-shot-bufferize does not
-                // insert defensive copies at call sites of this external decl.
-                for (unsigned i = 0; i < decl.getNumArguments(); ++i) {
-                    if (isa<TensorType>(decl.getArgumentTypes()[i]))
-                        decl.setArgAttr(i, "bufferization.access",
-                                        StringAttr::get(context, "read"));
-                }
-                targetDeclarations.push_back(decl);
-            }
             return WalkResult::advance();
         });
-
-        if (!targetDeclarations.empty()) {
-            OpBuilder declBuilder(&symbolTable->getRegion(0).front(),
-                                  symbolTable->getRegion(0).front().begin());
-            for (func::FuncOp decl : targetDeclarations)
-                declBuilder.insert(decl);
-        }
 
         RewritePatternSet nestedToFlat(context);
         nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern, ZNEReplacerPattern>(
