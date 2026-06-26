@@ -49,7 +49,7 @@ from catalyst.jax_primitives import (
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.patching import Patcher
 
-from .qref_operator2_primitives import qref_operator_p, _qref_operator_p_lowering
+from .qref_operator2_primitives import _qref_operator_p_lowering, qref_operator_p
 
 with Patcher(
     (
@@ -168,7 +168,6 @@ qref_measure_in_basis_p = Primitive("qref_measure_in_basis")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
-
 
 
 #
@@ -801,7 +800,6 @@ def _qref_named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value,
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
     return NamedObsOp(result_type, qubit, obsId).results
-
 
 
 #
