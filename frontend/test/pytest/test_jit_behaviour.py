@@ -863,6 +863,28 @@ class TestTracingQJITAnnotatedFunctions:
 
 
 class TestDefaultAvailableIR:
+
+    def test_AbstractArray_AbstractWires_AOT(self):
+        """Test that AbstractArray and AbstractWires can be used to specify the input
+        shapes for AOT compilation."""
+
+        @qp.qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        def c(x: qp.typing.AbstractArray((3,), float), wires: qp.wires.Wires[4]):
+            @qp.for_loop(x.shape[0])
+            def loop(i):
+                qp.RX(x[i], wires[i])
+
+            @qp.for_loop(wires.shape[0])
+            def loop2(i):
+                qp.X(i)
+
+            loop()
+            loop2()
+            return qp.expval(qp.Z(0))
+
+        assert c.mlir
+
     def test_mlir(self):
         """Test mlir."""
 
