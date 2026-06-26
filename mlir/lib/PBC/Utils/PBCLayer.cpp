@@ -183,6 +183,12 @@ FailureOr<int64_t> PBCLayerContext::computeBlockWorstCaseDepth(Block *block,
             continue;
         }
 
+        // multi-region ops
+        if (op.getNumRegions() != 1) {
+            return op.emitOpError(
+                "worst-case depth cannot analyze operations with multiple regions");
+        }
+
         // Recurse into the op's single-block region body (e.g. quantum.adjoint)
         Region &region = op.getRegion(0);
         if (region.empty()) {
