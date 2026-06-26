@@ -818,10 +818,22 @@ def _operator_op_lowering(
     hybrid_lens,
     hybrid_trees,
     wire_lens,
+    n_ctrls,
+    adjoint,
     **static_data,
 ):
     params = args[: len(op_cls.dynamic_argnames)]
-    qubits = args[len(op_cls.dynamic_argnames) :]
+    if n_ctrls:
+        qubits = args[len(op_cls.dynamic_argnames) : -2 * n_ctrls]
+        ctrl_qubits = args[-2 * n_ctrls : -n_ctrls]
+        ctrl_values = args[-n_ctrls:]
+        ctrl_values = [
+            extract_scalar(v, op_cls) if ir.RankedTensorType.isinstance(v.type) else v
+            for v in ctrl_values
+        ]
+    else:
+        qubits = args[len(op_cls.dynamic_argnames) :]
+        ctrl_qubits = ctrl_values = ()
 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
 
@@ -846,9 +858,9 @@ def _operator_op_lowering(
         params=params,
         qubits=qubits,
         forward_args=[],
-        ctrl_qubits=[],
-        ctrl_values=[],
-        adjoint=False,
+        ctrl_qubits=ctrl_qubits,
+        ctrl_values=ctrl_values,
+        adjoint=adjoint,
         UID=None,
         arr_qubit_indices=[],
         param_map=processed_param_map,

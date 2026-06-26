@@ -210,16 +210,24 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Check some constraints regarding dynamic allocation."""
         if self.has_dynamic_allocation:
             if len(measurement.wires) == 0 and not isinstance(measurement, qp.measurements.StateMP):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
-                        """))
+                        """
+                    )
+                )
 
             if any(is_abstract_qubit(w) for w in measurement.wires):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
-                        """))
+                        """
+                    )
+                )
 
     # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):
@@ -293,23 +301,38 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
-def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
+def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, n_ctrls, adjoint, **kwargs):
 
     if hybrid_lens or hybrid_trees or op_cls.static_argnames:
         # only support compilable_argnames for the moment
         raise NotImplementedError
 
-    wire_inputs = args[len(op_cls.dynamic_argnames) :]
+    if n_ctrls:
+        wire_inputs = args[len(op_cls.dynamic_argnames) : -2 * n_ctrls]
+        control_wire_inputs = args[-2 * n_ctrls : -n_ctrls]
+        control_values = args[-n_ctrls:]
+    else:
+        wire_inputs = args[len(op_cls.dynamic_argnames) :]
+        control_wire_inputs = control_values = ()
+
     new_wires = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs
+    ]
+    new_control_wires = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w)
+        for w in control_wire_inputs
     ]
 
     qref_operator_op.bind(
         *args[: len(op_cls.dynamic_argnames)],
         *new_wires,
+        *new_control_wires,
+        *control_values,
         op_cls=op_cls,
         hybrid_lens=hybrid_lens,
         hybrid_trees=hybrid_trees,
+        n_ctrls=n_ctrls,
+        adjoint=adjoint,
         **kwargs,
     )
     return []
