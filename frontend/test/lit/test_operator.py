@@ -50,6 +50,7 @@ def c_no_params():
 
 print(c_no_params.mlir)
 
+
 class NoParamsCustomOp(qp.core.Operator2):
 
     def __init__(self, wires):
@@ -71,7 +72,6 @@ def c_no_params_custom():
 
 
 print(c_no_params_custom.mlir)
-
 
 
 class SingleParam(qp.core.Operator2):
@@ -188,7 +188,7 @@ print(c_multiple_registers.mlir)
 class MultiParams(qp.core.Operator2):
 
     dynamic_argnames = ("a", "b", "c")
-    wire_argnames = ("reg", )
+    wire_argnames = ("reg",)
 
     # note also having non-standard order with dynamic inputs after wires
     def __init__(self, reg, a, b, c):
