@@ -32,8 +32,8 @@ class NoParams(qp.core.Operator2):
 def c_no_params():
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: qref.operator "NoParams"() qubits([[q0]])
-    # CHECK static_data = {}
-    # CHECK param_map = {} qubit_map = {wires = [0]}
+    # CHECK: static_data = {}
+    # CHECK: param_map = {} qubit_map = {wires = [0]}
     NoParams(wires=0)
 
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
