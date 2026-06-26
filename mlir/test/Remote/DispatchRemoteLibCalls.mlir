@@ -55,14 +55,15 @@ module @jit_inherit {
   func.func @teardown() {
     return
   }
-  func.func private @compute()
   func.func @main() {
-    func.call @compute() : () -> ()
+    catalyst.launch_kernel @target::@compute() : () -> ()
     catalyst.custom_call fn("fpga_trampoline_a_teardown") () {backend_config = {dispatch = ""}} : () -> ()
     return
   }
   module @target attributes {catalyst.object_file = "/tmp/target.o", catalyst.dispatch = {address = "ADDR:PORT"}} {
-    func.func private @compute() attributes {catalyst.entry_point}
+    func.func public @compute() {
+      return
+    }
   }
 }
 
@@ -74,19 +75,21 @@ module @jit_ambiguous {
   func.func @setup() {
     return
   }
-  func.func private @c1()
-  func.func private @c2()
   func.func @main() {
-    func.call @c1() : () -> ()
-    func.call @c2() : () -> ()
+    catalyst.launch_kernel @t1::@c1() : () -> ()
+    catalyst.launch_kernel @t2::@c2() : () -> ()
     // expected-error @below {{ambiguous remote executor}}
     catalyst.custom_call fn("foo") () {backend_config = {dispatch = ""}} : () -> ()
     return
   }
   module @t1 attributes {catalyst.object_file = "/tmp/t1.o", catalyst.dispatch = {address = "host:1"}} {
-    func.func private @c1() attributes {catalyst.entry_point}
+    func.func public @c1() {
+      return
+    }
   }
   module @t2 attributes {catalyst.object_file = "/tmp/t2.o", catalyst.dispatch = {address = "host:2"}} {
-    func.func private @c2() attributes {catalyst.entry_point}
+    func.func public @c2() {
+      return
+    }
   }
 }

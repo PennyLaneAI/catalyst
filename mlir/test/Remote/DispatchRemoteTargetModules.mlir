@@ -29,15 +29,14 @@
 // CHECK-NOT: remote.
 // CHECK: return
 
-// Each host-side call is rewritten to its own remote.launch, preserving the call's
+// Each host-side launch_kernel is rewritten to its own remote.launch, preserving the call's
 // operand/result types (a typed call exercises the memref-result path).
 // CHECK-LABEL: func.func public @jit_main
-// CHECK: remote.launch("noop", "ADDR:PORT") () : () -> ()
-// CHECK: remote.launch("compute", "ADDR:PORT") (%{{.*}}) : (memref<4xf64>) -> memref<4xf64>
+// CHECK: remote.launch("noop", "ADDR:PORT", "/tmp/target_compute.o") () : () -> ()
+// CHECK: remote.launch("compute", "ADDR:PORT", "/tmp/target_compute.o") (%{{.*}}) : (memref<4xf64>) -> memref<4xf64>
 
-// The bodyless declarations and the nested module are erased.
-// CHECK-NOT: func.call @noop
-// CHECK-NOT: func.call @compute
+// The launch_kernels and the nested module are gone.
+// CHECK-NOT: catalyst.launch_kernel
 // CHECK-NOT: module @target_compute
 
 module @jit_test_dispatch {
@@ -50,17 +49,22 @@ module @jit_test_dispatch {
     return
   }
 
-  func.func private @noop()
-  func.func private @compute(memref<4xf64>) -> memref<4xf64>
-
+  // inline-nested-module keeps dispatch-module calls as launch_kernel (no flattening, no host-side
+  // declarations), so dispatch matches the launch_kernel callee module directly.
   func.func public @jit_main(%arg0: memref<4xf64>) -> memref<4xf64> attributes {llvm.emit_c_interface} {
-    func.call @noop() : () -> ()
-    %0 = func.call @compute(%arg0) : (memref<4xf64>) -> memref<4xf64>
+    catalyst.launch_kernel @target_compute::@noop() : () -> ()
+    %0 = catalyst.launch_kernel @target_compute::@compute(%arg0) : (memref<4xf64>) -> memref<4xf64>
     return %0 : memref<4xf64>
   }
 
+  // cross-compile-targets leaves remote-dispatch modules intact (public, with bodies); dispatch
+  // erases the whole module after rewriting the host launch_kernels.
   module @target_compute attributes {catalyst.object_file = "/tmp/target_compute.o", catalyst.dispatch = {address = "ADDR:PORT"}} {
-    func.func private @noop() attributes {catalyst.entry_point}
-    func.func private @compute(memref<4xf64>) -> memref<4xf64> attributes {catalyst.entry_point}
+    func.func public @noop() {
+      return
+    }
+    func.func public @compute(%arg0: memref<4xf64>) -> memref<4xf64> {
+      return %arg0 : memref<4xf64>
+    }
   }
 }

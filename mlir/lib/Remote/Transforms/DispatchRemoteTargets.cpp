@@ -32,12 +32,6 @@ namespace remote {
 
 namespace {
 
-// Functions marked as the object's externally-callable entry points.
-bool isEntryPoint(func::FuncOp fn)
-{
-    return fn->hasAttr("catalyst.entry_point");
-}
-
 // Ships cross-compiled `catalyst.target` modules to a remote executor using the `remote` dialect.
 //
 // This pass should be run after `cross-compile-targets`, which records each module's object file in
@@ -231,48 +225,36 @@ struct DispatchRemoteTargetsPass
         // entry function, and remote.launch resolves individual symbols within it.
         injectRemoteSendBinaryIntoSetup(host, addressAttr, pathAttr);
 
-        // Per entry-marked function: rewrite host-side calls to remote.launch.
-        for (auto nestedFn : nested.getOps<func::FuncOp>()) {
-            if (!isEntryPoint(nestedFn)) {
-                continue;
+        // Rewrite each host-side launch_kernel targeting this module into a remote.launch.
+        StringRef moduleName = nested.getSymName().value_or("");
+        SmallVector<catalyst::LaunchKernelOp> launches;
+        host.walk([&](catalyst::LaunchKernelOp launchKernel) {
+            if (launchKernel.getCalleeModuleName().getValue() == moduleName) {
+                launches.push_back(launchKernel);
             }
-            StringRef fnName = nestedFn.getName();
-            auto decl = host.lookupSymbol<func::FuncOp>(fnName);
-            if (!decl || !decl.isExternal()) {
-                continue;
+        });
+        for (catalyst::LaunchKernelOp launchKernel : launches) {
+            // remote.launch marshals memref descriptors, so its lowering only accepts memref-typed
+            // operands and results. Reject anything else here with a clear error rather than
+            // crashing later in convert-remote-to-llvm. This runs after bufferization, so a
+            // well-formed entry call is already memref-typed.
+            auto isMemref = [](Type ty) { return isa<MemRefType>(ty); };
+            if (!llvm::all_of(launchKernel.getOperandTypes(), isMemref) ||
+                !llvm::all_of(launchKernel.getResultTypes(), isMemref)) {
+                launchKernel.emitOpError("remote dispatch of '")
+                    << launchKernel.getCalleeName().getValue()
+                    << "' requires memref-typed operands and results";
+                return failure();
             }
-
-            auto calleeAttr = StringAttr::get(ctx, fnName);
-
-            SmallVector<func::CallOp> calls;
-            if (auto uses = SymbolTable::getSymbolUses(decl.getNameAttr(), host)) {
-                for (const SymbolTable::SymbolUse &use : *uses) {
-                    if (auto call = dyn_cast<func::CallOp>(use.getUser())) {
-                        calls.push_back(call);
-                    }
-                }
-            }
-            for (func::CallOp call : calls) {
-                // remote.launch marshals memref descriptors, so its lowering only accepts
-                // memref-typed operands and results. Reject anything else here with a clear
-                // error rather than crashing later in convert-remote-to-llvm. This runs after
-                // bufferization, so a well-formed entry call is already memref-typed.
-                auto isMemref = [](Type ty) { return isa<MemRefType>(ty); };
-                if (!llvm::all_of(call.getOperandTypes(), isMemref) ||
-                    !llvm::all_of(call.getResultTypes(), isMemref)) {
-                    call.emitOpError("remote dispatch of '")
-                        << fnName << "' requires memref-typed operands and results";
-                    return failure();
-                }
-                OpBuilder b(call);
-                auto launch =
-                    remote::LaunchOp::create(b, call.getLoc(), call.getResultTypes(),
-                                             call.getOperands(), addressAttr, calleeAttr);
-                call.replaceAllUsesWith(launch.getResults());
-                call.erase();
-            }
-
-            decl.erase();
+            auto calleeAttr = StringAttr::get(ctx, launchKernel.getCalleeName().getValue());
+            OpBuilder b(launchKernel);
+            // `pathAttr` (the object-file path, same value shipped by send_binary) keys the
+            // per-kernel JITDylib on the executor so the entry resolves in its own object.
+            auto launch = remote::LaunchOp::create(
+                b, launchKernel.getLoc(), launchKernel.getResultTypes(),
+                launchKernel.getOperands(), addressAttr, calleeAttr, pathAttr);
+            launchKernel.replaceAllUsesWith(launch.getResults());
+            launchKernel.erase();
         }
         return success();
     }
