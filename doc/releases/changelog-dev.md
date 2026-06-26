@@ -201,6 +201,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `graph-decomposition` pass now performs far less IR manipulation.
+  [(#2977)](https://github.com/PennyLaneAI/catalyst/pull/2977)
+
 * Update tests to not use global capture toggle where possible.
   [(#2964)](https://github.com/PennyLaneAI/catalyst/pull/2964)
 
