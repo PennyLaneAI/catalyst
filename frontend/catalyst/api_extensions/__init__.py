@@ -40,7 +40,7 @@ from catalyst.api_extensions.quantum_operators import (
     measure,
     pauli_measure,
 )
-from catalyst.api_extensions.target import remote, target
+from catalyst.api_extensions.target import target
 
 __all__ = (
     "accelerate",
@@ -62,5 +62,4 @@ __all__ = (
     "adjoint",
     "ctrl",
     "target",
-    "remote",
 )

@@ -91,7 +91,7 @@ def declare(name: str, artifact: Optional[str] = None, outputs=None, *,
         outputs:  :class:`jax.ShapeDtypeStruct` or tuple of them describing each output tensor.
                   JAX needs these at trace time to infer what the call returns.
         remote:   Mark the symbol as executor-side. Pass the **remote device**
-                  (``remote(target(...), address=...)``) to bind this call explicitly to that
+                  (``target(..., address=...)``) to bind this call explicitly to that
                   executor's address. ``True`` inheriting the program's single remote executor.
 
     Returns:
@@ -107,8 +107,8 @@ def declare(name: str, artifact: Optional[str] = None, outputs=None, *,
             dispatch = get_dispatch(remote)
             if dispatch is None:
                 raise ValueError(
-                    "kernel.declare(remote=<device>): the device has no remote dispatch; wrap it "
-                    "with remote(target(...), address=...) first, or pass remote=True to inherit "
+                    "kernel.declare(remote=<device>): the device has no remote dispatch; create it "
+                    "with target(..., address=...) first, or pass remote=True to inherit "
                     "the program's single executor."
                 )
             address = dispatch.address
