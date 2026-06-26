@@ -352,6 +352,7 @@
   [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
 
 * The documentation for `QJIT.mlir` and `QJIT.mlir_opt` was updated with type hints and docstrings that better reflect the compilation-dependent nature of the properties.
+  [(#2975)](https://github.com/PennyLaneAI/catalyst/pull/2975)
 
 <h3>Contributors ✍️</h3>
 
