@@ -689,7 +689,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
 }
 
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                         AttrSizedOperandSegments, AttrSizedResultSegments,
+                                         DecomposableGate]> {
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
         The `quantum.paulirot` operation applies a rotation around a Pauli product
@@ -728,6 +729,20 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
                 pauliWord += cast<mlir::StringAttr>(pauliChar).getValue();
             }
             return pauliWord;
+        }
+
+        std::string getDecompId() {
+            return "paulirot" + getPauliWord();
+        }
+
+        mlir::TypeRange getDynamicShape() {
+            return getAllParams().getTypes();
+        }
+
+        mlir::DictionaryAttr getStaticData() {
+            mlir::MLIRContext *ctx = getContext();
+            mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(mlir::StringAttr::get(ctx, "pauli_word"), getPauliProduct());
+            return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
         }
     }];
 
