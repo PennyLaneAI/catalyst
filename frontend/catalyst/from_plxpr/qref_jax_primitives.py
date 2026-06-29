@@ -50,6 +50,8 @@ from catalyst.jax_primitives import (
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.patching import Patcher
 
+from .uid import generate_uid
+
 with Patcher(
     (
         _ods_cext,
@@ -823,35 +825,57 @@ def _qref_operator_p_lowering(
     **static_data,
 ):
     params = args[: len(op_cls.dynamic_argnames)]
+    param_map = {
+        name: ir.DenseI64ArrayAttr.get([idx]) for idx, name in enumerate(op_cls.dynamic_argnames)
+    }
+
+    # wire_lens only tracks non-hybrid wire arguments. Hybrid wire arguments are handled later
+    qubits = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + sum(wire_lens)]
+    qubit_map = {}
+    qmap_idx = 0
+    for name, size in zip(op_cls.wire_argnames, wire_lens):
+        qubit_map[name] = ir.DenseI64ArrayAttr.get(list(range(qmap_idx, qmap_idx + size)))
+        qmap_idx += size
+
+    args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
+    pmap_idx = len(op_cls.dynamic_argnames)
+    for name, size in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
+        if name in op_cls.wire_argnames:
+            # Hybrid wire arguments
+            qubits += args[args_idx : args_idx + size]
+            qubit_map[name] = ir.DenseI64ArrayAttr.get(list(range(qmap_idx, qmap_idx + size)))
+            qmap_idx += size
+
+        else:
+            # Hybrid dynamic arguments
+            params += args[args_idx : args_idx + size]
+            param_map[name] = ir.DenseI64ArrayAttr.get(list(range(pmap_idx, pmap_idx + size)))
+            pmap_idx += size
+
+        args_idx += size
+
+    processed_param_map = get_mlir_attribute_from_pyval(param_map)
+    processed_qubit_map = get_mlir_attribute_from_pyval(qubit_map)
+    name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
+
     if n_ctrls:
-        qubits = args[len(op_cls.dynamic_argnames) : -2 * n_ctrls]
-        ctrl_qubits = args[-2 * n_ctrls : -n_ctrls]
+        ctrl_qubits = args[args_idx:-n_ctrls]
         ctrl_values = args[-n_ctrls:]
         ctrl_values = [
             extract_scalar(v, op_cls) if ir.RankedTensorType.isinstance(v.type) else v
             for v in ctrl_values
         ]
     else:
-        qubits = args[len(op_cls.dynamic_argnames) :]
         ctrl_qubits = ctrl_values = ()
 
-    name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
-
-    repack_static_data = {k: unflatten(*v) for k, v in static_data.items()}
-    processed_static_data = get_mlir_attribute_from_pyval(repack_static_data)
-
-    param_map = {
-        name: ir.DenseI64ArrayAttr.get([ind]) for ind, name in enumerate(op_cls.dynamic_argnames)
-    }
-    processed_param_map = get_mlir_attribute_from_pyval(param_map)
-
-    qubit_map = {}
-    ind = 0
-    for name, size in zip(op_cls.wire_argnames, wire_lens):
-        qubit_map[name] = ir.DenseI64ArrayAttr.get(list(range(ind, ind + size)))
-        ind += size
-
-    processed_qubit_map = get_mlir_attribute_from_pyval(qubit_map)
+    if op_cls.hybrid_argnames or op_cls.static_argnames:
+        # uid = generate_uid(args, op_cls, wire_lens, hybrid_lens, hybrid_trees, static_data)
+        uid = 99
+        processed_static_data = None
+    else:
+        uid = None
+        repack_static_data = {k: unflatten(*v) for k, v in static_data.items()}
+        processed_static_data = get_mlir_attribute_from_pyval(repack_static_data)
 
     OperatorOp(
         op_name=name_attr,
@@ -861,7 +885,7 @@ def _qref_operator_p_lowering(
         ctrl_qubits=ctrl_qubits,
         ctrl_values=ctrl_values,
         adjoint=adjoint,
-        UID=None,
+        UID=uid,
         arr_qubit_indices=[],
         param_map=processed_param_map,
         static_data=processed_static_data,
