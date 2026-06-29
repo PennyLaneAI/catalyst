@@ -28,9 +28,9 @@ from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
+from pennylane.capture.primitives import operator_p
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
 from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
-from pennylane.core.operator.operator2 import operator_p
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 from pennylane.wires import AbstractQubit, is_abstract_qubit
