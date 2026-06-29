@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <optional>
+
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
@@ -36,5 +38,12 @@ int64_t countStaticForloopIterations(Operation *op);
 // Returns the static trip count of a single for loop if all three bounds are
 // arith.constant ops, or -1 if any bound is dynamic.
 int64_t countStaticForOpIterations(scf::ForOp forOp);
+
+// Resolve a for loop's static trip count using, in order of preference:
+//   1. an `estimated_iterations` integer attribute,
+//   2. scf::ForOp::getStaticTripCount(), then
+//   3. recursively-resolved constant lower/upper bounds and step.
+// Returns std::nullopt when the trip count cannot be determined statically.
+std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp);
 
 } // namespace catalyst

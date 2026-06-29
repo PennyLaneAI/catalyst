@@ -18,9 +18,8 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/BuiltinAttributes.h"
 
-#include "Catalyst/Utils/ConstantResolve.h"
+#include "Catalyst/Utils/SCFUtils.h"
 #include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Utils/PauliStringWrapper.h"
@@ -75,21 +74,7 @@ FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp swit
 FailureOr<int64_t> PBCLayerContext::forWorstCaseDepth(scf::ForOp forOp)
 {
     // Same trip-count rules as resource counting (`estimated_iterations`, static bounds, …).
-    std::optional<int64_t> tripCount;
-    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
-        tripCount = estAttr.getValue().getSExtValue();
-    }
-    else if (auto sTrip = forOp.getStaticTripCount()) {
-        tripCount = sTrip->getSExtValue();
-    }
-    else {
-        auto lb = resolveConstantInt(forOp.getLowerBound());
-        auto ub = resolveConstantInt(forOp.getUpperBound());
-        auto step = resolveConstantInt(forOp.getStep());
-        if (lb && ub && step && *step != 0 && *ub > *lb) {
-            tripCount = (*ub - *lb + *step - 1) / *step;
-        }
-    }
+    std::optional<int64_t> tripCount = resolveForLoopTripCount(forOp);
 
     if (!tripCount) {
         if (skipDynamic_) {

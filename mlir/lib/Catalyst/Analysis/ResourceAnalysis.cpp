@@ -27,7 +27,7 @@
 #include "mlir/IR/Operation.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
-#include "Catalyst/Utils/ConstantResolve.h"
+#include "Catalyst/Utils/SCFUtils.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
@@ -321,21 +321,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
     // Try to resolve a static trip count.
-    std::optional<int64_t> tripCount;
-    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
-        tripCount = estAttr.getValue().getSExtValue();
-    }
-    else if (auto sTrip = forOp.getStaticTripCount()) {
-        tripCount = sTrip->getSExtValue();
-    }
-    else {
-        auto lb = resolveConstantInt(forOp.getLowerBound());
-        auto ub = resolveConstantInt(forOp.getUpperBound());
-        auto step = resolveConstantInt(forOp.getStep());
-        if (lb && ub && step && *step != 0 && *ub > *lb) {
-            tripCount = (*ub - *lb + *step - 1) / *step;
-        }
-    }
+    std::optional<int64_t> tripCount = resolveForLoopTripCount(forOp);
 
     if (tripCount.has_value()) {
         // Record the loop body under a new name (for_loop_1, …).
