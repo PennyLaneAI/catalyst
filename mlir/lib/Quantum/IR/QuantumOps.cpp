@@ -30,6 +30,8 @@
 #include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
 
+#include <mlir/IR/BuiltinAttributes.h>
+
 using namespace mlir;
 using namespace catalyst::quantum;
 
@@ -785,8 +787,9 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 5. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {"static_data",         "param_map",          "qubit_map",
-                                          "operandSegmentSizes", "resultSegmentSizes", "op_name"};
+    SmallVector<StringRef> elidedAttrs = {
+        "static_data",        "param_map", "qubit_map", "operandSegmentSizes",
+        "resultSegmentSizes", "op_name",   "adjoint"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
@@ -920,7 +923,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 
     // 3. Optional adjoint marker.
     if (succeeded(parser.parseOptionalKeyword("adj"))) {
-        opProperties.setAdjoint(true);
+        result.addAttribute("adjoint", builder.getUnitAttr());
     }
 
     SmallVector<OpAsmParser::UnresolvedOperand> inQubits;
