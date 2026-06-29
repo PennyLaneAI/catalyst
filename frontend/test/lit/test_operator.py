@@ -209,3 +209,72 @@ def c_multi_params():
 
 
 print(c_multi_params.mlir)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def c_controlled():
+    # CHECK: [[true:%.+]] = arith.constant true
+    # CHECK: [[false:%.+]] = arith.constant false
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+
+    # CHECK: qref.operator "NoParams"() qubits([[q0]])
+    # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
+    op0 = NoParams(wires=0)
+    qp.ops.ControlledOp2(op0, [1], control_values=[False])
+
+    # CHECK: [[q0_1:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1_1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[q2_1:%.+]] = qref.get {{%.+}}[ 2]
+    # CHECK: [[q3_1:%.+]] = qref.get {{%.+}}[ 3]
+
+    # CHECK: qref.operator "NoParams"() qubits([[q0_1]])
+    # CHECK-NEXT: ctrls([[q1_1]], [[q2_1]], [[q3_1]]) ctrl_vals([[true]], [[false]], [[true]])
+    qp.ops.ControlledOp2(
+        qp.ops.ControlledOp2(op0, [1], control_values=[True]), [2, 3], control_values=[False, True]
+    )
+    return qp.state()
+
+
+print(c_controlled.mlir)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=1))
+def c_adjoint():
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
+    op0 = NoParams(wires=0)
+    qp.adjoint(op0)
+
+    # CHECK: [[q0_1:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.operator "NoParams"() qubits([[q0_1]])
+    qp.adjoint(qp.adjoint(op0))
+    return qp.state()
+
+
+print(c_adjoint.mlir)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def c_adjoint_and_controlled():
+    # CHECK: [[false:%.+]] = arith.constant false
+
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
+    # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
+    op0 = NoParams(wires=0)
+    qp.ops.ControlledOp2(qp.adjoint(op0), [1], [False])
+
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
+    # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
+    qp.adjoint(qp.ops.ControlledOp2(op0, [1], [False]))
+    return qp.state()
+
+
+print(c_adjoint_and_controlled.mlir)
