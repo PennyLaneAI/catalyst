@@ -303,11 +303,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 # pylint: disable=too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
 def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, adjoint, n_ctrls, **kwargs):
-
-    if hybrid_lens or hybrid_trees or op_cls.static_argnames:
-        # only support compilable_argnames for the moment
-        raise NotImplementedError
-
     if n_ctrls:
         wire_inputs = args[len(op_cls.dynamic_argnames) : -2 * n_ctrls]
         control_wire_inputs = args[-2 * n_ctrls : -n_ctrls]
