@@ -97,7 +97,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
                            const ResourceAnalysis &analysis)
     {
         // Swallow expected errors
-        // Happens when the depth is counter in dynamic loops.
+        // Errors arise when attempting to compute depth of dynamic loops.
         ScopedDiagnosticHandler depthDiagHandler(
             getOperation()->getContext(), [](Diagnostic &diag) {
                 if (diag.getSeverity() == DiagnosticSeverity::Error &&
