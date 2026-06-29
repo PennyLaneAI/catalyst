@@ -179,6 +179,28 @@ def DifferentiableGate : OpInterface<"DifferentiableGate", [ParametrizedGate]> {
     ];
 }
 
+def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
+    let description = [{
+        This interface provides a generic way to query decomposition data from a quantum operation.
+    }];
+
+    let cppNamespace = "::catalyst::quantum";
+
+    let methods = [
+        InterfaceMethod<
+            "Return the shape and dtype of dynamic data.",
+            "mlir::TypeRange", "getDynamicShape"
+        >,
+        InterfaceMethod<
+            "Return the values of static data.",
+            "mlir::DictionaryAttr", "getStaticData"
+        >,
+        InterfaceMethod<
+            "Return the operation name.", "std::string", "getDecompId"
+        >
+    ];
+}
+
 def MeasurementProcess : OpInterface<"MeasurementProcess"> {
     let description = [{
         This interface provides a generic way to interact with quantum measurement processes.
