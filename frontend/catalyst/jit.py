@@ -642,7 +642,7 @@ class QJIT(CatalystCallable):
 
         Returns:
             str: The textual MLIR module after applying the QJIT object's pipelines.
-            None: If optimized MLIR has not yet been generated for the program.
+            None: If MLIR has not yet been generated for the program.
         """
         if not self.mlir_module:
             return None
