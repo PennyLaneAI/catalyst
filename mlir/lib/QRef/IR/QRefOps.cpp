@@ -392,6 +392,8 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        std::optional<int64_t> UID, DictionaryAttr static_data,
                        DictionaryAttr param_map, DictionaryAttr qubit_map)
 {
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
+
     build(odsBuilder, odsState,
           /*op_name=*/op_name,
           /*params=*/params,
@@ -404,7 +406,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/Value(),
           /*arr_ctrl_values=*/Value(),
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -416,6 +418,8 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        bool adjoint, std::optional<int64_t> UID, DictionaryAttr static_data,
                        DictionaryAttr param_map, DictionaryAttr qubit_map)
 {
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
+
     build(odsBuilder, odsState,
           /*op_name=*/op_name,
           /*params=*/params,
@@ -428,7 +432,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/arr_ctrl_indices,
           /*arr_ctrl_values=*/arr_ctrl_values,
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
