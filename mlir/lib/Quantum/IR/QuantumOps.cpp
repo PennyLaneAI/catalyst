@@ -788,7 +788,7 @@ void OperatorOp::print(OpAsmPrinter &p)
     // 5. Attribute Dictionary
     SmallVector<StringRef> elidedAttrs = {
         "static_data",        "param_map", "qubit_map", "operandSegmentSizes",
-        "resultSegmentSizes", "op_name",   "adjoint"};
+        "resultSegmentSizes", "op_name",   "adjoint",   "UID"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
@@ -900,7 +900,6 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
     if (parser.parseString(&opName)) {
         return failure();
     }
-    auto &opProperties = result.getOrAddProperties<OperatorOp::Properties>();
     result.addAttribute("op_name", builder.getStringAttr(opName));
 
     // 2. Parse variadic params: (%arg0: type, ...)
@@ -966,7 +965,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         if (parser.parseLParen() || parser.parseInteger(uid) || parser.parseRParen()) {
             return failure();
         }
-        opProperties.setUID(uid);
+        result.addAttribute("UID", builder.getI64IntegerAttr(uid));
 
         if (succeeded(parser.parseOptionalKeyword("forward"))) {
             auto parseForwardArgAndType = [&]() -> ParseResult {
