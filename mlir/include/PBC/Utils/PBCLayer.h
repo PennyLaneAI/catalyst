@@ -61,21 +61,26 @@ class PBCLayerContext {
     // unless `skipDynamic` is true (dynamic loops then contribute 0).
     mlir::FailureOr<int64_t> computeBlockWorstCaseDepth(mlir::Block *block,
                                                         bool onlyOnDisjointQubit = false,
-                                                        bool skipDynamic = false);
+                                                        bool skipDynamic = false,
+                                                        bool liftForLoops = false);
 
     // Returns (any_commuting_depth, qubit_disjoint_depth), or nullopt.
     // Falls back to skip-dynamic on strict failure.
     PBCDepths computePBCDepth(mlir::Block *block);
 
   private:
-    mlir::FailureOr<int64_t> ifWorstCaseDepth(mlir::scf::IfOp ifOp, bool onlyOnDisjointQubit,
-                                              bool skipDynamic);
+    // Recursive worker for computeBlockWorstCaseDepth.
+    mlir::FailureOr<int64_t> worstCaseDepthOfBlock(mlir::Block *block, bool liftForLoops);
 
-    mlir::FailureOr<int64_t> switchWorstCaseDepth(mlir::scf::IndexSwitchOp switchOp,
-                                                  bool onlyOnDisjointQubit, bool skipDynamic);
+    mlir::FailureOr<int64_t> ifWorstCaseDepth(mlir::scf::IfOp ifOp);
 
-    mlir::FailureOr<int64_t> forWorstCaseDepth(mlir::scf::ForOp forOp, bool onlyOnDisjointQubit,
-                                               bool skipDynamic);
+    mlir::FailureOr<int64_t> switchWorstCaseDepth(mlir::scf::IndexSwitchOp switchOp);
+
+    mlir::FailureOr<int64_t> forWorstCaseDepth(mlir::scf::ForOp forOp);
+
+    // Traversal-invariant flags for the current depth computation.
+    bool onlyOnDisjointQubit_ = false;
+    bool skipDynamic_ = false;
 };
 
 class PBCLayer {
