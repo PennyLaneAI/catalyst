@@ -27,7 +27,8 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.tree_util import tree_flatten
 
-from catalyst.api_extensions.rem_postprocessing import rem_apply_to_samples, rem_calibrate
+from catalyst.api_extensions.rem_postprocessing import rem_apply_to_samples, rem_apply_to_counts, rem_apply_to_probs
+from catalyst.api_extensions.rem_postprocessing import rem_calibrate_samples, rem_calibrate_counts, rem_calibrate_probs
 from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, rem_p, zne_p
 from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
@@ -308,7 +309,9 @@ class RemCallable(CatalystCallable):
                     break
             if mp_kind is not None:
                 break
-
+        assert mp_kind != None, (
+            "measurement process must be one of CountsMP, ProbsMP or SampleMP. Other measurement processes such as observables are not supported yet."
+        )
         rem_results = rem_p.bind(
             *args_data,
             compute_all_zeroes_ones=self.compute_all_zeroes_ones,
@@ -321,25 +324,54 @@ class RemCallable(CatalystCallable):
         if not self.compute_all_zeroes_ones:
             return rem_results[0]
 
+        qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
+        assert qnode_obj is not None, (
+            "REM post-processing requires a QNode target"
+        )
+        n_qubits = len(qnode_obj.device.wires)
+        # print(f"the wires obj: {qnode_obj.device.wires}, {[x for x in qnode_obj.device.wires]}")
+        measured_qubits = jnp.array([x for x in qnode_obj.device.wires]) # list(range(n_qubits)) # qnode_obj.device.wires
         if mp_kind == "sample":
-            qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
-            assert qnode_obj is not None, (
-                "REM SampleMP post-processing requires a QNode target"
-            )
-            n_qubits = len(qnode_obj.device.wires)
 
             # quantum.sample returns f64 in catalyst; the REM helpers index
             # confusion matrices by bit value and need an integer dtype.
-            user_samples = rem_results[0].astype(jnp.int32)
+            mitigatee_samples = rem_results[0].astype(jnp.int32)
             zeros_samples = rem_results[1].astype(jnp.int32)
             ones_samples = rem_results[2].astype(jnp.int32)
-            measured_qubits = jnp.arange(n_qubits, dtype=jnp.int32)
+            # measured_qubits = jnp.arange(n_qubits, dtype=jnp.int32)
 
-            confusion_matrices = rem_calibrate(zeros_samples, ones_samples)
+            confusion_matrices = rem_calibrate_samples(zeros_samples, ones_samples)
             unique_bitstrings, mitigated_counts = rem_apply_to_samples(
-                user_samples, confusion_matrices, measured_qubits, n_qubits
+                mitigatee_samples, confusion_matrices, measured_qubits, n_qubits
             )
             return unique_bitstrings, mitigated_counts
+
+        elif mp_kind == "counts":
+
+            mitigatee_eigvals = rem_results[0]
+            mitigatee_counts = rem_results[1]
+            zeros_counts = rem_results[2]
+            ones_counts = rem_results[3]
+            # jax.debug.print("I'm before rem_calibrate_counts")
+            confusion_matrices = rem_calibrate_counts(zeros_counts, ones_counts)
+            # jax.debug.print("I'm after rem_calibrate_counts")
+            mitigated_counts = rem_apply_to_counts(
+                mitigatee_counts, confusion_matrices, measured_qubits, n_qubits
+            )
+            print(f"Done with RemCallable, returning: {mitigatee_eigvals, mitigated_counts}")
+            return (mitigatee_eigvals, mitigated_counts)
+
+        elif mp_kind == "probs":
+
+            mitigatee_probs = rem_results[0]
+            zeros_probs = rem_results[1]
+            ones_probs = rem_results[2]
+
+            confusion_matrices = rem_calibrate_probs(zeros_probs, ones_probs)
+            mitigated_probs = rem_apply_to_probs(
+                mitigatee_probs, confusion_matrices, measured_qubits, n_qubits
+            )
+            return mitigated_probs
 
         # ProbsMP / CountsMP post-processing is not yet wired up; return the
         # three raw outputs as a tuple so user code can post-process them.

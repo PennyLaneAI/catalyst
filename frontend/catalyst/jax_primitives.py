@@ -1098,7 +1098,7 @@ def _rem_abstract_eval(*args, compute_all_zeroes_ones, jaxpr, fn):  # pylint: di
     the callee's measurement result, an all-zeros calibration result, and
     an all-ones calibration result. Calibration shapes/dtypes are derived
     from the QNode's device size and the measurement-process kind on the
-    inner jaxpr (probs vs. sample).
+    inner jaxpr (probs, counts, sample).
     """
     qnode = jaxpr.eqns[0].params['qnode']
     device_qubit_count = len(qnode.device.wires)
@@ -1107,7 +1107,7 @@ def _rem_abstract_eval(*args, compute_all_zeroes_ones, jaxpr, fn):  # pylint: di
     mp = None
     for eqn in subjaxprs(jaxpr):
         for op_eq in eqn.eqns:
-            if str(op_eq.primitive) in ("probs", "sample"):
+            if str(op_eq.primitive) in ("probs", "counts", "sample"):
                 mp = str(op_eq.primitive)
                 break
         if mp is not None:
@@ -1117,6 +1117,14 @@ def _rem_abstract_eval(*args, compute_all_zeroes_ones, jaxpr, fn):  # pylint: di
         prob_size = 2 << (device_qubit_count - 1)
         prob_aval = core.ShapedArray((prob_size,), dtype=jax.numpy.dtype("float64"))
         return (jaxpr.out_avals[0], prob_aval, prob_aval)
+    elif mp == "counts":
+        # The mitigation-lowering pass takes the counts half (i64) of each
+        # calibration CountsOp's result pair, so the calibration avals are
+        # i64 here. f64 would cause a type-mismatch when the rewriter
+        # replaces the rem op with those values.
+        counts_size = 2 << (device_qubit_count - 1)
+        counts_aval = core.ShapedArray((counts_size,), dtype=jax.numpy.dtype("int64"))
+        return (jaxpr.out_avals[0], jaxpr.out_avals[1], counts_aval, counts_aval)
     elif mp == "sample":
         # Catalyst's quantum.sample lowering produces an f64 tensor (see
         # `_sample_lowering`). The Mitigation pass also creates calibration
@@ -1128,7 +1136,7 @@ def _rem_abstract_eval(*args, compute_all_zeroes_ones, jaxpr, fn):  # pylint: di
         )
         return (jaxpr.out_avals[0], sample_aval, sample_aval)
     raise NotImplementedError(
-        f"REM only supports probs/sample measurements; got {mp!r}"
+        f"REM only supports probs, counts and sample measurement processes; got {mp!r}"
     )
 
             
@@ -1144,9 +1152,10 @@ def _rem_lowering(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):
     """
     func_op = lower_jaxpr(ctx, jaxpr)
     symbol_ref = get_symbolref(ctx, func_op)
-    callee_output_types = list(map(mlir.aval_to_ir_types, [ctx.avals_out[0]]))
-    zeros_output_types = list(map(mlir.aval_to_ir_types, [ctx.avals_out[1]]))
-    ones_output_types = list(map(mlir.aval_to_ir_types, [ctx.avals_out[2]]))
+    *callee_avals, zeros_aval, ones_aval = ctx.avals_out
+    callee_output_types = list(map(mlir.aval_to_ir_types, callee_avals))
+    zeros_output_types = [mlir.aval_to_ir_types(zeros_aval)] # list(map(mlir.aval_to_ir_types, [ctx.avals_out[1]]))
+    ones_output_types = [mlir.aval_to_ir_types(ones_aval)] # list(map(mlir.aval_to_ir_types, [ctx.avals_out[2]]))
     flat_callee_output_types = util.flatten(callee_output_types)
     # The zeros/ones operands are non-variadic in the .td, so a single type
     # (not a list) is what the op constructor expects.

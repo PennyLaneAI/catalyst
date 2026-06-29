@@ -62,7 +62,7 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     const int64_t qubitCount = (*calleeOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
     // Get the device using quantom.device opeartion  inside callee function (FuncOp) 
     quantum::DeviceInitOp deviceInitOp = *(calleeOp.getOps<quantum::DeviceInitOp>().begin());
-    //shots value could be a result of some operation, and not just a literal value, which is why pointer to the operation is stored
+    // shots value could be a result of some operation, and not just a literal value, which is why pointer to the operation is stored
     Operation *shots = deviceInitOp.getShots().getDefiningOp();
     StringAttr lib = deviceInitOp.getLibAttr();
     StringAttr name = deviceInitOp.getDeviceNameAttr();
@@ -71,52 +71,68 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
                  << ", shots: " << *shots << ", lib: "<< lib
                  << ", name: " << name << ", kwargs" << kwargs << "\n";
     
-    //check for MP type: Sample or Probs
+    //check for MP type: Sample, Probs or Counts
     auto measurementProcesses = calleeOp.getOps<quantum::MeasurementProcess>();
     if (measurementProcesses.empty()) {
-        llvm::errs() << "[mitigation.rem] No valid MP found." << "\n";
+        llvm::errs() << "[mitigation.rem] No valid MP found.\n";
         return failure();
     }
-    mlir::Operation* measurementProcess = (*(measurementProcesses.begin())).getOperation();
+    mlir::Operation* measurementProcess = (*measurementProcesses.begin()).getOperation();
     std::string MPName = measurementProcess->getName().getIdentifier().str();
     llvm::dbgs() << "[mitigation.rem] MP name: " << MPName << "\n";
     
     //pre-compute MP and attribute-dependent values
     bool doCalib = computeAllZeroesOnes.getValue(); //get boolean value of BoolAttr
-    mlir::RankedTensorType tensorTy;
-    int64_t calibrationTensorShape;
+    mlir::RankedTensorType tensorTyI64;
+    mlir::RankedTensorType tensorTyF64;
+    int64_t calibrationTensorShape = 0;
     int64_t shotCount = 0;
-    if (MPName == "quantum.probs"s) {
-        calibrationTensorShape = 2 << (qubitCount - 1);
-        tensorTy = RankedTensorType::get({calibrationTensorShape}, rewriter.getF64Type());
+    if (MPName == "quantum.probs"s || MPName == "quantum.counts"s) {
+        // avoid undefined behaviour due to integer overflow
+        if (qubitCount >= 63) {
+            // in practice, due to exponential memory growth, users will
+            // OOM much earlier, at < 30 qubits
+            llvm::errs() << "[mitigation.rem] Qubit count" << qubitCount
+                         << "exceeds maximum simulated register size (62 qubits).\n";
+        }
+        calibrationTensorShape = static_cast<int64_t>(1ULL << qubitCount);
+        tensorTyF64 = RankedTensorType::get({calibrationTensorShape}, rewriter.getF64Type());
+        tensorTyI64 = RankedTensorType::get({calibrationTensorShape}, rewriter.getI64Type());
     }
     else if (MPName == "quantum.sample"s) {
         // check if shots Op is actually a arith.constant. In that case, shots are known at compile time
         if (shots->getName().getIdentifier() == arith::ConstantOp::getOperationName()) {
             auto shotsAttr = shots->getAttrOfType<IntegerAttr>("value");
             if (!shotsAttr || shotsAttr == 0) {
-                llvm::dbgs() << "[mitigation.rem] Shots constant missing non-zero integer value. Sample MP not supported for analytic simulation (shots must be > 0)." << "\n";
+                llvm::errs() << "[mitigation.rem] Shots constant missing non-zero integer value. Sample MP not supported for analytic simulation (shots must be > 0).\n";
                 return failure();
             }
             shotCount = shotsAttr.getInt();
             llvm::dbgs() << "[mitigation.rem] Shots is a arth.constant op, shots known at compile time: " << shotCount << "\n";
             calibrationTensorShape = shotCount * qubitCount;
-            tensorTy = RankedTensorType::get({shotCount, qubitCount}, rewriter.getI64Type());
+            tensorTyI64 = RankedTensorType::get({shotCount, qubitCount}, rewriter.getI64Type());
+            tensorTyF64 = RankedTensorType::get({shotCount, qubitCount}, rewriter.getF64Type());
         }
         else {
-            llvm::dbgs() << "[mitigation.rem] Dynamic number of shots not supported currently." << "\n";
+            llvm::errs() << "[mitigation.rem] Dynamic number of shots not supported currently.\n";
             return failure();
         }
         
         // SmallVector<double> zeros_vec(bitspaceShape, 0.0); //initialize with zeroes
     }
+    else {
+        llvm::errs() << "[mitigation.rem] Supported measurement processes are quantum.counts, quantum.probs and quantum.sample. "
+                     << MPName << " is not supported.\n";
+        return failure();
+    }
     if (!doCalib) { //doCalib == false
         llvm::dbgs() << "[mitigation.rem] doCalibration == false, replacing RemOp with wrapped callee circuit function call..." << "\n";
+        mlir::RankedTensorType tensorTyConst;
         // Create constant array of type ranked tensor<Nxf64> initialized with 0.0. This is the default value returned when doCalib == false and indicates that no calibration circuits were run
         // auto tensorTy = RankedTensorType::get({bitspaceShape}, rewriter.getF64Type());
         // SmallVector<double> zeros_vec(bitspaceShape, 0.0); //initialize with zeroes
         DenseElementsAttr tensorAttr;
-        if (MPName == "quantum.probs"s) {
+        if (MPName == "quantum.probs"s || MPName == "quantum.counts"s) {
             SmallVector<double> zerosVector(calibrationTensorShape, 0.0); //initialize with zeroes
             // To initialize with other values:
             // for (auto i = 0; i < 4; ++i) {
@@ -127,14 +143,16 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
             // It is also possible to use this:
             // auto zerosAttr = rewriter.getF64ArrayAttr(zeros_vec); // returns ArrayAttr used by DenseElementsAttr
             // because there is also an overload of DenseElementsAttr which accepts ArrayAttr. Attributes and compile-time constant metadata attached to ops/types in the IR, it requires a static shape
-            tensorAttr = DenseElementsAttr::get(tensorTy, ArrayRef<double>{zerosVector.begin(), zerosVector.end()});
+            tensorTyConst = tensorTyF64;
+            tensorAttr = DenseElementsAttr::get(tensorTyConst, ArrayRef<double>{zerosVector.begin(), zerosVector.end()});
             //tensorAttr is an attribute attached with the newly created airth.constant operation on the line below. It represents values known at pass-time (compile-time with regards to IR generation, but could be inferred at compile time of the passs from other attributes or something else)
         }
         else if (MPName == "quantum.sample"s) {
             SmallVector<int64_t> zerosVector(calibrationTensorShape, 0); //initialize with zeroes
-            tensorAttr = DenseElementsAttr::get(tensorTy, ArrayRef<int64_t>{zerosVector.begin(), zerosVector.end()});
+            tensorTyConst = tensorTyI64;
+            tensorAttr = DenseElementsAttr::get(tensorTyConst, ArrayRef<int64_t>{zerosVector.begin(), zerosVector.end()});
         } 
-        auto cst_zeros = rewriter.create<arith::ConstantOp>(loc, tensorTy, tensorAttr);
+        auto cst_zeros = rewriter.create<arith::ConstantOp>(loc, tensorTyConst, tensorAttr);
         llvm::dbgs() << "[mitigation.rem] cst_zeros = " << cst_zeros << "\n";
 
         // 1) original callee results
@@ -152,7 +170,7 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     llvm::dbgs() << "[mitigation.rem] doCalibration == true, start adding all-zeroes and all-ones circuits..." << "\n";
     //
     //DONE: implement adding two calibation circuits (all-zeroes and all-ones) and return appropriate results
-    // TODO: Then, add support for other MP, such as CountsMP and change the return type accordingly.
+    //DONE: Then, add support for other MP, such as CountsMP and change the return type accordingly.
     // Finally, add support for returning Observables, by somehow injecting the mitigation code (applying the confusion matrix) before observable calculation. (out of scope for now)
     // 0. Check how insertion point is managed -- for now it seems to be just fine as it is, but this must be researched in the future
     // ===BEGIN ZEROES QFUNC===
@@ -201,13 +219,18 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     quantum::MeasurementProcess insertedMP;
     ValueRange calibratedZeroResult;
     if (MPName == "quantum.probs"s) {
-        insertedMP = rewriter.create<quantum::ProbsOp>(loc, TypeRange{tensorTy}, compbasis.getResult(), Value(), Value());
+        insertedMP = rewriter.create<quantum::ProbsOp>(loc, TypeRange{tensorTyF64}, compbasis.getResult(), Value(), Value());
         llvm::dbgs() << "[mitigation.rem] quantum.probs addition OK, op=" << insertedMP << "\n";
         calibratedZeroResult = insertedMP->getResults();
     }
+    else if (MPName == "quantum.counts"s) {
+        insertedMP = rewriter.create<quantum::CountsOp>(loc, TypeRange{tensorTyF64, tensorTyI64}, compbasis.getResult(), Value(), Value(), Value());
+        llvm::dbgs() << "[mitigation.rem] quantum.counts addition OK, op=" << insertedMP << "\n";
+        calibratedZeroResult = insertedMP->getResults().drop_front(); // drop the first element in the iterator (eigvals not used for calibration matrices)
+    }
     else if (MPName == "quantum.sample"s) {
-        auto tensorTyFloat = RankedTensorType::get({shotCount, qubitCount}, rewriter.getF64Type());
-        insertedMP = rewriter.create<quantum::SampleOp>(loc, TypeRange{tensorTyFloat}, compbasis.getResult(), ValueRange{}, Value());// (loc, TypeRange{tensorTy}, compbasis.getResult(), Value(), Value());
+        // auto tensorTyFloat = RankedTensorType::get({shotCount, qubitCount}, rewriter.getF64Type());
+        insertedMP = rewriter.create<quantum::SampleOp>(loc, TypeRange{tensorTyF64}, compbasis.getResult(), ValueRange{}, Value());// (loc, TypeRange{tensorTy}, compbasis.getResult(), Value(), Value());
         llvm::dbgs() << "[mitigation.rem] quantum.sample addition OK, op=" << insertedMP << "\n";
         IRMapping postprocMapping;
         uint64_t resultIndex = 0;
@@ -226,7 +249,8 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
             // loc = insertedOp->getLoc();
         }
     }
-    
+    //MPName is already guaranteed to be a valid value, so no else block here. 
+
     // 4. Deallocate everything
     auto dealloc = rewriter.create<quantum::DeallocOp>(loc, qreg);
     llvm::dbgs() << "[mitigation.rem] quantum.dealloc addition OK, op=" << dealloc << "\n";
@@ -266,15 +290,20 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     llvm::dbgs() << "[mitigation.rem] quantum.compbasis (ones) addition OK, op=" << compbasisOnes << "\n";
     //TODO: maybe refactor into a function like in ZNE and call for zeroes and ones
     quantum::MeasurementProcess insertedMPOnes;
-    ValueRange calibratedOnesResult;
+    ValueRange calibratedOnesResult{};
     if (MPName == "quantum.probs"s) {
-        insertedMPOnes = rewriter.create<quantum::ProbsOp>(loc, TypeRange{tensorTy}, compbasisOnes.getResult(), Value(), Value());
+        insertedMPOnes = rewriter.create<quantum::ProbsOp>(loc, TypeRange{tensorTyF64}, compbasisOnes.getResult(), Value(), Value());
         llvm::dbgs() << "[mitigation.rem] quantum.probs (ones) addition OK, op=" << insertedMPOnes << "\n";
         calibratedOnesResult = insertedMPOnes->getResults();
     }
+    if (MPName == "quantum.counts"s) {
+        insertedMPOnes = rewriter.create<quantum::CountsOp>(loc, TypeRange{tensorTyF64, tensorTyI64}, compbasisOnes.getResult(), Value(), Value(), Value());
+        llvm::dbgs() << "[mitigation.rem] quantum.counts (ones) addition OK, op=" << insertedMPOnes << "\n";
+        calibratedOnesResult = insertedMPOnes->getResults().drop_front(); // drop the first element in the iterator (eigvals not used for calibration matrices)
+    }
     else if ((MPName == "quantum.sample"s)) {
-        auto tensorTyFloat = RankedTensorType::get({shotCount, qubitCount}, rewriter.getF64Type());
-        insertedMPOnes = rewriter.create<quantum::SampleOp>(loc, TypeRange{tensorTyFloat}, compbasisOnes.getResult(), ValueRange{}, Value());// (loc, TypeRange{tensorTy}, compbasis.getResult(), Value(), Value());
+        // auto tensorTyFloat = RankedTensorType::get({shotCount, qubitCount}, rewriter.getF64Type());
+        insertedMPOnes = rewriter.create<quantum::SampleOp>(loc, TypeRange{tensorTyF64}, compbasisOnes.getResult(), ValueRange{}, Value());// (loc, TypeRange{tensorTy}, compbasis.getResult(), Value(), Value());
         llvm::dbgs() << "[mitigation.rem] quantum.sample addition OK, op=" << insertedMPOnes << "\n";
         IRMapping postprocMapping;
         uint64_t resultIndex = 0;
@@ -298,7 +327,7 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     auto deinitOnes = rewriter.create<quantum::DeviceReleaseOp>(loc);
     llvm::dbgs() << "[mitigation.rem] quantum.deinit (ones) addition OK, op=" << deinitOnes << "\n";
     // ===END ONES QFUNC===
-    // If I'll need to create integer constants later, this is gow it's done:
+    // If I'll ever need to create integer constants later, this is how it's done:
     // TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
     // Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
 
