@@ -46,7 +46,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_measure_in_basis_p,
     qref_measure_p,
     qref_namedobs_p,
-    qref_operator_op,
+    qref_operator_p,
     qref_pauli_measure_p,
     qref_pauli_rot_p,
     qref_qinst_p,
@@ -304,7 +304,7 @@ def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs
     ]
 
-    qref_operator_op.bind(
+    qref_operator_p.bind(
         *args[: len(op_cls.dynamic_argnames)],
         *new_wires,
         op_cls=op_cls,
