@@ -691,6 +691,8 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
     resultTypes.append(qubitTypes.begin(), qubitTypes.end());
     resultTypes.append(ctrlQubitTypes.begin(), ctrlQubitTypes.end());
 
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
+
     build(odsBuilder, odsState,
           /*resultTypes=*/resultTypes,
           /*op_name=*/op_name,
@@ -704,7 +706,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/Value(),
           /*arr_ctrl_values=*/Value(),
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -717,6 +719,8 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        DictionaryAttr param_map, DictionaryAttr qubit_map)
 {
     SmallVector<Type> resultTypes = {in_qreg.getType()};
+
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
 
     build(odsBuilder, odsState,
           /*resultTypes=*/resultTypes,
@@ -731,7 +735,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/arr_ctrl_indices,
           /*arr_ctrl_values=*/arr_ctrl_values,
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
