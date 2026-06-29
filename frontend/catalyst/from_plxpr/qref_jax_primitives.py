@@ -50,6 +50,8 @@ from catalyst.jax_primitives import (
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.patching import Patcher
 
+from .uid import generate_uid
+
 with Patcher(
     (
         _ods_cext,
@@ -853,6 +855,12 @@ def _qref_operator_p_lowering(
 
     processed_qubit_map = get_mlir_attribute_from_pyval(qubit_map)
 
+    uid = (
+        generate_uid(args, op_cls, wire_lens, hybrid_lens, hybrid_trees, static_data)
+        if op_cls.hybrid_argnames or op_cls.compilable_argnames
+        else None
+    )
+
     OperatorOp(
         op_name=name_attr,
         params=params,
@@ -861,7 +869,7 @@ def _qref_operator_p_lowering(
         ctrl_qubits=ctrl_qubits,
         ctrl_values=ctrl_values,
         adjoint=adjoint,
-        UID=None,
+        UID=uid,
         arr_qubit_indices=[],
         param_map=processed_param_map,
         static_data=processed_static_data,
