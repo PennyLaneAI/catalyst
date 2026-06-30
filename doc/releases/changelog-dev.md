@@ -5,6 +5,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* `quantum.extract` canonicalization now looks through a `quantum.insert` at a distinct
+  static index, rewriting the extract to read from the register feeding the insert. This
+  removes the false data dependency between wires that act on different qubits of the same
+  register.
+  [(#2965)](https://github.com/PennyLaneAI/catalyst/pull/2965)
+
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
   with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
@@ -362,6 +368,7 @@ Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 Christina Lee,
+Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,

@@ -749,7 +749,9 @@ module @different_qreg_values{
     // CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() [[q0]] : !quantum.bit
     // CHECK: [[H_insert:%.+]] = quantum.insert [[reg]][ 0], [[H]] : !quantum.reg, !quantum.bit
-    // CHECK: [[full_insert:%.+]] = quantum.insert [[H_insert]][ 1], [[q1]] : !quantum.reg, !quantum.bit
+    // CHECK: [[q2_pre:%.+]] = quantum.extract [[reg]][ 2] : !quantum.reg -> !quantum.bit
+    // CHECK: [[insert_2:%.+]] = quantum.insert [[H_insert]][ 2], [[q2_pre]] : !quantum.reg, !quantum.bit
+    // CHECK: [[full_insert:%.+]] = quantum.insert [[insert_2]][ 1], [[q1]] : !quantum.reg, !quantum.bit
     %0 = quantum.alloc( 3) : !quantum.reg
     %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
