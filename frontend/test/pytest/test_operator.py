@@ -26,17 +26,6 @@ class DummyOp(qp.core.Operator2):
         super().__init__(wires=wires)
 
 
-def test_error_on_operator_outside_qnode():
-    """Test that an error is raised for an Operator2 outside the qnode."""
-
-    with pytest.raises(ValueError, match="must occur inside a qnode."):
-
-        @qp.qjit(capture=True, target="jaxpr")
-        def f():
-            DummyOp(2)
-            return 2
-
-
 def test_hybrid_not_supported_yet():
     """Test that hybrid arguments are not yet supported."""
 

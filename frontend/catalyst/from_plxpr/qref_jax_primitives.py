@@ -845,6 +845,7 @@ def _qref_operator_p_lowering(
         op_name=name_attr,
         params=params,
         qubits=qubits,
+        qreg=None,
         forward_args=[],
         ctrl_qubits=[],
         ctrl_values=[],

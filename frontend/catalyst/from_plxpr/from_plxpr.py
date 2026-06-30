@@ -408,12 +408,6 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     # return self.eval(final_jaxpr.jaxpr, consts, *non_const_args)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
-
-@WorkflowInterpreter.register_primitive(operator_p)
-def _error_on_operator(self, *args, op_cls, **kwargs):
-    raise ValueError(f"Operator {op_cls} must occur inside a qnode.")
-
-
 # pylint: disable=too-many-arguments
 @WorkflowInterpreter.register_primitive(transform_prim)
 def handle_transform(
