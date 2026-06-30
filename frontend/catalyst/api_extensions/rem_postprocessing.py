@@ -34,7 +34,7 @@ from jax.typing import ArrayLike
 
 def _bitstrings_for_n_qubits(n_qubits: int) -> jax.Array:
     """All ``2**n_qubits`` bitstrings in MSB-first order, shape (2**n, n_qubits)."""
-    n_states = 2 ** n_qubits
+    n_states = 2**n_qubits
     indices = jnp.arange(n_states, dtype=jnp.int32)
     bit_positions = jnp.arange(n_qubits - 1, -1, -1, dtype=jnp.int32)
     return ((indices[:, None] >> bit_positions[None, :]) & 1).astype(jnp.int32)
@@ -42,7 +42,7 @@ def _bitstrings_for_n_qubits(n_qubits: int) -> jax.Array:
 
 def _bitstring_codes(shot_result_array: jax.Array, n_qubits: int) -> jax.Array:
     """Encode each (n_qubits,) bitstring row as an MSB-first integer in [0, 2**n)."""
-    powers = (1 << jnp.arange(n_qubits - 1, -1, -1, dtype=jnp.int32))
+    powers = 1 << jnp.arange(n_qubits - 1, -1, -1, dtype=jnp.int32)
     return (shot_result_array * powers[None, :]).sum(axis=1).astype(jnp.int32)
 
 
@@ -55,7 +55,7 @@ def _count_shots_histogram(shot_result_array: jax.Array, n_qubits: int) -> jax.A
     ``2**n_qubits <= n_shots``.
     """
     codes = _bitstring_codes(shot_result_array, n_qubits)
-    one_hot = jax.nn.one_hot(codes, 2 ** n_qubits, dtype=jnp.int32)
+    one_hot = jax.nn.one_hot(codes, 2**n_qubits, dtype=jnp.int32)
     return one_hot.sum(axis=0)
 
 
@@ -71,7 +71,7 @@ def _sort_based_unique(samples: jax.Array, n_qubits: int, n_shots: int):
     ``n_shots - n_unique`` positions are zero-padded to maintain fixed tensor
     dimensions; :func:`rem_apply_to_samples` pins them to identity in the linear solve.
     """
-    powers = (1 << jnp.arange(n_qubits - 1, -1, -1, dtype=jnp.int32))
+    powers = 1 << jnp.arange(n_qubits - 1, -1, -1, dtype=jnp.int32)
     codes = (samples * powers[None, :]).sum(axis=1).astype(jnp.int32)  # (n_shots,)
 
     # Stable sort by code so equal bitstrings land in consecutive positions.
@@ -173,14 +173,13 @@ def rem_calibrate_probs(zeros_probs: jax.Array, ones_probs: jax.Array) -> jax.Ar
 
     bit_positions = jnp.arange(n_qubits, dtype=jnp.uint32)
     _, (fp, tp) = jax.lax.scan(_process_one_bit, None, bit_positions)
-    
+
     tn = total_zeros - fp
     fn = total_ones - tp
 
-    confusion_matrices = jnp.stack([
-        jnp.stack([tn, fp], axis=-1),
-        jnp.stack([fn, tp], axis=-1)
-    ], axis=1)
+    confusion_matrices = jnp.stack(
+        [jnp.stack([tn, fp], axis=-1), jnp.stack([fn, tp], axis=-1)], axis=1
+    )
     norm = jnp.sum(confusion_matrices, axis=-1, keepdims=True)
     return confusion_matrices / norm
 
@@ -207,7 +206,7 @@ def rem_apply_to_samples(
 
     Step 2 of the REM pipeline. Create a reduced transition matrix from confusion
     matrices and mitigatee measurement results, then solve the linear system to
-    obtain mitigated counts histogram. The matrix that  goes into the linear 
+    obtain mitigated counts histogram. The matrix that  goes into the linear
     solve has size ``K x K`` where ``K`` is either ``2**n_qubits`` or
     the total number of bitstrings, ``n_shots``. The Two strategies are
     wired up here and e smaller-``K`` one is chosen at trace time.
@@ -216,7 +215,7 @@ def rem_apply_to_samples(
     Returns ``(unique_bitstrings, mitigated_counts)``: in path A the
     bitstrings enumerate the full ``2**n_qubits`` state space (MSB-first);
     in path B they are the sorted ``n_shots`` rows of the mitigatee
-    sampled bitstrings, with ``mitigated_counts[i] != 0`` only for 
+    sampled bitstrings, with ``mitigated_counts[i] != 0`` only for
     first-occurrence rows (other rows are pinned to identity in the solve).
     This results in total size of ``n_shots``, where first ``n_unique_bitstrings``
     of elements have meaningful results, while the rest are zero-padded.
@@ -236,13 +235,11 @@ def rem_apply_to_samples(
     # The path that minimizes K (and thus the dominant O(K**3) solve
     # cost) is chosen.
     # ======================================================================
-    if 2 ** n_qubits <= n_shots:
+    if 2**n_qubits <= n_shots:
         unique_bitstrings = _bitstrings_for_n_qubits(n_qubits)
         user_counts = _count_shots_histogram(mitigatee_samples, n_qubits).astype(jnp.float64)
     else:
-        unique_bitstrings, raw_counts = _sort_based_unique(
-            mitigatee_samples, n_qubits, n_shots
-        )
+        unique_bitstrings, raw_counts = _sort_based_unique(mitigatee_samples, n_qubits, n_shots)
         user_counts = raw_counts.astype(jnp.float64)
 
     selected = confusion_matrices[measured_qubits]  # (n_measured, 2, 2)
@@ -274,9 +271,9 @@ def rem_apply_to_counts(
 
     Note: for CountsMP, the size is always bounded by 2 ** n, therefore
     the histogram path is always dispatched.
-    
+
     Note: The mitigated counts are returned as float64 instead of int64, due to
-    how linear solve works. Further discretization is possible, but leads to 
+    how linear solve works. Further discretization is possible, but leads to
     loss of precision.
 
     Create a transition matrix from a kronecker product of confusion
@@ -286,12 +283,14 @@ def rem_apply_to_counts(
     indices enumerate the full ``2**n_qubits`` state space.
     """
     # List comprehension runs at JAX compile time, when `n_qubits` is static and already known.
-    # this is then unrolled, just like `reduce`, no loop is present at runtime. 
-    selected = [jnp.linalg.inv(confusion_matrices[measured_qubits[i]]) for i in range(n_qubits)] # (n_measured, 2, 2)  
+    # this is then unrolled, just like `reduce`, no loop is present at runtime.
+    selected = [
+        jnp.linalg.inv(confusion_matrices[measured_qubits[i]]) for i in range(n_qubits)
+    ]  # (n_measured, 2, 2)
     inv_transition_matrix = reduce(jnp.kron, selected)
 
     # transition_probs = transition_probs / jnp.sum(transition_probs, axis=0, keepdims=True)
-    # Direct matrix-vector product to solve the system, since inverting 2x2 matrices is much faster 
+    # Direct matrix-vector product to solve the system, since inverting 2x2 matrices is much faster
     mitigated_counts = jnp.dot(inv_transition_matrix, mitigatee_counts)
     return mitigated_counts
 
@@ -315,11 +314,13 @@ def rem_apply_to_probs(
     indices enumerate the full ``2**n_qubits`` state space.
     """
     # List comprehension runs at JAX compile time, when `n_qubits` is static and already known.
-    # this is then unrolled, just like `reduce`, no loop is present at runtime. 
-    selected = [jnp.linalg.inv(confusion_matrices[measured_qubits[i]]) for i in range(n_qubits)] # (n_measured, 2, 2)  
+    # this is then unrolled, just like `reduce`, no loop is present at runtime.
+    selected = [
+        jnp.linalg.inv(confusion_matrices[measured_qubits[i]]) for i in range(n_qubits)
+    ]  # (n_measured, 2, 2)
     inv_transition_matrix = reduce(jnp.kron, selected)
 
     # transition_probs = transition_probs / jnp.sum(transition_probs, axis=0, keepdims=True)
-    # Direct matrix-vector product to solve the system, since inverting 2x2 matrices is much faster 
+    # Direct matrix-vector product to solve the system, since inverting 2x2 matrices is much faster
     mitigated_probs = jnp.dot(inv_transition_matrix, mitigatee_probs)
     return mitigated_probs

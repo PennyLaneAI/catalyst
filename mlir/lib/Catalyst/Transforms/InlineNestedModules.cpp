@@ -72,7 +72,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "Catalyst/Transforms/Patterns.h"
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Mitigation/IR/MitigationOps.h"
 
@@ -553,9 +552,9 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
             }
         }
 
-    RewritePatternSet nestedToFlat(context);
-    nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern, ZNEReplacerPattern, REMReplacerPattern>(
-            context, &old_to_new);
+        RewritePatternSet nestedToFlat(context);
+        nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern, ZNEReplacerPattern,
+                         REMReplacerPattern>(context, &old_to_new);
         run = _stopAfterStep >= 4 || _stopAfterStep == 0;
         if (run && failed(applyPatternsGreedily(symbolTable, std::move(nestedToFlat), config))) {
             signalPassFailure();

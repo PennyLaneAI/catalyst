@@ -27,8 +27,14 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.tree_util import tree_flatten
 
-from catalyst.api_extensions.rem_postprocessing import rem_apply_to_samples, rem_apply_to_counts, rem_apply_to_probs
-from catalyst.api_extensions.rem_postprocessing import rem_calibrate_samples, rem_calibrate_counts, rem_calibrate_probs
+from catalyst.api_extensions.rem_postprocessing import (
+    rem_apply_to_counts,
+    rem_apply_to_probs,
+    rem_apply_to_samples,
+    rem_calibrate_counts,
+    rem_calibrate_probs,
+    rem_calibrate_samples,
+)
 from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, rem_p, zne_p
 from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
@@ -287,13 +293,14 @@ class RemCallable(CatalystCallable):
         args_data, _ = tree_flatten(args)
 
         assert jaxpr.eqns, "expected non-empty jaxpr for rem target"
-        assert jaxpr.eqns[0].primitive in {func_p, quantum_kernel_p}, (
-            "expected func_p or quantum_kernel_p as first operation in rem target"
-        )
+        assert jaxpr.eqns[0].primitive in {
+            func_p,
+            quantum_kernel_p,
+        }, "expected func_p or quantum_kernel_p as first operation in rem target"
         callable_fn = jaxpr.eqns[0].params.get("fn", callable_fn)
-        assert callable(callable_fn), (
-            "expected callable set as param on the first operation in rem target"
-        )
+        assert callable(
+            callable_fn
+        ), "expected callable set as param on the first operation in rem target"
 
         # Identify the measurement process by walking the inner jaxpr, matching
         # the logic in `_rem_abstract_eval`.
@@ -309,9 +316,9 @@ class RemCallable(CatalystCallable):
                     break
             if mp_kind is not None:
                 break
-        assert mp_kind != None, (
-            "measurement process must be one of CountsMP, ProbsMP or SampleMP. Other measurement processes such as observables are not supported yet."
-        )
+        assert (
+            mp_kind != None
+        ), "measurement process must be one of CountsMP, ProbsMP or SampleMP. Other measurement processes such as observables are not supported yet."
         rem_results = rem_p.bind(
             *args_data,
             compute_all_zeroes_ones=self.compute_all_zeroes_ones,
@@ -325,12 +332,12 @@ class RemCallable(CatalystCallable):
             return rem_results[0]
 
         qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
-        assert qnode_obj is not None, (
-            "REM post-processing requires a QNode target"
-        )
+        assert qnode_obj is not None, "REM post-processing requires a QNode target"
         n_qubits = len(qnode_obj.device.wires)
         # print(f"the wires obj: {qnode_obj.device.wires}, {[x for x in qnode_obj.device.wires]}")
-        measured_qubits = jnp.array([x for x in qnode_obj.device.wires]) # list(range(n_qubits)) # qnode_obj.device.wires
+        measured_qubits = jnp.array(
+            [x for x in qnode_obj.device.wires]
+        )  # list(range(n_qubits)) # qnode_obj.device.wires
         if mp_kind == "sample":
 
             # quantum.sample returns f64 in catalyst; the REM helpers index

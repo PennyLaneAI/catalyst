@@ -1091,7 +1091,9 @@ def _rem_def_impl(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):  # pragma: no
 
 
 @rem_p.def_abstract_eval
-def _rem_abstract_eval(*args, compute_all_zeroes_ones, jaxpr, fn):  # pylint: disable=unused-argument
+def _rem_abstract_eval(
+    *args, compute_all_zeroes_ones, jaxpr, fn
+):  # pylint: disable=unused-argument
     """Abstract eval for the REM primitive.
 
     Returns a 3-tuple of avals matching the lowering's three results:
@@ -1100,7 +1102,7 @@ def _rem_abstract_eval(*args, compute_all_zeroes_ones, jaxpr, fn):  # pylint: di
     from the QNode's device size and the measurement-process kind on the
     inner jaxpr (probs, counts, sample).
     """
-    qnode = jaxpr.eqns[0].params['qnode']
+    qnode = jaxpr.eqns[0].params["qnode"]
     device_qubit_count = len(qnode.device.wires)
     device_shot_count = qnode.shots.total_shots
 
@@ -1139,8 +1141,6 @@ def _rem_abstract_eval(*args, compute_all_zeroes_ones, jaxpr, fn):  # pylint: di
         f"REM only supports probs, counts and sample measurement processes; got {mp!r}"
     )
 
-            
-
 
 def _rem_lowering(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):
     """Lowering function for the REM primitive.
@@ -1154,8 +1154,12 @@ def _rem_lowering(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):
     symbol_ref = get_symbolref(ctx, func_op)
     *callee_avals, zeros_aval, ones_aval = ctx.avals_out
     callee_output_types = list(map(mlir.aval_to_ir_types, callee_avals))
-    zeros_output_types = [mlir.aval_to_ir_types(zeros_aval)] # list(map(mlir.aval_to_ir_types, [ctx.avals_out[1]]))
-    ones_output_types = [mlir.aval_to_ir_types(ones_aval)] # list(map(mlir.aval_to_ir_types, [ctx.avals_out[2]]))
+    zeros_output_types = [
+        mlir.aval_to_ir_types(zeros_aval)
+    ]  # list(map(mlir.aval_to_ir_types, [ctx.avals_out[1]]))
+    ones_output_types = [
+        mlir.aval_to_ir_types(ones_aval)
+    ]  # list(map(mlir.aval_to_ir_types, [ctx.avals_out[2]]))
     flat_callee_output_types = util.flatten(callee_output_types)
     # The zeros/ones operands are non-variadic in the .td, so a single type
     # (not a list) is what the op constructor expects.
@@ -3160,10 +3164,13 @@ def subroutine_lowering(*args, **kwargs):
         retval = _pjit_lowering(*args, **kwargs)
     except NotImplementedError as e:
         if "MLIR translation rule for primitive" in str(e):
-            msg = str(e) + """
+            msg = (
+                str(e)
+                + """
                 This error sometimes occurs when using quantum operations
                 inside subroutines but calling them outside a qnode
             """
+            )
             raise NotImplementedError(msg) from e
         raise e
 
