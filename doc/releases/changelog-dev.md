@@ -15,6 +15,10 @@
 * The `ResourceAnalysis` pass now supports IR in reference semantics natively, rather than requiring a conversion step.
   [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
 
+* The `resource-analysis` pass JSON output now includes `depth` for worst-case PBC layer depth
+  (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
+  [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
+
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)

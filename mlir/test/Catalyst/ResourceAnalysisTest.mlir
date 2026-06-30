@@ -67,6 +67,9 @@ func.func @mbqc_gates() {
 // PBC operations (PPR and PPM)
 
 // CHECK-LABEL: "pbc_operations"
+// CHECK: "depth"
+// CHECK-DAG: "any_commuting_depth": 4
+// CHECK-DAG: "qubit_disjoint_depth": 4
 // CHECK:   "num_alloc_qubits": 2
 // CHECK:   "num_arg_qubits": 0
 // CHECK:   "num_qubits": 2
@@ -143,6 +146,180 @@ func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     }
 
     return %q : !quantum.bit
+}
+
+// -----
+
+// PBC ops inside a dynamic for loop: parent reports empty depth; lifted body
+// reports single-iteration depth.
+
+// CHECK-LABEL: "dyn_for_loop_1": {
+// CHECK: "depth"
+// CHECK-DAG: "any_commuting_depth": 1
+// CHECK-DAG: "qubit_disjoint_depth": 1
+// CHECK-DAG: "PPR-pi/4(1)": 1
+
+// CHECK-LABEL: "pbc_in_dyn_loop"
+// CHECK: "depth": {}
+func.func @pbc_in_dyn_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+        scf.yield %out : !quantum.bit
+    }
+
+    return %q : !quantum.bit
+}
+
+// -----
+
+// Inline PBC ops after a dynamic for loop: parent depth covers only the
+// post-loop ops; loop body depth stays in dyn_for_loop_<N>.
+
+// CHECK-LABEL: "dyn_for_loop_1": {
+// CHECK: "depth"
+// CHECK-DAG: "any_commuting_depth": 1
+// CHECK-DAG: "qubit_disjoint_depth": 1
+// CHECK-DAG: "PPR-pi/4(1)": 1
+
+// CHECK-LABEL: "pbc_in_dyn_loop_post_ppr": {
+// CHECK: "depth"
+// CHECK-DAG: "any_commuting_depth": 1
+// CHECK-DAG: "qubit_disjoint_depth": 1
+// CHECK-DAG: "PPR-pi/4(1)": 1
+// CHECK: "var_function_calls"
+// CHECK: "dyn_for_loop_1"
+func.func @pbc_in_dyn_loop_post_ppr(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+        scf.yield %out : !quantum.bit
+    }
+
+    %q3 = pbc.ppr ["X"](4) %q : !quantum.bit
+
+    return %q3 : !quantum.bit
+}
+
+// -----
+
+// CHECK: "test_independent_extract_between_pprs": 
+// CHECK:   "depth":
+// CHECK:      "any_commuting_depth": 1
+// CHECK:      "qubit_disjoint_depth": 2
+func.func public @test_independent_extract_between_pprs() {
+    %0 = quantum.alloc(4) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[2] : !quantum.reg -> !quantum.bit
+    %4:3 = pbc.ppr ["X", "X", "X"](4) %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
+    %5 = quantum.extract %0[3] : !quantum.reg -> !quantum.bit
+    %6:3 = pbc.ppr ["X", "X", "Y"](4) %4#1, %4#2, %5 : !quantum.bit, !quantum.bit, !quantum.bit
+    %7 = quantum.insert %0[0], %4#0 : !quantum.reg, !quantum.bit
+    %8 = quantum.insert %7[1], %6#0 : !quantum.reg, !quantum.bit
+    %9 = quantum.insert %8[2], %6#1 : !quantum.reg, !quantum.bit
+    %10 = quantum.insert %9[3], %6#2 : !quantum.reg, !quantum.bit
+    quantum.dealloc %10 : !quantum.reg
+    return
+}
+
+// -----
+
+// CHECK: "for_loop_1"
+// CHECK:   "depth":
+// CHECK:     "any_commuting_depth": 1
+// CHECK:     "qubit_disjoint_depth": 2
+// CHECK:   "operations":
+// CHECK:     "PPR-pi/8(1)": 2
+
+// CHECK: "for_loop_2":
+// CHECK:   "depth":
+// CHECK:     "any_commuting_depth": 1
+// CHECK:     "qubit_disjoint_depth": 1
+// CHECK:   "function_calls":
+// CHECK:     "for_loop_1": 5
+// CHECK:   "operations":
+// CHECK:     "PPR-pi/8(1)": 1
+
+// CHECK: "static_for_loop_nested":
+// CHECK:   "function_calls":
+// CHECK:     "for_loop_2": 6
+
+func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
+    %c5 = arith.constant 5 : index
+    %c6 = arith.constant 6 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    // for_loop_2
+    %q = scf.for %iter = %c0 to %c6 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+
+        // for_loop_1
+        %qp_inner = scf.for %iter_inner = %c0 to %c5 step %c1 iter_args(%arg1_qp = %arg1) -> (!quantum.bit) {
+          %qp0 = pbc.ppr ["Z"](8) %arg1_qp : !quantum.bit
+          %qp1 = pbc.ppr ["Z"](8) %qp0 : !quantum.bit
+          scf.yield %qp1 : !quantum.bit
+        }
+
+        %qp2 = pbc.ppr ["Z"](8) %qp_inner : !quantum.bit
+        scf.yield %qp2 : !quantum.bit
+    }
+
+    return
+}
+
+// -----
+
+
+// CHECK: "for_loop_1":
+// CHECK:   "depth":
+// CHECK:     "any_commuting_depth": 1
+// CHECK:     "qubit_disjoint_depth": 1
+// CHECK:   "operations": {
+// CHECK:     "PPR-pi/4(1)": 1
+
+// CHECK: "pbc_estimated_iterations_loop":
+// CHECK:  "function_calls":
+// CHECK:    "for_loop_1": 10
+
+func.func @pbc_estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
+        %out = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
+        scf.yield %out : !quantum.bit
+    } {estimated_iterations = 10 : i16}
+
+    return %q : !quantum.bit
+}
+
+// -----
+
+// PBC depth is per-function only; callers without inline PBC ops report no depth
+// even when they call a helper that contains PBC ops.
+
+// CHECK-LABEL: "depth_caller": {
+// CHECK: "depth": {}
+// CHECK: "function_calls"
+// CHECK: "depth_helper": 1
+
+// CHECK-LABEL: "depth_helper": {
+// CHECK: "depth"
+// CHECK-DAG: "any_commuting_depth": 1
+// CHECK-DAG: "qubit_disjoint_depth": 1
+func.func private @depth_helper(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = pbc.ppr ["Z"](4) %arg0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+func.func @depth_caller(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = func.call @depth_helper(%arg0) : (!quantum.bit) -> !quantum.bit
+    return %out : !quantum.bit
 }
 
 // -----
@@ -650,6 +827,9 @@ func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 // Mixed quantum and PBC ops
 
 // CHECK-LABEL: "mixed_ops"
+// CHECK: "depth"
+// CHECK-DAG: "any_commuting_depth": 1
+// CHECK-DAG: "qubit_disjoint_depth": 2
 // CHECK: "num_alloc_qubits": 2
 // CHECK: "num_arg_qubits": 0
 // CHECK: "num_qubits": 2
