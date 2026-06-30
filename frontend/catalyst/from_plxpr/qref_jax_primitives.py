@@ -29,7 +29,10 @@ from jaxlib.mlir.dialects.arith import (
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane.pytrees import unflatten
 from pennylane.wires import AbstractQubit
+
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -72,6 +75,7 @@ with Patcher(
         MeasureOp,
         MultiRZOp,
         NamedObsOp,
+        OperatorOp,
         PauliRotOp,
         PCPhaseOp,
         QubitUnitaryOp,
@@ -164,6 +168,7 @@ qref_measure_in_basis_p = Primitive("qref_measure_in_basis")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
+qref_operator_p = Primitive("qref_operator")
 
 
 #
@@ -798,6 +803,62 @@ def _qref_named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value,
     return NamedObsOp(result_type, qubit, obsId).results
 
 
+qref_operator_p.multiple_results = True
+
+
+@qref_operator_p.def_abstract_eval
+def _qref_operator_p_abstract_eval(*args, **kwargs):
+    return []
+
+
+def _qref_operator_p_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *args,
+    op_cls,
+    hybrid_lens,
+    hybrid_trees,
+    wire_lens,
+    **static_data,
+):
+    params = args[: len(op_cls.dynamic_argnames)]
+    qubits = args[len(op_cls.dynamic_argnames) :]
+
+    name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
+
+    repack_static_data = {k: unflatten(*v) for k, v in static_data.items()}
+    processed_static_data = get_mlir_attribute_from_pyval(repack_static_data)
+
+    param_map = {
+        name: ir.DenseI64ArrayAttr.get([ind]) for ind, name in enumerate(op_cls.dynamic_argnames)
+    }
+    processed_param_map = get_mlir_attribute_from_pyval(param_map)
+
+    qubit_map = {}
+    ind = 0
+    for name, size in zip(op_cls.wire_argnames, wire_lens):
+        qubit_map[name] = ir.DenseI64ArrayAttr.get(list(range(ind, ind + size)))
+        ind += size
+
+    processed_qubit_map = get_mlir_attribute_from_pyval(qubit_map)
+
+    OperatorOp(
+        op_name=name_attr,
+        params=params,
+        qubits=qubits,
+        qreg=None,
+        forward_args=[],
+        ctrl_qubits=[],
+        ctrl_values=[],
+        adjoint=False,
+        UID=None,
+        arr_qubit_indices=[],
+        param_map=processed_param_map,
+        static_data=processed_static_data,
+        qubit_map=processed_qubit_map,
+    )
+    return []
+
+
 #
 # hermitian observable
 #
@@ -821,6 +882,7 @@ def _qref_hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value
 
 
 CUSTOM_LOWERING_RULES = (
+    (qref_operator_p, _qref_operator_p_lowering),
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
     (qref_get_p, _qref_get_lowering),
