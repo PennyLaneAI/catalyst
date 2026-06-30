@@ -613,7 +613,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
     }];
 
     let arguments = (ins
-        StringProp:$op_name,
+        StrAttr:$op_name,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$forward_args,
 

@@ -118,9 +118,6 @@ def catalyst_decompose(
     # only supports qp.StatePrep and qp.BasisState. A default strategy for handling any PennyLane
     # operator of type qp.StatePrepBase will be needed before this conditional can be removed.
     skip_initial_state_prep = False
-    if len(tape) > 0 and type(tape[0]) in (qp.StatePrep, qp.BasisState):
-        if grad_method is None or not is_active(tape[0]):
-            skip_initial_state_prep = capabilities.initial_state_prep
 
     if capabilities is None:
         if grad_method is not None:
@@ -131,6 +128,10 @@ def catalyst_decompose(
         target_gates, stopping_condition = _resolve_gate_set(target_gates, None)
         decomposer = None
     else:
+        if len(tape) > 0 and type(tape[0]) in (qp.StatePrep, qp.BasisState):
+            if grad_method is None or not is_active(tape[0]):
+                skip_initial_state_prep = capabilities.initial_state_prep
+
         if target_gates is not None:
             raise ValueError(
                 "target_gates are not taken into account in catalyst_decompose if device "

@@ -12,6 +12,10 @@
   Instead, rules are removed by the `symbol-dce` pass at the end of the `QuantumCompilationStage`.
   [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
 
+* The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
+  without non-lowerable arguments.
+  [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969/)
+
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
   with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
