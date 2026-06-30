@@ -23,8 +23,11 @@ import pennylane as qp
 
 class NoParams(qp.core.Operator2):
 
-    def __init__(self, wires):
-        super().__init__(wires=wires)
+    # have to use different wire argnames or will in up CustomOp
+    wire_argnames = ("reg",)
+
+    def __init__(self, reg):
+        super().__init__(reg=reg)
 
 
 @qp.qjit(target="mlir", capture=True)
@@ -33,27 +36,51 @@ def c_no_params():
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: qref.operator "NoParams"() qubits([[q0]])
     # CHECK: static_data = {}
-    # CHECK: param_map = {} qubit_map = {wires = [0]}
-    NoParams(wires=0)
+    # CHECK: param_map = {} qubit_map = {reg = [0]}
+    NoParams(reg=0)
 
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}
     # CHECK: qref.operator "NoParams"() qubits([[q1]], [[q2]])
     # CHECK: static_data = {}
-    # CHECK: param_map = {} qubit_map = {wires = [0, 1]}
-    NoParams(wires=(0, 1))
+    # CHECK: param_map = {} qubit_map = {reg = [0, 1]}
+    NoParams(reg=(0, 1))
     return qp.state()
 
 
 print(c_no_params.mlir)
 
+class NoParamsCustomOp(qp.core.Operator2):
+
+    def __init__(self, wires):
+        super().__init__(wires=wires)
+
+
+@qp.qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("null.qubit", wires=2))
+def c_no_params_custom():
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
+    # CHECK: qref.custom "NoParamsCustomOp"() [[q0]] : !qref.bit
+    NoParamsCustomOp(wires=0)
+
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
+    # CHECK: qref.custom "NoParamsCustomOp"() [[q1]], [[q2]] : !qref.bit, !qref.bit
+    NoParamsCustomOp(wires=(0, 1))
+    return qp.state()
+
+
+print(c_no_params_custom.mlir)
+
+
 
 class SingleParam(qp.core.Operator2):
 
     dynamic_argnames = ("x",)
+    wire_argnames = ("reg",)
 
-    def __init__(self, x, wires):
-        super().__init__(x, wires=wires)
+    def __init__(self, x, reg):
+        super().__init__(x, reg=reg)
 
 
 @qp.qjit(target="mlir", capture=True)
@@ -64,20 +91,47 @@ def c_single_param(x: float):
 
     # CHECK: qref.operator "SingleParam"({{%.+}}: tensor<f64>) qubits([[q0]])
     # CHECK: static_data = {}
-    # CHECK: param_map = {x = [0]} qubit_map = {wires = [0]}
+    # CHECK: param_map = {x = [0]} qubit_map = {reg = [0]}
     SingleParam(x, 0)
 
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}
     # CHECK: qref.operator "SingleParam"({{%.+}}: tensor<4x4xf64>) qubits([[q1]], [[q2]])
     # CHECK: static_data = {}
-    # CHECK: param_map = {x = [0]} qubit_map = {wires = [0, 1]}
+    # CHECK: param_map = {x = [0]} qubit_map = {reg = [0, 1]}
     SingleParam(np.eye(4), (1, 2))
 
     return qp.state()
 
 
 print(c_single_param.mlir)
+
+
+class SingleParamCustomOp(qp.core.Operator2):
+
+    dynamic_argnames = ("x",)
+
+    def __init__(self, x, wires):
+        super().__init__(x, wires=wires)
+
+
+@qp.qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("null.qubit", wires=3))
+def c_single_param_custom(x: float):
+
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
+    # CHECK: qref.custom "SingleParamCustomOp"({{%.+}}) [[q0]] : !qref.bit
+    SingleParamCustomOp(x, 0)
+
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
+    # CHECK: qref.custom "SingleParamCustomOp"({{%.+}}) [[q1]], [[q2]] : !qref.bit, !qref.bit
+    SingleParamCustomOp(0.5, (1, 2))
+
+    return qp.state()
+
+
+print(c_single_param_custom.mlir)
 
 
 class CompilableData(qp.core.Operator2):
@@ -134,10 +188,11 @@ print(c_multiple_registers.mlir)
 class MultiParams(qp.core.Operator2):
 
     dynamic_argnames = ("a", "b", "c")
+    wire_argnames = ("reg", )
 
     # note also having non-standard order with dynamic inputs after wires
-    def __init__(self, wires, a, b, c):
-        super().__init__(wires, a, b, c)
+    def __init__(self, reg, a, b, c):
+        super().__init__(reg, a, b, c)
 
 
 @qp.qjit(capture=True, target="mlir")
@@ -148,9 +203,51 @@ def c_multi_params():
     # pylint: disable=line-too-long
     # CHECK: qref.operator "MultiParams"({{%.+}}: tensor<f64>, {{%.+}}: tensor<4x2x1xf64>, {{%.+}}: tensor<3xi64>) qubits([[q0]])
     # CHECK: static_data = {}
-    # CHECK: param_map = {a = [0], b = [1], c = [2]} qubit_map = {wires = [0]}
+    # CHECK: param_map = {a = [0], b = [1], c = [2]} qubit_map = {reg = [0]}
     MultiParams(0, 0.5, c=np.array([1, 2, 3]), b=np.zeros((4, 2, 1)))
     return qp.state()
 
 
 print(c_multi_params.mlir)
+
+class MultiParamsCustom(qp.core.Operator2):
+
+    dynamic_argnames = ("a", "b", "c")
+
+    # note also having non-standard order with dynamic inputs after wires
+    def __init__(self, wires, a, b, c):
+        super().__init__(wires, a, b, c)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=1))
+def c_multi_param_custom():
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
+
+    # pylint: disable=line-too-long
+    # CHECK: qref.custom "MultiParamsCustom"({{%.+}}, {{%.+}}, {{%.+}}) [[q0]] : !qref.bit
+    MultiParamsCustom(0, 0.5, c=0.7, b=2.4)
+    return qp.state()
+
+
+print(c_multi_param_custom.mlir)
+
+class MultiRZ(qp.core.Operator2):
+
+    dynamic_argnames = ("phi",)
+
+    def __init__(self, phi, wires):
+        super().__init__(phi, wires)
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device('null.qubit', wires=2))
+def c(x: float):
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
+
+    # CHECK: qref.multirz({{%.+}}) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
+    MultiRZ(x, (0,1,2))
+    return qp.state()
+
+print(c.mlir)
