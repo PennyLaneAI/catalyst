@@ -27,7 +27,6 @@ import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.primitives import transform_prim
-from pennylane.core.operator.operator2 import operator_p
 from pennylane.transforms import decompose as pl_decompose
 
 from catalyst.device import extract_backend_info
@@ -407,6 +406,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     # final_jaxpr = jax.make_jaxpr(gds_wrapper)(*args)
     # return self.eval(final_jaxpr.jaxpr, consts, *non_const_args)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
+
 
 # pylint: disable=too-many-arguments
 @WorkflowInterpreter.register_primitive(transform_prim)
