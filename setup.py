@@ -331,13 +331,13 @@ class CustomBuildExtMacos(UnifiedBuildExt):
         build_path = glob.glob(os.path.join("build", "**", library_name), recursive=True)
         lib_with_r_path = "@rpath/libcustom_calls.so"
 
-        original_path = frontend_path[0] if frontend_path else build_path[0]
-
         # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
-        subprocess.run(
-            ["/usr/bin/install_name_tool", "-id", lib_with_r_path, original_path],
-            check=False,
-        )
+        for path in (build_path, frontend_path):
+            if path:
+                subprocess.run(
+                    ["/usr/bin/install_name_tool", "-id", lib_with_r_path, path[0]],
+                    check=False,
+                )
 
 
 Py_LIMITED_API_macros = [("Py_LIMITED_API", "0x030C0000")]
