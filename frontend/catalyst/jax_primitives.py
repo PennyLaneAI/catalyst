@@ -1154,12 +1154,8 @@ def _rem_lowering(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):
     symbol_ref = get_symbolref(ctx, func_op)
     *callee_avals, zeros_aval, ones_aval = ctx.avals_out
     callee_output_types = list(map(mlir.aval_to_ir_types, callee_avals))
-    zeros_output_types = [
-        mlir.aval_to_ir_types(zeros_aval)
-    ]  # list(map(mlir.aval_to_ir_types, [ctx.avals_out[1]]))
-    ones_output_types = [
-        mlir.aval_to_ir_types(ones_aval)
-    ]  # list(map(mlir.aval_to_ir_types, [ctx.avals_out[2]]))
+    zeros_output_types = [mlir.aval_to_ir_types(zeros_aval)]
+    ones_output_types = [mlir.aval_to_ir_types(ones_aval)]
     flat_callee_output_types = util.flatten(callee_output_types)
     # The zeros/ones operands are non-variadic in the .td, so a single type
     # (not a list) is what the op constructor expects.

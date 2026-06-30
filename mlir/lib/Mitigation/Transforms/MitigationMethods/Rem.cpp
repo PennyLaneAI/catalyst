@@ -130,8 +130,6 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
             llvm::errs() << "[mitigation.rem] Dynamic number of shots not supported currently.\n";
             return failure();
         }
-
-        // SmallVector<double> zeros_vec(bitspaceShape, 0.0); //initialize with zeroes
     }
     else {
         llvm::errs() << "[mitigation.rem] Supported measurement processes are quantum.counts, "
@@ -206,9 +204,6 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     // ===BEGIN ZEROES QFUNC===
     // 1. Add device creation and allocation (quantum.device and quantum.alloc with previously
     // determined attributes)
-    llvm::dbgs() << "[mitigation.rem] doCalibration == true, start adding all-zeroes and all-ones "
-                    "circuits..."
-                 << "\n";
     Operation *shotsLocal = shots->clone(); // not sure why this is needed
     rewriter.insert(shotsLocal);            // not sure why this is needed
     auto devInit =
@@ -218,7 +213,6 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     // quantum.alloc works
     IntegerAttr qubitCountAttr = rewriter.getI64IntegerAttr(qubitCount);
     Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, qubitCountAttr);
-    // IntegerAttr intAttr{};
     llvm::dbgs() << "[mitigation.rem] quantum.device initialization OK, op=" << devInit << "\n";
     auto qreg = rewriter.create<quantum::AllocOp>(loc, qregType, numberQubitsValue, qubitCountAttr);
     llvm::dbgs() << "[mitigation.rem] quantum.alloc addition OK, op=" << qreg << "\n";
@@ -242,8 +236,6 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     llvm::dbgs() << "[mitigation.rem] quantum.compbasis addition OK, op=" << compbasis << "\n";
     // 3. Add quantum.probs op from result of compbasis and get Value of tensor
     // Probs returns a tensor of size 2^nqubits; build the appropriate RankedTensorType
-    // const int64_t bitspaceShape = 2 << (qubitCount - 1);
-    // auto probsTensorTy = RankedTensorType::get({bitspaceShape}, rewriter.getF64Type());
     // Be explicit about the builder overload to avoid overload-resolution
     // ambiguity that can lead to incorrect operandSegmentSizes being set.
     // Use the TypeRange overload so the result type is unambiguous and the
@@ -270,17 +262,13 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
                                                    // (eigvals not used for calibration matrices)
     }
     else if (MPName == "quantum.sample"s) {
-        // auto tensorTyFloat = RankedTensorType::get({shotCount, qubitCount},
-        // rewriter.getF64Type());
         insertedMP = rewriter.create<quantum::SampleOp>(
-            loc, TypeRange{tensorTyF64}, compbasis.getResult(), ValueRange{},
-            Value()); // (loc, TypeRange{tensorTy}, compbasis.getResult(), Value(), Value());
+            loc, TypeRange{tensorTyF64}, compbasis.getResult(), ValueRange{}, Value());
         llvm::dbgs() << "[mitigation.rem] quantum.sample addition OK, op=" << insertedMP << "\n";
         IRMapping postprocMapping;
         uint64_t resultIndex = 0;
         for (auto res : measurementProcess->getResults())
             postprocMapping.map(res, insertedMP->getResult(resultIndex++));
-        // OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointAfter(insertedMP.getOperation());
         calibratedZeroResult = insertedMP->getResults();
         for (auto postprocOp = measurementProcess->getNextNode();
@@ -295,7 +283,6 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
             rewriter.setInsertionPointAfter(insertedOp);
             llvm::dbgs() << "[mitigation.rem] insertedOp: " << insertedOp->getName().getIdentifier()
                          << "\n";
-            // loc = insertedOp->getLoc();
         }
     }
     // MPName is already guaranteed to be a valid value, so no else block here.
@@ -367,18 +354,14 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
                                                   // not used for calibration matrices)
     }
     else if ((MPName == "quantum.sample"s)) {
-        // auto tensorTyFloat = RankedTensorType::get({shotCount, qubitCount},
-        // rewriter.getF64Type());
         insertedMPOnes = rewriter.create<quantum::SampleOp>(
-            loc, TypeRange{tensorTyF64}, compbasisOnes.getResult(), ValueRange{},
-            Value()); // (loc, TypeRange{tensorTy}, compbasis.getResult(), Value(), Value());
+            loc, TypeRange{tensorTyF64}, compbasisOnes.getResult(), ValueRange{}, Value());
         llvm::dbgs() << "[mitigation.rem] quantum.sample addition OK, op=" << insertedMPOnes
                      << "\n";
         IRMapping postprocMapping;
         uint64_t resultIndex = 0;
         for (auto res : measurementProcess->getResults())
             postprocMapping.map(res, insertedMPOnes->getResult(resultIndex++));
-        // OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointAfter(insertedMPOnes.getOperation());
         calibratedOnesResult = insertedMPOnes->getResults();
         for (auto postprocOp = measurementProcess->getNextNode();
@@ -391,7 +374,6 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
             if (!insertedOp->getResults().empty())
                 calibratedOnesResult = insertedOp->getResults();
             rewriter.setInsertionPointAfter(insertedOp);
-            // loc = insertedOp->getLoc();
             llvm::dbgs() << "[mitigation.rem] insertedOp: " << insertedOp->getName().getIdentifier()
                          << "\n";
         }
@@ -402,14 +384,6 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     auto deinitOnes = rewriter.create<quantum::DeviceReleaseOp>(loc);
     llvm::dbgs() << "[mitigation.rem] quantum.deinit (ones) addition OK, op=" << deinitOnes << "\n";
     // ===END ONES QFUNC===
-    // If I'll ever need to create integer constants later, this is how it's done:
-    // TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-    // Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
-
-    // placeholder fallback: return 3 groups (callee, zeros, ones) by
-    // replicating the call results. Each returned Value is an SSA use of
-    // the same tensor produced by the callee; this yields three separate
-    // results in the caller, each referencing the same underlying tensor.
 
     // 1) original callee results
     for (Value v : results)
@@ -421,99 +395,6 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
 
     rewriter.replaceOp(op, completeResults);
     return success();
-
-    // // Determine device qubit count if present on the op. This controls the
-    // // size of the probability vector returned by the calibration circuits
-    // // (2^n_qubits). If absent, fallback to a single-element tensor used
-    // // during iterative development.
-    // int64_t nqubits = 0;
-    // if (auto attr = op->getAttrOfType<IntegerAttr>("deviceNumQubits")) {
-    //     nqubits = attr.getInt();
-    // }
-    // size_t probSize = 1;
-    // if (nqubits > 0) {
-    //     // cap shifts to avoid UB for large n
-    //     if (nqubits < 63)
-    //         probSize = (size_t)1 << static_cast<size_t>(nqubits);
-    //     else
-    //         probSize = 1; // fallback
-    // }
-
-    // // Helper to get or create a simple calibration function that returns
-    // // tensor<probSize x f64> with a constant one-hot vector. The function
-    // // is inserted into the parent module.
-    // auto getOrCreateCalib = [&](StringRef suffix, size_t size, double constPos) -> func::FuncOp {
-    //     auto module = op->getParentOfType<ModuleOp>();
-    //     assert(module && "rem op must be inside a module");
-    //     std::string name = (calleeOp.getName().str() + ".rem_calib_") + suffix.str();
-
-    //     // If function already exists, return it.
-    //     if (auto existing = module.lookupSymbol<func::FuncOp>(name))
-    //         return existing;
-
-    //     // Create function type: () -> tensor<size x f64>
-    //     auto f64 = rewriter.getF64Type();
-    //     auto tensorTy = RankedTensorType::get({static_cast<int64_t>(size)}, f64);
-    //     auto fnType = FunctionType::get(rewriter.getContext(), /*inputs=*/{},
-    //     /*results=*/{tensorTy});
-
-    //     OpBuilder::InsertionGuard guard(rewriter);
-    // // Insert the new function at the start of the module body
-    // rewriter.setInsertionPointToStart(module.getBody());
-    // auto func = rewriter.create<func::FuncOp>(loc, name, fnType);
-    //     // Add an entry block
-    //     auto *block = func.addEntryBlock();
-
-    //     // Create a dense constant vector with a single 1.0 in the requested
-    //     // position (constPos interpreted as index position) and zeros elsewhere.
-    //     SmallVector<double> elems(size, 0.0);
-    //     size_t pos = 0;
-    //     if (size > 0) {
-    //         if (constPos <= 0.0)
-    //             pos = 0;
-    //         else
-    //             pos = static_cast<size_t>(constPos) < size ? static_cast<size_t>(constPos) : size
-    //             - 1;
-    //     }
-    //     elems[pos] = 1.0;
-    //     auto attr = DenseElementsAttr::get(tensorTy, rewriter.getF64ArrayAttr(elems));
-    //     rewriter.setInsertionPointToStart(block);
-    //     auto cst = rewriter.create<arith::ConstantOp>(loc, tensorTy, attr);
-    //     Value constValRes = cst.getResult();
-    //     rewriter.create<func::ReturnOp>(loc, constValRes);
-    //     return func;
-    // };
-
-    // // Create/get calibration functions
-    // func::FuncOp allZeros = getOrCreateCalib("all_zeroes", 0.0);
-    // func::FuncOp allOnes = getOrCreateCalib("all_ones", 1.0);
-
-    // // Call the calibration functions
-    // auto callZeros = rewriter.create<func::CallOp>(loc, allZeros, ArrayRef<Value>{});
-    // auto callOnes = rewriter.create<func::CallOp>(loc, allOnes, ArrayRef<Value>{});
-
-    // // Aggregate results: original callee results followed by zeros and ones results
-    // SmallVector<Value> results;
-    // for (auto r : originalCall.getResults())
-    //     results.push_back(r);
-    // for (auto r : callZeros.getResults())
-    //     results.push_back(r);
-    // for (auto r : callOnes.getResults())
-    //     results.push_back(r);
-
-    // // Decide whether to emit calibration circuits based on the attribute.
-    // // If the frontend requested no calibration runs, simply forward the
-    // // callee results (preserving the previous behavior).
-    // bool doCalib = false;
-    // if (computeAllZeroesOnes) {
-    //     // computeAllZeroesOnes is a BoolAttr; retrieve its value if present.
-    //     doCalib = computeAllZeroesOnes.getValue();
-    // }
-
-    // // Otherwise, we will produce callee results + two calibration results.
-    // // Replace the operation with the full set of produced values.
-    // rewriter.replaceOp(op, results);
-    // return success();
 }
 
 void populateRemLoweringPatterns(RewritePatternSet &patterns)

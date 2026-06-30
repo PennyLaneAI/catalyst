@@ -334,10 +334,7 @@ class RemCallable(CatalystCallable):
         qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
         assert qnode_obj is not None, "REM post-processing requires a QNode target"
         n_qubits = len(qnode_obj.device.wires)
-        # print(f"the wires obj: {qnode_obj.device.wires}, {[x for x in qnode_obj.device.wires]}")
-        measured_qubits = jnp.array(
-            [x for x in qnode_obj.device.wires]
-        )  # list(range(n_qubits)) # qnode_obj.device.wires
+        measured_qubits = jnp.array([x for x in qnode_obj.device.wires])
         if mp_kind == "sample":
 
             # quantum.sample returns f64 in catalyst; the REM helpers index
@@ -345,7 +342,6 @@ class RemCallable(CatalystCallable):
             mitigatee_samples = rem_results[0].astype(jnp.int32)
             zeros_samples = rem_results[1].astype(jnp.int32)
             ones_samples = rem_results[2].astype(jnp.int32)
-            # measured_qubits = jnp.arange(n_qubits, dtype=jnp.int32)
 
             confusion_matrices = rem_calibrate_samples(zeros_samples, ones_samples)
             unique_bitstrings, mitigated_counts = rem_apply_to_samples(
@@ -359,13 +355,10 @@ class RemCallable(CatalystCallable):
             mitigatee_counts = rem_results[1]
             zeros_counts = rem_results[2]
             ones_counts = rem_results[3]
-            # jax.debug.print("I'm before rem_calibrate_counts")
             confusion_matrices = rem_calibrate_counts(zeros_counts, ones_counts)
-            # jax.debug.print("I'm after rem_calibrate_counts")
             mitigated_counts = rem_apply_to_counts(
                 mitigatee_counts, confusion_matrices, measured_qubits, n_qubits
             )
-            print(f"Done with RemCallable, returning: {mitigatee_eigvals, mitigated_counts}")
             return (mitigatee_eigvals, mitigated_counts)
 
         elif mp_kind == "probs":

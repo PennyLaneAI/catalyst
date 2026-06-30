@@ -92,7 +92,7 @@ def test_counts(n_qubits):
 @pytest.mark.parametrize("n_qubits", [1, 2, 11])
 def test_sample(n_qubits):
     """Mitigated sample histogram on a noiseless GHZ state must match the analytic distribution.
-    
+
     Note that for `n_qubits == 11`, 2^n_qubits > shots (2000), which covers the shot-count bounded
     codepath for transition matrix generation.
     """
