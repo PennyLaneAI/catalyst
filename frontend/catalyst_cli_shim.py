@@ -37,7 +37,9 @@ def _get_cli_path() -> str:
     spec = importlib.util.find_spec("catalyst")
     if spec is None or spec.origin is None:
         raise ImportError(
-            "Could not locate the 'catalyst' package, please make sure it is installed."
+            "Could not locate the 'catalyst' package, please make sure it is installed. "
+            "Refer to https://docs.pennylane.ai/projects/catalyst/en/stable/dev/installation.html "
+            "for additional instructions."
         )
     catalyst_path = os.path.dirname(spec.origin)
 
