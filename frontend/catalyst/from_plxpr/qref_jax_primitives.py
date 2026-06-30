@@ -811,6 +811,14 @@ def _qref_operator_p_abstract_eval(*args, **kwargs):
     return []
 
 
+def _is_custom_op(op_cls, params):
+    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
+        return False
+    if op_cls.wire_argnames != ("wires",):
+        return False
+    return all(p.shape == () and "float" in p.dtype.name for p in params)
+
+
 def _qref_operator_p_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *args,
@@ -823,7 +831,15 @@ def _qref_operator_p_lowering(
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     if op_cls.__name__ in _SPECIAL_LOWERINGS:
-        return _SPECIAL_LOWERINGS[op_cls.__name__](jax_ctx, *args, op_cls=op_cls, hybrid_lens=hybrid_lens, hybrid_trees=hybrid_trees, wire_lens=wire_lens, **static_data)
+        return _SPECIAL_LOWERINGS[op_cls.__name__](
+            jax_ctx,
+            *args,
+            op_cls=op_cls,
+            hybrid_lens=hybrid_lens,
+            hybrid_trees=hybrid_trees,
+            wire_lens=wire_lens,
+            **static_data,
+        )
     params = args[: len(op_cls.dynamic_argnames)]
     qubits = args[len(op_cls.dynamic_argnames) :]
 
@@ -860,31 +876,34 @@ def _qref_operator_p_lowering(
             adjoint=adjoint,
         )
     else:
-      OperatorOp(
-          op_name=name_attr,
-          params=params,
-          qubits=qubits,
-          qreg=None,
-          forward_args=[],
-          ctrl_qubits=[],
-          ctrl_values=[],
-          adjoint=False,
-          UID=None,
-          arr_qubit_indices=[],
-          param_map=processed_param_map,
-          static_data=processed_static_data,
-          qubit_map=processed_qubit_map,
-      )
+        OperatorOp(
+            op_name=name_attr,
+            params=params,
+            qubits=qubits,
+            qreg=None,
+            forward_args=[],
+            ctrl_qubits=[],
+            ctrl_values=[],
+            adjoint=False,
+            UID=None,
+            arr_qubit_indices=[],
+            param_map=processed_param_map,
+            static_data=processed_static_data,
+            qubit_map=processed_qubit_map,
+        )
     return []
 
 
 _SPECIAL_LOWERINGS = {}
 
+
 def _register_special_lowering(op_name):
     def decorator(f):
         _SPECIAL_LOWERINGS[op_name] = f
         return f
+
     return decorator
+
 
 @_register_special_lowering("MultiRZ")
 def _multirz_lowering(
@@ -893,10 +912,10 @@ def _multirz_lowering(
     op_cls,
     hybrid_lens,
     hybrid_trees,
-    wire_lens,
+    wire_lens
 ):
-    theta=extract_scalar(safe_cast_to_f64(args[0], "MultiRZ"), "MultiRZ"),
-    qubits=args[1:]
+    theta = (extract_scalar(safe_cast_to_f64(args[0], "MultiRZ"), "MultiRZ"),)
+    qubits = args[1:]
     MultiRZOp(
         theta=theta,
         qubits=qubits,
@@ -926,6 +945,7 @@ def _pcphase_lowering(
         adjoint=False,
     )
     return ()
+
 
 @_register_special_lowering("GlobalPhase")
 def _special_gphase_lowering(
@@ -1000,6 +1020,7 @@ def _special_unitary_lowering(
 
     return ()
 
+
 @_register_special_lowering("PauliRot")
 def _special_paulirot_lowering(
     jax_ctx: mlir.LoweringRuleContext,
@@ -1040,6 +1061,7 @@ def _special_paulirot_lowering(
     )
 
     return ()
+
 
 #
 # hermitian observable
