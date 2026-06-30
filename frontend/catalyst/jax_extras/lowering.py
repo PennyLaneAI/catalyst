@@ -202,6 +202,9 @@ def get_mlir_attribute_from_pyval(value):
 
     attr = None
     match value:
+        case ir.Attribute():
+            attr = value
+
         case bool():
             attr = ir.BoolAttr.get(value)
 
