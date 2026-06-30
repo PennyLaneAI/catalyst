@@ -70,6 +70,7 @@ def _register_special_lowering(op_name):
 
     return decorator
 
+
 qref_operator_p = Primitive("qref_operator")
 qref_operator_p.multiple_results = True
 
@@ -84,29 +85,63 @@ def _is_custom_op(op_cls, params):
         return False
     if op_cls.wire_argnames != ("wires",):
         return False
-    return all(p.shape == () and "float" in p.dtype.name for p in params)
+
+    for p in params:
+        baseType = ir.RankedTensorType(p.type).element_type
+        if ir.ComplexType.isinstance(baseType) or (
+            ir.FloatType.isinstance(baseType) and ir.FloatType(baseType).width > 64
+        ):
+            return False
+        shape = ir.RankedTensorType(p.type).shape
+        if shape not in ([], [1]):
+            return False
+
+    return True
 
 
 def _qref_operator_p_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *args,
     op_cls,
+    hybrid_lens,
+    hybrid_trees,
+    wire_lens,
+    adjoint,
+    n_ctrls,
     **kwargs,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
+    assert (
+        len(hybrid_lens) == 0 and len(hybrid_trees) == 0
+    ), "Hybrid arguments are not supported yet."
+
+    if n_ctrls:
+        ctrl_qubits = args[-2 * n_ctrls : -n_ctrls]
+        ctrl_values = [
+            TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result for v in args[-n_ctrls:]
+        ]
+        qubits_slice = slice(len(op_cls.dynamic_argnames), -2 * n_ctrls)
+    else:
+        ctrl_qubits = ctrl_values = ()
+        qubits_slice = slice(len(op_cls.dynamic_argnames), None)
+
+    params = args[: len(op_cls.dynamic_argnames)]
+    qubits = args[qubits_slice]
+
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "qref"
+        assert ir.OpaqueType(q.type).data == "bit"
+
     if op_cls.__name__ in _SPECIAL_LOWERINGS:
         return _SPECIAL_LOWERINGS[op_cls.__name__](
-            jax_ctx,
             *args,
-            op_cls=op_cls,
-            **kwargs
+            adjoint=adjoint,
+            ctrl_qubits=ctrl_qubits,
+            ctrl_values=ctrl_values,
+            **kwargs,
         )
-    hybrid_lens = kwargs.pop("hybrid_lens")
-    hybrid_trees = kwargs.pop("hybrid_trees")
-    wire_lens = kwargs.pop("wire_lens")
-    params = args[: len(op_cls.dynamic_argnames)]
-    qubits = args[len(op_cls.dynamic_argnames) :]
 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
 
@@ -126,20 +161,24 @@ def _qref_operator_p_lowering(
 
     processed_qubit_map = get_mlir_attribute_from_pyval(qubit_map)
 
-    ctrl_qubits = []
-    ctrl_values = []
-    adjoint = False
-
     if _is_custom_op(op_cls, params):
-        params = [extract_scalar(safe_cast_to_f64(p, op_cls), op_cls) for p in params]
+        new_params = []
+        for p in params:
+            new_p = extract_scalar(safe_cast_to_f64(p, op_cls), op_cls)
+            assert ir.F64Type.isinstance(
+                new_p.type
+            ), "Only scalar double parameters are allowed for quantum gates!"
+            new_params.append(new_p)
+
         CustomOp(
-            params=params,
+            params=new_params,
             qubits=qubits,
             gate_name=name_attr,
             ctrl_qubits=ctrl_qubits,
             ctrl_values=ctrl_values,
             adjoint=adjoint,
         )
+
     else:
         OperatorOp(
             op_name=name_attr,
@@ -147,9 +186,9 @@ def _qref_operator_p_lowering(
             qubits=qubits,
             qreg=None,
             forward_args=[],
-            ctrl_qubits=[],
-            ctrl_values=[],
-            adjoint=False,
+            ctrl_qubits=ctrl_qubits,
+            ctrl_values=ctrl_values,
+            adjoint=adjoint,
             UID=None,
             arr_qubit_indices=[],
             param_map=processed_param_map,
@@ -159,86 +198,57 @@ def _qref_operator_p_lowering(
     return []
 
 
-
-
 @_register_special_lowering("MultiRZ")
-def _multirz_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *args,
-    op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens
-):
-    theta = (extract_scalar(safe_cast_to_f64(args[0], "MultiRZ"), "MultiRZ"),)
-    qubits = args[1:]
+def _multirz_lowering(theta, *qubits, adjoint, ctrl_qubits, ctrl_values):
+    theta = extract_scalar(safe_cast_to_f64(theta, "MultiRZ"), "MultiRZ")
+    assert ir.F64Type.isinstance(
+        theta.type
+    ), "Only scalar double parameters are allowed for MultiRZ!"
+
     MultiRZOp(
         theta=theta,
         qubits=qubits,
-        ctrl_qubits=[],
-        ctrl_values=[],
-        adjoint=False,
+        ctrl_qubits=ctrl_qubits,
+        ctrl_values=ctrl_values,
+        adjoint=adjoint,
     )
     return []
 
 
 @_register_special_lowering("PCPhase")
-def _pcphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *args,
-    op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens,
-):
-    qubits = args[2:]
+def _pcphase_lowering(theta, dim, *qubits, adjoint, ctrl_qubits, ctrl_values):
+    theta = extract_scalar(safe_cast_to_f64(theta, "PCPhase"), "PCPhase")
+    dim = extract_scalar(safe_cast_to_f64(dim, "PCPhase"), "PCPhase")
+
+    assert ir.F64Type.isinstance(
+        theta.type
+    ), "Only scalar double parameters are allowed for PCPhase!"
+    assert ir.F64Type.isinstance(dim.type), "Only scalar double parameters are allowed for PCPhase!"
+
     PCPhaseOp(
-        theta=extract_scalar(safe_cast_to_f64(args[0], "PCPhase"), "PCPhase"),
-        dim=extract_scalar(safe_cast_to_f64(args[0], "PCPhase"), "PCPhase"),
+        theta=theta,
+        dim=dim,
         qubits=qubits,
-        ctrl_qubits=[],
-        ctrl_values=[],
-        adjoint=False,
+        ctrl_qubits=ctrl_qubits,
+        ctrl_values=ctrl_values,
+        adjoint=adjoint,
     )
     return ()
 
 
 @_register_special_lowering("GlobalPhase")
-def _special_gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *args,
-    op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens,
-):
-    GlobalPhaseOp(
-        angle=extract_scalar(safe_cast_to_f64(args[0], "GlobalPhase"), "GlobalPhase"),
-        ctrl_qubits=[],
-        ctrl_values=[],
-        adjoint=False,
-    )
+def _gphase_lowering(*args, adjoint, ctrl_qubits, ctrl_values):
+    angle = extract_scalar(safe_cast_to_f64(args[0], "GlobalPhase"), "GlobalPhase")
+    assert ir.F64Type.isinstance(
+        angle.type
+    ), "Only scalar double parameters are allowed for GlobalPhase!"
+
+    GlobalPhaseOp(angle=angle, ctrl_qubits=ctrl_qubits, ctrl_values=ctrl_values, adjoint=adjoint)
     return ()
 
 
 @_register_special_lowering("QubitUnitary")
-def _special_unitary_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    matrix,
-    *qubits,
-    op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens,
-):
-    ctrl_qubits = []
-    ctrl_values = []
-
-    for q in qubits:
-        assert ir.OpaqueType.isinstance(q.type)
-        assert ir.OpaqueType(q.type).dialect_namespace == "qref"
-        assert ir.OpaqueType(q.type).data == "bit"
-
+def _qubit_unitary_lowering(matrix, *qubits, adjoint, ctrl_qubits, ctrl_values):
     matrix_type = matrix.type
     is_tensor = ir.RankedTensorType.isinstance(matrix_type)
     shape = ir.RankedTensorType(matrix_type).shape if is_tensor else None
@@ -262,58 +272,44 @@ def _special_unitary_lowering(
         tensor_complex_f64_type = ir.RankedTensorType.get(shape, complex_f64_type)
         matrix = StableHLOConvertOp(tensor_complex_f64_type, matrix).result
 
-    ctrl_values_i1 = [
-        TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result for v in ctrl_values
-    ]
-
     QubitUnitaryOp(
         matrix=matrix,
         qubits=qubits,
         ctrl_qubits=ctrl_qubits,
-        ctrl_values=ctrl_values_i1,
-        adjoint=False,
+        ctrl_values=ctrl_values,
+        adjoint=adjoint,
     )
 
     return ()
 
 
 @_register_special_lowering("PauliRot")
-def _special_paulirot_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    angle,
-    *qubits,
-    op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens,
-    pauli_word,
-):
+def _paulirot_lowering(angle, *qubits, adjoint, ctrl_qubits, ctrl_values, pauli_word=None):
+    assert pauli_word is not None
     pauli_word = unflatten(*pauli_word)
-    ctrl_qubits = []
-    ctrl_values = []
+    if not all(p in ["I", "X", "Y", "Z"] for p in pauli_word):
+        raise ValueError("Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.")
 
     for q in qubits:
         assert ir.OpaqueType.isinstance(q.type)
         assert ir.OpaqueType(q.type).dialect_namespace == "qref"
         assert ir.OpaqueType(q.type).data == "bit"
 
-    angle = safe_cast_to_f64(angle, "PauliRot")
-    angle = extract_scalar(angle, "PauliRot")
-    assert ir.F64Type.isinstance(angle.type)
+    angle = extract_scalar(safe_cast_to_f64(angle, "PauliRot"), "PauliRot")
+    assert ir.F64Type.isinstance(
+        angle.type
+    ), "Only scalar double parameters are allowed for PauliRot!"
 
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
-
-    ctrl_values_i1 = [
-        TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result for v in ctrl_values
-    ]
 
     PauliRotOp(
         angle=angle,
         pauli_product=pauli_word,
         qubits=qubits,
         ctrl_qubits=ctrl_qubits,
-        ctrl_values=ctrl_values_i1,
-        adjoint=False,
+        ctrl_values=ctrl_values,
+        adjoint=adjoint,
     )
 
+    return ()
     return ()
