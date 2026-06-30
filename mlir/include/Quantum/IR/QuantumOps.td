@@ -735,15 +735,24 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
             return "paulirot" + getPauliWord();
         }
 
+        std::string getOpName() {
+            return "paulirot";
+        }
+
         mlir::TypeRange getDynamicShape() {
             return getAllParams().getTypes();
         }
 
         mlir::DictionaryAttr getStaticData() {
             mlir::MLIRContext *ctx = getContext();
-            mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(mlir::StringAttr::get(ctx, "pauli_word"), getPauliProduct());
+            mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
             return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
         }
+
+        size_t getNumWires() {
+            return getNonCtrlQubitOperands().size();
+        }
+
     }];
 
     let hasVerifier = 1;

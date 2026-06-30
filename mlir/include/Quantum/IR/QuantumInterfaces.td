@@ -196,7 +196,13 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "mlir::DictionaryAttr", "getStaticData"
         >,
         InterfaceMethod<
-            "Return the operation name.", "std::string", "getDecompId"
+            "Return the operations ID for use with the graph.", "std::string", "getDecompId"
+        >,
+        InterfaceMethod<
+            "Return the name of the operation.", "std::string", "getOpName"
+        >,
+        InterfaceMethod<
+            "Return the number of wires the operation acts on.", "size_t", "getNumWires"
         >
     ];
 }
