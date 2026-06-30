@@ -76,6 +76,7 @@ with Patcher(
         CallbackCallOp,
         CallbackOp,
         PrintOp,
+        EstimationArrayOp,
     )
     from mlir_quantum.dialects.gradient import (
         CustomGradOp,
@@ -3065,8 +3066,23 @@ def subroutine_lowering(*args, **kwargs):
 
     return retval
 
+def estimation_array(shape, dtype):
+    return estimation_array_p.bind(shape=shape, dtype=dtype)
+
+estimation_array_p = jax.extend.core.Primitive("estimation_array")
+
+@estimation_array_p.def_abstract_eval
+def _estimation_array_abstract_eval(*, shape, dtype):
+    return jax.core.ShapedArray(shape, dtype)
+    
+def _estimation_array_lowering(ctx, *, shape, dtype):
+    result_types = [mlir.aval_to_ir_types(a)[0] for a in ctx.avals_out]
+    return EstimationArrayOp(result_types[0]).results
+
+
 
 CUSTOM_LOWERING_RULES = (
+    (estimation_array_p, _estimation_array_lowering),
     (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
     (device_release_p, _device_release_lowering),
