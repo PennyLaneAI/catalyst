@@ -168,7 +168,7 @@ qref_measure_in_basis_p = Primitive("qref_measure_in_basis")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
-qref_operator_op = Primitive("qref_operator")
+qref_operator_p = Primitive("qref_operator")
 
 
 #
@@ -803,23 +803,15 @@ def _qref_named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value,
     return NamedObsOp(result_type, qubit, obsId).results
 
 
-qref_operator_op.multiple_results = True
+qref_operator_p.multiple_results = True
 
 
-@qref_operator_op.def_abstract_eval
-def _qref_operator_op_abstract_eval(*args, **kwargs):
+@qref_operator_p.def_abstract_eval
+def _qref_operator_p_abstract_eval(*args, **kwargs):
     return []
 
 
-def _is_custom_op(op_cls, params):
-    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
-        return False
-    if op_cls.wire_argnames != ("wires",):
-        return False
-    return all(p.shape == () and "float" in p.dtype.name for p in params)
-
-
-def _operator_op_lowering(
+def _qref_operator_p_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *args,
     op_cls,
@@ -857,18 +849,7 @@ def _operator_op_lowering(
     ctrl_values = []
     adjoint = False
 
-    if op_cls.__name__ == "PCPhase":
-        assert len(params) == 2, "PCPhase takes two float parameters"
-        PCPhaseOp(
-            theta=extract_scalar(safe_cast_to_f64(params[0], op_cls), op_cls),
-            dim=extract_scalar(safe_cast_to_f64(params[1], op_cls), op_cls),
-            qubits=qubits,
-            ctrl_qubits=ctrl_qubits,
-            ctrl_values=ctrl_values,
-            adjoint=adjoint,
-        )
-        return ()
-    elif _is_custom_op(op_cls, params):
+    if _is_custom_op(op_cls, params):
         params = [extract_scalar(safe_cast_to_f64(p, op_cls), op_cls) for p in params]
         CustomOp(
             params=params,
@@ -879,20 +860,21 @@ def _operator_op_lowering(
             adjoint=adjoint,
         )
     else:
-        OperatorOp(
-            op_name=name_attr,
-            params=params,
-            qubits=qubits,
-            forward_args=[],
-            ctrl_qubits=ctrl_qubits,
-            ctrl_values=ctrl_values,
-            adjoint=adjoint,
-            UID=None,
-            arr_qubit_indices=[],
-            param_map=processed_param_map,
-            static_data=processed_static_data,
-            qubit_map=processed_qubit_map,
-        )
+      OperatorOp(
+          op_name=name_attr,
+          params=params,
+          qubits=qubits,
+          qreg=None,
+          forward_args=[],
+          ctrl_qubits=[],
+          ctrl_values=[],
+          adjoint=False,
+          UID=None,
+          arr_qubit_indices=[],
+          param_map=processed_param_map,
+          static_data=processed_static_data,
+          qubit_map=processed_qubit_map,
+      )
     return []
 
 
@@ -1082,7 +1064,7 @@ def _qref_hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value
 
 
 CUSTOM_LOWERING_RULES = (
-    (qref_operator_op, _operator_op_lowering),
+    (qref_operator_p, _qref_operator_p_lowering),
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
     (qref_get_p, _qref_get_lowering),
