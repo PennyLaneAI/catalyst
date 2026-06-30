@@ -181,6 +181,14 @@ class LinkerDriver:
         if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
             default_flags.append("-lrt_OQD_capi")
 
+        for artifact_path in options.runtime_artifacts:
+            dir_name = os.path.dirname(artifact_path)
+            default_flags += [
+                f"-Wl,-rpath,{dir_name}",
+                f"-L{dir_name}",
+                artifact_path,
+            ]
+
         return default_flags
 
     @staticmethod
