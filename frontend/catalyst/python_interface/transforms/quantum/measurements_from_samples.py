@@ -375,7 +375,7 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         # relabel all the callees in the postprocessing FuncOp
         for op in postprocessing_func_op.body.walk():
             if isinstance(op, func.CallOp):
-                new_name = op.callee.string_value() + f"_{self.postprocessing_idx}"
+                new_name = op.callee.string_value() + f"_meas_from_samples_{self.postprocessing_idx}"
                 op.callee = builtin.SymbolRefAttr(new_name)
 
         parent_block = parent_func_op.parent
@@ -389,9 +389,9 @@ class MeasurementsFromSamplesPattern(RewritePattern):
                 # if the helper_op calls any functions in the module, also relabel those callees
                 for op in helper_op.body.walk():
                     if isinstance(op, func.CallOp):
-                        new_name = op.callee.string_value() + f"_{self.postprocessing_idx}"
+                        new_name = op.callee.string_value() + f"_meas_from_samples_{self.postprocessing_idx}"
                         op.callee = builtin.SymbolRefAttr(new_name)
-                new_name = helper_op.sym_name.data + f"_{self.postprocessing_idx}"
+                new_name = helper_op.sym_name.data + f"_meas_from_samples_{self.postprocessing_idx}"
                 helper_op.sym_name = builtin.StringAttr(new_name)
 
                 parent_block.insert_op_after(helper_op, prev_op)
