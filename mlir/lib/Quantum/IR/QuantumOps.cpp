@@ -785,8 +785,8 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 5. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {"static_data", "param_map", "qubit_map",
-                                          "operandSegmentSizes", "resultSegmentSizes"};
+    SmallVector<StringRef> elidedAttrs = {"static_data",         "param_map",          "qubit_map",
+                                          "operandSegmentSizes", "resultSegmentSizes", "op_name"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
@@ -899,7 +899,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         return failure();
     }
     auto &opProperties = result.getOrAddProperties<OperatorOp::Properties>();
-    opProperties.setOpName(opName);
+    result.addAttribute("op_name", builder.getStringAttr(opName));
 
     // 2. Parse variadic params: (%arg0: type, ...)
     SmallVector<OpAsmParser::UnresolvedOperand> params;

@@ -1159,7 +1159,6 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
                          builder.getDenseI32ArrayAttr({nTargets, nCtrls, nQreg}));
 
         // Properties are not handled via the generic attribute fields, so we set them separately.
-        vGateOp.setOpName(rOperatorOp.getOpName());
         vGateOp.setAdjoint(rOperatorOp.getAdjoint());
         vGateOp.setUID(rOperatorOp.getUID());
     }
