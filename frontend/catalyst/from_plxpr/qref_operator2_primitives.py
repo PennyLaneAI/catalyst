@@ -79,12 +79,12 @@ def _qref_operator_p_abstract_eval(*args, **kwargs):
     return []
 
 
-def _is_custom_op(op_cls, params):
+def _is_custom_op(op_cls, avals_in):
     if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
         return False
     if op_cls.wire_argnames != ("wires",):
         return False
-    return all(p.shape == () and "float" in p.dtype.name for p in params)
+    return all(p.shape == () and "float" in p.dtype.name for p in avals_in)
 
 
 def _qref_operator_p_lowering(
@@ -130,7 +130,7 @@ def _qref_operator_p_lowering(
     ctrl_values = []
     adjoint = False
 
-    if _is_custom_op(op_cls, params):
+    if _is_custom_op(op_cls, jax_ctx.avals_in[:len(op_cls.dynamic_argnames)]):
         params = [extract_scalar(safe_cast_to_f64(p, op_cls), op_cls) for p in params]
         CustomOp(
             params=params,
@@ -170,7 +170,7 @@ def _multirz_lowering(
     hybrid_trees,
     wire_lens
 ):
-    theta = (extract_scalar(safe_cast_to_f64(args[0], "MultiRZ"), "MultiRZ"),)
+    theta = extract_scalar(safe_cast_to_f64(args[0], "MultiRZ"), "MultiRZ")
     qubits = args[1:]
     MultiRZOp(
         theta=theta,
@@ -194,7 +194,7 @@ def _pcphase_lowering(
     qubits = args[2:]
     PCPhaseOp(
         theta=extract_scalar(safe_cast_to_f64(args[0], "PCPhase"), "PCPhase"),
-        dim=extract_scalar(safe_cast_to_f64(args[0], "PCPhase"), "PCPhase"),
+        dim=extract_scalar(safe_cast_to_f64(args[1], "PCPhase"), "PCPhase"),
         qubits=qubits,
         ctrl_qubits=[],
         ctrl_values=[],

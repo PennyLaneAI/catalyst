@@ -120,12 +120,12 @@ class SingleParamCustomOp(qp.core.Operator2):
 def c_single_param_custom(x: float):
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
-    # CHECK: qref.custom "SingleParamCustomOp"({{%.+}}: tensor<f64>) [[q0]] -> !qref.bit
+    # CHECK: qref.custom "SingleParamCustomOp"({{%.+}}) [[q0]] : !qref.bit
     SingleParamCustomOp(x, 0)
 
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}
-    # CHECK: qref.custom "SingleParamCustomOp"({{%.+}}: tensor<f64>) [[q1]], [[q2]]) -> !qref.bit !qref.bit
+    # CHECK: qref.custom "SingleParamCustomOp"({{%.+}}) [[q1]], [[q2]] : !qref.bit, !qref.bit
     SingleParamCustomOp(0.5, (1, 2))
 
     return qp.state()
@@ -209,3 +209,25 @@ def c_multi_params():
 
 
 print(c_multi_params.mlir)
+
+class MultiParamsCustom(qp.core.Operator2):
+
+    dynamic_argnames = ("a", "b", "c")
+
+    # note also having non-standard order with dynamic inputs after wires
+    def __init__(self, wires, a, b, c):
+        super().__init__(wires, a, b, c)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=1))
+def c_multi_param_custom():
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
+
+    # pylint: disable=line-too-long
+    # CHECK: qref.custom "MultiParamsCustom"({{%.+}}, {{%.+}}, {{%.+}}) [[q0]] : !qref.bit
+    MultiParamsCustom(0, 0.5, c=0.7, b=2.4)
+    return qp.state()
+
+
+print(c_multi_param_custom.mlir)
