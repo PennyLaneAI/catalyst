@@ -410,7 +410,9 @@ def c_controlled():
 
     # CHECK: qref.operator "NoParams"() qubits([[q0]])
     # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
-    op0 = NoParams(wires=0)
+    # CHECK-NEXT: static_data = {}
+    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
+    op0 = NoParams(reg=0)
     qp.ops.ControlledOp2(op0, [1], control_values=[False])
 
     # CHECK: [[q0_1:%.+]] = qref.get {{%.+}}[ 0]
@@ -420,6 +422,8 @@ def c_controlled():
 
     # CHECK: qref.operator "NoParams"() qubits([[q0_1]])
     # CHECK-NEXT: ctrls([[q1_1]], [[q2_1]], [[q3_1]]) ctrl_vals([[true]], [[false]], [[true]])
+    # CHECK-NEXT: static_data = {}
+    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
     qp.ops.ControlledOp2(
         qp.ops.ControlledOp2(op0, [1], control_values=[True]), [2, 3], control_values=[False, True]
     )
@@ -440,13 +444,17 @@ def c_adjoint_and_controlled():
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
     # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
-    op0 = NoParams(wires=0)
+    # CHECK-NEXT: static_data = {}
+    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
+    op0 = NoParams(reg=0)
     qp.ops.ControlledOp2(qp.adjoint(op0), [1], [False])
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
     # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
+    # CHECK-NEXT: static_data = {}
+    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
     qp.adjoint(qp.ops.ControlledOp2(op0, [1], [False]))
     return qp.state()
 
