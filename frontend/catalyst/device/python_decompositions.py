@@ -42,20 +42,21 @@ import jax.numpy as jnp
 import pennylane as qp
 
 
-def paulirot_decomposition_wrapper(theta, pauli_word, wires):
-    """Wraps the paulirot decomp rule for compile-time lowering with a static pauli word.
+def python_decomposition_wrapper(op_name, op_id, dynamic_shape, static_data, num_wires) -> str:
+    """Generic decomposition wrapper."""
+    print("Hello from python! Here's the received data:", op_name, dynamic_shape, static_data)
 
-    The decomposition rule is identifiable by the name `paulirot_decomp_rule`.
-    """
-    device = qp.device("null.qubit", wires=len(wires))
-    wires = jnp.array(wires)
+    device = qp.device("null.qubit", wires=num_wires)
+    wires = jnp.array(range(num_wires))
 
-    def paulirot_decomp_rule(theta, wires):
+    def decomp_rule(*params, wires):
         qp.ops.qubit.parametric_ops_multi_qubit._pauli_rot_decomposition._impl(
-            theta, wires, pauli_word
+            *params, wires=wires, **static_data
         )
 
-    paulirot_subroutine = qp.capture.subroutine(paulirot_decomp_rule)
+    decomp_rule.__name__ = op_id + "_decomposition"
+
+    paulirot_subroutine = qp.capture.subroutine(decomp_rule)
 
     @qp.qjit(
         target="mlir",
@@ -63,6 +64,6 @@ def paulirot_decomposition_wrapper(theta, pauli_word, wires):
     )
     @qp.qnode(device=device)
     def circuit():
-        paulirot_subroutine(theta, wires)
+        paulirot_subroutine(*[0.5 for _ in dynamic_shape], wires=wires)
 
     return str(circuit.mlir_module)
