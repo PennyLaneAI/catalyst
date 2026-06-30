@@ -231,3 +231,23 @@ def c_multi_param_custom():
 
 
 print(c_multi_param_custom.mlir)
+
+class MultiRZ(qp.core.Operator2):
+
+    dynamic_argnames = ("phi",)
+
+    def __init__(self, phi, wires):
+        super().__init__(phi, wires)
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device('null.qubit', wires=2))
+def c(x: float):
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
+
+    # CHECK: qref.multirz({{%.+}}) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
+    MultiRZ(x, (0,1,2))
+    return qp.state()
+
+print(c.mlir)

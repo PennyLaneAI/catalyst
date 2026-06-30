@@ -157,7 +157,7 @@ class TestOperator2Execution:
         """Test that QubitUnitary can be executed."""
 
         @qp.qjit(capture=True)
-        @qp.qnode(qp.device('lightning.qubit', wires=3))
+        @qp.qjitqnode(qp.device('lightning.qubit', wires=3))
         def c():
             QubitUnitary(jnp.array([[0,1],[1,0]]), 0)
             QubitUnitary(qp.CNOT.compute_matrix(), (0,1))
