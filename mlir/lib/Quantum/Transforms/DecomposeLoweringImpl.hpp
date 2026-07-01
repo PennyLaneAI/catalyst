@@ -220,11 +220,26 @@ class BaseSignatureAnalyzer {
         }
 
         if (hasQreg) {
+            // The wire indices may be packed into a single tensor argument (e.g.
+            // tensor<2xi64>) or spread across several scalar arguments, as in
+            // signatures of the form (qreg, *params, first_qubit_index,
+            // second_qubit_index, ...). Consume the function inputs one at a time,
+            // letting the number of elements each input type expects decide how many
+            // wire indices it absorbs.
             for (const auto &indices : {signature.inWireIndices, signature.inCtrlWireIndices}) {
-                if (!indices.empty()) {
+                size_t consumed = 0;
+                while (consumed < indices.size()) {
+                    assert(operandIdx < static_cast<int>(funcInputsNoQreg.size()) &&
+                           "ran out of function inputs while mapping wire indices");
+                    Type funcInputType = funcInputsNoQreg[operandIdx];
+                    size_t numToConsume =
+                        std::min(getElementsCount(funcInputType), indices.size() - consumed);
+                    ArrayRef<QubitIndex> indexSlice =
+                        ArrayRef<QubitIndex>(indices).slice(consumed, numToConsume);
                     operands[operandIdx] =
-                        fromTensorOrAsIs(indices, funcInputsNoQreg[operandIdx], rewriter, loc);
+                        fromTensorOrAsIs(indexSlice, funcInputType, rewriter, loc);
                     operandIdx++;
+                    consumed += numToConsume;
                 }
             }
         }
