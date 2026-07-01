@@ -32,6 +32,15 @@ struct ZneLowering : public OpRewritePattern<mitigation::ZneOp> {
     LogicalResult matchAndRewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const override;
 
   private:
+    static func::FuncOp getOrCreateFoldedCallee(Location loc, PatternRewriter &rewriter,
+                                                mitigation::ZneOp op, func::FuncOp calleeOp,
+                                                Folding foldingAlgorithm, Type foldCountType);
+
+    static Value buildFoldedResultsLoop(Location loc, PatternRewriter &rewriter,
+                                        mitigation::ZneOp op, func::FuncOp fnFoldedOp,
+                                        Value numFolds, bool randomFolding, int64_t numScaleFactors,
+                                        RankedTensorType resultType);
+
     static FlatSymbolRefAttr getOrInsertFoldedCircuit(Location loc, PatternRewriter &builder,
                                                       func::FuncOp op, Folding foldingAlgorithm);
     static FlatSymbolRefAttr getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,

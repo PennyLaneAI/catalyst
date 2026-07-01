@@ -2,6 +2,11 @@
 
 <h3>New features since last release</h3>
 
+* The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
+  reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
+  times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
+  gates. Non-integer scale factors are now also accepted for `local-random`.
+  [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
 
@@ -365,6 +370,7 @@ Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+Jacob Kitchen,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
