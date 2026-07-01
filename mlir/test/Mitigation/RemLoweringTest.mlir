@@ -41,7 +41,7 @@ func.func @probsCircuit() -> tensor<4xf64> attributes {qnode} {
 }
 
 func.func @remProbsCalibrate() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) {
-    %out:3 = mitigation.rem @probsCircuit() runCalibration(true) : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
+    %out:3 = mitigation.rem @probsCircuit() runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
     func.return %out#0, %out#1, %out#2 : tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
 }
 
@@ -87,7 +87,7 @@ func.func @countsCircuit() -> (tensor<4xf64>, tensor<4xi64>) attributes {qnode} 
 }
 
 func.func @remCountsCalibrate() -> (tensor<4xf64>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>) {
-    %out:4 = mitigation.rem @countsCircuit() runCalibration(true) : () -> (tensor<4xf64>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>)
+    %out:4 = mitigation.rem @countsCircuit() runCalibration(true) {resultSegmentSizes = array<i32: 2, 1, 1>} : () -> (tensor<4xf64>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>)
     func.return %out#0, %out#1, %out#2, %out#3 : tensor<4xf64>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>
 }
 
@@ -124,7 +124,7 @@ func.func @sampleCircuit() -> tensor<200x2xf64> attributes {qnode} {
 }
 
 func.func @remSampleCalibrate() -> (tensor<200x2xf64>, tensor<200x2xf64>, tensor<200x2xf64>) {
-    %out:3 = mitigation.rem @sampleCircuit() runCalibration(true) : () -> (tensor<200x2xf64>, tensor<200x2xf64>, tensor<200x2xf64>)
+    %out:3 = mitigation.rem @sampleCircuit() runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : () -> (tensor<200x2xf64>, tensor<200x2xf64>, tensor<200x2xf64>)
     func.return %out#0, %out#1, %out#2 : tensor<200x2xf64>, tensor<200x2xf64>, tensor<200x2xf64>
 }
 
@@ -137,9 +137,9 @@ func.func @remSampleCalibrate() -> (tensor<200x2xf64>, tensor<200x2xf64>, tensor
 // -----
 
 // ===================================================================
-// runCalibration(false): the pass forwards the callee unchanged and
-// stamps two zero-filled placeholder tensors for the calibration slots --
-// no cloned circuits and no extra quantum.device calls.
+// runCalibration(false): the pass forwards the callee unchanged. With the
+// zeros/ones result groups empty, the op replacement is just the callee's
+// SSA values -- no placeholder constants and no calibration circuits.
 // ===================================================================
 
 func.func @passthroughCircuit() -> tensor<4xf64> attributes {qnode} {
@@ -157,14 +157,14 @@ func.func @passthroughCircuit() -> tensor<4xf64> attributes {qnode} {
     func.return %probs : tensor<4xf64>
 }
 
-func.func @remProbsPassthrough() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) {
-    %out:3 = mitigation.rem @passthroughCircuit() runCalibration(false) : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
-    func.return %out#0, %out#1, %out#2 : tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
+func.func @remProbsPassthrough() -> tensor<4xf64> {
+    %out = mitigation.rem @passthroughCircuit() runCalibration(false) {resultSegmentSizes = array<i32: 1, 0, 0>} : () -> tensor<4xf64>
+    func.return %out : tensor<4xf64>
 }
 
 // CHECK-LABEL: func.func @remProbsPassthrough
-// CHECK:       arith.constant dense<0.000000e+00> : tensor<4xf64>
 // CHECK:       call @passthroughCircuit() : () -> tensor<4xf64>
+// CHECK-NOT:   arith.constant dense<0.000000e+00>
 // CHECK-NOT:   quantum.compbasis
 // CHECK-NOT:   quantum.custom "PauliX"
 
@@ -177,7 +177,7 @@ func.func @remProbsPassthrough() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
 // ===================================================================
 
 func.func @remMissingCallee() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) {
-    %out:3 = mitigation.rem @doesNotExist() runCalibration(true) : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
+    %out:3 = mitigation.rem @doesNotExist() runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
     func.return %out#0, %out#1, %out#2 : tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
 }
 

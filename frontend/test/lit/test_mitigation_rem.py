@@ -150,7 +150,9 @@ def rem_cached():
 
 
 # CHECK-LABEL: func.func public @jit_rem_cached
+# The op's result tuple must shrink to only the callee's return, no zeros/ones slots.
 # CHECK: mitigation.rem @{{[^(]+}}() runCalibration(false)
+# CHECK-SAME: -> tensor<4xf64>
 # CHECK: call @rem_apply_to_probs({{.*}}) : (tensor<4xf64>, tensor<2x2x2xf64>, tensor<2xi64>) -> tensor<4xf64>
 # CHECK-NOT: call @rem_calibrate
 # CHECK-NOT: func.func private @rem_calibrate

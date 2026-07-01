@@ -60,7 +60,8 @@ def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
 }
 
 def RemOp : Mitigation_Op<"rem", [DeclareOpInterfaceMethods<CallOpInterface>,
-    DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+    AttrSizedResultSegments]> {
     let summary = "Compute a quantum function with Readout Error Mitigation (REM).";
     let description = [{
         The `mitigation.rem` operation wraps a quantum function call so the
@@ -84,8 +85,8 @@ def RemOp : Mitigation_Op<"rem", [DeclareOpInterfaceMethods<CallOpInterface>,
     );
     let results = (outs
         Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat, AnyInteger]>]>>:$callee_result,
-        RankedTensorOf<[AnyFloat, AnyInteger]>:$zeros,
-        RankedTensorOf<[AnyFloat, AnyInteger]>:$ones
+        Variadic<RankedTensorOf<[AnyFloat, AnyInteger]>>:$zeros,
+        Variadic<RankedTensorOf<[AnyFloat, AnyInteger]>>:$ones
     );
     let assemblyFormat = [{
         $callee `(` $args `)` `runCalibration` `(` $runCalibration `)` attr-dict `:` functional-type($args, results)

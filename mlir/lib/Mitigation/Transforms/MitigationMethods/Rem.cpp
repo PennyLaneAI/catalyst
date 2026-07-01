@@ -141,51 +141,10 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
         llvm::dbgs() << "[mitigation.rem] doCalibration == false, replacing RemOp with wrapped "
                         "callee circuit function call..."
                      << "\n";
-        mlir::RankedTensorType tensorTyConst;
-        // Create constant array of type ranked tensor<Nxf64> initialized with 0.0. This is the
-        // default value returned when doCalib == false and indicates that no calibration circuits
-        // were run auto tensorTy = RankedTensorType::get({bitspaceShape}, rewriter.getF64Type());
-        // SmallVector<double> zeros_vec(bitspaceShape, 0.0); //initialize with zeroes
-        DenseElementsAttr tensorAttr;
-        if (MPName == "quantum.probs"s || MPName == "quantum.counts"s) {
-            SmallVector<double> zerosVector(calibrationTensorShape, 0.0); // initialize with zeroes
-            // To initialize with other values:
-            // for (auto i = 0; i < 4; ++i) {
-            //     zeros_vec[i] = static_cast<double>(i);
-            // }
-            // -----------------------------------------------------------------
-            // ArrayRef is a non-owning view and needs to be created because it is often required by
-            // MLIR APIs to avoid copies. It is also possible to use this: auto zerosAttr =
-            // rewriter.getF64ArrayAttr(zeros_vec); // returns ArrayAttr used by DenseElementsAttr
-            // because there is also an overload of DenseElementsAttr which accepts ArrayAttr.
-            // Attributes and compile-time constant metadata attached to ops/types in the IR, it
-            // requires a static shape
-            tensorTyConst = tensorTyF64;
-            tensorAttr = DenseElementsAttr::get(
-                tensorTyConst, ArrayRef<double>{zerosVector.begin(), zerosVector.end()});
-            // tensorAttr is an attribute attached with the newly created airth.constant operation
-            // on the line below. It represents values known at pass-time (compile-time with regards
-            // to IR generation, but could be inferred at compile time of the passs from other
-            // attributes or something else)
-        }
-        else if (MPName == "quantum.sample"s) {
-            SmallVector<int64_t> zerosVector(calibrationTensorShape, 0); // initialize with zeroes
-            tensorTyConst = tensorTyI64;
-            tensorAttr = DenseElementsAttr::get(
-                tensorTyConst, ArrayRef<int64_t>{zerosVector.begin(), zerosVector.end()});
-        }
-        auto cst_zeros = rewriter.create<arith::ConstantOp>(loc, tensorTyConst, tensorAttr);
-        llvm::dbgs() << "[mitigation.rem] cst_zeros = " << cst_zeros << "\n";
-
-        // 1) original callee results
+        // The zeros/ones result groups are empty variadics when doCalib is false,
+        // so the op is replaced by only the callee's SSA values.
         for (Value v : results)
             completeResults.push_back(v);
-        // 2) zeros calibration placeholders (reuse same tensors for now)
-        completeResults.push_back(cst_zeros.getResult());
-        // 3) ones calibration placeholders
-        completeResults.push_back(cst_zeros.getResult());
-        // Replace the results of the original operation (mitigation.rem) with this vector of Values
-        // (could be any object castable to ValueRange)
         rewriter.replaceOp(op, completeResults);
         return success();
     }

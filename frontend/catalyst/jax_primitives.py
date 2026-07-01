@@ -1118,7 +1118,9 @@ def _rem_abstract_eval(
     if mp == "probs":
         prob_size = 2 << (device_qubit_count - 1)
         prob_aval = core.ShapedArray((prob_size,), dtype=jax.numpy.dtype("float64"))
-        return (jaxpr.out_avals[0], prob_aval, prob_aval)
+        if run_calibration:
+            return (jaxpr.out_avals[0], prob_aval, prob_aval)
+        return (jaxpr.out_avals[0],)
     elif mp == "counts":
         # The mitigation-lowering pass takes the counts half (i64) of each
         # calibration CountsOp's result pair, so the calibration avals are
@@ -1126,7 +1128,9 @@ def _rem_abstract_eval(
         # replaces the rem op with those values.
         counts_size = 2 << (device_qubit_count - 1)
         counts_aval = core.ShapedArray((counts_size,), dtype=jax.numpy.dtype("int64"))
-        return (jaxpr.out_avals[0], jaxpr.out_avals[1], counts_aval, counts_aval)
+        if run_calibration:
+            return (jaxpr.out_avals[0], jaxpr.out_avals[1], counts_aval, counts_aval)
+        return (jaxpr.out_avals[0], jaxpr.out_avals[1])
     elif mp == "sample":
         # Catalyst's quantum.sample lowering produces an f64 tensor (see
         # `_sample_lowering`). The Mitigation pass also creates calibration
@@ -1136,7 +1140,9 @@ def _rem_abstract_eval(
         sample_aval = core.ShapedArray(
             (device_shot_count, device_qubit_count), dtype=jax.numpy.dtype("float64")
         )
-        return (jaxpr.out_avals[0], sample_aval, sample_aval)
+        if run_calibration:
+            return (jaxpr.out_avals[0], sample_aval, sample_aval)
+        return (jaxpr.out_avals[0],)
     raise NotImplementedError(
         f"REM only supports probs, counts and sample measurement processes; got {mp!r}"
     )
@@ -1146,21 +1152,23 @@ def _rem_lowering(ctx, *args, run_calibration, jaxpr, fn):
     """Lowering function for the REM primitive.
 
     Emits a ``mitigation.rem`` op with the callee symbol-ref + the boolean
-    ``runCalibration`` attribute. The op has one variadic callee result
-    plus two fixed-shape calibration results (zeros / ones), matching the
-    three avals produced by :func:`_rem_abstract_eval`.
+    ``runCalibration`` attribute. All three result groups (callee_result,
+    zeros, ones) are variadic; the zeros/ones groups are empty when
+    ``run_calibration`` is False so the op leaves no calibration SSA values in
+    the lowered IR.
     """
     func_op = lower_jaxpr(ctx, jaxpr)
     symbol_ref = get_symbolref(ctx, func_op)
-    *callee_avals, zeros_aval, ones_aval = ctx.avals_out
+    if run_calibration:
+        *callee_avals, zeros_aval, ones_aval = ctx.avals_out
+        zeros_output_types = util.flatten([mlir.aval_to_ir_types(zeros_aval)])
+        ones_output_types = util.flatten([mlir.aval_to_ir_types(ones_aval)])
+    else:
+        callee_avals = list(ctx.avals_out)
+        zeros_output_types = []
+        ones_output_types = []
     callee_output_types = list(map(mlir.aval_to_ir_types, callee_avals))
-    zeros_output_types = [mlir.aval_to_ir_types(zeros_aval)]
-    ones_output_types = [mlir.aval_to_ir_types(ones_aval)]
     flat_callee_output_types = util.flatten(callee_output_types)
-    # The zeros/ones operands are non-variadic in the .td, so a single type
-    # (not a list) is what the op constructor expects.
-    flat_zeros_output_types = util.flatten(zeros_output_types)[0]
-    flat_ones_output_types = util.flatten(ones_output_types)[0]
 
     constants = []
     for const in jaxpr.consts:
@@ -1177,8 +1185,8 @@ def _rem_lowering(ctx, *args, run_calibration, jaxpr, fn):
 
     rem_op = RemOp(
         flat_callee_output_types,
-        flat_zeros_output_types,
-        flat_ones_output_types,
+        zeros_output_types,
+        ones_output_types,
         symbol_ref,
         mlir.flatten_ir_values(args_and_consts),
         runCalibration=bool_attr,
