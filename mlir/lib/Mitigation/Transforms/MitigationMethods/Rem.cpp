@@ -34,8 +34,8 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     // with proper calibration circuits in a subsequent step.
     Location loc = op.getLoc();
 
-    auto computeAllZeroesOnes = op.getComputeAllZeroesOnesAttr();
-    llvm::dbgs() << "[mitigation.rem] computeAllZeroesOnes: " << computeAllZeroesOnes << "\n";
+    auto runCalibration = op.getRunCalibrationAttr();
+    llvm::dbgs() << "[mitigation.rem] runCalibration: " << runCalibration << "\n";
     for (auto v : op.getResultTypes()) {
         llvm::dbgs() << "[mitigation.rem] Result type: " << v << "\n";
     }
@@ -90,7 +90,7 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     llvm::dbgs() << "[mitigation.rem] MP name: " << MPName << "\n";
 
     // pre-compute MP and attribute-dependent values
-    bool doCalib = computeAllZeroesOnes.getValue(); // get boolean value of BoolAttr
+    bool doCalib = runCalibration.getValue(); // get boolean value of BoolAttr
     mlir::RankedTensorType tensorTyI64;
     mlir::RankedTensorType tensorTyF64;
     int64_t calibrationTensorShape = 0;

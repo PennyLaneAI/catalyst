@@ -65,19 +65,20 @@ def RemOp : Mitigation_Op<"rem", [DeclareOpInterfaceMethods<CallOpInterface>,
     let description = [{
         The `mitigation.rem` operation wraps a quantum function call so the
         mitigation-lowering pass can insert calibration circuits next to it.
-        When `computeAllZeroesOnes` is true the pass emits an all-zeros and an
+        When `runCalibration` is true the pass emits an all-zeros and an
         all-ones calibration circuit alongside the original callee; their
         sample/probs results are returned as the `zeros` and `ones` SSA values
         and consumed by the classical REM post-processing on the JAX side.
         When false the calibration outputs are zero-filled placeholder tensors
-        of the same type, which leaves a hook for a future cached-confusion-
-        matrices path without changing the op's result signature.
+        of the same type, which lets the caller supply cached confusion
+        matrices and skip the calibration circuits without changing the op's
+        result signature.
     }];
 
     let arguments = (ins
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
-        BoolAttr:$computeAllZeroesOnes,
+        BoolAttr:$runCalibration,
         OptionalAttr<DictArrayAttr>:$arg_attrs,
         OptionalAttr<DictArrayAttr>:$res_attrs
     );
@@ -87,7 +88,7 @@ def RemOp : Mitigation_Op<"rem", [DeclareOpInterfaceMethods<CallOpInterface>,
         RankedTensorOf<[AnyFloat, AnyInteger]>:$ones
     );
     let assemblyFormat = [{
-        $callee `(` $args `)` `computeAllZeroesOnes` `(` $computeAllZeroesOnes `)` attr-dict `:` functional-type($args, results)
+        $callee `(` $args `)` `runCalibration` `(` $runCalibration `)` attr-dict `:` functional-type($args, results)
     }];
 }
 

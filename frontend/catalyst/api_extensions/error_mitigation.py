@@ -168,14 +168,18 @@ def mitigate_with_zne(
     return ZNECallable(fn, scale_factors, extrapolate, folding)
 
 
-def mitigate_with_rem(fn=None, *, compute_all_zeroes_ones: bool = False):
+def mitigate_with_rem(
+    fn=None, *, calibration_matrices=None, return_calibration_matrices: bool = False
+):
     """A qjit-compatible frontend that emits a `mitigation.rem` operation.
 
-    Takes a boolean ``compute_all_zeroes_ones`` flag that is forwarded to the
-    lowering as an attribute on the `mitigation.rem` op. When ``True``, the
-    mitigation-lowering pass also emits the all-zeros and all-ones calibration
-    circuits and this callable runs the classical REM post-processing on the
-    three resulting sample arrays.
+    When ``calibration_matrices`` is ``None`` the lowering pass emits the
+    all-zeros and all-ones calibration circuits and this callable computes
+    the confusion matrices itself. When a precomputed ``(n_qubits, 2, 2)``
+    matrix stack is supplied, ``rem_calibrate_*`` is skipped and the matrices
+    are passed straight into ``rem_apply_to_*``. Pass
+    ``return_calibration_matrices=True`` to get the matrices back alongside
+    the mitigated result so they can be cached for subsequent calls.
     """
 
     kwargs = copy.copy(locals())
@@ -184,7 +188,11 @@ def mitigate_with_rem(fn=None, *, compute_all_zeroes_ones: bool = False):
     if fn is None:
         return functools.partial(mitigate_with_rem, **kwargs)
 
-    return RemCallable(fn, compute_all_zeroes_ones=compute_all_zeroes_ones)
+    return RemCallable(
+        fn,
+        calibration_matrices=calibration_matrices,
+        return_calibration_matrices=return_calibration_matrices,
+    )
 
 
 ## IMPL ##
@@ -267,23 +275,32 @@ class RemCallable(CatalystCallable):
 
     Args:
         fn (Callable): the circuit to be mitigated with REM.
-        compute_all_zeroes_ones (bool): forwarded to the lowering as an
-            attribute on the ``mitigation.rem`` op. When ``True``, the pass
-            emits the all-zeros and all-ones calibration circuits next to the
-            user circuit and this callable applies classical post-processing
-            to the three sample arrays. SampleMP is currently the only
-            measurement type whose post-processing is wired up; for ProbsMP
-            and CountsMP the three raw outputs are returned as a tuple.
+        calibration_matrices: optional precomputed per-qubit confusion stack
+            of shape ``(n_qubits, 2, 2)``. When ``None`` the lowering pass
+            emits the all-zeros and all-ones calibration circuits and this
+            callable computes the matrices from their outputs via
+            ``rem_calibrate_*``. When provided, ``rem_calibrate_*`` is not
+            traced and the supplied matrices are passed straight into
+            ``rem_apply_to_*``.
+        return_calibration_matrices (bool): when ``True`` the callable
+            returns ``(mitigated_result, calibration_matrices)`` instead of
+            just the mitigated result.
 
     Raises:
         TypeError: Non-QNode object was passed as ``fn``.
     """
 
-    def __init__(self, fn: Callable, compute_all_zeroes_ones: bool = False):
+    def __init__(
+        self,
+        fn: Callable,
+        calibration_matrices=None,
+        return_calibration_matrices: bool = False,
+    ):
         functools.update_wrapper(self, fn)
         self.fn = fn
         self.__name__ = f"rem.{getattr(fn, '__name__', 'unknown')}"
-        self.compute_all_zeroes_ones = bool(compute_all_zeroes_ones)
+        self.calibration_matrices = calibration_matrices
+        self.return_calibration_matrices = bool(return_calibration_matrices)
         super().__init__("fn")
 
     def __call__(self, *args, **kwargs):
@@ -319,17 +336,13 @@ class RemCallable(CatalystCallable):
         assert (
             mp_kind != None
         ), "measurement process must be one of CountsMP, ProbsMP or SampleMP. Other measurement processes such as observables are not supported yet."
+        run_calibration = self.calibration_matrices is None
         rem_results = rem_p.bind(
             *args_data,
-            compute_all_zeroes_ones=self.compute_all_zeroes_ones,
+            run_calibration=run_calibration,
             jaxpr=jaxpr,
             fn=callable_fn,
         )
-
-        # With calibration disabled the lowering forwards only the callee
-        # result plus two placeholder zero tensors, so surface just the result.
-        if not self.compute_all_zeroes_ones:
-            return rem_results[0]
 
         qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
         assert qnode_obj is not None, "REM post-processing requires a QNode target"
@@ -340,42 +353,49 @@ class RemCallable(CatalystCallable):
             # quantum.sample returns f64 in catalyst; the REM helpers index
             # confusion matrices by bit value and need an integer dtype.
             mitigatee_samples = rem_results[0].astype(jnp.int32)
-            zeros_samples = rem_results[1].astype(jnp.int32)
-            ones_samples = rem_results[2].astype(jnp.int32)
-
-            confusion_matrices = rem_calibrate_samples(zeros_samples, ones_samples)
+            if run_calibration:
+                zeros_samples = rem_results[1].astype(jnp.int32)
+                ones_samples = rem_results[2].astype(jnp.int32)
+                confusion_matrices = rem_calibrate_samples(zeros_samples, ones_samples)
+            else:
+                confusion_matrices = jnp.asarray(self.calibration_matrices)
             unique_bitstrings, mitigated_counts = rem_apply_to_samples(
                 mitigatee_samples, confusion_matrices, measured_qubits, n_qubits
             )
-            return unique_bitstrings, mitigated_counts
+            mitigated_result = (unique_bitstrings, mitigated_counts)
 
         elif mp_kind == "counts":
 
             mitigatee_eigvals = rem_results[0]
             mitigatee_counts = rem_results[1]
-            zeros_counts = rem_results[2]
-            ones_counts = rem_results[3]
-            confusion_matrices = rem_calibrate_counts(zeros_counts, ones_counts)
+            if run_calibration:
+                zeros_counts = rem_results[2]
+                ones_counts = rem_results[3]
+                confusion_matrices = rem_calibrate_counts(zeros_counts, ones_counts)
+            else:
+                confusion_matrices = jnp.asarray(self.calibration_matrices)
             mitigated_counts = rem_apply_to_counts(
                 mitigatee_counts, confusion_matrices, measured_qubits, n_qubits
             )
-            return (mitigatee_eigvals, mitigated_counts)
+            mitigated_result = (mitigatee_eigvals, mitigated_counts)
 
         elif mp_kind == "probs":
 
             mitigatee_probs = rem_results[0]
-            zeros_probs = rem_results[1]
-            ones_probs = rem_results[2]
-
-            confusion_matrices = rem_calibrate_probs(zeros_probs, ones_probs)
+            if run_calibration:
+                zeros_probs = rem_results[1]
+                ones_probs = rem_results[2]
+                confusion_matrices = rem_calibrate_probs(zeros_probs, ones_probs)
+            else:
+                confusion_matrices = jnp.asarray(self.calibration_matrices)
             mitigated_probs = rem_apply_to_probs(
                 mitigatee_probs, confusion_matrices, measured_qubits, n_qubits
             )
-            return mitigated_probs
+            mitigated_result = mitigated_probs
 
-        # ProbsMP / CountsMP post-processing is not yet wired up; return the
-        # three raw outputs as a tuple so user code can post-process them.
-        return tuple(rem_results)
+        if self.return_calibration_matrices:
+            return mitigated_result, confusion_matrices
+        return mitigated_result
 
 
 def polynomial_extrapolation(degree):

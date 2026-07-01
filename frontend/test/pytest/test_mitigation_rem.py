@@ -60,7 +60,7 @@ def test_probs(n_qubits):
 
     @catalyst.qjit
     def mitigated():
-        return mitigate_with_rem(circuit, compute_all_zeroes_ones=True)()
+        return mitigate_with_rem(circuit)()
 
     out = np.asarray(mitigated())
     expected = np.zeros(2**n_qubits)
@@ -77,7 +77,7 @@ def test_counts(n_qubits):
 
     @catalyst.qjit
     def mitigated():
-        return mitigate_with_rem(circuit, compute_all_zeroes_ones=True)()
+        return mitigate_with_rem(circuit)()
 
     eigvals, counts = mitigated()
     counts = np.asarray(counts)
@@ -101,7 +101,7 @@ def test_sample(n_qubits):
 
     @catalyst.qjit
     def mitigated():
-        return mitigate_with_rem(circuit, compute_all_zeroes_ones=True)()
+        return mitigate_with_rem(circuit)()
 
     bitstrings, counts = mitigated()
     bitstrings = np.asarray(bitstrings)
@@ -118,20 +118,111 @@ def test_sample(n_qubits):
     assert histogram[0] + histogram[-1] > 0.9 * shots
 
 
-def test_no_calibration():
-    """compute_all_zeroes_ones=False forwards the raw callee result without REM post-processing."""
-    n_qubits, shots = 2, 1000
+def test_return_calibration_matrices():
+    """return_calibration_matrices=True wraps the mitigated probs in a (result, cm) tuple."""
+    n_qubits, shots = 2, 2000
     circuit = _ghz_qnode(n_qubits, shots, "probs")
 
     @catalyst.qjit
-    def passthrough():
-        return mitigate_with_rem(circuit, compute_all_zeroes_ones=False)()
+    def mitigated():
+        return mitigate_with_rem(circuit, return_calibration_matrices=True)()
 
-    out = np.asarray(passthrough())
+    result, cm = mitigated()
+    cm = np.asarray(cm)
+    assert cm.shape == (n_qubits, 2, 2)
+    # Each 2x2 confusion matrix is column-stochastic.
+    assert np.allclose(cm.sum(axis=-2), 1.0, atol=1e-6)
+
+    expected = np.zeros(2**n_qubits)
+    expected[0] = 0.5
+    expected[-1] = 0.5
+    assert np.allclose(np.asarray(result), expected, atol=5e-2)
+
+
+def test_caching_probs_roundtrip():
+    """Compute calibration once, reuse it on a second qjit call; result still matches the GHZ probs."""
+    n_qubits, shots = 2, 2000
+    circuit = _ghz_qnode(n_qubits, shots, "probs")
+
+    @catalyst.qjit
+    def fresh():
+        return mitigate_with_rem(circuit, return_calibration_matrices=True)()
+
+    _, cm = fresh()
+
+    @catalyst.qjit
+    def cached(cm_in):
+        return mitigate_with_rem(circuit, calibration_matrices=cm_in)()
+
+    out = np.asarray(cached(cm))
     expected = np.zeros(2**n_qubits)
     expected[0] = 0.5
     expected[-1] = 0.5
     assert np.allclose(out, expected, atol=5e-2)
+
+
+def test_caching_counts_roundtrip():
+    """Counts MP: cached calibration matrices yield concentrated GHZ peaks on a noiseless device."""
+    n_qubits, shots = 2, 2000
+    circuit = _ghz_qnode(n_qubits, shots, "counts")
+
+    @catalyst.qjit
+    def fresh():
+        return mitigate_with_rem(circuit, return_calibration_matrices=True)()
+
+    _, cm = fresh()
+
+    @catalyst.qjit
+    def cached(cm_in):
+        return mitigate_with_rem(circuit, calibration_matrices=cm_in)()
+
+    eigvals, counts = cached(cm)
+    counts = np.asarray(counts)
+    assert counts.shape == (2**n_qubits,)
+    assert counts[0] + counts[-1] > 0.9 * shots
+    assert np.allclose(np.asarray(eigvals), np.arange(2**n_qubits))
+
+
+def test_caching_sample_roundtrip():
+    """Sample MP histogram-path cache reuse on a noiseless GHZ device."""
+    n_qubits, shots = 2, 2000
+    circuit = _ghz_qnode(n_qubits, shots, "sample")
+
+    @catalyst.qjit
+    def fresh():
+        return mitigate_with_rem(circuit, return_calibration_matrices=True)()
+
+    _, cm = fresh()
+
+    @catalyst.qjit
+    def cached(cm_in):
+        return mitigate_with_rem(circuit, calibration_matrices=cm_in)()
+
+    bitstrings, counts = cached(cm)
+    bitstrings = np.asarray(bitstrings)
+    counts = np.asarray(counts)
+    powers = 1 << np.arange(n_qubits - 1, -1, -1)
+    codes = (bitstrings * powers[None, :]).sum(axis=1)
+    histogram = np.zeros(2**n_qubits)
+    for code, c in zip(codes, counts):
+        histogram[code] += c
+    assert histogram[0] + histogram[-1] > 0.9 * shots
+
+
+def test_caching_skips_rem_calibrate_in_ir():
+    """Cached path must not emit rem_calibrate_* helpers in the traced MLIR."""
+    n_qubits, shots = 2, 200
+    circuit = _ghz_qnode(n_qubits, shots, "probs")
+    cm = jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (n_qubits, 2, 2))
+
+    @catalyst.qjit(target="mlir")
+    def cached():
+        return mitigate_with_rem(circuit, calibration_matrices=cm)()
+
+    ir = cached.mlir
+    assert "runCalibration(false)" in ir
+    assert "rem_apply_to_probs" in ir
+    assert "rem_calibrate_probs" not in ir
 
 
 def _per_qubit_symmetric_confusion(n_qubits, p):
@@ -281,7 +372,7 @@ def test_unsupported_measurement():
     qnode = qp.set_shots(qp.QNode(circuit, dev), shots=200)
 
     def mitigated():
-        return mitigate_with_rem(qnode, compute_all_zeroes_ones=True)()
+        return mitigate_with_rem(qnode)()
 
     with pytest.raises(AssertionError, match="measurement process must be one of"):
         catalyst.qjit(mitigated)

@@ -15,7 +15,7 @@
 // RUN: quantum-opt %s --lower-mitigation --split-input-file --verify-diagnostics | FileCheck %s
 
 // ===================================================================
-// computeAllZeroesOnes(true) on a ProbsMP callee: the pass must keep the
+// runCalibration(true) on a ProbsMP callee: the pass must keep the
 // original func.call, then emit two cloned quantum.device / quantum.alloc /
 // quantum.compbasis / quantum.probs blocks. The all-ones clone is
 // distinguished from the all-zeroes one by per-qubit PauliX gates inserted
@@ -41,7 +41,7 @@ func.func @probsCircuit() -> tensor<4xf64> attributes {qnode} {
 }
 
 func.func @remProbsCalibrate() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) {
-    %out:3 = mitigation.rem @probsCircuit() computeAllZeroesOnes(true) : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
+    %out:3 = mitigation.rem @probsCircuit() runCalibration(true) : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
     func.return %out#0, %out#1, %out#2 : tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
 }
 
@@ -63,7 +63,7 @@ func.func @remProbsCalibrate() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) 
 // -----
 
 // ===================================================================
-// computeAllZeroesOnes(true) on a CountsMP callee: callee result is the
+// runCalibration(true) on a CountsMP callee: callee result is the
 // (eigvals, counts) pair, and the rem op surfaces two i64 calibration
 // tensors -- one per all-zeroes / all-ones run.
 // ===================================================================
@@ -87,7 +87,7 @@ func.func @countsCircuit() -> (tensor<4xf64>, tensor<4xi64>) attributes {qnode} 
 }
 
 func.func @remCountsCalibrate() -> (tensor<4xf64>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>) {
-    %out:4 = mitigation.rem @countsCircuit() computeAllZeroesOnes(true) : () -> (tensor<4xf64>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>)
+    %out:4 = mitigation.rem @countsCircuit() runCalibration(true) : () -> (tensor<4xf64>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>)
     func.return %out#0, %out#1, %out#2, %out#3 : tensor<4xf64>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>
 }
 
@@ -100,7 +100,7 @@ func.func @remCountsCalibrate() -> (tensor<4xf64>, tensor<4xi64>, tensor<4xi64>,
 // -----
 
 // ===================================================================
-// computeAllZeroesOnes(true) on a SampleMP callee with shots = 200: the
+// runCalibration(true) on a SampleMP callee with shots = 200: the
 // calibration tensors take the (shots, qubits) shape inferred from the
 // callee's quantum.device + quantum.alloc.
 // ===================================================================
@@ -124,7 +124,7 @@ func.func @sampleCircuit() -> tensor<200x2xf64> attributes {qnode} {
 }
 
 func.func @remSampleCalibrate() -> (tensor<200x2xf64>, tensor<200x2xf64>, tensor<200x2xf64>) {
-    %out:3 = mitigation.rem @sampleCircuit() computeAllZeroesOnes(true) : () -> (tensor<200x2xf64>, tensor<200x2xf64>, tensor<200x2xf64>)
+    %out:3 = mitigation.rem @sampleCircuit() runCalibration(true) : () -> (tensor<200x2xf64>, tensor<200x2xf64>, tensor<200x2xf64>)
     func.return %out#0, %out#1, %out#2 : tensor<200x2xf64>, tensor<200x2xf64>, tensor<200x2xf64>
 }
 
@@ -137,7 +137,7 @@ func.func @remSampleCalibrate() -> (tensor<200x2xf64>, tensor<200x2xf64>, tensor
 // -----
 
 // ===================================================================
-// computeAllZeroesOnes(false): the pass forwards the callee unchanged and
+// runCalibration(false): the pass forwards the callee unchanged and
 // stamps two zero-filled placeholder tensors for the calibration slots --
 // no cloned circuits and no extra quantum.device calls.
 // ===================================================================
@@ -158,7 +158,7 @@ func.func @passthroughCircuit() -> tensor<4xf64> attributes {qnode} {
 }
 
 func.func @remProbsPassthrough() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) {
-    %out:3 = mitigation.rem @passthroughCircuit() computeAllZeroesOnes(false) : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
+    %out:3 = mitigation.rem @passthroughCircuit() runCalibration(false) : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
     func.return %out#0, %out#1, %out#2 : tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
 }
 
@@ -177,9 +177,9 @@ func.func @remProbsPassthrough() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
 // ===================================================================
 
 func.func @remMissingCallee() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) {
-    %out:3 = mitigation.rem @doesNotExist() computeAllZeroesOnes(true) : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
+    %out:3 = mitigation.rem @doesNotExist() runCalibration(true) : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
     func.return %out#0, %out#1, %out#2 : tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
 }
 
 // CHECK-LABEL: func.func @remMissingCallee
-// CHECK:       mitigation.rem @doesNotExist() computeAllZeroesOnes(true)
+// CHECK:       mitigation.rem @doesNotExist() runCalibration(true)

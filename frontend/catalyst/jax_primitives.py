@@ -1086,13 +1086,13 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 
 
 @rem_p.def_impl
-def _rem_def_impl(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):  # pragma: no cover
+def _rem_def_impl(ctx, *args, run_calibration, jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
 
 
 @rem_p.def_abstract_eval
 def _rem_abstract_eval(
-    *args, compute_all_zeroes_ones, jaxpr, fn
+    *args, run_calibration, jaxpr, fn
 ):  # pylint: disable=unused-argument
     """Abstract eval for the REM primitive.
 
@@ -1142,11 +1142,11 @@ def _rem_abstract_eval(
     )
 
 
-def _rem_lowering(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):
+def _rem_lowering(ctx, *args, run_calibration, jaxpr, fn):
     """Lowering function for the REM primitive.
 
     Emits a ``mitigation.rem`` op with the callee symbol-ref + the boolean
-    ``computeAllZeroesOnes`` attribute. The op has one variadic callee result
+    ``runCalibration`` attribute. The op has one variadic callee result
     plus two fixed-shape calibration results (zeros / ones), matching the
     three avals produced by :func:`_rem_abstract_eval`.
     """
@@ -1173,7 +1173,7 @@ def _rem_lowering(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):
         constants.append(constantVals)
 
     args_and_consts = constants + list(args)
-    bool_attr = ir.BoolAttr.get(bool(compute_all_zeroes_ones))
+    bool_attr = ir.BoolAttr.get(bool(run_calibration))
 
     rem_op = RemOp(
         flat_callee_output_types,
@@ -1181,7 +1181,7 @@ def _rem_lowering(ctx, *args, compute_all_zeroes_ones, jaxpr, fn):
         flat_ones_output_types,
         symbol_ref,
         mlir.flatten_ir_values(args_and_consts),
-        computeAllZeroesOnes=bool_attr,
+        runCalibration=bool_attr,
     )
 
     return rem_op.results
