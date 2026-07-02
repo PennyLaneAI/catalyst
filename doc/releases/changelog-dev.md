@@ -6,7 +6,9 @@
 <h3>Improvements 🛠</h3>
 
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
-  without non-lowerable arguments.
+  without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
+  where applicable, unlocking compilation and execution for these cases.
+  [(#2979)](https://github.com/PennyLaneAI/catalyst/pull/2979)
   [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969/)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
