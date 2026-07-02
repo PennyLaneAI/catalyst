@@ -18,12 +18,15 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 # pylint: disable=protected-access
 
 import warnings
+from contextlib import nullcontext
 from copy import copy
 from functools import partial
 from typing import Callable
 
 import jax
 import pennylane as qp
+from jax._src import config as jax_config
+from jax.core import ensure_compile_time_eval
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.primitives import transform_prim
@@ -312,23 +315,26 @@ def handle_qnode(
             )
 
     def calling_convention(*args):
-        device_init_p.bind(
-            shots,
-            auto_qubit_management=(device.wires is None),
-            **_get_device_kwargs(device),
-        )
+        with jax_config.eager_constant_folding(False):
+            device_init_p.bind(
+                shots,
+                auto_qubit_management=(device.wires is None),
+                **_get_device_kwargs(device),
+            )
 
         # https://github.com/PennyLaneAI/pennylane/pull/9248
         assert not is_dynamic_wires(
             device.wires
         ), "plxpr does not support dynamic number of wires on the device yet"
-        qreg = qref_alloc_p.bind(static_num_qubits=len(device.wires))
+        with jax_config.eager_constant_folding(False):
+            qreg = qref_alloc_p.bind(static_num_qubits=len(device.wires))
         self.init_qreg = qreg
 
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.init_qreg, {})
         retvals = converter(closed_jaxpr, *args)
         qref_dealloc_p.bind(self.init_qreg)
-        device_release_p.bind()
+        with jax_config.eager_constant_folding(False):
+            device_release_p.bind()
         return retvals
 
     if self.requires_decompose_lowering and graph_succeeded:
@@ -467,6 +473,7 @@ def trace_from_pennylane(
     static_argnums,
     abstracted_axes,
     skip_preprocess=False,
+    const_eval=True,
     debug_info=None,
 ):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
@@ -507,9 +514,11 @@ def trace_from_pennylane(
         # Therefore we need to coordinate them manually
         fn.static_argnums = static_argnums
 
+    const_eval_ctx_manager = ensure_compile_time_eval() if const_eval else nullcontext()
+
     with transient_jax_config(
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
-    ), Patcher(*get_jax_patches()):
+    ), Patcher(*get_jax_patches()), const_eval_ctx_manager:
 
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
@@ -533,8 +542,8 @@ def trace_from_pennylane(
             jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(
                 *abstract_shapes, *flat_inputs
             )
-
-            return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
+            with jax_config.eager_constant_folding(False):
+                return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
 
         nested_jaxpr = jax.make_jaxpr(wrapper, **make_jaxpr_kwargs)(*args, **kwargs)
         jaxpr = nested_jaxpr.eqns[0].params["jaxpr"]
