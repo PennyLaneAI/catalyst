@@ -235,7 +235,7 @@ class MultiParamsCustom(qp.core.Operator2):
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=1))
 def c_multi_param_custom():
-    # CHECK-LABEL: func.func public @circuit_multi_param_custom
+    # CHECK-LABEL: func.func public @c_multi_param_custom
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
 
     # pylint: disable=line-too-long
