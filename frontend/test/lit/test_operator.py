@@ -53,6 +53,89 @@ def c_no_params():
 print(c_no_params.mlir)
 
 
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("lightning.qubit", wires=1))
+def c_adjoint():
+    # CHECK-LABEL: func.func public @c_adjoint
+
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
+    op0 = NoParams(reg=0)
+    qp.adjoint(op0)
+
+    # CHECK: [[q0_1:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.operator "NoParams"() qubits([[q0_1]])
+    qp.adjoint(qp.adjoint(op0))
+    return qp.state()
+
+
+print(c_adjoint.mlir)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def c_controlled():
+    # CHECK-LABEL: func.func public @c_controlled
+
+    # CHECK: [[true:%.+]] = arith.constant true
+    # CHECK: [[false:%.+]] = arith.constant false
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+
+    # CHECK: qref.operator "NoParams"() qubits([[q0]])
+    # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
+    # CHECK-NEXT: static_data = {}
+    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
+    op0 = NoParams(reg=0)
+    qp.ops.ControlledOp2(op0, [1], control_values=[False])
+
+    # CHECK: [[q0_1:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1_1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[q2_1:%.+]] = qref.get {{%.+}}[ 2]
+    # CHECK: [[q3_1:%.+]] = qref.get {{%.+}}[ 3]
+
+    # CHECK: qref.operator "NoParams"() qubits([[q0_1]])
+    # CHECK-NEXT: ctrls([[q1_1]], [[q2_1]], [[q3_1]]) ctrl_vals([[false]], [[true]], [[true]])
+    # CHECK-NEXT: static_data = {}
+    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
+    qp.ops.ControlledOp2(
+        qp.ops.ControlledOp2(op0, [3], control_values=[True]), [1, 2], control_values=[False, True]
+    )
+    return qp.state()
+
+
+print(c_controlled.mlir)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def c_adjoint_and_controlled():
+    # CHECK-LABEL: func.func public @c_adjoint_and_controlled
+
+    # CHECK: [[false:%.+]] = arith.constant false
+
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
+    # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
+    # CHECK-NEXT: static_data = {}
+    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
+    op0 = NoParams(reg=0)
+    qp.ops.ControlledOp2(qp.adjoint(op0), [1], [False])
+
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
+    # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
+    # CHECK-NEXT: static_data = {}
+    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
+    qp.adjoint(qp.ops.ControlledOp2(op0, [1], [False]))
+    return qp.state()
+
+
+print(c_adjoint_and_controlled.mlir)
+
+
 class NoParamsCustomOp(qp.core.Operator2):
 
     def __init__(self, wires):
@@ -235,7 +318,7 @@ class MultiParamsCustom(qp.core.Operator2):
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=1))
 def c_multi_param_custom():
-    # CHECK-LABEL: func.func public @circuit_multi_param_custom
+    # CHECK-LABEL: func.func public @c_multi_param_custom
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
 
     # pylint: disable=line-too-long
@@ -257,7 +340,9 @@ class MultiRZ(qp.core.Operator2):
 
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
-def circuit(x: float):
+def circuit_multirz(x: float):
+    # CHECK-LABEL: func.func public @circuit_multirz
+
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}
@@ -267,7 +352,7 @@ def circuit(x: float):
     return qp.state()
 
 
-print(circuit.mlir)
+print(circuit_multirz.mlir)
 
 
 class PauliRot(qp.core.Operator2):
@@ -334,7 +419,7 @@ class QubitUnitary(qp.core.Operator2):
         super().__init__(matrix, wires)
 
 
-@qp.qjit(capture=True)
+@qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def circuit_qubitunitary():
     # CHECK-LABEL: func.func public @circuit_qubitunitary
@@ -363,7 +448,7 @@ class PCPhase(qp.core.Operator2):
         super().__init__(phi, dim, wires)
 
 
-@qp.qjit(capture=True)
+@qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def c_pcphase(x: float, dim: int):
     # CHECK-LABEL: func.func public @c_pcphase
@@ -377,86 +462,3 @@ def c_pcphase(x: float, dim: int):
 
 
 print(c_pcphase.mlir)
-
-
-@qp.qjit(capture=True)
-@qp.qnode(qp.device("lightning.qubit", wires=1))
-def c_adjoint():
-    # CHECK-LABEL: func.func public @c_adjoint
-
-    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
-    op0 = NoParams(wires=0)
-    qp.adjoint(op0)
-
-    # CHECK: [[q0_1:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: qref.operator "NoParams"() qubits([[q0_1]])
-    qp.adjoint(qp.adjoint(op0))
-    return qp.state()
-
-
-print(c_adjoint.mlir)
-
-
-@qp.qjit(capture=True, target="mlir")
-@qp.qnode(qp.device("null.qubit", wires=4))
-def c_controlled():
-    # CHECK-LABEL: func.func public @c_controlled
-
-    # CHECK: [[true:%.+]] = arith.constant true
-    # CHECK: [[false:%.+]] = arith.constant false
-    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
-
-    # CHECK: qref.operator "NoParams"() qubits([[q0]])
-    # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
-    # CHECK-NEXT: static_data = {}
-    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
-    op0 = NoParams(reg=0)
-    qp.ops.ControlledOp2(op0, [1], control_values=[False])
-
-    # CHECK: [[q0_1:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: [[q1_1:%.+]] = qref.get {{%.+}}[ 1]
-    # CHECK: [[q2_1:%.+]] = qref.get {{%.+}}[ 2]
-    # CHECK: [[q3_1:%.+]] = qref.get {{%.+}}[ 3]
-
-    # CHECK: qref.operator "NoParams"() qubits([[q0_1]])
-    # CHECK-NEXT: ctrls([[q1_1]], [[q2_1]], [[q3_1]]) ctrl_vals([[true]], [[false]], [[true]])
-    # CHECK-NEXT: static_data = {}
-    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
-    qp.ops.ControlledOp2(
-        qp.ops.ControlledOp2(op0, [1], control_values=[True]), [2, 3], control_values=[False, True]
-    )
-    return qp.state()
-
-
-print(c_controlled.mlir)
-
-
-@qp.qjit(capture=True, target="mlir")
-@qp.qnode(qp.device("null.qubit", wires=4))
-def c_adjoint_and_controlled():
-    # CHECK-LABEL: func.func public @c_adjoint_and_controlled
-
-    # CHECK: [[false:%.+]] = arith.constant false
-
-    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
-    # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
-    # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
-    # CHECK-NEXT: static_data = {}
-    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
-    op0 = NoParams(reg=0)
-    qp.ops.ControlledOp2(qp.adjoint(op0), [1], [False])
-
-    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
-    # CHECK: qref.operator "NoParams"() adj qubits([[q0]])
-    # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
-    # CHECK-NEXT: static_data = {}
-    # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
-    qp.adjoint(qp.ops.ControlledOp2(op0, [1], [False]))
-    return qp.state()
-
-
-print(c_adjoint_and_controlled.mlir)
