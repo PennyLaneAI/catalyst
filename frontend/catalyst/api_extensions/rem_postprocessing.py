@@ -16,7 +16,7 @@
 JAX-compilable post-processing helpers for Readout Error Mitigation (REM).
 
 These helpers integrate with the catalyst frontend so ``mitigate_with_rem``
-can apply classical SampleMP post-processing - per-qubit confusion-matrix
+can apply classical post-processing - per-qubit confusion-matrix
 calibration, reduced-confusion-matrix construction, and a linear solve -
 to the three sample arrays emitted by the ``mitigation.rem`` op after
 lowering.
