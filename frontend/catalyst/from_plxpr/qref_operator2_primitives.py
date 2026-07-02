@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """This module contains JAX-compatible quantum primitives to support the lowering
-of quantum operations, measurements, and observables to reference semantics JAXPR.
+of quantum operations to reference semantics JAXPR.
 """
 
 # pylint: disable=unused-argument
