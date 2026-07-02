@@ -3,20 +3,22 @@ set(LIBRARY_NAME quantum-transforms)
 add_subdirectory(DecompGraphSolver)
 
 file(GLOB SRC
-    AdjointPatterns.cpp
+    AdjointLowering/AdjointLowering.cpp
+    AdjointLowering/ForwardPass.cpp
+    AdjointLowering/QuantumCache.cpp
+    AdjointLowering/ReversePass.cpp
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
     ConversionPatterns.cpp
     DecomposeLoweringPatterns.cpp
-    QPDLoader.cpp
     DisentangleCNOT.cpp
     DisentangleSWAP.cpp
     GridsynthPatterns.cpp
     IonsDecompositionPatterns.cpp
     LoopBoundaryOptimizationPatterns.cpp
     MergeRotationsPatterns.cpp
+    QPDLoader.cpp
     SplitMultipleTapes.cpp
-    adjoint_lowering.cpp
     cancel_inverses.cpp
     cp_global_buffers.cpp
     decompose_lowering.cpp
@@ -58,8 +60,9 @@ add_mlir_library(${LIBRARY_NAME} STATIC
 )
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
-                           .
-                           ${PROJECT_SOURCE_DIR}/include
-                           ${CMAKE_BINARY_DIR}/include
-                           DecompGraphSolver/
-                       )
+    .
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_BINARY_DIR}/include
+    AdjointLowering/
+    DecompGraphSolver/
+)
