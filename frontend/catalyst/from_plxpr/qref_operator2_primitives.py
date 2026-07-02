@@ -91,7 +91,7 @@ def _is_custom_op(op_cls, avals_in):
 
 def _general_validation(*args, op_cls, wire_lens, **kwargs):
     num_normal_wires = sum(wire_lens)
-    wires = args[len(op_cls.dynamic_argnames): (len(op_cls.dynamic_argnames) + num_normal_wires)]
+    wires = args[len(op_cls.dynamic_argnames) : (len(op_cls.dynamic_argnames) + num_normal_wires)]
     for w in wires:
         assert ir.OpaqueType.isinstance(w.type)
         assert ir.OpaqueType(w.type).dialect_namespace == "qref"
@@ -104,7 +104,7 @@ def _qref_operator_p_lowering(
     op_cls,
     **kwargs,
 ):
-    _general_validation(*args, op_cls, **kwargs)
+    _general_validation(*args, op_cls=op_cls, **kwargs)
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     if op_cls.__name__ in _SPECIAL_LOWERINGS:
