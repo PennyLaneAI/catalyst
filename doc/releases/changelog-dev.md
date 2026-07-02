@@ -6,11 +6,8 @@
 <h3>Improvements 🛠</h3>
 
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
-  without non-lowerable arguments. `Operator2` classes with scalar float dynamic inputs, a single
-  register of wires called `wires`, and no static/ compilable metadata are lowered to `CustomOp` and
-  can be compiled and executed using the existing infrastructure. `Operator2` versions of 
-  `GlobalPhase`, `MultiRZ`,`PauliRot`, `PCPhase`, and `QubitUnitary` can also be lowered to their
-  specialized representations, compiled, and executed.
+  without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
+  where applicable, unlocking compilation and execution for these cases.
   [(#2979)](https://github.com/PennyLaneAI/catalyst/pull/2979)
   [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969/)
 
