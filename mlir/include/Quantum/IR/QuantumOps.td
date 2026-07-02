@@ -736,7 +736,7 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
         }
 
         std::string getOpName() {
-            return "paulirot";
+            return "PauliRot";
         }
 
         mlir::TypeRange getDynamicShape() {
@@ -745,7 +745,11 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
 
         mlir::DictionaryAttr getStaticData() {
             mlir::MLIRContext *ctx = getContext();
-            mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+            mlir::NamedAttribute pauliWordEntry =
+                mlir::NamedAttribute(
+                    mlir::StringAttr::get(ctx, "pauli_word"),
+                    mlir::StringAttr::get(ctx, getPauliWord())
+                );
             return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
         }
 

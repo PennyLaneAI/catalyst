@@ -47,16 +47,21 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, static_data, num
     print("Hello from python! Here's the received data:", op_name, dynamic_shape, static_data)
 
     device = qp.device("null.qubit", wires=num_wires)
+    # TODO support multiple wire args/qregs
     wires = jnp.array(range(num_wires))
 
-    def decomp_rule(*params, wires):
-        qp.ops.qubit.parametric_ops_multi_qubit._pauli_rot_decomposition._impl(
-            *params, wires=wires, **static_data
-        )
+    def rule_to_subroutine(rule):
+        def decomp_rule(*params, wires):
+            rule._impl(*params, wires=wires, **static_data)
 
-    decomp_rule.__name__ = op_id + "_decomposition"
+        decomp_rule.__name__ = op_id + "_" + rule.name
 
-    paulirot_subroutine = qp.capture.subroutine(decomp_rule)
+        return qp.capture.subroutine(decomp_rule)
+
+    # let this fail with the standard error message if the op is not found
+    op_class = getattr(qp, op_name)
+
+    subroutines = [rule_to_subroutine(rule) for rule in qp.decomposition.list_decomps(op_class)]
 
     @qp.qjit(
         target="mlir",
@@ -64,6 +69,7 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, static_data, num
     )
     @qp.qnode(device=device)
     def circuit():
-        paulirot_subroutine(*[0.5 for _ in dynamic_shape], wires=wires)
+        for subroutine in subroutines:
+            subroutine(*[0.5 for _ in dynamic_shape], wires=wires)
 
     return str(circuit.mlir_module)

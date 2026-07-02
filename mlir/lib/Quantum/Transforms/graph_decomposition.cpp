@@ -347,7 +347,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         MLIRContext *context = &getContext();
 
         llvm::StringSet<> handledOpIds;
-        // Add IDs from existing decomposable ops
+        // Add IDs from existing decomposable ops with decomposition rules
+        // NOTE: we assume in general that if one decomposition rule for an op is available, then
+        // all decomposition rules for that op are available. No system should introduce a subset of
+        // the rules for an op.
         module.walk([&](mlir::func::FuncOp func) {
             if (func->hasAttr("target_gate")) {
                 handledOpIds.insert(func->getAttrOfType<StringAttr>("target_gate").str());
@@ -366,7 +369,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         for (quantum::DecomposableGate op : decomposableOps) {
             std::string opId = op.getDecompId();
-            std::string ruleName = opId + "_decomposition";
 
             if (handledOpIds.contains(opId)) {
                 continue;
@@ -378,35 +380,27 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             mlir::ParserConfig config(context);
             auto moduleOp = mlir::parseSourceString(llvm::StringRef(mlirText), config);
             if (!moduleOp) {
+                // If we fail to parse the lowered module this op will be left without a
+                // decomposition, so we must fail here.
                 llvm::errs() << "failed to parse MLIR from python-decomposition\n";
                 return failure();
             }
 
-            mlir::OwningOpRef<mlir::func::FuncOp> outOp;
             moduleOp->walk([&](mlir::func::FuncOp func) {
-                // TODO: enable multiple decomposition rules for the same operator
-                if (func.getName() == ruleName) {
+                if (func.getName().starts_with(opId)) {
+                    mlir::OwningOpRef<mlir::func::FuncOp> outOp;
                     func->remove();
                     outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
-                    return mlir::WalkResult::interrupt();
+                    mlir::func::FuncOp funcOp = outOp.get();
+                    funcOp->setAttr("target_gate", mlir::StringAttr::get(context, opId));
+
+                    // if we fail to add one of the decomps, we still want to try for the rest
+                    std::ignore = addRuleNode(funcOp, ruleNodes);
+                    LDBG() << "adding rule " << funcOp.getName();
+                    module.push_back(std::move(outOp.release()));
                 }
                 return mlir::WalkResult::advance();
             });
-
-            if (!outOp) {
-                llvm::errs() << "failed to find " << ruleName << " in parsed MLIR\n";
-                return failure();
-            }
-
-            mlir::func::FuncOp funcOp = outOp.get();
-            outOp->setName(ruleName); // unique name per pauliword
-            funcOp->setAttr("target_gate", mlir::StringAttr::get(context, opId));
-
-            if (failed(addRuleNode(funcOp, ruleNodes))) {
-                return failure();
-            }
-            LDBG() << "adding rule " << ruleName;
-            module.push_back(std::move(outOp.release()));
         }
         return success();
     }

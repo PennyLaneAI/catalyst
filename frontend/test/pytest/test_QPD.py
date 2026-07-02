@@ -14,9 +14,10 @@
 
 """Unit tests for the python decompositions module."""
 
+import pennylane as qp
 import pytest
 
-from catalyst.device.python_decompositions import paulirot_decomposition_wrapper
+from catalyst.device.python_decompositions import python_decomposition_wrapper
 
 
 class TestQPD:
@@ -24,11 +25,33 @@ class TestQPD:
 
     def test_paulirot_wrapper(self):
         """Test that the paulirot QPD wrapper correctly returns the IR as a string."""
-        result = paulirot_decomposition_wrapper(0.4, "XZZ", [0, 1, 2])
+        result = python_decomposition_wrapper(
+            "PauliRot", "paulirotXZZ", [0.4], {"pauli_word": "XZZ"}, 3
+        )
         assert isinstance(result, str)
-        assert "paulirot_decomp_rule" in result
+        assert "paulirotXZZ__pauli_rot_decomposition" in result
         assert "Hadamard" in result
         assert "multirz" in result
+
+    def test_multiple_rules(self):
+        """Test that the python decomposition wrapper supports multiple rules."""
+        with qp.decomposition.local_decomps():
+
+            def test_resources():
+                return {qp.X: 1}
+
+            @qp.register_resources(test_resources)
+            def test_decomp(angle, wires, pauli_word):
+                qp.RX(angle, wires[0])
+
+            qp.add_decomps(qp.PauliRot, test_decomp)
+
+            result = python_decomposition_wrapper(
+                "PauliRot", "paulirotXYX", [float], {"pauli_word": "XYX"}, 3
+            )
+
+            assert "paulirotXYX_test_decomp" in result
+            assert "test_decomp" in result
 
 
 if __name__ == "__main__":
