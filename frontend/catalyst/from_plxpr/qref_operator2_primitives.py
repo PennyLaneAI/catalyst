@@ -89,12 +89,22 @@ def _is_custom_op(op_cls, avals_in):
     return all(p.shape == () and "float" in p.dtype.name for p in avals_in)
 
 
+def _general_validation(*args, op_cls, wire_lens, **kwargs):
+    num_normal_wires = sum(wire_lens)
+    wires = args[len(op_cls.dynamic_argnames): (len(op_cls.dynamic_argnames) + num_normal_wires)]
+    for w in wires:
+        assert ir.OpaqueType.isinstance(w.type)
+        assert ir.OpaqueType(w.type).dialect_namespace == "qref"
+        assert ir.OpaqueType(w.type).data == "bit"
+
+
 def _qref_operator_p_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *args,
     op_cls,
     **kwargs,
 ):
+    _general_validation(*args, op_cls, **kwargs)
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     if op_cls.__name__ in _SPECIAL_LOWERINGS:
@@ -210,11 +220,6 @@ def _special_unitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix, *qubits
     ctrl_qubits = []
     ctrl_values = []
 
-    for q in qubits:
-        assert ir.OpaqueType.isinstance(q.type)
-        assert ir.OpaqueType(q.type).dialect_namespace == "qref"
-        assert ir.OpaqueType(q.type).data == "bit"
-
     matrix_type = matrix.type
     is_tensor = ir.RankedTensorType.isinstance(matrix_type)
     shape = ir.RankedTensorType(matrix_type).shape if is_tensor else None
@@ -264,11 +269,6 @@ def _special_paulirot_lowering(
     pauli_word = unflatten(*pauli_word)
     ctrl_qubits = []
     ctrl_values = []
-
-    for q in qubits:
-        assert ir.OpaqueType.isinstance(q.type)
-        assert ir.OpaqueType(q.type).dialect_namespace == "qref"
-        assert ir.OpaqueType(q.type).data == "bit"
 
     angle = safe_cast_to_f64(angle, "PauliRot")
     angle = extract_scalar(angle, "PauliRot")
