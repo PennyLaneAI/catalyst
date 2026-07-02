@@ -33,6 +33,8 @@ class NoParams(qp.core.Operator2):
 @qp.qjit(target="mlir", capture=True)
 @qp.qnode(qp.device("null.qubit", wires=2))
 def c_no_params():
+    # CHECK-LABEL: func.func public @c_no_params
+
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: qref.operator "NoParams"() qubits([[q0]])
     # CHECK: static_data = {}
@@ -60,6 +62,8 @@ class NoParamsCustomOp(qp.core.Operator2):
 @qp.qjit(target="mlir", capture=True)
 @qp.qnode(qp.device("null.qubit", wires=2))
 def c_no_params_custom():
+    # CHECK-LABEL: func.func public @c_no_params_custom
+
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: qref.custom "NoParamsCustomOp"() [[q0]] : !qref.bit
     NoParamsCustomOp(wires=0)
@@ -86,6 +90,7 @@ class SingleParam(qp.core.Operator2):
 @qp.qjit(target="mlir", capture=True)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def c_single_param(x: float):
+    # CHECK-LABEL: func.func public @c_single_param
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
 
@@ -118,6 +123,7 @@ class SingleParamCustomOp(qp.core.Operator2):
 @qp.qjit(target="mlir", capture=True)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def c_single_param_custom(x: float):
+    # CHECK-LABEL: func.func public @c_single_param_custom
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: qref.custom "SingleParamCustomOp"({{%.+}}) [[q0]] : !qref.bit
@@ -145,6 +151,8 @@ class CompilableData(qp.core.Operator2):
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def c_compilable():
+    # CHECK-LABEL: func.func public @c_compilable
+
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}
     # CHECK: qref.operator "CompilableData"() qubits([[q1]], [[q2]])
@@ -170,6 +178,8 @@ class MultipleRegisters(qp.core.Operator2):
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=5))
 def c_multiple_registers():
+    # CHECK-LABEL: func.func public @c_multiple_registers
+
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}
     # CHECK: [[q3:%.+]] = qref.get {{%.+}}
@@ -198,6 +208,8 @@ class MultiParams(qp.core.Operator2):
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=1))
 def c_multi_params():
+    # CHECK-LABEL: func.func public @c_multi_params
+
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
 
     # pylint: disable=line-too-long
@@ -223,6 +235,7 @@ class MultiParamsCustom(qp.core.Operator2):
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=1))
 def c_multi_param_custom():
+    # CHECK-LABEL: func.func public @circuit_multi_param_custom
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
 
     # pylint: disable=line-too-long
@@ -269,6 +282,7 @@ class PauliRot(qp.core.Operator2):
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def circuit_paulirot(x: float):
+    # CHECK-LABEL: func.func public @circuit_paulirot
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
@@ -302,6 +316,7 @@ class GlobalPhase(qp.core.Operator2):
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def circuit_gphase(x: float):
+    # CHECK-LABEL: func.func public @circuit_gphase
 
     # CHECK: qref.gphase({{%.+}})
     GlobalPhase(x)
@@ -322,15 +337,16 @@ class QubitUnitary(qp.core.Operator2):
 @qp.qjit(capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def circuit_qubitunitary():
+    # CHECK-LABEL: func.func public @circuit_qubitunitary
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
-    # CHECK: qref.unitary({{%.+}}. : tensor<2x2xcomplex<f64>>) [[q0]] : !qref.bit
+    # CHECK: qref.unitary({{%.+}} : tensor<2x2xcomplex<f64>>) [[q0]] : !qref.bit
 
     QubitUnitary(np.array([[0, 1], [1, 0]]), 0)
 
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}
-    # CHECK: qref.unitary({{%.+}}. : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] : !qref.bit, !qref.bit
+    # CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] : !qref.bit, !qref.bit
 
     QubitUnitary(qp.CNOT.compute_matrix(), (0, 1))
     return qp.expval(qp.Z(0)), qp.expval(qp.Z(0))
@@ -350,10 +366,11 @@ class PCPhase(qp.core.Operator2):
 @qp.qjit(capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def c_pcphase(x: float, dim: int):
+    # CHECK-LABEL: func.func public @c_pcphase
 
-    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
-    # CHECK: qref.pcphase({{%.+}}, {{%.+}}) [[q1]], [[q2]] :  !qref.bit, !qref.bit
+    # CHECK: [[q11:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q12:%.+]] = qref.get {{%.+}}
+    # CHECK: qref.pcphase({{%.+}}, {{%.+}}) [[q11]], [[q12]] : !qref.bit, !qref.bit
 
     PCPhase(x, dim, (0, 1))
     return qp.state()
