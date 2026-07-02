@@ -13,7 +13,7 @@
 # limitations under the License.
 """Tests for operator in Catalyst."""
 
-# pylint: disable = useless-parent-delegation, missing-function-docstring, missing-class-docstring
+# pylint: disable = useless-parent-delegation, missing-function-docstring, missing-class-docstring, line-too-long
 
 # RUN: %PYTHON %s | FileCheck %s
 
@@ -268,7 +268,7 @@ class PauliRot(qp.core.Operator2):
 
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
-def circuit(x: float):
+def circuit_paulirot(x: float):
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
@@ -287,7 +287,7 @@ def circuit(x: float):
     return qp.probs(wires=(0, 1, 2))
 
 
-print(circuit.mlir)
+print(circuit_paulirot.mlir)
 
 
 class GlobalPhase(qp.core.Operator2):
@@ -301,14 +301,14 @@ class GlobalPhase(qp.core.Operator2):
 
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
-def circuit(x: float):
+def circuit_gphase(x: float):
 
     # CHECK: qref.gphase({{%.+}})
     GlobalPhase(x)
     return qp.state()
 
 
-print(circuit.mlir)
+print(circuit_gphase.mlir)
 
 
 class QubitUnitary(qp.core.Operator2):
@@ -321,7 +321,7 @@ class QubitUnitary(qp.core.Operator2):
 
 @qp.qjit(capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
-def c():
+def circuit_qubitunitary():
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: qref.unitary({{%.+}}. : tensor<2x2xcomplex<f64>>) [[q0]] : !qref.bit
@@ -336,7 +336,7 @@ def c():
     return qp.expval(qp.Z(0)), qp.expval(qp.Z(0))
 
 
-print(circuit.mlir)
+print(circuit_qubitunitary.mlir)
 
 
 class PCPhase(qp.core.Operator2):
@@ -349,7 +349,7 @@ class PCPhase(qp.core.Operator2):
 
 @qp.qjit(capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
-def c(x: float, dim: int):
+def c_pcphase(x: float, dim: int):
 
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}
@@ -359,4 +359,4 @@ def c(x: float, dim: int):
     return qp.state()
 
 
-print(circuit.mlir)
+print(c_pcphase.mlir)
