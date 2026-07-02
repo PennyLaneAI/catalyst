@@ -14,6 +14,7 @@
 """This module contains JAX-compatible quantum primitives to support the lowering
 of quantum operations, measurements, and observables to reference semantics JAXPR.
 """
+
 # pylint: disable=unused-argument
 from jax._src.lib.mlir import ir
 from jax.extend.core import Primitive
@@ -70,6 +71,7 @@ def _register_special_lowering(op_name):
 
     return decorator
 
+
 qref_operator_p = Primitive("qref_operator")
 qref_operator_p.multiple_results = True
 
@@ -96,14 +98,10 @@ def _qref_operator_p_lowering(
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     if op_cls.__name__ in _SPECIAL_LOWERINGS:
-        return _SPECIAL_LOWERINGS[op_cls.__name__](
-            jax_ctx,
-            *args,
-            op_cls=op_cls,
-            **kwargs
-        )
-    hybrid_lens = kwargs.pop("hybrid_lens")
-    hybrid_trees = kwargs.pop("hybrid_trees")
+        return _SPECIAL_LOWERINGS[op_cls.__name__](jax_ctx, *args, op_cls=op_cls, **kwargs)
+    # will be used in future improvements
+    hybrid_lens = kwargs.pop("hybrid_lens")  # pylint: disable=unused-variable
+    hybrid_trees = kwargs.pop("hybrid_trees")  # pylint: disable=unused-variable
     wire_lens = kwargs.pop("wire_lens")
     params = args[: len(op_cls.dynamic_argnames)]
     qubits = args[len(op_cls.dynamic_argnames) :]
@@ -130,7 +128,7 @@ def _qref_operator_p_lowering(
     ctrl_values = []
     adjoint = False
 
-    if _is_custom_op(op_cls, jax_ctx.avals_in[:len(op_cls.dynamic_argnames)]):
+    if _is_custom_op(op_cls, jax_ctx.avals_in[: len(op_cls.dynamic_argnames)]):
         params = [extract_scalar(safe_cast_to_f64(p, op_cls), op_cls) for p in params]
         CustomOp(
             params=params,
@@ -159,17 +157,8 @@ def _qref_operator_p_lowering(
     return []
 
 
-
-
 @_register_special_lowering("MultiRZ")
-def _multirz_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *args,
-    op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens
-):
+def _multirz_lowering(jax_ctx: mlir.LoweringRuleContext, *args, **_):
     theta = extract_scalar(safe_cast_to_f64(args[0], "MultiRZ"), "MultiRZ")
     qubits = args[1:]
     MultiRZOp(
@@ -186,10 +175,7 @@ def _multirz_lowering(
 def _pcphase_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *args,
-    op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens,
+    **_,
 ):
     qubits = args[2:]
     PCPhaseOp(
@@ -208,9 +194,7 @@ def _special_gphase_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *args,
     op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens,
+    **_,
 ):
     GlobalPhaseOp(
         angle=extract_scalar(safe_cast_to_f64(args[0], "GlobalPhase"), "GlobalPhase"),
@@ -222,15 +206,7 @@ def _special_gphase_lowering(
 
 
 @_register_special_lowering("QubitUnitary")
-def _special_unitary_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    matrix,
-    *qubits,
-    op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens,
-):
+def _special_unitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix, *qubits, **_):
     ctrl_qubits = []
     ctrl_values = []
 
@@ -282,11 +258,8 @@ def _special_paulirot_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     angle,
     *qubits,
-    op_cls,
-    hybrid_lens,
-    hybrid_trees,
-    wire_lens,
     pauli_word,
+    **_,
 ):
     pauli_word = unflatten(*pauli_word)
     ctrl_qubits = []

@@ -31,8 +31,6 @@ from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.wires import AbstractQubit
 
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
-
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
 # Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
@@ -49,7 +47,7 @@ from catalyst.jax_primitives import (
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.patching import Patcher
 
-from .qref_operator2_primitives import qref_operator_p, _qref_operator_p_lowering
+from .qref_operator2_primitives import _qref_operator_p_lowering, qref_operator_p
 
 with Patcher(
     (
@@ -168,7 +166,6 @@ qref_measure_in_basis_p = Primitive("qref_measure_in_basis")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
-
 
 
 #
@@ -801,7 +798,6 @@ def _qref_named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value,
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
     return NamedObsOp(result_type, qubit, obsId).results
-
 
 
 #

@@ -50,6 +50,7 @@ def c_no_params():
 
 print(c_no_params.mlir)
 
+
 class NoParamsCustomOp(qp.core.Operator2):
 
     def __init__(self, wires):
@@ -71,7 +72,6 @@ def c_no_params_custom():
 
 
 print(c_no_params_custom.mlir)
-
 
 
 class SingleParam(qp.core.Operator2):
@@ -188,7 +188,7 @@ print(c_multiple_registers.mlir)
 class MultiParams(qp.core.Operator2):
 
     dynamic_argnames = ("a", "b", "c")
-    wire_argnames = ("reg", )
+    wire_argnames = ("reg",)
 
     # note also having non-standard order with dynamic inputs after wires
     def __init__(self, reg, a, b, c):
@@ -209,6 +209,7 @@ def c_multi_params():
 
 
 print(c_multi_params.mlir)
+
 
 class MultiParamsCustom(qp.core.Operator2):
 
@@ -232,6 +233,7 @@ def c_multi_param_custom():
 
 print(c_multi_param_custom.mlir)
 
+
 class MultiRZ(qp.core.Operator2):
 
     dynamic_argnames = ("phi",)
@@ -239,15 +241,122 @@ class MultiRZ(qp.core.Operator2):
     def __init__(self, phi, wires):
         super().__init__(phi, wires)
 
+
 @qp.qjit(capture=True, target="mlir")
-@qp.qnode(qp.device('null.qubit', wires=2))
-def c(x: float):
+@qp.qnode(qp.device("null.qubit", wires=2))
+def circuit(x: float):
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}
 
     # CHECK: qref.multirz({{%.+}}) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
-    MultiRZ(x, (0,1,2))
+    MultiRZ(x, (0, 1, 2))
     return qp.state()
 
-print(c.mlir)
+
+print(circuit.mlir)
+
+
+class PauliRot(qp.core.Operator2):
+
+    dynamic_argnames = ("phi",)
+    compilable_argnames = ("pauli_word",)
+
+    def __init__(self, phi, pauli_word, wires):
+        super().__init__(phi, pauli_word, wires)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def circuit(x: float):
+
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
+
+    # CHECK: qref.paulirot ["X", "Y", "Z"]({{%.+}}) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
+    PauliRot(x, "XYZ", (0, 1, 2))
+
+    # CHECK: [[q3:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q4:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q5:%.+]] = qref.get {{%.+}}
+
+    # CHECK: qref.paulirot ["Y", "Z", "X"]({{%.+}}) [[q3]], [[q4]], [[q5]] : !qref.bit, !qref.bit, !qref.bit
+    PauliRot(x, "YZX", (0, 1, 2))
+
+    return qp.probs(wires=(0, 1, 2))
+
+
+print(circuit.mlir)
+
+
+class GlobalPhase(qp.core.Operator2):
+
+    dynamic_argnames = ("phi",)
+    wire_argnames = ()
+
+    def __init__(self, phi):
+        super().__init__(phi=phi)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def circuit(x: float):
+
+    # CHECK: qref.gphase({{%.+}})
+    GlobalPhase(x)
+    return qp.state()
+
+
+print(circuit.mlir)
+
+
+class QubitUnitary(qp.core.Operator2):
+
+    dynamic_argnames = ("matrix",)
+
+    def __init__(self, matrix, wires):
+        super().__init__(matrix, wires)
+
+
+@qp.qjit(capture=True)
+@qp.qnode(qp.device("lightning.qubit", wires=3))
+def c():
+
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
+    # CHECK: qref.unitary({{%.+}}. : tensor<2x2xcomplex<f64>>) [[q0]] : !qref.bit
+
+    QubitUnitary(np.array([[0, 1], [1, 0]]), 0)
+
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
+    # CHECK: qref.unitary({{%.+}}. : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] : !qref.bit, !qref.bit
+
+    QubitUnitary(qp.CNOT.compute_matrix(), (0, 1))
+    return qp.expval(qp.Z(0)), qp.expval(qp.Z(0))
+
+
+print(circuit.mlir)
+
+
+class PCPhase(qp.core.Operator2):
+
+    dynamic_argnames = ("phi", "dim")
+
+    def __init__(self, phi, dim, wires):
+        super().__init__(phi, dim, wires)
+
+
+@qp.qjit(capture=True)
+@qp.qnode(qp.device("lightning.qubit", wires=2))
+def c(x: float, dim: int):
+
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
+    # CHECK: qref.pcphase({{%.+}}, {{%.+}}) [[q1]], [[q2]] :  !qref.bit, !qref.bit
+
+    PCPhase(x, dim, (0, 1))
+    return qp.state()
+
+
+print(circuit.mlir)
