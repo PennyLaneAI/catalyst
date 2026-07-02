@@ -28,8 +28,6 @@ from typing import Tuple
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax import Array
-from jax.typing import ArrayLike
 
 
 def _bitstrings_for_n_qubits(n_qubits: int) -> jax.Array:

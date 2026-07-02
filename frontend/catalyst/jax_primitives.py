@@ -1091,9 +1091,7 @@ def _rem_def_impl(ctx, *args, run_calibration, jaxpr, fn):  # pragma: no cover
 
 
 @rem_p.def_abstract_eval
-def _rem_abstract_eval(
-    *args, run_calibration, jaxpr, fn
-):  # pylint: disable=unused-argument
+def _rem_abstract_eval(*args, run_calibration, jaxpr, fn):  # pylint: disable=unused-argument
     """Abstract eval for the REM primitive.
 
     Returns a 3-tuple of avals matching the lowering's three results:

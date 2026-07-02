@@ -23,15 +23,126 @@ using namespace std::string_literals;
 namespace catalyst {
 namespace mitigation {
 
+namespace {
+
+// Emit one calibration circuit next to the user callee. It reuses the callee's
+// `quantum.device` kwargs verbatim (so it inherits the same noise channel) and,
+// when `applyPauliX` is true, applies a PauliX gate on every qubit before
+// compbasis to produce the all-ones basis state. Returns the calibration result
+// values (drops the eigvals half of CountsOp).
+ValueRange emitCalibrationCircuit(PatternRewriter &rewriter, Location loc, func::FuncOp calleeOp,
+                                  RankedTensorType tensorTyF64, RankedTensorType tensorTyI64,
+                                  bool applyPauliX)
+{
+    const char *tag = applyPauliX ? "(ones)" : "(zeros)";
+
+    const int64_t qubitCount =
+        (*calleeOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
+    quantum::DeviceInitOp deviceInitOp = *(calleeOp.getOps<quantum::DeviceInitOp>().begin());
+    Operation *shots = deviceInitOp.getShots().getDefiningOp();
+    StringAttr lib = deviceInitOp.getLibAttr();
+    StringAttr name = deviceInitOp.getDeviceNameAttr();
+    StringAttr kwargs = deviceInitOp.getKwargsAttr();
+
+    Operation *measurementProcess =
+        (*calleeOp.getOps<quantum::MeasurementProcess>().begin()).getOperation();
+    const std::string MPName = measurementProcess->getName().getIdentifier().str();
+
+    Operation *shotsLocal = shots->clone();
+    rewriter.insert(shotsLocal);
+    auto devInit =
+        rewriter.create<quantum::DeviceInitOp>(loc, shotsLocal->getResult(0), lib, name, kwargs);
+    llvm::dbgs() << "[mitigation.rem] quantum.device initialization " << tag
+                 << " OK, op=" << devInit << "\n";
+
+    IntegerAttr qubitCountAttr = rewriter.getI64IntegerAttr(qubitCount);
+    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, qubitCountAttr);
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+    auto qreg = rewriter.create<quantum::AllocOp>(loc, qregType, numberQubitsValue, qubitCountAttr);
+    llvm::dbgs() << "[mitigation.rem] quantum.alloc " << tag << " addition OK, op=" << qreg << "\n";
+
+    Value currentQreg = qreg.getResult();
+    if (applyPauliX) {
+        // For each qubit: extract -> PauliX -> insert. Each insert produces a
+        // fresh register SSA Value so the chain threads correctly.
+        for (int64_t i = 0; i < qubitCount; ++i) {
+            auto idxAttr = rewriter.getI64IntegerAttr(i);
+            auto extracted = rewriter.create<quantum::ExtractOp>(
+                loc, rewriter.getType<quantum::QubitType>(), currentQreg, nullptr, idxAttr);
+            auto xgate = rewriter.create<quantum::CustomOp>(
+                loc, /*gate_name=*/"PauliX", mlir::ValueRange({extracted.getResult()}));
+            auto inserted = rewriter.create<quantum::InsertOp>(
+                loc, qreg.getType(), currentQreg, nullptr, idxAttr, xgate.getResult(0));
+            currentQreg = inserted.getResult();
+        }
+    }
+
+    Type obsType = ::catalyst::quantum::ObservableType::get(rewriter.getContext());
+    auto compbasis = rewriter.create<quantum::ComputationalBasisOp>(loc, TypeRange{obsType},
+                                                                    ValueRange{}, currentQreg);
+    llvm::dbgs() << "[mitigation.rem] quantum.compbasis " << tag << " addition OK, op=" << compbasis
+                 << "\n";
+
+    ValueRange calibratedResult;
+    if (MPName == "quantum.probs"s) {
+        auto insertedMP = rewriter.create<quantum::ProbsOp>(
+            loc, TypeRange{tensorTyF64}, compbasis.getResult(), Value(), Value());
+        llvm::dbgs() << "[mitigation.rem] quantum.probs " << tag
+                     << " addition OK, op=" << insertedMP << "\n";
+        calibratedResult = insertedMP->getResults();
+    }
+    else if (MPName == "quantum.counts"s) {
+        auto insertedMP =
+            rewriter.create<quantum::CountsOp>(loc, TypeRange{tensorTyF64, tensorTyI64},
+                                               compbasis.getResult(), Value(), Value(), Value());
+        llvm::dbgs() << "[mitigation.rem] quantum.counts " << tag
+                     << " addition OK, op=" << insertedMP << "\n";
+        // Drop the eigvals half; only the counts tensor feeds calibration.
+        calibratedResult = insertedMP->getResults().drop_front();
+    }
+    else if (MPName == "quantum.sample"s) {
+        auto insertedMP = rewriter.create<quantum::SampleOp>(
+            loc, TypeRange{tensorTyF64}, compbasis.getResult(), ValueRange{}, Value());
+        llvm::dbgs() << "[mitigation.rem] quantum.sample " << tag
+                     << " addition OK, op=" << insertedMP << "\n";
+        IRMapping postprocMapping;
+        uint64_t resultIndex = 0;
+        for (auto res : measurementProcess->getResults())
+            postprocMapping.map(res, insertedMP->getResult(resultIndex++));
+        rewriter.setInsertionPointAfter(insertedMP.getOperation());
+        calibratedResult = insertedMP->getResults();
+        for (auto postprocOp = measurementProcess->getNextNode();
+             postprocOp != nullptr &&
+             postprocOp->getName().getIdentifier() != quantum::DeallocOp::getOperationName();
+             postprocOp = postprocOp->getNextNode()) {
+            llvm::dbgs() << "[mitigation.rem] looking for next op: "
+                         << postprocOp->getName().getIdentifier() << "\n";
+            Operation *insertedOp = rewriter.clone(*postprocOp, postprocMapping);
+            if (!insertedOp->getResults().empty())
+                calibratedResult = insertedOp->getResults();
+            rewriter.setInsertionPointAfter(insertedOp);
+            llvm::dbgs() << "[mitigation.rem] insertedOp: " << insertedOp->getName().getIdentifier()
+                         << "\n";
+        }
+    }
+
+    auto dealloc = rewriter.create<quantum::DeallocOp>(loc, qreg);
+    llvm::dbgs() << "[mitigation.rem] quantum.dealloc " << tag << " addition OK, op=" << dealloc
+                 << "\n";
+    auto deinit = rewriter.create<quantum::DeviceReleaseOp>(loc);
+    llvm::dbgs() << "[mitigation.rem] quantum.deinit " << tag << " addition OK, op=" << deinit
+                 << "\n";
+    return calibratedResult;
+}
+
+} // namespace
+
 LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter &rewriter) const
 {
     // The Rem lowering will produce three groups of results:
     //  1) the original callee results
     //  2) probabilities from an all-zeroes calibration circuit
     //  3) probabilities from an all-ones calibration circuit
-    // For the initial implementation we create simple placeholder calibration
-    // functions that return a 1-element tensor<f64>. These will be replaced
-    // with proper calibration circuits in a subsequent step.
     Location loc = op.getLoc();
 
     auto runCalibration = op.getRunCalibrationAttr();
@@ -50,11 +161,6 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     SmallVector<Value> callArgs(op.getArgs().begin(), op.getArgs().end());
     auto callOp = rewriter.create<func::CallOp>(loc, calleeOp, callArgs);
 
-    // Get SSA Values for wrapped callee function results. Note that these are not actual values of
-    // elements, but an abstraction, Value objects and ValueRange: non-owning view of multiple Value
-    // objects. These values are not known until runtime of the compiled program (not to be confused
-    // with from pass runtime / pass time). But their abstractions can be used to define the flow of
-    // the program
     auto results = callOp.getResults();
     // Declare vector of SSA Values representing the total result (callee results + two calibration
     // circuit results, or zero-tensors if no calibration is present)
@@ -63,81 +169,8 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     // times as many Value objects (because of zeros and ones calibration circuits)
     completeResults.reserve(results.size() * 3);
 
-    // Determine quantum device information, specifically number of qubits and shots.
-    // Get the number of qubits from quantum.alloc operation inside callee function (FuncOp). Note
-    // the due to iterator (pointer)
-    const int64_t qubitCount =
-        (*calleeOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
-    // Get the device using quantom.device opeartion  inside callee function (FuncOp)
-    quantum::DeviceInitOp deviceInitOp = *(calleeOp.getOps<quantum::DeviceInitOp>().begin());
-    // shots value could be a result of some operation, and not just a literal value, which is why
-    // pointer to the operation is stored
-    Operation *shots = deviceInitOp.getShots().getDefiningOp();
-    StringAttr lib = deviceInitOp.getLibAttr();
-    StringAttr name = deviceInitOp.getDeviceNameAttr();
-    StringAttr kwargs = deviceInitOp.getKwargsAttr();
-    llvm::dbgs() << "[mitigation.rem] qubitCount: " << qubitCount << ", shots: " << *shots
-                 << ", lib: " << lib << ", name: " << name << ", kwargs" << kwargs << "\n";
-
-    // check for MP type: Sample, Probs or Counts
-    auto measurementProcesses = calleeOp.getOps<quantum::MeasurementProcess>();
-    if (measurementProcesses.empty()) {
-        llvm::errs() << "[mitigation.rem] No valid MP found.\n";
-        return failure();
-    }
-    mlir::Operation *measurementProcess = (*measurementProcesses.begin()).getOperation();
-    std::string MPName = measurementProcess->getName().getIdentifier().str();
-    llvm::dbgs() << "[mitigation.rem] MP name: " << MPName << "\n";
-
-    // pre-compute MP and attribute-dependent values
-    bool doCalib = runCalibration.getValue(); // get boolean value of BoolAttr
-    mlir::RankedTensorType tensorTyI64;
-    mlir::RankedTensorType tensorTyF64;
-    int64_t calibrationTensorShape = 0;
-    int64_t shotCount = 0;
-    if (MPName == "quantum.probs"s || MPName == "quantum.counts"s) {
-        // avoid undefined behaviour due to integer overflow
-        if (qubitCount >= 63) {
-            // in practice, due to exponential memory growth, users will
-            // OOM much earlier, at < 30 qubits
-            llvm::errs() << "[mitigation.rem] Qubit count" << qubitCount
-                         << "exceeds maximum simulated register size (62 qubits).\n";
-        }
-        calibrationTensorShape = static_cast<int64_t>(1ULL << qubitCount);
-        tensorTyF64 = RankedTensorType::get({calibrationTensorShape}, rewriter.getF64Type());
-        tensorTyI64 = RankedTensorType::get({calibrationTensorShape}, rewriter.getI64Type());
-    }
-    else if (MPName == "quantum.sample"s) {
-        // check if shots Op is actually a arith.constant. In that case, shots are known at compile
-        // time
-        if (shots->getName().getIdentifier() == arith::ConstantOp::getOperationName()) {
-            auto shotsAttr = shots->getAttrOfType<IntegerAttr>("value");
-            if (!shotsAttr || shotsAttr == 0) {
-                llvm::errs()
-                    << "[mitigation.rem] Shots constant missing non-zero integer value. Sample MP "
-                       "not supported for analytic simulation (shots must be > 0).\n";
-                return failure();
-            }
-            shotCount = shotsAttr.getInt();
-            llvm::dbgs()
-                << "[mitigation.rem] Shots is a arth.constant op, shots known at compile time: "
-                << shotCount << "\n";
-            calibrationTensorShape = shotCount * qubitCount;
-            tensorTyI64 = RankedTensorType::get({shotCount, qubitCount}, rewriter.getI64Type());
-            tensorTyF64 = RankedTensorType::get({shotCount, qubitCount}, rewriter.getF64Type());
-        }
-        else {
-            llvm::errs() << "[mitigation.rem] Dynamic number of shots not supported currently.\n";
-            return failure();
-        }
-    }
-    else {
-        llvm::errs() << "[mitigation.rem] Supported measurement processes are quantum.counts, "
-                        "quantum.probs and quantum.sample. "
-                     << MPName << " is not supported.\n";
-        return failure();
-    }
-    if (!doCalib) { // doCalib == false
+    const bool doCalib = runCalibration.getValue();
+    if (!doCalib) {
         llvm::dbgs() << "[mitigation.rem] doCalibration == false, replacing RemOp with wrapped "
                         "callee circuit function call..."
                      << "\n";
@@ -148,201 +181,83 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
         rewriter.replaceOp(op, completeResults);
         return success();
     }
-    // else, doCalib == true
+
+    // Determine quantum device information, specifically number of qubits and shots.
+    // Get the number of qubits from quantum.alloc operation inside callee function (FuncOp).
+    const int64_t qubitCount =
+        (*calleeOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
+    // Get the device using quantom.device opeartion  inside callee function (FuncOp)
+    quantum::DeviceInitOp deviceInitOp = *(calleeOp.getOps<quantum::DeviceInitOp>().begin());
+    // shots value could be a result of some operation, and not just a literal value, which is why
+    // pointer to the operation is stored
+    Operation *shots = deviceInitOp.getShots().getDefiningOp();
+    llvm::dbgs() << "[mitigation.rem] qubitCount: " << qubitCount << ", shots: " << *shots
+                 << ", lib: " << deviceInitOp.getLibAttr()
+                 << ", name: " << deviceInitOp.getDeviceNameAttr() << ", kwargs"
+                 << deviceInitOp.getKwargsAttr() << "\n";
+
+    // check for MP type: Sample, Probs or Counts
+    auto measurementProcesses = calleeOp.getOps<quantum::MeasurementProcess>();
+    if (measurementProcesses.empty()) {
+        llvm::errs() << "[mitigation.rem] No valid MP found.\n";
+        return failure();
+    }
+    const std::string MPName =
+        (*measurementProcesses.begin()).getOperation()->getName().getIdentifier().str();
+    llvm::dbgs() << "[mitigation.rem] MP name: " << MPName << "\n";
+
+    // pre-compute MP and attribute-dependent values
+    RankedTensorType tensorTyI64;
+    RankedTensorType tensorTyF64;
+    if (MPName == "quantum.probs"s || MPName == "quantum.counts"s) {
+        // avoid undefined behaviour due to integer overflow
+        if (qubitCount >= 63) {
+            // in practice, due to exponential memory growth, users will
+            // OOM much earlier, at < 30 qubits
+            llvm::errs() << "[mitigation.rem] Qubit count" << qubitCount
+                         << "exceeds maximum simulated register size (62 qubits).\n";
+        }
+        const int64_t calibrationTensorShape = static_cast<int64_t>(1ULL << qubitCount);
+        tensorTyF64 = RankedTensorType::get({calibrationTensorShape}, rewriter.getF64Type());
+        tensorTyI64 = RankedTensorType::get({calibrationTensorShape}, rewriter.getI64Type());
+    }
+    else if (MPName == "quantum.sample"s) {
+        // shots must be a compile-time arith.constant with a non-zero value.
+        if (shots->getName().getIdentifier() != arith::ConstantOp::getOperationName()) {
+            llvm::errs() << "[mitigation.rem] Dynamic number of shots not supported currently.\n";
+            return failure();
+        }
+        auto shotsAttr = shots->getAttrOfType<IntegerAttr>("value");
+        if (!shotsAttr || shotsAttr == 0) {
+            llvm::errs()
+                << "[mitigation.rem] Shots constant missing non-zero integer value. "
+                   "Sample MP not supported for analytic simulation (shots must be > 0).\n";
+            return failure();
+        }
+        const int64_t shotCount = shotsAttr.getInt();
+        llvm::dbgs()
+            << "[mitigation.rem] Shots is a arth.constant op, shots known at compile time: "
+            << shotCount << "\n";
+        tensorTyI64 = RankedTensorType::get({shotCount, qubitCount}, rewriter.getI64Type());
+        tensorTyF64 = RankedTensorType::get({shotCount, qubitCount}, rewriter.getF64Type());
+    }
+    else {
+        llvm::errs() << "[mitigation.rem] Supported measurement processes are quantum.counts, "
+                        "quantum.probs and quantum.sample. "
+                     << MPName << " is not supported.\n";
+        return failure();
+    }
+
     llvm::dbgs() << "[mitigation.rem] doCalibration == true, start adding all-zeroes and all-ones "
                     "circuits..."
                  << "\n";
-    //
-    // DONE: implement adding two calibation circuits (all-zeroes and all-ones) and return
-    // appropriate results DONE: Then, add support for other MP, such as CountsMP and change the
-    // return type accordingly.
-    // Finally, add support for returning Observables, by somehow injecting the mitigation code
-    // (applying the confusion matrix) before observable calculation. (out of scope for now) 0.
-    // Check how insertion point is managed -- for now it seems to be just fine as it is, but this
-    // must be researched in the future
-    // ===BEGIN ZEROES QFUNC===
-    // 1. Add device creation and allocation (quantum.device and quantum.alloc with previously
-    // determined attributes)
-    Operation *shotsLocal = shots->clone(); // not sure why this is needed
-    rewriter.insert(shotsLocal);            // not sure why this is needed
-    auto devInit =
-        rewriter.create<quantum::DeviceInitOp>(loc, shotsLocal->getResult(0), lib, name, kwargs);
-    Type qregType = quantum::QuregType::get(rewriter.getContext());
-    // not sure why empty IntegerAttr is needed, probably need to research more about how
-    // quantum.alloc works
-    IntegerAttr qubitCountAttr = rewriter.getI64IntegerAttr(qubitCount);
-    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, qubitCountAttr);
-    llvm::dbgs() << "[mitigation.rem] quantum.device initialization OK, op=" << devInit << "\n";
-    auto qreg = rewriter.create<quantum::AllocOp>(loc, qregType, numberQubitsValue, qubitCountAttr);
-    llvm::dbgs() << "[mitigation.rem] quantum.alloc addition OK, op=" << qreg << "\n";
-    // 2. Add quantum.compbasis op with the quantum observation result type and
-    // the allocated quantum register Value as its operand. Use the dialect's
-    // observation type and pass the AllocOp result Value (qreg.getResult())
-    // as the operand; passing the wrong type or an incorrect operand can
-    // cause an `operandSegmentSizes` attribute to appear in the printed IR.
-    Type obsType = ::catalyst::quantum::ObservableType::get(rewriter.getContext());
-    Value qregVal = qreg.getResult();
-    // ComputationalBasisOp has the signature build(OpBuilder, OperationState, Type obs,
-    // ValueRange qubits, optional Value qreg). To create the "qreg" form (measure
-    // the entire register), pass an empty qubits ValueRange and the qreg Value as
-    // the optional argument.
-    // Use the TypeRange overload to ensure the builder picks the overload that
-    // treats the first argument as the result type (observable) rather than
-    // mistakenly interpreting operands. This avoids accidental operand ordering
-    // that can produce explicit operandSegmentSizes or wrong printed form.
-    auto compbasis = rewriter.create<quantum::ComputationalBasisOp>(loc, TypeRange{obsType},
-                                                                    ValueRange{}, qregVal);
-    llvm::dbgs() << "[mitigation.rem] quantum.compbasis addition OK, op=" << compbasis << "\n";
-    // 3. Add quantum.probs op from result of compbasis and get Value of tensor
-    // Probs returns a tensor of size 2^nqubits; build the appropriate RankedTensorType
-    // Be explicit about the builder overload to avoid overload-resolution
-    // ambiguity that can lead to incorrect operandSegmentSizes being set.
-    // Use the TypeRange overload so the result type is unambiguous and the
-    // `obs` operand is passed in the correct position.
-    // Pass explicit placeholders for the optional `dynamic_shape` and `state_in`
-    // operands (as null Values) so that the ODS builder records the correct
-    // operandSegmentSizes = {1, 0, 0} and the assembly printer can elide that
-    // property producing a clean printed form.
-    quantum::MeasurementProcess insertedMP;
-    ValueRange calibratedZeroResult;
-    if (MPName == "quantum.probs"s) {
-        insertedMP = rewriter.create<quantum::ProbsOp>(loc, TypeRange{tensorTyF64},
-                                                       compbasis.getResult(), Value(), Value());
-        llvm::dbgs() << "[mitigation.rem] quantum.probs addition OK, op=" << insertedMP << "\n";
-        calibratedZeroResult = insertedMP->getResults();
-    }
-    else if (MPName == "quantum.counts"s) {
-        insertedMP =
-            rewriter.create<quantum::CountsOp>(loc, TypeRange{tensorTyF64, tensorTyI64},
-                                               compbasis.getResult(), Value(), Value(), Value());
-        llvm::dbgs() << "[mitigation.rem] quantum.counts addition OK, op=" << insertedMP << "\n";
-        calibratedZeroResult =
-            insertedMP->getResults().drop_front(); // drop the first element in the iterator
-                                                   // (eigvals not used for calibration matrices)
-    }
-    else if (MPName == "quantum.sample"s) {
-        insertedMP = rewriter.create<quantum::SampleOp>(
-            loc, TypeRange{tensorTyF64}, compbasis.getResult(), ValueRange{}, Value());
-        llvm::dbgs() << "[mitigation.rem] quantum.sample addition OK, op=" << insertedMP << "\n";
-        IRMapping postprocMapping;
-        uint64_t resultIndex = 0;
-        for (auto res : measurementProcess->getResults())
-            postprocMapping.map(res, insertedMP->getResult(resultIndex++));
-        rewriter.setInsertionPointAfter(insertedMP.getOperation());
-        calibratedZeroResult = insertedMP->getResults();
-        for (auto postprocOp = measurementProcess->getNextNode();
-             postprocOp != nullptr &&
-             postprocOp->getName().getIdentifier() != quantum::DeallocOp::getOperationName();
-             postprocOp = postprocOp->getNextNode()) {
-            llvm::dbgs() << "[mitigation.rem] looking for next op: "
-                         << postprocOp->getName().getIdentifier() << "\n";
-            Operation *insertedOp = rewriter.clone(*postprocOp, postprocMapping);
-            if (!insertedOp->getResults().empty())
-                calibratedZeroResult = insertedOp->getResults();
-            rewriter.setInsertionPointAfter(insertedOp);
-            llvm::dbgs() << "[mitigation.rem] insertedOp: " << insertedOp->getName().getIdentifier()
-                         << "\n";
-        }
-    }
-    // MPName is already guaranteed to be a valid value, so no else block here.
 
-    // 4. Deallocate everything
-    auto dealloc = rewriter.create<quantum::DeallocOp>(loc, qreg);
-    llvm::dbgs() << "[mitigation.rem] quantum.dealloc addition OK, op=" << dealloc << "\n";
-    auto deinit = rewriter.create<quantum::DeviceReleaseOp>(loc);
-    llvm::dbgs() << "[mitigation.rem] quantum.deinit addition OK, op=" << deinit << "\n";
-    // ===END ZEROES QFUNC===
-    // 5. Add quantum.custom 'X' gates to implement ones circuit
-    // ===BEGIN ONES QFUNC===
-    // Reuse numberQubitsValue and qubitCountAttr created above. Clone shots and create a new
-    // device/alloc sequence for the ones circuit.
-    Operation *shotsLocalOnes = shots->clone();
-    rewriter.insert(shotsLocalOnes);
-    auto devInitOnes = rewriter.create<quantum::DeviceInitOp>(loc, shotsLocalOnes->getResult(0),
-                                                              lib, name, kwargs);
-    llvm::dbgs() << "[mitigation.rem] quantum.device initialization (ones) OK, op=" << devInitOnes
-                 << "\n";
-    auto qregOnes =
-        rewriter.create<quantum::AllocOp>(loc, qregType, numberQubitsValue, qubitCountAttr);
-    llvm::dbgs() << "[mitigation.rem] quantum.alloc (ones) addition OK, op=" << qregOnes << "\n";
-
-    // For each qubit in the register: extract -> apply PauliX -> insert back
-    // Use a Value to track the current register SSA value so each insert
-    // produces a new SSA Value derived from the previous one. Reusing the
-    // previous InsertOp object (or its Op pointer) risks confusing the
-    // builder/operands and producing identical SSA uses.
-    Value currentQreg = qregOnes.getResult();
-    for (int64_t i = 0; i < qubitCount; ++i) {
-        auto idxAttr = rewriter.getI64IntegerAttr(i);
-        // Extract qubit
-        auto extracted = rewriter.create<quantum::ExtractOp>(
-            loc, rewriter.getType<quantum::QubitType>(), currentQreg, nullptr, idxAttr);
-        // Apply PauliX (1-qubit gate)
-        auto xgate = rewriter.create<quantum::CustomOp>(loc, /*gate_name=*/"PauliX",
-                                                        mlir::ValueRange({extracted.getResult()}));
-        // Insert back into the register, producing a new register Value
-        auto inserted = rewriter.create<quantum::InsertOp>(loc, qregOnes.getType(), currentQreg,
-                                                           nullptr, idxAttr, xgate.getResult(0));
-        currentQreg = inserted.getResult();
-    }
-
-    // Measure and get probs for ones circuit
-    Value qregValOnes = currentQreg;
-    auto compbasisOnes = rewriter.create<quantum::ComputationalBasisOp>(loc, TypeRange{obsType},
-                                                                        ValueRange{}, qregValOnes);
-    llvm::dbgs() << "[mitigation.rem] quantum.compbasis (ones) addition OK, op=" << compbasisOnes
-                 << "\n";
-    // TODO: maybe refactor into a function like in ZNE and call for zeroes and ones
-    quantum::MeasurementProcess insertedMPOnes;
-    ValueRange calibratedOnesResult{};
-    if (MPName == "quantum.probs"s) {
-        insertedMPOnes = rewriter.create<quantum::ProbsOp>(
-            loc, TypeRange{tensorTyF64}, compbasisOnes.getResult(), Value(), Value());
-        llvm::dbgs() << "[mitigation.rem] quantum.probs (ones) addition OK, op=" << insertedMPOnes
-                     << "\n";
-        calibratedOnesResult = insertedMPOnes->getResults();
-    }
-    if (MPName == "quantum.counts"s) {
-        insertedMPOnes = rewriter.create<quantum::CountsOp>(
-            loc, TypeRange{tensorTyF64, tensorTyI64}, compbasisOnes.getResult(), Value(), Value(),
-            Value());
-        llvm::dbgs() << "[mitigation.rem] quantum.counts (ones) addition OK, op=" << insertedMPOnes
-                     << "\n";
-        calibratedOnesResult = insertedMPOnes->getResults()
-                                   .drop_front(); // drop the first element in the iterator (eigvals
-                                                  // not used for calibration matrices)
-    }
-    else if ((MPName == "quantum.sample"s)) {
-        insertedMPOnes = rewriter.create<quantum::SampleOp>(
-            loc, TypeRange{tensorTyF64}, compbasisOnes.getResult(), ValueRange{}, Value());
-        llvm::dbgs() << "[mitigation.rem] quantum.sample addition OK, op=" << insertedMPOnes
-                     << "\n";
-        IRMapping postprocMapping;
-        uint64_t resultIndex = 0;
-        for (auto res : measurementProcess->getResults())
-            postprocMapping.map(res, insertedMPOnes->getResult(resultIndex++));
-        rewriter.setInsertionPointAfter(insertedMPOnes.getOperation());
-        calibratedOnesResult = insertedMPOnes->getResults();
-        for (auto postprocOp = measurementProcess->getNextNode();
-             postprocOp != nullptr &&
-             postprocOp->getName().getIdentifier() != quantum::DeallocOp::getOperationName();
-             postprocOp = postprocOp->getNextNode()) {
-            llvm::dbgs() << "[mitigation.rem] looking for next op: "
-                         << postprocOp->getName().getIdentifier() << "\n";
-            Operation *insertedOp = rewriter.clone(*postprocOp, postprocMapping);
-            if (!insertedOp->getResults().empty())
-                calibratedOnesResult = insertedOp->getResults();
-            rewriter.setInsertionPointAfter(insertedOp);
-            llvm::dbgs() << "[mitigation.rem] insertedOp: " << insertedOp->getName().getIdentifier()
-                         << "\n";
-        }
-    }
-    auto deallocOnes = rewriter.create<quantum::DeallocOp>(loc, qregOnes);
-    llvm::dbgs() << "[mitigation.rem] quantum.dealloc (ones) addition OK, op=" << deallocOnes
-                 << "\n";
-    auto deinitOnes = rewriter.create<quantum::DeviceReleaseOp>(loc);
-    llvm::dbgs() << "[mitigation.rem] quantum.deinit (ones) addition OK, op=" << deinitOnes << "\n";
-    // ===END ONES QFUNC===
+    ValueRange calibratedZeroResult =
+        emitCalibrationCircuit(rewriter, loc, calleeOp, tensorTyF64, tensorTyI64,
+                               /*applyPauliX=*/false);
+    ValueRange calibratedOnesResult =
+        emitCalibrationCircuit(rewriter, loc, calleeOp, tensorTyF64, tensorTyI64,
+                               /*applyPauliX=*/true);
 
     // 1) original callee results
     for (Value v : results)

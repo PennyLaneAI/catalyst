@@ -319,23 +319,12 @@ class RemCallable(CatalystCallable):
             callable_fn
         ), "expected callable set as param on the first operation in rem target"
 
-        # Identify the measurement process by walking the inner jaxpr, matching
-        # the logic in `_rem_abstract_eval`.
-        mp_kind = None
-        for eqn in jaxpr.eqns:
-            inner = eqn.params.get("call_jaxpr", None)
-            if inner is None:
-                continue
-            for op_eq in inner.eqns:
-                pname = str(op_eq.primitive)
-                if pname in ("probs", "sample", "counts"):
-                    mp_kind = pname
-                    break
-            if mp_kind is not None:
-                break
-        assert (
-            mp_kind != None
-        ), "measurement process must be one of CountsMP, ProbsMP or SampleMP. Other measurement processes such as observables are not supported yet."
+        mp_kind = _detect_measurement_process(jaxpr)
+        assert mp_kind is not None, (
+            "measurement process must be one of CountsMP, ProbsMP or SampleMP. "
+            "Other measurement processes such as observables are not supported yet."
+        )
+
         run_calibration = self.calibration_matrices is None
         rem_results = rem_p.bind(
             *args_data,
@@ -347,55 +336,62 @@ class RemCallable(CatalystCallable):
         qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
         assert qnode_obj is not None, "REM post-processing requires a QNode target"
         n_qubits = len(qnode_obj.device.wires)
-        measured_qubits = jnp.array([x for x in qnode_obj.device.wires])
-        if mp_kind == "sample":
+        measured_qubits = jnp.array(list(qnode_obj.device.wires))
 
-            # quantum.sample returns f64 in catalyst; the REM helpers index
-            # confusion matrices by bit value and need an integer dtype.
-            mitigatee_samples = rem_results[0].astype(jnp.int32)
-            if run_calibration:
-                zeros_samples = rem_results[1].astype(jnp.int32)
-                ones_samples = rem_results[2].astype(jnp.int32)
-                confusion_matrices = rem_calibrate_samples(zeros_samples, ones_samples)
-            else:
-                confusion_matrices = jnp.asarray(self.calibration_matrices)
-            unique_bitstrings, mitigated_counts = rem_apply_to_samples(
-                mitigatee_samples, confusion_matrices, measured_qubits, n_qubits
-            )
-            mitigated_result = (unique_bitstrings, mitigated_counts)
-
-        elif mp_kind == "counts":
-
-            mitigatee_eigvals = rem_results[0]
-            mitigatee_counts = rem_results[1]
-            if run_calibration:
-                zeros_counts = rem_results[2]
-                ones_counts = rem_results[3]
-                confusion_matrices = rem_calibrate_counts(zeros_counts, ones_counts)
-            else:
-                confusion_matrices = jnp.asarray(self.calibration_matrices)
-            mitigated_counts = rem_apply_to_counts(
-                mitigatee_counts, confusion_matrices, measured_qubits, n_qubits
-            )
-            mitigated_result = (mitigatee_eigvals, mitigated_counts)
-
-        elif mp_kind == "probs":
-
-            mitigatee_probs = rem_results[0]
-            if run_calibration:
-                zeros_probs = rem_results[1]
-                ones_probs = rem_results[2]
-                confusion_matrices = rem_calibrate_probs(zeros_probs, ones_probs)
-            else:
-                confusion_matrices = jnp.asarray(self.calibration_matrices)
-            mitigated_probs = rem_apply_to_probs(
-                mitigatee_probs, confusion_matrices, measured_qubits, n_qubits
-            )
-            mitigated_result = mitigated_probs
+        handler = {
+            "sample": self._apply_sample,
+            "counts": self._apply_counts,
+            "probs": self._apply_probs,
+        }[mp_kind]
+        mitigated_result, confusion_matrices = handler(
+            rem_results, run_calibration, measured_qubits, n_qubits
+        )
 
         if self.return_calibration_matrices:
             return mitigated_result, confusion_matrices
         return mitigated_result
+
+    def _apply_sample(self, rem_results, run_calibration, measured_qubits, n_qubits):
+        # quantum.sample returns f64 in catalyst; the REM helpers index
+        # confusion matrices by bit value and need an integer dtype.
+        mitigatee_samples = rem_results[0].astype(jnp.int32)
+        if run_calibration:
+            zeros_samples = rem_results[1].astype(jnp.int32)
+            ones_samples = rem_results[2].astype(jnp.int32)
+            confusion_matrices = rem_calibrate_samples(zeros_samples, ones_samples)
+        else:
+            confusion_matrices = jnp.asarray(self.calibration_matrices)
+        unique_bitstrings, mitigated_counts = rem_apply_to_samples(
+            mitigatee_samples, confusion_matrices, measured_qubits, n_qubits
+        )
+        return (unique_bitstrings, mitigated_counts), confusion_matrices
+
+    def _apply_counts(self, rem_results, run_calibration, measured_qubits, n_qubits):
+        mitigatee_eigvals = rem_results[0]
+        mitigatee_counts = rem_results[1]
+        if run_calibration:
+            zeros_counts = rem_results[2]
+            ones_counts = rem_results[3]
+            confusion_matrices = rem_calibrate_counts(zeros_counts, ones_counts)
+        else:
+            confusion_matrices = jnp.asarray(self.calibration_matrices)
+        mitigated_counts = rem_apply_to_counts(
+            mitigatee_counts, confusion_matrices, measured_qubits, n_qubits
+        )
+        return (mitigatee_eigvals, mitigated_counts), confusion_matrices
+
+    def _apply_probs(self, rem_results, run_calibration, measured_qubits, n_qubits):
+        mitigatee_probs = rem_results[0]
+        if run_calibration:
+            zeros_probs = rem_results[1]
+            ones_probs = rem_results[2]
+            confusion_matrices = rem_calibrate_probs(zeros_probs, ones_probs)
+        else:
+            confusion_matrices = jnp.asarray(self.calibration_matrices)
+        mitigated_probs = rem_apply_to_probs(
+            mitigatee_probs, confusion_matrices, measured_qubits, n_qubits
+        )
+        return mitigated_probs, confusion_matrices
 
 
 def polynomial_extrapolation(degree):
@@ -410,3 +406,19 @@ def _wrap_callable(fn):
     elif isinstance(fn, Callable):  # Keep at the bottom
         return Function(fn)
     raise TypeError(f"Target must be callable, got: {type(fn)}")
+
+
+def _detect_measurement_process(jaxpr):
+    """Walk the inner jaxpr for a probs/sample/counts primitive; return its name or None.
+
+    Mirrors the detection logic in :func:`_rem_abstract_eval`.
+    """
+    for eqn in jaxpr.eqns:
+        inner = eqn.params.get("call_jaxpr", None)
+        if inner is None:
+            continue
+        for op_eq in inner.eqns:
+            pname = str(op_eq.primitive)
+            if pname in ("probs", "sample", "counts"):
+                return pname
+    return None

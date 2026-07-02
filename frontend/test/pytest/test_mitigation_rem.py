@@ -140,7 +140,7 @@ def test_return_calibration_matrices():
 
 
 def test_caching_probs_roundtrip():
-    """Compute calibration once, reuse it on a second qjit call; result still matches the GHZ probs."""
+    """Compute calibration once, reuse it on a second qjit call, get matching GHZ probs."""
     n_qubits, shots = 2, 2000
     circuit = _ghz_qnode(n_qubits, shots, "probs")
 
@@ -314,7 +314,7 @@ def test_inverse_recovers_counts():
 
 
 def test_calibrate_paths_agree():
-    """rem_calibrate_{samples,counts,probs} on the same logical channel must yield matching matrices."""
+    """rem_calibrate_{samples,counts,probs} on the same channel must produce matching matrices."""
     n_qubits, n_shots = 2, 4000
     p = 0.10
     rng = np.random.default_rng(0)
