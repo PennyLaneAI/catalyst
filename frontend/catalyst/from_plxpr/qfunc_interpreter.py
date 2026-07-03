@@ -210,16 +210,24 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Check some constraints regarding dynamic allocation."""
         if self.has_dynamic_allocation:
             if len(measurement.wires) == 0 and not isinstance(measurement, qp.measurements.StateMP):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements must take in an explicit list of wires when
                         dynamically allocated wires are present in the program.
-                        """))
+                        """
+                    )
+                )
 
             if any(is_abstract_qubit(w) for w in measurement.wires):
-                raise CompileError(textwrap.dedent("""
+                raise CompileError(
+                    textwrap.dedent(
+                        """
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
-                        """))
+                        """
+                    )
+                )
 
     # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):
@@ -293,7 +301,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
-def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
+def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, adjoint, n_ctrls, **kwargs):
 
     if hybrid_lens or hybrid_trees or op_cls.static_argnames:
         # only support compilable_argnames for the moment
@@ -310,6 +318,8 @@ def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
         op_cls=op_cls,
         hybrid_lens=hybrid_lens,
         hybrid_trees=hybrid_trees,
+        adjoint=adjoint,
+        n_ctrls=n_ctrls,
         **kwargs,
     )
     return []
