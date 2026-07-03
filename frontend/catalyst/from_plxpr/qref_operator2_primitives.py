@@ -137,7 +137,6 @@ def _qref_operator_p_lowering(
             adjoint=adjoint,
             **kwargs,
         )
-    # will be used in future improvements
 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
 
