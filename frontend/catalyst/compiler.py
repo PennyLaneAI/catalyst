@@ -275,8 +275,11 @@ class LinkerDriver:
 def _get_catalyst_cli_cmd(*args, stdin=None):
     """Just get the command, do not run it"""
     cli_path = get_cli_path()
-    if not path.isfile(cli_path):
-        raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
+    if not path.isfile(cli_path):  # pragma: nocover
+        raise FileNotFoundError(
+            f"Could not locate the `catalyst` executable at {cli_path}. "
+            "Please verify your installation or report the issue on GitHub."
+        )
 
     cmd = [cli_path]
     for arg in args:

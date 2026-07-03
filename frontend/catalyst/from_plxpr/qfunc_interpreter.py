@@ -30,6 +30,7 @@ from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_trans
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
 from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
+from pennylane.core.operator.operator2 import operator_p
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 from pennylane.wires import AbstractQubit, is_abstract_qubit
@@ -45,6 +46,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_measure_in_basis_p,
     qref_measure_p,
     qref_namedobs_p,
+    qref_operator_p,
     qref_pauli_measure_p,
     qref_pauli_rot_p,
     qref_qinst_p,
@@ -288,6 +290,32 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         and no **kwargs) and the results is a sequence of values
         """
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
+
+
+# pylint: disable=too-many-arguments
+@PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
+def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, adjoint, n_ctrls, **kwargs):
+
+    if hybrid_lens or hybrid_trees or op_cls.static_argnames:
+        # only support compilable_argnames for the moment
+        raise NotImplementedError
+
+    wire_inputs = args[len(op_cls.dynamic_argnames) :]
+    new_wires = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs
+    ]
+
+    qref_operator_p.bind(
+        *args[: len(op_cls.dynamic_argnames)],
+        *new_wires,
+        op_cls=op_cls,
+        hybrid_lens=hybrid_lens,
+        hybrid_trees=hybrid_trees,
+        adjoint=adjoint,
+        n_ctrls=n_ctrls,
+        **kwargs,
+    )
+    return []
 
 
 # pylint: disable=unused-argument, too-many-arguments

@@ -14,7 +14,7 @@ test_rules.mlirbc
 
 # Packaging directories
 dist
-frontend/bin
+frontend/catalyst/bin
 frontend/catalyst/lib
 frontend/catalyst/_revision.py
 frontend/mlir_quantum
