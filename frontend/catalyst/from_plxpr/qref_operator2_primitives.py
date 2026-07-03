@@ -109,6 +109,12 @@ def _qref_operator_p_lowering(
     ctx.allow_unregistered_dialects = True
     if op_cls.__name__ in _SPECIAL_LOWERINGS:
         return _SPECIAL_LOWERINGS[op_cls.__name__](jax_ctx, *args, op_cls=op_cls, **kwargs)
+
+    n_ctrls = kwargs.pop("n_ctrls", 0)
+    adjoint = kwargs.pop("adjoint", False)
+    if n_ctrls:
+        raise NotImplementedError("Controlled Operator2 lowering is not supported yet.")
+
     # will be used in future improvements
     hybrid_lens = kwargs.pop("hybrid_lens")  # pylint: disable=unused-variable
     hybrid_trees = kwargs.pop("hybrid_trees")  # pylint: disable=unused-variable
@@ -136,7 +142,6 @@ def _qref_operator_p_lowering(
 
     ctrl_qubits = []
     ctrl_values = []
-    adjoint = False
 
     if _is_custom_op(op_cls, jax_ctx.avals_in[: len(op_cls.dynamic_argnames)]):
         params = [extract_scalar(safe_cast_to_f64(p, op_cls), op_cls) for p in params]
@@ -157,7 +162,7 @@ def _qref_operator_p_lowering(
             forward_args=[],
             ctrl_qubits=[],
             ctrl_values=[],
-            adjoint=False,
+            adjoint=adjoint,
             UID=None,
             arr_qubit_indices=[],
             param_map=processed_param_map,
