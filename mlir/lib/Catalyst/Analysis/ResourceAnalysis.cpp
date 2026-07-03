@@ -485,11 +485,10 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 {
     // Quantum gates
     if (isa<quantum::CustomOp, qref::CustomOp, quantum::OperatorOp, qref::OperatorOp,
-            quantum::PauliRotOp, qref::PauliRotOp,
-            quantum::GlobalPhaseOp, qref::GlobalPhaseOp, quantum::MultiRZOp, qref::MultiRZOp,
-            quantum::PCPhaseOp, qref::PCPhaseOp, quantum::QubitUnitaryOp, qref::QubitUnitaryOp,
-            quantum::SetStateOp, qref::SetStateOp, quantum::SetBasisStateOp, qref::SetBasisStateOp>(
-            op)) {
+            quantum::PauliRotOp, qref::PauliRotOp, quantum::GlobalPhaseOp, qref::GlobalPhaseOp,
+            quantum::MultiRZOp, qref::MultiRZOp, quantum::PCPhaseOp, qref::PCPhaseOp,
+            quantum::QubitUnitaryOp, qref::QubitUnitaryOp, quantum::SetStateOp, qref::SetStateOp,
+            quantum::SetBasisStateOp, qref::SetBasisStateOp>(op)) {
         std::string name = getGateOpName(op, isAdjoint);
         int nQubits = getGateQubitCount(op);
         int nParams = getGateParamCount(op);
