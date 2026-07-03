@@ -24,7 +24,7 @@ from pennylane.pytrees import PyTreeStructure, unflatten
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments
 def generate_uid(
-    *args: tuple[Any, ...],
+    *avals_in: tuple[Any, ...],
     op_cls: type[Operator2],
     wire_lens: tuple[int, ...],
     hybrid_lens: tuple[int, ...],
@@ -38,11 +38,10 @@ def generate_uid(
     reduced = []
 
     # Flat dynamic arguments
-    dynamic_args = args[: len(op_cls.dynamic_argnames)]
-    dynamic_shapes, dynamic_dtypes = [], []
+    dynamic_args = avals_in[: len(op_cls.dynamic_argnames)]
+    dynamic_avals = []
     for val in dynamic_args:
-        dynamic_shapes.append(math.shape(val))
-        dynamic_dtypes.append(math.get_dtype_name(val))
+        dynamic_avals.append((val.shape, val.dtype.name))
 
     # Hybrid arguments (wire and non-wire)
     args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
@@ -53,21 +52,21 @@ def generate_uid(
 
         else:
             cur_avals = []
-            for val in args[args_idx : args_idx + hsize]:
-                cur_avals.append((math.shape(val), math.get_dtype_name(val)))
+            for val in avals_in[args_idx : args_idx + hsize]:
+                cur_avals.append((val.shape, val.dtype.name))
             hybrid_avals.append(cur_avals)
 
         args_idx += hsize
 
     # Static arguments
-    reduced_static_values = tuple(
+    reduced_static_args = tuple(
         _serialize_static(unflatten(*val), name) for name, val in static_args.items()
     )
 
-    reduced.append(("dynamic", tuple(dynamic_shapes), tuple(dynamic_dtypes)))
+    reduced.append(("dynamic", tuple(dynamic_avals)))
     reduced.append(("wires", wire_lens))
     reduced.append(("hybrid", hybrid_trees, hybrid_avals))
-    reduced.append(("static", reduced_static_values))
+    reduced.append(("static", reduced_static_args))
     reduced.append(("adjoint", adjoint))
     reduced.append(("n_ctrls", n_ctrls))
 

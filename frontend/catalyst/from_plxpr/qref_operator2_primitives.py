@@ -251,7 +251,7 @@ def _qref_operator_p_lowering(
 
     if op_cls.hybrid_argnames or op_cls.static_argnames:
         uid = generate_uid(
-            *args,
+            *jax_ctx.avals_in,
             op_cls=op_cls,
             wire_lens=wire_lens,
             hybrid_lens=hybrid_lens,
