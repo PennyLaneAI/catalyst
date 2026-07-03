@@ -77,6 +77,8 @@ static std::string getGateOpName(Operation *op, bool isAdjoint)
         llvm::TypeSwitch<Operation *, std::string>(op)
             .Case<quantum::CustomOp, qref::CustomOp>(
                 [](auto customOp) { return customOp.getGateName().str(); })
+            .Case<quantum::OperatorOp, qref::OperatorOp>(
+                [](auto operatorOp) { return operatorOp.getOpName().str(); })
             .Case<quantum::PauliRotOp, qref::PauliRotOp>([](auto) { return "PauliRot"; })
             .Case<quantum::GlobalPhaseOp, qref::GlobalPhaseOp>([](auto) { return "GlobalPhase"; })
             .Case<quantum::MultiRZOp, qref::MultiRZOp>([](auto) { return "MultiRZ"; })
@@ -482,7 +484,8 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
 {
     // Quantum gates
-    if (isa<quantum::CustomOp, qref::CustomOp, quantum::PauliRotOp, qref::PauliRotOp,
+    if (isa<quantum::CustomOp, qref::CustomOp, quantum::OperatorOp, qref::OperatorOp,
+            quantum::PauliRotOp, qref::PauliRotOp,
             quantum::GlobalPhaseOp, qref::GlobalPhaseOp, quantum::MultiRZOp, qref::MultiRZOp,
             quantum::PCPhaseOp, qref::PCPhaseOp, quantum::QubitUnitaryOp, qref::QubitUnitaryOp,
             quantum::SetStateOp, qref::SetStateOp, quantum::SetBasisStateOp, qref::SetBasisStateOp>(
