@@ -207,6 +207,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Upgrade macOS runner to `macos-15`; `macos-14` is no longer maintained.
+  [(#2972)](https://github.com/PennyLaneAI/catalyst/pull/2972)
+
 * Update tests to not use global capture toggle where possible.
   [(#2964)](https://github.com/PennyLaneAI/catalyst/pull/2964)
 
