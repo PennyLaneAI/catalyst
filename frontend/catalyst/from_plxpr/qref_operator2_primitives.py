@@ -110,6 +110,8 @@ def _qref_operator_p_lowering(
 
     hybrid_lens = kwargs.pop("hybrid_lens")  # pylint: disable=unused-variable
     hybrid_trees = kwargs.pop("hybrid_trees")  # pylint: disable=unused-variable
+    adjoint = kwargs.pop("adjoint")  # pylint: disable=unused-variable
+    n_ctrls = kwargs.pop("n_ctrls")  # pylint: disable=unused-variable
     wire_lens = kwargs.pop("wire_lens")
     adjoint = kwargs.pop("adjoint")
     n_ctrls = kwargs.pop("n_ctrls")
