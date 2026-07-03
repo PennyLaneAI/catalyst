@@ -239,7 +239,6 @@ class TestDeviceLevelSpecs:
         assert complex_meas_specs["resources"].measurements == expected_measurements
 
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
 class TestPassByPassSpecs:
     """Test qp.specs() pass-by-pass specs"""
 
@@ -992,7 +991,7 @@ class TestPassByPassSpecs:
             return qp.state()
 
         for level in [0, 1]:
-            resources = qp.specs(c, level=level)()
+            resources = qp.specs(c, level=level)().resources
 
             assert resources.gate_types == {"DummyOp": 2}
             assert resources.gate_sizes == {4: 1, 5: 1}
