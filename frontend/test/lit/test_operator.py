@@ -87,7 +87,7 @@ def c_controlled():
     # CHECK-NEXT: static_data = {}
     # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
     op0 = NoParams(reg=0)
-    qp.ops.ControlledOp2(op0, [1], control_values=[False])
+    qp.ctrl(op0, [1], control_values=[False])
 
     # CHECK: [[q0_1:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q1_1:%.+]] = qref.get {{%.+}}[ 1]
@@ -98,9 +98,7 @@ def c_controlled():
     # CHECK-NEXT: ctrls([[q1_1]], [[q2_1]], [[q3_1]]) ctrl_vals([[false]], [[true]], [[true]])
     # CHECK-NEXT: static_data = {}
     # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
-    qp.ops.ControlledOp2(
-        qp.ops.ControlledOp2(op0, [3], control_values=[True]), [1, 2], control_values=[False, True]
-    )
+    qp.ctrl(qp.ctrl(op0, [3], control_values=[True]), [1, 2], control_values=[False, True])
     return qp.state()
 
 
@@ -121,7 +119,7 @@ def c_adjoint_and_controlled():
     # CHECK-NEXT: static_data = {}
     # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
     op0 = NoParams(reg=0)
-    qp.ops.ControlledOp2(qp.adjoint(op0), [1], [False])
+    qp.ctrl(qp.adjoint(op0), [1], [False])
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
@@ -129,7 +127,7 @@ def c_adjoint_and_controlled():
     # CHECK-NEXT: ctrls([[q1]]) ctrl_vals([[false]])
     # CHECK-NEXT: static_data = {}
     # CHECK-NEXT: param_map = {} qubit_map = {reg = [0]}
-    qp.adjoint(qp.ops.ControlledOp2(op0, [1], [False]))
+    qp.adjoint(qp.ctrl(op0, [1], [False]))
     return qp.state()
 
 
