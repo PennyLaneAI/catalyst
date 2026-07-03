@@ -208,11 +208,7 @@ def _qref_operator_p_lowering(
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
 
         return _SPECIAL_LOWERINGS[op_cls.__name__](
-            *args,
-            ctrl_qubits=ctrl_qubits,
-            ctrl_values=ctrl_values,
-            adjoint=adjoint,
-            **kwargs,
+            *args, ctrl_qubits=ctrl_qubits, ctrl_values=ctrl_values, adjoint=adjoint, **kwargs
         )
 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
