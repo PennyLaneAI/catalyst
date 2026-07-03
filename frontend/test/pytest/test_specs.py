@@ -969,11 +969,12 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
-    @pytest.mark.parametrize("with_pass", (True, False))
-    def test_operator2(self, with_pass):
+    def test_operator2(self):
         """Test that specs works with operator2 classes."""
 
+        # pylint: disable=useless-parent-delegation
         class DummyOp(qp.core.Operator2):
+            """Dummy Local Operator."""
 
             dynamic_argnames = ("phi",)
             wire_argnames = ("reg1", "reg2")
