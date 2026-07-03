@@ -21,7 +21,8 @@ from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from pennylane.pytrees import unflatten
+from pennylane.core import Operator2
+from pennylane.pytrees import flatten, unflatten
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
@@ -98,6 +99,84 @@ def _general_validation(*args, op_cls, wire_lens, **kwargs):
         assert ir.OpaqueType(w.type).data == "bit"
 
 
+def _process_params(
+    *args, op_cls, wire_lens, hybrid_lens, hybrid_trees
+) -> tuple[list, list, dict[str, list[int]]]:
+    """Process non-qubit operands of an operator. This function returns the flattened sequence
+    of qubit operands of the operator, feed-through arguments of any operator arguments, and a
+    dictionary mapping argument names to the indices of their respective qubits.
+    """
+    params = []
+    forward_params = []
+    param_map = {}
+
+    # Flat dynamic arguments
+    for i, dname in enumerate(op_cls.dynamic_argnames):
+        params.append(args[i])
+        param_map[dname] = ir.DenseI64ArrayAttr.get([i])
+
+    # Hybrid dynamic arguments
+    args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
+    map_idx = len(op_cls.dynamic_argnames)
+    for hname, hsize, htree in zip(op_cls.hybrid_argnames, hybrid_lens, hybrid_trees, strict=True):
+        if hname in op_cls.wire_argnames:
+            args_idx += hsize
+            continue
+
+        value = unflatten(args[args_idx : args_idx + hsize], htree)
+        val_with_ops, _ = flatten(value, is_leaf=lambda x: isinstance(x, Operator2))
+        cur_params = []
+
+        # Any dynamic arguments of input operators are considered feed-forward arguments for
+        # decomposition rules, not parameters or qubits of the outer operator.
+        for val in val_with_ops:
+            if isinstance(val, Operator2):
+                forward_args += flatten(val)[0]
+            else:
+                cur_params.append(val)
+
+        params += cur_params
+        param_map[hname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + len(cur_params))))
+        map_idx += len(cur_params)
+        args_idx += hsize
+
+    param_map = get_mlir_attribute_from_pyval(param_map)
+    return params, forward_params, param_map
+
+
+def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[str, list[int]]]:
+    """Process qubit operands of an operator. This function returns the flattened sequence
+    of qubit operands of the operator, as well as a dictionary mapping argument names to
+    the indices of their respective qubits.
+    """
+    qubits = []
+    qubit_map = {}
+    flat_wire_argnames = tuple(
+        name for name in op_cls.wire_argnames if name not in op_cls.hybrid_argnames
+    )
+
+    # Flat wire arguments
+    args_idx = len(op_cls.dynamic_argnames)
+    map_idx = 0
+    for wname, wsize in zip(flat_wire_argnames, wire_lens, strict=True):
+        qubits += args[args_idx : args_idx + wsize]
+        qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
+        map_idx += wsize
+        args_idx += wsize
+
+    # Hybrid wire arguments
+    for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
+        if hname in op_cls.wire_argnames:
+            qubits += args[args_idx : args_idx + hsize]
+            qubit_map[hname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + hsize)))
+            map_idx += hsize
+
+        args_idx += hsize
+
+    qubit_map = get_mlir_attribute_from_pyval(qubit_map)
+    return qubits, qubit_map
+
+
 def _qref_operator_p_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *args,
@@ -120,18 +199,16 @@ def _qref_operator_p_lowering(
             TensorExtractOp(ir.IntegerType.get_signless(1), val, []).result
             for val in args[-n_ctrls:]
         ]
-        qubits_slice = slice(len(op_cls.dynamic_argnames), -2 * n_ctrls)
+        args = args[: -2 * n_ctrls]
     else:
         ctrl_qubits = ctrl_values = ()
-        qubits_slice = slice(len(op_cls.dynamic_argnames), None)
-
-    params = args[: len(op_cls.dynamic_argnames)]
-    qubits = args[qubits_slice]
 
     if op_cls.__name__ in _SPECIAL_LOWERINGS:
+        expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
+        assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
+
         return _SPECIAL_LOWERINGS[op_cls.__name__](
-            *params,
-            *qubits,
+            *args,
             ctrl_qubits=ctrl_qubits,
             ctrl_values=ctrl_values,
             adjoint=adjoint,
@@ -139,25 +216,20 @@ def _qref_operator_p_lowering(
         )
 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
-
     repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
     processed_static_data = get_mlir_attribute_from_pyval(repack_static_data)
 
-    param_map = {
-        name: ir.DenseI64ArrayAttr.get([ind]) for ind, name in enumerate(op_cls.dynamic_argnames)
-    }
-    processed_param_map = get_mlir_attribute_from_pyval(param_map)
-
-    qubit_map = {}
-    ind = 0
-    for name, size in zip(op_cls.wire_argnames, wire_lens):
-        qubit_map[name] = ir.DenseI64ArrayAttr.get(list(range(ind, ind + size)))
-        ind += size
-
-    processed_qubit_map = get_mlir_attribute_from_pyval(qubit_map)
-
     if _is_custom_op(op_cls, jax_ctx.avals_in[: len(op_cls.dynamic_argnames)]):
-        params = [extract_scalar(safe_cast_to_f64(p, op_cls), op_cls) for p in params]
+        expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
+        assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
+
+        op_name = op_cls.__name__
+        params = [
+            extract_scalar(safe_cast_to_f64(p, op_name), op_name)
+            for p in args[: len(op_cls.dynamic_argnames)]
+        ]
+        qubits = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + sum(wire_lens)]
+
         CustomOp(
             params=params,
             qubits=qubits,
@@ -166,22 +238,37 @@ def _qref_operator_p_lowering(
             ctrl_values=ctrl_values,
             adjoint=adjoint,
         )
-    else:
-        OperatorOp(
-            op_name=name_attr,
-            params=params,
-            qubits=qubits,
-            qreg=None,
-            forward_args=[],
-            ctrl_qubits=ctrl_qubits,
-            ctrl_values=ctrl_values,
-            adjoint=adjoint,
-            UID=None,
-            arr_qubit_indices=[],
-            param_map=processed_param_map,
-            static_data=processed_static_data,
-            qubit_map=processed_qubit_map,
-        )
+        return []
+
+    params, forward_args, param_map = _process_params(
+        *args,
+        op_cls=op_cls,
+        wire_lens=wire_lens,
+        hybrid_lens=hybrid_lens,
+        hybrid_trees=hybrid_trees,
+    )
+    qubits, qubit_map = _process_qubits(
+        *args, op_cls=op_cls, wire_lens=wire_lens, hybrid_lens=hybrid_lens
+    )
+    # TODO: Update to use generate_uid
+    uid = 1 if op_cls.hybrid_argnames else None
+
+    OperatorOp(
+        op_name=name_attr,
+        params=params,
+        qubits=qubits,
+        qreg=None,
+        forward_args=forward_args,
+        ctrl_qubits=ctrl_qubits,
+        ctrl_values=ctrl_values,
+        adjoint=adjoint,
+        UID=uid,
+        arr_qubit_indices=[],
+        param_map=param_map,
+        static_data=processed_static_data,
+        qubit_map=qubit_map,
+    )
+
     return []
 
 
