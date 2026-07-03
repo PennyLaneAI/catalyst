@@ -125,6 +125,8 @@ def _process_params(
             args_idx += hsize
             continue
 
+        # FIXME: This is going to fail in most cases where the arg is/has an operator, because we
+        # will be unflattening with a list of MLIR SSA values which are not valid dynamic arguments
         value = unflatten(args[args_idx : args_idx + hsize], htree)
         val_with_ops, _ = flatten(value, is_leaf=lambda x: isinstance(x, Operator2))
         cur_params = []
@@ -189,8 +191,8 @@ def _qref_operator_p_lowering(
     ctx.allow_unregistered_dialects = True
     _general_validation(*args, op_cls=op_cls, **kwargs)
 
-    hybrid_lens = kwargs.pop("hybrid_lens")  # pylint: disable=unused-variable
-    hybrid_trees = kwargs.pop("hybrid_trees")  # pylint: disable=unused-variable
+    hybrid_lens = kwargs.pop("hybrid_lens")
+    hybrid_trees = kwargs.pop("hybrid_trees")
     adjoint = kwargs.pop("adjoint")
     n_ctrls = kwargs.pop("n_ctrls")
     wire_lens = kwargs.pop("wire_lens")
