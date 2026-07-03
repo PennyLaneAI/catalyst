@@ -23,6 +23,7 @@
 #include "Ion/Transforms/ValueTracing.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
+#include "RTIO/IR/RTIOOps.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -451,6 +452,93 @@ struct PropagateEventsPattern : public OpRewritePattern<UnrealizedConversionCast
     }
 };
 
+/// Convert ion.measure_pulse to rtio.pulse marked with `_measurement` for ARTIQ lowering.
+struct MeasurePulseToRTIOPattern : public OpConversionPattern<ion::MeasurePulseOp> {
+    DenseMap<Value, Value> &qextractToMemrefMap;
+
+    MeasurePulseToRTIOPattern(TypeConverter &typeConverter, MLIRContext *ctx,
+                              DenseMap<Value, Value> &qextractToMemrefMap)
+        : OpConversionPattern<ion::MeasurePulseOp>(typeConverter, ctx),
+          qextractToMemrefMap(qextractToMemrefMap)
+    {
+    }
+
+    LogicalResult matchAndRewrite(ion::MeasurePulseOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+
+        Value duration = op.getTime();
+        Value freqValue = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(0.0));
+        Value phaseValue = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(0.0));
+
+        auto beamAttr = op.getBeam();
+        int64_t transitionIndex = beamAttr.getTransitionIndex().getInt();
+        ArrayAttr qualifiers = rewriter.getArrayAttr({rewriter.getI64IntegerAttr(transitionIndex)});
+        IntegerAttr channelIdAttr = rewriter.getIntegerAttr(rewriter.getIndexType(), 0); // TTL0
+        auto channelType = rtio::ChannelType::get(ctx, "ttl", qualifiers, channelIdAttr);
+
+        Value memrefLoadValue = nullptr;
+        traceValueWithCallback<TraceMode::Qreg>(op.getInQubit(), [&](Value value) -> WalkResult {
+            if (qextractToMemrefMap.count(value)) {
+                memrefLoadValue = qextractToMemrefMap[value];
+                return WalkResult::interrupt();
+            }
+            return WalkResult::advance();
+        });
+
+        if (memrefLoadValue == nullptr) {
+            op->emitError("Failed to trace the memref load value for measure_pulse");
+            return failure();
+        }
+
+        Value channel =
+            rtio::RTIOQubitToChannelOp::create(rewriter, loc, channelType, memrefLoadValue);
+
+        auto eventType = rtio::EventType::get(ctx);
+        Value event = rtio::RTIOPulseOp::create(rewriter, loc, eventType, channel, duration,
+                                                freqValue, phaseValue, nullptr);
+        event.getDefiningOp()->setAttr("_measurement", rewriter.getUnitAttr());
+
+        rewriter.replaceOp(op, event);
+        return success();
+    }
+};
+
+/// Convert ion.readout_bit to rtio.readout (measurement count).
+struct ReadoutBitToRTIOPattern : public OpConversionPattern<ion::ReadoutBitOp> {
+    ReadoutBitToRTIOPattern(TypeConverter &typeConverter, MLIRContext *ctx)
+        : OpConversionPattern<ion::ReadoutBitOp>(typeConverter, ctx)
+    {
+    }
+
+    LogicalResult matchAndRewrite(ion::ReadoutBitOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        rtio::RTIOPulseOp measPulse;
+        for (Operation *cur = op->getPrevNode(); cur; cur = cur->getPrevNode()) {
+            auto pulse = dyn_cast<rtio::RTIOPulseOp>(cur);
+            if (pulse && pulse->hasAttr("_measurement")) {
+                measPulse = pulse;
+                break;
+            }
+        }
+        if (!measPulse) {
+            return op->emitError(
+                "readout_bit: no preceding rtio.pulse(_measurement) in this block (expected "
+                "measure -> readout ordering after parallelprotocol lowering)");
+        }
+
+        auto readout =
+            rtio::RTIOReadoutOp::create(rewriter, loc, rewriter.getI32Type(), measPulse.getEvent());
+
+        rewriter.replaceOp(op, ValueRange{op.getInQubit(), readout.getCount()});
+        return success();
+    }
+};
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -475,6 +563,19 @@ void populateIonToRTIOFinalizePatterns(RewritePatternSet &patterns)
 {
     patterns.add<PropagateEventsPattern>(patterns.getContext());
     patterns.add<ResolveChannelMappingPattern>(patterns.getContext());
+}
+
+void populateIonMeasurePulseToRTIOPatterns(TypeConverter &typeConverter,
+                                           RewritePatternSet &patterns,
+                                           DenseMap<Value, Value> &qextractToMemrefMap)
+{
+    patterns.add<MeasurePulseToRTIOPattern>(typeConverter, patterns.getContext(),
+                                            qextractToMemrefMap);
+}
+
+void populateIonReadoutBitToRTIOPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
+{
+    patterns.add<ReadoutBitToRTIOPattern>(typeConverter, patterns.getContext());
 }
 
 } // namespace ion

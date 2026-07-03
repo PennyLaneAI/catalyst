@@ -33,6 +33,11 @@ void populateConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
 void populateIonPulseToRTIOPatterns(mlir::TypeConverter &typeConverter,
                                     mlir::RewritePatternSet &patterns, const IonInfo &ionInfo,
                                     mlir::DenseMap<mlir::Value, mlir::Value> &qextractToMemrefMap);
+void populateIonMeasurePulseToRTIOPatterns(
+    mlir::TypeConverter &typeConverter, mlir::RewritePatternSet &patterns,
+    mlir::DenseMap<mlir::Value, mlir::Value> &qextractToMemrefMap);
+void populateIonReadoutBitToRTIOPatterns(mlir::TypeConverter &typeConverter,
+                                         mlir::RewritePatternSet &patterns);
 void populateParallelProtocolToRTIOPatterns(mlir::TypeConverter &typeConverter,
                                             mlir::RewritePatternSet &patterns);
 void populateIonToRTIOFinalizePatterns(mlir::RewritePatternSet &patterns);

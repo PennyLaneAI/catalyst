@@ -576,7 +576,7 @@ func.func @example_measure() -> (i1, !quantum.bit) attributes {qnode} {
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
     // CHECK-NEXT:   ion.yield %arg0 : !ion.qubit
     // CHECK-NEXT: }
-    // CHECK-NEXT: [[mres:%.+]], [[out_ion:%.+]] = ion.readout_bit [[pp_out]] : i1, !ion.qubit
+    // CHECK-NEXT: [[out_ion:%.+]], [[cnt:%.+]] = ion.readout_bit [[pp_out]] : !ion.qubit, i32
     // CHECK-NEXT: [[out_qubit:%.+]] = builtin.unrealized_conversion_cast [[out_ion]] : !ion.qubit to !quantum.bit
     %mres, %q_out = quantum.measure %2 : i1, !quantum.bit
     return %mres, %q_out : i1, !quantum.bit

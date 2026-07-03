@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -40,6 +42,10 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         ARTIQRuntimeBuilder artiq(rewriter, op);
+
+        if (op->hasAttr("_measurement")) {
+            return lowerMeasurementPulse(op, adaptor, rewriter, artiq);
+        }
 
         // Set timeline position
         artiq.atMu(adaptor.getWait());
@@ -102,6 +108,51 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
         rewriter.replaceOp(op, newTime);
         return success();
     }
+
+    LogicalResult lowerMeasurementPulse(RTIOPulseOp op, OpAdaptor adaptor,
+                                        ConversionPatternRewriter &rewriter,
+                                        ARTIQRuntimeBuilder &artiq) const
+    {
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        Location loc = op.getLoc();
+
+        MeasurementChannelAddrs ch = ARTIQRuntimeBuilder::getMeasurementChannelAddresses(mod);
+        if (ch.gateRisingAddr == 0 || ch.dmdOutputAddr == 0) {
+            return op->emitError(
+                "measurement lowering requires device_db ttl0 (TTLInOut) and ttl7 (TTLOut)");
+        }
+
+        Value startMu = adaptor.getWait();
+        artiq.atMu(startMu);
+
+        // 1. gate_rising_mu(sensitivity_addr, duration_mu)
+        Value gateDurationMu = artiq.secToMu(adaptor.getDuration());
+        artiq.gateRisingMu(artiq.constI32(ch.gateRisingAddr), gateDurationMu);
+
+        // 2. Compute Poisson-distributed photon count for mock_measure
+        int32_t photonCount = 0;
+        if (auto cst = adaptor.getDuration().getDefiningOp<arith::ConstantOp>()) {
+            if (auto fAttr = dyn_cast<FloatAttr>(cst.getValue())) {
+                double durationSec = fAttr.getValueAsDouble();
+                int64_t durationMu = static_cast<int64_t>(std::round(durationSec / 1e-9));
+                photonCount = ARTIQHardwareConfig::computeSimulatedPhotonCount(durationMu);
+            }
+        }
+
+        // 3. mock_measure(start_mu, dmd_output_addr, photon_count)
+        artiq.mockMeasure(startMu, artiq.constI32(ch.dmdOutputAddr),
+                          artiq.constI64(static_cast<int64_t>(photonCount)));
+
+        // 4. Advance timeline to gateEnd + offset for underflow protection.
+        Value gateEnd = arith::AddIOp::create(rewriter, loc, startMu, gateDurationMu);
+        Value nextBase = arith::AddIOp::create(
+            rewriter, loc, gateEnd, artiq.constI64(ARTIQHardwareConfig::measurementStartOffsetMu));
+        artiq.atMu(nextBase);
+
+        Value newTime = artiq.nowMu();
+        rewriter.replaceOp(op, newTime);
+        return success();
+    }
 };
 
 struct SyncOpLowering : public OpConversionPattern<RTIOSyncOp> {
@@ -153,6 +204,34 @@ struct ChannelOpLowering : public OpConversionPattern<RTIOChannelOp> {
         Value result = arith::ConstantOp::create(rewriter, op.getLoc(),
                                                  rewriter.getIntegerAttr(resultType, channelId));
         rewriter.replaceOp(op, result);
+        return success();
+    }
+};
+
+struct ReadoutOpLowering : public OpConversionPattern<RTIOReadoutOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(RTIOReadoutOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        Location loc = op.getLoc();
+
+        MeasurementChannelAddrs ch = ARTIQRuntimeBuilder::getMeasurementChannelAddresses(mod);
+        ARTIQRuntimeBuilder artiq(rewriter, op);
+        Value eventMu = adaptor.getEvent();
+
+        // The measurement pulse event = gateEnd + offset.
+        // We subtract the offset and add the gate latency to get the safer execution timing.
+        Value gateEnd = arith::SubIOp::create(
+            rewriter, loc, eventMu, artiq.constI64(ARTIQHardwareConfig::measurementStartOffsetMu));
+        artiq.atMu(gateEnd);
+
+        Value gateLatencyMu = artiq.constI64(ARTIQHardwareConfig::defaultTtlInOutGateLatencyMu);
+        Value deadline = arith::AddIOp::create(rewriter, loc, gateEnd, gateLatencyMu);
+        Value count = artiq.rtioCount(deadline, artiq.constI32(ch.countChannel));
+
+        rewriter.replaceOp(op, count);
         return success();
     }
 };
@@ -283,8 +362,8 @@ namespace rtio {
 void populateRTIOToARTIQConversionPatterns(LLVMTypeConverter &typeConverter,
                                            RewritePatternSet &patterns)
 {
-    patterns.add<SyncOpLowering, EmptyOpLowering, ChannelOpLowering, PulseOpLowering>(
-        typeConverter, patterns.getContext());
+    patterns.add<SyncOpLowering, EmptyOpLowering, ChannelOpLowering, PulseOpLowering,
+                 ReadoutOpLowering>(typeConverter, patterns.getContext());
 }
 
 void populateRTIORewritePatterns(RewritePatternSet &patterns)

@@ -22,6 +22,7 @@ include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/BuiltinAttributes.td"
+include "mlir/IR/BuiltinTypes.td"
 
 include "Ion/IR/IonDialect.td"
 include "Ion/IR/IonInterfaces.td"
@@ -211,11 +212,12 @@ def MeasurePulseOp : BasePulseOp<"measure_pulse"> {
 }
 
 def ReadoutBitOp : Ion_Op<"readout_bit", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
-    let summary = "Read out the classical measurement result from a qubit after a measure pulse.";
+    let summary = "Read out measurement count for a mid-circuit measurement.";
 
     let description = [{
-        This op reads out the classical measurement result from a ParallelProtocolOp containing a
-        MeasurePulseOp, and threads the qubit wire through.
+        Threads the qubit SSA through and yields a 32-bit readout value (e.g. photon count or a
+        host-provided classical value). Callers that need a binary result can compare `cnt_val` to
+        zero.
     }];
 
     let arguments = (ins
@@ -223,8 +225,8 @@ def ReadoutBitOp : Ion_Op<"readout_bit", [AllTypesMatch<["in_qubit", "out_qubit"
     );
 
     let results = (outs
-        I1: $mres,
-        QubitType: $out_qubit
+        QubitType: $out_qubit,
+        I32: $cnt_val
     );
 
     let assemblyFormat = [{
