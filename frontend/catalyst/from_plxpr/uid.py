@@ -24,11 +24,13 @@ from pennylane.pytrees import PyTreeStructure, unflatten
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments
 def generate_uid(
-    all_dynamic_args: tuple[Any, ...],
+    *args: tuple[Any, ...],
     op_cls: type[Operator2],
     wire_lens: tuple[int, ...],
     hybrid_lens: tuple[int, ...],
     hybrid_trees: tuple[PyTreeStructure, ...],
+    adjoint: bool,
+    n_ctrls: int,
     static_args: dict[str, Any],
 ):
     """Generate a unique identifier that allows us to distinguish between
@@ -36,42 +38,38 @@ def generate_uid(
     reduced = []
 
     # Flat dynamic arguments
-    dynamic_args = all_dynamic_args[: len(op_cls.dynamic_argnames)]
+    dynamic_args = args[: len(op_cls.dynamic_argnames)]
     dynamic_shapes, dynamic_dtypes = [], []
     for val in dynamic_args:
         dynamic_shapes.append(math.shape(val))
         dynamic_dtypes.append(math.get_dtype_name(val))
 
-    # Hybrid wire arguments
-    hybrid_wires = tuple(name for name in op_cls.hybrid_argnames if name in op_cls.wire_argnames)
+    # Hybrid arguments (wire and non-wire)
+    args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
+    hybrid_avals = []
+    for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens):
+        if hname in op_cls.wire_argnames:
+            hybrid_avals.append(hsize)
 
-    # Non-wire hybrid arguments
-    hybrid_start = (
-        len(op_cls.dynamic_argnames) + sum(wire_lens) + sum(hybrid_lens[: len(hybrid_wires)])
-    )
-    hybrid_args = all_dynamic_args[hybrid_start:]
-    hybrid_shapes, hybrid_dtypes = [], []
-    i = 0
-    for len_ in hybrid_lens:
-        cur_shapes, cur_dtypes = [], []
-        for val in hybrid_args[i : i + len_]:
-            cur_shapes.append(math.shape(val))
-            cur_dtypes.append(math.get_dtype_name(val))
+        else:
+            cur_avals = []
+            for val in args[args_idx : args_idx + hsize]:
+                cur_avals.append((math.shape(val), math.get_dtype_name(val)))
+            hybrid_avals.append(cur_avals)
 
-        hybrid_shapes.append(tuple(cur_shapes))
-        hybrid_dtypes.append(tuple(cur_dtypes))
-        i += len_
+        args_idx += hsize
 
     # Static arguments
     reduced_static_values = tuple(
-        _serialize_static(unflatten(*static_args[name]), name) for name in op_cls.static_argnames
+        _serialize_static(unflatten(*val), name) for name, val in static_args.items()
     )
 
-    reduced += ("dynamic", tuple(dynamic_shapes), tuple(dynamic_dtypes))
-    reduced += ("wires", wire_lens)
-    reduced += ("hybrid_wires", hybrid_trees[: len(hybrid_wires)], hybrid_lens[: len(hybrid_wires)])
-    reduced += ("hybrid", hybrid_trees[len(hybrid_wires) :], hybrid_shapes, hybrid_dtypes)
-    reduced += ("static", reduced_static_values)
+    reduced.append(("dynamic", tuple(dynamic_shapes), tuple(dynamic_dtypes)))
+    reduced.append(("wires", wire_lens))
+    reduced.append(("hybrid", hybrid_trees, hybrid_avals))
+    reduced.append(("static", reduced_static_values))
+    reduced.append(("adjoint", adjoint))
+    reduced.append(("n_ctrls", n_ctrls))
 
     return hash(tuple(reduced))
 

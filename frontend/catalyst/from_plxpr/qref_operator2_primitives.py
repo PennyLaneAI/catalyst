@@ -40,6 +40,8 @@ from catalyst.jax_primitives import (
 from catalyst.utils.extra_bindings import TensorExtractOp
 from catalyst.utils.patching import Patcher
 
+from .uid import generate_uid
+
 with Patcher(
     (
         _ods_cext,
@@ -246,8 +248,20 @@ def _qref_operator_p_lowering(
     qubits, qubit_map = _process_qubits(
         *args, op_cls=op_cls, wire_lens=wire_lens, hybrid_lens=hybrid_lens
     )
-    # TODO: Update to use generate_uid
-    uid = 1 if op_cls.hybrid_argnames else None
+
+    if op_cls.hybrid_argnames or op_cls.static_argnames:
+        uid = generate_uid(
+            *args,
+            op_cls=op_cls,
+            wire_lens=wire_lens,
+            hybrid_lens=hybrid_lens,
+            hybrid_trees=hybrid_trees,
+            adjoint=adjoint,
+            n_ctrls=n_ctrls,
+            static_args=kwargs,
+        )
+    else:
+        uid = None
 
     OperatorOp(
         op_name=name_attr,
