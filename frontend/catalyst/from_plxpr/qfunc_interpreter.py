@@ -292,8 +292,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
+# pylint: disable=too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
-def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
+def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, adjoint, n_ctrls, **kwargs):
 
     if hybrid_lens or hybrid_trees or op_cls.static_argnames:
         # only support compilable_argnames for the moment
@@ -310,6 +311,8 @@ def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
         op_cls=op_cls,
         hybrid_lens=hybrid_lens,
         hybrid_trees=hybrid_trees,
+        adjoint=adjoint,
+        n_ctrls=n_ctrls,
         **kwargs,
     )
     return []
