@@ -41,6 +41,47 @@ func.func @basic_gates() {
     return
 }
 
+// Operator2 gates
+
+// CHECK-LABEL: "operator2_gates"
+// CHECK:    "num_alloc_qubits": 10
+// CHECK:    "num_arg_qubits": 0
+// CHECK:    "num_qubits": 10
+// CHECK:    "operations"
+// CHECK-DAG: "DummyOp(4)": 1
+// CHECK-DAG: "DummyOp(5)": 1
+
+func.func @operator2_gates(){
+    %cst = stablehlo.constant dense<5.000000e-01> : tensor<f64>
+    %0 = quantum.alloc( 10) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %4 = quantum.extract %0[ 3] : !quantum.reg -> !quantum.bit
+    %5 = quantum.extract %0[ 4] : !quantum.reg -> !quantum.bit
+    %out_qubits:5 = quantum.operator "DummyOp"(%cst: tensor<f64>) qubits(%1, %2, %3, %4, %5)
+      static_data = {metadata = "word"}
+      param_map = {phi = [0]} qubit_map = {reg1 = [0, 1], reg2 = [2, 3, 4]}
+    %6 = quantum.insert %0[ 0], %out_qubits#0 : !quantum.reg, !quantum.bit
+    %7 = quantum.insert %6[ 1], %out_qubits#1 : !quantum.reg, !quantum.bit
+    %8 = quantum.insert %7[ 2], %out_qubits#2 : !quantum.reg, !quantum.bit
+    %9 = quantum.insert %8[ 3], %out_qubits#3 : !quantum.reg, !quantum.bit
+    %10 = quantum.insert %9[ 4], %out_qubits#4 : !quantum.reg, !quantum.bit
+    %11 = quantum.extract %10[ 2] : !quantum.reg -> !quantum.bit
+    %12 = quantum.extract %10[ 3] : !quantum.reg -> !quantum.bit
+    %13 = quantum.extract %10[ 4] : !quantum.reg -> !quantum.bit
+    %14 = quantum.extract %10[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits_0:4 = quantum.operator "DummyOp"(%cst: tensor<f64>) qubits(%11, %12, %13, %14)
+      static_data = {metadata = "word"}
+      param_map = {phi = [0]} qubit_map = {reg1 = [0, 1, 2], reg2 = [3]}
+    %15 = quantum.insert %10[ 2], %out_qubits_0#0 : !quantum.reg, !quantum.bit
+    %16 = quantum.insert %15[ 3], %out_qubits_0#1 : !quantum.reg, !quantum.bit
+    %17 = quantum.insert %16[ 4], %out_qubits_0#2 : !quantum.reg, !quantum.bit
+    %18 = quantum.insert %17[ 0], %out_qubits_0#3 : !quantum.reg, !quantum.bit
+    quantum.dealloc %18 : !quantum.reg
+    return
+}
+
 // -----
 
 // MBQC Operations
