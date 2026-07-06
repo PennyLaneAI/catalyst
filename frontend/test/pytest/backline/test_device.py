@@ -191,3 +191,45 @@ class TestEntryPointResolution:
         dev = qp.device("ftqc.heterogeneous", wires=49, backline=_backline(), emulate="local")
         assert isinstance(dev, HeterogeneousDevice)
         assert dev.resolved_transport == "roce"
+
+
+def _local_backline():
+    return qp.backline(controller=qp.Endpoint("localhost", role="fpga-qpu"), transport="roce")
+
+
+class TestLocalExecution:
+    """A local controller delegates to null.qubit so the circuit compiles and runs in-process."""
+
+    def test_get_c_interface_is_null_qubit_for_local_and_remote(self):
+        # QPU runtime is null.qubit (no-op) for both local and remote; transport/decoder are separate.
+        local_dev = HeterogeneousDevice(wires=1, backline=_local_backline())
+        remote_dev = HeterogeneousDevice(wires=1, backline=_backline())
+        assert local_dev.get_c_interface()[0] == "NullQubit"
+        assert remote_dev.get_c_interface()[0] == "NullQubit"
+
+    def test_local_device_compiles_and_runs(self):
+        import os
+        import platform
+
+        import catalyst.utils.wrapper as _wrapper
+        from catalyst import qjit
+        from catalyst.compiler import get_lib_path
+
+        ext = ".dylib" if platform.system() == "Darwin" else ".so"
+        if not os.path.exists(
+            os.path.join(get_lib_path("runtime", "RUNTIME_LIB_DIR"), f"librtd_null_qubit{ext}")
+        ):
+            pytest.skip("null.qubit runtime not built")
+        if not hasattr(_wrapper, "invoke_setup"):
+            pytest.skip("catalyst wrapper extension is stale (no invoke_setup) — rebuild catalyst")
+
+        dev = qp.device("ftqc.heterogeneous", wires=1, backline=_local_backline())
+
+        @qjit
+        @qp.qnode(dev)
+        def circ():
+            qp.Hadamard(0)
+            return qp.expval(qp.Z(0))
+
+        # null.qubit returns null results; the point is it compiles and runs locally without error.
+        assert circ() == 0.0

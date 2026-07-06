@@ -14,12 +14,15 @@
 
 """The ``ftqc.heterogeneous`` device.
 
-The device is the thin wrapper over Catalyst's existing remote-execution frontend: it
-takes a :class:`~pennylane.backline.Backline` placement and lowers it onto the ``catalyst.target`` /
-``catalyst.dispatch`` tags (via ``catalyst.target(address=...)``) that the cross-compile and dispatch
-passes consume. Execution is Catalyst-only (``@qjit``); the runtime library it targets is dealt with separately.
+The device is a thin wrapper over Catalyst's existing remote-execution frontend: it takes a
+:class:`~pennylane.backline.Backline` placement and lowers it onto the ``catalyst.target`` /
+``catalyst.dispatch`` tags (via ``catalyst.target(address=...)``) that the cross-compile and
+dispatch passes consume. Execution is Catalyst-only (``@qjit``).
+
+We use ``null.qubit`` as our runtime library for now.
 """
 
+import os
 import platform
 from typing import Optional
 
@@ -27,13 +30,15 @@ from pennylane import CompilePipeline
 from pennylane.devices import Device, ExecutionConfig
 
 from catalyst.api_extensions.target import RemoteDispatch, run_remote
+from catalyst.compiler import get_lib_path
 
 
 class _EndpointHandle:
     """A dispatch target for a single backline endpoint.
 
-    Carries the endpoint's locality, and its address for a remote endpoint, which is handed to ``kernel.declare(remote=...)`` and resolved through the standard ``get_dispatch`` path. A local endpoint does not carry a dispatch: its kernel is called
-    locally.
+    Carries the endpoint's locality and, for a remote endpoint, its address, which is handed to
+    ``kernel.declare(remote=...)`` and resolved via the standard ``get_dispatch`` path. A local
+    endpoint carries no dispatch: its kernel is called locally.
     """
 
     def __init__(self, endpoint):
@@ -65,9 +70,14 @@ class HeterogeneousDevice(Device):
         # Carry the transport to the runtime via rtd_kwargs in device_init as a device_kwarg
         self.device_kwargs = {"transport": str(backline.transport)}
 
+        # We use `null.qubit` for our runtime library for now
+        self.config_filepath = os.path.join(
+            get_lib_path("runtime", "RUNTIME_LIB_DIR"), "backend", "null_qubit.toml"
+        )
+
         controller = backline.controller
         if not controller.local:
-            run_remote(self, controller)
+            run_remote(self, controller)  # remote: cross-compile + dispatch tags
 
     @property
     def backline(self):
@@ -135,14 +145,14 @@ class HeterogeneousDevice(Device):
         """Whether the device executes remotely. Stub: always ``True``."""
         return True
 
-    @staticmethod
-    def get_c_interface():
-        """Return ``(device_name, runtime_library_path)``.
-
-        Not yet implemented.
+    def get_c_interface(self):
         """
-        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        return "ftqc_heterogeneous", f"librtd_backline{system_extension}"
+        We use null qubit as our temporary runtime library for both the local and remote executor.
+        The transport and decoder are separate ``runtime_call`` libraries.
+        """
+        ext = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib = os.path.join(get_lib_path("runtime", "RUNTIME_LIB_DIR"), f"librtd_null_qubit{ext}")
+        return "NullQubit", lib
 
     def preprocess(self, execution_config: Optional[ExecutionConfig] = None):
         """Return the device transform program and the (unchanged) execution config."""
