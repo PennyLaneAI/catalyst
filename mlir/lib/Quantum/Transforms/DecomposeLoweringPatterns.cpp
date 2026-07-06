@@ -54,7 +54,8 @@ namespace quantum {
  * replace the parameters of `rule` and returning the results. `rewriter`'s insertion point will be
  * moved to the end of the inlined function body.
  */
-static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule, ValueRange operands)
+static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule,
+                                         ValueRange operands)
 {
     Block &body = rule.front();
     auto returnOp = cast<func::ReturnOp>(body.getTerminator());
