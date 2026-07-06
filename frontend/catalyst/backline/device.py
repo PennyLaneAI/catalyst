@@ -62,9 +62,12 @@ class HeterogeneousDevice(Device):
         self._decoder = decoder
         super().__init__(wires=wires, **kwargs)
 
+        # Carry the transport to the runtime via device_init's rtd_kwargs (device_kwargs -> rtd_kwargs).
+        self.device_kwargs = {"transport": str(backline.transport)}
+
         controller = backline.controller
         if not controller.local:
-            run_remote(self, controller, backend=str(backline.transport))
+            run_remote(self, controller)
 
     @property
     def backline(self):

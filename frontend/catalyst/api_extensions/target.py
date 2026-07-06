@@ -85,10 +85,12 @@ def get_dispatch(device) -> Optional[RemoteDispatch]:
     return getattr(device, _DISPATCH_ATTR, None)
 
 
-def run_remote(device, endpoint, *, backend: Optional[str] = None):
+def run_remote(device, endpoint):
     """Run an ordinary device's circuits on a remote executor and return it.
 
-    Simple wrapper over :func:`target` + :func:`remote`: tags ``device`` so its QNodes are cross-compiled to a standalone object and dispatched to a remote host. This provides a simple syntax for running any device (e.g. ``null.qubit``) remotely::
+    Simple wrapper over :func:`target`: tags ``device`` so its QNodes are cross-compiled to a
+    standalone object and dispatched to a remote host. This provides a simple syntax for running any
+    device (e.g. ``null.qubit``) remotely::
 
         dev = catalyst.run_remote(qp.device("null.qubit", wires=2), "host:port")
 
@@ -97,7 +99,6 @@ def run_remote(device, endpoint, *, backend: Optional[str] = None):
         endpoint: The remote host — an address string (``"host:port"``) or a ``pennylane.Endpoint``
             (its ``host`` and, from ``attrs``, an optional target ``triple`` are used). ``run_remote``
             always dispatches remotely, regardless of an Endpoint's ``local`` flag.
-        backend: Optional backend name recorded as metadata on the target.
 
     Returns:
         The same ``device``, now tagged for remote execution.
@@ -107,4 +108,4 @@ def run_remote(device, endpoint, *, backend: Optional[str] = None):
     else:
         address = endpoint.host
         triple = (getattr(endpoint, "attrs", None) or {}).get("triple")
-    return remote(target(device, backend=backend, triple=triple), address=address)
+    return target(device, triple=triple, address=address)

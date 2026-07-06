@@ -57,6 +57,11 @@ class TestConstruction:
         dev = HeterogeneousDevice(wires=2, backline=_backline(), emulate="local", decoder="steane")
         assert dev.backline is not None
 
+    def test_device_kwargs_carries_transport(self):
+        # The transport reaches the runtime via device_kwargs -> device_init's rtd_kwargs.
+        dev = HeterogeneousDevice(wires=2, backline=_backline())
+        assert dev.device_kwargs["transport"] == "roce"
+
 
 class TestLowering:
     """Construction lowers the backline onto catalyst.target/remote tags."""
@@ -65,10 +70,9 @@ class TestLowering:
         dev = HeterogeneousDevice(wires=2, backline=_backline())
         assert get_dispatch(dev).address == "fpga-qpu.ip"
 
-    def test_tags_cross_compile_target_from_transport_and_triple(self):
+    def test_tags_cross_compile_target_triple(self):
         dev = HeterogeneousDevice(wires=2, backline=_backline())
         tgt = get_target(dev)
-        assert tgt.backend == "roce"
         assert tgt.triple == "x86_64-unknown-linux"
 
     def test_local_controller_is_not_remote_tagged(self):
