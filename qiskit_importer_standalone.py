@@ -2,6 +2,7 @@
 # Bypasses catalyst package initialization issues
 
 import qiskit
+from qiskit.circuit import Clbit
 
 try:
     # Use standard MLIR package
@@ -93,6 +94,24 @@ class QiskitToCatalystImporter:
 
         return self.module
 
+    # Control-flow operations carry their own op.condition; they must not be
+    # routed through the legacy single-gate conditional path.
+    _CONTROL_FLOW_OPS = {"if_else", "while_loop", "for_loop", "switch_case"}
+
+    # Gates the QASM3 emitter can express directly (stdgates.inc, the builtin
+    # U, gates with hard-coded defs, and the reset/barrier markers). Anything
+    # else with a Qiskit definition gets inlined into these.
+    _KNOWN_GATES = {
+        "h", "x", "y", "z", "s", "t", "sdg", "tdg", "sx", "sxdg",
+        "p", "phase", "id", "u", "u1", "u2", "u3",
+        "rx", "ry", "rz",
+        "cx", "cnot", "cy", "cz", "ch", "cp", "cu", "cu1", "cu3",
+        "crx", "cry", "crz",
+        "swap", "ccx", "cswap",
+        "rzz", "rxx", "ryy", "rccx",
+        "reset", "barrier",
+    }
+
     def _process_instructions(self, instructions, loc):
         for instruction in instructions:
             op = instruction.operation
@@ -100,14 +119,23 @@ class QiskitToCatalystImporter:
 
             # Check for legacy QASM2 classical condition FIRST so that named
             # gates like "h" or "cx" with op.condition don't bypass it.
-            if getattr(op, "condition", None) is not None:
+            if (
+                op.name not in self._CONTROL_FLOW_OPS
+                and getattr(op, "condition", None) is not None
+            ):
                 self._emit_conditional_gate(op, qubits, loc)
             elif op.name == "h":
                 self._emit_gate("h", qubits, [], loc)
             elif op.name == "cx":
                 self._emit_gate("cnot", qubits, [], loc)
+            elif op.name == "reset":
+                self._emit_gate("reset", qubits, [], loc)
+            elif op.name == "barrier":
+                self._emit_gate("barrier", qubits, [], loc)
             elif op.name == "for_loop":
                 self._emit_for_loop(op, qubits, loc)
+            elif op.name == "while_loop":
+                self._emit_while_loop(op, qubits, instruction.clbits, loc)
             elif op.name == "measure":
                 self._emit_measure(qubits, instruction.clbits, loc)
             elif op.name == "if_else":
@@ -126,7 +154,50 @@ class QiskitToCatalystImporter:
                 # but instruction.qubits will contain them.
                 self._emit_if_else(op, qubits, clbits, loc)
             else:
-                self._emit_gate(op.name, qubits, op.params, loc)
+                self._emit_gate_or_inline(op, qubits, loc)
+
+    def _emit_gate_or_inline(self, op, qubits, loc):
+        """Emit a gate directly if the QASM3 emitter knows it; otherwise
+        inline its Qiskit definition."""
+        if op.name not in self._KNOWN_GATES and getattr(op, "definition", None) is not None:
+            self._inline_gate_definition(op, qubits, loc)
+        else:
+            self._emit_gate(op.name, qubits, op.params, loc)
+
+    def _inline_gate_definition(self, op, qubits, loc):
+        """Inline a user-defined gate by emitting its (parameter-bound)
+        definition body on the instruction's qubits. An empty definition is
+        the identity and emits nothing (e.g. `gate post q { }`)."""
+        body = op.definition
+        for bq, oq in zip(body.qubits, qubits):
+            self.qubit_map[bq] = self.qubit_map[oq]
+
+        self._process_instructions(body.data, loc)
+
+        for bq, oq in zip(body.qubits, qubits):
+            self.qubit_map[oq] = self.qubit_map[bq]
+
+    def _creg_attrs(self, clbit):
+        """Locate the classical register owning `clbit` and return MLIR attrs
+        (creg_name/creg_idx/creg_size) describing it, or None for loose bits.
+
+        The translator uses these to emit `bit[n] c;` declarations and
+        `c[i] = measure q[j];` assignments instead of anonymous bits — which
+        is also what makes while-loop conditions re-assignable in QASM3.
+        """
+        try:
+            registers = self.circuit.find_bit(clbit).registers
+        except Exception:
+            return None
+        if not registers:
+            return None
+        reg, idx = registers[0]
+        i64_type = IntegerType.get_signless(64, self.ctx)
+        return {
+            "creg_name": StringAttr.get(reg.name, self.ctx),
+            "creg_idx": IntegerAttr.get(i64_type, idx),
+            "creg_size": IntegerAttr.get(i64_type, reg.size),
+        }
 
     def _emit_measure(self, qubits, clbits, loc):
         for i, q in enumerate(qubits):
@@ -134,7 +205,10 @@ class QiskitToCatalystImporter:
             bit_type = Type.parse("!quantum.bit", context=self.ctx)
             i1_type = IntegerType.get_signless(1, self.ctx)
 
-            op = self._emit_quantum_op("quantum.measure", [val_in], [i1_type, bit_type], loc)
+            attrs = self._creg_attrs(clbits[i]) if i < len(clbits) else None
+            op = self._emit_quantum_op(
+                "quantum.measure", [val_in], [i1_type, bit_type], loc, attrs
+            )
             self.qubit_map[q] = op.results[1]
             if i < len(clbits):
                 self.clbit_map[clbits[i]] = op.results[0]
@@ -230,20 +304,26 @@ class QiskitToCatalystImporter:
         for i, q in enumerate(qubits):
             self.qubit_map[q] = results[i]
 
-    def _emit_conditional_gate(self, op, qubits, loc):
-        """Wrap a gate with op.condition=(ClassicalRegister, value) in nested scf.if blocks."""
-        cond_reg, cond_val = op.condition
-        i1_type = IntegerType.get_signless(1, self.ctx)
-        bit_type = Type.parse("!quantum.bit", context=self.ctx)
-        result_types = [bit_type] * len(qubits)
+    def _build_condition_value(self, target, value, loc, skip_unmeasured=False):
+        """Fold a Qiskit condition (Clbit or ClassicalRegister, expected int)
+        into a single i1 SSA value: AND of per-bit tests, with arith.xori for
+        expected-0 bits. The translator renders it as e.g. `c[0] && !c[1]`.
 
-        # Build one condition per measured bit in the register.
-        # XOrIOp encodes expected==0 so the C++ translator can emit "name == false".
+        Returns None if no condition bits are available. Raises CompileError
+        for unmeasured bits unless skip_unmeasured is set (legacy behavior).
+        """
+        i1_type = IntegerType.get_signless(1, self.ctx)
+        bits = [target] if isinstance(target, Clbit) else list(target)
+
         conditions = []
-        for bit_idx, clbit in enumerate(cond_reg):
+        for bit_idx, clbit in enumerate(bits):
             if clbit not in self.clbit_map:
-                continue
-            expected = (cond_val >> bit_idx) & 1
+                if skip_unmeasured:
+                    continue
+                raise CompileError(
+                    f"Classical bit {clbit} used in condition but not measured previously"
+                )
+            expected = (value >> bit_idx) & 1
             measured = self.clbit_map[clbit]
             if expected == 0:
                 one = arith.ConstantOp(i1_type, IntegerAttr.get(i1_type, 1), loc=loc).result
@@ -251,38 +331,53 @@ class QiskitToCatalystImporter:
             conditions.append(measured)
 
         if not conditions:
-            self._emit_gate(op.name, qubits, op.params, loc)
+            return None
+
+        cond = conditions[0]
+        for c in conditions[1:]:
+            cond = arith.AndIOp(cond, c, loc=loc).result
+        return cond
+
+    def _emit_conditional_gate(self, op, qubits, loc):
+        """Wrap a gate with op.condition=(ClassicalRegister|Clbit, value) in a
+        single scf.if whose condition AND-folds all register bits."""
+        cond_reg, cond_val = op.condition
+        bit_type = Type.parse("!quantum.bit", context=self.ctx)
+        result_types = [bit_type] * len(qubits)
+
+        cond = self._build_condition_value(cond_reg, cond_val, loc, skip_unmeasured=True)
+        if cond is None:
+            self._emit_gate_or_inline(op, qubits, loc)
             return
 
-        # Generate nested scf.if blocks — one level per bit condition.
-        # The innermost level emits the actual gate; each outer level passes
-        # qubits through its else branch unchanged.
-        def emit_nested(depth):
-            if depth == len(conditions):
-                self._emit_gate(op.name, qubits, op.params, loc)
-                return
+        passthrough = [self.qubit_map[q] for q in qubits]
+        if_op = scf.IfOp(cond, result_types, hasElse=True, loc=loc)
 
-            passthrough = [self.qubit_map[q] for q in qubits]
-            if_op = scf.IfOp(conditions[depth], result_types, hasElse=True, loc=loc)
+        with InsertionPoint(if_op.then_block):
+            old_map = self.qubit_map.copy()
+            self._emit_gate_or_inline(op, qubits, loc)
+            scf.YieldOp([self.qubit_map[q] for q in qubits], loc=loc)
+            self.qubit_map = old_map
 
-            with InsertionPoint(if_op.then_block):
-                old_map = self.qubit_map.copy()
-                emit_nested(depth + 1)
-                scf.YieldOp([self.qubit_map[q] for q in qubits], loc=loc)
-                self.qubit_map = old_map
+        with InsertionPoint(if_op.else_block):
+            scf.YieldOp(passthrough, loc=loc)
 
-            with InsertionPoint(if_op.else_block):
-                scf.YieldOp(passthrough, loc=loc)
+        for i, q in enumerate(qubits):
+            self.qubit_map[q] = if_op.results[i]
 
-            for i, q in enumerate(qubits):
-                self.qubit_map[q] = if_op.results[i]
+    def _resolve_condition(self, condition, clbits, loc):
+        """Turn a control-flow op condition into a single i1 SSA value.
 
-        emit_nested(0)
-
-    def _emit_if_else(self, op, qubits, clbits, loc):
-        # op.params = [true_body, false_body]
-        true_body = op.params[0]
-        false_body = op.params[1]
+        Accepts Qiskit's (Clbit|ClassicalRegister, value) tuples; falls back
+        to the first associated clbit when no condition is attached. Classical
+        expressions (qiskit.circuit.classical.expr) are not supported (P2).
+        """
+        if condition is not None:
+            target, value = self._unpack_condition(condition)
+            cond = self._build_condition_value(target, value, loc)
+            if cond is None:
+                raise CompileError("Control-flow condition has no classical bits")
+            return cond
 
         if not clbits:
             raise CompileError("if_else instruction requires classical bits for condition")
@@ -292,8 +387,26 @@ class QiskitToCatalystImporter:
             raise CompileError(
                 f"Classical bit {cond_bit} used in if_else but not measured previously"
             )
+        return self.clbit_map[cond_bit]  # i1
 
-        cond_val = self.clbit_map[cond_bit]  # i1
+    @staticmethod
+    def _unpack_condition(condition):
+        try:
+            target, value = condition
+        except (TypeError, ValueError):
+            # Not a (target, value) tuple — e.g. a classical expr.Expr node.
+            raise CompileError(
+                f"Unsupported condition type {type(condition).__name__}: only "
+                "(Clbit|ClassicalRegister, value) conditions are supported"
+            )
+        return target, value
+
+    def _emit_if_else(self, op, qubits, clbits, loc):
+        # op.params = [true_body, false_body]
+        true_body = op.params[0]
+        false_body = op.params[1]
+
+        cond_val = self._resolve_condition(getattr(op, "condition", None), clbits, loc)
 
         # Determine qubits involved in the if_else block
         # The 'qubits' argument to this function *should* contain all qubits touched by the body.
@@ -326,3 +439,123 @@ class QiskitToCatalystImporter:
         results = if_op.results
         for i, q in enumerate(qubits):
             self.qubit_map[q] = results[i]
+
+    def _emit_while_loop(self, op, qubits, clbits, loc):
+        """Lower Qiskit while_loop to scf.while.
+
+        Loop-carried values are [condition clbits...] + [qubits...]. The
+        before region recomputes the boolean from its block arguments and
+        forwards all of them via scf.condition; the body re-measures the
+        condition clbits and yields the new values. The QASM3 translator maps
+        this back to `while (c[i]) { ... }` where the in-body measurement
+        re-assigns the same named register bit.
+        """
+        condition = getattr(op, "condition", None)
+        if condition is None:
+            raise CompileError("while_loop instruction requires a condition")
+        target, value = self._unpack_condition(condition)
+        cond_clbits = [target] if isinstance(target, Clbit) else list(target)
+
+        for cb in cond_clbits:
+            if cb not in self.clbit_map:
+                raise CompileError(
+                    f"Classical bit {cb} used in while_loop condition but not "
+                    "measured previously"
+                )
+
+        body = op.params[0]
+        i1_type = IntegerType.get_signless(1, self.ctx)
+
+        # Carry ALL clbits associated with the loop (condition bits first, so
+        # the before-region indices line up), not just the condition bits —
+        # otherwise a non-condition bit measured inside the body would be
+        # invisible to code after the loop. Bits never measured before the
+        # loop start as constant 0, matching QASM3's default bit value.
+        carried_clbits = list(cond_clbits)
+        for cb in clbits:
+            if cb not in carried_clbits:
+                carried_clbits.append(cb)
+
+        init_clbit_vals = []
+        for cb in carried_clbits:
+            if cb in self.clbit_map:
+                init_clbit_vals.append(self.clbit_map[cb])
+            else:
+                zero = arith.ConstantOp(i1_type, IntegerAttr.get(i1_type, 0), loc=loc).result
+                init_clbit_vals.append(zero)
+
+        inits = init_clbit_vals + [self.qubit_map[q] for q in qubits]
+        arg_types = [v.type for v in inits]
+
+        with loc:
+            while_op = scf.WhileOp(arg_types, inits, loc=loc)
+            while_op.before.blocks.append(*arg_types)
+            while_op.after.blocks.append(*arg_types)
+        before_block = while_op.before.blocks[0]
+        after_block = while_op.after.blocks[0]
+
+        # Before region: rebuild the boolean from the loop-carried clbits and
+        # forward ALL arguments to the after region.
+        with InsertionPoint(before_block):
+            before_args = list(before_block.arguments)
+            conditions = []
+            for bit_idx in range(len(cond_clbits)):
+                expected = (value >> bit_idx) & 1
+                measured = before_args[bit_idx]
+                if expected == 0:
+                    one = arith.ConstantOp(
+                        i1_type, IntegerAttr.get(i1_type, 1), loc=loc
+                    ).result
+                    measured = arith.XOrIOp(measured, one, loc=loc).result
+                conditions.append(measured)
+            cond = conditions[0]
+            for c in conditions[1:]:
+                cond = arith.AndIOp(cond, c, loc=loc).result
+            scf.ConditionOp(cond, before_args, loc=loc)
+
+        # After region (loop body): rebind maps to block arguments, process the
+        # body, then yield the updated clbit/qubit values.
+        with InsertionPoint(after_block):
+            after_args = list(after_block.arguments)
+            old_qubit_map = self.qubit_map.copy()
+            old_clbit_map = self.clbit_map.copy()
+
+            for i, cb in enumerate(carried_clbits):
+                self.clbit_map[cb] = after_args[i]
+            for i, q in enumerate(qubits):
+                self.qubit_map[q] = after_args[len(carried_clbits) + i]
+
+            # Builder-style bodies reuse the outer Qubit/Clbit objects; the
+            # explicit while_loop(...) form may use body-local bits, which
+            # correspond positionally to instruction.qubits/clbits.
+            for bq, oq in zip(body.qubits, qubits):
+                if bq not in self.qubit_map:
+                    self.qubit_map[bq] = self.qubit_map[oq]
+            for bc, oc in zip(body.clbits, clbits):
+                if bc not in self.clbit_map and oc in self.clbit_map:
+                    self.clbit_map[bc] = self.clbit_map[oc]
+
+            self._process_instructions(body.data, loc)
+
+            # Propagate body-local bit updates back to the outer bit objects.
+            for bq, oq in zip(body.qubits, qubits):
+                if bq is not oq:
+                    self.qubit_map[oq] = self.qubit_map[bq]
+            for bc, oc in zip(body.clbits, clbits):
+                if bc is not oc and bc in self.clbit_map:
+                    self.clbit_map[oc] = self.clbit_map[bc]
+
+            yield_vals = [self.clbit_map[cb] for cb in carried_clbits] + [
+                self.qubit_map[q] for q in qubits
+            ]
+            scf.YieldOp(yield_vals, loc=loc)
+
+            self.qubit_map = old_qubit_map
+            self.clbit_map = old_clbit_map
+
+        # Rebind outer maps to the loop results.
+        results = while_op.results
+        for i, cb in enumerate(carried_clbits):
+            self.clbit_map[cb] = results[i]
+        for i, q in enumerate(qubits):
+            self.qubit_map[q] = results[len(carried_clbits) + i]

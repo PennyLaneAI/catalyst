@@ -469,5 +469,257 @@ class TestOutputFormat:
         assert "qubit" in qasm3_code.lower()
 
 
+class TestDynamicCircuits:
+    """OpenQASM 3.0 dynamic-circuit syntax: reset, barrier, classical
+    registers, feedforward if/else on register values, and while loops.
+
+    Circuits are built in code (these constructs cannot all be expressed in
+    QASM 2.0 inputs) and pushed through the full pipeline with and without
+    the quantum-opt pass pipeline.
+    """
+
+    def pipeline_from_circuit(self, qc, quantum_opt_path, quantum_translate_path, optimize):
+        """Convert a QuantumCircuit to QASM3 via importer -> [quantum-opt] -> quantum-translate."""
+        importer = QiskitToCatalystImporter(qc)
+        module = importer.convert()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mlir", delete=False) as tmp_mlir:
+            tmp_mlir.write(str(module))
+            tmp_mlir_path = tmp_mlir.name
+
+        if optimize:
+            opt_cmd = [
+                str(quantum_opt_path),
+                "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
+                tmp_mlir_path,
+                "-o",
+                tmp_mlir_path,
+            ]
+            subprocess.run(opt_cmd, capture_output=True, text=True, check=True)
+
+        cmd = [str(quantum_translate_path), "--mlir-to-qasm3", tmp_mlir_path]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        Path(tmp_mlir_path).unlink()
+        return result.stdout
+
+    @staticmethod
+    def assert_valid_qasm3(qasm3_code):
+        """Parse the emitted QASM3 with qiskit.qasm3 if the importer is installed."""
+        try:
+            import qiskit.qasm3 as qasm3_mod
+
+            return qasm3_mod.loads(qasm3_code)
+        except ImportError:
+            pytest.skip("qiskit qasm3 importer not installed")
+
+    @staticmethod
+    def creg_circuit():
+        from qiskit import ClassicalRegister, QuantumRegister
+
+        q = QuantumRegister(2, "q")
+        c = ClassicalRegister(2, "c")
+        qc = QuantumCircuit(q, c)
+        qc.h(0)
+        qc.cx(0, 1)
+        qc.measure(q, c)
+        return qc
+
+    @staticmethod
+    def reset_barrier_circuit():
+        qc = QuantumCircuit(2, 2)
+        qc.h(0)
+        qc.reset(0)
+        qc.barrier()
+        qc.x(0)
+        qc.measure([0, 1], [0, 1])
+        return qc
+
+    @staticmethod
+    def if_else_circuit():
+        from qiskit import ClassicalRegister, QuantumRegister
+
+        q = QuantumRegister(2, "q")
+        c = ClassicalRegister(2, "c")
+        qc = QuantumCircuit(q, c)
+        qc.h(0)
+        qc.measure(0, 0)
+        with qc.if_test((c[0], 1)) as else_:
+            qc.x(1)
+        with else_:
+            qc.z(1)
+        qc.measure(1, 1)
+        return qc
+
+    @staticmethod
+    def register_condition_circuit():
+        from qiskit import ClassicalRegister, QuantumRegister
+
+        q = QuantumRegister(3, "q")
+        c = ClassicalRegister(2, "c")
+        qc = QuantumCircuit(q, c)
+        qc.h(0)
+        qc.h(1)
+        qc.measure(0, 0)
+        qc.measure(1, 1)
+        with qc.if_test((c, 2)):
+            qc.x(2)
+        qc.measure(2, 0)
+        return qc
+
+    @staticmethod
+    def while_loop_circuit():
+        from qiskit import ClassicalRegister, QuantumRegister
+
+        q = QuantumRegister(1, "q")
+        c = ClassicalRegister(1, "c")
+        qc = QuantumCircuit(q, c)
+        qc.h(0)
+        qc.measure(0, 0)
+        with qc.while_loop((c[0], 1)):
+            qc.h(0)
+            qc.measure(0, 0)
+        return qc
+
+    @pytest.mark.parametrize("optimize", [False, True])
+    def test_creg_measurement(self, quantum_opt_path, quantum_translate_path, optimize):
+        qasm3 = self.pipeline_from_circuit(
+            self.creg_circuit(), quantum_opt_path, quantum_translate_path, optimize
+        )
+        assert "bit[2] c;" in qasm3
+        assert "c[0] = measure" in qasm3
+        assert "c[1] = measure" in qasm3
+        assert "bit m_" not in qasm3, "creg measurements must not fall back to anonymous bits"
+
+    @pytest.mark.parametrize("optimize", [False, True])
+    def test_reset_and_barrier(self, quantum_opt_path, quantum_translate_path, optimize):
+        qasm3 = self.pipeline_from_circuit(
+            self.reset_barrier_circuit(), quantum_opt_path, quantum_translate_path, optimize
+        )
+        assert "reset q0[0];" in qasm3
+        assert "barrier q0[0], q0[1];" in qasm3
+
+    @pytest.mark.parametrize("optimize", [False, True])
+    def test_if_else(self, quantum_opt_path, quantum_translate_path, optimize):
+        qasm3 = self.pipeline_from_circuit(
+            self.if_else_circuit(), quantum_opt_path, quantum_translate_path, optimize
+        )
+        assert "if (c[0]) {" in qasm3
+        assert "} else {" in qasm3
+        assert "x q0[1];" in qasm3
+        assert "z q0[1];" in qasm3
+
+    @pytest.mark.parametrize("optimize", [False, True])
+    def test_register_value_condition(self, quantum_opt_path, quantum_translate_path, optimize):
+        qasm3 = self.pipeline_from_circuit(
+            self.register_condition_circuit(), quantum_opt_path, quantum_translate_path, optimize
+        )
+        # c == 2 is AND-folded bitwise: !c[0] && c[1]
+        assert "if ((!c[0] && c[1]))" in qasm3
+
+    @pytest.mark.parametrize("optimize", [False, True])
+    def test_while_loop(self, quantum_opt_path, quantum_translate_path, optimize):
+        qasm3 = self.pipeline_from_circuit(
+            self.while_loop_circuit(), quantum_opt_path, quantum_translate_path, optimize
+        )
+        assert "while (c[0]) {" in qasm3
+        # The in-body measurement must re-assign the same named bit the
+        # condition reads; that is what carries the loop state in QASM3.
+        body = qasm3.split("while (c[0]) {", 1)[1]
+        assert "c[0] = measure" in body
+
+    @pytest.mark.parametrize(
+        "builder",
+        ["creg_circuit", "reset_barrier_circuit", "if_else_circuit", "while_loop_circuit"],
+    )
+    def test_output_parses_as_qasm3(self, quantum_opt_path, quantum_translate_path, builder):
+        qc = getattr(self, builder)()
+        qasm3 = self.pipeline_from_circuit(qc, quantum_opt_path, quantum_translate_path, True)
+        self.assert_valid_qasm3(qasm3)
+
+    @pytest.mark.skipif(not AER_AVAILABLE, reason="qiskit-aer not installed")
+    def test_if_else_semantics(self, quantum_opt_path, quantum_translate_path):
+        """Feedforward circuit: original and translated distributions must match."""
+        qc = self.if_else_circuit()
+        qasm3 = self.pipeline_from_circuit(qc, quantum_opt_path, quantum_translate_path, True)
+        translated = self.assert_valid_qasm3(qasm3)
+
+        shots = 10000
+        sim = AerSimulator()
+        counts1 = sim.run(qc, shots=shots).result().get_counts()
+        counts2 = sim.run(translated, shots=shots).result().get_counts()
+
+        agg1 = aggregate_by_hamming_weight(counts1)
+        agg2 = aggregate_by_hamming_weight(counts2)
+        distance = hellinger_distance(agg1, agg2, shots)
+        assert distance < 0.1, f"Hellinger distance too high: {distance}"
+
+    @pytest.mark.parametrize("optimize", [False, True])
+    def test_while_body_measures_other_clbit(
+        self, quantum_opt_path, quantum_translate_path, optimize
+    ):
+        """A non-condition clbit first measured inside a while body must be
+        usable in conditions after the loop (loop-carried classical state)."""
+        from qiskit import ClassicalRegister, QuantumRegister
+
+        q = QuantumRegister(2, "q")
+        c = ClassicalRegister(2, "c")
+        qc = QuantumCircuit(q, c)
+        qc.h(0)
+        qc.measure(0, 0)
+        with qc.while_loop((c[0], 1)):
+            qc.h(1)
+            qc.measure(1, 1)
+            qc.h(0)
+            qc.measure(0, 0)
+        with qc.if_test((c[1], 1)):
+            qc.x(1)
+        qc.measure(1, 1)
+
+        qasm3 = self.pipeline_from_circuit(qc, quantum_opt_path, quantum_translate_path, optimize)
+        assert "while (c[0]) {" in qasm3
+        assert "if (c[1]) {" in qasm3
+        assert "unknown_cond" not in qasm3
+
+    def test_official_teleport_roundtrip(self, quantum_opt_path, quantum_translate_path):
+        """Official spec example teleport.qasm (reset, barrier, U, feedforward
+        ifs, custom identity gate) must survive the full pipeline and re-parse
+        as valid QASM3."""
+        import re
+
+        try:
+            import qiskit.qasm3 as qasm3_mod
+        except ImportError:
+            pytest.skip("qiskit qasm3 importer not installed")
+
+        src_path = Path(__file__).parent / "openqasm3_official_example" / "teleport.qasm"
+        src = src_path.read_text()
+        # qiskit_qasm3_import quirk: single-bit comparisons must be written
+        # '== true'; the spec's own example uses '== 1'.
+        src = re.sub(r"==\s*1\b", "==true", src)
+        qc = qasm3_mod.loads(src)
+
+        qasm3 = self.pipeline_from_circuit(qc, quantum_opt_path, quantum_translate_path, True)
+        assert qasm3.count("reset ") == 3
+        assert "barrier" in qasm3
+        assert "U(" in qasm3
+        assert "if (" in qasm3
+        qasm3_mod.loads(qasm3)
+
+    @pytest.mark.skipif(not AER_AVAILABLE, reason="qiskit-aer not installed")
+    def test_while_loop_semantics(self, quantum_opt_path, quantum_translate_path):
+        """Repeat-until-zero loop must terminate with c[0] == 0 in both versions."""
+        qc = self.while_loop_circuit()
+        qasm3 = self.pipeline_from_circuit(qc, quantum_opt_path, quantum_translate_path, True)
+        translated = self.assert_valid_qasm3(qasm3)
+
+        shots = 1000
+        sim = AerSimulator()
+        counts1 = sim.run(qc, shots=shots).result().get_counts()
+        counts2 = sim.run(translated, shots=shots).result().get_counts()
+        assert set(counts1) == {"0"}
+        assert set(counts2) == {"0"}
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

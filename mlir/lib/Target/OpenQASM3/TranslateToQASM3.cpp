@@ -49,6 +49,8 @@ class QASM3Emitter {
     DenseMap<Value, std::string> bitMap;
     // Track which non-stdgates custom gate definitions have been emitted
     llvm::SmallSet<std::string, 8> emittedCustomGates;
+    // Track which classical registers (bit[n] c;) have been declared
+    llvm::SmallSet<std::string, 4> declaredCregs;
 
     LogicalResult emitOperation(Operation *op)
     {
@@ -57,6 +59,7 @@ class QASM3Emitter {
             .Case<func::FuncOp>([&](func::FuncOp op) { return emitFunction(op); })
             .Case<scf::ForOp>([&](scf::ForOp op) { return emitForLoop(op); })
             .Case<scf::IfOp>([&](scf::IfOp op) { return emitIf(op); })
+            .Case<scf::WhileOp>([&](scf::WhileOp op) { return emitWhileLoop(op); })
             .Case<CustomOp>([&](CustomOp op) { return emitCustomGate(op); })
             // Add other quantum ops like Alloc, Measure here
             .Case<AllocOp>([&](AllocOp op) { return emitAlloc(op); })
@@ -76,6 +79,10 @@ class QASM3Emitter {
         // Simple main function or simple scope
         // If it's main, we just emit body.
         if (op.getName() == "main") {
+            // Declare all classical registers up front. Measurements may sit
+            // inside if/for/while bodies, but QASM3 register declarations must
+            // be visible at the outer scope for feedforward conditions.
+            emitCregDeclarations(op);
             for (Operation &innerOp : op.getBody().front()) {
                 if (failed(emitOperation(&innerOp)))
                     return failure();
@@ -85,12 +92,31 @@ class QASM3Emitter {
 
         // Otherwise emit as box or def (simplification)
         os << "def " << op.getName() << "() {\n";
+        // Local register declarations for any creg-tagged measurements here.
+        emitCregDeclarations(op);
         for (Operation &innerOp : op.getBody().front()) {
             if (failed(emitOperation(&innerOp)))
                 return failure();
         }
         os << "}\n";
         return success();
+    }
+
+    void emitCregDeclarations(func::FuncOp fn)
+    {
+        fn.walk([&](MeasureOp m) {
+            auto nameAttr = m->getAttrOfType<StringAttr>("creg_name");
+            if (!nameAttr)
+                return;
+            std::string name = nameAttr.getValue().str();
+            if (declaredCregs.count(name))
+                return;
+            declaredCregs.insert(name);
+            int64_t size = 1;
+            if (auto sizeAttr = m->getAttrOfType<IntegerAttr>("creg_size"))
+                size = sizeAttr.getInt();
+            os << "bit[" << size << "] " << name << ";\n";
+        });
     }
 
     LogicalResult emitForLoop(scf::ForOp op)
@@ -193,37 +219,78 @@ class QASM3Emitter {
         return success();
     }
 
+    // Recursively translate a classical i1/int SSA value into a QASM3
+    // condition expression. Supports measurement bits, constants, negation
+    // (arith.xori with 1), conjunction/disjunction, and eq/ne comparisons.
+    std::string buildCondExpr(Value v)
+    {
+        if (bitMap.count(v))
+            return bitMap[v];
+
+        Operation *def = v.getDefiningOp();
+        if (!def) {
+            llvm::errs() << "WARNING: condition value is an unmapped block argument\n";
+            return "unknown_cond";
+        }
+
+        if (auto cOp = dyn_cast<arith::ConstantOp>(def)) {
+            // NOTE: i1 constants ("true") sign-extend under getInt() to -1,
+            // so read the raw APInt zero-extended instead.
+            if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
+                if (intAttr.getType().isInteger(1))
+                    return intAttr.getValue().isZero() ? "0" : "1";
+                return std::to_string(intAttr.getInt());
+            }
+        }
+
+        if (auto xorOp = dyn_cast<arith::XOrIOp>(def)) {
+            // xori(x, 1) is boolean negation; xori(x, 0) is a no-op.
+            auto getConst = [](Value v) -> std::optional<bool> {
+                if (auto cOp = v.getDefiningOp<arith::ConstantOp>())
+                    if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue()))
+                        return !intAttr.getValue().isZero();
+                return std::nullopt;
+            };
+            Value other;
+            std::optional<bool> c;
+            if ((c = getConst(xorOp.getRhs())))
+                other = xorOp.getLhs();
+            else if ((c = getConst(xorOp.getLhs())))
+                other = xorOp.getRhs();
+            if (c) {
+                std::string inner = buildCondExpr(other);
+                if (!*c)
+                    return inner;
+                return inner.find(' ') == std::string::npos ? "!" + inner : "!(" + inner + ")";
+            }
+        }
+
+        if (auto andOp = dyn_cast<arith::AndIOp>(def))
+            return "(" + buildCondExpr(andOp.getLhs()) + " && " + buildCondExpr(andOp.getRhs()) +
+                   ")";
+
+        if (auto orOp = dyn_cast<arith::OrIOp>(def))
+            return "(" + buildCondExpr(orOp.getLhs()) + " || " + buildCondExpr(orOp.getRhs()) +
+                   ")";
+
+        if (auto cmpOp = dyn_cast<arith::CmpIOp>(def)) {
+            auto pred = cmpOp.getPredicate();
+            if (pred == arith::CmpIPredicate::eq || pred == arith::CmpIPredicate::ne) {
+                std::string lhs = buildCondExpr(cmpOp.getLhs());
+                std::string rhs = buildCondExpr(cmpOp.getRhs());
+                const char *opStr = (pred == arith::CmpIPredicate::eq) ? " == " : " != ";
+                return lhs + opStr + rhs;
+            }
+        }
+
+        llvm::errs() << "WARNING: unsupported condition op: " << def->getName().getStringRef()
+                     << "\n";
+        return "unknown_cond";
+    }
+
     LogicalResult emitIf(scf::IfOp op)
     {
-        Value cond = op.getCondition();
-        std::string condExpr = "unknown_cond";
-
-        if (bitMap.count(cond)) {
-            // Direct measurement bit: emit  if (m_i)
-            condExpr = bitMap[cond];
-        }
-        else if (auto xorOp = cond.getDefiningOp<arith::XOrIOp>()) {
-            // Negated bit: arith.xori(m_i, 1) — emit  if (m_i == false)
-            Value lhs = xorOp.getLhs();
-            Value rhs = xorOp.getRhs();
-            Value bitVal, constVal;
-            if (bitMap.count(lhs)) {
-                bitVal = lhs;
-                constVal = rhs;
-            }
-            else if (bitMap.count(rhs)) {
-                bitVal = rhs;
-                constVal = lhs;
-            }
-            if (bitVal) {
-                if (auto cOp = constVal.getDefiningOp<arith::ConstantOp>()) {
-                    if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
-                        if (intAttr.getInt() == 1)
-                            condExpr = "!" + bitMap[bitVal];
-                    }
-                }
-            }
-        }
+        std::string condExpr = buildCondExpr(op.getCondition());
 
         os << "if (" << condExpr << ") {\n";
 
@@ -275,19 +342,113 @@ class QASM3Emitter {
         return success();
     }
 
+    LogicalResult emitWhileLoop(scf::WhileOp op)
+    {
+        // scf.while → while (<cond>) { ... }
+        // The before region computes the condition from loop-carried values;
+        // it is pure classical logic, so we translate it as an expression and
+        // never emit its ops as statements. QASM3's named creg bits provide
+        // the loop-carry that SSA does in MLIR: the in-body measurement
+        // re-assigns the same c[i] the condition reads.
+        Block &before = op.getBefore().front();
+        auto inits = op.getInits();
+        for (size_t i = 0; i < inits.size() && i < before.getNumArguments(); ++i) {
+            Value initVal = inits[i];
+            Value blockArg = before.getArgument(i);
+            if (qubitMap.count(initVal))
+                qubitMap[blockArg] = qubitMap[initVal];
+            if (bitMap.count(initVal))
+                bitMap[blockArg] = bitMap[initVal];
+        }
+
+        // The before region must be pure classical condition computation; any
+        // quantum op or side effect there has no place in the emitted text.
+        for (Operation &beforeOp : before) {
+            if (!isa<scf::ConditionOp>(beforeOp) &&
+                beforeOp.getDialect()->getNamespace() != "arith") {
+                llvm::errs() << "WARNING: op '" << beforeOp.getName().getStringRef()
+                             << "' in scf.while before-region is dropped; only pure "
+                             << "condition computation is supported there\n";
+            }
+        }
+
+        auto condOp = op.getConditionOp();
+        std::string condExpr = buildCondExpr(condOp.getCondition());
+        if (condExpr.find("m_") != std::string::npos) {
+            llvm::errs() << "WARNING: while condition uses an anonymous measurement bit ('"
+                         << condExpr << "'); re-measurements inside the loop body will not "
+                         << "update it. Measure into a named classical register instead.\n";
+        }
+
+        os << "while (" << condExpr << ") {\n";
+
+        // After-region args correspond to scf.condition's forwarded operands,
+        // NOT positionally to the inits: canonicalize prunes unused forwarded
+        // values, so the two lists can differ.
+        Block &after = op.getAfter().front();
+        auto fwdArgs = condOp.getArgs();
+        for (size_t i = 0; i < fwdArgs.size() && i < after.getNumArguments(); ++i) {
+            Value fwdVal = fwdArgs[i];
+            Value blockArg = after.getArgument(i);
+            if (qubitMap.count(fwdVal))
+                qubitMap[blockArg] = qubitMap[fwdVal];
+            if (bitMap.count(fwdVal))
+                bitMap[blockArg] = bitMap[fwdVal];
+        }
+
+        for (Operation &innerOp : after) {
+            if (failed(emitOperation(&innerOp)))
+                return failure();
+        }
+
+        os << "}\n";
+
+        // Back-propagate names from the body's yielded values onto the
+        // before-region args. A loop-carried bit first measured INSIDE the
+        // body has a constant as its init (no name), but its yield operand
+        // carries the creg name assigned during body emission.
+        auto yieldOp = op.getYieldOp();
+        auto yieldOperands = yieldOp.getOperands();
+        for (size_t j = 0; j < yieldOperands.size() && j < before.getNumArguments(); ++j) {
+            Value blockArg = before.getArgument(j);
+            if (!qubitMap.count(blockArg) && qubitMap.count(yieldOperands[j]))
+                qubitMap[blockArg] = qubitMap[yieldOperands[j]];
+            if (!bitMap.count(blockArg) && bitMap.count(yieldOperands[j]))
+                bitMap[blockArg] = bitMap[yieldOperands[j]];
+        }
+
+        // Loop results also correspond to the condition's forwarded operands.
+        auto results = op.getResults();
+        for (size_t i = 0; i < results.size() && i < fwdArgs.size(); ++i) {
+            Value fwdVal = fwdArgs[i];
+            Value result = results[i];
+            if (qubitMap.count(fwdVal))
+                qubitMap[result] = qubitMap[fwdVal];
+            if (bitMap.count(fwdVal))
+                bitMap[result] = bitMap[fwdVal];
+        }
+
+        return success();
+    }
+
     LogicalResult emitAlloc(AllocOp op)
     {
         // quantum.alloc(n) -> qreg q[n];
         // We need to name it.
         std::string name = "q" + std::to_string(qubitCounter++);
 
-        // n_qubits is an operand. Check if constant.
-
+        // The qubit count is either an SSA operand or the nqubits_attr
+        // attribute (e.g. `quantum.alloc(5)` literal form).
         int64_t n = 1;
-        if (auto cOp = op.getNqubits().getDefiningOp<arith::ConstantOp>()) {
-            if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
-                n = intAttr.getInt();
+        if (Value nq = op.getNqubits()) {
+            if (auto cOp = nq.getDefiningOp<arith::ConstantOp>()) {
+                if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
+                    n = intAttr.getInt();
+                }
             }
+        }
+        else if (auto nqAttr = op.getNqubitsAttr()) {
+            n = *nqAttr;
         }
 
         os << "qubit[" << n << "] " << name << ";\n";
@@ -425,12 +586,52 @@ class QASM3Emitter {
         }
     }
 
+    LogicalResult emitResetOrBarrier(CustomOp op)
+    {
+        llvm::StringRef name = op.getGateName();
+        auto operands = op.getInQubits();
+
+        SmallVector<std::string> qNames;
+        for (Value q : operands) {
+            if (!qubitMap.count(q) || qubitMap[q].empty())
+                return op.emitError("Cannot emit " + name + ": qubit operand not mapped");
+            qNames.push_back(qubitMap[q]);
+        }
+
+        if (name == "reset") {
+            // One reset statement per qubit.
+            for (const std::string &qName : qNames)
+                os << "reset " << qName << ";\n";
+        }
+        else if (qNames.empty()) {
+            // Bare form: barrier on everything.
+            os << "barrier;\n";
+        }
+        else {
+            os << "barrier " << llvm::join(qNames, ", ") << ";\n";
+        }
+
+        // Thread qubit SSA values through, QASM modifies in place.
+        auto results = op->getResults();
+        size_t numToMap = std::min(results.size(), operands.size());
+        for (size_t i = 0; i < numToMap; ++i)
+            qubitMap[results[i]] = qNames[i];
+
+        return success();
+    }
+
     LogicalResult emitCustomGate(CustomOp op)
     {
         // quantum.custom "name" (q1, q2)
         // or quantum.custom "name"(p1) (q1)
         llvm::StringRef gateName = op.getGateName();
         std::string qasmGateName;
+
+        // "reset" and "barrier" are represented as quantum.custom markers by
+        // the importer (the quantum dialect has no dedicated ops for them).
+        // They are statements, not gates: no params, no gate defs.
+        if (gateName == "reset" || gateName == "barrier")
+            return emitResetOrBarrier(op);
 
         // Map gate names from QASM 2.0 (qelib1.inc) to QASM 3.0 (stdgates.inc)
         if (gateName == "cnot") {
@@ -439,6 +640,11 @@ class QASM3Emitter {
         else if (gateName == "cu1") {
             // cu1(lambda) in QASM 2.0 is equivalent to cp(lambda) in QASM 3.0
             qasmGateName = "cp";
+        }
+        else if (gateName == "u") {
+            // Qiskit's u(theta,phi,lambda) is the QASM 3.0 builtin U gate
+            // (plain "u" is not defined in stdgates.inc).
+            qasmGateName = "U";
         }
         else if (gateName == "rzz" || gateName == "rxx" || gateName == "ryy" ||
                  gateName == "rccx") {
@@ -571,10 +777,21 @@ class QASM3Emitter {
             return op.emitError("Cannot emit measure: qubit operand not mapped to QASM variable");
         }
 
-        // Generate a name for the classical outcome
-        std::string cName = "m_" + std::to_string(qubitCounter++);
-
-        os << "bit " << cName << ";\n" << cName << " = measure " << qName << ";\n";
+        // If the importer tagged this measurement with its classical register,
+        // assign into the pre-declared bit[n] register element. Otherwise fall
+        // back to a fresh anonymous bit.
+        std::string cName;
+        if (auto nameAttr = op->getAttrOfType<StringAttr>("creg_name")) {
+            int64_t idx = 0;
+            if (auto idxAttr = op->getAttrOfType<IntegerAttr>("creg_idx"))
+                idx = idxAttr.getInt();
+            cName = nameAttr.getValue().str() + "[" + std::to_string(idx) + "]";
+            os << cName << " = measure " << qName << ";\n";
+        }
+        else {
+            cName = "m_" + std::to_string(qubitCounter++);
+            os << "bit " << cName << ";\n" << cName << " = measure " << qName << ";\n";
+        }
 
         // Update map for the qubit OUT state
         // In Catalyst, measure returns the qubit state as well.
