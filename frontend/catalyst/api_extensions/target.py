@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tag a PennyLane device as a separate cross-compilation target, optionally remote.
-"""
+"""Tag a PennyLane device as a separate cross-compilation target, optionally remote."""
 
 from dataclasses import dataclass
 from typing import Optional
@@ -60,7 +59,7 @@ def target(
     """Tag a PennyLane device as a separate cross-compilation target and return it.
 
     Any QNode wrapping the returned device is kept as a separate compilation unit which carries
-    ``catalyst.target = {backend, pipeline, triple}`` and is cross-compiled to a standalone 
+    ``catalyst.target = {backend, pipeline, triple}`` and is cross-compiled to a standalone
     object file rather than being inlined into the host module.
 
     Args:
@@ -105,3 +104,28 @@ def get_target(device) -> Optional[Target]:
 def get_dispatch(device) -> Optional[RemoteDispatch]:
     """Return the :class:`RemoteDispatch` attached via :func:`remote`, or ``None``."""
     return getattr(device, _DISPATCH_ATTR, None)
+
+
+def run_remote(device, endpoint, *, backend: Optional[str] = None):
+    """Run an ordinary device's circuits on a remote executor and return it.
+
+    Simple wrapper over :func:`target` + :func:`remote`: tags ``device`` so its QNodes are cross-compiled to a standalone object and dispatched to a remote host. This provides a simple syntax for running any device (e.g. ``null.qubit``) remotely::
+
+        dev = catalyst.run_remote(qp.device("null.qubit", wires=2), "host:port")
+
+    Args:
+        device: A PennyLane device.
+        endpoint: The remote host — an address string (``"host:port"``) or a ``pennylane.Endpoint``
+            (its ``host`` and, from ``attrs``, an optional target ``triple`` are used). ``run_remote``
+            always dispatches remotely, regardless of an Endpoint's ``local`` flag.
+        backend: Optional backend name recorded as metadata on the target.
+
+    Returns:
+        The same ``device``, now tagged for remote execution.
+    """
+    if isinstance(endpoint, str):
+        address, triple = endpoint, None
+    else:
+        address = endpoint.host
+        triple = (getattr(endpoint, "attrs", None) or {}).get("triple")
+    return remote(target(device, backend=backend, triple=triple), address=address)

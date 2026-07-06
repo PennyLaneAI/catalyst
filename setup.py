@@ -136,6 +136,7 @@ requirements = [
 
 entry_points = {
     "pennylane.plugins": [
+        "ftqc.heterogeneous = catalyst.backline:HeterogeneousDevice",
         "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
         "softwareq.qpp = catalyst.third_party.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.third_party.cuda:NvidiaCuStateVec",
