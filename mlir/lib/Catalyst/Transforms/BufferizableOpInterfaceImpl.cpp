@@ -182,10 +182,9 @@ struct CustomCallOpInterface
 
         // Create an updated custom call operation. `backend_config` is a declared attribute, so it
         // must be passed to the builder explicitly; discardable attrs are carried separately below.
-        auto newCustomCallOp =
-            CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
-                                 customCallOp.getCallTargetName(), numArgumentsAttr,
-                                 customCallOp.getBackendConfigAttr());
+        auto newCustomCallOp = CustomCallOp::create(
+            rewriter, op->getLoc(), TypeRange{}, bufferArgs, customCallOp.getCallTargetName(),
+            numArgumentsAttr, customCallOp.getBackendConfigAttr());
         newCustomCallOp->setDiscardableAttrs(customCallOp->getDiscardableAttrDictionary());
         size_t startIndex = bufferArgs.size() - customCallOp.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
@@ -338,9 +337,9 @@ struct CallbackCallOpInterface
 };
 
 /// Bufferization of catalyst.launch_kernel. The callee reads its operands and returns each result
-/// in its own freshly allocated buffer. Bufferization therefore converts the operands to buffers and
-/// the tensor results to memref results (return-by-value): no operand is written in place and no
-/// result aliases an operand.
+/// in its own freshly allocated buffer. Bufferization therefore converts the operands to buffers
+/// and the tensor results to memref results (return-by-value): no operand is written in place and
+/// no result aliases an operand.
 struct LaunchKernelOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<LaunchKernelOpInterface,
                                                                    LaunchKernelOp> {
@@ -389,9 +388,10 @@ struct LaunchKernelOpInterface
                 buffer = operand;
             }
 
-            // The callee receives each operand as a contiguous block, addressed through the memref's
-            // aligned pointer with its strides/offset ignored. Copy any non-identity-layout operand
-            // into a fresh contiguous buffer first so the callee sees the intended elements.
+            // The callee receives each operand as a contiguous block, addressed through the
+            // memref's aligned pointer with its strides/offset ignored. Copy any
+            // non-identity-layout operand into a fresh contiguous buffer first so the callee sees
+            // the intended elements.
             if (auto memrefTy = dyn_cast<MemRefType>(buffer.getType())) {
                 if (!memrefTy.getLayout().isIdentity()) {
                     MemRefType contiguousTy =
@@ -415,10 +415,9 @@ struct LaunchKernelOpInterface
             }
         }
 
-        auto newLaunchOp =
-            LaunchKernelOp::create(rewriter, op->getLoc(), memrefResultTypes, launchOp.getCallee(),
-                                   bufferOperands, launchOp.getArgAttrsAttr(),
-                                   launchOp.getResAttrsAttr());
+        auto newLaunchOp = LaunchKernelOp::create(
+            rewriter, op->getLoc(), memrefResultTypes, launchOp.getCallee(), bufferOperands,
+            launchOp.getArgAttrsAttr(), launchOp.getResAttrsAttr());
         // Carry over any discardable attributes, since create() only sets the declared ones.
         newLaunchOp->setDiscardableAttrs(launchOp->getDiscardableAttrDictionary());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newLaunchOp.getResults());

@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Integration test for the target cross-compilation + remote-dispatch chain.
-"""
+"""Integration test for the target cross-compilation + remote-dispatch chain."""
 
 import os
 

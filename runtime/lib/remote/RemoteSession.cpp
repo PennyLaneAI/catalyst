@@ -99,8 +99,8 @@ void initialize_targets()
 // messaging (e.g. deallocating JIT'd memory) — avoids tearing the socket down prematurely.
 class ShutdownFDTransport : public SimpleRemoteEPCTransport {
   public:
-    static Expected<std::unique_ptr<ShutdownFDTransport>>
-    Create(SimpleRemoteEPCTransportClient &C, int InFD, int OutFD)
+    static Expected<std::unique_ptr<ShutdownFDTransport>> Create(SimpleRemoteEPCTransportClient &C,
+                                                                 int InFD, int OutFD)
     {
         auto Inner = FDSimpleRemoteEPCTransport::Create(C, InFD, OutFD);
         if (!Inner) {
@@ -312,9 +312,9 @@ struct RemoteSession {
 
         auto setup = SimpleRemoteEPC::Setup();
         setup.CreateMemoryManager = createSimpleRemoteMemoryManager;
-        // The ORC bootstrap handshake inside SimpleRemoteEPC::Create is an unbounded blocking read on
-        // the socket. If the peer is not a live catalyst-executor (e.g. a stale port-forward or a
-        // dead SSH tunnel accepted the connection), it would hang forever. A watchdog shuts the
+        // The ORC bootstrap handshake inside SimpleRemoteEPC::Create is an unbounded blocking read
+        // on the socket. If the peer is not a live catalyst-executor (e.g. a stale port-forward or
+        // a dead SSH tunnel accepted the connection), it would hang forever. A watchdog shuts the
         // socket down after the timeout, which forces the blocked read to fail and Create to return
         // an error instead of hanging.
         const int sockFd = *SockFD;
@@ -338,8 +338,8 @@ struct RemoteSession {
         // ShutdownFDTransport instead of FDSimpleRemoteEPCTransport so teardown shutdown()s the
         // socket and doesn't deadlock — see the class comment above.
         auto EPC = SimpleRemoteEPC::Create<ShutdownFDTransport>(
-            std::make_unique<DynamicThreadPoolTaskDispatcher>(std::nullopt), std::move(setup), sockFd,
-            sockFd);
+            std::make_unique<DynamicThreadPoolTaskDispatcher>(std::nullopt), std::move(setup),
+            sockFd, sockFd);
 
         if (watchdog.joinable()) {
             {
@@ -383,8 +383,8 @@ struct RemoteSession {
         return ObjectLayer.add(jd, std::move(Buf));
     }
 
-    // Resolve `Name` in the JITDylib of the object identified by `path` (kernel entry points). Falls
-    // back to MainJD if the object is unknown.
+    // Resolve `Name` in the JITDylib of the object identified by `path` (kernel entry points).
+    // Falls back to MainJD if the object is unknown.
     ExecutorAddr lookupSym(StringRef path, StringRef Name)
     {
         auto it = KernelJDs.find(path.str());
