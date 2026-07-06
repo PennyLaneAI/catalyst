@@ -135,12 +135,16 @@ def _process_params(
         # decomposition rules, not parameters or qubits of the outer operator.
         for val in val_with_ops:
             if isinstance(val, Operator2):
-                forward_args += flatten(val)[0]
+                forward_params += flatten(val)[0]
             else:
                 cur_params.append(val)
 
-        params += cur_params
-        param_map[hname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + len(cur_params))))
+        if len(cur_params) != 0:
+            params += cur_params
+            param_map[hname] = ir.DenseI64ArrayAttr.get(
+                list(range(map_idx, map_idx + len(cur_params)))
+            )
+
         map_idx += len(cur_params)
         args_idx += hsize
 

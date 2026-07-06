@@ -20,6 +20,7 @@ from typing import Any
 from pennylane import math
 from pennylane.core import Operator2
 from pennylane.pytrees import PyTreeStructure, unflatten
+from pennylane.wires import AbstractQubit
 
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -53,8 +54,9 @@ def generate_uid(
         else:
             cur_avals = []
             for val in avals_in[args_idx : args_idx + hsize]:
-                cur_avals.append((val.shape, val.dtype.name))
-            hybrid_avals.append(cur_avals)
+                aval = val if isinstance(val, AbstractQubit) else (val.shape, val.dtype.name)
+                cur_avals.append(aval)
+            hybrid_avals.append(tuple(cur_avals))
 
         args_idx += hsize
 
@@ -65,7 +67,7 @@ def generate_uid(
 
     reduced.append(("dynamic", tuple(dynamic_avals)))
     reduced.append(("wires", wire_lens))
-    reduced.append(("hybrid", hybrid_trees, hybrid_avals))
+    reduced.append(("hybrid", hybrid_trees, tuple(hybrid_avals)))
     reduced.append(("static", reduced_static_args))
     reduced.append(("adjoint", adjoint))
     reduced.append(("n_ctrls", n_ctrls))
