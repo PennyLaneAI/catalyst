@@ -58,8 +58,8 @@ from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils.runtime_artifacts import collect_runtime_artifacts
 from catalyst.utils.patching import Patcher
+from catalyst.utils.runtime_artifacts import collect_runtime_artifacts
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

@@ -251,8 +251,9 @@ class LinkerDriver:
 
     @staticmethod
     @debug_logger
-    def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None,
-            extra_objects=None):
+    def run(
+        infile, outfile=None, flags=None, fallback_compilers=None, options=None, extra_objects=None
+    ):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
@@ -277,7 +278,8 @@ class LinkerDriver:
             fallback_compilers = LinkerDriver._default_fallback_compilers
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
             success = LinkerDriver._attempt_link(
-                compiler, flags, infile, outfile, options, extra_objects)
+                compiler, flags, infile, outfile, options, extra_objects
+            )
             if options.verbose:
                 print("Shared object linking successful", file=options.logfile)
             if success:

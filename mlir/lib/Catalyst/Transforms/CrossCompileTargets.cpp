@@ -92,9 +92,10 @@ std::vector<std::string> defaultLoweringPassList()
 }
 
 // Lower a *local* (non-dispatch) target module. Its cross-compiled object is statically linked into
-// the final binary, so each host-side launch_kernel into it is rewritten to a flat func.call against
-// an external declaration of the entry (resolved at link time by the object's native symbol). The
-// object path is recorded on the root module for the linker, and the now-empty module is erased.
+// the final binary, so each host-side launch_kernel into it is rewritten to a flat func.call
+// against an external declaration of the entry (resolved at link time by the object's native
+// symbol). The object path is recorded on the root module for the linker, and the now-empty module
+// is erased.
 LogicalResult lowerLocalTargetCalls(ModuleOp host, ModuleOp nested,
                                     SmallVectorImpl<Attribute> &objectFiles)
 {
@@ -146,8 +147,7 @@ LogicalResult lowerLocalTargetCalls(ModuleOp host, ModuleOp nested,
     return success();
 }
 
-struct CrossCompileTargetsPass
-    : impl::CrossCompileTargetsPassBase<CrossCompileTargetsPass> {
+struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileTargetsPass> {
     using CrossCompileTargetsPassBase::CrossCompileTargetsPassBase;
 
     void getDependentDialects(DialectRegistry &registry) const override
@@ -344,9 +344,9 @@ struct CrossCompileTargetsPass
         }
         llvm::DataLayout dataLayout = targetMachine->createDataLayout();
 
-        // Clone the target module into an unparented root module: leaves `nested` intact in the host
-        // (its host launch_kernel is consumed later by local flattening or dispatch) and gives the
-        // sub-pipeline / translateModuleToLLVMIR a top-level module to operate on.
+        // Clone the target module into an unparented root module: leaves `nested` intact in the
+        // host (its host launch_kernel is consumed later by local flattening or dispatch) and gives
+        // the sub-pipeline / translateModuleToLLVMIR a top-level module to operate on.
         OpBuilder builder(ctx);
         mlir::OwningOpRef<mlir::ModuleOp> standalone(cast<ModuleOp>(nested->clone()));
 
@@ -383,8 +383,8 @@ struct CrossCompileTargetsPass
             dumpMLIR(*standalone, kernelDir, "extracted.mlir");
         }
 
-        // Lower the extracted module. A 'pipeline' key on catalyst.target selects a named 
-        // target-lowering pipeline resolved against the host pipeline registry. 
+        // Lower the extracted module. A 'pipeline' key on catalyst.target selects a named
+        // target-lowering pipeline resolved against the host pipeline registry.
         // Without it, fall back to the default bufferization + LLVM-dialect lowering.
         std::string pipelineSpec;
         if (auto pipelineAttr = targetAttr.getAs<StringAttr>("pipeline")) {
@@ -395,8 +395,7 @@ struct CrossCompileTargetsPass
         }
         PassManager subPM(ctx);
         if (failed(parsePassPipeline(pipelineSpec, subPM))) {
-            nested.emitError("failed to build the target-lowering pipeline '" + pipelineSpec +
-                             "'");
+            nested.emitError("failed to build the target-lowering pipeline '" + pipelineSpec + "'");
             return failure();
         }
         if (failed(subPM.run(*standalone))) {

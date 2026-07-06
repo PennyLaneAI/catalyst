@@ -101,7 +101,7 @@ class SharedLibraryManager final {
         const char *primary_dlerror = dlerror();
         std::string primary_error = primary_dlerror ? primary_dlerror : "unknown dlopen error";
         auto basename = std::filesystem::path(filename).filename().string();
-        
+
         // rewrite the extension if it differs from the platform one.
         if (!basename.ends_with(dl_ext)) {
             auto dot = basename.find_last_of('.');
