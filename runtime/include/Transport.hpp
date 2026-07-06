@@ -45,9 +45,9 @@ enum class MemKind {
  * @brief Host-provided connection configuration for the out-of-band handshake.
  */
 struct ConnectInfo {
-    std::string   peer;       // Peer host[:port] for the out-of-band handshake.
-    std::uint16_t oob_port;   // Out-of-band TCP port.
-    bool          is_server;  // Which side listens on the OOB channel.
+    std::string peer;       // Peer host[:port] for the out-of-band handshake.
+    std::uint16_t oob_port; // Out-of-band TCP port.
+    bool is_server;         // Which side listens on the OOB channel.
 };
 
 /**
@@ -57,12 +57,13 @@ struct ConnectInfo {
  * holds the region as an opaque handle.
  */
 struct MemRegion {
-    void         *addr = nullptr;          // Device-allocated address.
-    std::size_t   size = 0;                // Region size in bytes.
-    std::uint32_t lkey = 0;                // Local key.
-    std::uint32_t rkey = 0;                // Remote key.
-    MemKind       kind = MemKind::CpuRam;  // Memory kind / registration path.
-    int           device_id = -1;          // For cases when we manage multiple devices (e.g. multi-GPU on a single host).
+    void *addr = nullptr;           // Device-allocated address.
+    std::size_t size = 0;           // Region size in bytes.
+    std::uint32_t lkey = 0;         // Local key.
+    std::uint32_t rkey = 0;         // Remote key.
+    MemKind kind = MemKind::CpuRam; // Memory kind / registration path.
+    int device_id =
+        -1; // For cases when we manage multiple devices (e.g. multi-GPU on a single host).
 };
 
 /**
@@ -71,18 +72,18 @@ struct MemRegion {
  * The target of this endpoint's one-sided RDMA operations.
  */
 struct PeerRef {
-    std::uint32_t rkey = 0;         // Peer's remote key.
-    std::uint64_t remote_addr = 0;  // Peer's remote address.
-    std::size_t   size = 0;         // Peer region size in bytes.
+    std::uint32_t rkey = 0;        // Peer's remote key.
+    std::uint64_t remote_addr = 0; // Peer's remote address.
+    std::size_t size = 0;          // Peer region size in bytes.
 };
 
 /**
  * @brief A single RDMA operation in a channel's per-round schedule.
  */
 struct RdmaOp {
-    std::uint32_t opcode = 0;    // WRITE / READ / SEND.
-    std::uint64_t xfer_len = 0;  // Transfer length in bytes.
-    bool          inl = false;   // Inline payload (e.g. bf-inline small writes).
+    std::uint32_t opcode = 0;   // WRITE / READ / SEND.
+    std::uint64_t xfer_len = 0; // Transfer length in bytes.
+    bool inl = false;           // Inline payload (e.g. bf-inline small writes).
 };
 
 /**
@@ -90,13 +91,15 @@ struct RdmaOp {
  *        to run, and the ordered RDMA operations it performs each round.
  */
 struct ChannelDesc {
-    DataPath            data_path = DataPath::CpuVerbs;  // Engine that drives the transfers.
-    std::uint32_t       n_rounds = 0;   // Rounds to run; 0 = persistent (run until close(), e.g. a GPU persistent kernel).
-    std::vector<RdmaOp> ops;            // The directed RDMA operations, in order.
+    DataPath data_path = DataPath::CpuVerbs; // Engine that drives the transfers.
+    std::uint32_t n_rounds =
+        0; // Rounds to run; 0 = persistent (run until close(), e.g. a GPU persistent kernel).
+    std::vector<RdmaOp> ops; // The directed RDMA operations, in order.
 };
 
 /**
- * @brief Data-plane channel. Lifecycle only; the steady-state loop runs in the engine after start().
+ * @brief Data-plane channel. Lifecycle only; the steady-state loop runs in the engine after
+ * start().
  */
 class Channel {
   public:
@@ -105,8 +108,8 @@ class Channel {
     /**
      * @brief Start the engine driving this channel's transfers.
      *
-     * Non-blocking: after this call the engine runs autonomously and the CPU is out of the per-round
-     * loop. A bounded channel runs `ChannelDesc::n_rounds` rounds; a persistent channel
+     * Non-blocking: after this call the engine runs autonomously and the CPU is out of the
+     * per-round loop. A bounded channel runs `ChannelDesc::n_rounds` rounds; a persistent channel
      * (`n_rounds == 0`) runs until `close`.
      */
     virtual void start() = 0;
