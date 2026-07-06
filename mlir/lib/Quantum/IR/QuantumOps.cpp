@@ -225,8 +225,8 @@ LogicalResult OperatorOp::verify()
     const bool hasQubitOutput = !getOutQubits().empty();
     const bool hasQubitMode = hasQubitInput || hasQubitOutput;
 
-    // Exactly one mode must be used: explicit qubits or qreg-based addressing.
-    if (hasQregMode == hasQubitMode) {
+    // At most one mode must be used: explicit qubits or qreg-based addressing.
+    if (hasQregMode && hasQubitMode) {
         return emitOpError() << "must use either qubits or registers, but not both";
     }
 

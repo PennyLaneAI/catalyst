@@ -673,6 +673,13 @@ func.func @operator_custom_with_uid_and_forward(%fwd : i64, %q0 : !quantum.bit, 
 
 // -----
 
+func.func @operator_no_mode() {
+    "quantum.operator"() <{op_name = "no_qubits_or_qreg", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 0>}> : () -> ()
+    return
+}
+
+// -----
+
 func.func @operator_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
     // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
     %o0, %o1 = "quantum.operator"(%p0, %p1, %q0, %q1) <{op_name = "bad_param_map", param_map = {p0 = array<i64: 0>}, qubit_map = {}, operandSegmentSizes = array<i32: 2, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (f64, i64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
@@ -772,14 +779,6 @@ func.func @operator_invalid_forward_args_without_uid(%fwd : i64, %q0 : !quantum.
 func.func @operator_invalid_both_modes(%q : !quantum.bit, %r : !quantum.reg, %idx : tensor<2xi64>) {
     // expected-error@+1 {{must use either qubits or registers, but not both}}
     %out_q, %out_r = "quantum.operator"(%q, %r, %idx) <{op_name = "bad_both", operandSegmentSizes = array<i32: 0, 0, 1, 0, 0, 1, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0, 1>}> : (!quantum.bit, !quantum.reg, tensor<2xi64>) -> (!quantum.bit, !quantum.reg)
-    return
-}
-
-// -----
-
-func.func @operator_invalid_no_mode() {
-    // expected-error@+1 {{must use either qubits or registers, but not both}}
-    "quantum.operator"() <{op_name = "bad_none", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 0>}> : () -> ()
     return
 }
 
