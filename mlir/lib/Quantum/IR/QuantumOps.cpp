@@ -154,8 +154,12 @@ OpFoldResult ExtractOp::fold(FoldAdaptor adaptor)
 
 LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &rewriter)
 {
-    // Handle the pattern: %reg2 = insert %reg1[idx], %qubit -> %q = extract %reg2[idx]
-    // Convert to: %q = %qubit, and replace other uses of %reg2 with %reg1
+    // Handle two patterns on an extract fed by an insert:
+    //   1. Same index: %reg2 = insert %reg1[idx], %qubit -> %q = extract %reg2[idx]
+    //      Convert to: %q = %qubit, and replace other uses of %reg2 with %reg1.
+    //   2. Statically distinct indices: %reg2 = insert %reg1[i], %qubit -> %q = extract %reg2[j]
+    //      The insert does not affect qubit j, so read %reg1 directly and sink the bypassed
+    //      insert below the gates acting on the extracted qubits.
     if (auto insert = dyn_cast_if_present<InsertOp>(extract.getQreg().getDefiningOp())) {
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
@@ -174,8 +178,27 @@ LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &
         bool insertHasNonExtractUser = llvm::any_of(
             insert.getResult().getUsers(), [](Operation *user) { return !isa<ExtractOp>(user); });
         if (staticallyDistinct && inSameBlock && insertHasNonExtractUser) {
+            // Reading the pre-insert register drops the false dependency between the two wires.
             rewriter.modifyOpInPlace(extract,
                                      [&] { extract.getQregMutable().assign(insert.getInQreg()); });
+
+            // Sink the bypassed insert to just above the earliest remaining user of its result.
+            // Although extract/insert are pure, downstream consumers rely on their positions:
+            // convert-to-value-semantics expects an extract to read the newest version of its
+            // register, and an insert stranded mid-circuit splits the gate runs analyzed by
+            // parity synthesis. Sinking keeps extracts up and inserts down.
+            Operation *earliestUser = nullptr;
+            for (Operation *user : insert.getResult().getUsers()) {
+                if (user->getBlock() != insert->getBlock()) {
+                    continue;
+                }
+                if (!earliestUser || user->isBeforeInBlock(earliestUser)) {
+                    earliestUser = user;
+                }
+            }
+            if (earliestUser && insert->getNextNode() != earliestUser) {
+                rewriter.modifyOpInPlace(insert, [&] { insert->moveBefore(earliestUser); });
+            }
             return success();
         }
     }

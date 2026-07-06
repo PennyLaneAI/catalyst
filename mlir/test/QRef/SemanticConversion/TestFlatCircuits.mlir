@@ -281,10 +281,10 @@ func.func @test_namedobs_op() -> (!quantum.obs, !quantum.obs) attributes {quantu
     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
 
     // CHECK: [[obs_x:%.+]] = quantum.namedobs [[CNOT]]#0[ PauliX] : !quantum.obs
-    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT]]#0 : !quantum.reg, !quantum.bit
     %obs_x = qref.namedobs %q0 [ PauliX] : !quantum.obs
 
     // CHECK: [[obs_z:%.+]] = quantum.namedobs [[CNOT]]#1[ PauliZ] : !quantum.obs
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT]]#0 : !quantum.reg, !quantum.bit
     // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOT]]#1 : !quantum.reg, !quantum.bit
     %obs_z = qref.namedobs %q1 [ PauliZ] : !quantum.obs
 

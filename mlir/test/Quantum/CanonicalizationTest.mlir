@@ -107,9 +107,9 @@ func.func @test_extract_no_redirect_when_insert_is_leaf(%r0: !quantum.reg) -> !q
 func.func @test_extract_through_insert_distinct_index(%r0: !quantum.reg) -> !quantum.reg {
     // CHECK: [[Q0:%.+]] = quantum.extract %arg0[ 0]
     // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[Q0]]
-    // CHECK: [[INS0:%.+]] = quantum.insert %arg0[ 0], [[X]]
     // CHECK: [[Q1:%.+]] = quantum.extract %arg0[ 1]
     // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() [[Q1]]
+    // CHECK: [[INS0:%.+]] = quantum.insert %arg0[ 0], [[X]]
     // CHECK: [[INS1:%.+]] = quantum.insert [[INS0]][ 1], [[Z]]
     // CHECK: return [[INS1]]
     %q0 = quantum.extract %r0[0] : !quantum.reg -> !quantum.bit
