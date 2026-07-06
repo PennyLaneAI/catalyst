@@ -57,6 +57,7 @@ namespace quantum {
 static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule,
                                          ValueRange operands)
 {
+    assert(rule.getBlocks().size() == 1)
     Block &body = rule.front();
     auto returnOp = cast<func::ReturnOp>(body.getTerminator());
 
