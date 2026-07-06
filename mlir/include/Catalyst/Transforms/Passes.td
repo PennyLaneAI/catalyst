@@ -180,16 +180,6 @@ def CrossCompileTargetsPass : Pass<"cross-compile-targets", "mlir::ModuleOp"> {
     ];
 }
 
-def MarkEntryPointsPass : Pass<"mark-entry-points", "mlir::ModuleOp"> {
-    let summary = "Mark externally-callable entries on nested modules.";
-    let description = [{
-        Annotate functions inside any nested module whose name is reachable 
-        from outside that module with `catalyst.entry_point`.
-    }];
-
-    let dependentDialects = ["mlir::func::FuncDialect"];
-}
-
 def InlineNestedModulePass : Pass<"inline-nested-module"> {
     let summary = "Inline nested modules with qnode attribute.";
 

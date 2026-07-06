@@ -244,8 +244,12 @@ struct LaunchOpLowering : public OpConversionPattern<remote::LaunchOp> {
         // - num_outputs: the number of output arguments
         // - output_descs: the output descriptor array
         // - output_ranks: the output rank array
+        // Signature: (addr, symbol, object, num_in, in_descs, in_ranks, in_sizes,
+        //             num_out, out_descs, out_ranks, out_sizes). `object` keys the per-kernel
+        //             JITDylib on the executor so same-named entries in different objects don't
+        //             collide in one symbol namespace.
         Type launchSig = LLVM::LLVMFunctionType::get(
-            voidTy, {ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
+            voidTy, {ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
         LLVM::LLVMFuncOp launchFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__remote__launch", launchSig);
 
@@ -256,6 +260,9 @@ struct LaunchOpLowering : public OpConversionPattern<remote::LaunchOp> {
         std::string symbolName = "_catalyst_pyface_" + callee;
         Value symbolPtr =
             getGlobalString(loc, rewriter, "remote_sym_" + callee, symbolName + '\0', mod);
+
+        Value objectPtr = getGlobalString(loc, rewriter, "remote_obj_" + callee,
+                                          op.getObject().str() + '\0', mod);
 
         SmallVector<Value> inputDescPtrs;
         SmallVector<int64_t> inputRanks, inputElemSizes;
@@ -297,9 +304,9 @@ struct LaunchOpLowering : public OpConversionPattern<remote::LaunchOp> {
             rewriter, loc, rewriter.getI64IntegerAttr(outputDescPtrs.size()));
 
         LLVM::CallOp::create(rewriter, loc, launchFn,
-                             ValueRange{addrPtr, symbolPtr, numInputs, inputDescsArr, inputRanksArr,
-                                        inputSizesArr, numOutputs, outputDescsArr, outputRanksArr,
-                                        outputSizesArr});
+                             ValueRange{addrPtr, symbolPtr, objectPtr, numInputs, inputDescsArr,
+                                        inputRanksArr, inputSizesArr, numOutputs, outputDescsArr,
+                                        outputRanksArr, outputSizesArr});
 
         SmallVector<Value> results;
         for (auto [descPtr, resultTy] : llvm::zip(outputDescPtrs, op.getResultTypes())) {

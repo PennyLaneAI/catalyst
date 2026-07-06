@@ -62,9 +62,8 @@ def inject_functions(module, ctx, seed):
     """
     This function appends functions to the input module.
     """
-    # Add C interface for the quantum function and annonate it as the main entry_point.
+    # Add the C interface for the quantum function so it is callable across the C ABI.
     mlir_qfunc = module.body.operations[0]
-    mlir_qfunc.attributes["catalyst.entry_point"] = ir.UnitAttr.get(context=ctx)
     mlir_qfunc.attributes["llvm.emit_c_interface"] = ir.UnitAttr.get(context=ctx)
 
     setup_module = gen_setup(ctx, seed)

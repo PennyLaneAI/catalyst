@@ -15,12 +15,18 @@
 #include "RemoteSession.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
+#include <cstdlib>
 #include <cstring>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <numeric>
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
+#include <thread>
 #include <vector>
 
 #include "llvm/ADT/StringRef.h"
@@ -160,6 +166,21 @@ Error createTCPSocketError(Twine Details)
                                    inconvertibleErrorCode());
 }
 
+// Seconds to wait for the catalyst-executor ORC bootstrap handshake before giving up. Overridable
+// via CATALYST_REMOTE_CONNECT_TIMEOUT; defaults to 10s. A value of 0 disables the timeout (the
+// handshake then blocks indefinitely, matching the upstream llvm-jitlink behaviour).
+unsigned remoteConnectTimeoutSeconds()
+{
+    if (const char *env = std::getenv("CATALYST_REMOTE_CONNECT_TIMEOUT")) {
+        char *end = nullptr;
+        unsigned long secs = std::strtoul(env, &end, 10);
+        if (end != env) {
+            return static_cast<unsigned>(secs);
+        }
+    }
+    return 10;
+}
+
 Expected<int> connectTCPSocket(std::string Host, std::string PortStr)
 {
     addrinfo *AI;
@@ -242,7 +263,12 @@ struct RemoteSession {
     MangleAndInterner Mangle;
     ObjectLinkingLayer ObjectLayer;
 
+    // Shared namespace: the process-symbol generator (QIR runtime, libc) plus library-call objects.
     JITDylib &MainJD;
+    // One JITDylib per shipped kernel object, keyed by its object-file path. Each links against
+    // MainJD for its external deps, but keeps its own entry symbol isolated — so two objects can
+    // export the same `_catalyst_pyface_<entry>` without colliding.
+    std::map<std::string, JITDylib *> KernelJDs;
 
     ExecutorAddr alloc_fn{0};
     ExecutorAddr free_fn{0};
@@ -286,11 +312,54 @@ struct RemoteSession {
 
         auto setup = SimpleRemoteEPC::Setup();
         setup.CreateMemoryManager = createSimpleRemoteMemoryManager;
+        // The ORC bootstrap handshake inside SimpleRemoteEPC::Create is an unbounded blocking read on
+        // the socket. If the peer is not a live catalyst-executor (e.g. a stale port-forward or a
+        // dead SSH tunnel accepted the connection), it would hang forever. A watchdog shuts the
+        // socket down after the timeout, which forces the blocked read to fail and Create to return
+        // an error instead of hanging.
+        const int sockFd = *SockFD;
+        const unsigned timeoutSecs = remoteConnectTimeoutSeconds();
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool handshakeDone = false;
+        bool timedOut = false;
+        std::thread watchdog;
+        if (timeoutSecs > 0) {
+            watchdog = std::thread([&] {
+                std::unique_lock<std::mutex> lock(mtx);
+                if (!cv.wait_for(lock, std::chrono::seconds(timeoutSecs),
+                                 [&] { return handshakeDone; })) {
+                    timedOut = true;
+                    ::shutdown(sockFd, SHUT_RDWR);
+                }
+            });
+        }
+
         // ShutdownFDTransport instead of FDSimpleRemoteEPCTransport so teardown shutdown()s the
         // socket and doesn't deadlock — see the class comment above.
         auto EPC = SimpleRemoteEPC::Create<ShutdownFDTransport>(
-            std::make_unique<DynamicThreadPoolTaskDispatcher>(std::nullopt), std::move(setup),
-            *SockFD, *SockFD);
+            std::make_unique<DynamicThreadPoolTaskDispatcher>(std::nullopt), std::move(setup), sockFd,
+            sockFd);
+
+        if (watchdog.joinable()) {
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                handshakeDone = true;
+            }
+            cv.notify_all();
+            watchdog.join();
+        }
+
+        if (timedOut) {
+            // Consume any error the forced socket shutdown produced before reporting the timeout.
+            if (!EPC) {
+                consumeError(EPC.takeError());
+            }
+            return createTCPSocketError("handshake with catalyst-executor timed out after " +
+                                        Twine(timeoutSecs) +
+                                        "s (is a catalyst-executor actually listening there?). "
+                                        "Override with CATALYST_REMOTE_CONNECT_TIMEOUT");
+        }
         if (!EPC) {
             return EPC.takeError();
         }
@@ -305,11 +374,26 @@ struct RemoteSession {
         return std::make_unique<RemoteSession>(std::move(ES), std::move(*DL));
     }
 
-    Error addObjectFile(std::unique_ptr<MemoryBuffer> Buf)
+    // Load a kernel object into its own JITDylib (keyed by `path`), linked against MainJD for deps.
+    Error addObjectFile(StringRef path, std::unique_ptr<MemoryBuffer> Buf)
     {
-        return ObjectLayer.add(MainJD, std::move(Buf));
+        JITDylib &jd = ES->createBareJITDylib(("kernel:" + path).str());
+        jd.addToLinkOrder(MainJD);
+        KernelJDs[path.str()] = &jd;
+        return ObjectLayer.add(jd, std::move(Buf));
     }
 
+    // Resolve `Name` in the JITDylib of the object identified by `path` (kernel entry points). Falls
+    // back to MainJD if the object is unknown.
+    ExecutorAddr lookupSym(StringRef path, StringRef Name)
+    {
+        auto it = KernelJDs.find(path.str());
+        JITDylib *jd = (it != KernelJDs.end()) ? it->second : &MainJD;
+        auto Sym = unwrap(ES->lookup({jd}, Mangle(Name.str())), "lookup(" + Name + ")");
+        return Sym.getAddress();
+    }
+
+    // Resolve `Name` in the shared process namespace (library-call symbols).
     ExecutorAddr lookupSym(StringRef Name)
     {
         auto Sym = unwrap(ES->lookup({&MainJD}, Mangle(Name.str())), "lookup(" + Name + ")");
@@ -471,7 +555,7 @@ int load_object_path(RemoteSession *s, const char *path)
     clear_error();
     try {
         auto buf = unwrap(getFile(path), "getFile(" + Twine(path) + ")");
-        check(s->addObjectFile(std::move(buf)), "addObjectFile");
+        check(s->addObjectFile(path, std::move(buf)), "addObjectFile");
         return 0;
     }
     catch (const std::exception &e) {
@@ -561,10 +645,13 @@ int call_wrapper_raw(RemoteSession *s, const char *sym, const char *args_buf, si
  * @param name the name of the symbol
  * @return uint64_t the address of the symbol
  */
-uint64_t lookup(RemoteSession *s, const char *name)
+uint64_t lookup(RemoteSession *s, const char *name, const char *object)
 {
     clear_error();
     try {
+        if (object && *object) {
+            return s->lookupSym(object, name).getValue();
+        }
         return s->lookupSym(name).getValue();
     }
     catch (const std::exception &e) {
