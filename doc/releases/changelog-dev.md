@@ -6,8 +6,11 @@
 <h3>Improvements 🛠</h3>
 
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
-  without non-lowerable arguments.
+  without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
+  where applicable, unlocking compilation and execution for these cases.
+  [(#2979)](https://github.com/PennyLaneAI/catalyst/pull/2979)
   [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969/)
+  [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
@@ -18,6 +21,11 @@
 
 * The `ResourceAnalysis` pass now supports IR in reference semantics natively, rather than requiring a conversion step.
   [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
+
+
+* The `--adjoint-lowering` pass no longer turns statically bounded for loops into
+  dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
+  [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
 
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
@@ -197,6 +205,9 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* Upgrade macOS runner to `macos-15`; `macos-14` is no longer maintained.
+  [(#2972)](https://github.com/PennyLaneAI/catalyst/pull/2972)
 
 * Update tests to not use global capture toggle where possible.
   [(#2964)](https://github.com/PennyLaneAI/catalyst/pull/2964)
