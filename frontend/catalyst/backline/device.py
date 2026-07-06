@@ -16,8 +16,8 @@
 
 The device is the thin wrapper over Catalyst's existing remote-execution frontend: it
 takes a :class:`~pennylane.backline.Backline` placement and lowers it onto the ``catalyst.target`` /
-``catalyst.remote`` tags that the cross-compile and dispatch passes consume. Execution is
-Catalyst-only (``@qjit``); the runtime library it targets is produced by a later increment.
+``catalyst.dispatch`` tags (via ``catalyst.target(address=...)``) that the cross-compile and dispatch
+passes consume. Execution is Catalyst-only (``@qjit``); the runtime library it targets is dealt with separately.
 """
 
 import platform
@@ -32,7 +32,7 @@ from catalyst.api_extensions.target import RemoteDispatch, run_remote
 class _EndpointHandle:
     """A dispatch target for a single backline endpoint.
 
-    Carries the endpoint's locality, and its address for a remote endpoint, which is handed to ``kernel.declare(remote=...)`` and resolved through the standard ``get_dispatch`` path. A local endpoint carries does not carry a dispatch: its kernel is called
+    Carries the endpoint's locality, and its address for a remote endpoint, which is handed to ``kernel.declare(remote=...)`` and resolved through the standard ``get_dispatch`` path. A local endpoint does not carry a dispatch: its kernel is called
     locally.
     """
 
@@ -62,7 +62,7 @@ class HeterogeneousDevice(Device):
         self._decoder = decoder
         super().__init__(wires=wires, **kwargs)
 
-        # Carry the transport to the runtime via device_init's rtd_kwargs (device_kwargs -> rtd_kwargs).
+        # Carry the transport to the runtime via rtd_kwargs in device_init as a device_kwarg
         self.device_kwargs = {"transport": str(backline.transport)}
 
         controller = backline.controller
