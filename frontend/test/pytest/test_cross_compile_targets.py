@@ -17,21 +17,19 @@
 
 import os
 
+import numpy as np
 import pennylane as qp
 
-from catalyst import remote, target
+from catalyst import qjit, target
 from catalyst.compiler import CompileOptions
 from catalyst.debug import get_compilation_stage
 from catalyst.jit import QJIT
 
 
 def test_remote_dispatch_full_chain():
-    """A ``remote``-tagged QNode is cross-compiled to its own object and its host call is
+    """A ``target(..., address=...)`` QNode is cross-compiled to its own object and its host call is
     rewritten for remote dispatch."""
-    dev = remote(
-        target(qp.device("null.qubit", wires=2), backend="my-backend"),
-        address="ADDR:PORT",
-    )
+    dev = target(qp.device("null.qubit", wires=2), address="ADDR:PORT")
 
     @qp.qnode(dev)
     def circuit():
@@ -55,3 +53,20 @@ def test_remote_dispatch_full_chain():
         assert "module @module_circuit" not in ir
     finally:
         jitted.workspace.cleanup()
+
+
+def test_local_target_compiles_links_and_runs():
+    """A ``target``-tagged (non-remote) QNode is cross-compiled to its own object, statically linked,
+    and executed in-process — its host launch_kernel is flattened to a flat call into the object."""
+    # No ``address`` and no explicit triple -> host triple -> local static-link path.
+    dev = target(qp.device("lightning.qubit", wires=2))
+
+    @qjit
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.RX(x, wires=0)
+        qp.CNOT(wires=[0, 1])
+        return qp.expval(qp.PauliZ(0))
+
+    assert np.isclose(circuit(0.0), 1.0)
+    assert np.isclose(circuit(np.pi), -1.0)

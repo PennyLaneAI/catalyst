@@ -31,7 +31,7 @@ def qnode(x):
 
 @qjit(target="mlir")
 # The entry point has no internal linkage.
-# CHECK-DAG: func.func public @jit_workload(%arg0: tensor<f64>) -> tensor<4xcomplex<f64>> attributes {catalyst.entry_point, llvm.emit_c_interface} {
+# CHECK-DAG: func.func public @jit_workload(%arg0: tensor<f64>) -> tensor<4xcomplex<f64>> attributes {llvm.emit_c_interface} {
 def workload(x: float):
     y = x * qp.numpy.pi  # pylint: disable=no-member
     return qnode(y)

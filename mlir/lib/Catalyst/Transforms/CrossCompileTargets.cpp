@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h" // llvm::join
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -73,11 +74,6 @@ void exposeEntryViaCInterface(func::FuncOp fn)
     fn->removeAttr("llvm.linkage");
 }
 
-bool isEntryPoint(func::FuncOp fn)
-{
-    return fn->hasAttr("catalyst.entry_point");
-}
-
 // The default lowering applied to a catalyst.target module: bufferization +
 // LLVM-dialect lowering, reusing the same stage definitions as the host pipeline.
 std::vector<std::string> defaultLoweringPassList()
@@ -95,26 +91,59 @@ std::vector<std::string> defaultLoweringPassList()
     return passes;
 }
 
-// Reduce a compiled target module to external declarations of its entry functions. The definitions
-// now live in the emitted object, so the host pipeline does not re-lower them.
-void reduceToEntryDeclarations(ModuleOp nested)
+// Lower a *local* (non-dispatch) target module. Its cross-compiled object is statically linked into
+// the final binary, so each host-side launch_kernel into it is rewritten to a flat func.call against
+// an external declaration of the entry (resolved at link time by the object's native symbol). The
+// object path is recorded on the root module for the linker, and the now-empty module is erased.
+LogicalResult lowerLocalTargetCalls(ModuleOp host, ModuleOp nested,
+                                    SmallVectorImpl<Attribute> &objectFiles)
 {
-    SmallVector<Operation *> toErase;
-    for (Operation &op : *nested.getBody()) {
-        auto fn = dyn_cast<func::FuncOp>(&op);
-        if (fn && isEntryPoint(fn)) {
-            if (!fn.getBody().empty()) {
-                fn.getBody().getBlocks().clear();
+    MLIRContext *ctx = host.getContext();
+
+    // A statically-linked object must be built for the host architecture. A different triple can
+    // only be reached via remote dispatch.
+    if (auto targetAttr = nested->getAttrOfType<DictionaryAttr>("catalyst.target")) {
+        if (auto triple = targetAttr.getAs<StringAttr>("triple")) {
+            if (!triple.getValue().empty() &&
+                triple.getValue() != llvm::sys::getDefaultTargetTriple()) {
+                nested.emitError("local (non-remote) target must use the host triple '")
+                    << llvm::sys::getDefaultTargetTriple()
+                    << "'; use remote() to dispatch a cross-compiled target";
+                return failure();
             }
-            fn.setVisibility(SymbolTable::Visibility::Private);
-            fn->removeAttr("llvm.emit_c_interface");
-            continue;
         }
-        toErase.push_back(&op);
     }
-    for (Operation *op : toErase) {
-        op->erase();
+
+    StringRef moduleName = nested.getSymName().value_or("");
+    SmallVector<catalyst::LaunchKernelOp> launches;
+    host.walk([&](catalyst::LaunchKernelOp launchKernel) {
+        if (launchKernel.getCalleeModuleName().getValue() == moduleName) {
+            launches.push_back(launchKernel);
+        }
+    });
+    for (catalyst::LaunchKernelOp launchKernel : launches) {
+        StringRef entry = launchKernel.getCalleeName().getValue();
+        // One external declaration per entry, resolved against the linked object's native symbol.
+        auto decl = host.lookupSymbol<func::FuncOp>(entry);
+        if (!decl) {
+            OpBuilder rootBuilder(host.getBody(), host.getBody()->begin());
+            auto fnTy = FunctionType::get(ctx, launchKernel.getOperandTypes(),
+                                          launchKernel.getResultTypes());
+            decl = func::FuncOp::create(rootBuilder, launchKernel.getLoc(), entry, fnTy);
+            decl.setPrivate();
+        }
+        OpBuilder callBuilder(launchKernel);
+        auto call = func::CallOp::create(callBuilder, launchKernel.getLoc(), decl,
+                                         launchKernel.getOperands());
+        launchKernel.replaceAllUsesWith(call.getResults());
+        launchKernel.erase();
     }
+
+    if (auto objPath = nested->getAttrOfType<StringAttr>("catalyst.object_file")) {
+        objectFiles.push_back(objPath);
+    }
+    nested.erase();
+    return success();
 }
 
 struct CrossCompileTargetsPass
@@ -163,15 +192,26 @@ struct CrossCompileTargetsPass
         llvm::InitializeAllAsmParsers();
         llvm::InitializeAllAsmPrinters();
 
-        // Compile each target module, record its object path, and reduce it to
-        // entry declarations.
+        // Compile each target module to an object, then dispose of it per delivery mode:
+        //  - remote (catalyst.dispatch): leave the module intact for dispatch-remote-targets.
+        //  - local: statically link — flatten its host calls and record the object for the linker.
+        SmallVector<Attribute> localObjectFiles;
         for (auto nested : targetMods) {
             FailureOr<std::string> objPath = compileTargetModule(nested);
             if (failed(objPath)) {
                 return signalPassFailure();
             }
             nested->setAttr("catalyst.object_file", StringAttr::get(&getContext(), *objPath));
-            reduceToEntryDeclarations(nested);
+            if (!nested->hasAttr("catalyst.dispatch")) {
+                if (failed(lowerLocalTargetCalls(host, nested, localObjectFiles))) {
+                    return signalPassFailure();
+                }
+            }
+        }
+
+        // Record the objects to statically link, for the driver to hand to the linker.
+        if (!localObjectFiles.empty()) {
+            host->setAttr("catalyst.object_files", ArrayAttr::get(&getContext(), localObjectFiles));
         }
     }
 
@@ -304,9 +344,9 @@ struct CrossCompileTargetsPass
         }
         llvm::DataLayout dataLayout = targetMachine->createDataLayout();
 
-        // Clone the target module into an unparented root module: leaves `nested`
-        // intact for reduceToEntryDeclarations and gives the sub-pipeline /
-        // translateModuleToLLVMIR a top-level module to operate on.
+        // Clone the target module into an unparented root module: leaves `nested` intact in the host
+        // (its host launch_kernel is consumed later by local flattening or dispatch) and gives the
+        // sub-pipeline / translateModuleToLLVMIR a top-level module to operate on.
         OpBuilder builder(ctx);
         mlir::OwningOpRef<mlir::ModuleOp> standalone(cast<ModuleOp>(nested->clone()));
 
@@ -318,10 +358,24 @@ struct CrossCompileTargetsPass
         moduleOp->setAttr(DLTIDialect::kDataLayoutAttrName,
                           mlir::translateDataLayout(dataLayout, ctx));
 
-        // Expose only the entry-point functions through the C ABI.
+        // The entry points are exactly the functions the host calls into this module, named by the
+        // surviving launch_kernel call edges. Expose those through the C ABI; privatize the rest so
+        // they can be internalized / DCE'd and don't leak as exported symbols.
+        StringRef moduleName = nested.getSymName().value_or("");
+        llvm::SmallSet<StringRef, 8> entries;
+        if (auto host = nested->getParentOfType<ModuleOp>()) {
+            host.walk([&](catalyst::LaunchKernelOp launchKernel) {
+                if (launchKernel.getCalleeModuleName().getValue() == moduleName) {
+                    entries.insert(launchKernel.getCalleeName().getValue());
+                }
+            });
+        }
         for (auto fn : standalone->getOps<func::FuncOp>()) {
-            if (isEntryPoint(fn)) {
+            if (entries.contains(fn.getName())) {
                 exposeEntryViaCInterface(fn);
+            }
+            else {
+                fn.setPrivate();
             }
         }
 

@@ -295,8 +295,9 @@ struct CrossCompileRemoteKernelsPass
 
         for (func::CallOp call : callsToReplace) {
             OpBuilder builder(call);
-            auto launch = remote::LaunchOp::create(builder, call.getLoc(), call.getResultTypes(),
-                                                   call.getOperands(), addressAttr, calleeAttr);
+            auto launch =
+                remote::LaunchOp::create(builder, call.getLoc(), call.getResultTypes(),
+                                         call.getOperands(), addressAttr, calleeAttr, pathAttr);
             call.replaceAllUsesWith(launch.getResults());
             call.erase();
         }

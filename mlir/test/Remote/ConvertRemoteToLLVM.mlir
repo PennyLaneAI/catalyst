@@ -38,7 +38,7 @@ func.func @send_binary() {
 // CHECK-LABEL: func.func @launch
 func.func @launch(%arg0: memref<f64>) -> memref<f64> {
   // CHECK: llvm.call @__catalyst__remote__launch
-  %0 = remote.launch("qnode_0", "127.0.0.1:9000") (%arg0) : (memref<f64>) -> memref<f64>
+  %0 = remote.launch("qnode_0", "127.0.0.1:9000", "/tmp/qnode_0.o") (%arg0) : (memref<f64>) -> memref<f64>
   return %0 : memref<f64>
 }
 
