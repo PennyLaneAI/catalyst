@@ -77,8 +77,9 @@ def _to_hashable(spec):
     return tuple(entries)
 
 
-def declare(name: str, artifact: Optional[str] = None, outputs=None, *,
-            remote=False) -> KernelDescriptor:
+def declare(
+    name: str, artifact: Optional[str] = None, outputs=None, *, remote=False
+) -> KernelDescriptor:
     """Declare an external kernel for use with :func:`kernel.runtime_call`.
 
     Args:
@@ -133,8 +134,8 @@ def define(builder, *, name: Optional[str] = None, outputs):
     """Build a kernel with ``builder`` and declare it, as a single decorator.
 
     Args:
-        builder: A backend-specific object implementing ``build(kernel_fn, *, name) -> path``, 
-            where ``path`` points to a shared library exporting ``name`` with the 
+        builder: A backend-specific object implementing ``build(kernel_fn, *, name) -> path``,
+            where ``path`` points to a shared library exporting ``name`` with the
             :func:`runtime_call` ABI.
         name: Symbol the artifact must export. Defaults to ``kernel_fn.__name__``;
             passed to both ``builder.build`` and :func:`declare`.

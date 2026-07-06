@@ -52,7 +52,7 @@ def test_define(tmp_path):
             return str(artifact)
 
     @kernel.define(Builder(), outputs=jax.ShapeDtypeStruct((1,), jnp.int32))
-    def my_kernel():  # pragma: no cover 
+    def my_kernel():  # pragma: no cover
         pass
 
     assert isinstance(my_kernel, KernelDescriptor)

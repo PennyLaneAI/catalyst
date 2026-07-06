@@ -19,6 +19,7 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+
 #include "Remote/IR/RemoteOps.h"
 #include "Remote/Transforms/Passes.h"
 
@@ -35,7 +36,8 @@ namespace {
 // Ships cross-compiled `catalyst.target` modules to a remote executor using the `remote` dialect.
 //
 // This pass should be run after `cross-compile-targets`, which records each module's object file in
-// `catalyst.object_file`. For every nested module carrying a `catalyst.dispatch` attribute this pass:
+// `catalyst.object_file`. For every nested module carrying a `catalyst.dispatch` attribute this
+// pass:
 //   1. Injects `remote.open` into `setup()` (once per unique address) and `remote.send_binary`
 //      into `setup()` (once per module; the object holds every entry).
 //   2. Rewrites every host-side `func.call` to an entry function into a `remote.launch` op carrying
@@ -45,8 +47,7 @@ namespace {
 //
 // Session teardown is handled by the runtime, which closes every open session when the process
 // exits, so no explicit close op is emitted (matching `cross-compile-remote-kernels`).
-struct DispatchRemoteTargetsPass
-    : impl::DispatchRemoteTargetsPassBase<DispatchRemoteTargetsPass> {
+struct DispatchRemoteTargetsPass : impl::DispatchRemoteTargetsPassBase<DispatchRemoteTargetsPass> {
     using DispatchRemoteTargetsPassBase::DispatchRemoteTargetsPassBase;
 
     void runOnOperation() final
@@ -251,8 +252,8 @@ struct DispatchRemoteTargetsPass
             // `pathAttr` (the object-file path, same value shipped by send_binary) keys the
             // per-kernel JITDylib on the executor so the entry resolves in its own object.
             auto launch = remote::LaunchOp::create(
-                b, launchKernel.getLoc(), launchKernel.getResultTypes(),
-                launchKernel.getOperands(), addressAttr, calleeAttr, pathAttr);
+                b, launchKernel.getLoc(), launchKernel.getResultTypes(), launchKernel.getOperands(),
+                addressAttr, calleeAttr, pathAttr);
             launchKernel.replaceAllUsesWith(launch.getResults());
             launchKernel.erase();
         }

@@ -489,10 +489,9 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
             Pipeline targetPipeline;
             targetPipeline.setName("CrossCompileTargets");
             std::string dumpIntermediate = options.keepIntermediate ? "true" : "false";
-            targetPipeline.setPasses(
-                {"cross-compile-targets{workspace=" + options.workspace.str() +
-                     " dump-intermediate=" + dumpIntermediate + "}",
-                 "dispatch-remote-targets"});
+            targetPipeline.setPasses({"cross-compile-targets{workspace=" + options.workspace.str() +
+                                          " dump-intermediate=" + dumpIntermediate + "}",
+                                      "dispatch-remote-targets"});
             if (failed(catalyst::utils::Timer<>::timer(
                     catalyst::driver::runPipeline, targetPipeline.getName(),
                     /* add_endl */ false, pm, options, output, targetPipeline,

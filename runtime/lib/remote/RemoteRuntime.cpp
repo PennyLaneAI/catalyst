@@ -247,8 +247,9 @@ void __catalyst__remote__launch(const char *addr, const char *entry_symbol, cons
 
     std::lock_guard<std::mutex> lock(entry->mu);
     if (remote_verbose()) {
-        std::fprintf(stderr, "[remote] launch(addr=%s, symbol=%s, object=%s, n_in=%zu, n_out=%zu)\n",
-                     addr, entry_symbol, object ? object : "<none>", num_inputs, num_outputs);
+        std::fprintf(stderr,
+                     "[remote] launch(addr=%s, symbol=%s, object=%s, n_in=%zu, n_out=%zu)\n", addr,
+                     entry_symbol, object ? object : "<none>", num_inputs, num_outputs);
     }
     if (!entry->session) {
         RT_FAIL("Session is closed");
