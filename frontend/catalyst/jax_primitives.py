@@ -59,7 +59,7 @@ from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 # pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.utils.patching import Patcher
-from pennylane.capture.primitives import estimation_array_p
+from pennylane.capture.primitives import symbolic_array_prim
 
 with Patcher(
     (
@@ -77,7 +77,7 @@ with Patcher(
         CallbackCallOp,
         CallbackOp,
         PrintOp,
-        EstimationArrayOp,
+        SymbolicArrayOp,
     )
     from mlir_quantum.dialects.gradient import (
         CustomGradOp,
@@ -3068,14 +3068,14 @@ def subroutine_lowering(*args, **kwargs):
     return retval
 
 
-def _estimation_array_lowering(ctx, *, shape, dtype):
+def _symbolic_array_lowering(ctx, *, shape, dtype):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in ctx.avals_out]
-    return EstimationArrayOp(result_types[0]).results
+    return SymbolicArrayOp(result_types[0]).results
 
 
 
 CUSTOM_LOWERING_RULES = (
-    (estimation_array_p, _estimation_array_lowering),
+    (symbolic_array_prim, _symbolic_array_lowering),
     (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
     (device_release_p, _device_release_lowering),
