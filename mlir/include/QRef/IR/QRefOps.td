@@ -439,8 +439,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             // the ODS operands must be next to each other
-            auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/1);
-            auto [_, lenForwardArgs] = getODSOperandIndexAndLength(/*forward_args=*/2);
+            auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/0);
+            auto [_, lenForwardArgs] = getODSOperandIndexAndLength(/*forward_args=*/1);
             return getOperands().slice(start, lenParams + lenForwardArgs);
         }
     }];
