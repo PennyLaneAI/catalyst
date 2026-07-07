@@ -7,11 +7,13 @@
 
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
   without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
-  where applicable, unlocking compilation and execution for these cases.
+  where applicable, unlocking compilation and execution for these cases. `qp.specs` and the
+  `ResourceAnalysis` pass now support the `quantum::OperatorOp` and `qref::OperatorOp` instructions.
   [(#2979)](https://github.com/PennyLaneAI/catalyst/pull/2979)
   [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969)
   [(#2980)](https://github.com/PennyLaneAI/catalyst/pull/2980)
   [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
+  [(#2993)](https://github.com/PennyLaneAI/catalyst/pull/2993)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
