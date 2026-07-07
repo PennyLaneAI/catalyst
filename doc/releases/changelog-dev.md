@@ -9,7 +9,8 @@
   without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
   where applicable, unlocking compilation and execution for these cases.
   [(#2979)](https://github.com/PennyLaneAI/catalyst/pull/2979)
-  [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969/)
+  [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969)
+  [(#2980)](https://github.com/PennyLaneAI/catalyst/pull/2980)
   [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
