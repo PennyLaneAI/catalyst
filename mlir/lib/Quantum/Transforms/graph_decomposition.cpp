@@ -363,7 +363,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     name = "GlobalPhase";
                 }
                 else if (name == "paulirot") {
-                    name = "paulirot" + cast<quantum::PauliRotOp>(op.getOperation()).getPauliWord();
+                    node.staticNamedArgs["pauli_word"] =
+                        cast<quantum::PauliRotOp>(op.getOperation()).getPauliWord();
                 }
                 node.name = name;
             }
@@ -422,6 +423,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             // If pStr is empty we were given the legacy "(w)" format; leave
             // numParams at the wildcard default so old bytecode keeps working.
+        }
+
+        if (llvm::StringRef nameRef(node.name);
+            nameRef.consume_front("paulirot") && !nameRef.empty()) {
+            node.staticNamedArgs["pauli_word"] = nameRef.str();
+            node.name = "paulirot";
         }
 
         return node;
