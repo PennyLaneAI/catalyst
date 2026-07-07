@@ -481,7 +481,7 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 4. Qubits
-    if (!getQubits().empty()) {
+    if (!getQreg()) {
         p << " qubits(" << getQubits() << ")";
     }
 
