@@ -65,6 +65,7 @@ def generate_uid(
         _serialize_static(unflatten(*val), name) for name, val in static_args.items()
     )
 
+    reduced.append(op_cls)
     reduced.append(("dynamic", tuple(dynamic_avals)))
     reduced.append(("wires", wire_lens))
     reduced.append(("hybrid", hybrid_trees, tuple(hybrid_avals)))
