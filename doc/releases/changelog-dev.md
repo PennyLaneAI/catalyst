@@ -5,6 +5,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `decompose-lowering` pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
+  The pass also no longer applies the `inline`, `cse` and `canonicalize` passes to avoid unnecessary IR mutations.
+  Instead, decomposition rules are deterministically inlined by a custom function (`inline` is non-deterministic, using an estimated benefit and threshold as criteria for inlining).
+  Decomposition rules are no longer removed after the `decompose-lowering` pass, which allows them to be used by subsequent passes, namely `graph-decomposition`.
+  Instead, rules are removed by the `symbol-dce` pass at the end of the `QuantumCompilationStage`.
+  [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
+
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
   without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
   where applicable, unlocking compilation and execution for these cases. `qp.specs` and the
