@@ -13,13 +13,13 @@
 # limitations under the License.
 """Tests for UID generation for Operator2 lowering."""
 
-import re
-
 import pennylane as qp
+import pytest
 from pennylane.pytrees import flatten
 from pennylane.typing import AbstractArray
+from pennylane.wires import AbstractQubit
 
-from catalyst.from_plxpr.uid import generate_uid
+from catalyst.from_plxpr.uid import _serialize_static, generate_uid
 
 
 class StaticOp(qp.core.Operator2):
@@ -46,6 +46,28 @@ class DynamicStaticOp(qp.core.Operator2):
 
     def __init__(self, angle, label, wires):
         super().__init__(angle, label, wires)
+
+
+class InnerOp(qp.core.Operator2):
+
+    dynamic_argnames = ("phi",)
+
+    def __init__(self, phi, wires):
+        super().__init__(phi, wires)
+
+
+class HybridOp(qp.core.Operator2):
+
+    hybrid_argnames = ("op",)
+    static_argnames = ("label",)
+    wire_argnames = ()
+
+    def __init__(self, op, label=""):
+        super().__init__(op, label=label)
+
+
+class _Opaque:
+    pass
 
 
 def _static_kwargs(label):
@@ -199,3 +221,56 @@ class TestGenerateUID:
         uid_f64 = generate_uid(AbstractArray((), float), **kwargs)
         uid_i64 = generate_uid(AbstractArray((), int), **kwargs)
         assert uid_f64 != uid_i64
+
+
+class TestSerializeStatic:
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            None,
+            True,
+            1,
+            1.5,
+            1 + 2j,
+            "s",
+            [1, True],
+            (1, "a"),
+            {"k": 1},
+            {1, 2},
+            frozenset([1]),
+        ],
+    )
+    def test_supported_types(self, value):
+        """Test that common static Python types are serialized for UID hashing."""
+        ser = _serialize_static(value, "name")
+        assert hash(ser)
+
+    def test_hybrid_operator_avals_in_uid(self):
+        """Test that non-wire hybrid operator aval signatures affect UID generation."""
+        _, hybrid_tree1 = flatten(InnerOp(0.5, [0, 1, 2]))
+        _, hybrid_tree2 = flatten(InnerOp(0.5, [0, 1]))
+        kwargs = dict(
+            op_cls=HybridOp,
+            wire_lens=(),
+            adjoint=False,
+            n_ctrls=0,
+            static_args=_static_kwargs("hello"),
+        )
+
+        uid_three_wires = generate_uid(
+            AbstractArray((), float),
+            AbstractQubit(),
+            AbstractQubit(),
+            hybrid_trees=(hybrid_tree1,),
+            hybrid_lens=(3,),
+            **kwargs,
+        )
+        uid_two_wires = generate_uid(
+            AbstractArray((), float),
+            AbstractQubit(),
+            hybrid_lens=(2,),
+            hybrid_trees=(hybrid_tree2,),
+            **kwargs,
+        )
+        assert uid_three_wires != uid_two_wires
