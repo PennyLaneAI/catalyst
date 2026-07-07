@@ -630,7 +630,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
 
         // additional functionality provided by quantum.operator, being last allows the builder
         // to use default values in the signature, so that these args are truly optional
-        UnitProp:$adjoint,
+        UnitAttr:$adjoint,
         OptionalProp<I64Prop>:$UID,
         DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
