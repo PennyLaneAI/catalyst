@@ -23,51 +23,61 @@ from catalyst.from_plxpr.uid import _serialize_static, generate_uid
 
 
 class StaticOp(qp.core.Operator2):
+    """Test operator with static Python-only data."""
 
     static_argnames = ("label",)
 
+    # pylint: disable=useless-parent-delegation
     def __init__(self, label, wires):
         super().__init__(label, wires)
 
 
 class HybridWiresOp(qp.core.Operator2):
+    """Test operator with a hybrid wire argument."""
 
     hybrid_argnames = ("cwires",)
     wire_argnames = ("cwires",)
 
+    # pylint: disable=useless-parent-delegation
     def __init__(self, cwires):
         super().__init__(cwires=cwires)
 
 
 class DynamicStaticOp(qp.core.Operator2):
+    """Test operator with dynamic and static Python-only data."""
 
     dynamic_argnames = ("angle",)
     static_argnames = ("label",)
 
+    # pylint: disable=useless-parent-delegation
     def __init__(self, angle, label, wires):
         super().__init__(angle, label, wires)
 
 
 class InnerOp(qp.core.Operator2):
+    """Simple test operator to use as an input for hybrid operator testing."""
 
     dynamic_argnames = ("phi",)
 
+    # pylint: disable=useless-parent-delegation
     def __init__(self, phi, wires):
         super().__init__(phi, wires)
 
 
 class HybridOp(qp.core.Operator2):
+    """Test operator that takes an operator as input."""
 
     hybrid_argnames = ("op",)
     static_argnames = ("label",)
     wire_argnames = ()
 
+    # pylint: disable=useless-parent-delegation
     def __init__(self, op, label=""):
         super().__init__(op, label=label)
 
 
 class _Opaque:
-    pass
+    """Opaque type for testing."""
 
 
 def _static_kwargs(label):
@@ -76,6 +86,7 @@ def _static_kwargs(label):
 
 
 class TestGenerateUID:
+    """Tests for generate_uid and helpers."""
 
     def test_same_static_args_same_uid(self):
         """Test that operators with the same static arguments have the same UID."""
@@ -176,15 +187,15 @@ class TestGenerateUID:
     def test_same_dynamic_avals_same_uid(self):
         """Test that operators with the same dynamic aval signatures have the same UID."""
         aval = AbstractArray((), int)
-        kwargs = dict(
-            op_cls=DynamicStaticOp,
-            wire_lens=(1,),
-            hybrid_lens=(),
-            hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
-            static_args=_static_kwargs("hello"),
-        )
+        kwargs = {
+            "op_cls": DynamicStaticOp,
+            "wire_lens": (1,),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "adjoint": False,
+            "n_ctrls": 0,
+            "static_args": _static_kwargs("hello"),
+        }
 
         uid_a = generate_uid(aval, **kwargs)
         uid_b = generate_uid(aval, **kwargs)
@@ -192,15 +203,15 @@ class TestGenerateUID:
 
     def test_different_dynamic_shape_different_uid(self):
         """Test that different dynamic argument shapes produce different UIDs."""
-        kwargs = dict(
-            op_cls=DynamicStaticOp,
-            wire_lens=(1,),
-            hybrid_lens=(),
-            hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
-            static_args=_static_kwargs("hello"),
-        )
+        kwargs = {
+            "op_cls": DynamicStaticOp,
+            "wire_lens": (1,),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "adjoint": False,
+            "n_ctrls": 0,
+            "static_args": _static_kwargs("hello"),
+        }
 
         uid_scalar = generate_uid(AbstractArray((), int), **kwargs)
         uid_matrix = generate_uid(AbstractArray((4, 4), int), **kwargs)
@@ -208,22 +219,19 @@ class TestGenerateUID:
 
     def test_different_dynamic_dtype_different_uid(self):
         """Test that different dynamic argument dtypes produce different UIDs."""
-        kwargs = dict(
-            op_cls=DynamicStaticOp,
-            wire_lens=(1,),
-            hybrid_lens=(),
-            hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
-            static_args=_static_kwargs("hello"),
-        )
+        kwargs = {
+            "op_cls": DynamicStaticOp,
+            "wire_lens": (1,),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "adjoint": False,
+            "n_ctrls": 0,
+            "static_args": _static_kwargs("hello"),
+        }
 
         uid_f64 = generate_uid(AbstractArray((), float), **kwargs)
         uid_i64 = generate_uid(AbstractArray((), int), **kwargs)
         assert uid_f64 != uid_i64
-
-
-class TestSerializeStatic:
 
     @pytest.mark.parametrize(
         "value",
@@ -239,6 +247,7 @@ class TestSerializeStatic:
             {"k": 1},
             {1, 2},
             frozenset([1]),
+            _Opaque(),
         ],
     )
     def test_supported_types(self, value):
@@ -250,13 +259,13 @@ class TestSerializeStatic:
         """Test that non-wire hybrid operator aval signatures affect UID generation."""
         _, hybrid_tree1 = flatten(InnerOp(0.5, [0, 1, 2]))
         _, hybrid_tree2 = flatten(InnerOp(0.5, [0, 1]))
-        kwargs = dict(
-            op_cls=HybridOp,
-            wire_lens=(),
-            adjoint=False,
-            n_ctrls=0,
-            static_args=_static_kwargs("hello"),
-        )
+        kwargs = {
+            "op_cls": HybridOp,
+            "wire_lens": (),
+            "adjoint": False,
+            "n_ctrls": 0,
+            "static_args": _static_kwargs("hello"),
+        }
 
         uid_three_wires = generate_uid(
             AbstractArray((), float),
