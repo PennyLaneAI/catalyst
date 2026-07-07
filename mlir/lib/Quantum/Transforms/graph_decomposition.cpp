@@ -242,13 +242,21 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             return failure();
         }
 
-        // Ensure resources
+        // Try to generate resources if they're missing
         if (!resourcesAttr) {
             ResourceAnalysis analysis(rule);
             if (const ResourceResult *flat = analysis.getFlattenedResource(rule.getName())) {
                 rule->setAttr("resources", buildResourceDict(&getContext(), *flat));
             }
             resourcesAttr = rule->getAttrOfType<DictionaryAttr>("resources");
+        }
+
+        // Fail if resources are missing
+        if (!resourcesAttr) {
+            llvm::errs() << "Decomposition rule " << ruleName
+                         << " was provided without resources, and resources could not be generated "
+                            "for it.\n";
+            return failure();
         }
 
         // 2. Extract 'operations' dictionary from resources
@@ -338,9 +346,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
     /**
      * @brief
-     * Use python to lower decomposition rules for all `quantum.paulirot` operations in the circuit,
-     * annotating the lowered decomposition rules with resources and target gates. The target gate
-     * for the decomposition rule associated with Pauli word `ABC` will be `paulirotABC`.
+     * Use python to lower decomposition rules for all `quantum.paulirot` operations in the
+     * circuit, annotating the lowered decomposition rules with resources and target gates. The
+     * target gate for the decomposition rule associated with Pauli word `ABC` will be
+     * `paulirotABC`.
      */
     mlir::LogicalResult loadPauliRotRules(std::vector<RuleNode> &ruleNodes)
     {
@@ -350,6 +359,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         llvm::StringSet<> addedWords;
         // Add words from existing paulirot rules
         module.walk([&](mlir::func::FuncOp func) {
+            // TODO: generalize this
             if (func->hasAttr("target_gate")) {
                 if (func.getName().starts_with("paulirot_decomp_rule_")) {
                     addedWords.insert(func.getName().drop_front(21));
