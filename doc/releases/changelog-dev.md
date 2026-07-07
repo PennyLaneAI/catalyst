@@ -5,6 +5,14 @@
 
 <h3>Improvements 🛠</h3>
 
+* The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
+  without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
+  where applicable, unlocking compilation and execution for these cases.
+  [(#2979)](https://github.com/PennyLaneAI/catalyst/pull/2979)
+  [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969)
+  [(#2980)](https://github.com/PennyLaneAI/catalyst/pull/2980)
+  [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
+
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
   with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
@@ -18,6 +26,10 @@
 * The `resource-analysis` pass JSON output now includes `depth` for worst-case PBC layer depth
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
+
+* The `--adjoint-lowering` pass no longer turns statically bounded for loops into
+  dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
+  [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
 
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.

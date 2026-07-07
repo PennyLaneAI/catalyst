@@ -14,16 +14,29 @@
 
 """Utility code for keeping paths."""
 
+import importlib.util
 import os
 import os.path
-import sys
 import sysconfig
 
-from catalyst._configuration import INSTALLED
-from catalyst._revision import __revision__
-from catalyst._version import __version__
-
 package_root = os.path.join(os.path.dirname(__file__), "..")
+
+
+def _load_config(filename, attr):
+    """Read Catalyst config flags without importing Catalyst via the usual machinery.
+
+    This enables us to use this utility module from outside the Catalyst package as well.
+    """
+    path = os.path.join(package_root, filename)
+    spec = importlib.util.spec_from_file_location("", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return getattr(mod, attr)
+
+
+INSTALLED = _load_config("_configuration.py", "INSTALLED")
+__revision__ = _load_config("_revision.py", "__revision__")
+__version__ = _load_config("_version.py", "__version__")
 
 # Default paths to dep libraries
 DEFAULT_LIB_PATHS = {
@@ -73,49 +86,27 @@ def get_libpython_path() -> str:  # pragma: no cover
 
 def get_lib_path(project, env_var):
     """Get the path to Catalyst's shared libraries."""
-    if INSTALLED:
-        return os.path.join(package_root, "lib")  # pragma: no cover
+    if INSTALLED:  # pragma: no cover
+        return os.path.join(package_root, "lib")
+
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
 def get_include_path():
     """Return the path to Catalyst's include directory."""
-    if INSTALLED:
-        return os.path.join(package_root, "include")  # pragma: no cover
+    if INSTALLED:  # pragma: no cover
+        return os.path.join(package_root, "include")
+
     return os.getenv("CATALYST_INCLUDE_DIRS", DEFAULT_INCLUDE_PATHS.get("mlir", ""))
 
 
-def get_cli_path() -> str:  # pragma: nocover
-    """Method to obtain the Catalyst CLI path packaged via the data_files mechanism."""
+def get_cli_path() -> str:
+    """Method to obtain the Catalyst CLI path whether installed or locally built."""
     catalyst_cli = "catalyst"
 
-    if not INSTALLED:
-        return os.path.join(
-            os.getenv("CATALYST_BIN_DIR", DEFAULT_BIN_PATHS.get("cli", "")), catalyst_cli
-        )
+    if INSTALLED:  # pragma: nocover
+        return os.path.join(package_root, "bin", catalyst_cli)
 
-    # Default path
-    path = os.path.join(sysconfig.get_path("scripts"), catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    # User path
-    user_scheme = sysconfig.get_preferred_scheme("user")
-    path = os.path.join(sysconfig.get_path("scripts", scheme=user_scheme), catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    # Fallback to python location
-    path = os.path.join(os.path.dirname(sys.executable), catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    # Check the old bin directory location, which in rare scenarios may still be used
-    # (e.g. the configuration after `make wheel` has been run).
-    path = os.path.join(package_root, "..", "bin", catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    raise RuntimeError(
-        "Could not locate the Catalyst executable, please report this issue on GitHub."
+    return os.path.join(
+        os.getenv("CATALYST_BIN_DIR", DEFAULT_BIN_PATHS.get("cli", "")), catalyst_cli
     )

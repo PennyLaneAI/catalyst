@@ -18,6 +18,7 @@
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpImplementation.h"
 
 #include "QRef/IR/QRefDialect.h"
@@ -481,8 +482,8 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 5. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {"static_data", "param_map", "qubit_map",
-                                          "operandSegmentSizes"};
+    SmallVector<StringRef> elidedAttrs = {"static_data",         "param_map", "qubit_map",
+                                          "operandSegmentSizes", "op_name",   "adjoint"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
@@ -594,8 +595,8 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
     if (parser.parseString(&opName)) {
         return failure();
     }
+    result.addAttribute("op_name", builder.getStringAttr(opName));
     auto &opProperties = result.getOrAddProperties<OperatorOp::Properties>();
-    opProperties.setOpName(opName);
 
     // 2. Parse variadic params: (%arg0: type, ...)
     SmallVector<OpAsmParser::UnresolvedOperand> params;
@@ -616,7 +617,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 
     // 3. Optional adjoint marker.
     if (succeeded(parser.parseOptionalKeyword("adj"))) {
-        opProperties.setAdjoint(true);
+        result.addAttribute("adjoint", builder.getUnitAttr());
     }
 
     SmallVector<OpAsmParser::UnresolvedOperand> qubits;
