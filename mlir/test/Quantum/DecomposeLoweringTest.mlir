@@ -792,3 +792,42 @@ module @different_qreg_values{
     return %7 : !quantum.reg
   }
 }
+
+// -----
+
+// Test a qreg-mode decomposition rule whose wire indices are passed as separate
+// scalar arguments, i.e. a signature of the form
+// (qreg, *params, first_qubit_index, second_qubit_index, ...) instead of packing
+// the indices into a single tensor<Nxi64> argument.
+module @paulirot_scalar_wire_indices {
+  func.func public @circuit(%arg0: tensor<i64>, %arg1: tensor<i64>) attributes {quantum.node} {
+    %cst = arith.constant 2.000000e-01 : f64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %extracted = tensor.extract %arg0[] : tensor<i64>
+    %1 = quantum.extract %0[%extracted] : !quantum.reg -> !quantum.bit
+    %extracted_0 = tensor.extract %arg1[] : tensor<i64>
+    %2 = quantum.extract %0[%extracted_0] : !quantum.reg -> !quantum.bit
+
+    // CHECK-NOT: quantum.paulirot
+    // CHECK: quantum.multirz
+    %out_qubits:2 = quantum.paulirot ["X", "Z"](%cst) %1, %2 : !quantum.bit, !quantum.bit
+
+    %3 = quantum.insert %0[%extracted], %out_qubits#0 : !quantum.reg, !quantum.bit
+    %4 = quantum.insert %3[%extracted_0], %out_qubits#1 : !quantum.reg, !quantum.bit
+    quantum.dealloc %4 : !quantum.reg
+    return
+  }
+
+  // CHECK-NOT: func.func private @my_paulirot_xz_decomp
+  func.func private @my_paulirot_xz_decomp(%inreg: !quantum.reg, %angle: tensor<f64>, %q0: tensor<i64>, %q1: tensor<i64>) -> !quantum.reg attributes {target_gate = "paulirotXZ"} {
+    %angle_f = tensor.extract %angle[] : tensor<f64>
+    %i0 = tensor.extract %q0[] : tensor<i64>
+    %i1 = tensor.extract %q1[] : tensor<i64>
+    %qb0 = quantum.extract %inreg[%i0] : !quantum.reg -> !quantum.bit
+    %qb1 = quantum.extract %inreg[%i1] : !quantum.reg -> !quantum.bit
+    %m:2 = quantum.multirz(%angle_f) %qb0, %qb1 : !quantum.bit, !quantum.bit
+    %r0 = quantum.insert %inreg[%i0], %m#0 : !quantum.reg, !quantum.bit
+    %r1 = quantum.insert %r0[%i1], %m#1 : !quantum.reg, !quantum.bit
+    return %r1 : !quantum.reg
+  }
+}
