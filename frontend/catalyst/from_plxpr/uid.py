@@ -18,7 +18,6 @@ UID generation logic for compiling operators with non-compilable data.
 from functools import singledispatch
 from typing import Any
 
-from pennylane import math
 from pennylane.core import Operator2
 from pennylane.pytrees import PyTreeStructure, unflatten
 from pennylane.wires import AbstractQubit
