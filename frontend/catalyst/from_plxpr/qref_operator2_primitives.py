@@ -171,7 +171,7 @@ def _process_params(
 
         args_idx += hsize
 
-    param_map = get_mlir_attribute_from_pyval(param_map)
+    param_map = get_mlir_attribute_from_pyval(param_map) if param_map else None
     return params, forward_params, param_map
 
 
@@ -190,21 +190,24 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
     args_idx = len(op_cls.dynamic_argnames)
     map_idx = 0
     for wname, wsize in zip(flat_wire_argnames, wire_lens, strict=True):
-        qubits += args[args_idx : args_idx + wsize]
-        qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
-        map_idx += wsize
-        args_idx += wsize
+        if wsize:
+            # If wsize is 0, then we don't want to populate the qubit map
+            qubits += args[args_idx : args_idx + wsize]
+            qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
+            map_idx += wsize
+            args_idx += wsize
 
     # Hybrid wire arguments
     for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
-        if hname in op_cls.wire_argnames:
+        if hname in op_cls.wire_argnames and hsize:
+            # If hsize is 0, then we don't want to populate the qubit map
             qubits += args[args_idx : args_idx + hsize]
             qubit_map[hname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + hsize)))
             map_idx += hsize
 
         args_idx += hsize
 
-    qubit_map = get_mlir_attribute_from_pyval(qubit_map)
+    qubit_map = get_mlir_attribute_from_pyval(qubit_map) if qubit_map else None
     return qubits, qubit_map
 
 
@@ -243,8 +246,6 @@ def _qref_operator_p_lowering(
         )
 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
-    repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
-    processed_static_data = get_mlir_attribute_from_pyval(repack_static_data)
 
     if _is_custom_op(op_cls, jax_ctx.avals_in[: len(op_cls.dynamic_argnames)]):
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
@@ -289,8 +290,11 @@ def _qref_operator_p_lowering(
             n_ctrls=n_ctrls,
             static_args=kwargs,
         )
+        static_data = None
     else:
         uid = None
+        repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
+        static_data = get_mlir_attribute_from_pyval(repack_static_data)
 
     OperatorOp(
         op_name=name_attr,
@@ -304,7 +308,7 @@ def _qref_operator_p_lowering(
         UID=uid,
         arr_qubit_indices=[],
         param_map=param_map,
-        static_data=processed_static_data,
+        static_data=static_data,
         qubit_map=qubit_map,
     )
 
