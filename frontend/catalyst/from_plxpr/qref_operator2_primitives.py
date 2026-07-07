@@ -22,7 +22,7 @@ from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.core import Operator2
-from pennylane.pytrees import flatten, unflatten
+from pennylane.pytrees import PyTreeStructure, flatten, unflatten
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
@@ -101,6 +101,38 @@ def _general_validation(*args, op_cls, wire_lens, **kwargs):
         assert ir.OpaqueType(w.type).data == "bit"
 
 
+def _count_leaves(tree):
+    if tree.is_leaf:
+        return 1
+    return sum(_count_leaves(c) for c in tree.children)
+
+
+def _partition_hybrid_leaves(leaves: list, tree: PyTreeStructure, idx: int = 0):
+    """Split hybrid SSA leaves into forward vs outer-param operands. This is necessary
+    instead of just unflattening the pytree because pytrees containing operators will
+    likely fail unflattening as that will require instantiating operators with MLIR
+    SSA values for dynamic parameters.
+
+    Returns:
+        tuple[list, list, int]: List of forwarding arguments, non-forwarding arguments,
+        and an index used to track the running leaf index during recursion.
+    """
+    if tree.is_leaf:
+        return [], [leaves[idx]], idx + 1
+
+    if tree.type_ is not None and issubclass(tree.type_, Operator2):
+        n = _count_leaves(tree)
+        return leaves[idx : idx + n], [], idx + n
+    forward, params = [], []
+
+    for child in tree.children:
+        f, p, idx = _partition_hybrid_leaves(leaves, child, idx)
+        forward += f
+        params += p
+
+    return forward, params, idx
+
+
 def _process_params(
     *args, op_cls, wire_lens, hybrid_lens, hybrid_trees
 ) -> tuple[list, list, dict[str, list[int]]]:
@@ -120,32 +152,23 @@ def _process_params(
     # Hybrid dynamic arguments
     args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
     map_idx = len(op_cls.dynamic_argnames)
+
     for hname, hsize, htree in zip(op_cls.hybrid_argnames, hybrid_lens, hybrid_trees, strict=True):
-        if hname in op_cls.wire_argnames:
-            args_idx += hsize
-            continue
+        if hname not in op_cls.wire_argnames:
+            leaves = args[args_idx : args_idx + hsize]
+            # Any dynamic arguments of input operators are considered feed-forward arguments for
+            # decomposition rules, not parameters or qubits of the outer operator. This function
+            # is used to partition feed-forward arguments from other dynamic values.
+            cur_fwd, cur_params, _ = _partition_hybrid_leaves(leaves, htree)
+            forward_params += cur_fwd
 
-        # FIXME: This is going to fail in most cases where the arg is/has an operator, because we
-        # will be unflattening with a list of MLIR SSA values which are not valid dynamic arguments
-        value = unflatten(args[args_idx : args_idx + hsize], htree)
-        val_with_ops, _ = flatten(value, is_leaf=lambda x: isinstance(x, Operator2))
-        cur_params = []
+            if cur_params:
+                params += cur_params
+                param_map[hname] = ir.DenseI64ArrayAttr.get(
+                    list(range(map_idx, map_idx + len(cur_params)))
+                )
+                map_idx += len(cur_params)
 
-        # Any dynamic arguments of input operators are considered feed-forward arguments for
-        # decomposition rules, not parameters or qubits of the outer operator.
-        for val in val_with_ops:
-            if isinstance(val, Operator2):
-                forward_params += flatten(val)[0]
-            else:
-                cur_params.append(val)
-
-        if len(cur_params) != 0:
-            params += cur_params
-            param_map[hname] = ir.DenseI64ArrayAttr.get(
-                list(range(map_idx, map_idx + len(cur_params)))
-            )
-
-        map_idx += len(cur_params)
         args_idx += hsize
 
     param_map = get_mlir_attribute_from_pyval(param_map)
