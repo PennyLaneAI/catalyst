@@ -14,6 +14,7 @@
 """
 UID generation logic for compiling operators with non-compilable data.
 """
+
 from functools import singledispatch
 from typing import Any
 
