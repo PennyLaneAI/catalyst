@@ -411,7 +411,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 return failure();
             }
             LDBG() << "adding rule " << funcOp.getName();
-            module.push_back(std::move(outOp.release()));
+            module.push_back(outOp.release());
         }
         return success();
     }
