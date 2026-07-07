@@ -205,7 +205,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The `graph-decomposition` pass now performs far less IR manipulation.
+* The `graph-decomposition` pass eliminates three redundant IR manipulations:
+  the cloning, removal, and re-insertion of user rules. This optimization is particularly
+  beneficial when the pass is executed multiple times within the compilation pipeline.
   [(#2977)](https://github.com/PennyLaneAI/catalyst/pull/2977)
 
 * Update tests to not use global capture toggle where possible.
