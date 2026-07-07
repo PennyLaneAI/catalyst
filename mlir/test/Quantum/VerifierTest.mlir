@@ -674,6 +674,7 @@ func.func @operator_custom_with_uid_and_forward(%fwd : i64, %q0 : !quantum.bit, 
 // -----
 
 func.func @operator_no_mode() {
+    // CHECK: quantum.operator "no_qubits_or_qreg"() qubits()
     "quantum.operator"() <{op_name = "no_qubits_or_qreg", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 0>}> : () -> ()
     return
 }
