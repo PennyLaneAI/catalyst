@@ -89,7 +89,7 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         {
             # Keys need to match the names of the corresponding qecl.gate gates; if any adjoint
             # gates are supported, they should be included as a separate entry with key
-            # "gatename_adj". Values are a tuple of the qecp gate, and the indices its applied at in
+            # "gatename_adj". Values are a tuple of gate string identifiers specifying the qecp ops
             # the codeblock will need to be refactored for k>1
             "x": ("I", "I", "I", "I", "X", "X", "X"),
             "y": ("I", "I", "I", "I", "Y", "Y", "Y"),
@@ -103,7 +103,7 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         },
         #### Unitary encoding circuit ####
         {
-            # ops (in the form of a qecp operator and the indices of the codeblock
+            # ops (in the form of a gate string identifier and the indices of the codeblock
             # it should be applied on) defining a transporter encoding circuit, i.e.
             # one that maps an input to the logical version of that input, rather
             # than just encoding logical 0

@@ -1902,7 +1902,7 @@ class TestGenerality:
             //   CHECK-DAG:   [[q6:%.+]] = qecp.extract [[cb]][6] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
             //   CHECK-DAG:   [[q7:%.+]] = qecp.extract [[cb]][7] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
             //   CHECK-DAG:   [[q8:%.+]] = qecp.extract [[cb]][8] : !qecp.codeblock<1 x 9> -> !qecp.qubit<data>
-            // COM: State injection on the state_prep_index (qubit 6): H then T
+            // COM: State injection on the state_prep_index (qubit 0): H then T
             //       CHECK:   [[h_inj:%.+]] = qecp.hadamard [[q0]] : !qecp.qubit<data>
             //       CHECK:   [[q0_1:%.+]] = qecp.t [[h_inj]] : !qecp.qubit<data>
             // COM: Unitary encoding: initial CNOTs

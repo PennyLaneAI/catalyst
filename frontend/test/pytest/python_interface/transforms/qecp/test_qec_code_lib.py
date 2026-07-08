@@ -263,7 +263,7 @@ class TestQecCode:
 
 
 class TestGateStringIds:
-    """TODO"""
+    """Test that gate string ID to qecp operation works as expected."""
 
     @pytest.mark.parametrize(
         "gate_str, expected_op",
