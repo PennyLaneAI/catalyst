@@ -1047,7 +1047,7 @@ class AstFrontend:
         raise QASM3FrontendError(f"Unsupported cast to {tname}")
 
 
-def load_qasm3(source, inputs=None):
+def load_qasm3(source, inputs=None, return_origin=False):
     """Load an OpenQASM 3 program into a qiskit QuantumCircuit.
 
     Tries qiskit's importer first; falls back to the openqasm3-AST partial
@@ -1056,6 +1056,8 @@ def load_qasm3(source, inputs=None):
     Args:
         source: QASM3 source text, or a path to a .qasm file.
         inputs: dict of values for the program's `input` declarations.
+        return_origin: when True, return ``(circuit, origin)`` where origin
+            is ``"qiskit"`` or ``"ast"`` (which frontend parsed the program).
 
     Raises:
         QASM3FrontendError: for constructs with no circuit representation
@@ -1074,8 +1076,10 @@ def load_qasm3(source, inputs=None):
     try:
         import qiskit.qasm3
 
-        return qiskit.qasm3.loads(qiskit_text)
+        qc = qiskit.qasm3.loads(qiskit_text)
+        return (qc, "qiskit") if return_origin else qc
     except Exception:
         pass
 
-    return AstFrontend(inputs=inputs).build(text)
+    qc = AstFrontend(inputs=inputs).build(text)
+    return (qc, "ast") if return_origin else qc

@@ -81,6 +81,13 @@ except ImportError:
     _openqasm3_mod = None  # type: ignore
     _OPENQASM3_OK = False
 
+try:
+    from qasm3_frontend import QASM3FrontendError, load_qasm3
+
+    _HYBRID_OK = True
+except ImportError:
+    _HYBRID_OK = False
+
 
 # ── Section 2: Constants ───────────────────────────────────────────────────────
 _WIDTH = 72
@@ -202,13 +209,15 @@ class Renderer:
 
     # ── circuit result footer ──────────────────────────────────────────────────
 
-    def circuit_result(self, passed: bool, total_elapsed: float) -> None:
+    def circuit_result(self, passed: bool, total_elapsed: float, skipped: bool = False) -> None:
         self._emit("═" * _WIDTH + "\n")
-        if passed:
+        if skipped:
+            mark = self._c("− SKIP", _YELLOW + _BOLD)
+        elif passed:
             mark = self._c("✓ PASS", _GREEN + _BOLD)
         else:
             mark = self._c("✗ FAIL", _RED + _BOLD)
-        raw_mark = "✓ PASS" if passed else "✗ FAIL"
+        raw_mark = "− SKIP" if skipped else ("✓ PASS" if passed else "✗ FAIL")
         pad = max(
             1,
             _WIDTH
@@ -233,7 +242,7 @@ class Renderer:
         self._emit(header)
         self._emit("  " + "─" * (_WIDTH - 2) + "\n")
 
-        pass_count = fail_count = 0
+        pass_count = fail_count = skip_count = 0
         for r in results:
             marks = []
             for s in r["stages"]:
@@ -244,11 +253,14 @@ class Renderer:
                 else:
                     marks.append(self._c("-", _YELLOW))
 
-            result_str = self._c("PASS", _GREEN) if r["passed"] else self._c("FAIL", _RED)
-            raw_result = "PASS" if r["passed"] else "FAIL"
-            if r["passed"]:
+            if r.get("skipped"):
+                result_str = self._c("SKIP", _YELLOW)
+                skip_count += 1
+            elif r["passed"]:
+                result_str = self._c("PASS", _GREEN)
                 pass_count += 1
             else:
+                result_str = self._c("FAIL", _RED)
                 fail_count += 1
 
             name = r["name"][:col_name]
@@ -263,7 +275,12 @@ class Renderer:
         self._emit("  " + "─" * (_WIDTH - 2) + "\n")
         passed_s = self._c(str(pass_count), _GREEN)
         failed_s = self._c(str(fail_count), _RED)
-        self._emit(f"  Total: {total} circuits | {passed_s} PASS | {failed_s} FAIL\n")
+        skipped_s = self._c(str(skip_count), _YELLOW)
+        self._emit(
+            f"  Total: {total} circuits | {passed_s} PASS | {failed_s} FAIL"
+            + (f" | {skipped_s} SKIP" if skip_count else "")
+            + "\n"
+        )
         self._emit("═" * _WIDTH + "\n")
 
     def close(self) -> None:
@@ -338,7 +355,7 @@ def _detect_qasm_version(content: str) -> int:
     return 2
 
 
-def _load_qasm3_circuit(path: Path, content: str) -> StageResult:
+def _load_qasm3_circuit(path: Path, content: str, inputs: Optional[dict] = None) -> StageResult:
     """Parse a QASM 3 file and produce a QuantumCircuit.
 
     Two-stage approach:
@@ -346,10 +363,12 @@ def _load_qasm3_circuit(path: Path, content: str) -> StageResult:
          AST-level information (works for *all* QASM 3 files, including those
          that use features Qiskit cannot yet import, e.g. ``uint``, ``const``,
          ``def``, timing directives, pulse calibration).
-      2. ``qiskit.qasm3.loads()`` — converts the validated QASM 3 into a
-         ``QuantumCircuit`` so the rest of the pipeline (MLIR gen, opt,
-         translate) can proceed.  Fails gracefully with a specific error message
-         when unsupported QASM 3 features are encountered.
+      2. ``qasm3_frontend.load_qasm3()`` — hybrid conversion into a
+         ``QuantumCircuit``: qiskit's importer first (best dynamic-circuit
+         support), then the openqasm3-AST partial evaluator for the grammar
+         qiskit rejects (const, def, uint, casts, let, gate modifiers, ...).
+         Constructs with no circuit representation (extern, defcal, timing)
+         raise ``QASM3FrontendError`` and are reported as SKIP, not FAIL.
     """
     # ── Step 1: openqasm3 syntax validation ───────────────────────────────────
     ast_detail = ""
@@ -383,7 +402,26 @@ def _load_qasm3_circuit(path: Path, content: str) -> StageResult:
             "Install with: pip install openqasm3 qiskit-aer",
         )
 
-    # ── Step 2: qiskit.qasm3.loads() → QuantumCircuit ────────────────────────
+    # ── Step 2: hybrid loader → QuantumCircuit ────────────────────────────────
+    if _HYBRID_OK:
+        try:
+            qc, origin = load_qasm3(content, inputs=inputs, return_origin=True)
+            origin_str = "qiskit" if origin == "qiskit" else "AST fallback"
+            detail = (
+                f"QASM3 via {origin_str} — {qc.num_qubits} qubits, "
+                f"{qc.num_clbits} cbits, {len(qc.data)} gates"
+                + (f"  [{ast_detail}]" if ast_detail else "")
+            )
+            return StageResult(True, qc, detail)
+        except QASM3FrontendError as exc:
+            # Valid QASM3, but the construct has no circuit representation
+            # (extern, defcal, timing, runtime classical arithmetic) or needs
+            # values (--inputs). Report as SKIP, not FAIL.
+            return StageResult(False, "UNSUPPORTED_SKIP", str(exc))
+        except Exception as exc:
+            return StageResult(False, None, f"QASM3 conversion failed: {str(exc)[:300]}")
+
+    # Legacy path: qiskit.qasm3 only (hybrid frontend not importable)
     if _AER_OK:  # _AER_OK implies qiskit.qasm3 was importable
         try:
             qc = _qasm3_mod.loads(content)
@@ -454,7 +492,7 @@ def _pennylane_to_qiskit(path: Path):
     return qc, args
 
 
-def run_stage1_frontend(path: Path, lang: str) -> StageResult:
+def run_stage1_frontend(path: Path, lang: str, inputs: Optional[dict] = None) -> StageResult:
     if not _QISKIT_OK:
         return StageResult(False, None, "qiskit is not installed")
 
@@ -469,8 +507,8 @@ def run_stage1_frontend(path: Path, lang: str) -> StageResult:
         qasm_version = _detect_qasm_version(content)
 
         if qasm_version >= 3:
-            # Route through the openqasm3 + qiskit.qasm3 path
-            return _load_qasm3_circuit(path, content)
+            # Route through the openqasm3 + hybrid-loader path
+            return _load_qasm3_circuit(path, content, inputs)
 
         # QASM 2 path — use Qiskit's native parser
         try:
@@ -484,10 +522,12 @@ def run_stage1_frontend(path: Path, lang: str) -> StageResult:
             # its result as long as openqasm3 could validate the file — even if
             # qiskit.qasm3 conversion fails, that error is more informative than a
             # raw "non-ASCII byte" from the QASM2 parser.
-            if _OPENQASM3_OK or _AER_OK:
-                fallback = _load_qasm3_circuit(path, content)
-                if fallback.passed or (
-                    fallback.message and "QASM3 syntax valid" in fallback.message
+            if _OPENQASM3_OK or _AER_OK or _HYBRID_OK:
+                fallback = _load_qasm3_circuit(path, content, inputs)
+                if (
+                    fallback.passed
+                    or fallback.data == "UNSUPPORTED_SKIP"
+                    or (fallback.message and "QASM3 syntax valid" in fallback.message)
                 ):
                     return fallback
             return StageResult(False, None, qasm2_err)
@@ -558,12 +598,15 @@ def run_stage3_optimize(mlir_str: str) -> StageResult:
             fh.write(mlir_str)
             tmp_path = fh.name
 
+        # NOTE: -o must not target the input file — quantum-opt mmaps its
+        # input, and overwriting it in place SIGBUSes on larger modules.
+        opt_path = tmp_path + ".opt.mlir"
         cmd = [
             str(_OPT_BIN),
             f"--pass-pipeline={_OPT_PIPELINE}",
             tmp_path,
             "-o",
-            tmp_path,
+            opt_path,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -572,8 +615,9 @@ def run_stage3_optimize(mlir_str: str) -> StageResult:
                 False, (tmp_path, None), f"quantum-opt exited {result.returncode}: {err[:400]}"
             )
 
-        with open(tmp_path, encoding="utf-8") as fh:
+        with open(opt_path, encoding="utf-8") as fh:
             opt_mlir = fh.read()
+        os.replace(opt_path, tmp_path)
         lines = opt_mlir.splitlines()
         ops = sum(1 for ln in lines if "=" in ln)
         detail = f"{len(lines)} lines, {ops} ops after optimization"
@@ -667,14 +711,16 @@ def run_stage6_simulate(qasm3: str, original_qc) -> StageResult:
             "qiskit-aer or qiskit.qasm3 not available (install with: pip install qiskit-aer)",
         )
 
-    if re.search(r"^\s*if\s*\(", qasm3, re.MULTILINE) or re.search(
-        r"^\s*for\s+", qasm3, re.MULTILINE
+    if (
+        re.search(r"^\s*if\s*\(", qasm3, re.MULTILINE)
+        or re.search(r"^\s*for\s+", qasm3, re.MULTILINE)
+        or re.search(r"^\s*while\s*\(", qasm3, re.MULTILINE)
     ):
         return StageResult(
             True,
             "COND_SKIP",
             "Skipped — circuit contains classical control flow "
-            "(QASM3 simulation not supported for if/for blocks)",
+            "(QASM3 simulation not supported for if/for/while blocks)",
         )
 
     if original_qc.num_clbits == 0:
@@ -737,10 +783,17 @@ def _detect_lang(path: Path) -> str:
 class PipelineRunner:
     """Orchestrates the 6-stage pipeline for a single circuit file."""
 
-    def __init__(self, renderer: Renderer, verbose: bool = False, no_simulation: bool = False):
+    def __init__(
+        self,
+        renderer: Renderer,
+        verbose: bool = False,
+        no_simulation: bool = False,
+        inputs: Optional[dict] = None,
+    ):
         self.R = renderer
         self.verbose = verbose
         self.no_simulation = no_simulation
+        self.inputs = inputs
 
     def run(self, path: Path, lang: str) -> Dict:
         R = self.R
@@ -754,15 +807,32 @@ class PipelineRunner:
         # ── Stage 1 ────────────────────────────────────────────────────────────
         t0 = time.perf_counter()
         R.stage_running(1, total_stages, STAGES[0][2])
-        sr = run_stage1_frontend(path, lang)
+        sr = run_stage1_frontend(path, lang, self.inputs)
         elapsed = time.perf_counter() - t0
 
         if sr.passed:
             qc = sr.data
+            if qc.num_clbits == 0 and len(qc.data) > 0:
+                # Without measurements every gate is dead code under
+                # canonicalize and the translation would be empty; add
+                # terminal measurements so validation is meaningful.
+                qc = qc.copy()
+                qc.measure_all()
+                R.info("Note", "no measurements in source — added measure_all()")
             R.info("Source", str(path))
             R.info("Circuit", sr.message)
             R.stage_pass(1, total_stages, STAGES[0][2], elapsed)
             stages[0] = True
+        elif sr.data == "UNSUPPORTED_SKIP":
+            # Valid QASM3 using constructs with no circuit representation —
+            # not a pipeline failure. Skip the whole circuit with the reason.
+            R.info("Source", str(path))
+            R.info("Skipped", sr.message)
+            for i in range(total_stages):
+                R.stage_skip(i + 1, total_stages, STAGES[i][2])
+            total_elapsed = time.perf_counter() - t_total
+            R.circuit_result(True, total_elapsed, skipped=True)
+            return _make_result(path.name, stages, True, total_elapsed, skipped=True)
         else:
             R.error_detail(sr.message)
             R.stage_fail(1, total_stages, STAGES[0][2], elapsed)
@@ -890,8 +960,16 @@ class PipelineRunner:
         return _make_result(path.name, stages, overall, total_elapsed)
 
 
-def _make_result(name: str, stages: list, passed: bool, elapsed: float) -> Dict:
-    return {"name": name, "stages": stages, "passed": passed, "elapsed": elapsed}
+def _make_result(
+    name: str, stages: list, passed: bool, elapsed: float, skipped: bool = False
+) -> Dict:
+    return {
+        "name": name,
+        "stages": stages,
+        "passed": passed,
+        "elapsed": elapsed,
+        "skipped": skipped,
+    }
 
 
 # ── Section 13: BatchRunner ───────────────────────────────────────────────────
@@ -903,8 +981,14 @@ _SUPPORTED_EXTS = {".qasm", ".py"}
 class BatchRunner:
     """Discover and process all circuits in a directory."""
 
-    def __init__(self, renderer: Renderer, verbose: bool = False, no_simulation: bool = False):
-        self.pipeline = PipelineRunner(renderer, verbose, no_simulation)
+    def __init__(
+        self,
+        renderer: Renderer,
+        verbose: bool = False,
+        no_simulation: bool = False,
+        inputs: Optional[dict] = None,
+    ):
+        self.pipeline = PipelineRunner(renderer, verbose, no_simulation, inputs)
         self.renderer = renderer
 
     def run(self, directory: Path) -> int:
@@ -966,6 +1050,14 @@ def parse_args() -> argparse.Namespace:
         "--verbose", action="store_true", help="Print intermediate MLIR and QASM3 content"
     )
     parser.add_argument(
+        "--inputs",
+        type=str,
+        metavar="JSON",
+        default=None,
+        help="Values for QASM3 'input' declarations as JSON, "
+        "e.g. --inputs '{\"a_in\": 3}' (applies to all circuits in --batch mode)",
+    )
+    parser.add_argument(
         "--report", type=Path, metavar="FILE", help="Write output to FILE (ANSI codes stripped)"
     )
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI color output")
@@ -979,6 +1071,16 @@ def main() -> int:
         print("Error: specify a circuit file or --batch <dir>", file=sys.stderr)
         print("Run with --help for usage.", file=sys.stderr)
         return 2
+
+    inputs = None
+    if args.inputs:
+        import json
+
+        try:
+            inputs = json.loads(args.inputs)
+        except json.JSONDecodeError as exc:
+            print(f"Error: --inputs is not valid JSON: {exc}", file=sys.stderr)
+            return 2
 
     renderer = Renderer(
         report_path=args.report,
@@ -996,6 +1098,7 @@ def main() -> int:
                 renderer,
                 verbose=args.verbose,
                 no_simulation=not args.simulation,
+                inputs=inputs,
             )
             return runner.run(args.batch)
 
@@ -1009,6 +1112,7 @@ def main() -> int:
                 renderer,
                 verbose=args.verbose,
                 no_simulation=not args.simulation,
+                inputs=inputs,
             )
             result = runner.run(path, lang)
             return 0 if result["passed"] else 1
