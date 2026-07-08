@@ -42,18 +42,24 @@ import jax.numpy as jnp
 import pennylane as qp
 
 
-def python_decomposition_wrapper(op_name, op_id, dynamic_shape, static_data, num_wires) -> str:
+def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:
     """Generic decomposition wrapper."""
-    print("Hello from python! Here's the received data:", op_name, dynamic_shape, static_data)
+    print(
+        "Hello from python! Here's the received data:",
+        op_name,
+        dynamic_shape,
+        wire_lens,
+        static_data,
+    )
 
-    device = qp.device("null.qubit", wires=num_wires)
-    # TODO support multiple wire args/qregs
-    wires = jnp.array(range(num_wires))
+    device = qp.device("null.qubit", wires=sum(wire_lens))
+    wires = tuple(jnp.array(range(length)) for length in wire_lens)
 
     def rule_to_subroutine(rule):
         def decomp_rule(*params, wires):
-            rule._impl(*params, wires=wires, **static_data)
+            rule._impl(*params, *wires, **static_data)
 
+        # TODO remove this once we have unified lowering, we should be able to set target_gate
         decomp_rule.__name__ = op_id + "_" + rule.name
 
         return qp.capture.subroutine(decomp_rule)

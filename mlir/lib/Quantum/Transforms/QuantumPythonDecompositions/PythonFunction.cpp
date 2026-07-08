@@ -72,12 +72,19 @@ nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
 std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
 {
     std::cout << "using new python lowering for op with the following data:\n";
+    std::cout << "op name: " << op.getPlName() << "\n";
     std::cout << "op ID: " << op.getDecompId() << "\n";
 
     std::cout << "dynamic data shape:\n";
     for (auto type : op.getDynamicShape()) {
         type.dump();
     }
+
+    std::cout << "wire lens:\n";
+    for (size_t len : op.getWireLens()) {
+        std::cout << len << ", ";
+    }
+    std::cout << "\n";
 
     std::cout << "static data:\n";
     for (auto namedAttr : op.getStaticData()) {
@@ -98,8 +105,8 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
             nb::object wrapperFunction = wrapperModule.attr(functionName);
 
             nb::object pythonResult = wrapperFunction(
-                op.getOpName(), op.getDecompId(), getPyvalFromTypeRange(op.getDynamicShape()),
-                getPyvalFromMlirAttribute(op.getStaticData()), op.getNumWires());
+                op.getPlName(), op.getDecompId(), getPyvalFromTypeRange(op.getDynamicShape()),
+                op.getWireLens(), getPyvalFromMlirAttribute(op.getStaticData()));
 
             return nb::borrow<nb::str>(pythonResult).c_str();
         }
