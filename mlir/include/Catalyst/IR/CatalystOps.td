@@ -29,6 +29,7 @@ include "Catalyst/IR/CatalystDialect.td"
 def SymbolicArrayOp : Catalyst_Op<"symbolic_array"> {
     let summary = "Initialize a dummy array that can be used for resource estimation and dry-runs.";
     let results = (outs AnyRankedTensor:$result);
+    let assemblyFormat = [{ attr-dict `:` type($result) }];
 }
 
 def ListInitOp : Catalyst_Op<"list_init"> {
