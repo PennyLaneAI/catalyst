@@ -54,6 +54,7 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/DecompStaticData.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/QPDLoader.h"
 
@@ -358,7 +359,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             mlir::func::FuncOp funcOp = outOp.get();
             outOp->setName((outOp->getName() + "_" + pauliWord).str()); // unique name per pauliword
-            funcOp->setAttr("target_gate", mlir::StringAttr::get(context, "paulirot" + pauliWord));
+            funcOp->setAttr("target_gate", mlir::StringAttr::get(context, "paulirot"));
+            funcOp->setAttr(
+                "static_data",
+                mlir::DictionaryAttr::get(
+                    context, {mlir::NamedAttribute(mlir::StringAttr::get(context, "pauli_word"),
+                                                   mlir::StringAttr::get(context, pauliWord))}));
 
             auto analysis = ResourceAnalysis(funcOp);
             if (const ResourceResult *flat = analysis.getFlattenedResource(funcOp.getName())) {
@@ -378,18 +384,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             node.numWires = op.getNonCtrlQubitOperands().size();
             node.adjoint = op.getAdjointFlag();
 
+            // Static arguments (e.g. paulirot's pauli word, or a quantum.operator's static_data)
+            node.staticNamedArgs = staticDataToMap(staticDataOf(op.getOperation()));
+
             if (auto customOp = llvm::dyn_cast<quantum::CustomOp>(op.getOperation())) {
                 node.name = customOp.getGateName().str();
             }
-            // Name handling for non-custom ops
+            else if (auto operatorOp = llvm::dyn_cast<quantum::OperatorOp>(op.getOperation())) {
+                node.name = operatorOp.getOpName().str();
+            }
             else {
                 std::string name = op->getName().stripDialect().str();
                 if (name == "gphase") {
                     name = "GlobalPhase";
-                }
-                else if (name == "paulirot") {
-                    node.staticNamedArgs["pauli_word"] =
-                        cast<quantum::PauliRotOp>(op.getOperation()).getPauliWord();
                 }
                 node.name = name;
             }
@@ -450,13 +457,22 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // numParams at the wildcard default so old bytecode keeps working.
         }
 
-        if (llvm::StringRef nameRef(node.name);
-            nameRef.consume_front("paulirot") && !nameRef.empty()) {
-            node.staticNamedArgs["pauli_word"] = nameRef.str();
-            node.name = "paulirot";
-        }
-
         return node;
+    }
+
+    /**
+     * @brief Overlay a rule function's structured operator identity onto its output node.
+     */
+    void applyStructuredOperatorIdentity(mlir::func::FuncOp func, OperatorNode &output)
+    {
+        if (auto opNameAttr = func->getAttrOfType<StringAttr>("op_name")) {
+            output.name = opNameAttr.getValue().str();
+        }
+        if (auto staticData = func->getAttrOfType<DictionaryAttr>("static_data")) {
+            for (const auto &[key, value] : staticDataToMap(staticData)) {
+                output.staticNamedArgs[key] = value;
+            }
+        }
     }
 
     /**
@@ -498,6 +514,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             RuleNode ruleNode;
             ruleNode.name = ruleName.str();
             ruleNode.output = parseOperator(targetGateAttr.getValue());
+            applyStructuredOperatorIdentity(func, ruleNode.output);
 
             for (const auto &namedAttr : operations) {
                 if (auto intAttr = mlir::dyn_cast<IntegerAttr>(namedAttr.getValue())) {

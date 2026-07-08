@@ -669,7 +669,7 @@ module @test_paulirot {
     }
 
     // CHECK: my_paulirot_decomp
-    func.func private @my_paulirot_decomp(%inreg : !quantum.reg, %angle_tensor : tensor<f64>, %q_tensor : tensor<3xi64>) -> !quantum.reg attributes {target_gate = "paulirotZXY"} {
+    func.func private @my_paulirot_decomp(%inreg : !quantum.reg, %angle_tensor : tensor<f64>, %q_tensor : tensor<3xi64>) -> !quantum.reg attributes {target_gate = "paulirot", static_data = {pauli_word = "ZXY"}} {
         %pi_by_2 = arith.constant 1.57 : f64
         %m_pi_by_2 = arith.constant -1.57 : f64
         %angle = tensor.extract %angle_tensor[] : tensor<f64>

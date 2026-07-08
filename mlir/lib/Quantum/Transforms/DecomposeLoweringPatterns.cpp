@@ -37,6 +37,7 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
+#include "Quantum/Transforms/DecompStaticData.h"
 
 #include "DecomposeLoweringImpl.hpp"
 
@@ -266,7 +267,8 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
 
     LogicalResult matchAndRewrite(PauliRotOp op, PatternRewriter &rewriter) const override
     {
-        std::string gateName = "paulirot" + op.getPauliWord();
+        // The registry key is the base op name specialized by its static data (e.g., pauli word)
+        std::string gateName = makeDecompRegistryKey("paulirot", staticDataOf(op.getOperation()));
 
         // Only decompose the op if it is not in the target gate set
         if (targetGateSet.contains("paulirot")) {

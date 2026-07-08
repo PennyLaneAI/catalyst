@@ -43,6 +43,7 @@
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/DecompStaticData.h"
 #include "Quantum/Transforms/Patterns.h"
 
 #define DEBUG_TYPE "decompose-lowering"
@@ -83,6 +84,14 @@ uint64_t getNumWires(func::FuncOp func)
         return num_wires_attr.getValue().getZExtValue();
     }
     return 0;
+}
+
+// Read a decomposition rule's `static_data` attribute.
+// This is currently used for PauliRot (`{pauli_word = "ZXY"}`),
+// but can be also utilized for quantum.operator in the IR.
+DictionaryAttr getStaticData(func::FuncOp func)
+{
+    return func->getAttrOfType<DictionaryAttr>("static_data");
 }
 
 } // namespace DecompUtils
@@ -130,7 +139,8 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
                     decompositionRegistry[newTargetOpStr] = func;
                 }
                 else {
-                    decompositionRegistry[targetOp] = func;
+                    decompositionRegistry[makeDecompRegistryKey(
+                        targetOp, DecompUtils::getStaticData(func))] = func;
                 }
             }
             // No need to walk into the function body
