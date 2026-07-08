@@ -140,8 +140,9 @@ struct RuleTerm {
  * - Default: The default rule for decomposing an operator as defined in the decomposition graph.
  * - Fixed: A fixed rule that cannot be changed or overridden by the solver.
  * - Alternative: An alternative rule that can be used in place of the default rule.
+ * - AdjointGenerated: A rule synthesized by adjointing a base decomposition rule.
  */
-enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2 };
+enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2, AdjointGenerated = 3 };
 
 /**
  * @brief This represents the decomposition rules in the graph decomposition problem.
@@ -186,6 +187,38 @@ using FixedDecomps = std::unordered_map<OperatorNode, RuleNode, OperatorNodeHash
 using AltDecomps = std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>;
 
 /**
+ * @brief This returns a copy of the given operator with its adjoint flag.
+ *
+ * Note taht because Adjoint is represented as a boolean flag in the IR,
+ * applying it twice should cancel out (Adjoint(Adjoint(op)) == op).
+ */
+inline OperatorNode makeAdjoint(OperatorNode op)
+{
+    op.adjoint = !op.adjoint;
+    return op;
+}
+
+/**
+ * @brief Constructs the Adjoint decomposition of a base rule.
+ *
+ * Given a rule `output -> {inputs}`, produces `Adjoint(output) -> {Adjoint(input), ...}`
+ * with the same multiplicities: the adjoint of a decomposition is obtained by adjointing
+ * every produced gate (and reversing their order, which does not affect resource/cost counting).
+ */
+inline RuleNode makeAdjointRule(const RuleNode &base)
+{
+    RuleNode adj;
+    adj.name = base.name + "_adjoint";
+    adj.output = makeAdjoint(base.output);
+    adj.origin = RuleOrigin::AdjointGenerated;
+    adj.inputs.reserve(base.inputs.size());
+    for (const auto &term : base.inputs) {
+        adj.inputs.push_back({makeAdjoint(term.op), term.multiplicity});
+    }
+    return adj;
+}
+
+/**
  * @brief This represents the chosen decomposition rule for an operator in
  * the solution of the graph decomposition problem.
  */
@@ -196,6 +229,9 @@ struct ChosenDecompRule {
     std::vector<RuleTerm> inputs;
     double totalCost{0.0};
     std::unordered_map<OperatorNode, std::size_t, OperatorNodeHash> basisCounts;
+
+    // TODO: revisit this after testing..
+    RuleOrigin origin{RuleOrigin::Default};
 };
 
 /**

@@ -51,6 +51,7 @@ ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule)
     solution.isBasis = false;
     solution.inputs = rule.inputs;
     solution.op = rule.output;
+    solution.origin = rule.origin;
 
     double total_cost = 0.0;
     for (const auto &input : rule.inputs) {
