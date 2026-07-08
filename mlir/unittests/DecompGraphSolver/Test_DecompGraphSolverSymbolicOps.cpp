@@ -29,8 +29,7 @@ using namespace Catch::Matchers;
 using namespace DecompGraph::Core;
 using namespace DecompGraph::Solver;
 
-TEST_CASE("Test makeAdjoint and cancels on double application",
-          "[DecompGraph::Core]")
+TEST_CASE("Test makeAdjoint and cancels on double application", "[DecompGraph::Core]")
 {
     const OperatorNode h{"H", 1, 0, false};
     const OperatorNode adjH = makeAdjoint(h);
