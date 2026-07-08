@@ -47,6 +47,8 @@ from catalyst.jax_primitives import (
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.patching import Patcher
 
+from .qref_operator2_primitives import _qref_operator_p_lowering, qref_operator_p
+
 with Patcher(
     (
         _ods_cext,
@@ -821,6 +823,7 @@ def _qref_hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value
 
 
 CUSTOM_LOWERING_RULES = (
+    (qref_operator_p, _qref_operator_p_lowering),
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
     (qref_get_p, _qref_get_lowering),

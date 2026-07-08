@@ -12,34 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "decompose-lowering"
+#include <cstdint>
+#include <string>
+#include <utility>
 
-// When we read the decomposition rules module from file,
-// StablehloDialect may not be registered from start.
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/WalkResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Inliner.h"
 #include "mlir/Transforms/Passes.h"
-#include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/dialect/StablehloOps.h" // When we read the decomposition rules module from file, StablehloDialect may not be registered from start.
 
+#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+
+#define DEBUG_TYPE "decompose-lowering"
 
 using namespace mlir;
 using namespace catalyst::quantum;
 
 namespace catalyst {
 namespace quantum {
+
 #define GEN_PASS_DEF_DECOMPOSELOWERINGPASS
 #define GEN_PASS_DECL_DECOMPOSELOWERINGPASS
 #include "Quantum/Transforms/Passes.h.inc"
@@ -96,9 +109,15 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     // Function to discover and register decomposition functions from a module
     // It's bookkeeping the targetOp and the decomposition function that can decompose the targetOp
     void discoverAndRegisterDecompositions(ModuleOp module,
-                                           llvm::StringMap<func::FuncOp> &decompositionRegistry)
+                                           llvm::StringMap<func::FuncOp> &decompositionRegistry,
+                                           llvm::StringSet<> targetRules)
     {
         module.walk([&](func::FuncOp func) {
+            // if targetRules is provided, only add requested rules
+            if (!targetRules.empty() && !targetRules.contains(func.getName())) {
+                return WalkResult::skip();
+            }
+
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
                 removeUnusedFuncArgs(func);
                 if (targetOp == "MultiRZ") {
@@ -150,82 +169,33 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
                                             f.front().getTerminator()->getOperandTypes()));
     }
 
-    // Remove unused decomposition functions:
-    // Since the decomposition functions are marked as public from the frontend,
-    // there is no way to remove them with any DCE pass automatically.
-    // So we need to manually remove them from the module
-    void removeDecompositionFunctions(ModuleOp module,
-                                      llvm::StringMap<func::FuncOp> &decompositionRegistry)
-    {
-        llvm::DenseSet<func::FuncOp> usedDecompositionFunctions;
-
-        module.walk([&](func::CallOp callOp) {
-            if (auto targetFunc = module.lookupSymbol<func::FuncOp>(callOp.getCallee())) {
-                if (DecompUtils::isDecompositionFunction(targetFunc)) {
-                    usedDecompositionFunctions.insert(targetFunc);
-                }
-            }
-        });
-
-        // remove unused decomposition functions
-        module.walk([&](func::FuncOp func) {
-            if (DecompUtils::isDecompositionFunction(func) &&
-                !usedDecompositionFunctions.contains(func)) {
-                func.erase();
-            }
-            return WalkResult::skip();
-        });
-    }
-
   public:
     void runOnOperation() final
     {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
         // Step 1: Discover and register all decomposition functions in the module
-        discoverAndRegisterDecompositions(module, decompositionRegistry);
+        llvm::StringSet<> targetRules;
+        for (auto rule : targetRulesOption) {
+            targetRules.insert(rule);
+        }
+        discoverAndRegisterDecompositions(module, decompositionRegistry, targetRules);
         if (decompositionRegistry.empty()) {
             return;
         }
 
-        // Step 1.1: Find the target gate set
+        // Step 2: Find the target gate set
         findTargetGateSet(module, targetGateSet);
 
-        // Step 2: Canonicalize the module
-        RewritePatternSet patternsCanonicalization(&getContext());
-        catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
-                                                                 &getContext());
-        if (failed(applyPatternsGreedily(module, std::move(patternsCanonicalization)))) {
-            return signalPassFailure();
-        }
-
-        // Step 3: Apply the decomposition patterns
+        // Step 3: Apply the decomposition patterns, canonicalizing the insert/extract pairs
         RewritePatternSet decompositionPatterns(&getContext());
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
                                           targetGateSet);
-        if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
-            return signalPassFailure();
-        }
-
-        // Step 4: Inline and canonicalize/CSE the module again
-        PassManager pm(&getContext());
-        pm.addPass(createInlinerPass());
-        pm.addPass(createCanonicalizerPass());
-        pm.addPass(createCSEPass());
-        if (failed(pm.run(module))) {
-            return signalPassFailure();
-        }
-
-        // Step 5. Remove redundant decomposition functions
-        removeDecompositionFunctions(module, decompositionRegistry);
-
-        // Step 6. Canonicalize the extract/insert pair
-        RewritePatternSet patternsInsertExtract(&getContext());
-        catalyst::quantum::InsertOp::getCanonicalizationPatterns(patternsInsertExtract,
+        catalyst::quantum::InsertOp::getCanonicalizationPatterns(decompositionPatterns,
                                                                  &getContext());
-        catalyst::quantum::ExtractOp::getCanonicalizationPatterns(patternsInsertExtract,
+        catalyst::quantum::ExtractOp::getCanonicalizationPatterns(decompositionPatterns,
                                                                   &getContext());
-        if (failed(applyPatternsGreedily(module, std::move(patternsInsertExtract)))) {
+        if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
             return signalPassFailure();
         }
     }

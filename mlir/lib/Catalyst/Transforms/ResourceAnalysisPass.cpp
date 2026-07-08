@@ -18,10 +18,12 @@
 #include <string>
 
 #include "llvm/Support/JSON.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "PBC/Utils/PBCLayer.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -74,7 +76,9 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         std::string jsonStr = "";
 
         if (outputJson) {
-            jsonStr = buildJsonString(results);
+            llvm::StringMap<ResourceResult> resultsWithDepth = results;
+            populatePBCDepths(resultsWithDepth, analysis);
+            jsonStr = buildJsonString(resultsWithDepth);
 
             if (outputFname.empty()) {
                 printJsonOutput(jsonStr);
@@ -88,6 +92,40 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     }
 
   private:
+    /// Populate PBC worst-case depth on each function and lifted loop body entry.
+    void populatePBCDepths(llvm::StringMap<ResourceResult> &results,
+                           const ResourceAnalysis &analysis)
+    {
+        // Swallow expected errors
+        // Errors arise when attempting to compute depth of dynamic loops.
+        ScopedDiagnosticHandler depthDiagHandler(
+            getOperation()->getContext(), [](Diagnostic &diag) {
+                if (diag.getSeverity() == DiagnosticSeverity::Error &&
+                    diag.str().find("worst-case depth") != std::string::npos) {
+                    return success();
+                }
+                return failure();
+            });
+
+        // Handle static loop bodies.
+        getOperation()->walk([&](func::FuncOp funcOp) {
+            if (funcOp.isDeclaration()) {
+                return;
+            }
+
+            pbc::PBCLayerContext layerContext;
+            results[funcOp.getName()].pbcDepth =
+                layerContext.computePBCDepth(&funcOp.getBody().front());
+        });
+
+        // Handle dynamic loop bodies.
+        for (const auto &entry : analysis.getSyntheticLoopBodies()) {
+            scf::ForOp forOp = entry.getValue();
+            pbc::PBCLayerContext layerContext;
+            results[entry.getKey()].pbcDepth = layerContext.computePBCDepth(forOp.getBody());
+        }
+    }
+
     /// Sum a ResourceResult's content into the pass's
     /// Statistic counters. Caller is responsible for choosing whether to
     /// pass a per-function or flattened result.
@@ -163,6 +201,12 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         if (result.autoQubitManagement.has_value()) {
             funcObj["auto_qubit_management"] = *result.autoQubitManagement;
         }
+        llvm::json::Object depthObj;
+        if (result.pbcDepth) {
+            depthObj["any_commuting_depth"] = result.pbcDepth->first;
+            depthObj["qubit_disjoint_depth"] = result.pbcDepth->second;
+        }
+        funcObj["depth"] = std::move(depthObj);
 
         return funcObj;
     }

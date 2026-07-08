@@ -5,6 +5,24 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `decompose-lowering` pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
+  The pass also no longer applies the `inline`, `cse` and `canonicalize` passes to avoid unnecessary IR mutations.
+  Instead, decomposition rules are deterministically inlined by a custom function (`inline` is non-deterministic, using an estimated benefit and threshold as criteria for inlining).
+  Decomposition rules are no longer removed after the `decompose-lowering` pass, which allows them to be used by subsequent passes, namely `graph-decomposition`.
+  Instead, rules are removed by the `symbol-dce` pass at the end of the `QuantumCompilationStage`.
+  [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
+
+* The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
+  without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
+  where applicable, unlocking compilation and execution for these cases. `qp.specs` and the
+  `ResourceAnalysis` pass now support the `quantum::OperatorOp` and `qref::OperatorOp` instructions.
+  [(#2979)](https://github.com/PennyLaneAI/catalyst/pull/2979)
+  [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969)
+  [(#2980)](https://github.com/PennyLaneAI/catalyst/pull/2980)
+  [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
+  [(#2993)](https://github.com/PennyLaneAI/catalyst/pull/2993)
+  [(#2998)](https://github.com/PennyLaneAI/catalyst/pull/2998)
+
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
   with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
@@ -14,6 +32,14 @@
 
 * The `ResourceAnalysis` pass now supports IR in reference semantics natively, rather than requiring a conversion step.
   [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
+
+* The `resource-analysis` pass JSON output now includes `depth` for worst-case PBC layer depth
+  (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
+  [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
+
+* The `--adjoint-lowering` pass no longer turns statically bounded for loops into
+  dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
+  [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
 
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.

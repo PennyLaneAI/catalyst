@@ -368,8 +368,6 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
         rGateOp->removeAttr("resultSegmentSizes");
 
         // Properties are not handled via the generic attribute fields, so we set them separately.
-        rGateOp.setOpName(vOperatorOp.getOpName());
-        rGateOp.setAdjoint(vOperatorOp.getAdjoint());
         rGateOp.setUID(vOperatorOp.getUID());
     }
     else {
