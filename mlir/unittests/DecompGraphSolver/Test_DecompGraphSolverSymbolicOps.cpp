@@ -64,8 +64,7 @@ TEST_CASE("Test makeAdjointRule", "[DecompGraph::Core]")
     REQUIRE(adj.inputs[1].multiplicity == 1);
 }
 
-TEST_CASE("Test DecompositionGraph adjoint rules from base rules",
-          "[DecompGraph::Solver]")
+TEST_CASE("Test DecompositionGraph adjoint rules from base rules", "[DecompGraph::Solver]")
 {
     const OperatorNode rot{"Rot", 1, 3, false};
     const OperatorNode rz{"RZ", 1, 1, false};
@@ -97,7 +96,7 @@ TEST_CASE("Test DecompositionGraph does not synthesize adjoint rules for empty o
 
     const WeightedGateset gateset{{{h, 1.0}}};
     const std::vector<RuleNode> rules{
-        {"h_is_basis", h, {}},         // empty rule
+        {"h_is_basis", h, {}},              // empty rule
         {"self_adjoint_H", adjH, {{h, 1}}}, // adjoint output, must not be mirrored!!
     };
 
@@ -149,7 +148,8 @@ TEST_CASE("Test Adjoint: adjoint_rotation (Adjoint(RX) -> RX)", "[DecompGraph::S
     REQUIRE(chosen.basisCounts.at(rx) == 1);
 }
 
-TEST_CASE("Test Adjoint: multiple rules and the solver should pick the cheapest", "[DecompGraph::Solver]")
+TEST_CASE("Test Adjoint: multiple rules and the solver should pick the cheapest",
+          "[DecompGraph::Solver]")
 {
     const OperatorNode rot{"Rot", 1, 3, false};
     const OperatorNode rz{"RZ", 1, 1, false};
