@@ -129,7 +129,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 
         PBCLayerContext layerContext;
         FailureOr<int64_t> depth =
-            layerContext.computeWorstCaseDepth(&funcOp.getBody().front(), onlyDisjointQubit);
+            layerContext.computeBlockWorstCaseDepth(&funcOp.getBody().front(), onlyDisjointQubit);
         if (failed(depth)) {
             return failure();
         }
