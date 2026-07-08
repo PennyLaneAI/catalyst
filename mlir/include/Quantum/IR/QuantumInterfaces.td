@@ -181,7 +181,7 @@ def DifferentiableGate : OpInterface<"DifferentiableGate", [ParametrizedGate]> {
 
 def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
     let description = [{
-        This interface provides a generic way to query decomposition data from a quantum operation.
+        This interface provides a generic way to query decomposition data from a quantum operation. An operation must implement this interface in order to compatible with the `graph-decomposition` pass. Note that implementing this interface does not guarantee that an operation will decomposed successfully, only that it will be registered with the graph.
     }];
 
     let cppNamespace = "::catalyst::quantum";
@@ -192,22 +192,27 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "mlir::TypeRange", "getDynamicShape"
         >,
         InterfaceMethod<
+            "Return the number of wires the operation acts on for each wire argument.",
+            "std::vector<size_t>", "getWireLens"
+        >,
+        InterfaceMethod<
             "Return the values of static data.",
             "mlir::DictionaryAttr", "getStaticData"
         >,
         InterfaceMethod<
-            "Return the operation's ID for use with the graph."
-            "This should be a unique combination of the name and the static data associated with"
-            " the op.",
+            "Return the name of the corresponding PennyLane operator.", "std::string", "getPlName"
+        >,
+        InterfaceMethod<
+            "Return the operation's ID for use with the graph. "
+            "This should be computed by the following convention:\n"
+            "```\n"
+            "if uid:\n"
+            "    uid\n"
+            "else:\n"
+            "    name + {dtype tree of args} + {number of wires per wires arg} + {static data}\n"
+            "```\n"
+            "Note that UID is currently specific to `OperatorOp`s.",
             "std::string", "getDecompId"
-        >,
-        InterfaceMethod<
-            "Return the name of the corresponding PennyLane operator.", "std::string", "getOpName"
-        >,
-        // TODO: change this to vector<size_t> for multiple registers/wire args
-        InterfaceMethod<
-            "Return the number of wires the operation acts on for each wire argument.",
-            "size_t", "getNumWires"
         >
     ];
 }

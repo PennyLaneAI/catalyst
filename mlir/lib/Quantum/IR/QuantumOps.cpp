@@ -1160,3 +1160,23 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// Quantum op interface methods.
+//===----------------------------------------------------------------------===//
+
+mlir::TypeRange PauliRotOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::string PauliRotOp::getDecompId() { return "paulirot" + getPauliWord(); }
+
+std::string PauliRotOp::getPlName() { return "PauliRot"; }
+
+mlir::DictionaryAttr PauliRotOp::getStaticData()
+{
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
+        mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+    return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
+}
+
+std::vector<size_t> PauliRotOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
