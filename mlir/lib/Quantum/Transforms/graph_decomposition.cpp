@@ -12,27 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "graph-decomposition"
+#include <cstdint>
+#include <numeric>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/AsmState.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/OwningOpRef.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
+#include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/QPDLoader.h"
@@ -40,6 +60,8 @@
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
+
+#define DEBUG_TYPE "graph-decomposition"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -135,9 +157,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
 
         ///////////////////////////
-        // Step 5: Re-introduce (all) user rules for future decompositions
+        // Step 5: Re-introduce any missing user rules for future decompositions
+        SymbolTable symbolTable(module);
         for (auto &rule : allUserRules) {
-            module.getBody()->push_back(rule.release());
+            if (!symbolTable.lookup<func::FuncOp>(rule->getName())) {
+                module.getBody()->push_back(rule.release());
+            }
         }
     }
 
