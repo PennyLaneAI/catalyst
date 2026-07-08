@@ -2,6 +2,35 @@
 
 Reference: [OpenQASM 3.0 specification](https://github.com/openqasm/openqasm)
 
+## Frontend: hybrid QASM3 loader (`qasm3_frontend.load_qasm3`)
+
+qiskit's QASM3 importer (`qiskit_qasm3_import`) supports only a subset of the
+grammar (no `const`, `def`, `uint`, casts, arrays, `let`, gate modifiers).
+`load_qasm3()` in [qasm3_frontend.py](../../qasm3_frontend.py) tries qiskit
+first (best dynamic-circuit support), then falls back to a partial evaluator
+on the reference `openqasm3` parser (full grammar) that lowers static
+constructs at compile time: const folding, classical types & casts,
+`def` subroutine inlining (measured-bit returns bind to the assignment
+target), user gate definitions, gate modifiers (`ctrl @`/`negctrl @`/`inv @`/
+`pow(k) @`), `for` unrolling, `let` aliases, register broadcast, and
+`input` values supplied via `load_qasm3(..., inputs={...})`.
+
+**Official spec example coverage: 11/21** translate end-to-end
+(adder, cphase, inverseqft1, inverseqft2, qec, qft, qpt, rb, rus, teleport,
+varteleport). The other 10 fail *cleanly* with the blocker named:
+
+| Reason | Files |
+|---|---|
+| `extern` functions (need a runtime) | gateteleport, scqec, vqe, (also t1) |
+| Hardware timing (`stretch`/`duration`/`delay`/`box`) | alignment, dd, t1 |
+| `defcal` pulse grammar | defcal |
+| Runtime classical arithmetic on measurement results | ipe (angle accumulator feeds gate params) |
+| Out-of-bounds bugs in the spec's own example text | arrays (`my_defined_uints[4]` on size 4), msd (`scratch[3]` on `qubit[3]`) |
+
+No existing library covers these: PennyLane has no QASM3 import, Catalyst's
+frontend only *generates* QASM, and Braket's OpenQASM interpreter is
+simulation-oriented (no reset/extern/feedforward).
+
 This document lists the OpenQASM 3.0 syntax essential for **dynamic circuits**
 (circuits where classical measurement results influence subsequent quantum
 operations), assigns priorities, and records the implementation status in the
@@ -43,22 +72,35 @@ needed for the standard dynamic-circuit patterns in the official spec examples
 through the full pipeline and re-parses as valid QASM3
 (`TestDynamicCircuits::test_official_teleport_roundtrip`).
 
-## P2 — Not implemented (documented for future work)
+## P2 — Handled at compile time by the hybrid frontend
+
+These constructs never reach the MLIR pipeline: `qasm3_frontend` evaluates
+them while building the qiskit circuit (so the emitted QASM3 contains their
+*effects*, not the constructs themselves):
+
+| Syntax | How it is lowered |
+|--------|-------------------|
+| `const`, classical types `int[n]`/`uint[n]`/`float[n]`/`angle[n]`/`bool` | compile-time values; expressions, casts and math functions evaluated |
+| Casts in conditions (`int[2](flags) == 1`) | lowered to register comparisons on the underlying creg |
+| `def` subroutines | inlined; `return b` / `return measure q` binds to the caller's assignment target so measurements land in the right register |
+| User `gate` definitions | built as qiskit gates and inlined by the importer (definition not re-emitted; loses abstraction, keeps semantics) |
+| Gate modifiers `ctrl @`, `negctrl @`, `inv @`, `pow(k) @` | applied via qiskit `.control()`/`.inverse()`/`.power()` then decomposed |
+| `for` over ranges / discrete sets, classical `while` | unrolled (cap 10000) |
+| `let` aliasing, array types, slices, `sizeof` | compile-time evaluation |
+| `input` declarations | values supplied via `load_qasm3(..., inputs={...})` |
+| `gphase` | folded into qiskit `global_phase` |
+| `bit[n] x = "..."` initializers before a runtime `while` | one loop iteration is peeled so the lost initializer cannot skip the loop |
+
+## P2 — Not implemented (frontend raises a clear error)
 
 | Syntax | Notes |
 |--------|-------|
 | `switch (c) { case 0: ... }` | Qiskit `switch_case`; would map to `scf.index_switch` |
 | `break;` / `continue;` | no natural `scf` counterpart; needs restructuring |
-| Classical types `int[n]`, `uint[n]`, `float[n]`, `angle[n]`, `bool`, `complex` | measurement results are raw `i1` SSA values; no classical storage model |
-| Classical arithmetic / casts (`int[2](flags)`, `a += b`) | blocks `qec.qasm`, `rus.qasm`, `adder.qasm` |
-| `def` subroutines with typed params/returns | translator emits only a stub `def name() { ... }` for non-main funcs |
-| Re-emitting user `gate` definitions | definitions are inlined instead (semantically equivalent, loses abstraction) |
-| Gate modifiers `ctrl @`, `negctrl @`, `inv @`, `pow(k) @` | importer flattens controlled ops to named gates (`cx`, ...) |
-| `input` / `output` variables | |
-| Timing: `delay`, `duration`, `stretch`, `box`, `defcal`, `durationof` | hardware-level; out of compiler scope for now |
-| `let` aliasing, array views | |
-| `gphase` | `quantum.gphase` exists in the dialect but is not translated |
-| `while` on classical expressions other than register-bit tests | condition must be derived from measured bits |
+| *Runtime* classical arithmetic on measurement results (`c <<= 1`, bool algebra on bits, measuring into `angle[n]`) | no representation in qiskit or the MLIR pipeline; blocks `ipe.qasm`, `msd.qasm` |
+| `extern` functions | require a runtime implementation by definition; blocks `gateteleport`, `scqec`, `vqe`, `t1` |
+| `output` variables | declared but treated as plain registers |
+| Timing: `delay`, `duration`, `stretch`, `box`, `defcal`, `durationof` | hardware-level; out of compiler scope; blocks `alignment`, `dd`, `t1`, `defcal` |
 
 ## Implementation notes & caveats
 
@@ -83,6 +125,13 @@ through the full pipeline and re-parses as valid QASM3
   single `bit` to `1`, but `qiskit_qasm3_import` only accepts `== true` for
   single bits. Our emitted conditions use bare `c[0]` / `!c[0]` forms, which
   both accept.
+- **Register-comparison reconstruction**: the translator rebuilds whole-
+  register comparisons (`if (c == 2)`, `while (flags != 0)`) from the
+  importer's bit-level AND-folds when all conjuncts test the same creg —
+  matching spec style and keeping the output parseable by qiskit (whose
+  importer rejects `&&`). Note qiskit's importer still rejects `!=` register
+  comparisons; that form is validated against the reference `openqasm3`
+  grammar instead.
 
 ## Test entry points
 

@@ -21,6 +21,7 @@ try:
         StringAttr,
         SymbolTable,
         Type,
+        UnitAttr,
     )
 except ImportError:
     # Error out if mlir not found
@@ -317,13 +318,18 @@ class QiskitToCatalystImporter:
 
         conditions = []
         for bit_idx, clbit in enumerate(bits):
+            expected = (value >> bit_idx) & 1
             if clbit not in self.clbit_map:
                 if skip_unmeasured:
                     continue
-                raise CompileError(
-                    f"Classical bit {clbit} used in condition but not measured previously"
-                )
-            expected = (value >> bit_idx) & 1
+                # QASM3 bits default to 0 until measured: an expected-0 test
+                # on an unmeasured bit is trivially true (skip); an expected-1
+                # test makes the whole conjunction constant false.
+                if expected == 0:
+                    continue
+                return arith.ConstantOp(
+                    i1_type, IntegerAttr.get(i1_type, 0), loc=loc
+                ).result
             measured = self.clbit_map[clbit]
             if expected == 0:
                 one = arith.ConstantOp(i1_type, IntegerAttr.get(i1_type, 1), loc=loc).result
@@ -336,6 +342,12 @@ class QiskitToCatalystImporter:
         cond = conditions[0]
         for c in conditions[1:]:
             cond = arith.AndIOp(cond, c, loc=loc).result
+        if len(conditions) > 1:
+            # Mark this conjunction as a register-equality fold so the QASM3
+            # translator may soundly reconstruct `reg == value` from it.
+            # Generic logic ANDs (e.g. c[0] && c[1] on a wider register) must
+            # NOT carry this tag — they don't constrain unmentioned bits.
+            cond.owner.attributes["qasm3_creg_eq"] = UnitAttr.get(self.ctx)
         return cond
 
     def _emit_conditional_gate(self, op, qubits, loc):
@@ -373,11 +385,7 @@ class QiskitToCatalystImporter:
         expressions (qiskit.circuit.classical.expr) are not supported (P2).
         """
         if condition is not None:
-            target, value = self._unpack_condition(condition)
-            cond = self._build_condition_value(target, value, loc)
-            if cond is None:
-                raise CompileError("Control-flow condition has no classical bits")
-            return cond
+            return self._build_condition(condition, loc)
 
         if not clbits:
             raise CompileError("if_else instruction requires classical bits for condition")
@@ -400,6 +408,120 @@ class QiskitToCatalystImporter:
                 "(Clbit|ClassicalRegister, value) conditions are supported"
             )
         return target, value
+
+    def _build_condition(self, condition, loc):
+        """Lower a control-flow condition — (Clbit|ClassicalRegister, value)
+        tuple or qiskit classical expr tree — to a single i1 SSA value."""
+        if isinstance(condition, tuple):
+            target, value = self._unpack_condition(condition)
+            cond = self._build_condition_value(target, value, loc)
+            if cond is None:
+                raise CompileError("Control-flow condition has no classical bits")
+            return cond
+        return self._condition_from_expr(condition, loc)
+
+    def _condition_clbits(self, condition):
+        """Ordered, deduplicated clbits a condition depends on."""
+        bits = []
+        if isinstance(condition, tuple):
+            target, _ = self._unpack_condition(condition)
+            bits = [target] if isinstance(target, Clbit) else list(target)
+        else:
+            from qiskit.circuit.classical import expr as qexpr
+
+            def walk(n):
+                if isinstance(n, qexpr.Var):
+                    t = n.var
+                    bits.extend([t] if isinstance(t, Clbit) else list(t))
+                elif isinstance(n, qexpr.Unary):
+                    walk(n.operand)
+                elif isinstance(n, qexpr.Binary):
+                    walk(n.left)
+                    walk(n.right)
+
+            walk(condition)
+        seen, ordered = set(), []
+        for b in bits:
+            if b not in seen:
+                seen.add(b)
+                ordered.append(b)
+        return ordered
+
+    def _condition_from_expr(self, node, loc):
+        """Lower a qiskit classical expr tree (qiskit.circuit.classical.expr)
+        to a single i1 SSA value. Supports Var(clbit/creg), Value, unary
+        BIT_NOT/LOGIC_NOT, and binary EQUAL/NOT_EQUAL/LOGIC_AND/LOGIC_OR."""
+        from qiskit.circuit.classical import expr as qexpr
+
+        i1_type = IntegerType.get_signless(1, self.ctx)
+
+        def negate(val):
+            one = arith.ConstantOp(i1_type, IntegerAttr.get(i1_type, 1), loc=loc).result
+            return arith.XOrIOp(val, one, loc=loc).result
+
+        def lower(n):
+            if isinstance(n, qexpr.Var):
+                target = n.var
+                if isinstance(target, Clbit):
+                    if target not in self.clbit_map:
+                        raise CompileError(
+                            f"Classical bit {target} used in condition but not "
+                            "measured previously"
+                        )
+                    return ("bit", self.clbit_map[target])
+                return ("reg", target)
+            if isinstance(n, qexpr.Value):
+                return ("const", int(n.value))
+            if isinstance(n, qexpr.Unary):
+                if n.op in (qexpr.Unary.Op.BIT_NOT, qexpr.Unary.Op.LOGIC_NOT):
+                    kind, operand = lower(n.operand)
+                    if kind != "bit":
+                        raise CompileError("NOT on non-bit expr condition")
+                    return ("bit", negate(operand))
+                raise CompileError(f"Unsupported unary expr op: {n.op}")
+            if isinstance(n, qexpr.Binary):
+                op = n.op
+                if op in (qexpr.Binary.Op.EQUAL, qexpr.Binary.Op.NOT_EQUAL):
+                    lhs, rhs = lower(n.left), lower(n.right)
+                    if lhs[0] == "const":
+                        lhs, rhs = rhs, lhs
+                    if rhs[0] != "const":
+                        raise CompileError(
+                            "expr comparison requires one constant side"
+                        )
+                    value = rhs[1]
+                    if lhs[0] == "reg":
+                        cond = self._build_condition_value(lhs[1], value, loc)
+                        if cond is None:
+                            raise CompileError("expr condition has no bits")
+                    else:
+                        cond = lhs[1]
+                        if value == 0:
+                            cond = negate(cond)
+                    if op == qexpr.Binary.Op.NOT_EQUAL:
+                        cond = negate(cond)
+                    return ("bit", cond)
+                if op in (qexpr.Binary.Op.LOGIC_AND, qexpr.Binary.Op.LOGIC_OR):
+                    lk, lv = lower(n.left)
+                    rk, rv = lower(n.right)
+                    if lk != "bit" or rk != "bit":
+                        raise CompileError("logic expr requires bit operands")
+                    if op == qexpr.Binary.Op.LOGIC_AND:
+                        return ("bit", arith.AndIOp(lv, rv, loc=loc).result)
+                    return ("bit", arith.OrIOp(lv, rv, loc=loc).result)
+                raise CompileError(f"Unsupported binary expr op: {op}")
+            raise CompileError(f"Unsupported expr node: {type(n).__name__}")
+
+        kind, val = lower(node)
+        if kind == "reg":
+            # Bare register truthiness: reg != 0
+            cond = self._build_condition_value(val, 0, loc)
+            if cond is None:
+                raise CompileError("expr condition has no bits")
+            return negate(cond)
+        if kind == "const":
+            raise CompileError("Constant-only expr condition is not supported")
+        return val
 
     def _emit_if_else(self, op, qubits, clbits, loc):
         # op.params = [true_body, false_body]
@@ -453,8 +575,7 @@ class QiskitToCatalystImporter:
         condition = getattr(op, "condition", None)
         if condition is None:
             raise CompileError("while_loop instruction requires a condition")
-        target, value = self._unpack_condition(condition)
-        cond_clbits = [target] if isinstance(target, Clbit) else list(target)
+        cond_clbits = self._condition_clbits(condition)
 
         for cb in cond_clbits:
             if cb not in self.clbit_map:
@@ -495,22 +616,16 @@ class QiskitToCatalystImporter:
         after_block = while_op.after.blocks[0]
 
         # Before region: rebuild the boolean from the loop-carried clbits and
-        # forward ALL arguments to the after region.
+        # forward ALL arguments to the after region. The clbit_map is
+        # temporarily rebound to the block arguments so the generic condition
+        # builder (tuple or expr form) reads loop-carried values.
         with InsertionPoint(before_block):
             before_args = list(before_block.arguments)
-            conditions = []
-            for bit_idx in range(len(cond_clbits)):
-                expected = (value >> bit_idx) & 1
-                measured = before_args[bit_idx]
-                if expected == 0:
-                    one = arith.ConstantOp(
-                        i1_type, IntegerAttr.get(i1_type, 1), loc=loc
-                    ).result
-                    measured = arith.XOrIOp(measured, one, loc=loc).result
-                conditions.append(measured)
-            cond = conditions[0]
-            for c in conditions[1:]:
-                cond = arith.AndIOp(cond, c, loc=loc).result
+            saved_clbit_map = self.clbit_map.copy()
+            for i, cb in enumerate(cond_clbits):
+                self.clbit_map[cb] = before_args[i]
+            cond = self._build_condition(condition, loc)
+            self.clbit_map = saved_clbit_map
             scf.ConditionOp(cond, before_args, loc=loc)
 
         # After region (loop body): rebind maps to block arguments, process the

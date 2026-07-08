@@ -614,8 +614,9 @@ class TestDynamicCircuits:
         qasm3 = self.pipeline_from_circuit(
             self.register_condition_circuit(), quantum_opt_path, quantum_translate_path, optimize
         )
-        # c == 2 is AND-folded bitwise: !c[0] && c[1]
-        assert "if ((!c[0] && c[1]))" in qasm3
+        # c == 2 is AND-folded bitwise in MLIR; the translator reconstructs
+        # the whole-register comparison.
+        assert "if (c == 2)" in qasm3
 
     @pytest.mark.parametrize("optimize", [False, True])
     def test_while_loop(self, quantum_opt_path, quantum_translate_path, optimize):
@@ -653,6 +654,34 @@ class TestDynamicCircuits:
         agg2 = aggregate_by_hamming_weight(counts2)
         distance = hellinger_distance(agg1, agg2, shots)
         assert distance < 0.1, f"Hellinger distance too high: {distance}"
+
+    @pytest.mark.parametrize("optimize", [False, True])
+    def test_logic_and_is_not_register_equality(
+        self, quantum_opt_path, quantum_translate_path, optimize
+    ):
+        """A generic logic AND of two bits on a WIDER register must stay a
+        conjunction — rewriting it to `c == 3` would wrongly assert the
+        unmentioned bit is 0. Only importer-tagged equality folds may be
+        reconstructed as whole-register comparisons."""
+        from qiskit import ClassicalRegister, QuantumRegister
+        from qiskit.circuit.classical import expr
+
+        q = QuantumRegister(4, "q")
+        c = ClassicalRegister(3, "c")
+        qc = QuantumCircuit(q, c)
+        qc.h(0)
+        qc.h(1)
+        qc.h(2)
+        qc.measure(0, 0)
+        qc.measure(1, 1)
+        qc.measure(2, 2)
+        with qc.if_test(expr.logic_and(expr.lift(c[0]), expr.lift(c[1]))):
+            qc.x(3)
+        qc.measure(3, 0)
+
+        qasm3 = self.pipeline_from_circuit(qc, quantum_opt_path, quantum_translate_path, optimize)
+        assert "if ((c[0] && c[1])) {" in qasm3
+        assert "c == 3" not in qasm3
 
     @pytest.mark.parametrize("optimize", [False, True])
     def test_while_body_measures_other_clbit(
@@ -719,6 +748,110 @@ class TestDynamicCircuits:
         counts2 = sim.run(translated, shots=shots).result().get_counts()
         assert set(counts1) == {"0"}
         assert set(counts2) == {"0"}
+
+
+class TestHybridFrontend:
+    """The hybrid QASM3 loader (qasm3_frontend.load_qasm3): qiskit fast path
+    plus the openqasm3-AST partial evaluator for constructs qiskit rejects."""
+
+    # Official spec examples that must translate through the full pipeline.
+    SUPPORTED = [
+        "adder.qasm", "cphase.qasm", "inverseqft1.qasm", "inverseqft2.qasm",
+        "qec.qasm", "qft.qasm", "qpt.qasm", "rb.qasm", "rus.qasm",
+        "teleport.qasm", "varteleport.qasm",
+    ]
+    # Files that must fail cleanly, with the named blocker in the error.
+    UNSUPPORTED = {
+        "alignment.qasm": "Stretch",
+        "dd.qasm": "Stretch",
+        "t1.qasm": "Duration",
+        "defcal.qasm": "defcal",
+        "gateteleport.qasm": "extern",
+        "scqec.qasm": "extern",
+        "vqe.qasm": "extern",
+        "ipe.qasm": "bit or bit register",
+        # arrays.qasm and msd.qasm contain genuine out-of-bounds accesses in
+        # the spec's own text (my_defined_uints[4] on size 4; scratch[3] on
+        # qubit[3]).
+        "arrays.qasm": "out of bounds",
+        "msd.qasm": "out of bounds",
+    }
+    INPUTS = {"msd.qasm": {"level": 1}}
+
+    @staticmethod
+    def examples_dir():
+        return Path(__file__).parent / "openqasm3_official_example"
+
+    def full_pipeline(self, qc, quantum_opt_path, quantum_translate_path):
+        from qiskit_importer_standalone import QiskitToCatalystImporter
+
+        importer = QiskitToCatalystImporter(qc)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mlir", delete=False) as tmp:
+            tmp.write(str(importer.convert()))
+            tmp_path = tmp.name
+        # NOTE: -o must not target the input file — quantum-opt mmaps its
+        # input, and overwriting it in place SIGBUSes on larger modules.
+        opt_path = tmp_path + ".opt.mlir"
+        subprocess.run(
+            [str(quantum_opt_path),
+             "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
+             tmp_path, "-o", opt_path],
+            capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            [str(quantum_translate_path), "--mlir-to-qasm3", opt_path],
+            capture_output=True, text=True, check=True)
+        Path(tmp_path).unlink()
+        Path(opt_path).unlink()
+        return result.stdout
+
+    @pytest.mark.parametrize("filename", SUPPORTED)
+    def test_official_example_translates(
+        self, quantum_opt_path, quantum_translate_path, filename
+    ):
+        import openqasm3
+
+        from qasm3_frontend import load_qasm3
+
+        src = (self.examples_dir() / filename).read_text()
+        qc = load_qasm3(src, inputs=self.INPUTS.get(filename))
+        qasm3 = self.full_pipeline(qc, quantum_opt_path, quantum_translate_path)
+        assert "OPENQASM 3.0;" in qasm3
+        assert "unknown_cond" not in qasm3
+        # The emitted program must be grammatically valid QASM3.
+        openqasm3.parse(qasm3)
+
+    @pytest.mark.parametrize("filename", sorted(UNSUPPORTED))
+    def test_official_example_unsupported_reason(self, filename):
+        from qasm3_frontend import QASM3FrontendError, load_qasm3
+
+        src = (self.examples_dir() / filename).read_text()
+        with pytest.raises(QASM3FrontendError) as excinfo:
+            load_qasm3(src, inputs=self.INPUTS.get(filename))
+        assert self.UNSUPPORTED[filename].lower() in str(excinfo.value).lower()
+
+    def test_qiskit_fast_path_still_used(self):
+        """Programs qiskit can parse must go through qiskit (dynamic-circuit
+        support is better there)."""
+        from qasm3_frontend import load_qasm3
+
+        qc = load_qasm3(
+            'OPENQASM 3.0;\ninclude "stdgates.inc";\n'
+            "qubit[2] q;\nbit[2] c;\nh q[0];\ncx q[0], q[1];\n"
+            "c[0] = measure q[0];\nc[1] = measure q[1];\n"
+        )
+        assert qc.num_qubits == 2
+
+    def test_input_values_required(self):
+        from qasm3_frontend import QASM3FrontendError, load_qasm3
+
+        src = ('OPENQASM 3.0;\ninclude "stdgates.inc";\n'
+               "input uint[4] a_in;\nqubit[4] q;\n"
+               "for uint i in [0:3] { if (bool(a_in[i])) x q[i]; }\n")
+        with pytest.raises(QASM3FrontendError, match="input 'a_in'"):
+            load_qasm3(src)
+        qc = load_qasm3(src, inputs={"a_in": 5})
+        # bits 0 and 2 of 5 are set -> two x gates
+        assert sum(1 for inst in qc.data if inst.operation.name == "x") == 2
 
 
 if __name__ == "__main__":

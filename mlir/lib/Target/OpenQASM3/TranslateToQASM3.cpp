@@ -219,6 +219,67 @@ class QASM3Emitter {
         return success();
     }
 
+    static bool splitBitName(const std::string &s, std::string &reg, int64_t &idx)
+    {
+        auto lb = s.find('[');
+        auto rb = s.find(']');
+        if (lb == std::string::npos || rb == std::string::npos || rb != s.size() - 1 ||
+            rb <= lb + 1)
+            return false;
+        std::string digits = s.substr(lb + 1, rb - lb - 1);
+        for (char c : digits)
+            if (!isdigit(c))
+                return false;
+        reg = s.substr(0, lb);
+        idx = std::stoll(digits);
+        return true;
+    }
+
+    // Try to reconstruct a whole-register comparison (reg == k) from a
+    // conjunction of per-bit tests (c[i] / !c[i]) over one classical
+    // register. Returns the number of matched leaves (0 = no match).
+    int matchRegisterEquality(Value v, std::string &regName, int64_t &k)
+    {
+        if (auto andOp = v.getDefiningOp<arith::AndIOp>()) {
+            int l = matchRegisterEquality(andOp.getLhs(), regName, k);
+            if (!l)
+                return 0;
+            int r = matchRegisterEquality(andOp.getRhs(), regName, k);
+            return r ? l + r : 0;
+        }
+        bool negated = false;
+        Value leaf = v;
+        if (auto xorOp = v.getDefiningOp<arith::XOrIOp>()) {
+            auto isTrueConst = [](Value c) {
+                if (auto cOp = c.getDefiningOp<arith::ConstantOp>())
+                    if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue()))
+                        return !intAttr.getValue().isZero();
+                return false;
+            };
+            if (isTrueConst(xorOp.getRhs())) {
+                negated = true;
+                leaf = xorOp.getLhs();
+            }
+            else if (isTrueConst(xorOp.getLhs())) {
+                negated = true;
+                leaf = xorOp.getRhs();
+            }
+        }
+        if (!bitMap.count(leaf))
+            return 0;
+        std::string reg;
+        int64_t idx;
+        if (!splitBitName(bitMap[leaf], reg, idx))
+            return 0;
+        if (regName.empty())
+            regName = reg;
+        else if (regName != reg)
+            return 0;
+        if (!negated)
+            k |= (int64_t(1) << idx);
+        return 1;
+    }
+
     // Recursively translate a classical i1/int SSA value into a QASM3
     // condition expression. Supports measurement bits, constants, negation
     // (arith.xori with 1), conjunction/disjunction, and eq/ne comparisons.
@@ -258,6 +319,19 @@ class QASM3Emitter {
             else if ((c = getConst(xorOp.getLhs())))
                 other = xorOp.getRhs();
             if (c) {
+                if (*c) {
+                    // Negated register equality reads as a != comparison.
+                    // Only folds the importer tagged as equality tests may be
+                    // reconstructed; generic conjunctions don't constrain
+                    // unmentioned register bits.
+                    Operation *innerDef = other.getDefiningOp();
+                    if (innerDef && innerDef->hasAttr("qasm3_creg_eq")) {
+                        std::string reg;
+                        int64_t k = 0;
+                        if (matchRegisterEquality(other, reg, k) >= 2)
+                            return reg + " != " + std::to_string(k);
+                    }
+                }
                 std::string inner = buildCondExpr(other);
                 if (!*c)
                     return inner;
@@ -265,9 +339,20 @@ class QASM3Emitter {
             }
         }
 
-        if (auto andOp = dyn_cast<arith::AndIOp>(def))
+        if (auto andOp = dyn_cast<arith::AndIOp>(def)) {
+            // Prefer a whole-register comparison over a bit-by-bit conjunction,
+            // but only for folds the importer tagged as register-equality
+            // tests (`qasm3_creg_eq`) — a generic `c[0] && c[1]` conjunction
+            // does not constrain the register's unmentioned bits.
+            if (def->hasAttr("qasm3_creg_eq")) {
+                std::string reg;
+                int64_t k = 0;
+                if (matchRegisterEquality(v, reg, k) >= 2)
+                    return reg + " == " + std::to_string(k);
+            }
             return "(" + buildCondExpr(andOp.getLhs()) + " && " + buildCondExpr(andOp.getRhs()) +
                    ")";
+        }
 
         if (auto orOp = dyn_cast<arith::OrIOp>(def))
             return "(" + buildCondExpr(orOp.getLhs()) + " || " + buildCondExpr(orOp.getRhs()) +

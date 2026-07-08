@@ -22,10 +22,11 @@ func.func @main() {
 
     %true = arith.constant true
 
-    // Register value test c == 2 lowered bitwise: !c[0] && c[1]
-    // CHECK: if ((!c[0] && c[1])) {
+    // A conjunction tagged by the importer as a register-equality fold
+    // (qasm3_creg_eq) is reconstructed as a whole-register comparison.
+    // CHECK: if (c == 2) {
     %n0 = arith.xori %m0, %true : i1
-    %and = arith.andi %n0, %m1 : i1
+    %and = arith.andi %n0, %m1 {qasm3_creg_eq} : i1
     %q2_a = scf.if %and -> !quantum.bit {
         %q2_x = quantum.custom "x"() %q2 : !quantum.bit
         scf.yield %q2_x : !quantum.bit
@@ -33,13 +34,24 @@ func.func @main() {
         scf.yield %q2 : !quantum.bit
     }
 
+    // An UNTAGGED conjunction is a generic logic AND: it must NOT become a
+    // register comparison (it says nothing about unmentioned bits).
+    // CHECK: if ((c[0] && c[1])) {
+    %and2 = arith.andi %m0, %m1 : i1
+    %q2_a2 = scf.if %and2 -> !quantum.bit {
+        %q2_y = quantum.custom "y"() %q2_a : !quantum.bit
+        scf.yield %q2_y : !quantum.bit
+    } else {
+        scf.yield %q2_a : !quantum.bit
+    }
+
     // CHECK: if ((c[0] || c[1])) {
     %or = arith.ori %m0, %m1 : i1
     %q2_b = scf.if %or -> !quantum.bit {
-        %q2_z = quantum.custom "z"() %q2_a : !quantum.bit
+        %q2_z = quantum.custom "z"() %q2_a2 : !quantum.bit
         scf.yield %q2_z : !quantum.bit
     } else {
-        scf.yield %q2_a : !quantum.bit
+        scf.yield %q2_a2 : !quantum.bit
     }
 
     // CHECK: if (c[0] == 1) {
