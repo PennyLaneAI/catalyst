@@ -875,7 +875,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         Args:
             used_init_states (set[str]): the init_states used in the circuit being compiled.
-                The function will create only the subroutines relevant to the current circuit.
+                The function will create only the subroutines relevant to the current circuit. If
+                an empty set is given, the function returns an empty dictionary.
 
         The encoding process follows the third option for magic state encoding described in
         https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that when using it to
@@ -892,6 +893,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         Note that this method does not insert the subroutine into the module op. Instead it
         returns the built func.FuncOp object that can then be subsequently inserted where desired.
         """
+        if not used_init_states:
+            return {}
+
         unitary_encoding_info = self.qec_code.unitary_encoding
 
         required_keys = {"state_prep_index", "ops"}

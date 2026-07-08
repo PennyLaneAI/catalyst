@@ -59,7 +59,7 @@ def fixture_get_generic_qec_code():
         z_tanner=None,
         transversal_1q_gates: dict[str, tuple[str, ...]] | None = None,
         transversal_2q_gates: dict[str, str] | None = None,
-        unitary_encoding=None,
+        unitary_encoding: dict = {},
     ) -> QecCode:
         rng = np.random.default_rng(seed=42)
 
@@ -80,17 +80,6 @@ def fixture_get_generic_qec_code():
 
         if transversal_2q_gates is None:
             transversal_2q_gates = {"cnot": "CNOT"}
-
-        if unitary_encoding is None:
-            hadamard_ops = tuple(("H", [i]) for i in range(n) if i % 2)
-            cnot_ops = tuple(("CNOT", [i, i + 1]) for i in range(n - 1))
-
-            unitary_encoding = {
-                "state_prep_index": rng.integers(n),
-                "ops": [hadamard_ops, cnot_ops],
-                # "hadamard_indices": [i for i in range(n) if i % 2],
-                # "cnot_indices": [[i, i + 1] for i in range(n - 1)],
-            }
 
         return QecCode(
             name=name,
