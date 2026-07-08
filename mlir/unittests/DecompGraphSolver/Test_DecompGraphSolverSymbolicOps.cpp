@@ -63,3 +63,166 @@ TEST_CASE("Test makeAdjointRule", "[DecompGraph::Core]")
     REQUIRE(adj.inputs[1].op == makeAdjoint(ry));
     REQUIRE(adj.inputs[1].multiplicity == 1);
 }
+
+TEST_CASE("Test DecompositionGraph adjoint rules from base rules",
+          "[DecompGraph::Solver]")
+{
+    const OperatorNode rot{"Rot", 1, 3, false};
+    const OperatorNode rz{"RZ", 1, 1, false};
+    const OperatorNode ry{"RY", 1, 1, false};
+
+    const WeightedGateset gateset{{{rz, 1.0}, {ry, 1.0}}};
+    const std::vector<RuleNode> rules{{"rot_decomp", rot, {{rz, 2}, {ry, 1}}}};
+
+    // Adjoint(Rot) is a root, so the builder should synthesize its adjoint decomposition
+    const DecompositionGraph graph({makeAdjoint(rot)}, gateset, rules);
+
+    REQUIRE(graph.getNumRules() == 2);
+    REQUIRE(graph.hasOperator(makeAdjoint(rot)));
+
+    const auto &adjRules = graph.getAllRulesFor(makeAdjoint(rot));
+    REQUIRE(adjRules.size() == 1);
+    REQUIRE(adjRules[0].name == "rot_decomp_adjoint");
+    REQUIRE(adjRules[0].origin == RuleOrigin::AdjointGenerated);
+    REQUIRE(adjRules[0].output == makeAdjoint(rot));
+    REQUIRE(adjRules[0].inputs[0].op == makeAdjoint(rz));
+    REQUIRE(adjRules[0].inputs[1].op == makeAdjoint(ry));
+}
+
+TEST_CASE("Test DecompositionGraph does not synthesize adjoint rules for empty or adjoint rules",
+          "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H", 1, 0, false};
+    const OperatorNode adjH = makeAdjoint(h);
+
+    const WeightedGateset gateset{{{h, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"h_is_basis", h, {}},         // empty rule
+        {"self_adjoint_H", adjH, {{h, 1}}}, // adjoint output, must not be mirrored!!
+    };
+
+    const DecompositionGraph graph({h}, gateset, rules);
+
+    REQUIRE(graph.getNumRules() == 2);
+    REQUIRE(graph.getAllRulesFor(adjH).size() == 1);
+    REQUIRE(graph.getAllRulesFor(adjH)[0].name == "self_adjoint_H");
+}
+
+TEST_CASE("Test Adjoint: self_adjoint (Adjoint(H) -> H)", "[DecompGraph::Solver]")
+{
+    const OperatorNode h{"H", 1, 0, false};
+    const OperatorNode adjH = makeAdjoint(h);
+
+    const WeightedGateset gateset{{{h, 1.0}}};
+    const std::vector<RuleNode> rules{{"self_adjoint_H", adjH, {{h, 1}}}};
+
+    const DecompositionGraph graph({adjH}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.find(adjH) != result.end());
+    const auto &chosen = result.at(adjH);
+    REQUIRE_FALSE(chosen.isBasis);
+    REQUIRE(chosen.ruleName == "self_adjoint_H");
+    REQUIRE(chosen.origin == RuleOrigin::Default);
+    REQUIRE(chosen.totalCost == 1.0);
+    REQUIRE(chosen.basisCounts.at(h) == 1);
+
+    REQUIRE(graph.getAllRulesFor(adjH).size() == 1);
+}
+
+TEST_CASE("Test Adjoint: adjoint_rotation (Adjoint(RX) -> RX)", "[DecompGraph::Solver]")
+{
+    const OperatorNode rx{"RX", 1, 1, false};
+    const OperatorNode adjRX = makeAdjoint(rx);
+
+    const WeightedGateset gateset{{{rx, 1.0}}};
+    const std::vector<RuleNode> rules{{"adjoint_rotation_RX", adjRX, {{rx, 1}}}};
+
+    const DecompositionGraph graph({adjRX}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    const auto &chosen = result.at(adjRX);
+    REQUIRE(chosen.ruleName == "adjoint_rotation_RX");
+    REQUIRE(chosen.totalCost == 1.0);
+    REQUIRE(chosen.basisCounts.at(rx) == 1);
+}
+
+TEST_CASE("Test Adjoint: multiple rules and the solver should pick the cheapest", "[DecompGraph::Solver]")
+{
+    const OperatorNode rot{"Rot", 1, 3, false};
+    const OperatorNode rz{"RZ", 1, 1, false};
+    const OperatorNode ry{"RY", 1, 1, false};
+    const OperatorNode e{"E", 1, 0, false};
+
+    const std::vector<RuleNode> commonRules{
+        {"rot_decomp", rot, {{rz, 2}, {ry, 1}}},
+        {"adjoint_rotation_RZ", makeAdjoint(rz), {{rz, 1}}},
+        {"adjoint_rotation_RY", makeAdjoint(ry), {{ry, 1}}},
+    };
+
+    SECTION("rot_decomp_adjoint is cheaper")
+    {
+        const WeightedGateset gateset{{{rz, 1.0}, {ry, 1.0}, {e, 10.0}}};
+        std::vector<RuleNode> rules = commonRules;
+        rules.push_back({"_adjoint_rot", makeAdjoint(rot), {{e, 1}}}); // cost 10
+
+        const DecompositionGraph graph({makeAdjoint(rot)}, gateset, rules);
+
+        // Both an explicit adjoint rule and the synthesized one exist for Adjoint(Rot).
+        REQUIRE(graph.getAllRulesFor(makeAdjoint(rot)).size() == 2);
+
+        DecompositionSolver solver(graph);
+        const auto result = solver.solve();
+        const auto &chosen = result.at(makeAdjoint(rot));
+        REQUIRE(chosen.ruleName == "rot_decomp_adjoint");
+        REQUIRE(chosen.origin == RuleOrigin::AdjointGenerated);
+        REQUIRE(chosen.totalCost == 3.0);
+        REQUIRE(chosen.basisCounts.at(rz) == 2);
+        REQUIRE(chosen.basisCounts.at(ry) == 1);
+    }
+
+    SECTION("_adjoint_rot is cheaper")
+    {
+        const WeightedGateset gateset{{{rz, 1.0}, {ry, 1.0}}};
+        std::vector<RuleNode> rules = commonRules;
+        rules.push_back({"_adjoint_rot", makeAdjoint(rot), {{rz, 1}}}); // cost 1
+
+        const DecompositionGraph graph({makeAdjoint(rot)}, gateset, rules);
+        DecompositionSolver solver(graph);
+        const auto result = solver.solve();
+        const auto &chosen = result.at(makeAdjoint(rot));
+        REQUIRE(chosen.ruleName == "_adjoint_rot");
+        REQUIRE(chosen.origin == RuleOrigin::Default);
+        REQUIRE(chosen.totalCost == 1.0);
+    }
+}
+
+TEST_CASE("Test Adjoint: adjoint pushed through a decomposition", "[DecompGraph::Solver]")
+{
+    const OperatorNode myOp{"MyOp", 2, 0, false};
+    const OperatorNode a{"A", 1, 0, false};
+    const OperatorNode b{"B", 1, 0, false};
+
+    const WeightedGateset gateset{{{a, 1.0}, {b, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"myop_decomp", myOp, {{a, 1}, {b, 1}}},
+        // Define self_adjoint rules so the adjointed produced gates can resolve:
+        {"self_adjoint_A", makeAdjoint(a), {{a, 1}}},
+        {"self_adjoint_B", makeAdjoint(b), {{b, 1}}},
+    };
+
+    const DecompositionGraph graph({makeAdjoint(myOp)}, gateset, rules);
+
+    REQUIRE(graph.getAllRulesFor(makeAdjoint(myOp)).size() == 1);
+
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+    const auto &chosen = result.at(makeAdjoint(myOp));
+    REQUIRE(chosen.ruleName == "myop_decomp_adjoint");
+    REQUIRE(chosen.origin == RuleOrigin::AdjointGenerated);
+    REQUIRE(chosen.totalCost == 2.0);
+    REQUIRE(chosen.basisCounts.at(a) == 1);
+    REQUIRE(chosen.basisCounts.at(b) == 1);
+}
