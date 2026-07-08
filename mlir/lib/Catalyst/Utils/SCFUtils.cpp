@@ -13,10 +13,13 @@
 // limitations under the License.
 
 #include <cmath> // std::ceil()
+#include <optional>
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
+
+#include "Catalyst/Utils/ConstantResolve.h"
 
 using namespace mlir;
 
@@ -69,6 +72,23 @@ int64_t countStaticForOpIterations(scf::ForOp forOp)
     int64_t s = getIntFromArithConstantOp(cast<arith::ConstantOp>(stepOp));
 
     return getNumIterations(l, u, s);
+}
+
+std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp)
+{
+    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
+        return estAttr.getValue().getSExtValue();
+    }
+    if (auto staticTrip = forOp.getStaticTripCount()) {
+        return staticTrip->getSExtValue();
+    }
+    auto lb = resolveConstantInt(forOp.getLowerBound());
+    auto ub = resolveConstantInt(forOp.getUpperBound());
+    auto step = resolveConstantInt(forOp.getStep());
+    if (lb && ub && step && *step != 0 && *ub > *lb) {
+        return (*ub - *lb + *step - 1) / *step;
+    }
+    return std::nullopt;
 }
 
 // Given an op in a for loop body with a static number of start, end and step,

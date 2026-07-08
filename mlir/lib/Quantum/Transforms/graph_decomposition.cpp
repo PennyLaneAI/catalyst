@@ -156,6 +156,15 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         if (failed(runPipeline(pm, module))) {
             return signalPassFailure();
         }
+
+        ///////////////////////////
+        // Step 5: Re-introduce any missing user rules for future decompositions
+        SymbolTable symbolTable(module);
+        for (auto &rule : allUserRules) {
+            if (!symbolTable.lookup<func::FuncOp>(rule->getName())) {
+                module.getBody()->push_back(rule.release());
+            }
+        }
     }
 
   private:
