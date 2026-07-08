@@ -5,6 +5,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* Add adjoint support to the decomposition graph solver, enabling `Adjoint(Op)` to be decomposed either
+  via registered adjoint rules or by adjointing the base operator's decomposition rule,
+  with the solver choosing the cheapest.
+  [(#3001)](https://github.com/PennyLaneAI/catalyst/pull/3001)
+
 * The `decompose-lowering` pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
   The pass also no longer applies the `inline`, `cse` and `canonicalize` passes to avoid unnecessary IR mutations.
   Instead, decomposition rules are deterministically inlined by a custom function (`inline` is non-deterministic, using an estimated benefit and threshold as criteria for inlining).
