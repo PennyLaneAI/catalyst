@@ -701,8 +701,8 @@ class TestLoweringMeasure:
         //   CHECK-DAG:   [[m2:%.+]], [[q2_1:%.+]] = qecp.measure [[q2_0]]
         //   CHECK-DAG:   [[q3_1:%.+]] = qecp.hadamard [[q3_0]]
         //   CHECK-DAG:   [[m3:%.+]], [[q3_2:%.+]] = qecp.measure [[q3_1]]
-        //   CHECK-DAG:   [[q4_1:%.+]] = qecp.hadamard [[q4_0]]
-        //   CHECK-DAG:   [[q4_2:%.+]] = qecp.s [[q4_1]] adj
+        //   CHECK-DAG:   [[q4_1:%.+]] = qecp.s [[q4_0]] adj
+        //   CHECK-DAG:   [[q4_2:%.+]] = qecp.hadamard [[q4_1]]
         //   CHECK-DAG:   [[m4:%.+]], [[q4_3:%.+]] = qecp.measure [[q4_2]]
         //   CHECK-NOT:   qecp.measure
         //       CHECK:   [[cb_1:%.+]] = qecp.insert [[cb_0]][0], [[q0_1]]

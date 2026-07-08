@@ -703,9 +703,9 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         hadamard_op = qecp.HadamardOp(qubits[i])
                         qubits[i] = hadamard_op.out_qubit
                     case "Y":
-                        hadamard_op = qecp.HadamardOp(qubits[i])
-                        s_adj_op = qecp.SOp(hadamard_op.out_qubit, adjoint=True)
-                        qubits[i] = s_adj_op.out_qubit
+                        s_adj_op = qecp.SOp(qubits[i], adjoint=True)
+                        hadamard_op = qecp.HadamardOp(s_adj_op)
+                        qubits[i] = hadamard_op.out_qubit
                     case _:  # pragma: no cover
                         raise CompileError(
                             f"Gate in logical Pauli Z definition cannot be diagonalized for "
