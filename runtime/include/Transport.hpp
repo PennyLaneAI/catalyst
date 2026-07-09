@@ -20,41 +20,57 @@
 namespace catalyst::transport {
 
 enum class DataPath { CpuVerbs, NicEngine, KernelFused };
-enum class MemKind  { CpuRam, GpuHbm, FpgaDdr, Bram };
-enum class Role     { Controller, Coprocessor };
+enum class MemKind { CpuRam, GpuHbm, FpgaDdr, Bram };
+enum class Role { Controller, Coprocessor };
 
-struct ConnectInfo { std::string peer; std::uint16_t oob_port; Role role; };
-struct MemRegion   { void* addr = nullptr; std::size_t size = 0;
-                     std::uint32_t lkey = 0; std::uint32_t rkey = 0; MemKind kind = MemKind::CpuRam; };
-struct PeerRef     { std::uint32_t rkey = 0; std::uint64_t remote_addr = 0; std::size_t size = 0; };
-struct ChannelDesc { DataPath data_path = DataPath::CpuVerbs; bool persistent = true;
-                     std::size_t message_size = 0; };  // advisory; a backend may use its own framing
+struct ConnectInfo {
+    std::string peer;
+    std::uint16_t oob_port;
+    Role role;
+};
+struct MemRegion {
+    void *addr = nullptr;
+    std::size_t size = 0;
+    std::uint32_t lkey = 0;
+    std::uint32_t rkey = 0;
+    MemKind kind = MemKind::CpuRam;
+};
+struct PeerRef {
+    std::uint32_t rkey = 0;
+    std::uint64_t remote_addr = 0;
+    std::size_t size = 0;
+};
+struct ChannelDesc {
+    DataPath data_path = DataPath::CpuVerbs;
+    bool persistent = true;
+    std::size_t message_size = 0;
+}; // advisory; a backend may use its own framing
 
 class TransportSession {
- public:
-  virtual ~TransportSession() = default;
+  public:
+    virtual ~TransportSession() = default;
 
-  // Bring up the connection (out-of-band handshake and QP transition to RTS).
-  virtual int connect(const ConnectInfo& info) = 0;
+    // Bring up the connection (out-of-band handshake and QP transition to RTS).
+    virtual int connect(const ConnectInfo &info) = 0;
 
-  // Allocate and register a memory region on the device.
-  virtual MemRegion alloc_memory(std::size_t size, MemKind kind, std::uint32_t access) = 0;
+    // Allocate and register a memory region on the device.
+    virtual MemRegion alloc_memory(std::size_t size, MemKind kind, std::uint32_t access) = 0;
 
-  // Advertise a local region and receive the peer's region over the out-of-band channel.
-  virtual PeerRef exchange_keys(const MemRegion& local) = 0;
+    // Advertise a local region and receive the peer's region over the out-of-band channel.
+    virtual PeerRef exchange_keys(const MemRegion &local) = 0;
 
-  // Program the data movement this session will run (single channel per session).
-  virtual void establish_channel(const ChannelDesc& desc, const MemRegion& local,
-                                 const PeerRef& peer) = 0;
+    // Program the data movement this session will run (single channel per session).
+    virtual void establish_channel(const ChannelDesc &desc, const MemRegion &local,
+                                   const PeerRef &peer) = 0;
 
-  // Launch the engine (non-blocking; runs until stop()).
-  virtual void start() = 0;
+    // Launch the engine (non-blocking; runs until stop()).
+    virtual void start() = 0;
 
-  // Wait for a result and write it out.
-  virtual int collect(void* const* outputs, std::size_t n) = 0;
+    // Wait for a result and write it out.
+    virtual int collect(void *const *outputs, std::size_t n) = 0;
 
-  // Stop the engine and join. Idempotent.
-  virtual void stop() = 0;
+    // Stop the engine and join. Idempotent.
+    virtual void stop() = 0;
 };
 
-}  // namespace catalyst::transport
+} // namespace catalyst::transport
