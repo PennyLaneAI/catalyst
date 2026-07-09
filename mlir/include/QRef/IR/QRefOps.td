@@ -412,7 +412,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     }];
 
     let arguments = (ins
-        StringProp:$op_name,
+        StrAttr:$op_name,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$forward_args,
 
@@ -429,7 +429,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
 
         // additional functionality provided by quantum.operator, being last allows the builder
         // to use default values in the signature, so that these args are truly optional
-        UnitProp:$adjoint,
+        UnitAttr:$adjoint,
         OptionalProp<I64Prop>:$UID,
         DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
@@ -439,8 +439,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             // the ODS operands must be next to each other
-            auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/1);
-            auto [_, lenForwardArgs] = getODSOperandIndexAndLength(/*forward_args=*/2);
+            auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/0);
+            auto [_, lenForwardArgs] = getODSOperandIndexAndLength(/*forward_args=*/1);
             return getOperands().slice(start, lenParams + lenForwardArgs);
         }
     }];
