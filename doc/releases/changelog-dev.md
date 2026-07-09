@@ -376,6 +376,10 @@
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
   [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
+* The [MLIR Plugins](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html)
+  documentation has been updated to fix a number of typos and formatting issues, and to improve
+  overall readability.
+  [(#3005)](https://github.com/PennyLaneAI/catalyst/pull/3005)
 
 <h3>Contributors ✍️</h3>
 
