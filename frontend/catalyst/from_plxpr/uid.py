@@ -19,7 +19,7 @@ from functools import singledispatch
 from typing import Any
 
 from pennylane.core import Operator2
-from pennylane.pytrees import PyTreeStructure, unflatten
+from pennylane.pytrees import PyTreeStructure
 from pennylane.wires import AbstractQubit
 
 

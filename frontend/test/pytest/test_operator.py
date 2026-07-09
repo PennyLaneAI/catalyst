@@ -17,7 +17,6 @@ Tests for the new Operator2 class.
 
 # pylint: disable = useless-parent-delegation, missing-function-docstring, missing-class-docstring
 import pennylane as qp
-import pytest
 from jax import numpy as jnp
 
 

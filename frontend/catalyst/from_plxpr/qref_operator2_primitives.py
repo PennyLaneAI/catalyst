@@ -21,8 +21,7 @@ from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from pennylane.core import Operator2
-from pennylane.pytrees import PyTreeStructure, flatten, unflatten
+from pennylane.pytrees import unflatten
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 

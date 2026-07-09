@@ -324,6 +324,7 @@ def handle_operator(
     n_ctrls,
     **kwargs,
 ):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the operator_p primitive."""
     n_wires = sum(wire_lens)
     wire_inputs = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + n_wires]
     if n_ctrls:
