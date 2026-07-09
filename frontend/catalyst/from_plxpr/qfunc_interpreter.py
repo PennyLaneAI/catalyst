@@ -312,8 +312,17 @@ def _new_hybrid_arg(interp: PLxPRToQuantumJaxprInterpreter, arg) -> list:
 
 # pylint: disable=too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
-def _handle_operator(
-    self, *args, op_cls, wire_lens, hybrid_lens, hybrid_trees, adjoint, n_ctrls, **kwargs
+def handle_operator(
+    self,
+    *args,
+    op_cls,
+    wire_lens,
+    hybrid_lens,
+    hybrid_trees,
+    forward_mask,
+    adjoint,
+    n_ctrls,
+    **kwargs,
 ):
     n_wires = sum(wire_lens)
     wire_inputs = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + n_wires]
@@ -336,18 +345,9 @@ def _handle_operator(
     new_hybrid_args = []
     args_idx = len(op_cls.dynamic_argnames) + n_wires
 
-    for hname, size, tree in zip(op_cls.hybrid_argnames, hybrid_lens, hybrid_trees, strict=True):
-        if hname in op_cls.wire_argnames:
-            new_hwires = tuple(
-                w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w)
-                for w in args[args_idx : args_idx + size]
-            )
-            new_hybrid_args.extend(new_hwires)
-
-        else:
-            unflattened_arg = unflatten(args[args_idx : args_idx + size], tree)
-            new_hybrid_args.extend(_new_hybrid_arg(self, unflattened_arg))
-
+    for size, tree in zip(hybrid_lens, hybrid_trees, strict=True):
+        unflattened_arg = unflatten(args[args_idx : args_idx + size], tree)
+        new_hybrid_args.extend(_new_hybrid_arg(self, unflattened_arg))
         args_idx += size
 
     qref_operator_p.bind(
@@ -360,6 +360,7 @@ def _handle_operator(
         wire_lens=wire_lens,
         hybrid_lens=hybrid_lens,
         hybrid_trees=hybrid_trees,
+        forward_mask=forward_mask,
         adjoint=adjoint,
         n_ctrls=n_ctrls,
         **kwargs,

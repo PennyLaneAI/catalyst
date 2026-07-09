@@ -101,40 +101,8 @@ def _general_validation(*args, op_cls, wire_lens, **kwargs):
         assert ir.OpaqueType(w.type).data == "bit"
 
 
-def _count_leaves(tree):
-    if tree.is_leaf:
-        return 1
-    return sum(_count_leaves(c) for c in tree.children)
-
-
-def _partition_hybrid_leaves(leaves: list, tree: PyTreeStructure, idx: int = 0):
-    """Split hybrid SSA leaves into forward vs outer-param operands. This is necessary
-    instead of just unflattening the pytree because pytrees containing operators will
-    likely fail unflattening as that will require instantiating operators with MLIR
-    SSA values for dynamic parameters.
-
-    Returns:
-        tuple[list, list, int]: List of forwarding arguments, non-forwarding arguments,
-        and an index used to track the running leaf index during recursion.
-    """
-    if tree.is_leaf:
-        return [], [leaves[idx]], idx + 1
-
-    if tree.type_ is not None and issubclass(tree.type_, Operator2):
-        n = _count_leaves(tree)
-        return leaves[idx : idx + n], [], idx + n
-    forward, params = [], []
-
-    for child in tree.children:
-        f, p, idx = _partition_hybrid_leaves(leaves, child, idx)
-        forward += f
-        params += p
-
-    return forward, params, idx
-
-
 def _process_params(
-    *args, op_cls, wire_lens, hybrid_lens, hybrid_trees
+    *args, op_cls, wire_lens, hybrid_lens, forward_mask
 ) -> tuple[list, list, dict[str, list[int]]]:
     """Process non-qubit operands of an operator. This function returns the flattened sequence
     of qubit operands of the operator, feed-through arguments of any operator arguments, and a
@@ -151,16 +119,23 @@ def _process_params(
 
     # Hybrid dynamic arguments
     args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
+    mask_idx = 0
     map_idx = len(op_cls.dynamic_argnames)
 
-    for hname, hsize, htree in zip(op_cls.hybrid_argnames, hybrid_lens, hybrid_trees, strict=True):
+    for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
         if hname not in op_cls.wire_argnames:
             leaves = args[args_idx : args_idx + hsize]
             # Any dynamic arguments of input operators are considered feed-forward arguments for
             # decomposition rules, not parameters or qubits of the outer operator. This function
             # is used to partition feed-forward arguments from other dynamic values.
-            cur_fwd, cur_params, _ = _partition_hybrid_leaves(leaves, htree)
-            forward_params += cur_fwd
+            cur_fwd_mask = forward_mask[mask_idx : mask_idx + hsize]
+            cur_params = []
+
+            for leaf, is_forward in zip(leaves, cur_fwd_mask, strict=True):
+                if is_forward:
+                    forward_params.append(leaf)
+                else:
+                    cur_params.append(leaf)
 
             if cur_params:
                 params += cur_params
@@ -169,6 +144,7 @@ def _process_params(
                 )
                 map_idx += len(cur_params)
 
+        mask_idx += hsize
         args_idx += hsize
 
     param_map = get_mlir_attribute_from_pyval(param_map) if param_map else None
@@ -223,6 +199,7 @@ def _qref_operator_p_lowering(
 
     hybrid_lens = kwargs.pop("hybrid_lens")
     hybrid_trees = kwargs.pop("hybrid_trees")
+    forward_mask = kwargs.pop("forward_mask")
     adjoint = kwargs.pop("adjoint")
     n_ctrls = kwargs.pop("n_ctrls")
     wire_lens = kwargs.pop("wire_lens")
@@ -273,11 +250,12 @@ def _qref_operator_p_lowering(
         op_cls=op_cls,
         wire_lens=wire_lens,
         hybrid_lens=hybrid_lens,
-        hybrid_trees=hybrid_trees,
+        forward_mask=forward_mask,
     )
     qubits, qubit_map = _process_qubits(
         *args, op_cls=op_cls, wire_lens=wire_lens, hybrid_lens=hybrid_lens
     )
+    repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
 
     if op_cls.hybrid_argnames or op_cls.static_argnames:
         uid = generate_uid(
@@ -288,12 +266,11 @@ def _qref_operator_p_lowering(
             hybrid_trees=hybrid_trees,
             adjoint=adjoint,
             n_ctrls=n_ctrls,
-            static_args=kwargs,
+            static_args=repack_static_data,
         )
         static_data = None
     else:
         uid = None
-        repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
         static_data = get_mlir_attribute_from_pyval(repack_static_data)
 
     OperatorOp(

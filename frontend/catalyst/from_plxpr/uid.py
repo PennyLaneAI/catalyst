@@ -61,9 +61,7 @@ def generate_uid(
         args_idx += hsize
 
     # Static arguments
-    reduced_static_args = tuple(
-        _serialize_static(unflatten(*val), name) for name, val in static_args.items()
-    )
+    reduced_static_args = tuple(_serialize_static(val, name) for name, val in static_args.items())
 
     reduced.append(op_cls)
     reduced.append(("dynamic", tuple(dynamic_avals)))

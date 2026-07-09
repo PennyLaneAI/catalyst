@@ -287,7 +287,7 @@ def c_multiple_registers():
     # CHECK: qubit_map = {reg1 = [0], reg2 = [1, 2, 3]}
     MultipleRegisters(0, (2, 3, 4))
 
-    # CHECK: [[q5:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.operator "MultipleRegisters"() qubits([[q5]])
     # CHECK: qubit_map = {reg1 = [0]}
     MultipleRegisters(0, [])
@@ -478,8 +478,8 @@ def circuit_qubitunitary():
 
     QubitUnitary(np.array([[0, 1], [1, 0]]), 0)
 
-    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] : !qref.bit, !qref.bit
 
     QubitUnitary(qp.CNOT.compute_matrix(), (0, 1))
@@ -547,7 +547,7 @@ class StaticData(qp.core.Operator2):
 def c_static_data():
     # CHECK-LABEL: func.func public @c_static_data
 
-    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.operator "StaticData"() qubits([[q0]])
     # CHECK: UID({{[0-9]+}})
     # CHECK-NOT: static_data
@@ -573,8 +573,8 @@ class HybridWires(qp.core.Operator2):
 def c_hybrid_wires():
     # CHECK-LABEL: func.func public @c_hybrid_wires
 
-    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: qref.operator "HybridWires"() qubits([[q0]], [[q1]])
     # CHECK: UID({{[0-9]+}})
     # CHECK: qubit_map = {cwires = [0, 1]}
@@ -590,19 +590,41 @@ def c_hybrid_wires():
 print(c_hybrid_wires.mlir)
 
 
-class DummyOp(qp.core.Operator2):
+class HybridNoOpArg(qp.core.Operator2):
 
-    def __init__(self, wires):
-        super().__init__(wires=wires)
+    hybrid_argnames = ("angles",)
+
+    def __init__(self, angles, wires):
+        super().__init__(angles, wires)
 
 
-class OperatorArgument(qp.core.Operator2):
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=2))
+def c_hybrid_arg_not_op():
+    # CHECK-LABEL: func.func public @c_hybrid_arg_not_op
 
-    hybrid_argnames = ("op",)
-    wire_argnames = ()
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.operator "HybridNoOpArg"({{%.+}}: tensor<f64>, {{%.+}}: tensor<f64>) qubits([[q0]])
+    # CHECK: UID([[UID_A:[0-9]+]])
+    # CHECK: param_map = {angles = [0, 1]} qubit_map = {wires = [0]}
+    HybridNoOpArg([1.5, 2.5], wires=0)
 
-    def __init__(self, op):
-        super().__init__(op)
+    # CHECK: [[q0_1:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.operator "HybridNoOpArg"({{%.+}}: tensor<f64>, {{%.+}}: tensor<f64>) qubits([[q0_1]])
+    # CHECK: UID([[UID_A]])
+    # CHECK: param_map = {angles = [0, 1]} qubit_map = {wires = [0]}
+    HybridNoOpArg([2.5, 4.5], wires=0)
+
+    # CHECK: [[q0_2:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.operator "HybridNoOpArg"({{%.+}}: tensor<f64>, {{%.+}}: tensor<f64>, {{%.+}}: tensor<f64>) qubits([[q0_2]])
+    # CHECK-NOT: UID([[UID_A]])
+    # CHECK: UID({{[0-9]+}})
+    # CHECK: param_map = {angles = [0, 1, 2]} qubit_map = {wires = [0]}
+    HybridNoOpArg([1.5, 2.5, 3.5], wires=0)
+    return qp.state()
+
+
+print(c_hybrid_arg_not_op.mlir)
 
 
 class HybridOpArg(qp.core.Operator2):
@@ -625,50 +647,43 @@ def c_hybrid_op_arg(x: float, y: float):
     op2 = MultiRZ(x, [0, 1, 2])
     op3 = MultiRZ(x, [0, 1])
 
-    # CHECK: [[q0:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q1:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q2:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q3:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 3]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 2]
     # CHECK: qref.operator "HybridOpArg"({{%.+}}: tensor<f64>) qubits([[q0]])
     # CHECK-NEXT: UID([[UID_A:.+]]) forward({{%.+}}: tensor<f64>, [[q1]]: !qref.bit, [[q2]]: !qref.bit, [[q3]]: !qref.bit)
     # CHECK-NEXT: param_map = {angle = [0]} qubit_map = {cwires = [0]}
     HybridOpArg(y, op1, cwires=[3])
 
-    # CHECK: [[q4:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q5:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q6:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q7:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 3]
+    # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q6:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[q7:%.+]] = qref.get {{%.+}}[ 2]
     # CHECK: qref.operator "HybridOpArg"({{%.+}}: tensor<f64>) qubits([[q4]])
     # CHECK-NEXT: UID([[UID_A]]) forward({{%.+}}: tensor<f64>, [[q5]]: !qref.bit, [[q6]]: !qref.bit, [[q7]]: !qref.bit)
     # CHECK-NEXT: param_map = {angle = [0]} qubit_map = {cwires = [0]}
     HybridOpArg(y, op2, cwires=[3])
 
-    # CHECK: [[q8:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q9:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q10:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q8:%.+]] = qref.get {{%.+}}[ 3]
+    # CHECK: [[q9:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q10:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: qref.operator "HybridOpArg"({{%.+}}: tensor<f64>) qubits([[q8]])
     # CHECK-NOT: UID([[UID_A]])
     # CHECK-NEXT: UID([[UID_B:.+]]) forward({{%.+}}: tensor<f64>, [[q9]]: !qref.bit, [[q10]]: !qref.bit)
     # CHECK-NEXT: param_map = {angle = [0]} qubit_map = {cwires = [0]}
     HybridOpArg(y, op3, cwires=[3])
 
-    # CHECK: [[q11:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q12:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q13:%.+]] = qref.get {{%.+}}
-    # CHECK: [[q14:%.+]] = qref.get {{%.+}}
+    # CHECK: [[q11:%.+]] = qref.get {{%.+}}[ 3]
+    # CHECK: [[q12:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q13:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[q14:%.+]] = qref.get {{%.+}}[ 2]
     # CHECK: qref.operator "HybridOpArg"({{%.+}}: tensor<f64>) qubits([[q11]])
     # CHECK-NOT: UID([[UID_A]])
     # CHECK-NOT: UID([[UID_B]])
     # CHECK-NEXT: UID([[UID_C:.+]]) forward({{%.+}}: tensor<f64>, [[q12]]: !qref.bit, [[q13]]: !qref.bit, [[q14]]: !qref.bit)
     # CHECK-NEXT: param_map = {angle = [0]} qubit_map = {cwires = [0]}
     HybridOpArg(y, op1, cwires=[3], n_iters=2)
-
-    # CHECK: [[q15:%.+]] = qref.get {{%.+}}
-    # CHECK: qref.operator "OperatorArgument"() qubits()
-    # CHECK-NEXT: UID({{[0-9]+}}) forward([[q15]]: !qref.bit)
-    # CHECK-NOT: qubit_map
-    OperatorArgument(DummyOp(0))
-    return qp.state()
 
 
 print(c_hybrid_op_arg.mlir)
