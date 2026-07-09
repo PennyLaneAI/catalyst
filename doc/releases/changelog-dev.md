@@ -372,6 +372,10 @@
   used in conjunction with the `measurements-from-samples` pass.
   [(#2958)](https://github.com/PennyLaneAI/catalyst/pull/2958)
 
+* Rename the pipeline names in the default pipeline specification (e.g. `quantum-compilation-pipeline`) to match the
+  `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
+  [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
@@ -392,4 +396,5 @@ Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Paul Haochen Wang,
-Jake Zaia.
+Jake Zaia,
+JiaRung Jian.
