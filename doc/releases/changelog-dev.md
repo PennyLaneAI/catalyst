@@ -391,10 +391,11 @@ Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+JiaRung Jian,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Paul Haochen Wang,
-Jake Zaia,
-JiaRung Jian.
+Jake Zaia.
+
