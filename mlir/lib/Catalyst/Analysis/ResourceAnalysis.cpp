@@ -27,7 +27,7 @@
 #include "mlir/IR/Operation.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
-#include "Catalyst/Utils/ConstantResolve.h"
+#include "Catalyst/Utils/SCFUtils.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
@@ -77,6 +77,8 @@ static std::string getGateOpName(Operation *op, bool isAdjoint)
         llvm::TypeSwitch<Operation *, std::string>(op)
             .Case<quantum::CustomOp, qref::CustomOp>(
                 [](auto customOp) { return customOp.getGateName().str(); })
+            .Case<quantum::OperatorOp, qref::OperatorOp>(
+                [](auto operatorOp) { return operatorOp.getOpName().str(); })
             .Case<quantum::PauliRotOp, qref::PauliRotOp>([](auto) { return "PauliRot"; })
             .Case<quantum::GlobalPhaseOp, qref::GlobalPhaseOp>([](auto) { return "GlobalPhase"; })
             .Case<quantum::MultiRZOp, qref::MultiRZOp>([](auto) { return "MultiRZ"; })
@@ -321,21 +323,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
     // Try to resolve a static trip count.
-    std::optional<int64_t> tripCount;
-    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
-        tripCount = estAttr.getValue().getSExtValue();
-    }
-    else if (auto sTrip = forOp.getStaticTripCount()) {
-        tripCount = sTrip->getSExtValue();
-    }
-    else {
-        auto lb = resolveConstantInt(forOp.getLowerBound());
-        auto ub = resolveConstantInt(forOp.getUpperBound());
-        auto step = resolveConstantInt(forOp.getStep());
-        if (lb && ub && step && *step != 0 && *ub > *lb) {
-            tripCount = (*ub - *lb + *step - 1) / *step;
-        }
-    }
+    std::optional<int64_t> tripCount = resolveForLoopTripCount(forOp);
 
     if (tripCount.has_value()) {
         // Record the loop body under a new name (for_loop_1, …).
@@ -344,6 +332,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         // The name is always new, so we don't overwrite an old entry.
         std::string name = makeUniqueSyntheticName("for_loop_", forLoopCounter);
         funcResults[name] = std::move(bodyResult);
+        syntheticLoopBodies[name] = forOp;
         result.functionCalls[name] = tripCount.value();
         return;
     }
@@ -352,6 +341,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     // and store a fixed number (hash) so each such loop has its own id in the output.
     std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
     funcResults[name] = std::move(bodyResult);
+    syntheticLoopBodies[name] = forOp;
     result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
     result.hasDynLoop = true;
 }
@@ -482,11 +472,11 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
 {
     // Quantum gates
-    if (isa<quantum::CustomOp, qref::CustomOp, quantum::PauliRotOp, qref::PauliRotOp,
-            quantum::GlobalPhaseOp, qref::GlobalPhaseOp, quantum::MultiRZOp, qref::MultiRZOp,
-            quantum::PCPhaseOp, qref::PCPhaseOp, quantum::QubitUnitaryOp, qref::QubitUnitaryOp,
-            quantum::SetStateOp, qref::SetStateOp, quantum::SetBasisStateOp, qref::SetBasisStateOp>(
-            op)) {
+    if (isa<quantum::CustomOp, qref::CustomOp, quantum::OperatorOp, qref::OperatorOp,
+            quantum::PauliRotOp, qref::PauliRotOp, quantum::GlobalPhaseOp, qref::GlobalPhaseOp,
+            quantum::MultiRZOp, qref::MultiRZOp, quantum::PCPhaseOp, qref::PCPhaseOp,
+            quantum::QubitUnitaryOp, qref::QubitUnitaryOp, quantum::SetStateOp, qref::SetStateOp,
+            quantum::SetBasisStateOp, qref::SetBasisStateOp>(op)) {
         std::string name = getGateOpName(op, isAdjoint);
         int nQubits = getGateQubitCount(op);
         int nParams = getGateParamCount(op);
