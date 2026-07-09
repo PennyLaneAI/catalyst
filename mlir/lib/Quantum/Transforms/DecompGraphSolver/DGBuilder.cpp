@@ -160,10 +160,23 @@ struct DecompositionGraph::Impl {
      * @brief Operators whose controlled form must be produced by a dedicated rule
      * rather than by controlling their decomposition, so control-each-gate is
      * suppressed for them.
-     *
-     * TODO: revisit this
      */
     static bool isCtrlRuleRequired(const std::string &opName) { return opName == "GlobalPhase"; }
+
+    /**
+     * @brief Index non-empty, uncontrolled decompositions by their output operator.
+     */
+    std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>
+    indexUncontrolledBaseRules() const
+    {
+        std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash> baseByOutput;
+        for (const auto &rule : rules) {
+            if (rule.output.numControlWires == 0 && !rule.isEmpty()) {
+                baseByOutput[rule.output].push_back(rule);
+            }
+        }
+        return baseByOutput;
+    }
 
     /**
      * @brief Generate Controlled decomposition rules.
@@ -184,16 +197,13 @@ struct DecompositionGraph::Impl {
      */
     void generateControlledRules()
     {
-        std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash> baseByOutput;
-        for (const auto &rule : rules) {
-            if (rule.output.numControlWires == 0 && !rule.isEmpty()) {
-                baseByOutput[rule.output].push_back(rule);
-            }
-        }
+        const auto baseByOutput = indexUncontrolledBaseRules();
         if (baseByOutput.empty()) {
             return;
         }
 
+        // Breadth-first over controlled operators
+        // the controlled inputs each synthesized rule introduces, until no new ones appear:
         std::unordered_set<OperatorNode, OperatorNodeHash> seen;
         std::vector<OperatorNode> worklist;
         auto enqueue = [&](const OperatorNode &op) {
@@ -211,8 +221,6 @@ struct DecompositionGraph::Impl {
             }
         }
 
-        // Synthesize controlled rules to a fixpoint,
-        // discovering new controlled inputs as we go.
         std::vector<RuleNode> generated;
         while (!worklist.empty()) {
             const OperatorNode ctrlOp = worklist.back();
@@ -222,16 +230,12 @@ struct DecompositionGraph::Impl {
                 continue;
             }
 
-            OperatorNode baseOp = ctrlOp;
-            const std::size_t numControlWires = baseOp.numControlWires;
-            baseOp.numControlWires = 0;
-
-            const auto it = baseByOutput.find(baseOp);
+            const auto it = baseByOutput.find(withoutControls(ctrlOp));
             if (it == baseByOutput.end()) {
                 continue;
             }
             for (const auto &baseRule : it->second) {
-                RuleNode ctrlRule = makeControlledRule(baseRule, numControlWires);
+                RuleNode ctrlRule = makeControlledRule(baseRule, ctrlOp.numControlWires);
                 for (const auto &term : ctrlRule.inputs) {
                     enqueue(term.op);
                 }

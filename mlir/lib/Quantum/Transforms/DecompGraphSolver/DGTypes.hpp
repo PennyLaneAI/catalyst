@@ -154,7 +154,7 @@ enum class RuleOrigin : uint8_t { Default = 0, Fixed, Alternative, ControlGenera
  * decomposition rules to break down complex operators into simpler ones that are part of
  * the target gateset.
  *
- * TODO:
+ * @todo
  * - We can add a field for work_wires_required if we want to consider the number of ancillary
  * wires needed for the decomposition, which can be an important factor in resource optimization.
  * - We can also consider adding a field for the decomposition function or a pointer to it,
@@ -195,6 +195,15 @@ using AltDecomps = std::unordered_map<OperatorNode, std::vector<RuleNode>, Opera
 inline OperatorNode makeControlled(OperatorNode op, std::size_t numControlWires = 1)
 {
     op.numControlWires += numControlWires;
+    return op;
+}
+
+/**
+ * @brief This returns a copy of the given operator with all controls removed.
+ */
+inline OperatorNode withoutControls(OperatorNode op)
+{
+    op.numControlWires = 0;
     return op;
 }
 
