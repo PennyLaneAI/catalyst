@@ -237,6 +237,7 @@ struct ChosenDecompRule {
     std::vector<RuleTerm> inputs;
     double totalCost{0.0};
     std::unordered_map<OperatorNode, std::size_t, OperatorNodeHash> basisCounts;
+    RuleOrigin origin{RuleOrigin::Default};
 };
 
 /**
