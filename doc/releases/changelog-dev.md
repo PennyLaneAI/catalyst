@@ -223,6 +223,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `from_plxpr` no longer depends on the `Transform.plxpr_transform` property.
+  [(#3004)](https://github.com/PennyLaneAI/catalyst/pull/3004)
+
 * Update tests to not use global capture toggle where possible.
   [(#2964)](https://github.com/PennyLaneAI/catalyst/pull/2964)
 
