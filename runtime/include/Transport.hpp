@@ -38,7 +38,7 @@ enum class MemKind {
     CpuRam,  // Plain host RAM.
     GpuHbm,  // GPU HBM, registered via dma-buf.
     FpgaDdr, // FPGA DDR, allocated via the Xilinx UMM allocator.
-    Bram,    // FPGA on-chip block RAM.
+    FpgaBram,    // FPGA on-chip block RAM.
 };
 
 /**
