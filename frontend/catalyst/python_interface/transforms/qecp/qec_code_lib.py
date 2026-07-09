@@ -162,9 +162,12 @@ _CODE_REGISTRY: dict[str, tuple[Any, ...]] = {
         },
         {"cnot": "CNOT"},
         #### Unitary encoding circuit ####
-        # jukebox generated this and verified it in simulation
-        # see simulation to validate here:
-        # https://app.notion.com/p/xanaduai/Shor-9-1-3-code-37bbc6bd17648058841aed64f771ee9c
+        # References:
+        #   [1] P. Shor (1995), Scheme for reducing decoherence in quantum computer memory,
+        #         Phys. Rev. A 52, R2493. https://doi.org/10.1103/PhysRevA.52.R2493.
+        #   [2] O. Khalifa, et al. (2021), Digital System Design for Quantum Error Correction Codes,
+        #         Contrast Media & Molecular Imaging, 1101911. https://doi.org/10.1155/2021/1101911.
+        #         (Open Access)
         {
             "ops": [
                 ("CNOT", [0, 3]),
