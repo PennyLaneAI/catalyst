@@ -19,9 +19,24 @@
 
 namespace catalyst::transport {
 
-enum class DataPath { CpuVerbs, NicEngine, KernelFused };
-enum class MemKind { CpuRam, GpuHbm, FpgaDdr, Bram };
-enum class Role { Controller, Coprocessor };
+/**
+ * @brief Data-plane strategy: which engine issues the transfer.
+ */
+enum class DataPath {
+    CpuVerbs,    // Plain ibverbs on CPU.
+    NicEngine,   // Hardware-embedded RNIC (e.g. ERNIC hardware handshake).
+    KernelFused, // Fused with a kernel on GPU (e.g. BlueFlame).
+};
+
+/**
+ * @brief Memory kind: selects the allocation and registration path.
+ */
+enum class MemKind {
+    CpuRam,   // Plain host RAM.
+    GpuHbm,   // GPU HBM, registered via dma-buf.
+    FpgaDdr,  // FPGA DDR, allocated via the Xilinx UMM allocator.
+    FpgaBram, // FPGA on-chip block RAM.
+};
 
 struct ConnectInfo {
     std::string peer;
