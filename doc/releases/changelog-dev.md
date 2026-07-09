@@ -116,7 +116,7 @@
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
-* `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
+* The `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
   duplicate serialization logic and keeping its output consistent.
   [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
 
