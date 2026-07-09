@@ -10,7 +10,6 @@ Building the Standalone Plugin
 ------------------------------
 
 Catalyst provides a pre-configured ``Makefile`` rule to build the standalone-plugin provided in the `upstream MLIR source repository <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone>`_.
-
 To compile the plugin, execute the following command:
 
 .. code-block:: bash
@@ -295,13 +294,13 @@ Finally, the appropriate library must be linked in (``MLIRQuantum`` for the ``Qu
 If the plugin depends on other dialects defined in Catalyst, they can be added as dependencies in a similar way.
 For instance, if the plugin depends on the ``Gradient`` dialect, add ``"catalyst::gradient::GradientDialect"`` to the ``dependentDialects`` field and link the ``MLIRGradient`` library.
 
-4. Modify the standalone plugin to modify quantum operations
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4. Modify the standalone plugin to rewrite quantum operations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Here we will create a very simple pass that will change the quantum qubit allocation from 1 to 42 (for illustration purposes).
 We recommend reading the `MLIR tutorials <https://mlir.llvm.org/docs/Tutorials/>`_ on how to write MLIR passes, reading the Catalyst source to understand the Catalyst IR, and submitting issues if you are having troubles building your own plugin.
 
-The first thing we need to do is change the ``OpRewritePattern`` to match against our ``quantum::AllocOp``, which denotes how many qubits should be allocated for a given quantum program.
+The first thing we need to do is change the ``OpRewritePattern`` to match against our ``quantum::AllocOp``, which denotes the allocation of a quantum register containing the given number of qubits.
 
 .. code-block:: diff
 
@@ -366,10 +365,10 @@ This shared object can be used with both the ``catalyst`` and ``quantum-opt`` to
 From here, you can change the name of the pass, change the name of the shared object, and implement more complex transformations.
 
 
-5. Build your own python wheel and ship your plugin
+5. Build your own Python wheel and ship your plugin
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Now that you have your ``StandalonePlugin.so``, you can ship it in a python wheel.
+Now that you have your ``StandalonePlugin.so``, you can ship it in a Python wheel.
 To allow users to run your pass, we have provided a class called :class:`~.passes.Pass` and :class:`~.passes.PassPlugin`.
 You can extend these classes and allow the user to import your derived classes and run passes as a decorator.
 We provide the :func:`~.passes.apply_pass_plugin` decorator to allow pass plugins to be loaded and executed.
