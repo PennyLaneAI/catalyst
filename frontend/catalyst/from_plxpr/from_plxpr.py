@@ -595,7 +595,6 @@ def _apply_compiler_decompose_to_plxpr(
     if stopping_condition:
         kwargs["stopping_condition"] = stopping_condition
 
-
     interpreter = DecomposeInterpreter(**kwargs)
     f = partial(interpreter.eval, inner_jaxpr, consts)
     final_jaxpr = jax.make_jaxpr(f)(*ncargs)
