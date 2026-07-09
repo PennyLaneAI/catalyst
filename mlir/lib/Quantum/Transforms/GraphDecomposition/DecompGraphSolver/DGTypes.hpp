@@ -55,6 +55,7 @@ namespace DecompGraph::Core {
 struct OperatorNode {
     std::string id;
     bool adjoint{false};
+    std::size_t numControlWires{0};
 
     // optional params, primarily for debug use
     std::string name{""};
@@ -127,8 +128,9 @@ struct RuleTerm {
  * - Fixed: A fixed rule that cannot be changed or overridden by the solver.
  * - Alternative: An alternative rule that can be used in place of the default rule.
  * - AdjointGenerated: A rule synthesized by adjointing a base decomposition rule.
+ * - ControlGenerated: A rule synthesized by controlling a base decomposition rule. 
  */
-enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2, AdjointGenerated = 3 };
+enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2, AdjointGenerated = 3, ControlGenerated = 4 };
 
 /**
  * @brief This represents the decomposition rules in the graph decomposition problem.
@@ -198,6 +200,16 @@ inline OperatorNode makeAdjoint(OperatorNode op)
         op.id = std::string(kPrefix) + op.id + ")";
         op.adjoint = true;
     }
+}
+
+/**
+ * @brief This returns a copy of the given operator wrapped in `numControlWires`
+ * additional controls (Controlled(op)). Control wires accumulate, so applying it
+ * repeatedly yields a multi-controlled operator.
+ */
+inline OperatorNode makeControlled(OperatorNode op, std::size_t numControlWires = 1)
+{
+    op.numControlWires += numControlWires;
     return op;
 }
 
@@ -219,6 +231,34 @@ inline RuleNode makeAdjointRule(const RuleNode &base)
         adj.inputs.push_back({makeAdjoint(term.op), term.multiplicity});
     }
     return adj;
+}
+
+/**
+ * @brief Constructs the Controlled decomposition rule from a base rule.
+ *
+ * Given a rule `output -> {inputs}`, produces `Controlled(output) -> {Controlled(input), ...}`
+ * where every operator gains `numControlWires` control wires: controlling a decomposition means
+ * applying the same controls to each gate it produces.
+ *
+ * The `numControlWires` count is encoded in the rule name so distinct control counts over
+ * the same base rule stay unique. The result is tagged with `RuleOrigin::ControlGenerated`
+ * so later stages can lower it by controlling each gate.
+ *
+ * @note: PennyLane counts `PauliX` flips for zero `control_values`.
+ * Those flips and `control_values` are not supported yet; the cost reflects only the
+ * cost of controlling each produced gate.
+ */
+inline RuleNode makeControlledRule(const RuleNode &base, std::size_t numControlWires)
+{
+    RuleNode ctrl;
+    ctrl.name = base.name + "_controlled_" + std::to_string(numControlWires);
+    ctrl.output = makeControlled(base.output, numControlWires);
+    ctrl.origin = RuleOrigin::ControlGenerated;
+    ctrl.inputs.reserve(base.inputs.size());
+    for (const auto &term : base.inputs) {
+        ctrl.inputs.push_back({makeControlled(term.op, numControlWires), term.multiplicity});
+    }
+    return ctrl;
 }
 
 /**
