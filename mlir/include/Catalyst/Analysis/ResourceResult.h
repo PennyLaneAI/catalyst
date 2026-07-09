@@ -72,6 +72,9 @@ struct ResourceResult {
     // nullopt means no quantum.device in this function.
     std::optional<bool> autoQubitManagement;
 
+    // PBC depths as (any_commuting_depth, qubit_disjoint_depth), or nullopt if unavailable.
+    std::optional<std::pair<int64_t, int64_t>> pbcDepth;
+
     // merge another ResourceResult into this one
     void mergeWith(const ResourceResult &other, MergeMethod method = MergeMethod::Sum);
 

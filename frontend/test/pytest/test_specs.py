@@ -239,7 +239,6 @@ class TestDeviceLevelSpecs:
         assert complex_meas_specs["resources"].measurements == expected_measurements
 
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
 class TestPassByPassSpecs:
     """Test qp.specs() pass-by-pass specs"""
 
@@ -968,6 +967,34 @@ class TestPassByPassSpecs:
         )
 
         check_specs_same(actual, expected)
+
+    def test_operator2(self):
+        """Test that specs works with operator2 classes."""
+
+        # pylint: disable=useless-parent-delegation
+        class DummyOp(qp.core.Operator2):
+            """Dummy Local Operator."""
+
+            dynamic_argnames = ("phi",)
+            wire_argnames = ("reg1", "reg2")
+            compilable_argnames = ("metadata",)
+
+            def __init__(self, phi, reg1, reg2, metadata):
+                super().__init__(phi, reg1, reg2, metadata)
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.transforms.merge_rotations
+        @qp.qnode(qp.device("null.qubit", wires=10))
+        def c():
+            DummyOp(0.5, (0, 1), (2, 3, 4), metadata="word")
+            DummyOp(0.5, (2, 3, 4), (0,), metadata="word")
+            return qp.state()
+
+        for level in [0, 1]:
+            resources = qp.specs(c, level=level)().resources
+
+            assert resources.gate_types == {"DummyOp": 2}
+            assert resources.gate_sizes == {4: 1, 5: 1}
 
 
 class TestSpecsWithPPR:

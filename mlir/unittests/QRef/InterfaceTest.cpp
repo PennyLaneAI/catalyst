@@ -291,4 +291,59 @@ func.func @f(%q0: !qref.bit, %cv: i1, %param: f64) {
     ASSERT_TRUE(ctrlValueOperands.size() == 1 && ctrlValueOperands[0] == args[1]);
 }
 
+TEST(InterfaceTests, OperatorOpGetAllParamsEmpty)
+{
+    std::string moduleStr = R"mlir(
+func.func @f(%q0: !qref.bit, %q1: !qref.bit) {
+    qref.operator "custom_basic_qubits"() qubits(%q0, %q1)
+    return
+}
+  )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
+
+    // Parse ops
+    func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
+    catalyst::qref::OperatorOp op = *f.getOps<catalyst::qref::OperatorOp>().begin();
+
+    // Run checks
+    ValueRange allParams = op.getAllParams();
+    ASSERT_TRUE(allParams.size() == 0);
+}
+
+TEST(InterfaceTests, OperatorOpGetAllParams)
+{
+    std::string moduleStr = R"mlir(
+func.func @f(%q0: !qref.bit, %q1: !qref.bit, %param0: f64, %param1: i64) {
+    qref.operator "custom_basic_qubits"(%param0: f64, %param1: i64) qubits(%q0, %q1)
+    return
+}
+  )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
+
+    // Parse ops
+    func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
+    catalyst::qref::OperatorOp op = *f.getOps<catalyst::qref::OperatorOp>().begin();
+
+    Block &bb = f.getCallableRegion()->front();
+    auto args = bb.getArguments();
+
+    // Run checks
+    ValueRange allParams = op.getAllParams();
+    ASSERT_TRUE(allParams.size() == 2);
+    ASSERT_TRUE(allParams[0] == args[2]);
+    ASSERT_TRUE(allParams[1] == args[3]);
+}
+
 } // namespace
