@@ -166,12 +166,17 @@ Value ZneLowering::buildFoldedResultsLoop(Location loc, PatternRewriter &rewrite
                    SmallVector<Value> index = {i};
                    Value numFold = tensor::ExtractOp::create(builder, loc, numFolds, index);
                    if (randomFolding) {
-                       // Already an f64 fold count; pass it through unchanged.
+                       // Keep the f64 fold count; its fractional part drives the
+                       // probabilistic extra fold.
                        newArgs.push_back(numFold);
                    }
                    else {
+                       // Integral by construction convert
+                       // to an index for the fold loops.
+                       Value numFoldInt =
+                           arith::FPToSIOp::create(builder, loc, builder.getI64Type(), numFold);
                        Value numFoldCasted =
-                           index::CastSOp::create(builder, loc, builder.getIndexType(), numFold);
+                           index::CastSOp::create(builder, loc, builder.getIndexType(), numFoldInt);
                        newArgs.push_back(numFoldCasted);
                    }
                    func::CallOp callOp = func::CallOp::create(builder, loc, fnFoldedOp, newArgs);
@@ -234,9 +239,10 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
     auto foldingAlgorithm = op.getFolding();
     auto calleeOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
-    // `random` folding carries the (possibly fractional) fold count `(scale_factor-1)/2`
-    // as an f64 so the fractional remainder survives to the folded circuit; the other
-    // methods use an exact integer count threaded as an `index`.
+    // The fold counts `(scale_factor-1)/2` always arrive as an f64 tensor. `random`
+    // folding threads the count through as an f64 so the fractional remainder survives
+    // to the folded circuit; the other methods require integral values and convert the
+    // count to an `index`.
     const bool randomFolding = foldingAlgorithm == Folding::random;
     Type foldCountType =
         randomFolding ? Type(rewriter.getF64Type()) : Type(rewriter.getIndexType());

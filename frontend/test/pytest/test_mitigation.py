@@ -290,10 +290,12 @@ def test_local_random_folding_runs():
     assert np.allclose(mitigated_qnode(), circuit())
 
 
-def test_local_random_fractional_scale_factors_run():
-    r"""local-random folding accepts non-integer scale factors >= 1.
+@pytest.mark.parametrize("scale_factors", [[1.0, 2.0, 3.0], [1.5, 2.5, 3.5], [1.0, 1.75, 4.25]])
+def test_local_random_fractional_scale_factors_run(scale_factors):
+    r"""local-random folding accepts non-integer scale factors >= 1, including truly
+    fractional ones.
 
-    For a non-integer scale factor a random subset of gates is folded one extra time at
+    For a fractional scale factor a random subset of gates is folded one extra time at
     run time. On a noiseless simulator every folding pair $G G^\dagger$ is the identity, so
     the mitigated result must still match the unfolded circuit regardless of the subset.
     """
@@ -310,7 +312,7 @@ def test_local_random_fractional_scale_factors_run():
     @catalyst.qjit(seed=42)
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
-            circuit, scale_factors=[1.0, 2.0, 3.0], folding="local-random"
+            circuit, scale_factors=scale_factors, folding="local-random"
         )()
 
     assert np.allclose(mitigated_qnode(), circuit())

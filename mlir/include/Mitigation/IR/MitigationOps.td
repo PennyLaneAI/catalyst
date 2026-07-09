@@ -42,18 +42,20 @@ def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
     let summary = "Compute a quantum function with ZNE (Zero Noise Extrapolation) error mitigation.";
     let description = [{
         The `mitigation.zne` operation computes the results of the quantum function with ZNE mitigation.
+
+        The `numFolds` operand holds one floating-point fold count
+        `(scale_factor - 1) / 2` per scale factor. The `global` and `all` folding
+        methods scale the circuit by an exact odd-integer factor and thus require
+        integral values. `random` folding also accepts fractional values, realized
+        as base folds plus one extra fold sampled with probability equal to the
+        fractional remainder.
     }];
 
     let arguments = (ins
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
         FoldingAttr:$folding,
-        // Integer entries hold an exact per-circuit fold count `(scale_factor - 1) / 2`
-        // (used by `global`/`all`). Floating-point entries carry the same quantity but
-        // keep its fractional part so `random` folding can support non-integer
-        // scale factors (base folds + one extra fold sampled with probability = frac).
-        AnyTypeOf<[RankedTensorOf<[AnySignlessIntegerOrIndex]>,
-                   RankedTensorOf<[AnyFloat]>]>:$numFolds,
+        RankedTensorOf<[AnyFloat]>:$numFolds,
         OptionalAttr<DictArrayAttr>:$arg_attrs,
         OptionalAttr<DictArrayAttr>:$res_attrs
     );

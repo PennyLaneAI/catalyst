@@ -254,15 +254,13 @@ class ZNECallable(CatalystCallable):
             callable_fn
         ), "expected callable set as param on the first operation in zne target"
 
-        # Number of per-gate folds is (scale_factor - 1) / 2. For integer folding
-        # methods this is an exact integer count. For ``local-random`` we keep it as
-        # a float so the fractional remainder survives to the runtime, where it
-        # becomes the probability of an extra fold per gate (matching the
-        # ``scale_factor * n`` gate count Mitiq targets for fractional factors).
-        if self.folding == "local-random":
-            fold_numbers = (jnp.asarray(self.scale_factors, dtype=float) - 1) / 2
-        else:
-            fold_numbers = (jnp.asarray(self.scale_factors, dtype=int) - 1) // 2
+        # Number of per-gate folds is (scale_factor - 1) / 2, always passed as floats.
+        # Scale factor validation guarantees integral values for the integer folding
+        # methods. For ``local-random`` the fractional remainder survives to the
+        # runtime, where it becomes the probability of an extra fold per gate
+        # (matching the ``scale_factor * n`` gate count Mitiq targets for fractional
+        # factors).
+        fold_numbers = (jnp.asarray(self.scale_factors, dtype=float) - 1) / 2
         fold_results = zne_p.bind(
             *args_data, fold_numbers, folding=folding, jaxpr=jaxpr, fn=callable_fn
         )

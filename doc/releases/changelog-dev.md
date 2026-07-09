@@ -5,7 +5,9 @@
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
-  gates. Non-integer scale factors are now also accepted for `local-random`.
+  gates. Non-integer scale factors are now also accepted for `local-random`. The `mitigation.zne`
+  operation's `numFolds` operand is now always a floating-point tensor; the integer folding methods
+  require integral values and convert the count internally.
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
