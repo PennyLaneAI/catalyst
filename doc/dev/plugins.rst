@@ -1,47 +1,50 @@
 MLIR Plugins
 ============
 
-This page outlines documentation on how to start developing an MLIR plugin that can work with Catalyst.
-An MLIR plugin is a shared object that implements a compilation pass compatible with the MLIR framework.
-Catalyst is built on top of MLIR, this means that MLIR plugins work with Catalyst.
-This can enable anyone to build quantum compilation passes and new dialects as well.
+This page describes how to develop an MLIR plugin that can work with Catalyst.
+An MLIR plugin is a shared object, defined and built outside of a project's primary source tree, that implements custom dialects or compilation passes compatible with the MLIR framework.
+Because Catalyst is built natively on top of MLIR, it seamlessly supports these external plugins.
+This extensibility allows developers to integrate custom quantum compilation passes and dialects directly into the Catalyst compilation pipeline.
 
 Building the Standalone Plugin
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------------
 
-Catalyst comes with ``Makefile`` rules to build the `standalone-plugin from MLIR upstream's source code <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone>`_.
-Simply type 
+Catalyst provides a pre-configured ``Makefile`` rule to build the standalone-plugin provided in the `upstream MLIR source repository <https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone>`_.
 
-``make plugin``
+To compile the plugin, execute the following command:
 
-and in the ``catalyst/mlir/standalone/build/lib`` folder, you will find the ``StandalonePlugin.so`` plugin.
-The ``StandalonePlugin.so`` file is a simple plugin that has its own dialect (called Standalone dialect) and a single transformation that transforms symbol names from ``bar`` to ``foo``.
-It is intended to show how one would build an MLIR plugin, rather than showing all the features to build a usable MLIR plugin.
+.. code-block:: bash
+
+    make plugin
+
+Upon successful compilation, the shared object file ``StandalonePlugin.so`` will be located in the ``catalyst/mlir/standalone/build/lib/`` directory.
+The ``StandalonePlugin.so`` file is a minimal reference plugin that introduces a custom dialect (called ``Standalone``) and a single transformation pass that renames symbols from ``bar`` to ``foo``.
+It is intended as a structural template for building external MLIR plugins, rather than a comprehensive demonstration of advanced MLIR capabilities.
 
 You can use the ``StandalonePlugin.so`` plugin to transform a quantum program
 
 * with either ``quantum-opt`` or ``catalyst``, or
 * by loading it from a Python program.
 
-If you are interested in using it from the command line interface, you can add the following flags to load the Standalone plugin:
+If you are interested in using it from the command-line interface, you can add the following flags to load the Standalone plugin:
 
 * ``--load-pass-plugin=/path/to/StandalonePlugin.so``
 * ``--load-dialect-plugin=/path/to/StandalonePlugin.so``
 
-Notice that you will still be able to use the rest of the flags accepted by the command line interface.
+Notice that you will still be able to use the rest of the flags and arguments accepted by the command-line interface.
 For example, passing ``--help`` as in
 
 .. code-block:: bash
 
     quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --help
 
-will now enable you to see the documentation available for the Standalone pass.
+outputs the documentation available for the Standalone pass:
 
-.. code-block:: bash
+.. code-block::
 
     --standalone-switch-bar-foo    - Switches the name of a FuncOp named `bar` to `foo` and folds.
 
-Taking into account the description of the pass ``standalone-switch-bar-foo``, let's write the most minimal program that would be transformed by this transformation.
+Taking into account the description of the pass ``standalone-switch-bar-foo``, let's write the most minimal program that would be transformed by this transformation:
 
 .. code-block:: mlir
 
@@ -52,15 +55,18 @@ Taking into account the description of the pass ``standalone-switch-bar-foo``, l
       }
     }
 
-And you can schedule this pass as any other pass:
+You can schedule this pass as any other pass:
 
 .. code-block:: bash
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir
+    quantum-opt \
+        --load-pass-plugin=/path/to/StandalonePlugin.so \
+        --pass-pipeline='builtin.module(standalone-switch-bar-foo)' \
+        example.mlir
 
 .. note::
 
-    Current implementation of MLIR plugins only supports using the `--pass-pipeline` option for specifying passes.
+    The current implementation of MLIR plugins only supports using the ``--pass-pipeline`` option for specifying passes.
 
 And you have your transformed program:
 
@@ -76,12 +82,12 @@ And you have your transformed program:
 Notice that the name of the function ``bar`` has been changed to ``foo``.
 
 Pass Plugins vs Dialect Plugins
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------------
 
 You may now be asking, "how come we used the option ``--load-pass-plugin`` but we didn't use the option ``--load-dialect-plugin``?"
 The ``--load-pass-plugin`` option is used to load passes, while the ``--load-dialect-plugin`` is used to load dialects.
 As mentioned earlier, the ``StandalonePlugin.so`` file also contains a dialect.
-It is a simple dialect intended only for testing purposes, and it only contains a single operation. It is the ``standalone.foo`` operation.
+It is a simple dialect intended only for testing purposes, and it only contains a single operation, ``standalone.foo``.
 (Please do not confuse this operation with symbols named ``foo``).
 
 We can write a program that contains operations in the standalone dialect:
@@ -96,40 +102,57 @@ We can write a program that contains operations in the standalone dialect:
       }
     }
 
-But if we try to run it, using the same command as shown earlier 
+But if we try to run it, using the same command as shown earlier
 
 .. code-block:: bash
 
-      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir
+    quantum-opt \
+        --load-pass-plugin=/path/to/StandalonePlugin.so \
+        --pass-pipeline='builtin.module(standalone-switch-bar-foo)' \
+        example.mlir
 
 the compilation will fail with the following message:
 
 .. code-block::
 
-    example.mlir:4:10: error: Dialect `standalone' not found for custom op 'standalone.foo' 
+    example.mlir:4:10: error: Dialect `standalone' not found for custom op 'standalone.foo'
     %1 = standalone.foo %0 : i32
          ^
     a.mlir:4:10: note: Registered dialects: acc, affine, amdgpu, amx, arith, arm_neon, arm_sme, arm_sve, async, bufferization, builtin, catalyst, cf, chlo, complex, dlti, emitc, func, gpu, gradient, index, irdl, linalg, llvm, math, memref, mesh, mhlo, mitigation, ml_program, mpi, nvgpu, nvvm, omp, pdl, pdl_interp, polynomial, quant, quantum, rocdl, scf, shape, sparse_tensor, spirv, stablehlo, tensor, test, tosa, transform, ub, vector, vhlo, x86vector, xegpu ; for more info on dialect registration see https://mlir.llvm.org/getting_started/Faq/#registered-loaded-dependent-whats-up-with-dialects-management
 
-To be able to parse this dialect, we need to load the dialect which is stored in the same file:
+In order to parse operations from this dialect, we need to load the dialect from the plugin shared object file:
 
 .. code-block:: bash
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir
+    quantum-opt \
+        --load-pass-plugin=/path/to/StandalonePlugin.so \
+        --load-dialect-plugin=/path/to/StandalonePlugin.so \
+        --pass-pipeline='builtin.module(standalone-switch-bar-foo)' \
+        example.mlir
 
-Now, you can parse the program without the error and run the ``standalone-switch-bar-foo`` pass.
+Now, you can parse the program without the error and run the ``standalone-switch-bar-foo`` pass:
+
+.. code-block:: mlir
+
+    module @module {
+      func.func private @foo() -> i32 {
+        %c0_i32 = arith.constant 0 : i32
+        %0 = standalone.foo %c0_i32 : i32
+        return %0 : i32
+      }
+    }
 
 Creating your own Pass Plugin
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------------
 
-Catalyst lists LLVM as a git submodule in its repository and the LLVM project already contains an example standalone plugin.
-When running ``make standalone-plugin`` Catalyst will copy the directory containing the standalone plugin and patch it to make sure that it works with Catalyst.
-However, as mentioned earlier, the standalone plugin is a bare bones example.
-You may be wondering, well, how can I make a standalone plugin but that is able to change some aspects of the quantum program?
-For that, you will need to change the build script for the standalone plugin.
-For now, we found that the following process is the easiest one:
+The Catalyst repository includes the LLVM project as a Git submodule, which contains the upstream standalone plugin example.
+Executing ``make standalone-plugin`` copies this example directory and applies the necessary patches to ensure compatibility with the Catalyst environment.
 
-1. Add the standalone plugin directory as a subdirectory of Catalyst:
+Because the standalone plugin is a minimal reference implementation, developing a production-ready plugin capable of manipulating quantum programs requires modifications to its build system.
+The recommended workflow for adapting the build scripts is detailed below:
+
+1. Add the standalone plugin directory as a subdirectory of Catalyst
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: diff
 
@@ -142,7 +165,7 @@ For now, we found that the following process is the easiest one:
      add_subdirectory(tools)
      add_subdirectory(test)
     +add_subdirectory(standalone)
-     
+
      if(QUANTUM_ENABLE_BINDINGS_PYTHON)
        message(STATUS "Enabling Python API")
 
@@ -159,7 +182,7 @@ You will also need to make the following change:
     -project(standalone-dialect LANGUAGES CXX C)
     -
      set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
-     
+
      set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 
 .. code-block:: diff
@@ -171,7 +194,7 @@ You will also need to make the following change:
     @@ -32,8 +32,8 @@ if(MLIR_ENABLE_BINDINGS_PYTHON)
        mlir_configure_python_dev_packages()
      endif()
-     
+
     -set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR})
     -set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR})
     +set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/standalone)
@@ -182,9 +205,10 @@ You will also need to make the following change:
 
 With these changes, you should now be able to use ``make all`` and build the standalone plugin.
 Please note that the location of the ``StandalonePlugin.so`` shared object has changed.
-It will now be stored in the ``mlir/build/lib/`` folder.
+It will now be stored in the ``mlir/build/lib/`` directory.
 
-2. Include the header files in the standalone plugin pass.
+2. Include the header files in the standalone plugin pass
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: diff
 
@@ -194,18 +218,24 @@ It will now be stored in the ``mlir/build/lib/`` folder.
     +++ b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
     @@ -12,6 +12,7 @@
      #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-     
+
      #include "Standalone/StandalonePasses.h"
     +#include "Quantum/IR/QuantumOps.h"
-     
+
      namespace mlir::standalone {
      #define GEN_PASS_DEF_STANDALONESWITCHBARFOO
 
-You can type ``make all`` and see the compilation succeed.
-Please note that Catalyst has three custom dialects, the Quantum, Catalyst and Gradient dialect.
-Depending on which dialect you are interested in, you can include the definition of the operations in that way.
+You can execute ``make all`` and see the compilation succeed.
+Please note that Catalyst has a number of custom dialects, such as the Quantum, Catalyst and Gradient dialects.
+Depending on which dialect you are interested in, you can include the definition of the operations in a similar way by including the appropriate dialect header file.
 
-3. Marking dialects as dependent in the pass TableGen file.
+3. Marking dialects as dependent in the pass TableGen file
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+LLVM and MLIR use `Tablegen <https://llvm.org/docs/TableGen/>`_, an embedded domain-specific language (DSL), to declare compiler passes.
+TableGen automates the generation of required C++ boilerplate code, streamline the development process.
+When defining transformations via TableGen, you must explicitly register any dependent dialects required by the pass.
+For instance, to manipulate ``quantum`` operations using the custom plugin, the ``Quantum`` dialect must be added to the list of dependent dialects in the pass definition file:
 
 .. code-block:: diff
 
@@ -216,21 +246,16 @@ Depending on which dialect you are interested in, you can include the definition
     @@ -26,6 +26,10 @@ def StandaloneSwitchBarFoo: Pass<"standalone-switch-bar-foo", "::mlir::ModuleOp"
          ```
        }];
-     
+
     +   let dependentDialects = [
     +       "catalyst::quantum::QuantumDialect"
     +   ];
     +
      }
-     
+
      #endif // STANDALONE_PASS
 
-LLVM and MLIR use an embedded DSL to declare passes called `Tablegen <https://llvm.org/docs/TableGen/>`_.
-This saves LLVM and MLIR developers time, because Tablegen generates C++ files that are mostly just boilerplate code.
-We are not going to go in depth into Tablegen, you just need to know that transformations require to register which passes are used.
-In this example, since we are interested in using the quantum dialect, we will add the Quantum Dialect in the list of dependent dialects.
-
-One also needs to link the MLIRQuantum library and change the plugin tool to catalyst-cli.
+Finally, the appropriate library must be linked in (``MLIRQuantum`` for the ``Quantum`` dialect), and the plugin tool changed to ``catalyst-cli``:
 
 .. code-block:: diff
 
@@ -243,7 +268,7 @@ One also needs to link the MLIRQuantum library and change the plugin tool to cat
              MLIRStandaloneOpsIncGen
              MLIRStandalonePassesIncGen
     +        MLIRQuantum
-     
+
              LINK_LIBS PUBLIC
              MLIRIR
              MLIRInferTypeOpInterface
@@ -263,18 +288,20 @@ One also needs to link the MLIRQuantum library and change the plugin tool to cat
              PLUGIN_TOOL
     -        mlir-opt
     +        catalyst-cli
-     
+
              LINK_LIBS
              MLIRStandalone
 
-Please note that if you are using the Catalyst or Gradient dialects, you should also add MLIRCatalyst and MLIRGradient to the list of dependencies and libraries to be linked.
+If the plugin depends on other dialects defined in Catalyst, they can be added as dependencies in a similar way.
+For instance, if the plugin depends on the ``Gradient`` dialect, add ``"catalyst::gradient::GradientDialect"`` to the ``dependentDialects`` field and link the ``MLIRGradient`` library.
 
-4. Modify the standalone plugin to modify quantum operations.
+4. Modify the standalone plugin to modify quantum operations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Here we will create a very simple pass that will change a the quantum qubit allocation from 1 to 42 (for illustration purposes).
-We recommend reading MLIR tutorials on how to write MLIR passes, reading the Catalyst source to understand the Catalyst IR, and submitting issues if you are having troubles building your own plugin.
+Here we will create a very simple pass that will change the quantum qubit allocation from 1 to 42 (for illustration purposes).
+We recommend reading the `MLIR tutorials <https://mlir.llvm.org/docs/Tutorials/>`_ on how to write MLIR passes, reading the Catalyst source to understand the Catalyst IR, and submitting issues if you are having troubles building your own plugin.
 
-The first thing we need to do is change the ``OpRewritePattern`` to match against our ``quantum::AllocOp`` which denotes how many qubits should be allocated for a given quantum program.
+The first thing we need to do is change the ``OpRewritePattern`` to match against our ``quantum::AllocOp``, which denotes how many qubits should be allocated for a given quantum program.
 
 .. code-block:: diff
 
@@ -284,7 +311,7 @@ The first thing we need to do is change the ``OpRewritePattern`` to match agains
     +++ b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
     @@ -19,10 +19,10 @@ namespace mlir::standalone {
      #include "Standalone/StandalonePasses.h.inc"
-     
+
      namespace {
     -class StandaloneSwitchBarFooRewriter : public OpRewritePattern<func::FuncOp> {
     +class StandaloneSwitchBarFooRewriter : public OpRewritePattern<catalyst::quantum::AllocOp> {
@@ -307,7 +334,7 @@ The next step is changing the contents of the function itself:
     +++ b/mlir/standalone/lib/Standalone/StandalonePasses.cpp
     @@ -19,15 +19,21 @@ namespace mlir::standalone {
      #include "Standalone/StandalonePasses.h.inc"
-     
+
      namespace {
     -class StandaloneSwitchBarFooRewriter : public OpRewritePattern<func::FuncOp> {
     +class StandaloneSwitchBarFooRewriter : public OpRewritePattern<catalyst::quantum::AllocOp> {
@@ -339,13 +366,14 @@ This shared object can be used with both the ``catalyst`` and ``quantum-opt`` to
 From here, you can change the name of the pass, change the name of the shared object, and implement more complex transformations.
 
 
-5. Build your own python wheel and ship your plugin.
+5. Build your own python wheel and ship your plugin
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Now that you have your ``StandalonePlugin.so``, you can ship it in a python wheel.
 To allow users to run your pass, we have provided a class called :class:`~.passes.Pass` and :class:`~.passes.PassPlugin`.
 You can extend these classes and allow the user to import your derived classes and run passes as a decorator.
 We provide the :func:`~.passes.apply_pass_plugin` decorator to allow pass plugins to be loaded and executed.
-See for example:
+For example:
 
 .. code-block:: python
 
@@ -364,10 +392,10 @@ See for example:
 
 
 If you have followed all the steps in this tutorial and inspect the MLIR sources, you'll find that the number of qubits allocated will be 42.
-Take a look into the ``standalone_plugin_wheel`` make rule to see how we test shipping a plugin.
-For more information, please consult our :doc:`dialect guide </dev/dialects.html>`_, our `compiler passes guide :doc:</dev/transforms.html>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_.
+Take a look into the ``standalone_plugin_wheel`` Makefile rule to see how we test shipping a plugin.
+For more information, please consult our :doc:`dialect guide </dev/dialects>`_, our `compiler passes guide :doc:</dev/transforms>`_, and the `MLIR documentation <https://mlir.llvm.org/>`_.
 
-You can also register your pass with Catalyst via Python's `entry_points <https://packaging.python.org/en/latest/specifications/entry-points/>`_ (for reference, we have an `example in the Catalyst Github repository <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_ 
+You can also register your pass with Catalyst via Python's `entry_points <https://packaging.python.org/en/latest/specifications/entry-points/>`_ (for reference, we have an `example in the Catalyst Github repository <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_
 that implements the standalone plugin as a Python package).
 To do this, you only need to define a function named ``name2pass``—it must be named ``name2pass``—that takes a string with the name of the pass (from the user perspective) and returns the absolute path to the plugin stored in your package and the name of the MLIR pass.
 For the `standalone plugin python <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_ package we defined:
@@ -393,9 +421,9 @@ See our ``setup.py`` `file in the standalone plugin python package <https://gith
     setup(
         name="standalone_plugin",
         version="0.1.0",
-        # ... 
+        # ...
         entry_points=entry_points,
-        # ... 
+        # ...
     )
 
 After this, the user will be able to use your pass with the :func:`~.passes.apply_pass` function.
