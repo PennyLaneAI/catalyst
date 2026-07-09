@@ -25,6 +25,7 @@ from typing import Iterable, List, Union
 import jax
 import numpy as np
 import pennylane as qp
+from jax._src import config as jax_config
 from jax._src import core, source_info_util, util
 from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
@@ -275,44 +276,51 @@ class Folding(Enum):
 # Primitives #
 ##############
 
-zne_p = Primitive("zne")
-device_init_p = Primitive("device_init")
+
+class CatxprPrimitive(Primitive):
+    def bind(self, *args, **kwargs):
+        with jax_config.eager_constant_folding(False):
+            return super().bind(*args, **kwargs)
+
+
+zne_p = CatxprPrimitive("zne")
+device_init_p = CatxprPrimitive("device_init")
 device_init_p.multiple_results = True
-device_release_p = Primitive("device_release")
+device_release_p = CatxprPrimitive("device_release")
 device_release_p.multiple_results = True
-num_qubits_p = Primitive("num_qubits")
-qalloc_p = Primitive("qalloc")
-qdealloc_p = Primitive("qdealloc")
+num_qubits_p = CatxprPrimitive("num_qubits")
+qalloc_p = CatxprPrimitive("qalloc")
+qdealloc_p = CatxprPrimitive("qdealloc")
 qdealloc_p.multiple_results = True
-qdealloc_qb_p = Primitive("qdealloc_qb")
+qdealloc_qb_p = CatxprPrimitive("qdealloc_qb")
 qdealloc_qb_p.multiple_results = True
-qextract_p = Primitive("qextract")
-qinsert_p = Primitive("qinsert")
-gphase_p = Primitive("gphase")
+qextract_p = CatxprPrimitive("qextract")
+qinsert_p = CatxprPrimitive("qinsert")
+gphase_p = CatxprPrimitive("gphase")
 gphase_p.multiple_results = True
-qinst_p = Primitive("qinst")
+qinst_p = CatxprPrimitive("qinst")
 qinst_p.multiple_results = True
-unitary_p = Primitive("unitary")
+unitary_p = CatxprPrimitive("unitary")
 unitary_p.multiple_results = True
-pauli_rot_p = Primitive("pauli_rot")
+pauli_rot_p = CatxprPrimitive("pauli_rot")
 pauli_rot_p.multiple_results = True
-pauli_measure_p = Primitive("pauli_measure")
+pauli_measure_p = CatxprPrimitive("pauli_measure")
 pauli_measure_p.multiple_results = True
-measure_p = Primitive("measure")
+measure_p = CatxprPrimitive("measure")
 measure_p.multiple_results = True
-compbasis_p = Primitive("compbasis")
-namedobs_p = Primitive("namedobs")
-mcmobs_p = Primitive("mcmobs")
-hermitian_p = Primitive("hermitian")
-tensorobs_p = Primitive("tensorobs")
-hamiltonian_p = Primitive("hamiltonian")
-sample_p = Primitive("sample")
-counts_p = Primitive("counts")
+compbasis_p = CatxprPrimitive("compbasis")
+namedobs_p = CatxprPrimitive("namedobs")
+mcmobs_p = CatxprPrimitive("mcmobs")
+hermitian_p = CatxprPrimitive("hermitian")
+tensorobs_p = CatxprPrimitive("tensorobs")
+hamiltonian_p = CatxprPrimitive("hamiltonian")
+sample_p = CatxprPrimitive("sample")
+counts_p = CatxprPrimitive("counts")
 counts_p.multiple_results = True
-expval_p = Primitive("expval")
-var_p = Primitive("var")
-probs_p = Primitive("probs")
-state_p = Primitive("state")
+expval_p = CatxprPrimitive("expval")
+var_p = CatxprPrimitive("var")
+probs_p = CatxprPrimitive("probs")
+state_p = CatxprPrimitive("state")
 cond_p = DynshapePrimitive("cond")
 cond_p.multiple_results = True
 switch_p = DynshapePrimitive("switch")
@@ -321,31 +329,31 @@ while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
 for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
-grad_p = Primitive("grad")
+grad_p = CatxprPrimitive("grad")
 grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
 func_p.multiple_results = True
-jvp_p = Primitive("jvp")
+jvp_p = CatxprPrimitive("jvp")
 jvp_p.multiple_results = True
-vjp_p = Primitive("vjp")
+vjp_p = CatxprPrimitive("vjp")
 vjp_p.multiple_results = True
-adjoint_p = Primitive("adjoint")
+adjoint_p = CatxprPrimitive("adjoint")
 adjoint_p.multiple_results = True
-print_p = Primitive("debug_print")
+print_p = CatxprPrimitive("debug_print")
 print_p.multiple_results = True
-python_callback_p = Primitive("python_callback")
+python_callback_p = CatxprPrimitive("python_callback")
 python_callback_p.multiple_results = True
-value_and_grad_p = Primitive("value_and_grad")
+value_and_grad_p = CatxprPrimitive("value_and_grad")
 value_and_grad_p.multiple_results = True
-assert_p = Primitive("assert")
+assert_p = CatxprPrimitive("assert")
 assert_p.multiple_results = True
-set_state_p = Primitive("state_prep")
+set_state_p = CatxprPrimitive("state_prep")
 set_state_p.multiple_results = True
-set_basis_state_p = Primitive("set_basis_state")
+set_basis_state_p = CatxprPrimitive("set_basis_state")
 set_basis_state_p.multiple_results = True
 quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
-decomprule_p = core.Primitive("decomposition_rule")
+decomprule_p = CatxprPrimitive("decomposition_rule")
 decomprule_p.multiple_results = True
 
 

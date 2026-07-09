@@ -26,6 +26,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, T
 
 import jax
 from jax import ShapeDtypeStruct
+from jax._src import config as jax_config
 from jax._src.core import DBIdx, InDBIdx, InputType, OutDBIdx, OutputType
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (

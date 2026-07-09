@@ -42,6 +42,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
 from catalyst.jax_extras import deduce_avals, make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
+    CatxprPrimitive,
     device_init_p,
     device_release_p,
     quantum_kernel_p,
@@ -56,7 +57,7 @@ from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 # we want to have the same tracers as inputs to plxpr capture and from_plxpr
 # translation, as this tells jax which inputs match which dynamic shapes
 # if we have concrete inputs to both, jax will get confused.
-_dummy_hop = jax.extend.core.Primitive("dummy_hop")
+_dummy_hop = CatxprPrimitive("dummy_hop")
 _dummy_hop.multiple_results = True
 
 
@@ -315,26 +316,23 @@ def handle_qnode(
             )
 
     def calling_convention(*args):
-        with jax_config.eager_constant_folding(False):
-            device_init_p.bind(
-                shots,
-                auto_qubit_management=(device.wires is None),
-                **_get_device_kwargs(device),
-            )
+        device_init_p.bind(
+            shots,
+            auto_qubit_management=(device.wires is None),
+            **_get_device_kwargs(device),
+        )
 
         # https://github.com/PennyLaneAI/pennylane/pull/9248
         assert not is_dynamic_wires(
             device.wires
         ), "plxpr does not support dynamic number of wires on the device yet"
-        with jax_config.eager_constant_folding(False):
-            qreg = qref_alloc_p.bind(static_num_qubits=len(device.wires))
+        qreg = qref_alloc_p.bind(static_num_qubits=len(device.wires))
         self.init_qreg = qreg
 
         converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.init_qreg, {})
         retvals = converter(closed_jaxpr, *args)
         qref_dealloc_p.bind(self.init_qreg)
-        with jax_config.eager_constant_folding(False):
-            device_release_p.bind()
+        device_release_p.bind()
         return retvals
 
     if self.requires_decompose_lowering and graph_succeeded:
@@ -542,8 +540,7 @@ def trace_from_pennylane(
             jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(
                 *abstract_shapes, *flat_inputs
             )
-            with jax_config.eager_constant_folding(False):
-                return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
+            return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
 
         nested_jaxpr = jax.make_jaxpr(wrapper, **make_jaxpr_kwargs)(*args, **kwargs)
         jaxpr = nested_jaxpr.eqns[0].params["jaxpr"]
