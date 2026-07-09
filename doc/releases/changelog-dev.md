@@ -37,6 +37,8 @@
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
+* The `ResourceAnalysis` pass is now extensible. 
+
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
   [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
