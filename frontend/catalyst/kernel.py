@@ -78,13 +78,12 @@ def _to_hashable(spec):
 
 
 def declare(name: str, artifact: Optional[str] = None, outputs=None, *,
-            remote=False) -> KernelDescriptor:
+            remote: bool | object = False) -> KernelDescriptor:
     """Declare an external kernel for use with :func:`kernel.runtime_call`.
 
     Args:
         name:     C symbol name. For a local kernel, exported by ``artifact``; for a remote
-                  kernel, a symbol already loaded on the executor (e.g.
-                  ``"fpga_trampoline_a_setup"``).
+                  kernel, a symbol already loaded on the executor (e.g. ``"remote_setup"``).
         artifact: Path to the shared library for a local kernel (resolved relative to
                   ``os.getcwd()`` if not absolute; must exist at declare time). Omit for a
                   remote kernel.

@@ -364,14 +364,18 @@ struct RemoteSession {
             return EPC.takeError();
         }
 
-        JITTargetMachineBuilder JTMB((*EPC)->getTargetTriple());
-        auto DL = JTMB.getDefaultDataLayoutForTarget();
-        if (!DL) {
-            return DL.takeError();
-        }
+        // A remote session only needs the executor's symbol-mangling convention (its global symbol
+        // prefix), which is fixed by the target's object format. Deriving it from the executor triple
+        // avoids building a target machine, so the client does not need the executor's codegen
+        // backend in its own LLVM — a client can drive an executor of a different architecture.
+        const Triple &executorTriple = (*EPC)->getTargetTriple();
+        StringRef manglingSpec = executorTriple.isOSBinFormatMachO()   ? "m:o"
+                                 : executorTriple.isOSBinFormatCOFF()  ? "m:w"
+                                                                       : "m:e";
+        DataLayout DL(manglingSpec);
 
         auto ES = std::make_unique<ExecutionSession>(std::move(*EPC));
-        return std::make_unique<RemoteSession>(std::move(ES), std::move(*DL));
+        return std::make_unique<RemoteSession>(std::move(ES), std::move(DL));
     }
 
     // Load a kernel object into its own JITDylib (keyed by `path`), linked against MainJD for deps.

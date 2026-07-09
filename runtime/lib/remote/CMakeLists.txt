@@ -61,3 +61,30 @@ if(NOT APPLE)
 else()
     set_property(TARGET rt_remote APPEND PROPERTY BUILD_RPATH @loader_path)
 endif()
+
+##############################
+# catalyst-executor (server) #
+##############################
+# The out-of-process executor a local/remote Executor() dispatches to: an ORC SimpleRemoteEPCServer
+# over a socket that dlopen's plugins and runs their entries. Exported dynamically so plugin symbols
+# are visible to the JIT.
+
+llvm_map_components_to_libnames(_executor_libs orcjit orctargetprocess orcshared support)
+
+add_executable(catalyst-executor executor.cpp)
+
+target_include_directories(catalyst-executor SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+
+target_link_libraries(catalyst-executor PRIVATE
+    ${_executor_libs}
+    pthread
+    ${CMAKE_DL_LIBS}
+)
+
+target_compile_options(catalyst-executor PRIVATE -fno-rtti)
+
+if(NOT APPLE)
+    target_link_options(catalyst-executor PRIVATE -Wl,--export-dynamic)
+else()
+    target_link_options(catalyst-executor PRIVATE -Wl,-export_dynamic)
+endif()
