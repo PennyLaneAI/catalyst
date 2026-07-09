@@ -59,7 +59,7 @@ def fixture_get_generic_qec_code():
         z_tanner=None,
         transversal_1q_gates: dict[str, tuple[str, ...]] | None = None,
         transversal_2q_gates: dict[str, str] | None = None,
-        unitary_encoding: dict = {},
+        unitary_encoding: dict | None = None,
     ) -> QecCode:
         rng = np.random.default_rng(seed=42)
 
@@ -80,6 +80,9 @@ def fixture_get_generic_qec_code():
 
         if transversal_2q_gates is None:
             transversal_2q_gates = {"cnot": "CNOT"}
+
+        if unitary_encoding is None:
+            unitary_encoding = {}
 
         return QecCode(
             name=name,
