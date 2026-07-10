@@ -68,12 +68,7 @@ def get_libpython_path() -> str:   # pragma: no cover
 
     The QPD plugin uses dlopen by the standalone ``catalyst`` compiler process, which does
     not embed Python, so it needs ``libpython`` loaded with ``RTLD_GLOBAL`` to resolve CPython
-    symbols. So, this path needs to return a shared object instead of the static python library.
-
-    ``LDLIBRARY`` in ``sysconfig`` is not reliably the shared library: some builds (notably
-    conda envs) report the static archive ``libpythonX.Y.a`` there even though a ``.so``
-    is present alongside it. We accept ``LDLIBRARY`` only when it is a shared object
-    that exists, and otherwise fall back to locating the shared library in ``LIBDIR``.
+    symbols. Therefore, this path needs to return a shared object.
     """
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
@@ -98,6 +93,10 @@ def get_libpython_path() -> str:   # pragma: no cover
     # Fall back to the conventionally-named shared library (e.g. libpython3.12.so). This is
     # the case that a static-preferring build (e.g. conda) hits: LDLIBRARY names the .a, but
     # the .so is present under its canonical, version-derived name.
+    # ``LDLIBRARY`` in ``sysconfig`` is not reliably the shared library: some builds (notably
+    # conda envs) report the static archive ``libpythonX.Y.a`` there even though a ``.so``
+    # is present alongside it. We accept ``LDLIBRARY`` only when it is a shared object
+    # that exists, and otherwise fall back to locating the shared library in ``LIBDIR``.
     ldversion = sysconfig.get_config_var("LDVERSION") or sysconfig.get_config_var("VERSION") or ""
     conventional_path = os.path.join(libdir, f"libpython{ldversion}{shlib_suffix}")
     if os.path.exists(conventional_path):
