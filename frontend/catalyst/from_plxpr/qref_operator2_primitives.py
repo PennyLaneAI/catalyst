@@ -131,8 +131,10 @@ def _process_params(
         if hname not in op_cls.wire_argnames:
             leaves = args[args_idx : args_idx + hsize]
             # Any dynamic arguments of input operators are considered feed-forward arguments for
-            # decomposition rules, not parameters or qubits of the outer operator. This function
-            # is used to partition feed-forward arguments from other dynamic values.
+            # decomposition rules, not parameters of the outer operator. This function is used
+            # to partition feed-forward arguments from other dynamic values. Note that _wires_ of
+            # operator arguments _ are not_ considered feed-forward arguments. Rather, it is assumed
+            # that an operator of operators acts on all the wires of its operator arguments.
             cur_fwd_mask = forward_mask[mask_idx : mask_idx + hsize]
             cur_params = []
 
@@ -140,6 +142,7 @@ def _process_params(
                 if is_forward:
                     forward_params.append(leaf)
                 elif not _is_qref_qubit(leaf):
+                    # Qubits are handled in _process_qubits
                     cur_params.append(leaf)
 
             if cur_params:
@@ -172,7 +175,7 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
     map_idx = 0
     for wname, wsize in zip(flat_wire_argnames, wire_lens, strict=True):
         if wsize:
-            # If wsize is 0, then we don't want to populate the qubit map
+            # If wsize is 0, then we don't need to populate the qubit map. It will be empty anyway
             qubits += args[args_idx : args_idx + wsize]
             qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
             map_idx += wsize
@@ -199,12 +202,7 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
     return qubits, qubit_map
 
 
-def _qref_operator_p_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *args,
-    op_cls,
-    **kwargs,
-):
+def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, **kwargs):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     _general_validation(*args, op_cls=op_cls, **kwargs)
@@ -226,6 +224,7 @@ def _qref_operator_p_lowering(
     else:
         ctrl_qubits = ctrl_values = ()
 
+    # Custom lowerings (qref.multirz, qref.pcphase, etc.)
     if op_cls.__name__ in _SPECIAL_LOWERINGS:
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
@@ -236,6 +235,7 @@ def _qref_operator_p_lowering(
 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
 
+    # Lowering to qref.custom
     if _is_custom_op(op_cls, jax_ctx.avals_in[: len(op_cls.dynamic_argnames)]):
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."

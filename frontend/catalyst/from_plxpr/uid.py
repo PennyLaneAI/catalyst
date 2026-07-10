@@ -36,7 +36,6 @@ def generate_uid(
 ):
     """Generate a unique identifier that allows us to distinguish between
     operators with unique non-compilable arguments."""
-    reduced = []
 
     # Flat dynamic arguments
     dynamic_args = avals_in[: len(op_cls.dynamic_argnames)]
@@ -63,7 +62,7 @@ def generate_uid(
     # Static arguments
     reduced_static_args = tuple(_serialize_static(val, name) for name, val in static_args.items())
 
-    reduced.append(op_cls)
+    reduced = [op_cls]
     reduced.append(("dynamic", tuple(dynamic_avals)))
     reduced.append(("wires", wire_lens))
     reduced.append(("hybrid", hybrid_trees, tuple(hybrid_avals)))
@@ -85,7 +84,7 @@ def _serialize_static(val: Any, name: str | None):
 
         (name, type, hashable_reduction)
     """
-    # For arbitrary unhashable data that is opaque, just use the id
+    # For arbitrary opaque data that may be unhashable, just use the id
     return (name, type(val), id(val))
 
 
