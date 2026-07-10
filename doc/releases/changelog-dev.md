@@ -220,6 +220,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `graph-decomposition` pass eliminates three redundant IR manipulations:
+  the cloning, removal, and re-insertion of user rules. This optimization is particularly
+  beneficial when the pass is executed multiple times within the compilation pipeline.
+  [(#2977)](https://github.com/PennyLaneAI/catalyst/pull/2977)
+
 * `from_plxpr` no longer depends on the `Transform.plxpr_transform` property.
   [(#3004)](https://github.com/PennyLaneAI/catalyst/pull/3004)
 
