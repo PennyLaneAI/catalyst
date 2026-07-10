@@ -238,11 +238,14 @@ void handleAlloc(IRRewriter &builder, quantum::AllocOp vAllocOp, QubitValueTrack
     Type qregType;
     if (vAllocOp.getNqubitsAttr().has_value()) {
         qregType = qref::QuregType::get(ctx, vAllocOp.getNqubitsAttrAttr());
-        rAllocOp = qref::AllocOp::create(builder, loc, qregType, {}, vAllocOp.getNqubitsAttrAttr());
+        rAllocOp = qref::AllocOp::create(builder, loc, qregType, {}, vAllocOp.getNqubitsAttrAttr(),
+                                         vAllocOp.getStateAttr(), vAllocOp.getRestoredAttr());
     }
     else {
         qregType = qref::QuregType::get(ctx, builder.getI64IntegerAttr(ShapedType::kDynamic));
-        rAllocOp = qref::AllocOp::create(builder, loc, qregType, vAllocOp.getNqubits(), nullptr);
+        rAllocOp = qref::AllocOp::create(builder, loc, qregType, vAllocOp.getNqubits(), nullptr,
+                                         vAllocOp.getNqubitsAttrAttr(), vAllocOp.getStateAttr(),
+                                         vAllocOp.getRestoredAttr());
     }
 
     tracker.setRQreg(vAllocOp.getQreg(), rAllocOp.getQreg());

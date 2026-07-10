@@ -419,7 +419,7 @@ def handle_allocate(self, *, num_wires, state=None, restored=False):
     ), "number of dynamically allocated qubits must be statically known"
 
     self.has_dynamic_allocation = True
-    new_qreg = qref_alloc_p.bind(static_num_qubits=num_wires)
+    new_qreg = qref_alloc_p.bind(static_num_qubits=num_wires, state=state, restored=restored)
     return [qref_get_p.bind(new_qreg, i) for i in range(num_wires)]
 
 

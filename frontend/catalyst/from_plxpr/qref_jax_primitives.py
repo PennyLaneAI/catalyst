@@ -31,6 +31,8 @@ from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.wires import AbstractQubit
 
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
 # Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
@@ -172,7 +174,9 @@ qref_hermitian_p = Primitive("qref_hermitian")
 # qref_alloc_p
 #
 @qref_alloc_p.def_abstract_eval
-def _qref_alloc_abstract_eval(*dynamic_num_qubits, static_num_qubits=None):
+def _qref_alloc_abstract_eval(
+    *dynamic_num_qubits, static_num_qubits=None, state=None, restored=False
+):
     static_num_qubits_present = static_num_qubits is not None
     assert bool(dynamic_num_qubits) ^ static_num_qubits_present
     if static_num_qubits_present:
@@ -182,21 +186,29 @@ def _qref_alloc_abstract_eval(*dynamic_num_qubits, static_num_qubits=None):
 
 
 def _qref_alloc_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *dynamic_num_qubits, static_num_qubits=None
+    jax_ctx: mlir.LoweringRuleContext,
+    *dynamic_num_qubits,
+    static_num_qubits=None,
+    state=None,
+    restored=False,
 ):
     static_num_qubits_present = static_num_qubits is not None
     assert bool(dynamic_num_qubits) ^ static_num_qubits_present
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
+    state = str(state.value) if state else "zero"
+    state = get_mlir_attribute_from_pyval(state)
+    restored = get_mlir_attribute_from_pyval(restored)
+
     if static_num_qubits_present:
         size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), static_num_qubits)
         qreg_type = ir.OpaqueType.get("qref", "reg<" + str(static_num_qubits) + ">", ctx)
-        return AllocOp(qreg_type, nqubits_attr=size_attr).results
+        return AllocOp(qreg_type, nqubits_attr=size_attr, state=state, restored=restored).results
     else:
         size_value = extract_scalar(dynamic_num_qubits[0], "qref_alloc")
         qreg_type = ir.OpaqueType.get("qref", "reg<?>", ctx)
-        return AllocOp(qreg_type, nqubits=size_value).results
+        return AllocOp(qreg_type, nqubits=size_value, state=state, restored=restored).results
 
 
 #

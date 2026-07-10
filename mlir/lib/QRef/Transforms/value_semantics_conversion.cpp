@@ -1051,10 +1051,12 @@ void handleAlloc(IRRewriter &builder, qref::AllocOp rAllocOp, QubitValueTracker 
     std::optional<uint64_t> nqubitsAttr = rAllocOp.getNqubitsAttr();
     if (nqubitsAttr.has_value()) {
         vAllocOp = quantum::AllocOp::create(builder, loc, qregType, {},
-                                            IntegerAttr::get(i64Type, *nqubitsAttr));
+                                            IntegerAttr::get(i64Type, *nqubitsAttr),
+                                            rAllocOp.getStateAttr(), rAllocOp.getRestoredAttr());
     }
     else {
-        vAllocOp = quantum::AllocOp::create(builder, loc, qregType, rAllocOp.getNqubits(), nullptr);
+        vAllocOp = quantum::AllocOp::create(builder, loc, qregType, rAllocOp.getNqubits(), nullptr,
+                                            rAllocOp.getStateAttr(), rAllocOp.getRestoredAttr());
     }
     tracker.setCurrentVQreg(rAllocOp.getQreg(), vAllocOp.getQreg());
 }

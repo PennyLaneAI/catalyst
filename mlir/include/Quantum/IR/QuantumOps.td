@@ -118,7 +118,9 @@ def AllocOp : Memory_Op<"alloc"> {
 
     let arguments = (ins
         Optional<I64>:$nqubits,
-        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$nqubits_attr
+        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$nqubits_attr,
+        DefaultValuedAttr<StrAttr, "\"zero\"">:$state,
+        DefaultValuedAttr<BoolAttr, "false">:$restored
     );
 
     let results = (outs
