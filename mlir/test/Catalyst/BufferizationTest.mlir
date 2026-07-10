@@ -53,7 +53,7 @@ func.func @dbprint_str() {
 
 // -----
 
-func.func public @jit_c_various_shapes() attributes {llvm.emit_c_interface} {
+func.func public @symbolic_array_error() attributes {llvm.emit_c_interface} {
     // expected-error @below {{catalyst::symbolic_array is a placeholder op}}
     // expected-error @below {{failed to bufferize op}}
     %0 = catalyst.symbolic_array : tensor<i64>
