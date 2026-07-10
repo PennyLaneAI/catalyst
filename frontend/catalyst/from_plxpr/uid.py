@@ -40,9 +40,7 @@ def generate_uid(
 
     # Flat dynamic arguments
     dynamic_args = avals_in[: len(op_cls.dynamic_argnames)]
-    dynamic_avals = []
-    for val in dynamic_args:
-        dynamic_avals.append((val.shape, val.dtype.name))
+    dynamic_avals = [(val.shape, val.dtype.name) for val in dynamic_args]
 
     # Hybrid arguments (wire and non-wire)
     args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
