@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Tests for using symobolic_array in a QNode.
+Tests for using ``symbolic_array`` in a QNode.
 """
 
 # pylint: disable=line-too-long, missing-function-docstring
