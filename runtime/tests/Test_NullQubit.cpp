@@ -1121,3 +1121,52 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
 
     std::remove(RESOURCES_FILENAME.c_str()); // Remove the file automatically created by the device
 }
+
+TEST_CASE("Test __catalyst__rt__random_double with a seeded runtime", "[CoreQIS]")
+{
+    uint32_t seed = 42;
+
+    __catalyst__rt__initialize(&seed);
+    std::vector<double> first_draw;
+    for (size_t i = 0; i < 10; i++) {
+        double value = __catalyst__rt__random_double();
+        CHECK(value >= 0.0);
+        CHECK(value < 1.0);
+        first_draw.push_back(value);
+    }
+    __catalyst__rt__finalize();
+
+    // Same seed: the folding PRNG stream must be reproducible.
+    __catalyst__rt__initialize(&seed);
+    for (size_t i = 0; i < 10; i++) {
+        CHECK(__catalyst__rt__random_double() == first_draw[i]);
+    }
+    __catalyst__rt__finalize();
+
+    // Different seed: the stream should differ.
+    uint32_t other_seed = 43;
+    __catalyst__rt__initialize(&other_seed);
+    bool all_equal = true;
+    for (size_t i = 0; i < 10; i++) {
+        all_equal &= (__catalyst__rt__random_double() == first_draw[i]);
+    }
+    CHECK(!all_equal);
+    __catalyst__rt__finalize();
+}
+
+TEST_CASE("Test __catalyst__rt__random_double with an unseeded runtime", "[CoreQIS]")
+{
+    __catalyst__rt__initialize(nullptr);
+    for (size_t i = 0; i < 10; i++) {
+        double value = __catalyst__rt__random_double();
+        CHECK(value >= 0.0);
+        CHECK(value < 1.0);
+    }
+    __catalyst__rt__finalize();
+}
+
+TEST_CASE("Test __catalyst__rt__random_double before initialization", "[CoreQIS]")
+{
+    REQUIRE_THROWS_WITH(__catalyst__rt__random_double(),
+                        ContainsSubstring("Invalid use of the global driver before initialization"));
+}
