@@ -13,15 +13,26 @@
 // limitations under the License.
 
 #include <algorithm> // std::move_backward
+#include <cassert>
+#include <cstddef>
+#include <iterator>
+#include <utility>
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
@@ -34,8 +45,8 @@ namespace catalyst {
 namespace quantum {
 
 // The goal of this class is to analyze the signature of a custom operation to get the enough
-// information to prepare the call operands and results for replacing the op to calling the
-// decomposition function.
+// information to prepare the operands and results for replacing the op with the decomposition
+// function.
 class BaseSignatureAnalyzer {
   protected:
     bool isValid = true;
@@ -177,7 +188,7 @@ class BaseSignatureAnalyzer {
         return latestQreg;
     }
 
-    // Prepare the operands for calling the decomposition function
+    // Prepare the operands for the decomposition function
     // There are two cases:
     // 1. The first input is a qreg, which means the decomposition function is a qreg mode function
     // 2. Otherwise, the decomposition function is a qubit mode function
@@ -187,10 +198,10 @@ class BaseSignatureAnalyzer {
     //    - func(qreg, param*, inWires*, inCtrlWires*?, inCtrlValues*?) -> qreg
     // 2. qubit mode:
     //    - func(param*, inQubits*, inCtrlQubits*?, inCtrlValues*?) -> outQubits*
-    llvm::SmallVector<Value> prepareCallOperands(func::FuncOp decompFunc, PatternRewriter &rewriter,
-                                                 Location loc)
+    llvm::SmallVector<Value> prepareOperands(func::FuncOp rule, PatternRewriter &rewriter,
+                                             Location loc)
     {
-        auto funcType = decompFunc.getFunctionType();
+        auto funcType = rule.getFunctionType();
         auto funcInputs = funcType.getInputs();
 
         SmallVector<Type> funcInputsNoQreg;
@@ -202,10 +213,10 @@ class BaseSignatureAnalyzer {
 
         SmallVector<Value> operands(funcInputs.size());
 
-        auto qregIt = llvm::find_if(decompFunc.getFunctionType().getInputs(),
+        auto qregIt = llvm::find_if(rule.getFunctionType().getInputs(),
                                     [](mlir::Type t) { return isa<quantum::QuregType>(t); });
-        int qregIdx = std::distance(decompFunc.getFunctionType().getInputs().begin(), qregIt);
-        bool hasQreg = (qregIt != decompFunc.getFunctionType().getInputs().end());
+        int qregIdx = std::distance(rule.getFunctionType().getInputs().begin(), qregIt);
+        bool hasQreg = (qregIt != rule.getFunctionType().getInputs().end());
 
         int operandIdx = 0;
         if (!signature.params.empty()) {
@@ -264,22 +275,18 @@ class BaseSignatureAnalyzer {
         return operands;
     }
 
-    // Prepare the results for the call operation
-    SmallVector<Value> prepareCallResultForQreg(func::CallOp callOp, PatternRewriter &rewriter)
+    // Prepare the results produced by a qreg-mode decomposition rule
+    SmallVector<Value> prepareResultsForQreg(Value qreg, Location loc, PatternRewriter &rewriter)
     {
-        assert(callOp.getNumResults() == 1 && "only one qreg result for qreg mode is allowed");
-
-        auto qreg = callOp.getResult(0);
         assert(isa<quantum::QuregType>(qreg.getType()) && "only allow to have qreg result");
 
         SmallVector<Value> newResults;
-        rewriter.setInsertionPointAfter(callOp);
 
         for (const auto &indices : {signature.outQubitIndices, signature.outCtrlQubitIndices}) {
             for (const auto &index : indices) {
                 auto extractOp = quantum::ExtractOp::create(
-                    rewriter, callOp.getLoc(), rewriter.getType<quantum::QubitType>(), qreg,
-                    index.getValue(), index.getAttr());
+                    rewriter, loc, rewriter.getType<quantum::QubitType>(), qreg, index.getValue(),
+                    index.getAttr());
                 newResults.emplace_back(extractOp.getResult());
             }
         }
@@ -325,7 +332,7 @@ class BaseSignatureAnalyzer {
         return {startIdx, paramTypeEnd};
     }
 
-    // generate params for calling the decomposition function based on function type requirements
+    // generate params for the decomposition function based on function type requirements
     SmallVector<Value> generateParams(ValueRange signatureParams, ArrayRef<Type> funcParamTypes,
                                       PatternRewriter &rewriter, Location loc)
     {
