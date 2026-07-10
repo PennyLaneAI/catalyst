@@ -191,8 +191,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         RewritePatternSet decompositionPatterns(&getContext());
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
                                           targetGateSet);
-        catalyst::quantum::InsertOp::getCanonicalizationPatterns(decompositionPatterns,
-                                                                 &getContext());
         catalyst::quantum::ExtractOp::getCanonicalizationPatterns(decompositionPatterns,
                                                                   &getContext());
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {

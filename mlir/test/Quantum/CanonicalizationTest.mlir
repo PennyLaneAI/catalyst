@@ -121,6 +121,18 @@ func.func @test_extract_through_insert_distinct_index(%r0: !quantum.reg) -> !qua
     return %r2 : !quantum.reg
 }
 
+// A same-index extract/insert round-trip cancels; the distinct-index redirect does not fire.
+// CHECK-LABEL: test_extract_through_insert_prefers_cancellation
+func.func @test_extract_through_insert_prefers_cancellation(%r0: !quantum.reg, %q: !quantum.bit) -> !quantum.reg {
+    // CHECK-NOT: quantum.extract
+    // CHECK: [[INS:%.+]] = quantum.insert %arg0[ 0], %arg1
+    // CHECK-NEXT: return [[INS]]
+    %r1 = quantum.insert %r0[0], %q : !quantum.reg, !quantum.bit
+    %q1 = quantum.extract %r1[1] : !quantum.reg -> !quantum.bit
+    %r2 = quantum.insert %r1[1], %q1 : !quantum.reg, !quantum.bit
+    return %r2 : !quantum.reg
+}
+
 // CHECK-LABEL: test_extract_insert_constant
 func.func @test_extract_insert_constant(%r1: !quantum.reg) -> !quantum.reg {
     // CHECK-NOT: arith.constant
