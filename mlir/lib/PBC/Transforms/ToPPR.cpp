@@ -31,7 +31,24 @@ namespace {
 //                       Helper functions
 //===----------------------------------------------------------------------===//
 
-enum class GateEnum { H, S, T, CNOT, CZ, X, Y, Z, I, RX, RY, RZ, IsingXX, IsingYY, IsingZZ, Unknown };
+enum class GateEnum {
+    H,
+    S,
+    T,
+    CNOT,
+    CZ,
+    X,
+    Y,
+    Z,
+    I,
+    RX,
+    RY,
+    RZ,
+    IsingXX,
+    IsingYY,
+    IsingZZ,
+    Unknown
+};
 
 // Hash gate name to GateEnum
 GateEnum hashGate(CustomOp op)
