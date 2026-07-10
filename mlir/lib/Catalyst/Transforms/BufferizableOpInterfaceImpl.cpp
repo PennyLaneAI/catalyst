@@ -333,7 +333,7 @@ struct CallbackCallOpInterface
     }
 };
 
-/// Bufferization of catalyst.estimation_array. This op is a placeholder with no
+/// Bufferization of catalyst.symbolic_array. This op is a placeholder with no
 /// buffer semantics and is expected to be consumed before bufferization. If it
 /// reaches this stage, emit an informative diagnostic instead of the generic
 /// "op was not bufferized" error.
@@ -364,7 +364,7 @@ struct SymbolicArrayOpInterface
                             bufferization::BufferizationState &state) const
     {
         return op->emitError(
-            "catalyst::estimation_array is a placeholder op for resource estimation and cannot currently be bufferized or executed.");
+            "catalyst::symbolic_array is a placeholder op for resource estimation and cannot currently be bufferized or executed.");
     }
 };
 

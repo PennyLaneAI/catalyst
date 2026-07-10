@@ -53,6 +53,14 @@ func.func @dbprint_str() {
 
 // -----
 
+func.func public @jit_c_various_shapes() attributes {llvm.emit_c_interface} {
+    // expected-error @below {{catalyst::symbolic_array is a placeholder op}}
+    %0 = catalyst.symbolic_array : tensor<i64>
+    return
+}
+
+// -----
+
 func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
     // CHECK: [[sourceAlloc:%.+]] = bufferization.to_buffer %arg0
     // CHECK: [[destAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
