@@ -14,7 +14,6 @@
 
 """Utility code for keeping paths."""
 
-import glob
 import importlib.util
 import os
 import os.path
@@ -96,16 +95,13 @@ def get_libpython_path() -> str:   # pragma: no cover
         if os.path.exists(ldlibrary_path):
             return ldlibrary_path
 
-    # Fall back to the conventionally-named shared library (e.g. libpython3.14.so).
+    # Fall back to the conventionally-named shared library (e.g. libpython3.12.so). This is
+    # the case that a static-preferring build (e.g. conda) hits: LDLIBRARY names the .a, but
+    # the .so is present under its canonical, version-derived name.
     ldversion = sysconfig.get_config_var("LDVERSION") or sysconfig.get_config_var("VERSION") or ""
     conventional_path = os.path.join(libdir, f"libpython{ldversion}{shlib_suffix}")
     if os.path.exists(conventional_path):
         return conventional_path
-
-    # If the fallback fails, try any shared libpython in LIBDIR:
-    matches = sorted(glob.glob(os.path.join(libdir, f"libpython*{shlib_suffix}*")))
-    if matches:
-        return matches[0]
 
     return ""
 
