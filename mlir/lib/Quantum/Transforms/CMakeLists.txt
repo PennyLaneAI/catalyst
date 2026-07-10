@@ -1,6 +1,6 @@
 set(LIBRARY_NAME quantum-transforms)
 
-add_subdirectory(DecompGraphSolver)
+add_subdirectory(GraphDecomposition/DecompGraphSolver)
 
 file(GLOB SRC
     AdjointLowering/AdjointLowering.cpp
@@ -10,7 +10,10 @@ file(GLOB SRC
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
     ConversionPatterns.cpp
-    DecomposeLoweringPatterns.cpp
+    GraphDecomposition/DecompUtils.cpp
+    GraphDecomposition/DecomposeLoweringPatterns.cpp
+    GraphDecomposition/decompose_lowering.cpp
+    GraphDecomposition/graph_decomposition.cpp
     DisentangleCNOT.cpp
     DisentangleSWAP.cpp
     GridsynthPatterns.cpp
@@ -21,10 +24,8 @@ file(GLOB SRC
     SplitMultipleTapes.cpp
     cancel_inverses.cpp
     cp_global_buffers.cpp
-    decompose_lowering.cpp
     dynamic_one_shot.cpp
     emit_catalyst_pyface.cpp
-    graph_decomposition.cpp
     gridsynth.cpp
     ions_decompositions.cpp
     loop_boundary_optimization.cpp
@@ -64,5 +65,6 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${CMAKE_BINARY_DIR}/include
     AdjointLowering/
-    DecompGraphSolver/
+    GraphDecomposition/
+    GraphDecomposition/DecompGraphSolver/
 )

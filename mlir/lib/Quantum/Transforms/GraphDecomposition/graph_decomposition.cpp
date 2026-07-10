@@ -60,6 +60,7 @@
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
+#include "DecompUtils.hpp"
 
 #define DEBUG_TYPE "graph-decomposition"
 
@@ -233,7 +234,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         llvm::StringRef ruleName = rule.getName();
 
         // 1. Mandatory Attribute Check (Target Gate and Resources)
-        auto targetGateAttr = rule->getAttrOfType<StringAttr>("target_gate");
+        auto targetGateAttr = rule->getAttrOfType<StringAttr>(DecompUtils::target_gate_attr_name);
         auto resourcesAttr = rule->getAttrOfType<DictionaryAttr>("resources");
         if (!targetGateAttr) {
             llvm::errs() << "Cannot parse decomposition rule " << ruleName
@@ -328,7 +329,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
 
         WalkResult walkResult = module.walk([&](mlir::func::FuncOp func) {
-            if (func->hasAttr("target_gate")) {
+            if (func->hasAttr(DecompUtils::target_gate_attr_name)) {
                 if (userRuleNames.contains(func.getName())) {
                     if (failed(addRuleNode(func, ruleNodes))) {
                         return WalkResult::interrupt();
@@ -414,19 +415,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
-    bool isInDecompRule(Operation *op)
-    {
-        while (auto parentOp = op->getParentOp()) {
-            if (auto funcOp = dyn_cast<func::FuncOp>(parentOp)) {
-                if (funcOp->hasAttr("target_gate")) {
-                    return true;
-                }
-            }
-            op = parentOp;
-        }
-        return false;
-    }
-
     void getOperators(std::vector<OperatorNode> &operators)
     {
         // TODO: replace this with DecomposableGate interface. We will drop support for any other op
@@ -435,7 +423,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // The interface will provide one unified way of generating operator nodes from operations,
         // with consistent getter methods for all relevant data fields.
         getOperation().walk([&](quantum::QuantumGate op) {
-            if (isInDecompRule(op)) {
+            if (DecompUtils::isInDecompRule(op)) {
                 return;
             }
             OperatorNode node;

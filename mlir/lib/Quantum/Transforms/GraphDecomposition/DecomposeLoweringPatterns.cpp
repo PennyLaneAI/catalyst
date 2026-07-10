@@ -38,6 +38,7 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
 
+#include "DecompUtils.hpp"
 #include "DecomposeLoweringImpl.hpp"
 
 #define DEBUG_TYPE "decompose-lowering"
@@ -75,19 +76,6 @@ static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp
     return results;
 }
 
-static bool isInDecompRule(Operation *op)
-{
-    while (auto parentOp = op->getParentOp()) {
-        if (auto funcOp = dyn_cast<func::FuncOp>(parentOp)) {
-            if (funcOp->hasAttr("target_gate")) {
-                return true;
-            }
-        }
-        op = parentOp;
-    }
-    return false;
-}
-
 struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
   private:
     const llvm::StringMap<func::FuncOp> &decompositionRegistry;
@@ -112,7 +100,7 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
 
         // do not nest decomposition rules, they're applied greedily and this can lead to
         // cycles/identity rules
-        if (isInDecompRule(op)) {
+        if (DecompUtils::isInDecompRule(op)) {
             return failure();
         }
 
@@ -194,7 +182,7 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         // do not nest decomposition rules, they're applied greedily and this can lead to
         // cycles/identity rules
-        if (isInDecompRule(op)) {
+        if (DecompUtils::isInDecompRule(op)) {
             return failure();
         }
 
@@ -275,7 +263,7 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
 
         // do not nest decomposition rules, they're applied greedily and this can lead to
         // cycles/identity rules
-        if (isInDecompRule(op)) {
+        if (DecompUtils::isInDecompRule(op)) {
             return failure();
         }
 
