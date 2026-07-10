@@ -1206,15 +1206,7 @@ std::vector<size_t> OperatorOp::getWireLens()
     return {getInQubits().size()};
 }
 
-std::string OperatorOp::getGraphOpId()
+std::string OperatorOp::getExtraData()
 {
-    std::string out;
-    llvm::raw_string_ostream ss(out);
-
-    ss << defaultGetGraphOpId(getOperation());
-    if (getUID().has_value()) {
-        ss << "[" << std::to_string(getUID().value()) << "]";
-    }
-
-    return out;
+    return getUID().has_value() ? std::to_string(getUID().value()) : "";
 }

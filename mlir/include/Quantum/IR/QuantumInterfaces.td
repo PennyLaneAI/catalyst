@@ -203,6 +203,11 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "mlir::DictionaryAttr", "getStaticData"
         >,
         InterfaceMethod<
+            "Return a string representation of any additional data an operator may need to provide"
+            " for uniqueness (ex. UID).",
+            "std::string", "getExtraData", (ins), [{}], [{ return ""; }]
+        >,
+        InterfaceMethod<
             "Return the operation's ID for use with the graph. "
             "This should be computed by the following convention:\n"
             "```\n"
