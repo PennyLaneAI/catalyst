@@ -69,30 +69,6 @@ nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
 
 std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
 {
-    std::cout << "using new python lowering for op with the following data:\n";
-    std::cout << "op name: " << op.getPlName() << "\n";
-    std::cout << "op ID: " << op.getGraphOpId() << "\n";
-
-    std::cout << "dynamic data shape:\n";
-    for (auto type : op.getDynamicShape()) {
-        type.dump();
-    }
-
-    std::cout << "wire lens:\n";
-    for (auto len : op.getWireLens()) {
-        std::cout << len << ", ";
-    }
-    std::cout << "\n";
-
-    std::cout << "static data:\n";
-    for (auto namedAttr : op.getStaticData()) {
-        std::cout << namedAttr.getName().getValue().str();
-        namedAttr.getValue().dump();
-        std::cout << "\n";
-    }
-
-    std::cout << "trying nanobind now\n";
-
     QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
         const char *moduleName = "catalyst.device.python_decompositions";

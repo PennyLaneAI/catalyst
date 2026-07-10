@@ -44,14 +44,6 @@ import pennylane as qp
 
 def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:
     """Generic decomposition wrapper."""
-    print(
-        "Hello from python! Here's the received data:",
-        op_name,
-        dynamic_shape,
-        wire_lens,
-        static_data,
-    )
-
     device = qp.device("null.qubit", wires=sum(wire_lens))
     wires = tuple(jnp.array(range(length)) for length in wire_lens)
 
