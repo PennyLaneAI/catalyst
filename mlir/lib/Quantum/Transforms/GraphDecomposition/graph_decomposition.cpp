@@ -417,7 +417,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             mlir::func::FuncOp funcOp = outOp.get();
             outOp->setName((outOp->getName() + "_" + pauliWord).str()); // unique name per pauliword
-            funcOp->setAttr(DecompUtils::target_gate_attr_name, mlir::StringAttr::get(context, "paulirot" + pauliWord));
+            funcOp->setAttr(DecompUtils::target_gate_attr_name,
+                            mlir::StringAttr::get(context, "paulirot" + pauliWord));
 
             if (failed(addRuleNode(funcOp, ruleNodes))) {
                 return failure();
