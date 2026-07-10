@@ -91,13 +91,19 @@ def _is_custom_op(op_cls, avals_in):
     return all(p.shape == () and "float" in p.dtype.name for p in avals_in)
 
 
+def _is_qref_qubit(val) -> bool:
+    val_type = val.type
+    return (
+        ir.OpaqueType.isinstance(val_type)
+        and ir.OpaqueType(val_type).dialect_namespace == "qref"
+        and ir.OpaqueType(val_type).data == "bit"
+    )
+
+
 def _general_validation(*args, op_cls, wire_lens, **kwargs):
     num_normal_wires = sum(wire_lens)
     wires = args[len(op_cls.dynamic_argnames) : (len(op_cls.dynamic_argnames) + num_normal_wires)]
-    for w in wires:
-        assert ir.OpaqueType.isinstance(w.type)
-        assert ir.OpaqueType(w.type).dialect_namespace == "qref"
-        assert ir.OpaqueType(w.type).data == "bit"
+    assert all(_is_qref_qubit(w) for w in wires)
 
 
 def _process_params(
@@ -133,7 +139,7 @@ def _process_params(
             for leaf, is_forward in zip(leaves, cur_fwd_mask, strict=True):
                 if is_forward:
                     forward_params.append(leaf)
-                else:
+                elif not _is_qref_qubit(leaf):
                     cur_params.append(leaf)
 
             if cur_params:
@@ -172,13 +178,20 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
             map_idx += wsize
             args_idx += wsize
 
-    # Hybrid wire arguments
+    # Hybrid wire arguments and nested-operator wires from non-wire hybrid arguments
     for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
-        if hname in op_cls.wire_argnames and hsize:
-            # If hsize is 0, then we don't want to populate the qubit map
-            qubits += args[args_idx : args_idx + hsize]
-            qubit_map[hname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + hsize)))
-            map_idx += hsize
+        leaves = args[args_idx : args_idx + hsize]
+        if hname in op_cls.wire_argnames:
+            cur_qubits = leaves
+        else:
+            cur_qubits = [l for l in leaves if _is_qref_qubit(l)]
+
+        if cur_qubits:
+            qubits += cur_qubits
+            qubit_map[hname] = ir.DenseI64ArrayAttr.get(
+                list(range(map_idx, map_idx + len(cur_qubits)))
+            )
+            map_idx += len(cur_qubits)
 
         args_idx += hsize
 
