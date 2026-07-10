@@ -1167,6 +1167,7 @@ TEST_CASE("Test __catalyst__rt__random_double with an unseeded runtime", "[CoreQ
 
 TEST_CASE("Test __catalyst__rt__random_double before initialization", "[CoreQIS]")
 {
-    REQUIRE_THROWS_WITH(__catalyst__rt__random_double(),
-                        ContainsSubstring("Invalid use of the global driver before initialization"));
+    REQUIRE_THROWS_WITH(
+        __catalyst__rt__random_double(),
+        ContainsSubstring("Invalid use of the global driver before initialization"));
 }

@@ -331,6 +331,19 @@ def test_local_random_rejects_scale_factor_below_one():
         catalyst.mitigate_with_zne(circuit, scale_factors=[0.5], folding="local-random")
 
 
+def test_local_random_rejects_non_numeric_scale_factor():
+    """local-random folding rejects non-numeric scale factors with a TypeError."""
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(device=dev)
+    def circuit():
+        qp.Hadamard(wires=0)
+        return qp.expval(qp.PauliZ(wires=0))
+
+    with pytest.raises(TypeError, match=".*local-random folding requires real scale_factors >= 1"):
+        catalyst.mitigate_with_zne(circuit, scale_factors=["3"], folding="local-random")
+
+
 @pytest.mark.parametrize("folding", ["global", "local-all"])
 def test_fractional_scale_factors_rejected_for_integer_folding(folding):
     """Non-integer scale factors are only supported with local-random folding."""
