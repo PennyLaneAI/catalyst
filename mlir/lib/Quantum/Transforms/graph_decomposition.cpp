@@ -140,7 +140,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         auto solution = solver.solve();
 
         ///////////////////////////
-        // Step 4: Convert python-decompositions from reference to value semantics and run
+        // Step 3: Convert python-decompositions from reference to value semantics and run
         // decompose-lowering to apply the chosen decomposition rules
         ModuleOp module = getOperation();
         OpPassManager pm("builtin.module");
@@ -242,13 +242,21 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             return failure();
         }
 
-        // Ensure resources
+        // Try to generate resources if they're missing
         if (!resourcesAttr) {
             ResourceAnalysis analysis(rule);
             if (const ResourceResult *flat = analysis.getFlattenedResource(rule.getName())) {
                 rule->setAttr("resources", buildResourceDict(&getContext(), *flat));
             }
             resourcesAttr = rule->getAttrOfType<DictionaryAttr>("resources");
+        }
+
+        // Fail if resources are missing
+        if (!resourcesAttr) {
+            llvm::errs() << "Decomposition rule " << ruleName
+                         << " was provided without resources, and resources could not be generated "
+                            "for it.\n";
+            return failure();
         }
 
         // 2. Extract 'operations' dictionary from resources
@@ -283,18 +291,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         mlir::MLIRContext *context = &getContext();
         mlir::ModuleOp module = getOperation();
         mlir::ParserConfig config(context);
-        mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
+        mlir::OwningOpRef<mlir::ModuleOp> builtinModule =
             mlir::parseSourceFile<mlir::ModuleOp>(filename, config);
 
         SymbolTable symbolTable(module);
 
-        if (!moduleOp) {
+        if (!builtinModule) {
             llvm::errs() << "failed to load built-in decomposition rules from '" << filename
                          << "': the rules file could not be parsed\n";
             return failure();
         }
 
-        for (auto rule : llvm::make_early_inc_range(moduleOp.get().getOps<mlir::func::FuncOp>())) {
+        for (auto rule :
+             llvm::make_early_inc_range(builtinModule.get().getOps<mlir::func::FuncOp>())) {
             if (failed(addRuleNode(rule, ruleNodes))) {
                 return failure();
             }
@@ -352,6 +361,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // all decomposition rules for that op are available. No system should introduce a subset of
         // the rules for an op.
         module.walk([&](mlir::func::FuncOp func) {
+            // TODO: generalize this
             if (func->hasAttr("target_gate")) {
                 handledOpIds.insert(func->getAttrOfType<StringAttr>("target_gate").str());
             }

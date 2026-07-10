@@ -13,8 +13,15 @@
   [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
 
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
-  without non-lowerable arguments.
-  [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969/)
+  without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
+  where applicable, unlocking compilation and execution for these cases. `qp.specs` and the
+  `ResourceAnalysis` pass now support the `quantum::OperatorOp` and `qref::OperatorOp` instructions.
+  [(#2979)](https://github.com/PennyLaneAI/catalyst/pull/2979)
+  [(#2969)](https://github.com/PennyLaneAI/catalyst/pull/2969)
+  [(#2980)](https://github.com/PennyLaneAI/catalyst/pull/2980)
+  [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
+  [(#2993)](https://github.com/PennyLaneAI/catalyst/pull/2993)
+  [(#2998)](https://github.com/PennyLaneAI/catalyst/pull/2998)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
@@ -25,6 +32,14 @@
 
 * The `ResourceAnalysis` pass now supports IR in reference semantics natively, rather than requiring a conversion step.
   [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
+
+* The `resource-analysis` pass JSON output now includes `depth` for worst-case PBC layer depth
+  (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
+  [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
+
+* The `--adjoint-lowering` pass no longer turns statically bounded for loops into
+  dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
+  [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
 
 * The `--decompose-lowering` pass can now handle decomposition rule functions whose quantum register
   argument is at an arbitrary position in the argument list.
@@ -205,8 +220,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The `graph-decomposition` pass now performs far less IR manipulation.
+* The `graph-decomposition` pass eliminates three redundant IR manipulations:
+  the cloning, removal, and re-insertion of user rules. This optimization is particularly
+  beneficial when the pass is executed multiple times within the compilation pipeline.
   [(#2977)](https://github.com/PennyLaneAI/catalyst/pull/2977)
+
+* `from_plxpr` no longer depends on the `Transform.plxpr_transform` property.
+  [(#3004)](https://github.com/PennyLaneAI/catalyst/pull/3004)
 
 * Update tests to not use global capture toggle where possible.
   [(#2964)](https://github.com/PennyLaneAI/catalyst/pull/2964)
@@ -360,6 +380,10 @@
   used in conjunction with the `measurements-from-samples` pass.
   [(#2958)](https://github.com/PennyLaneAI/catalyst/pull/2958)
 
+* Rename the pipeline names in the default pipeline specification (e.g. `quantum-compilation-pipeline`) to match the
+  `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
+  [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
@@ -375,9 +399,11 @@ Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+JiaRung Jian,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Paul Haochen Wang,
 Jake Zaia.
+

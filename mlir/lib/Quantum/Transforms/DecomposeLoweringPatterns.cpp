@@ -48,9 +48,16 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
-SmallVector<Value> getDecompRuleResults(func::FuncOp rule, ValueRange operands,
-                                        PatternRewriter &rewriter)
+/**
+ * @brief
+ * Inline the body of `rule` at `rewriter`'s current insertion point, using `operands` to
+ * replace the parameters of `rule` and returning the results. `rewriter`'s insertion point will be
+ * moved to the end of the inlined function body.
+ */
+static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule,
+                                         ValueRange operands)
 {
+    assert(rule.getBlocks().size() == 1);
     Block &body = rule.front();
     auto returnOp = cast<func::ReturnOp>(body.getTerminator());
 
@@ -68,7 +75,7 @@ SmallVector<Value> getDecompRuleResults(func::FuncOp rule, ValueRange operands,
     return results;
 }
 
-bool isInDecompRule(Operation *op)
+static bool isInDecompRule(Operation *op)
 {
     while (auto parentOp = op->getParentOp()) {
         if (auto funcOp = dyn_cast<func::FuncOp>(parentOp)) {
@@ -146,7 +153,7 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunctionResults = getDecompRuleResults(rule, operands, rewriter);
+        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, rule, operands);
 
         // Replace the op with the inlined function and adjust the insert ops for the qreg mode
         if (inlinedFunctionResults.size() == 1 &&
@@ -227,8 +234,7 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(decompFunc, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunctionResults =
-            getDecompRuleResults(decompFunc, operands, rewriter);
+        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, decompFunc, operands);
 
         // Replace the op with the inlined function and adjust the insert ops for the qreg mode
         if (inlinedFunctionResults.size() == 1 &&
@@ -295,8 +301,7 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(decompFunc, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunctionResults =
-            getDecompRuleResults(decompFunc, operands, rewriter);
+        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, decompFunc, operands);
 
         // Replace the op with the inlined results and adjust the insert ops for the qreg mode
         if (inlinedFunctionResults.size() == 1 &&
