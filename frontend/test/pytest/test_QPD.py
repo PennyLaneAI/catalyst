@@ -26,10 +26,10 @@ class TestQPD:
     def test_paulirot_wrapper(self):
         """Test that the paulirot QPD wrapper correctly returns the IR as a string."""
         result = python_decomposition_wrapper(
-            "PauliRot", "paulirotXZZ", [0.4], {"pauli_word": "XZZ"}, 3
+            "PauliRot", "paulirot[f64][3]{pauli_word:XZZ}", [0.4], [3], {"pauli_word": "XZZ"}
         )
         assert isinstance(result, str)
-        assert "paulirotXZZ__pauli_rot_decomposition" in result
+        assert "paulirot[f64][3]{pauli_word:XZZ}__pauli_rot_decomposition" in result
         assert "Hadamard" in result
         assert "multirz" in result
 
@@ -47,10 +47,10 @@ class TestQPD:
             qp.add_decomps(qp.PauliRot, test_decomp)
 
             result = python_decomposition_wrapper(
-                "PauliRot", "paulirotXYX", [float], {"pauli_word": "XYX"}, 3
+                "PauliRot", "paulirot[f64][3]{pauli_word:XYX}", [float], [3], {"pauli_word": "XYX"}
             )
 
-            assert "paulirotXYX_test_decomp" in result
+            assert "paulirot[f64][3]{pauli_word:XYX}_test_decomp" in result
             assert "test_decomp" in result
 
 
