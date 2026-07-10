@@ -430,6 +430,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
     void getOperators(std::vector<OperatorNode> &operators)
     {
+        // TODO: replace this with DecomposableGate interface. We will drop support for any other op
+        // types once the interface has been implemented for the core operations in the quantum
+        // dialect.
+        // The interface will provide one unified way of generating operator nodes from operations,
+        // with consistent getter methods for all relevant data fields.
         getOperation().walk([&](quantum::QuantumGate op) {
             if (isInDecompRule(op)) {
                 return;
@@ -443,7 +448,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             // Name handling for non-custom ops
             else {
-                // TODO: replace this with DecomposableGate interface
                 std::string name = op->getName().stripDialect().str();
                 if (name == "gphase") {
                     name = "GlobalPhase";
