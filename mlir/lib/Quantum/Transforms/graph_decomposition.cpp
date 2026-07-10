@@ -140,7 +140,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         auto solution = solver.solve();
 
         ///////////////////////////
-        // Step 4: Convert python-decompositions from reference to value semantics and run
+        // Step 3: Convert python-decompositions from reference to value semantics and run
         // decompose-lowering to apply the chosen decomposition rules
         ModuleOp module = getOperation();
         OpPassManager pm("builtin.module");
@@ -291,18 +291,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         mlir::MLIRContext *context = &getContext();
         mlir::ModuleOp module = getOperation();
         mlir::ParserConfig config(context);
-        mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
+        mlir::OwningOpRef<mlir::ModuleOp> builtinModule =
             mlir::parseSourceFile<mlir::ModuleOp>(filename, config);
 
         SymbolTable symbolTable(module);
 
-        if (!moduleOp) {
+        if (!builtinModule) {
             llvm::errs() << "failed to load built-in decomposition rules from '" << filename
                          << "': the rules file could not be parsed\n";
             return failure();
         }
 
-        for (auto rule : llvm::make_early_inc_range(moduleOp.get().getOps<mlir::func::FuncOp>())) {
+        for (auto rule :
+             llvm::make_early_inc_range(builtinModule.get().getOps<mlir::func::FuncOp>())) {
             if (failed(addRuleNode(rule, ruleNodes))) {
                 return failure();
             }
