@@ -361,7 +361,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // all decomposition rules for that op are available. No system should introduce a subset of
         // the rules for an op.
         module.walk([&](mlir::func::FuncOp func) {
-            // TODO: generalize this
             if (func->hasAttr("target_gate")) {
                 handledOpIds.insert(func->getAttrOfType<StringAttr>("target_gate").str());
             }
