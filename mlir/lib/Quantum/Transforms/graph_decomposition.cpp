@@ -453,7 +453,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     name = "GlobalPhase";
                 }
                 else if (name == "paulirot") {
-                    name = "paulirot" + cast<quantum::PauliRotOp>(op.getOperation()).getPauliWord();
+                    name = cast<DecomposableGate>(op.getOperation()).getGraphOpId();
                 }
                 node.name = name;
             }
