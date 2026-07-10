@@ -22,7 +22,7 @@ namespace catalyst::transport {
 /**
  * @brief Data-plane strategy: which engine issues the transfer.
  */
-enum class DataPath {
+enum class DataPath : std::uint8_t {
     CpuVerbs,    // Plain ibverbs on CPU.
     NicEngine,   // Hardware-embedded RNIC (e.g. ERNIC hardware handshake).
     KernelFused, // Fused with a kernel (e.g. on GPU). The decode runs
@@ -34,7 +34,7 @@ enum class DataPath {
 /**
  * @brief Memory kind: selects the allocation and registration path.
  */
-enum class MemKind {
+enum class MemKind : std::uint8_t {
     CpuRam,   // Plain host RAM.
     GpuHbm,   // GPU HBM, registered via dma-buf.
     FpgaDdr,  // FPGA DDR, allocated via the Xilinx UMM allocator.
@@ -45,7 +45,7 @@ enum class MemKind {
  * @brief Endpoint role in a session: the controller drives requests; the
  * coprocessor handles (e.g. runs the decoder) and returns them.
  */
-enum class Role { Controller, Coprocessor };
+enum class Role : std::uint8_t { Controller, Coprocessor };
 
 struct ConnectInfo {
     std::string peer;
@@ -54,7 +54,7 @@ struct ConnectInfo {
 };
 struct MemRegion {
     void *addr = nullptr;
-    std::size_t size = 0;
+    std::uint64_t size = 0;
     std::uint32_t lkey = 0;
     std::uint32_t rkey = 0;
     MemKind kind = MemKind::CpuRam;
@@ -62,13 +62,13 @@ struct MemRegion {
 struct PeerRef {
     std::uint32_t rkey = 0;
     std::uint64_t remote_addr = 0;
-    std::size_t size = 0;
+    std::uint64_t size = 0;
 };
 struct ChannelDesc {
     DataPath data_path = DataPath::CpuVerbs;
     bool persistent = true;
-    std::size_t syndrome_bytes = 0;   // controller sends / coprocessor receives (decode in_len)
-    std::size_t correction_bytes = 0; // coprocessor sends / controller receives (decode out_len)
+    std::uint64_t syndrome_bytes = 0;   // controller sends / coprocessor receives (decode in_len)
+    std::uint64_t correction_bytes = 0; // coprocessor sends / controller receives (decode out_len)
 };
 
 // Per-shot compute run on the coprocessor. Reads the syndrome from `in`
@@ -82,6 +82,13 @@ struct ChannelDesc {
 using DecodeFn = void (*)(void *ctx, const void *in, std::size_t in_len, void *out,
                           std::size_t out_len);
 
+// Stateful session: methods must be called in this order:
+//   1. connect            - bring up QPs + the out-of-band channel
+//   2. alloc_memory       - register the region (needs the connected context)
+//   3. exchange_keys      - swap region handles over the out-of-band channel
+//   4. establish_channel  - program the channel from the local + peer regions
+//   5. set_decoder        - coprocessor only, before start()
+//   6. start / collect / stop
 class TransportSession {
   public:
     virtual ~TransportSession() = default;
