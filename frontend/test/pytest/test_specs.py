@@ -996,6 +996,27 @@ class TestPassByPassSpecs:
             assert resources.gate_types == {"DummyOp": 2}
             assert resources.gate_sizes == {4: 1, 5: 1}
 
+    def test_symbolic_array(self):
+        """Test using specs with symbolic_array."""
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.transforms.merge_rotations
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c():
+            x = qp.capture.symbolic_array((), float)
+            qp.RX(x, 0)
+            qp.RX(2 * x, 0)
+            return qp.probs()
+
+        counts = qp.specs(c, level=0)().resources.gate_counts
+        assert counts == {"RX": 2}
+
+        counts1 = qp.specs(c, level=1)().resources.gate_counts
+        assert counts1 == {"RX": 1}
+
+        with pytest.raises(catalyst.utils.exceptions.CompileError, match="is a placeholder op"):
+            qp.specs(c, level="device")()
+
 
 class TestSpecsWithPPR:
     """Tests for using qp.specs with PPRs"""
