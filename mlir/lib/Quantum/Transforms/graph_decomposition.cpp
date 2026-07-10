@@ -368,7 +368,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
 
         for (quantum::DecomposableGate op : decomposableOps) {
-            std::string opId = op.getDecompId();
+            std::string opId = op.getGraphOpId();
 
             if (handledOpIds.contains(opId)) {
                 continue;

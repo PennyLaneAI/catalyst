@@ -535,7 +535,8 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 }
 
 def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
-                                             AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                             AttrSizedOperandSegments, AttrSizedResultSegments,
+                                             DeclareOpInterfaceMethods<DecomposableGate, ["getGraphOpId"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
         The `quantum.operator` is a generic representation for arbitrary quantum operations

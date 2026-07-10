@@ -15,7 +15,6 @@
 #include <exception>
 #include <iostream>
 #include <string>
-#include <vector>
 
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
@@ -27,7 +26,6 @@
 #include "nanobind/stl/vector.h" // for automatic vector conversion
 
 #include "Quantum/IR/QuantumInterfaces.h"
-#include "Quantum/IR/QuantumOps.h"
 
 #include "PythonDriverUtils.hpp"
 
@@ -73,7 +71,7 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
 {
     std::cout << "using new python lowering for op with the following data:\n";
     std::cout << "op name: " << op.getPlName() << "\n";
-    std::cout << "op ID: " << op.getDecompId() << "\n";
+    std::cout << "op ID: " << op.getGraphOpId() << "\n";
 
     std::cout << "dynamic data shape:\n";
     for (auto type : op.getDynamicShape()) {
@@ -81,7 +79,7 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
     }
 
     std::cout << "wire lens:\n";
-    for (size_t len : op.getWireLens()) {
+    for (auto len : op.getWireLens()) {
         std::cout << len << ", ";
     }
     std::cout << "\n";
@@ -105,14 +103,14 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
             nb::object wrapperFunction = wrapperModule.attr(functionName);
 
             nb::object pythonResult = wrapperFunction(
-                op.getPlName(), op.getDecompId(), getPyvalFromTypeRange(op.getDynamicShape()),
+                op.getPlName(), op.getGraphOpId(), getPyvalFromTypeRange(op.getDynamicShape()),
                 op.getWireLens(), getPyvalFromMlirAttribute(op.getStaticData()));
 
             return nb::borrow<nb::str>(pythonResult).c_str();
         }
         catch (const nb::python_error &error) {
             throw QuantumPythonDecompositions::TracingError(moduleName, functionName,
-                                                            op.getDecompId(), error.what());
+                                                            op.getGraphOpId(), error.what());
         }
         catch (const std::exception &error) {
             throw;

@@ -188,6 +188,9 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
 
     let methods = [
         InterfaceMethod<
+            "Return the name of the corresponding PennyLane operator.", "std::string", "getPlName"
+        >,
+        InterfaceMethod<
             "Return the shape and dtype of dynamic data.",
             "mlir::TypeRange", "getDynamicShape"
         >,
@@ -200,19 +203,13 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "mlir::DictionaryAttr", "getStaticData"
         >,
         InterfaceMethod<
-            "Return the name of the corresponding PennyLane operator.", "std::string", "getPlName"
-        >,
-        InterfaceMethod<
             "Return the operation's ID for use with the graph. "
             "This should be computed by the following convention:\n"
             "```\n"
-            "if uid:\n"
-            "    uid\n"
-            "else:\n"
-            "    name + {dtype tree of args} + {number of wires per wires arg} + {static data}\n"
+            "name + {dtype tree of args} + {number of wires per wires arg} + {static data} + {uid}\n"
             "```\n"
             "Note that UID is currently specific to `OperatorOp`s.",
-            "std::string", "getDecompId"
+            "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpId($_op.getOperation()); }]
         >
     ];
 }

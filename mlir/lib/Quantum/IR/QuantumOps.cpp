@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -28,6 +29,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
@@ -1165,11 +1167,13 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 // Quantum op interface methods.
 //===----------------------------------------------------------------------===//
 
-mlir::TypeRange PauliRotOp::getDynamicShape() { return getAllParams().getTypes(); }
-
-std::string PauliRotOp::getDecompId() { return "paulirot" + getPauliWord(); }
+// PauliRotOp
 
 std::string PauliRotOp::getPlName() { return "PauliRot"; }
+
+mlir::TypeRange PauliRotOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> PauliRotOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
 
 mlir::DictionaryAttr PauliRotOp::getStaticData()
 {
@@ -1179,4 +1183,37 @@ mlir::DictionaryAttr PauliRotOp::getStaticData()
     return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
 }
 
-std::vector<size_t> PauliRotOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+// OperatorOp
+
+std::string OperatorOp::getPlName() { return getOpName().str(); }
+
+mlir::TypeRange OperatorOp::getDynamicShape() { return getParams().getTypes(); }
+
+std::vector<size_t> OperatorOp::getWireLens()
+{
+    if (getInQreg()) {
+        std::vector<size_t> lens;
+        // This assumes static lengths!
+        // If we enable support for dynamic lengths, we need to update this
+        for (mlir::Type indexTensor : getArrQubitIndices().getType()) {
+            for (size_t dim : cast<RankedTensorType>(indexTensor).getShape()) {
+                lens.push_back(size_t(dim));
+            }
+        }
+        return lens;
+    }
+    return {getInQubits().size()};
+}
+
+std::string OperatorOp::getGraphOpId()
+{
+    std::string out;
+    llvm::raw_string_ostream ss(out);
+
+    ss << defaultGetGraphOpId(getOperation());
+    if (getUID().has_value()) {
+        ss << "[" << std::to_string(getUID().value()) << "]";
+    }
+
+    return out;
+}
