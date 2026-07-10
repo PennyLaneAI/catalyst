@@ -52,6 +52,20 @@ class QASM3Emitter {
     // Track which classical registers (bit[n] c;) have been declared
     llvm::SmallSet<std::string, 4> declaredCregs;
 
+    // Copy a name mapping from one SSA value to another. NEVER write
+    // `map[to] = map[from]` directly: the LHS operator[] may insert and
+    // rehash the DenseMap, invalidating the RHS reference mid-assignment
+    // (C++17 evaluates the RHS first). Symptom: silently empty/garbage
+    // names once the map grows past a rehash threshold.
+    static void copyMapping(DenseMap<Value, std::string> &map, Value from, Value to)
+    {
+        auto it = map.find(from);
+        if (it == map.end())
+            return;
+        std::string name = it->second;
+        map[to] = name;
+    }
+
     LogicalResult emitOperation(Operation *op)
     {
         return TypeSwitch<Operation *, LogicalResult>(op)
@@ -177,14 +191,8 @@ class QASM3Emitter {
             Value initVal = initArgs[i];
             Value blockArg = loopBody.getArgument(i + 1); // +1 to skip induction var
 
-            // If this is a qubit value, propagate the mapping
-            if (qubitMap.count(initVal)) {
-                qubitMap[blockArg] = qubitMap[initVal];
-            }
-            // Also handle classical bits if needed
-            if (bitMap.count(initVal)) {
-                bitMap[blockArg] = bitMap[initVal];
-            }
+            copyMapping(qubitMap, initVal, blockArg);
+            copyMapping(bitMap, initVal, blockArg);
         }
 
         for (Operation &innerOp : *op.getBody()) {
@@ -203,16 +211,8 @@ class QASM3Emitter {
             auto results = op.getResults();
 
             for (size_t i = 0; i < results.size() && i < yieldOperands.size(); ++i) {
-                Value yieldedVal = yieldOperands[i];
-                Value result = results[i];
-
-                // Map result to the same qubit name as the yielded value
-                if (qubitMap.count(yieldedVal)) {
-                    qubitMap[result] = qubitMap[yieldedVal];
-                }
-                if (bitMap.count(yieldedVal)) {
-                    bitMap[result] = bitMap[yieldedVal];
-                }
+                copyMapping(qubitMap, yieldOperands[i], results[i]);
+                copyMapping(bitMap, yieldOperands[i], results[i]);
             }
         }
 
@@ -408,18 +408,11 @@ class QASM3Emitter {
             if (auto thenYield = dyn_cast<scf::YieldOp>(thenTerminator)) {
                 auto yieldOperands = thenYield.getOperands();
 
+                // Map results to the same qubit/bit names as the yielded
+                // values: in QASM the if modifies variables in place.
                 for (size_t i = 0; i < results.size() && i < yieldOperands.size(); ++i) {
-                    Value yieldedVal = yieldOperands[i];
-                    Value result = results[i];
-
-                    // Map result to the same qubit/bit name as the yielded value
-                    // In QASM, the if doesn't create new variables, it modifies existing ones
-                    if (qubitMap.count(yieldedVal)) {
-                        qubitMap[result] = qubitMap[yieldedVal];
-                    }
-                    if (bitMap.count(yieldedVal)) {
-                        bitMap[result] = bitMap[yieldedVal];
-                    }
+                    copyMapping(qubitMap, yieldOperands[i], results[i]);
+                    copyMapping(bitMap, yieldOperands[i], results[i]);
                 }
             }
         }
@@ -438,12 +431,8 @@ class QASM3Emitter {
         Block &before = op.getBefore().front();
         auto inits = op.getInits();
         for (size_t i = 0; i < inits.size() && i < before.getNumArguments(); ++i) {
-            Value initVal = inits[i];
-            Value blockArg = before.getArgument(i);
-            if (qubitMap.count(initVal))
-                qubitMap[blockArg] = qubitMap[initVal];
-            if (bitMap.count(initVal))
-                bitMap[blockArg] = bitMap[initVal];
+            copyMapping(qubitMap, inits[i], before.getArgument(i));
+            copyMapping(bitMap, inits[i], before.getArgument(i));
         }
 
         // The before region must be pure classical condition computation; any
@@ -473,12 +462,8 @@ class QASM3Emitter {
         Block &after = op.getAfter().front();
         auto fwdArgs = condOp.getArgs();
         for (size_t i = 0; i < fwdArgs.size() && i < after.getNumArguments(); ++i) {
-            Value fwdVal = fwdArgs[i];
-            Value blockArg = after.getArgument(i);
-            if (qubitMap.count(fwdVal))
-                qubitMap[blockArg] = qubitMap[fwdVal];
-            if (bitMap.count(fwdVal))
-                bitMap[blockArg] = bitMap[fwdVal];
+            copyMapping(qubitMap, fwdArgs[i], after.getArgument(i));
+            copyMapping(bitMap, fwdArgs[i], after.getArgument(i));
         }
 
         for (Operation &innerOp : after) {
@@ -496,21 +481,17 @@ class QASM3Emitter {
         auto yieldOperands = yieldOp.getOperands();
         for (size_t j = 0; j < yieldOperands.size() && j < before.getNumArguments(); ++j) {
             Value blockArg = before.getArgument(j);
-            if (!qubitMap.count(blockArg) && qubitMap.count(yieldOperands[j]))
-                qubitMap[blockArg] = qubitMap[yieldOperands[j]];
-            if (!bitMap.count(blockArg) && bitMap.count(yieldOperands[j]))
-                bitMap[blockArg] = bitMap[yieldOperands[j]];
+            if (!qubitMap.count(blockArg))
+                copyMapping(qubitMap, yieldOperands[j], blockArg);
+            if (!bitMap.count(blockArg))
+                copyMapping(bitMap, yieldOperands[j], blockArg);
         }
 
         // Loop results also correspond to the condition's forwarded operands.
         auto results = op.getResults();
         for (size_t i = 0; i < results.size() && i < fwdArgs.size(); ++i) {
-            Value fwdVal = fwdArgs[i];
-            Value result = results[i];
-            if (qubitMap.count(fwdVal))
-                qubitMap[result] = qubitMap[fwdVal];
-            if (bitMap.count(fwdVal))
-                bitMap[result] = bitMap[fwdVal];
+            copyMapping(qubitMap, fwdArgs[i], results[i]);
+            copyMapping(bitMap, fwdArgs[i], results[i]);
         }
 
         return success();
@@ -609,7 +590,7 @@ class QASM3Emitter {
         if (!qubitMap.count(inQreg) || qubitMap[inQreg].empty()) {
             return op.emitError("Cannot emit insert: input register not mapped");
         }
-        qubitMap[op.getResult()] = qubitMap[inQreg];
+        copyMapping(qubitMap, inQreg, op.getResult());
         return success();
     }
 

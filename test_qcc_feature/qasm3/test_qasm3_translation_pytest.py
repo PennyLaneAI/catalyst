@@ -750,6 +750,30 @@ class TestDynamicCircuits:
         assert set(counts2) == {"0"}
 
 
+def run_hybrid_pipeline(qc, quantum_opt_path, quantum_translate_path):
+    """QuantumCircuit -> importer -> quantum-opt -> quantum-translate -> QASM3."""
+    from qiskit_importer_standalone import QiskitToCatalystImporter
+
+    importer = QiskitToCatalystImporter(qc)
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".mlir", delete=False) as tmp:
+        tmp.write(str(importer.convert()))
+        tmp_path = tmp.name
+    # NOTE: -o must not target the input file — quantum-opt mmaps its
+    # input, and overwriting it in place SIGBUSes on larger modules.
+    opt_path = tmp_path + ".opt.mlir"
+    subprocess.run(
+        [str(quantum_opt_path),
+         "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
+         tmp_path, "-o", opt_path],
+        capture_output=True, text=True, check=True)
+    result = subprocess.run(
+        [str(quantum_translate_path), "--mlir-to-qasm3", opt_path],
+        capture_output=True, text=True, check=True)
+    Path(tmp_path).unlink()
+    Path(opt_path).unlink()
+    return result.stdout
+
+
 class TestHybridFrontend:
     """The hybrid QASM3 loader (qasm3_frontend.load_qasm3): qiskit fast path
     plus the openqasm3-AST partial evaluator for constructs qiskit rejects."""
@@ -760,7 +784,8 @@ class TestHybridFrontend:
         "qec.qasm", "qft.qasm", "qpt.qasm", "rb.qasm", "rus.qasm",
         "teleport.qasm", "varteleport.qasm",
     ]
-    # Files that must fail cleanly, with the named blocker in the error.
+    # Files in unsupported/ that must fail cleanly, with the named blocker
+    # in the error (see openqasm3_official_example/unsupported/README.md).
     UNSUPPORTED = {
         "alignment.qasm": "Stretch",
         "dd.qasm": "Stretch",
@@ -782,27 +807,12 @@ class TestHybridFrontend:
     def examples_dir():
         return Path(__file__).parent / "openqasm3_official_example"
 
-    def full_pipeline(self, qc, quantum_opt_path, quantum_translate_path):
-        from qiskit_importer_standalone import QiskitToCatalystImporter
+    @classmethod
+    def unsupported_dir(cls):
+        return cls.examples_dir() / "unsupported"
 
-        importer = QiskitToCatalystImporter(qc)
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".mlir", delete=False) as tmp:
-            tmp.write(str(importer.convert()))
-            tmp_path = tmp.name
-        # NOTE: -o must not target the input file — quantum-opt mmaps its
-        # input, and overwriting it in place SIGBUSes on larger modules.
-        opt_path = tmp_path + ".opt.mlir"
-        subprocess.run(
-            [str(quantum_opt_path),
-             "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
-             tmp_path, "-o", opt_path],
-            capture_output=True, text=True, check=True)
-        result = subprocess.run(
-            [str(quantum_translate_path), "--mlir-to-qasm3", opt_path],
-            capture_output=True, text=True, check=True)
-        Path(tmp_path).unlink()
-        Path(opt_path).unlink()
-        return result.stdout
+    def full_pipeline(self, qc, quantum_opt_path, quantum_translate_path):
+        return run_hybrid_pipeline(qc, quantum_opt_path, quantum_translate_path)
 
     @pytest.mark.parametrize("filename", SUPPORTED)
     def test_official_example_translates(
@@ -824,10 +834,19 @@ class TestHybridFrontend:
     def test_official_example_unsupported_reason(self, filename):
         from qasm3_frontend import QASM3FrontendError, load_qasm3
 
-        src = (self.examples_dir() / filename).read_text()
+        src = (self.unsupported_dir() / filename).read_text()
         with pytest.raises(QASM3FrontendError) as excinfo:
             load_qasm3(src, inputs=self.INPUTS.get(filename))
         assert self.UNSUPPORTED[filename].lower() in str(excinfo.value).lower()
+
+    def test_folders_match_support_status(self):
+        """Every file in the parent folder must be in SUPPORTED; every file
+        in unsupported/ must be in UNSUPPORTED — so the folder layout stays
+        in sync with actual pipeline capability."""
+        top = {f.name for f in self.examples_dir().glob("*.qasm")}
+        assert top == set(self.SUPPORTED)
+        moved = {f.name for f in self.unsupported_dir().glob("*.qasm")}
+        assert moved == set(self.UNSUPPORTED)
 
     def test_qiskit_fast_path_still_used(self):
         """Programs qiskit can parse must go through qiskit (dynamic-circuit
@@ -852,6 +871,127 @@ class TestHybridFrontend:
         qc = load_qasm3(src, inputs={"a_in": 5})
         # bits 0 and 2 of 5 are set -> two x gates
         assert sum(1 for inst in qc.data if inst.operation.name == "x") == 2
+
+
+class TestQECCircuits:
+    """Quantum-error-correction dynamic circuits (qec_circuits/): Shor,
+    Steane, surface, and toric (qLDPC) codes with deterministic error
+    injection, feedforward lookup correction, and adaptive while loops.
+    Each file's stabilizers/lookup tables are documented in its header and
+    in qec_circuits/README.md."""
+
+    QEC_DIR = Path(__file__).parent / "qec_circuits"
+    FILES = [
+        "rep3_bitflip.qasm",
+        "rep3_phaseflip.qasm",
+        "rep3_bitflip_while.qasm",
+        "shor9_full.qasm",
+        "steane7_lookup.qasm",
+        "surface_d2_detect.qasm",
+        "surface17_d3_round.qasm",
+        "toric_2x2_detect.qasm",
+        "toric_2x2_rounds.qasm",
+    ]
+    # Files whose translated output contains `!=` register comparisons,
+    # which qiskit's reparser rejects (grammar-validated via openqasm3).
+    WHILE_FILES = {"rep3_bitflip_while.qasm", "surface_d2_detect.qasm"}
+    # Structural substrings expected in the emitted QASM3.
+    MARKERS = {
+        "rep3_bitflip.qasm": ["reset ", "if (", "measure"],
+        "rep3_phaseflip.qasm": ["reset ", "} else {"],
+        "rep3_bitflip_while.qasm": ["while (", "reset "],
+        "shor9_full.qasm": ["reset ", "if ("],
+        "steane7_lookup.qasm": ["reset ", "if ("],
+        "surface_d2_detect.qasm": ["while (", "reset "],
+        "surface17_d3_round.qasm": ["reset ", "if ("],
+        "toric_2x2_detect.qasm": ["reset ", "if ("],
+        "toric_2x2_rounds.qasm": ["reset ", "if ("],
+    }
+    # Deterministic expectations: register name -> set of allowed values.
+    EXPECTED = {
+        "rep3_bitflip.qasm": {"syn": {"11"}, "out": {"111"}},
+        "rep3_phaseflip.qasm": {"syn": {"11"}, "out": {"000"}},
+        "rep3_bitflip_while.qasm": {"syn": {"00"}, "out": {"111"}},
+        "shor9_full.qasm": {
+            "s0": {"00"}, "s1": {"11"}, "s2": {"00"},
+            "xs": {"11"}, "out": {"000000001"},
+        },
+        "steane7_lookup.qasm": {"zsyn": {"011"}, "xsyn": {"110"}, "out": {"0000000"}},
+        "surface_d2_detect.qasm": {"det": {"000"}, "out": {"0000", "1111"}},
+        "surface17_d3_round.qasm": {
+            "zs": {"0110"}, "xs": {"1010"}, "out": {"000000000"},
+        },
+        "toric_2x2_detect.qasm": {
+            "xs": {"0000"}, "zs": {"0011"}, "out": {"00000000"},
+        },
+        "toric_2x2_rounds.qasm": {"xs": {"000"}, "zs": {"011"}, "out": {"00000000"}},
+    }
+
+    def load(self, filename):
+        from qasm3_frontend import load_qasm3
+
+        return load_qasm3((self.QEC_DIR / filename).read_text())
+
+    @staticmethod
+    def assert_register_outcomes(qc, counts, expected):
+        """Register-aware count check: every shot's per-register value must
+        be in the allowed set for that register (matched by name, not by
+        key position)."""
+        names = [r.name for r in reversed(qc.cregs)]  # leftmost = last creg
+        for key in counts:
+            parts = key.split()
+            assert len(parts) == len(names), (key, names)
+            for name, value in zip(names, parts):
+                if name in expected:
+                    assert value in expected[name], (
+                        f"register {name}={value!r} not in {expected[name]}"
+                    )
+        # Every expected register must actually exist.
+        for name in expected:
+            assert name in names, f"register {name} missing from circuit"
+
+    @pytest.mark.parametrize("filename", FILES)
+    def test_qec_translates(self, quantum_opt_path, quantum_translate_path, filename):
+        import openqasm3
+
+        qc = self.load(filename)
+        qasm3 = run_hybrid_pipeline(qc, quantum_opt_path, quantum_translate_path)
+        assert "OPENQASM 3.0;" in qasm3
+        assert "unknown_cond" not in qasm3
+        for marker in self.MARKERS[filename]:
+            assert marker in qasm3, f"missing {marker!r} in output"
+        openqasm3.parse(qasm3)
+        if filename not in self.WHILE_FILES:
+            import qiskit.qasm3 as qasm3_mod
+
+            qasm3_mod.loads(qasm3)
+
+    @pytest.mark.skipif(not AER_AVAILABLE, reason="qiskit-aer not installed")
+    @pytest.mark.parametrize("filename", FILES)
+    def test_qec_source_semantics(self, filename):
+        """Validate the QEC physics (encoders, syndrome tables, corrections)
+        by simulating the loaded source circuit."""
+        qc = self.load(filename)
+        counts = AerSimulator().run(qc, shots=256).result().get_counts()
+        self.assert_register_outcomes(qc, counts, self.EXPECTED[filename])
+
+    @pytest.mark.skipif(not AER_AVAILABLE, reason="qiskit-aer not installed")
+    @pytest.mark.parametrize("filename", sorted(set(FILES) - WHILE_FILES))
+    def test_qec_translated_semantics(
+        self, quantum_opt_path, quantum_translate_path, filename
+    ):
+        """The TRANSLATED program must reproduce the same deterministic
+        register outcomes as the source."""
+        import qiskit.qasm3 as qasm3_mod
+
+        qc = self.load(filename)
+        qasm3 = run_hybrid_pipeline(qc, quantum_opt_path, quantum_translate_path)
+        translated = qasm3_mod.loads(qasm3)
+        counts = AerSimulator().run(translated, shots=256).result().get_counts()
+        self.assert_register_outcomes(translated, counts, self.EXPECTED[filename])
+
+    def test_qec_folder_in_sync(self):
+        assert {f.name for f in self.QEC_DIR.glob("*.qasm")} == set(self.FILES)
 
 
 if __name__ == "__main__":

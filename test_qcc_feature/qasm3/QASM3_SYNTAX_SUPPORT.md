@@ -17,7 +17,9 @@ target), user gate definitions, gate modifiers (`ctrl @`/`negctrl @`/`inv @`/
 
 **Official spec example coverage: 11/21** translate end-to-end
 (adder, cphase, inverseqft1, inverseqft2, qec, qft, qpt, rb, rus, teleport,
-varteleport). The other 10 fail *cleanly* with the blocker named:
+varteleport). The other 10 live in
+`openqasm3_official_example/unsupported/` (see its README) and fail
+*cleanly* with the blocker named:
 
 | Reason | Files |
 |---|---|
