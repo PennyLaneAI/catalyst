@@ -13,28 +13,28 @@
 // limitations under the License.
 
 #pragma once
-
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <string>
-#include <vector>
 
 namespace catalyst::transport {
 
 /**
  * @brief Data-plane strategy: which engine issues the transfer.
  */
-enum class DataPath {
+enum class DataPath : std::uint8_t {
     CpuVerbs,    // Plain ibverbs on CPU.
     NicEngine,   // Hardware-embedded RNIC (e.g. ERNIC hardware handshake).
-    KernelFused, // Fused with a kernel on GPU (e.g. BlueFlame).
+    KernelFused, // Fused with a kernel (e.g. on GPU). The decode runs
+                 // inside this fused kernel (poll+decode as one GPU kernel), so
+                 // set_decoder / DecodeFn are not used - the user/compiler
+                 // supplies the fused kernel itself.
 };
 
 /**
  * @brief Memory kind: selects the allocation and registration path.
  */
-enum class MemKind {
+enum class MemKind : std::uint8_t {
     CpuRam,   // Plain host RAM.
     GpuHbm,   // GPU HBM, registered via dma-buf.
     FpgaDdr,  // FPGA DDR, allocated via the Xilinx UMM allocator.
@@ -42,149 +42,84 @@ enum class MemKind {
 };
 
 /**
- * @brief Host-provided connection configuration for the out-of-band handshake.
+ * @brief Endpoint role in a session: the controller drives requests; the
+ * coprocessor handles (e.g. runs the decoder) and returns them.
  */
+enum class Role : std::uint8_t { Controller, Coprocessor };
+
 struct ConnectInfo {
-    std::string peer;       // Peer host[:port] for the out-of-band handshake.
-    std::uint16_t oob_port; // Out-of-band TCP port.
-    bool is_server;         // Which side listens on the OOB channel.
+    std::string peer;
+    std::uint16_t oob_port;
+    Role role;
 };
-
-/**
- * @brief A memory region, allocated and registered by the device at runtime.
- *
- * The address and keys are produced by the device; the host
- * holds the region as an opaque handle.
- */
 struct MemRegion {
-    void *addr = nullptr;           // Device-allocated address.
-    std::size_t size = 0;           // Region size in bytes.
-    std::uint32_t lkey = 0;         // Local key.
-    std::uint32_t rkey = 0;         // Remote key.
-    MemKind kind = MemKind::CpuRam; // Memory kind / registration path.
-    int device_id =
-        -1; // For cases when we manage multiple devices (e.g. multi-GPU on a single host).
+    void *addr = nullptr;
+    std::uint64_t size = 0;
+    std::uint32_t lkey = 0;
+    std::uint32_t rkey = 0;
+    MemKind kind = MemKind::CpuRam;
 };
-
-/**
- * @brief A peer's memory region, received over the out-of-band key exchange.
- *
- * The target of this endpoint's one-sided RDMA operations.
- */
 struct PeerRef {
-    std::uint32_t rkey = 0;        // Peer's remote key.
-    std::uint64_t remote_addr = 0; // Peer's remote address.
-    std::size_t size = 0;          // Peer region size in bytes.
+    std::uint32_t rkey = 0;
+    std::uint64_t remote_addr = 0;
+    std::uint64_t size = 0;
 };
-
-/**
- * @brief A single RDMA operation in a channel's per-round schedule.
- */
-struct RdmaOp {
-    std::uint32_t opcode = 0;   // WRITE / READ / SEND.
-    std::uint64_t xfer_len = 0; // Transfer length in bytes.
-    bool inl = false;           // Inline payload (e.g. bf-inline small writes).
-};
-
-/**
- * @brief Describes a channel's data movement: the data-path engine that drives it, how many rounds
- *        to run, and the ordered RDMA operations it performs each round.
- */
 struct ChannelDesc {
-    DataPath data_path = DataPath::CpuVerbs; // Engine that drives the transfers.
-    std::uint32_t n_rounds =
-        0; // Rounds to run; 0 = persistent (run until close(), e.g. a GPU persistent kernel).
-    std::vector<RdmaOp> ops; // The directed RDMA operations, in order.
+    DataPath data_path = DataPath::CpuVerbs;
+    bool persistent = true;
+    std::uint64_t syndrome_bytes = 0;   // controller sends / coprocessor receives (decode in_len)
+    std::uint64_t correction_bytes = 0; // coprocessor sends / controller receives (decode out_len)
 };
 
-/**
- * @brief Data-plane channel. Lifecycle only; the steady-state loop runs in the engine after
- * start().
- */
-class Channel {
-  public:
-    virtual ~Channel() = default;
+// Per-shot compute run on the coprocessor. Reads the syndrome from `in`
+// and writes the correction into `out`, in place on the transport's buffers.
+// Should not throw error.
+//
+// This is the per-shot host-callback model, used by the per-message data paths
+// (e.g. DataPath::CpuVerbs). A DataPath::KernelFused device does not use this:
+// its poll+decode is a single fused GPU kernel supplied by the user/compiler,
+// so no per-shot callback is registered or invoked.
+using DecodeFn = void (*)(void *ctx, const void *in, std::size_t in_len, void *out,
+                          std::size_t out_len);
 
-    /**
-     * @brief Start the engine driving this channel's transfers.
-     *
-     * Non-blocking: after this call the engine runs autonomously and the CPU is out of the
-     * per-round loop. A bounded channel runs `ChannelDesc::n_rounds` rounds; a persistent channel
-     * (`n_rounds == 0`) runs until `close`.
-     */
-    virtual void start() = 0;
-
-    /**
-     * @brief Wait for the channel to reach its terminal state and write the result(s) out.
-     *
-     * @param outputs Array of memref data pointers to receive the terminal result(s).
-     * @param n Number of output buffers.
-     *
-     * @return `int` Status (0 on success).
-     */
-    virtual int collect(void *const *outputs, std::size_t n) = 0;
-
-    /**
-     * @brief Tear down the channel, stopping a persistent engine if one is running.
-     */
-    virtual void close() = 0;
-};
-
-/**
- * @brief Control-plane transport session. Verbs-backed for every backend.
- *
- * A backend implements this interface via ibverbs. It runs on the host where its
- * hardware lives.
- */
+// Stateful session: methods must be called in this order:
+//   1. connect            - bring up QPs + the out-of-band channel
+//   2. alloc_memory       - register the region (needs the connected context)
+//   3. exchange_keys      - swap region handles over the out-of-band channel
+//   4. establish_channel  - program the channel from the local + peer regions
+//   5. set_decoder        - coprocessor only, before start()
+//   6. start / collect / stop
 class TransportSession {
   public:
     virtual ~TransportSession() = default;
 
-    /**
-     * @brief Bring up the connection (out-of-band handshake and QP transition to RTS).
-     *
-     * @param info Host-provided connection configuration.
-     *
-     * @return `int` Status (0 on success).
-     */
+    // Bring up the connection (out-of-band handshake and QP transition to RTS).
     virtual int connect(const ConnectInfo &info) = 0;
 
-    /**
-     * @brief Allocate and register a memory region on the device.
-     *
-     * The device owns the allocation; the returned region's address and keys are outputs.
-     *
-     * @param size Region size in bytes.
-     * @param kind Memory kind / registration path.
-     * @param device_id Target device (e.g. GPU index).
-     * @param access Access flags (map to `IBV_ACCESS_*`).
-     *
-     * @return `MemRegion` The allocated, registered region.
-     */
-    virtual MemRegion alloc_memory(std::size_t size, MemKind kind, int device_id,
-                                   std::uint32_t access) = 0;
+    // Allocate and register a memory region on the device.
+    virtual MemRegion alloc_memory(std::size_t size, MemKind kind, std::uint32_t access) = 0;
 
-    /**
-     * @brief Advertise a local region and receive the peer's region over the OOB channel.
-     *
-     * @param local The local region to advertise.
-     * @param peer Index of the peer to exchange with.
-     *
-     * @return `PeerRef` The peer's region.
-     */
-    virtual PeerRef exchange_keys(const MemRegion &local, int peer) = 0;
+    // Advertise a local region and receive the peer's region over the out-of-band channel.
+    virtual PeerRef exchange_keys(const MemRegion &local) = 0;
 
-    /**
-     * @brief Program the transport descriptor and return the channel.
-     *
-     * @param desc The channel description (data path, rounds, RDMA ops).
-     * @param local The local memory region.
-     * @param peer The peer's region.
-     *
-     * @return `std::unique_ptr<Channel>` The established channel.
-     */
-    virtual std::unique_ptr<Channel>
-    establish_channel(const ChannelDesc &desc, const MemRegion &local, const PeerRef &peer) = 0;
+    // Program the data movement this session will run (single channel per session).
+    virtual void establish_channel(const ChannelDesc &desc, const MemRegion &local,
+                                   const PeerRef &peer) = 0;
+
+    // Launch the engine (non-blocking; runs until stop()).
+    virtual void start() = 0;
+
+    // Wait for a result and write it out.
+    virtual int collect(void *const *outputs, std::size_t n) = 0;
+
+    // Stop the engine and join. Idempotent.
+    virtual void stop() = 0;
+
+    // Register the per-shot decoder (coprocessor role). No-op default so
+    // controller-only / non-decoding devices need not implement it. A
+    // DataPath::KernelFused device also leaves this unused: its fused poll+decode
+    // kernel is provided by the user/compiler, not registered here.
+    virtual void set_decoder(DecodeFn /*fn*/, void * /*ctx*/) {}
 };
 
 } // namespace catalyst::transport
