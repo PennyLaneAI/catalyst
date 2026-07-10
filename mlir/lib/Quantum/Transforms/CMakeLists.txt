@@ -10,6 +10,7 @@ file(GLOB SRC
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
     ConversionPatterns.cpp
+    GraphDecomposition/DecompUtils.cpp
     GraphDecomposition/DecomposeLoweringPatterns.cpp
     GraphDecomposition/decompose_lowering.cpp
     GraphDecomposition/graph_decomposition.cpp

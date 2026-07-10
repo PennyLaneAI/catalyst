@@ -45,6 +45,8 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
+#include "DecompUtils.hpp"
+
 #define DEBUG_TYPE "decompose-lowering"
 
 using namespace mlir;
@@ -56,36 +58,6 @@ namespace quantum {
 #define GEN_PASS_DEF_DECOMPOSELOWERINGPASS
 #define GEN_PASS_DECL_DECOMPOSELOWERINGPASS
 #include "Quantum/Transforms/Passes.h.inc"
-
-namespace DecompUtils {
-
-static constexpr StringRef target_gate_attr_name = "target_gate";
-static constexpr StringRef decomp_gateset_attr_name = "decomp_gateset";
-
-// Check if a function is a decomposition function
-// It's expected that the decomposition function would have this attribute:
-// `catalyst.decomposition.target_op` And this attribute is set by the `markDecompositionAttributes`
-// functionq The decomposition attribute are used to determine if a function is a decomposition
-// function, and target_op is that the decomposition function want to replace
-bool isDecompositionFunction(func::FuncOp func) { return func->hasAttr(target_gate_attr_name); }
-
-StringRef getTargetGateName(func::FuncOp func)
-{
-    if (auto target_op_attr = func->getAttrOfType<StringAttr>(target_gate_attr_name)) {
-        return target_op_attr.getValue();
-    }
-    return StringRef{};
-}
-
-uint64_t getNumWires(func::FuncOp func)
-{
-    if (auto num_wires_attr = func->getAttrOfType<IntegerAttr>("num_wires")) {
-        return num_wires_attr.getValue().getZExtValue();
-    }
-    return 0;
-}
-
-} // namespace DecompUtils
 
 /// A module pass that work through a module, register all decomposition functions, and apply the
 /// decomposition patterns
