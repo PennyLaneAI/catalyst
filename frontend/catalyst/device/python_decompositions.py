@@ -59,7 +59,8 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
         def decomp_rule(*params, wires):
             rule._impl(*params, *wires, **static_data)
 
-        # TODO remove this once we have unified lowering, we should be able to set target_gate
+        # TODO remove this once we have unified lowering, we should be able to set target_gate and
+        # stop relying on function names
         decomp_rule.__name__ = op_id + "_" + rule.name
 
         return qp.capture.subroutine(decomp_rule)
@@ -76,6 +77,9 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
+            # TODO I know this is dynamic, but we should probably have a better way of handling this
+            # than hard-coded dummy values. Revisit this when unifying the decomp-rule lowering
+            # pipeline
             subroutine(*[0.5 for _ in dynamic_shape], wires=wires)
 
     return str(circuit.mlir_module)
