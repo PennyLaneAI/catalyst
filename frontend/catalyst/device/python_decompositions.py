@@ -45,7 +45,7 @@ import pennylane as qp
 def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:
     """Generic decomposition wrapper."""
     device = qp.device("null.qubit", wires=sum(wire_lens))
-    wires = tuple(jnp.array(range(length)) for length in wire_lens)
+    wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
 
     def rule_to_subroutine(rule):
         def decomp_rule(*params, wires):
