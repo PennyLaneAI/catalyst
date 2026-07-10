@@ -37,7 +37,7 @@ class DAGBuilder(ABC):
         *,
         cluster_uid: ClusterUID | None = None,
         **attrs: Any,
-    ) ->  NodeUID:
+    ) -> NodeUID:
         """Add a single node to the graph.
 
         Args:
