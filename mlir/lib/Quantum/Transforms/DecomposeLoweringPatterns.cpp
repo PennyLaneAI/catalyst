@@ -266,7 +266,7 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
 
     LogicalResult matchAndRewrite(PauliRotOp op, PatternRewriter &rewriter) const override
     {
-        std::string gateName = "paulirot" + op.getPauliWord();
+        std::string gateName = cast<DecomposableGate>(op.getOperation()).getGraphOpId();
 
         // Only decompose the op if it is not in the target gate set
         if (targetGateSet.contains("paulirot")) {
