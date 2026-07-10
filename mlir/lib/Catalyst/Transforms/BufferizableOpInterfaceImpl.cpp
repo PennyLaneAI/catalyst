@@ -363,8 +363,8 @@ struct SymbolicArrayOpInterface
                             const bufferization::BufferizationOptions &options,
                             bufferization::BufferizationState &state) const
     {
-        return op->emitError(
-            "catalyst::symbolic_array is a placeholder op for resource estimation and cannot currently be bufferized or executed.");
+        return op->emitError("catalyst::symbolic_array is a placeholder op for resource estimation "
+                             "and cannot currently be bufferized or executed.");
     }
 };
 

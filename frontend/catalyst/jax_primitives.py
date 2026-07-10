@@ -50,6 +50,7 @@ from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, IndexSwitchOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
+from pennylane.capture.primitives import symbolic_array_prim
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -59,7 +60,6 @@ from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 # pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.utils.patching import Patcher
-from pennylane.capture.primitives import symbolic_array_prim
 
 with Patcher(
     (
@@ -3071,7 +3071,6 @@ def subroutine_lowering(*args, **kwargs):
 def _symbolic_array_lowering(ctx, *, shape, dtype):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in ctx.avals_out]
     return SymbolicArrayOp(result_types[0]).results
-
 
 
 CUSTOM_LOWERING_RULES = (
