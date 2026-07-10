@@ -67,7 +67,7 @@ void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss)
         })
         .Case<mlir::StringAttr>([&](mlir::StringAttr attr) { ss << attr.str(); })
         .Case<mlir::IntegerAttr>([&](mlir::IntegerAttr attr) { ss << attr.getInt(); })
-        .Case<mlir::FloatAttr>([&](mlir::FloatAttr attr) { ss << attr.getValue(); })
+        .Case<mlir::FloatAttr>([&](mlir::FloatAttr attr) { ss << attr.getValueAsDouble(); })
         .Default([&](mlir::Attribute attr) { attr.print(ss); });
 }
 } // namespace
