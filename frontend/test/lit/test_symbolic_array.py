@@ -14,6 +14,7 @@
 """
 Tests for using symobolic_array in a QNode.
 """
+
 # pylint: disable=line-too-long, missing-function-docstring
 # RUN: %PYTHON %s | FileCheck %s
 
