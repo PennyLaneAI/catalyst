@@ -338,8 +338,7 @@ def RerollLoopsPass : Pass<"reroll-loops"> {
     let description = [{
         Tracing a Python program unrolls its loops: N structurally identical
         circuit segments (Trotter steps, layers, folds) arrive as N copies of the
-        same op sequence, and every downstream stage amplifies each copy (see
-        issue #2759).
+        same op sequence, and every downstream stage amplifies each copy.
 
         This pass detects maximal tandem repeats of structurally isomorphic op
         windows via shift-invariant structural hashing, verifies that
@@ -381,7 +380,7 @@ def ScalarizeTensorExtractsPass : Pass<"scalarize-tensor-extracts"> {
         small tensor operations whose only consumers are scalar `tensor.extract`
         operations. Each intermediate tensor survives bufferization as an allocation
         with copies and each `linalg.generic` is later unrolled into loops, causing
-        severe IR amplification (see issue #2759).
+        severe IR amplification.
 
         This pass folds `tensor.extract` through elementwise `linalg.generic` (by
         inlining the scalar payload), `tensor.collapse_shape`, and

@@ -13,9 +13,9 @@
 # limitations under the License.
 
 """Integration tests for the IR-amplification fixes for runtime-coefficient
-Hamiltonians (issue #2759): scalarize-tensor-extracts, elementwise fusion, and
-reroll-loops in the default pipeline must preserve numerics for Trotterized
-workloads with runtime coefficients."""
+Hamiltonians: scalarize-tensor-extracts, elementwise fusion, and reroll-loops
+in the default pipeline must preserve numerics for Trotterized workloads with
+runtime coefficients."""
 
 import numpy as np
 import pennylane as qml

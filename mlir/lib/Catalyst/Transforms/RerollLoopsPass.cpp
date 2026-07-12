@@ -27,39 +27,16 @@
 using namespace llvm;
 using namespace mlir;
 
-// Tracing a Python circuit destroys its loop structure: N structurally identical
-// Trotter steps (or layers, folds, powers) arrive as N copies of the same op
-// sequence. Every later stage (bufferization, LLVM conversion, LLVM codegen)
-// amplifies each copy, which is the dominant source of IR blowup in issue #2759.
-//
-// This pass reconstructs those loops:
-//
-//  1. Canonical structural hashing: each op in a block is hashed over its name,
-//     attributes, result types, and operand provenance, where operands defined
-//     inside the block are identified by their *backward distance* in ops. The
-//     hash sequence is shift-invariant, so identical iterations produce
-//     identical hash subsequences regardless of position.
-//
-//  2. Tandem-repeat detection: maximal runs with H[i] == H[i+p] identify
-//     candidate repeats w^k of period p (a linear-time shift-and-compare over
-//     candidate periods harvested from same-hash gap statistics).
-//
-//  3. Semantic verification: consecutive windows must be isomorphic op-by-op,
-//     with cross-window dataflow restricted to values *threaded* from the
-//     directly preceding window at a fixed (position, result) slot — exactly the
-//     shape of qubit values chained through a gate sequence — and all other
-//     operands loop-invariant.
-//
-//  4. Materialization: the repeat is replaced by an scf.for whose iter_args are
-//     the threaded slots, its body a clone of one window. A repeat of
-//     multiplicity k shrinks that region k-fold before any downstream stage
-//     sees it.
+// Tracing unrolls Python loops: N identical circuit segments (Trotter steps,
+// layers, folds) arrive as N copies of the same op sequence, and every later
+// stage amplifies each copy. This pass reconstructs the loops in four steps:
+// structural hashing of each op, tandem-repeat detection on the hash sequence
+// (maximal runs with H[i] == H[i+p]), semantic verification that consecutive
+// windows are isomorphic with cross-window dataflow limited to threaded values
+// (e.g. qubits) plus loop invariants, and replacement of the repeat with an
+// scf.for whose iter_args are the threaded values.
 
 namespace {
-
-//===----------------------------------------------------------------------===//
-// Structural hashing
-//===----------------------------------------------------------------------===//
 
 /// Ops that may participate in a rerolled window: single-block-region-free,
 /// no successors, and not a terminator.
@@ -69,18 +46,11 @@ bool isRerollableOp(Operation *op)
            !op->hasTrait<OpTrait::IsTerminator>();
 }
 
-/// Compute shift-invariant structural hashes for all ops of a block (excluding
-/// the terminator). Non-rerollable ops receive unique sentinel hashes so they
-/// can never be part of a repeat.
-///
-/// In-block defs are hashed with a constant tag plus the result number:
-/// hashing them by identity would make every window distinct (each window
-/// threads different SSA values), and hashing them by backward distance breaks
-/// on loop-invariant values (e.g. CSE-deduplicated angle computations) whose
-/// distance grows window over window. The resulting weaker discrimination is
-/// compensated by semantic verification of every candidate. Block arguments
-/// and out-of-block values are hashed by identity (loop-invariant by
-/// construction).
+/// Compute structural hashes for all ops of a block (excluding the
+/// terminator). Non-rerollable ops receive unique sentinel hashes. In-block
+/// operand defs are hashed by result number only (not identity, which would
+/// make every window distinct); the weak discrimination this leaves is
+/// compensated by semantic verification of every candidate.
 void computeHashes(ArrayRef<Operation *> ops, const llvm::DenseMap<Operation *, size_t> &indexOf,
                    SmallVectorImpl<uint64_t> &hashes)
 {
@@ -109,10 +79,6 @@ void computeHashes(ArrayRef<Operation *> ops, const llvm::DenseMap<Operation *, 
         hashes.push_back(h);
     }
 }
-
-//===----------------------------------------------------------------------===//
-// Candidate detection
-//===----------------------------------------------------------------------===//
 
 struct Candidate {
     size_t start;  // index of the first op of the first window
@@ -170,10 +136,6 @@ void findCandidates(ArrayRef<uint64_t> hashes, unsigned minPeriod, unsigned maxP
         }
     }
 }
-
-//===----------------------------------------------------------------------===//
-// Semantic verification
-//===----------------------------------------------------------------------===//
 
 struct RerollPlan {
     Candidate cand;
@@ -363,10 +325,7 @@ RerollPlan extendCandidate(ArrayRef<Operation *> ops,
     return plan;
 }
 
-//===----------------------------------------------------------------------===//
-// Materialization
-//===----------------------------------------------------------------------===//
-
+/// Replace the repeat with an scf.for and erase the original ops.
 void materialize(ArrayRef<Operation *> ops, const RerollPlan &plan)
 {
     size_t start = plan.cand.start, p = plan.cand.period, count = plan.cand.count;
@@ -418,10 +377,6 @@ void materialize(ArrayRef<Operation *> ops, const RerollPlan &plan)
         ops[i]->erase();
     }
 }
-
-//===----------------------------------------------------------------------===//
-// Driver
-//===----------------------------------------------------------------------===//
 
 bool processBlock(Block &block, unsigned minPeriod, unsigned minSavings)
 {

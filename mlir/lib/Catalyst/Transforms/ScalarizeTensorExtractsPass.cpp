@@ -25,24 +25,15 @@
 using namespace llvm;
 using namespace mlir;
 
-// Traced programs that compute quantum gate parameters from runtime inputs (e.g.
-// Trotterized Hamiltonians with runtime coefficients, see catalyst issue #2759)
-// produce long chains of *small* tensor ops whose only consumers are scalar
-// `tensor.extract` operations feeding gate parameters. Each such tensor survives
-// bufferization as an allocation plus copies, and each surviving `linalg.generic`
-// is later unrolled into loops, amplifying the IR by orders of magnitude.
-//
-// The patterns in this pass sink `tensor.extract` through the producers of such
-// tensors, computing the extracted element directly in scalar arithmetic:
-//
-//   * extract(linalg.generic)      -> inline the generic's scalar payload
-//   * extract(tensor.collapse_shape) -> extract from the source with expanded indices
-//   * extract(tensor.extract_slice)  -> extract from the source with offset indices
-//
-// Applied to a fixpoint, extraction sinks to the leaves of the dataflow, the
-// intermediate tensors become dead, and the scalar chains remain (deduplicated by
-// a follow-up CSE). To avoid code growth on large tensors, generic-payload
-// inlining is restricted to small statically-shaped results.
+// Gate parameters computed from runtime inputs (e.g. Trotterization with
+// runtime Hamiltonian coefficients) arrive as long chains of small tensor ops
+// consumed only by scalar `tensor.extract` operations; each such tensor
+// survives bufferization as an allocation plus copies. This pass sinks
+// `tensor.extract` through `linalg.generic` (inlining the scalar payload),
+// `tensor.collapse_shape`, and `tensor.extract_slice`, so the extracted
+// element is computed in scalar arithmetic and the tensors become dead.
+// Payload inlining is limited to small statically-shaped results to bound
+// code growth.
 
 namespace {
 

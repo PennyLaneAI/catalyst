@@ -73,22 +73,22 @@ const PipelineList pipelineList{
       "cse",
       // Sink scalar extractions through small-tensor producers and fuse the
       // remaining elementwise ops. Traced gate-parameter dataflow (e.g. runtime
-      // Hamiltonian coefficients, issue #2759) otherwise reaches bufferization
-      // as thousands of tiny tensor ops that each become an alloc + copy.
+      // Hamiltonian coefficients) otherwise reaches bufferization as thousands
+      // of tiny tensor ops that each become an alloc + copy.
       "scalarize-tensor-extracts",
       "func.func(linalg-fuse-elementwise-ops)",
       "canonicalize",
       "cse",
       // Reconstruct the loops that tracing unrolled (e.g. Trotter steps); a
       // repeat of multiplicity k shrinks its region k-fold before the
-      // bufferization and LLVM stages amplify it (issue #2759).
+      // bufferization and LLVM stages amplify it.
       "reroll-loops",
       "func.func(linalg-detensorize{aggressive-mode})",
       "detensorize-scf",
       "detensorize-function-boundary",
       // Detensorization is what materializes tensor.extract on the gate-angle
       // dataflow, so scalarization must run again here to fold the
-      // extract_slice/collapse_shape chains it exposes (issue #2759).
+      // extract_slice/collapse_shape chains it exposes.
       "scalarize-tensor-extracts",
       "canonicalize",
       "cse",
@@ -111,7 +111,7 @@ const PipelineList pipelineList{
       // This pass is needed to avoid aliasing of the input buffer with the output buffer.
       "mark-entry-point-args-non-writable",
       // Value-number duplicate tensor computations before bufferization so they
-      // do not each become a separate buffer (issue #2759).
+      // do not each become a separate buffer.
       "cse",
       "one-shot-bufferize",
       // Remove dead memrefToTensorOp's
