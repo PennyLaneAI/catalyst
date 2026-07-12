@@ -80,7 +80,12 @@ const PipelineList pipelineList{
       "canonicalize",
       // Reconstruct the loops that tracing unrolled (e.g. Trotter steps); a
       // repeat of multiplicity k shrinks its region k-fold before the
-      // bufferization and LLVM stages amplify it.
+      // bufferization and LLVM stages amplify it. No cse is needed before
+      // this pass computations duplicated per iteration sit inside each
+      // repeated window and reroll as part of it, and constants (the only
+      // cross-window operands that must be identical SSA values) are already
+      // uniqued by the preceding canonicalize. An ablation with cse here
+      // showed no change in rerolling or output size.
       "reroll-loops",
       "func.func(linalg-detensorize{aggressive-mode})",
       "detensorize-scf",

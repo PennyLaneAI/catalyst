@@ -94,6 +94,20 @@ struct ExtractOfGeneric : public OpRewritePattern<tensor::ExtractOp> {
             }
         }
 
+        // Validate every input indexing map up front: patterns must not mutate
+        // the IR on the failure path, and ops are created per input below.
+        for (OpOperand *inOperand : genericOp.getDpsInputOperands()) {
+            if (!isa<RankedTensorType>(inOperand->get().getType())) {
+                continue;
+            }
+            AffineMap inputMap = genericOp.getMatchingIndexingMap(inOperand);
+            for (AffineExpr expr : inputMap.getResults()) {
+                if (!isa<AffineDimExpr, AffineConstantExpr>(expr)) {
+                    return failure();
+                }
+            }
+        }
+
         Location loc = extractOp.getLoc();
         SmallVector<Value> iterIndices(extractOp.getIndices());
 
@@ -115,12 +129,10 @@ struct ExtractOfGeneric : public OpRewritePattern<tensor::ExtractOp> {
                 if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
                     inputIndices.push_back(iterIndices[dimExpr.getPosition()]);
                 }
-                else if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
+                else {
+                    auto constExpr = cast<AffineConstantExpr>(expr);
                     inputIndices.push_back(
                         arith::ConstantIndexOp::create(rewriter, loc, constExpr.getValue()));
-                }
-                else {
-                    return failure();
                 }
             }
             Value scalar = tensor::ExtractOp::create(rewriter, loc, input, inputIndices);
@@ -161,6 +173,22 @@ struct ExtractOfCollapseShape : public OpRewritePattern<tensor::ExtractOp> {
             return failure();
         }
 
+        // Validate every reassociation group up front (at most one non-unit
+        // source dimension per group): patterns must not mutate the IR on the
+        // failure path, and index constants are created per group below.
+        SmallVector<ReassociationIndices> groups = collapseOp.getReassociationIndices();
+        SmallVector<int64_t> nonUnitDims(groups.size(), -1);
+        for (const auto &[groupIdx, group] : llvm::enumerate(groups)) {
+            for (int64_t srcDim : group) {
+                if (srcType.getDimSize(srcDim) != 1) {
+                    if (nonUnitDims[groupIdx] != -1) {
+                        return failure(); // true merge of two non-unit dims
+                    }
+                    nonUnitDims[groupIdx] = srcDim;
+                }
+            }
+        }
+
         Location loc = extractOp.getLoc();
         SmallVector<Value> srcIndices(srcType.getRank());
 
@@ -172,7 +200,6 @@ struct ExtractOfCollapseShape : public OpRewritePattern<tensor::ExtractOp> {
             return zero;
         };
 
-        SmallVector<ReassociationIndices> groups = collapseOp.getReassociationIndices();
         // A rank-0 result means every source dimension is a unit dimension.
         if (groups.empty()) {
             for (int64_t dim = 0; dim < srcType.getRank(); ++dim) {
@@ -180,18 +207,10 @@ struct ExtractOfCollapseShape : public OpRewritePattern<tensor::ExtractOp> {
             }
         }
         for (const auto &[groupIdx, group] : llvm::enumerate(groups)) {
-            int64_t nonUnitDim = -1;
             for (int64_t srcDim : group) {
-                if (srcType.getDimSize(srcDim) != 1) {
-                    if (nonUnitDim != -1) {
-                        return failure(); // true merge of two non-unit dims
-                    }
-                    nonUnitDim = srcDim;
-                }
-            }
-            for (int64_t srcDim : group) {
-                srcIndices[srcDim] =
-                    (srcDim == nonUnitDim) ? extractOp.getIndices()[groupIdx] : getZero();
+                srcIndices[srcDim] = (srcDim == nonUnitDims[groupIdx])
+                                         ? extractOp.getIndices()[groupIdx]
+                                         : getZero();
             }
         }
 

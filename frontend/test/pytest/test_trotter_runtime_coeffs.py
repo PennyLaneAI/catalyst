@@ -17,6 +17,8 @@ Hamiltonians: scalarize-tensor-extracts, elementwise fusion, and reroll-loops
 in the default pipeline must preserve numerics for Trotterized workloads with
 runtime coefficients."""
 
+import re
+
 import numpy as np
 import pennylane as qml
 import pytest
@@ -103,7 +105,12 @@ class TestRuntimeCoefficientTrotter:
         try:
             traced = get_compilation_stage(compiled, "QuantumCompilationStage")
             lowered = get_compilation_stage(compiled, "HLOLoweringStage")
-            assert "scf.for" in lowered, "reroll-loops did not fire"
+            # Rerolled Trotter steps are scf.for loops threading qubit values
+            # through iter_args.
+            qubit_loops = re.findall(
+                r"scf\.for .*iter_args\([^)]*\).*->.*!quantum\.bit", lowered
+            )
+            assert qubit_loops, "reroll-loops did not produce qubit-threading loops"
             unrolled_gates = traced.count("quantum.custom")
             rerolled_gates = lowered.count("quantum.custom")
             assert rerolled_gates < unrolled_gates / 2, (
