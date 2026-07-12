@@ -15,17 +15,14 @@
 // RUN: quantum-opt --reroll-loops="min-period=2 min-savings=4" --split-input-file %s | FileCheck %s
 
 // A scalar chain of alternating ops rerolls into an scf.for threading one
-// value. The first addf seeds the loop (its operand pattern differs), the
-// trailing mulf stays as an epilogue.
+// value through all eight iterations.
 
 // CHECK-LABEL: @scalar_chain
-// CHECK:         %[[SEED:.+]] = arith.addf
-// CHECK:         %[[FOR:.+]] = scf.for {{.*}} iter_args(%[[IT:.+]] = %[[SEED]]) -> (f64)
-// CHECK:           %[[M:.+]] = arith.mulf %[[IT]],
-// CHECK:           %[[A:.+]] = arith.addf %[[M]],
-// CHECK:           scf.yield %[[A]] : f64
-// CHECK:         %[[EPI:.+]] = arith.mulf %[[FOR]],
-// CHECK:         return %[[EPI]]
+// CHECK:         %[[FOR:.+]] = scf.for {{.*}} iter_args(%[[IT:.+]] = %arg0) -> (f64)
+// CHECK:           %[[A:.+]] = arith.addf %[[IT]],
+// CHECK:           %[[M:.+]] = arith.mulf %[[A]],
+// CHECK:           scf.yield %[[M]] : f64
+// CHECK:         return %[[FOR]]
 func.func @scalar_chain(%arg0: f64, %c: f64) -> f64 {
   %0 = arith.addf %arg0, %c : f64
   %1 = arith.mulf %0, %c : f64
@@ -49,19 +46,16 @@ func.func @scalar_chain(%arg0: f64, %c: f64) -> f64 {
 // -----
 
 // A repeated gate sequence threading two qubits rerolls with both qubit
-// values as iter_args; the rotation angle is loop-invariant. The pass may pick
-// any rotation of the repeated window (here the run starts at the first CNOT),
-// leaving a prologue/epilogue outside the loop.
+// values as iter_args; the rotation angle is loop-invariant.
 
 // CHECK-LABEL: @gate_sequence
 // CHECK:         quantum.alloc
 // CHECK:         %[[FOR:.+]]:2 = scf.for {{.*}} iter_args(%[[Q0:.+]] = %{{.+}}, %[[Q1:.+]] = %{{.+}}) -> (!quantum.bit, !quantum.bit)
-// CHECK:           %[[CNOT:.+]]:2 = quantum.custom "CNOT"() %[[Q0]], %[[Q1]]
-// CHECK:           %[[H:.+]] = quantum.custom "Hadamard"() %[[CNOT]]#0
-// CHECK:           %[[RZ:.+]] = quantum.custom "RZ"(%{{.+}}) %[[CNOT]]#1
-// CHECK:           scf.yield %[[H]], %[[RZ]]
-// CHECK:         %[[LAST:.+]]:2 = quantum.custom "CNOT"() %[[FOR]]#0, %[[FOR]]#1
-// CHECK:         quantum.insert %{{.+}}[ 0], %[[LAST]]#0
+// CHECK:           %[[H:.+]] = quantum.custom "Hadamard"() %[[Q0]]
+// CHECK:           %[[RZ:.+]] = quantum.custom "RZ"(%{{.+}}) %[[Q1]]
+// CHECK:           %[[CNOT:.+]]:2 = quantum.custom "CNOT"() %[[H]], %[[RZ]]
+// CHECK:           scf.yield %[[CNOT]]#0, %[[CNOT]]#1
+// CHECK:         quantum.insert %{{.+}}[ 0], %[[FOR]]#0
 func.func @gate_sequence(%theta: f64) -> !quantum.reg {
   %r0 = quantum.alloc( 2) : !quantum.reg
   %q0 = quantum.extract %r0[ 0] : !quantum.reg -> !quantum.bit

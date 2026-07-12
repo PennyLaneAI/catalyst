@@ -78,7 +78,6 @@ const PipelineList pipelineList{
       "scalarize-tensor-extracts",
       "func.func(linalg-fuse-elementwise-ops)",
       "canonicalize",
-      "cse",
       // Reconstruct the loops that tracing unrolled (e.g. Trotter steps); a
       // repeat of multiplicity k shrinks its region k-fold before the
       // bufferization and LLVM stages amplify it.
@@ -91,7 +90,6 @@ const PipelineList pipelineList{
       // extract_slice/collapse_shape chains it exposes.
       "scalarize-tensor-extracts",
       "canonicalize",
-      "cse",
       "symbol-dce"}},
     {"gradient-lowering-stage",
      {"annotate-invalid-gradient-functions",
@@ -110,9 +108,6 @@ const PipelineList pipelineList{
        */
       // This pass is needed to avoid aliasing of the input buffer with the output buffer.
       "mark-entry-point-args-non-writable",
-      // Value-number duplicate tensor computations before bufferization so they
-      // do not each become a separate buffer.
-      "cse",
       "one-shot-bufferize",
       // Remove dead memrefToTensorOp's
       "canonicalize",
@@ -132,7 +127,9 @@ const PipelineList pipelineList{
       // Must be after convert-bufferization-to-memref.
       // Otherwise, there are issues in the lowering of dynamic tensors.
       "canonicalize",
-      "cse",
+      /* [DISABLED PASS]
+       * "cse",
+       */
       "cp-global-memref"}},
     {"llvm-dialect-lowering-stage",
      {"qnode-to-async-lowering",

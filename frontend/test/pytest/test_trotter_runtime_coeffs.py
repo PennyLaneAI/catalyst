@@ -89,23 +89,27 @@ class TestRuntimeCoefficientTrotter:
         assert np.allclose(np.asarray(dyn), np.asarray(fixed), atol=1e-9)
 
     def test_reroll_recovers_loops(self):
-        """The compiled module must contain scf.for loops recovered from the
-        unrolled Trotter steps (guards against silent regression of
-        reroll-loops in the default pipeline)."""
+        """The IR after HLO lowering must contain scf.for loops recovered from
+        the unrolled Trotter steps, and fewer gate ops than the unrolled
+        circuit (guards against silent regression of reroll-loops in the
+        default pipeline)."""
+        from catalyst.debug import get_compilation_stage
+
         dev = qml.device("lightning.qubit", wires=N_QUBITS + N_EST)
         coeffs = jnp.array(COEFFS)
 
         compiled = qjit(make_qpe(dev, runtime=True), keep_intermediate=True)
         compiled(coeffs)
         try:
-            workspace = str(compiled.workspace)
-            import glob
-            import os
-
-            hlo_files = glob.glob(os.path.join(workspace, "*HLOLowering*.mlir"))
-            assert hlo_files, "no post-HLO snapshot written"
-            content = open(hlo_files[0], encoding="utf-8").read()
-            assert "scf.for" in content, "reroll-loops did not fire"
+            traced = get_compilation_stage(compiled, "QuantumCompilationStage")
+            lowered = get_compilation_stage(compiled, "HLOLoweringStage")
+            assert "scf.for" in lowered, "reroll-loops did not fire"
+            unrolled_gates = traced.count("quantum.custom")
+            rerolled_gates = lowered.count("quantum.custom")
+            assert rerolled_gates < unrolled_gates / 2, (
+                f"expected reroll to shrink gate volume by >2x, got "
+                f"{unrolled_gates} -> {rerolled_gates}"
+            )
         finally:
             compiled.workspace.cleanup()
 

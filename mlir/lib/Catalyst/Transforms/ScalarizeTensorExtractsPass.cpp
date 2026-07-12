@@ -38,7 +38,9 @@ using namespace mlir;
 namespace {
 
 /// Upper bound on the number of elements of a tensor whose producer payload we
-/// are willing to clone per extraction site.
+/// are willing to clone per extraction site. 16 covers the 4x4 matrices of
+/// two-qubit gates, the largest tensors in gate-parameter dataflow, while
+/// keeping the worst-case code growth per extract small.
 constexpr int64_t kMaxScalarizedElements = 16;
 
 /// Fold tensor.extract(linalg.generic) by inlining the generic's scalar payload
@@ -114,8 +116,8 @@ struct ExtractOfGeneric : public OpRewritePattern<tensor::ExtractOp> {
                     inputIndices.push_back(iterIndices[dimExpr.getPosition()]);
                 }
                 else if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
-                    inputIndices.push_back(arith::ConstantIndexOp::create(
-                        rewriter, loc, constExpr.getValue()));
+                    inputIndices.push_back(
+                        arith::ConstantIndexOp::create(rewriter, loc, constExpr.getValue()));
                 }
                 else {
                     return failure();
@@ -188,14 +190,12 @@ struct ExtractOfCollapseShape : public OpRewritePattern<tensor::ExtractOp> {
                 }
             }
             for (int64_t srcDim : group) {
-                srcIndices[srcDim] = (srcDim == nonUnitDim)
-                                         ? extractOp.getIndices()[groupIdx]
-                                         : getZero();
+                srcIndices[srcDim] =
+                    (srcDim == nonUnitDim) ? extractOp.getIndices()[groupIdx] : getZero();
             }
         }
 
-        rewriter.replaceOpWithNewOp<tensor::ExtractOp>(extractOp, collapseOp.getSrc(),
-                                                       srcIndices);
+        rewriter.replaceOpWithNewOp<tensor::ExtractOp>(extractOp, collapseOp.getSrc(), srcIndices);
         return success();
     }
 };
@@ -224,8 +224,8 @@ struct ExtractOfExtractSlice : public OpRewritePattern<tensor::ExtractOp> {
             if (auto val = dyn_cast<Value>(ofr)) {
                 return val;
             }
-            return arith::ConstantIndexOp::create(
-                rewriter, loc, cast<IntegerAttr>(cast<Attribute>(ofr)).getInt());
+            return arith::ConstantIndexOp::create(rewriter, loc,
+                                                  cast<IntegerAttr>(cast<Attribute>(ofr)).getInt());
         };
 
         SmallVector<Value> srcIndices;
@@ -242,8 +242,7 @@ struct ExtractOfExtractSlice : public OpRewritePattern<tensor::ExtractOp> {
             srcIndices.push_back(arith::AddIOp::create(rewriter, loc, offset, scaled));
         }
 
-        rewriter.replaceOpWithNewOp<tensor::ExtractOp>(extractOp, sliceOp.getSource(),
-                                                       srcIndices);
+        rewriter.replaceOpWithNewOp<tensor::ExtractOp>(extractOp, sliceOp.getSource(), srcIndices);
         return success();
     }
 };

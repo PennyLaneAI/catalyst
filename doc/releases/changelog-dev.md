@@ -161,20 +161,13 @@
 
 * IR amplification for circuits whose gate parameters are computed from runtime values
   (e.g. `qml.TrotterProduct` with runtime Hamiltonian coefficients) is drastically reduced.
-  Three changes work together in the default pipeline:
-  the new `scalarize-tensor-extracts` pass sinks scalar `tensor.extract` operations through
-  `tensor.extract_slice`, `tensor.collapse_shape`, and small elementwise `linalg.generic`
-  producers so gate-angle dataflow becomes pure scalar arithmetic instead of thousands of
-  tiny tensors that each survive bufferization as an allocation and copies;
-  `linalg-fuse-elementwise-ops` plus additional `cse` applications (before and after
-  `one-shot-bufferize`) remove the duplicate angle computations produced by tracing; and
-  the new `reroll-loops` pass reconstructs the loops that Python tracing unrolled, by
-  detecting tandem repeats of structurally isomorphic operation windows (via structural
-  hashing), verifying that cross-window dataflow is limited to threaded SSA values (such as
-  qubit values) plus loop-invariant values, and replacing each repeat with an `scf.for`.
-  For a representative Trotterized QPE workload with runtime coefficients, gate-op volume
-  after HLO lowering drops about 5x and downstream IR, compile time, and peak memory drop
-  accordingly.
+  The new `scalarize-tensor-extracts` pass turns gate-angle dataflow into scalar arithmetic
+  instead of thousands of small tensors that each survive bufferization as an allocation,
+  the new `reroll-loops` pass reconstructs the loops that tracing unrolled by rewriting
+  repeated op sequences as `scf.for` loops, and the default pipeline now runs elementwise
+  fusion. On a Trotterized QPE workload with runtime coefficients, compile time, peak
+  memory, and final IR size all drop by large factors.
+  [(#3013)](https://github.com/PennyLaneAI/catalyst/pull/3013)
 
 <h3>Breaking changes 💔</h3>
 

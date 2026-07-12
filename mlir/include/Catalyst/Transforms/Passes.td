@@ -365,9 +365,11 @@ def RerollLoopsPass : Pass<"reroll-loops"> {
             /*C++ var name=*/"minSavings",
             /*CLI arg name=*/"min-savings",
             /*type=*/"unsigned",
-            /*default=*/"8",
+            /*default=*/"32",
             /*description=*/
-            "Minimum number of ops a reroll must eliminate to be applied."
+            "Minimum number of ops a reroll must eliminate to be applied. The "
+            "default is deliberately conservative so that only substantial "
+            "repeats (e.g. unrolled Trotter steps) are converted to loops."
         >
     ];
 }

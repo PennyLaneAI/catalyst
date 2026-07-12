@@ -17,7 +17,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/Debug.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
@@ -38,6 +37,26 @@ using namespace mlir;
 
 namespace {
 
+/// Verifying a candidate period is linear in the block, so bound how many
+/// distinct periods (most-promising first) are tried per block.
+constexpr size_t kMaxPeriodsPerBlock = 16;
+
+/// Minimum number of windows for a repeat to become a loop. Two windows are
+/// cheaper as straight-line code and give extension no signal to distinguish
+/// coincidental hash matches from real repetition.
+constexpr size_t kMinWindows = 3;
+
+/// Rerolling creates new blocks (loop bodies) that may themselves contain
+/// repeats (nested loops), so the driver iterates; each round strictly
+/// shrinks the IR, and in practice one nesting level per round suffices.
+constexpr unsigned kMaxRounds = 4;
+
+/// Number of rounds of operand-hash mixing (see refineHashes). Deep enough to
+/// tell apart structurally similar ops at different positions of a window
+/// (e.g. the same gate applied to different qubits of a chain), shallow enough
+/// that an op's hash rarely depends on ops more than a window away.
+constexpr unsigned kHashDepth = 3;
+
 /// Ops that may participate in a rerolled window: single-block-region-free,
 /// no successors, and not a terminator.
 bool isRerollableOp(Operation *op)
@@ -47,10 +66,11 @@ bool isRerollableOp(Operation *op)
 }
 
 /// Compute structural hashes for all ops of a block (excluding the
-/// terminator). Non-rerollable ops receive unique sentinel hashes. In-block
-/// operand defs are hashed by result number only (not identity, which would
-/// make every window distinct); the weak discrimination this leaves is
-/// compensated by semantic verification of every candidate.
+/// terminator). Non-rerollable ops receive unique sentinel hashes. The hash
+/// covers the op name, attributes, and result types; in-block operand defs
+/// contribute only their result number (hashing them by identity would make
+/// every window distinct), out-of-block values their identity. The weak
+/// discrimination this leaves is compensated by semantic verification.
 void computeHashes(ArrayRef<Operation *> ops, const llvm::DenseMap<Operation *, size_t> &indexOf,
                    SmallVectorImpl<uint64_t> &hashes)
 {
@@ -60,8 +80,8 @@ void computeHashes(ArrayRef<Operation *> ops, const llvm::DenseMap<Operation *, 
             hashes.push_back(hash_combine(0xdeadbeefULL, ++sentinel));
             continue;
         }
-        hash_code h = hash_combine(op->getName().getTypeID(),
-                                   op->getAttrDictionary().getAsOpaquePointer());
+        hash_code h =
+            hash_combine(op->getName().getTypeID(), op->getAttrDictionary().getAsOpaquePointer());
         for (Type t : op->getResultTypes()) {
             h = hash_combine(h, t.getAsOpaquePointer());
         }
@@ -77,6 +97,35 @@ void computeHashes(ArrayRef<Operation *> ops, const llvm::DenseMap<Operation *, 
             }
         }
         hashes.push_back(h);
+    }
+}
+
+/// One round of mixing each op's hash with the hashes of its in-block operand
+/// defs. The base hashes alone can be too coarse for period detection: after
+/// CSE a long window may consist of a handful of op kinds (e.g. identical
+/// gates on different qubits of a chain), and the gap statistics in
+/// findCandidates only see the period if some op hash recurs exactly once per
+/// window. Mixing distinguishes positions within a window by their local
+/// dataflow ancestry while staying equal across windows of a repeat. It also
+/// pollutes hashes near the start of the run (their ancestry reaches the
+/// prologue), so candidates are harvested both before and after refinement.
+void refineHashes(ArrayRef<Operation *> ops, const llvm::DenseMap<Operation *, size_t> &indexOf,
+                  SmallVectorImpl<uint64_t> &hashes)
+{
+    SmallVector<uint64_t> prev(hashes.begin(), hashes.end());
+    for (const auto &[i, op] : llvm::enumerate(ops)) {
+        if (!isRerollableOp(op)) {
+            continue;
+        }
+        hash_code h = prev[i];
+        for (Value v : op->getOperands()) {
+            Operation *def = v.getDefiningOp();
+            auto it = def ? indexOf.find(def) : indexOf.end();
+            if (it != indexOf.end()) {
+                h = hash_combine(h, prev[it->second]);
+            }
+        }
+        hashes[i] = h;
     }
 }
 
@@ -107,16 +156,16 @@ void findCandidates(ArrayRef<uint64_t> hashes, unsigned minPeriod, unsigned maxP
 
     SmallVector<std::pair<size_t, size_t>> periods(gapWeight.begin(), gapWeight.end());
     // Favor periods that explain the most ops.
-    llvm::sort(periods, [](auto &a, auto &b) {
-        return a.first * a.second > b.first * b.second;
-    });
+    llvm::sort(periods, [](auto &a, auto &b) { return a.first * a.second > b.first * b.second; });
     if (periods.size() > maxPeriods) {
         periods.resize(maxPeriods);
     }
 
     for (auto &[p, weight] : periods) {
-        // Require the period to repeat enough times to be worth a loop.
-        if (weight < 2 * p) {
+        // A repeat of period p with >= kMinWindows windows produces at
+        // least (kMinWindows - 1) * p same-hash pairs at gap p; anything below
+        // that cannot yield an acceptable candidate.
+        if (weight < (kMinWindows - 1) * p) {
             continue;
         }
         size_t runStart = SIZE_MAX;
@@ -128,7 +177,7 @@ void findCandidates(ArrayRef<uint64_t> hashes, unsigned minPeriod, unsigned maxP
             if (!match && runStart != SIZE_MAX) {
                 size_t runLen = i - runStart;
                 size_t count = runLen / p + 1;
-                if (count >= 3) {
+                if (count >= kMinWindows) {
                     out.push_back({runStart, p, count});
                 }
                 runStart = SIZE_MAX;
@@ -182,8 +231,7 @@ std::optional<RerollPlan> verifyCandidate(ArrayRef<Operation *> ops,
             if (!isRerollableOp(a) || !isRerollableOp(b)) {
                 return std::nullopt;
             }
-            if (a->getName() != b->getName() ||
-                a->getAttrDictionary() != b->getAttrDictionary() ||
+            if (a->getName() != b->getName() || a->getAttrDictionary() != b->getAttrDictionary() ||
                 a->getResultTypes() != b->getResultTypes() ||
                 a->getNumOperands() != b->getNumOperands()) {
                 return std::nullopt;
@@ -276,8 +324,7 @@ std::optional<RerollPlan> verifyCandidate(ArrayRef<Operation *> ops,
                     size_t ui = (uit != indexOf.end()) ? uit->second : SIZE_MAX;
                     bool inOwnWindow =
                         ui != SIZE_MAX && ui >= start + w * p && ui < start + (w + 1) * p;
-                    bool inNextWindow = !isLast && ui != SIZE_MAX &&
-                                        ui >= start + (w + 1) * p &&
+                    bool inNextWindow = !isLast && ui != SIZE_MAX && ui >= start + (w + 1) * p &&
                                         ui < start + (w + 2) * p;
                     if (inOwnWindow || inNextWindow) {
                         continue;
@@ -299,28 +346,44 @@ std::optional<RerollPlan> verifyCandidate(ArrayRef<Operation *> ops,
 
 /// Try to extend a verified candidate by whole windows to the left/right; the
 /// hash sequence misses the first window (its cross-window references point at
-/// the prologue, at different distances), so this recovers it.
+/// the prologue, at different distances), so this recovers it. Each
+/// verification is linear in the candidate size, so the number of windows
+/// added per attempt grows geometrically (and resets on failure) to keep the
+/// total cost O(size * log(windows)) rather than quadratic.
 RerollPlan extendCandidate(ArrayRef<Operation *> ops,
                            const llvm::DenseMap<Operation *, size_t> &indexOf, RerollPlan plan)
 {
-    while (plan.cand.start >= plan.cand.period) {
+    size_t step = 1;
+    while (plan.cand.start >= plan.cand.period * step) {
         Candidate c = plan.cand;
-        c.start -= c.period;
-        c.count += 1;
-        auto extended = verifyCandidate(ops, indexOf, c);
-        if (!extended) {
+        c.start -= c.period * step;
+        c.count += step;
+        if (auto extended = verifyCandidate(ops, indexOf, c)) {
+            plan = *extended;
+            step *= 2;
+        }
+        else if (step == 1) {
             break;
         }
-        plan = *extended;
+        else {
+            step = 1;
+        }
     }
+    step = 1;
     while (true) {
         Candidate c = plan.cand;
-        c.count += 1;
-        auto extended = verifyCandidate(ops, indexOf, c);
-        if (!extended) {
+        c.count += step;
+        if (c.start + c.count * c.period <= ops.size()) {
+            if (auto extended = verifyCandidate(ops, indexOf, c)) {
+                plan = *extended;
+                step *= 2;
+                continue;
+            }
+        }
+        if (step == 1) {
             break;
         }
-        plan = *extended;
+        step = 1;
     }
     return plan;
 }
@@ -371,9 +434,11 @@ void materialize(ArrayRef<Operation *> ops, const RerollPlan &plan)
         lastOp->getResult(resNo).replaceAllUsesWith(forOp.getResult(slotIdx));
     }
 
-    // Erase the original ops, last first (uses before defs).
+    // Erase the original ops, last first (uses before defs). Verification
+    // guarantees no surviving uses; erase() asserts use_empty, so a
+    // verification bug fails loudly here instead of producing invalid IR.
     for (size_t i = start + count * p; i-- > start;) {
-        ops[i]->dropAllUses();
+        assert(ops[i]->use_empty() && "rerolled op still has uses; verification is unsound");
         ops[i]->erase();
     }
 }
@@ -393,11 +458,18 @@ bool processBlock(Block &block, unsigned minPeriod, unsigned minSavings)
         indexOf[op] = i;
     }
 
+    // Harvest candidates at every hash refinement depth: shallow hashes see
+    // repeats whose windows contain few distinct op kinds only as noise, deep
+    // hashes lose the first windows of a run to prologue ancestry. Duplicated
+    // candidates are cheap (verification dedups via the overlap check).
     SmallVector<uint64_t> hashes;
     computeHashes(ops, indexOf, hashes);
-
     SmallVector<Candidate> candidates;
-    findCandidates(hashes, minPeriod, /*maxPeriods=*/16, candidates);
+    findCandidates(hashes, minPeriod, kMaxPeriodsPerBlock, candidates);
+    for (unsigned depth = 0; depth < kHashDepth; ++depth) {
+        refineHashes(ops, indexOf, hashes);
+        findCandidates(hashes, minPeriod, kMaxPeriodsPerBlock, candidates);
+    }
 
     // Verify, extend, and pick non-overlapping plans greedily by savings.
     SmallVector<RerollPlan> plans;
@@ -419,8 +491,8 @@ bool processBlock(Block &block, unsigned minPeriod, unsigned minSavings)
     SmallVector<const RerollPlan *> accepted;
     for (const RerollPlan &plan : plans) {
         size_t s = plan.cand.start, e = s + plan.cand.count * plan.cand.period;
-        bool overlaps = llvm::any_of(
-            used, [&](auto range) { return s < range.second && range.first < e; });
+        bool overlaps =
+            llvm::any_of(used, [&](auto range) { return s < range.second && range.first < e; });
         if (!overlaps) {
             used.push_back({s, e});
             accepted.push_back(&plan);
@@ -434,8 +506,7 @@ bool processBlock(Block &block, unsigned minPeriod, unsigned minSavings)
     });
     for (const RerollPlan *plan : accepted) {
         LLVM_DEBUG(dbgs() << "rerolling: start=" << plan->cand.start
-                          << " period=" << plan->cand.period
-                          << " count=" << plan->cand.count
+                          << " period=" << plan->cand.period << " count=" << plan->cand.count
                           << " slots=" << plan->slots.size() << "\n");
         materialize(ops, *plan);
     }
@@ -446,6 +517,9 @@ bool processBlock(Block &block, unsigned minPeriod, unsigned minSavings)
 
 namespace catalyst {
 
+// GEN_PASS_DECL is needed in addition to GEN_PASS_DEF to declare the
+// RerollLoopsPassOptions struct that the generated base class references
+// (only passes with options need this).
 #define GEN_PASS_DECL_REROLLLOOPSPASS
 #define GEN_PASS_DEF_REROLLLOOPSPASS
 #include "Catalyst/Transforms/Passes.h.inc"
@@ -455,11 +529,9 @@ struct RerollLoopsPass : public impl::RerollLoopsPassBase<RerollLoopsPass> {
 
     void runOnOperation() override
     {
-        // Iterate to a fixpoint (bounded): rerolling creates new blocks (loop
-        // bodies) that may contain further repeats, e.g. nested loops.
         bool changed = true;
         unsigned rounds = 0;
-        while (changed && rounds++ < 4) {
+        while (changed && rounds++ < kMaxRounds) {
             changed = false;
             SmallVector<Block *> blocks;
             getOperation()->walk([&](Block *block) { blocks.push_back(block); });
