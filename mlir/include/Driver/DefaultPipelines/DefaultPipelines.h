@@ -71,10 +71,27 @@ const PipelineList pipelineList{
       "scatter-lowering",
       "hlo-custom-call-lowering",
       "cse",
+      // Sink scalar extractions through small-tensor producers and fuse the
+      // remaining elementwise ops. Traced gate-parameter dataflow (e.g. runtime
+      // Hamiltonian coefficients, issue #2759) otherwise reaches bufferization
+      // as thousands of tiny tensor ops that each become an alloc + copy.
+      "scalarize-tensor-extracts",
+      "func.func(linalg-fuse-elementwise-ops)",
+      "canonicalize",
+      "cse",
+      // Reconstruct the loops that tracing unrolled (e.g. Trotter steps); a
+      // repeat of multiplicity k shrinks its region k-fold before the
+      // bufferization and LLVM stages amplify it (issue #2759).
+      "reroll-loops",
       "func.func(linalg-detensorize{aggressive-mode})",
       "detensorize-scf",
       "detensorize-function-boundary",
+      // Detensorization is what materializes tensor.extract on the gate-angle
+      // dataflow, so scalarization must run again here to fold the
+      // extract_slice/collapse_shape chains it exposes (issue #2759).
+      "scalarize-tensor-extracts",
       "canonicalize",
+      "cse",
       "symbol-dce"}},
     {"gradient-lowering-stage",
      {"annotate-invalid-gradient-functions",
@@ -93,6 +110,9 @@ const PipelineList pipelineList{
        */
       // This pass is needed to avoid aliasing of the input buffer with the output buffer.
       "mark-entry-point-args-non-writable",
+      // Value-number duplicate tensor computations before bufferization so they
+      // do not each become a separate buffer (issue #2759).
+      "cse",
       "one-shot-bufferize",
       // Remove dead memrefToTensorOp's
       "canonicalize",
@@ -112,9 +132,7 @@ const PipelineList pipelineList{
       // Must be after convert-bufferization-to-memref.
       // Otherwise, there are issues in the lowering of dynamic tensors.
       "canonicalize",
-      /* [DISABLED PASS]
-       * "cse",
-       */
+      "cse",
       "cp-global-memref"}},
     {"llvm-dialect-lowering-stage",
      {"qnode-to-async-lowering",
