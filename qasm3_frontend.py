@@ -27,7 +27,36 @@ import openqasm3
 from openqasm3 import ast
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
-from qiskit.circuit import Clbit, Qubit, Gate
+from qiskit.circuit import Clbit, ControlledGate, Gate, Qubit
+
+
+def _is_open_controlled(op):
+    return (isinstance(op, ControlledGate)
+            and op.ctrl_state != (1 << op.num_ctrl_qubits) - 1)
+
+
+def _expand_open_controls(qc):
+    """Expand open-(negative-)controlled gates one level into their
+    definitions (X-conjugated closed-control gates).
+
+    Aer executes gates like ``ccx_o1`` by NAME, pattern-matching the ccx
+    fast path and silently ignoring ctrl_state (verified: Statevector fires
+    the gate, raw Aer does not, transpiled Aer does) — and it refuses
+    unknown gate names outright, so renaming is not enough. Expanding the
+    definition inline leaves only closed-control gates plus X conjugation,
+    which every consumer executes correctly. The QCC importer inlines
+    definitions regardless, so the MLIR path is unaffected.
+    """
+    if not any(_is_open_controlled(inst.operation) for inst in qc.data):
+        return qc
+    expanded = qc.copy_empty_like()
+    for inst in qc.data:
+        if _is_open_controlled(inst.operation):
+            expanded.compose(inst.operation.definition, qubits=inst.qubits,
+                             clbits=inst.clbits, inplace=True)
+        else:
+            expanded.append(inst.operation, inst.qubits, inst.clbits)
+    return expanded
 from qiskit.circuit.classical import expr as qexpr
 
 
@@ -148,7 +177,7 @@ class AstFrontend:
         self._create_implicit_registers(program)
         for stmt in program.statements:
             self._exec_stmt(stmt)
-        return self.qc
+        return _expand_open_controls(self.qc)
 
     def _create_implicit_registers(self, program):
         """Spec examples sometimes use qubit registers without declaring them
@@ -1076,7 +1105,7 @@ def load_qasm3(source, inputs=None, return_origin=False):
     try:
         import qiskit.qasm3
 
-        qc = qiskit.qasm3.loads(qiskit_text)
+        qc = _expand_open_controls(qiskit.qasm3.loads(qiskit_text))
         return (qc, "qiskit") if return_origin else qc
     except Exception:
         pass

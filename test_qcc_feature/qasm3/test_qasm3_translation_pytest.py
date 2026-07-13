@@ -891,6 +891,9 @@ class TestQECCircuits:
         "surface17_d3_round.qasm",
         "toric_2x2_detect.qasm",
         "toric_2x2_rounds.qasm",
+        "mf_rep3_coherent.qasm",
+        "mf_steane_prep_flag.qasm",
+        "mf_steane_cycle_x.qasm",
     ]
     # Files whose translated output contains `!=` register comparisons,
     # which qiskit's reparser rejects (grammar-validated via openqasm3).
@@ -906,6 +909,17 @@ class TestQECCircuits:
         "surface17_d3_round.qasm": ["reset ", "if ("],
         "toric_2x2_detect.qasm": ["reset ", "if ("],
         "toric_2x2_rounds.qasm": ["reset ", "if ("],
+        "mf_rep3_coherent.qasm": ["reset ", "measure"],
+        "mf_steane_prep_flag.qasm": ["reset ", "ccx "],
+        "mf_steane_cycle_x.qasm": ["reset ", "measure"],
+    }
+    # Measurement-free circuits (Heussen/Locher/Muller, PRX Quantum 5,
+    # 010333) replace feedforward with coherent multi-controlled feedback:
+    # their translated output must contain NO classical control flow.
+    FORBIDDEN = {
+        "mf_rep3_coherent.qasm": ["if (", "while ("],
+        "mf_steane_prep_flag.qasm": ["if (", "while ("],
+        "mf_steane_cycle_x.qasm": ["if (", "while ("],
     }
     # Deterministic expectations: register name -> set of allowed values.
     EXPECTED = {
@@ -925,6 +939,9 @@ class TestQECCircuits:
             "xs": {"0000"}, "zs": {"0011"}, "out": {"00000000"},
         },
         "toric_2x2_rounds.qasm": {"xs": {"000"}, "zs": {"011"}, "out": {"00000000"}},
+        "mf_rep3_coherent.qasm": {"out": {"111"}},
+        "mf_steane_prep_flag.qasm": {"out": {"0000000"}},
+        "mf_steane_cycle_x.qasm": {"out": {"0000000"}},
     }
 
     def load(self, filename):
@@ -960,6 +977,8 @@ class TestQECCircuits:
         assert "unknown_cond" not in qasm3
         for marker in self.MARKERS[filename]:
             assert marker in qasm3, f"missing {marker!r} in output"
+        for marker in self.FORBIDDEN.get(filename, []):
+            assert marker not in qasm3, f"forbidden {marker!r} in output"
         openqasm3.parse(qasm3)
         if filename not in self.WHILE_FILES:
             import qiskit.qasm3 as qasm3_mod

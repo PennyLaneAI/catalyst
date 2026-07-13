@@ -85,6 +85,36 @@ x q[4];` undo is an explicitly-labeled **test fixture** so the readout is
 deterministic; these files test syndrome-extraction circuit shape and
 lookup feedforward.
 
+## Measurement-free QEC (coherent feedback)
+
+Based on the scheme of S. Heußen, D. F. Locher and M. Müller,
+*"Measurement-Free Fault-Tolerant Quantum Error Correction in Near-Term
+Devices"*, PRX Quantum **5**, 010333 (2024) / arXiv:2307.13296: instead of
+measuring syndromes and applying classically-conditioned corrections, the
+syndrome is mapped **coherently** onto ancilla qubits and corrections are
+applied by multi-controlled gates whose positive/negative control patterns
+enumerate the syndrome values; ancillas are erased by `reset`. These files
+therefore exercise the *complementary* half of the dynamic-circuit
+envelope: gate modifiers (`ctrl @` / `negctrl @`), `ccx`, and reset — with
+the explicit negative assertion that the translated output contains **no
+`if`/`while` at all**.
+
+| File | Construction (paper ref) | Qubits | Injected error | Expected |
+|------|--------------------------|--------|----------------|----------|
+| `mf_rep3_coherent.qasm` | coherent-feedback principle, 3-qubit warm-up | 3+2 | X q1 | out="111" |
+| `mf_steane_prep_flag.qasm` | flag-verified \|0⟩_L prep (Fig. 6 structure) | 7+2 | X q0·X q1 (≡ X_L·X2, the dangerous class) | out="0000000" |
+| `mf_steane_cycle_x.qasm` | full MF-QEC cycle, X-half (Fig. 2), N = 2n+a = 17 | 7+7+3 | X q2 | out="0000000" |
+
+Adaptation notes: the circuits use **our verified encoders** (pivot
+construction above) rather than the paper's encoding circuits, so the
+flag-verification file targets the dangerous weight-2 class of *our*
+encoder and undoes the known injected error fixture-style (labeled in the
+file, like the toric files). `mf_steane_cycle_x` implements the X-error
+half at the paper's 17-qubit budget with all seven coherent-feedback
+C3NOTs (`ctrl @`/`negctrl @` chains over the 3 syndrome qubits, syndrome
+value k targeting data qubit k−1); the Z-half is the Hadamard-dual and is
+not duplicated.
+
 ## Running
 
 ```bash
