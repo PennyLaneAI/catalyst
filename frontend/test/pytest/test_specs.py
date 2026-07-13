@@ -1260,8 +1260,48 @@ class TestSymbolicSpecs:
                     ),
                 )
 
+    def test_symbolic_array_inside_loop(self):
+        """Test dynamic loop with symbolic_array in a loop."""
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
+        @qp.qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c(n):
+
+            # pylint: disable=unused-argument
+            @qp.for_loop(n)
+            def loop(i):
+                x = qp.capture.symbolic_array((), float)
+                qp.RX(x, 0)
+
+            loop()  # pylint: disable=no-value-for-parameter
+
+            return qp.state()
+
+        r = qp.specs(c, level=0)(2).resources
+        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
+
+    def test_symbolic_array_loop_arguemtn(self):
+        """Test dynamic loop with a symbolic array as a loop argument."""
+
+        @qp.qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c(n):
+
+            # pylint: disable=unused-argument
+            @qp.for_loop(n)
+            def loop(i, x):
+                qp.RX(x, 0)
+                return x
+
+            y = qp.capture.symbolic_array((), float)
+            loop(y)  # pylint: disable=no-value-for-parameter
+
+            return qp.state()
+
+        r = qp.specs(c, level=0)(2).resources
+        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
+
+
 class TestMarkerIntegration:
     """Tests the integration with qp.marker."""
 
