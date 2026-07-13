@@ -15,6 +15,7 @@
 #pragma once
 
 #include <vector>
+#include <cstdint>
 
 /**
  * A multi-dimensional view for MemRef-like and std::vector<T> types.
@@ -38,7 +39,7 @@ template <typename T, size_t R> class DataView {
   public:
     class iterator {
       private:
-        const DataView<T, R> &view;
+        const DataView<T, R>* view;
 
         int64_t loc; // physical index
         size_t indices[R] = {0};
@@ -50,24 +51,24 @@ template <typename T, size_t R> class DataView {
         using pointer = T *;                                 // LCOV_EXCL_LINE
         using reference = T &;                               // LCOV_EXCL_LINE
 
-        iterator(const DataView<T, R> &_view, int64_t begin_idx) : view(_view), loc(begin_idx) {}
-        pointer operator->() const { return &view.data_aligned[loc]; }
-        reference operator*() const { return view.data_aligned[loc]; }
+        iterator(const DataView<T, R> &_view, int64_t begin_idx) : view(&_view), loc(begin_idx) {}
+        pointer operator->() const { return &view->data_aligned[loc]; }
+        reference operator*() const { return view->data_aligned[loc]; }
         iterator &operator++()
         {
             int64_t next_axis = -1;
             for (int64_t axis = R - 1; axis >= 0; axis--) {
-                if (++indices[axis] < view.sizes[axis]) {
+                if (++indices[axis] < view->sizes[axis]) {
                     next_axis = axis;
                     break;
                 }
 
                 indices[axis] = 0;
 
-                loc -= view.sizes[axis] == 0 ? 0 : (view.sizes[axis] - 1) * view.strides[axis];
+                loc -= view->sizes[axis] == 0 ? 0 : (view->sizes[axis] - 1) * view->strides[axis];
             }
 
-            loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
+            loc = next_axis == -1 ? -1 : loc + view->strides[next_axis];
             return *this;
         }
         iterator operator++(int)
@@ -75,20 +76,20 @@ template <typename T, size_t R> class DataView {
             auto cached_iter = *this;
             int64_t next_axis = -1;
             for (int64_t axis = R - 1; axis >= 0; axis--) {
-                if (++indices[axis] < view.sizes[axis]) {
+                if (++indices[axis] < view->sizes[axis]) {
                     next_axis = axis;
                     break;
                 }
                 indices[axis] = 0;
-                loc -= view.sizes[axis] == 0 ? 0 : (view.sizes[axis] - 1) * view.strides[axis];
+                loc -= view->sizes[axis] == 0 ? 0 : (view->sizes[axis] - 1) * view->strides[axis];
             }
 
-            loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
+            loc = next_axis == -1 ? -1 : loc + view->strides[next_axis];
             return cached_iter;
         }
         bool operator==(const iterator &other) const
         {
-            return (loc == other.loc && view.data_aligned == other.view.data_aligned);
+            return (loc == other.loc && view->data_aligned == other.view->data_aligned);
         }
         bool operator!=(const iterator &other) const { return !(*this == other); }
     };
