@@ -31,7 +31,24 @@ namespace {
 //                       Helper functions
 //===----------------------------------------------------------------------===//
 
-enum class GateEnum { H, S, T, CNOT, X, Y, Z, I, RX, RY, RZ, IsingXX, IsingYY, IsingZZ, Unknown };
+enum class GateEnum {
+    H,
+    S,
+    T,
+    CNOT,
+    CZ,
+    X,
+    Y,
+    Z,
+    I,
+    RX,
+    RY,
+    RZ,
+    IsingXX,
+    IsingYY,
+    IsingZZ,
+    Unknown
+};
 
 // Hash gate name to GateEnum
 GateEnum hashGate(CustomOp op)
@@ -45,6 +62,8 @@ GateEnum hashGate(CustomOp op)
         return GateEnum::T;
     else if (gateName == "CNOT")
         return GateEnum::CNOT;
+    else if (gateName == "CZ")
+        return GateEnum::CZ;
     else if (gateName == "PauliX" || gateName == "X")
         return GateEnum::X;
     else if (gateName == "PauliY" || gateName == "Y")
@@ -249,6 +268,12 @@ LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter)
     return controlledConversion(op, "Z", "X", rewriter);
 }
 
+LogicalResult convertCZGate(CustomOp op, ConversionPatternRewriter &rewriter)
+{
+    applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
+    return controlledConversion(op, "Z", "Z", rewriter);
+}
+
 // Convert a MeasureOp to a PPMeasurementOp
 LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
                                     ConversionPatternRewriter &rewriter)
@@ -421,7 +446,7 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
     LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final
     {
-        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, "
+        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, "
                                    "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
         Operation *op = operation.getOperation();
 
@@ -447,6 +472,8 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
                 return convertZGate(originOp, rewriter);
             case GateEnum::CNOT:
                 return convertCNOTGate(originOp, rewriter);
+            case GateEnum::CZ:
+                return convertCZGate(originOp, rewriter);
             case GateEnum::I:
                 return convertIGate(originOp, rewriter);
             case GateEnum::RX:

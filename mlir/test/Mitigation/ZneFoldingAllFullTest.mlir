@@ -88,10 +88,12 @@ func.func @circuit() -> tensor<f64> attributes {qnode} {
     //CHECK-DAG:    [[c1:%.+]] = index.constant 1
     //CHECK-DAG:    [[c3:%.+]] = index.constant 3
     //CHECK-DAG:    [[emptyRes:%.+]] = tensor.empty() : tensor<3xf64> 
-    //CHECK-DAG:    [[dense3:%.+]] = arith.constant dense<[1, 2, 3]>
+    //CHECK-DAG:    [[dense3:%.+]] = arith.constant dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]>
     // CHECK:        [[results:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c3]] step [[c1]] iter_args([[emptyArg:%.+]] = [[emptyRes]]) -> (tensor<3xf64>) {
-        // CHECK:    [[scalarFactor:%.+]] = tensor.extract [[dense3]][[[idx]]] : tensor<3xindex>
-        // CHECK:    [[intermediateRes:%.+]] = func.call @circuit.folded([[scalarFactor]]) : (index) -> tensor<f64>
+        // CHECK:    [[scalarFactor:%.+]] = tensor.extract [[dense3]][[[idx]]] : tensor<3xf64>
+        // CHECK:    [[scalarInt:%.+]] = arith.fptosi [[scalarFactor]] : f64 to i64
+        // CHECK:    [[scalarIdx:%.+]] = index.casts [[scalarInt]] : i64 to index
+        // CHECK:    [[intermediateRes:%.+]] = func.call @circuit.folded([[scalarIdx]]) : (index) -> tensor<f64>
         // CHECK:    [[extracted:%.+]] = tensor.extract [[intermediateRes]][] : tensor<f64>
         // CHECK:    [[from_elements:%.+]] = tensor.from_elements [[extracted]] : tensor<1xf64>
             // CHECK:    [[resultsFor:%.+]] = scf.for [[idxJ:%.+]] = [[c0]] to [[c1]] step [[c1]] iter_args([[scalarArg:%.+]] = [[emptyArg]]) -> (tensor<3xf64>) {
@@ -101,7 +103,7 @@ func.func @circuit() -> tensor<f64> attributes {qnode} {
         // CHECK:    scf.yield [[resultsFor]]
     // CHECK:    return [[results]]
 func.func @mitigated_circuit() -> tensor<3xf64> {
-    %numFolds = arith.constant dense<[1, 2, 3]> : tensor<3xindex>
-    %0 = mitigation.zne @circuit() folding (all) numFolds (%numFolds : tensor<3xindex>) : () -> tensor<3xf64>
+    %numFolds = arith.constant dense<[1.0, 2.0, 3.0]> : tensor<3xf64>
+    %0 = mitigation.zne @circuit() folding (all) numFolds (%numFolds : tensor<3xf64>) : () -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }

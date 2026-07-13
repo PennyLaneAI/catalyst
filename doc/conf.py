@@ -102,7 +102,6 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.pbc",
     "mlir_quantum.dialects._transform_ops_gen",
     "pybind11",
-    "cudaq",
 ]
 
 mock = Mock()

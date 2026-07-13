@@ -2298,7 +2298,7 @@ def _pl_cond_lowering(
     args_slice,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
-    num_preds = len(jaxpr_branches)
+    num_preds = len(jaxpr_branches) - 1
     preds = invals[:num_preds]
     args = invals[slice(*args_slice)]
 
@@ -2351,7 +2351,6 @@ def _pl_cond_lowering(
                 new_jaxpr = else_jaxpr.replace(
                     constvars=(), invars=else_jaxpr.constvars + else_jaxpr.invars
                 )
-
                 with ir.InsertionPoint(else_block):
                     out, _ = mlir.jaxpr_subcomp(
                         else_ctx.module_context,

@@ -2,6 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
+  reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
+  times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
+  gates. Non-integer scale factors are now also accepted for `local-random`. The `mitigation.zne`
+  operation's `numFolds` operand is now always a floating-point tensor; the integer folding methods
+  require integral values and convert the count internally.
+  [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
 
@@ -155,6 +162,9 @@
   PennyLane.
   [(#2769)](https://github.com/PennyLaneAI/catalyst/pull/2769)
 
+* Added ``CZ`` support to ``to-ppr`` pass.
+  [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -162,6 +172,10 @@
 
 * Removes support for `Transform.plxpr_transform` from the `qp.qjit(capture=True)` capture pipeline.
   All transforms must now have a MLIR or XDSL implementation and a corresponding `pass_name`.
+
+* Support for `qjit` integration with `cudaq` has been removed in order to feasbily drop support 
+  for Python 3.11.
+  [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
 
 <h3>Deprecations 👋</h3>
 
@@ -222,6 +236,10 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
+  of the default else branch.
+  [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
@@ -408,10 +426,11 @@ Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 JiaRung Jian,
+Jacob Kitchen,
+Korbinian Kottmann,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Paul Haochen Wang,
 Jake Zaia.
-

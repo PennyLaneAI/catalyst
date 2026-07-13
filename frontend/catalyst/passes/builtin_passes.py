@@ -931,6 +931,7 @@ def to_ppr_setup_inputs():
     ``qp.Y``,
     ``qp.Z``,
     ``qp.CNOT``,
+    ``qp.CZ``,
     ``qp.RX``,
     ``qp.RY``,
     ``qp.RZ``,
