@@ -1,0 +1,82 @@
+# Copyright 2026 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for the fabricate operation."""
+
+import pytest
+
+import pennylane as qp
+from pennylane.ops.qubit.fabricate import Fabricate, fabricate, _VALID_INIT_STATES
+
+from catalyst import qjit
+
+
+class TestFabricateOp:
+    """Tests for the Fabricate operator and function."""
+
+    @pytest.mark.parametrize("init_state", sorted(_VALID_INIT_STATES))
+    def test_fabricate_valid_init_states(self, init_state):
+        """Test that valid init states are accepted."""
+        op = Fabricate(init_state)
+        assert op.init_state == init_state
+        assert op.num_wires == 0
+
+    def test_fabricate_invalid_init_state(self):
+        """Test that invalid init states are rejected."""
+        with pytest.raises(ValueError, match="not allowed"):
+            Fabricate("zero")
+
+    @pytest.mark.parametrize("init_state", sorted(_VALID_INIT_STATES))
+    def test_fabricate_function_capture(self, init_state):
+        """Test fabricate primitive binding under capture."""
+        import jax
+
+        qp.capture.enable()
+
+        def circuit():
+            fabricate(init_state)
+
+        jaxpr = jax.make_jaxpr(circuit)().jaxpr
+        assert any(eqn.primitive.name == "fabricate" for eqn in jaxpr.eqns)
+        qp.capture.disable()
+
+    def test_fabricate_mlir_lowering(self):
+        """Test that fabricate appears as pbc.fabricate in optimized MLIR."""
+        qp.capture.enable()
+        dev = qp.device("null.qubit", wires=1)
+
+        @qjit(
+            pipelines=[
+                (
+                    "pipe",
+                    [
+                        "canonicalize",
+                        "verify-no-quantum-use-after-free",
+                        "convert-to-value-semantics",
+                        "canonicalize",
+                    ],
+                )
+            ],
+            target="mlir",
+        )
+        @qp.qnode(device=dev)
+        def circuit():
+            magic = fabricate("magic_conj")
+            qp.pauli_measure("Z", wires=[magic])
+            qp.deallocate(magic)
+            return qp.expval(qp.Z(0))
+
+        mlir = circuit.mlir_opt
+        assert "pbc.fabricate" in mlir and "magic_conj" in mlir
+        qp.capture.disable()

@@ -29,6 +29,7 @@ from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import operator_p
+from pennylane.capture.primitives import fabricate_prim as plxpr_fabricate_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
 from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
@@ -40,6 +41,8 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_compbasis_p,
     qref_dealloc_p,
+    qref_dealloc_qb_p,
+    qref_fabricate_p,
     qref_get_p,
     qref_gphase_p,
     qref_hermitian_p,
@@ -427,17 +430,25 @@ def handle_allocate(self, *, num_wires, state=None, restored=False):
 def handle_deallocate(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.deallocate primitive"""
     qregs = set()
+    standalone_qubits = []
     for w in wires:
-        get_op = w.parent
+        parent_eqn = w.parent
+        if parent_eqn.primitive is qref_fabricate_p:
+            standalone_qubits.append(w)
+        elif parent_eqn.primitive is qref_get_p:
+            qreg = parent_eqn.in_tracers[0]
+            qregs.add(qreg)
+        else:
+            assert (
+                parent_eqn.primitive is qref_get_p
+            ), "Manual deallocation is only supported for manually allocated or fabricated wires"
+    for qubit in standalone_qubits:
+        qref_dealloc_qb_p.bind(qubit)
+    if qregs:
         assert (
-            get_op.primitive is qref_get_p
-        ), "Manual deallocation is only supported for manually allocated wires"
-        qreg = get_op.in_tracers[0]
-        qregs.add(qreg)
-    assert (
-        len(qregs) == 1
-    ), "Expected all wires to deallocate to come from the same allocation instruction"
-    qref_dealloc_p.bind(list(qregs)[0])
+            len(qregs) == 1
+        ), "Expected all wires to deallocate to come from the same allocation instruction"
+        qref_dealloc_p.bind(list(qregs)[0])
     return []
 
 
@@ -541,6 +552,13 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     decomprule_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
 
     return ()
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_fabricate_prim)
+def handle_fabricate(self, *_, init_state=""):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the fabricate primitive"""
+    qubit, = qref_fabricate_p.bind(init_state=init_state)
+    return (qubit,)
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_pauli_measure_prim)

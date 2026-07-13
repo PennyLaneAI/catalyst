@@ -83,6 +83,7 @@ RUNTIME_OPERATIONS = [
     "MultiRZ",
     "PauliRot",
     "PauliMeasure",
+    "Fabricate",
     "PauliX",
     "PauliY",
     "PauliZ",

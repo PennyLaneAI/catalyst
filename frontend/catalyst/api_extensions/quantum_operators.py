@@ -46,7 +46,7 @@ from catalyst.jax_extras import (
     deduce_avals,
     new_inner_tracer,
 )
-from catalyst.jax_primitives import AbstractQreg, adjoint_p, measure_p, pauli_measure_p
+from catalyst.jax_primitives import AbstractQreg, adjoint_p, fabricate_p, measure_p, pauli_measure_p
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
@@ -241,6 +241,37 @@ def pauli_measure(
         postselect=postselect,
     )
     return m
+
+
+def fabricate(init_state: str) -> DynamicJaxprTracer:
+    r"""A :func:`qjit` compatible fabricate operation for PennyLane/Catalyst.
+
+    .. important::
+
+        The :func:`qp.fabricate() <pennylane.fabricate>` function is **not** QJIT
+        compatible under the legacy tracing pathway; use :func:`catalyst.fabricate` instead.
+
+    Args:
+        init_state (str): The logical state to fabricate. One of ``"plus_i"``,
+            ``"minus_i"``, ``"magic"``, or ``"magic_conj"``.
+
+    Returns:
+        A JAX tracer for the fabricated qubit.
+    """
+    EvaluationContext.check_is_tracing("catalyst.fabricate can only be used from within @qjit.")
+    EvaluationContext.check_is_quantum_tracing(
+        "catalyst.fabricate can only be used from within a qp.qnode."
+    )
+
+    valid_states = {"plus_i", "minus_i", "magic", "magic_conj"}
+    if init_state not in valid_states:
+        raise ValueError(
+            f'The init_state "{init_state}" is not allowed. '
+            f"Allowed values are {sorted(valid_states)}."
+        )
+
+    qubit, = fabricate_p.bind(init_state=init_state)
+    return qubit
 
 
 def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator]:

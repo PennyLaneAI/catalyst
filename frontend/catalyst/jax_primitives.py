@@ -87,7 +87,7 @@ with Patcher(
         VJPOp,
     )
     from mlir_quantum.dialects.mitigation import ZneOp
-    from mlir_quantum.dialects.pbc import PPMeasurementOp
+    from mlir_quantum.dialects.pbc import FabricateOp, PPMeasurementOp
     from mlir_quantum.dialects.quantum import (
         AdjointOp,
         AllocOp,
@@ -298,6 +298,8 @@ pauli_rot_p = Primitive("pauli_rot")
 pauli_rot_p.multiple_results = True
 pauli_measure_p = Primitive("pauli_measure")
 pauli_measure_p.multiple_results = True
+fabricate_p = Primitive("fabricate")
+fabricate_p.multiple_results = True
 measure_p = Primitive("measure")
 measure_p.multiple_results = True
 compbasis_p = Primitive("compbasis")
@@ -1661,6 +1663,29 @@ def _pauli_measure_lowering(
 
 
 #
+# fabricate operation
+#
+@fabricate_p.def_abstract_eval
+def _fabricate_abstract_eval(*_, init_state=""):
+    return (AbstractQbit(),)
+
+
+@fabricate_p.def_impl
+def _fabricate_def_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _fabricate_lowering(jax_ctx: mlir.LoweringRuleContext, *_, init_state=""):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubit_type = ir.OpaqueType.get("quantum", "bit", ctx)
+    return FabricateOp(
+        out_qubits=[qubit_type], init_state=_logical_init_attr(ctx, init_state)
+    ).results
+
+
+#
 # measure
 #
 @measure_p.def_abstract_eval
@@ -1758,6 +1783,10 @@ def _namedobs_def_impl(qubit, kind):  # pragma: no cover
 def _namedobs_abstract_eval(qubit, kind):
     assert isinstance(qubit, AbstractQbit)
     return AbstractObs()
+
+
+def _logical_init_attr(ctx, init_state: str):
+    return ir.Attribute.parse(f"#pbc<enum {init_state}>", context=ctx)
 
 
 def _named_obs_attribute(ctx, kind: str):
@@ -3081,6 +3110,7 @@ CUSTOM_LOWERING_RULES = (
     (unitary_p, _unitary_lowering),
     (pauli_rot_p, _pauli_rot_lowering),
     (pauli_measure_p, _pauli_measure_lowering),
+    (fabricate_p, _fabricate_lowering),
     (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
     (namedobs_p, _named_obs_lowering),

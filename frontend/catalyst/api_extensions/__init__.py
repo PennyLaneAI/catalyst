@@ -39,6 +39,7 @@ from catalyst.api_extensions.quantum_operators import (
     ctrl,
     measure,
     pauli_measure,
+    fabricate,
 )
 
 __all__ = (
@@ -58,6 +59,7 @@ __all__ = (
     "vmap",
     "measure",
     "pauli_measure",
+    "fabricate",
     "adjoint",
     "ctrl",
 )

@@ -40,6 +40,7 @@ from pennylane.wires import AbstractQubit
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
     AbstractObs,
+    _logical_init_attr,
     _named_obs_attribute,
     extract_scalar,
     safe_cast_to_f64,
@@ -61,13 +62,14 @@ with Patcher(
     ),
 ):
     from mlir_quantum.dialects.mbqc import RefMeasureInBasisOp
-    from mlir_quantum.dialects.pbc import RefPPMeasurementOp
+    from mlir_quantum.dialects.pbc import RefFabricateOp, RefPPMeasurementOp
     from mlir_quantum.dialects.qref import (
         AdjointOp,
         AllocOp,
         ComputationalBasisOp,
         CustomOp,
         DeallocOp,
+        DeallocQubitOp,
         GetOp,
         GlobalPhaseOp,
         HermitianOp,
@@ -147,6 +149,8 @@ class MeasurementPlane(Enum):
 qref_alloc_p = Primitive("qref_alloc")
 qref_dealloc_p = Primitive("qref_dealloc")
 qref_dealloc_p.multiple_results = True
+qref_dealloc_qb_p = Primitive("qref_dealloc_qb")
+qref_dealloc_qb_p.multiple_results = True
 qref_get_p = Primitive("qref_get")
 qref_set_state_p = Primitive("qref_state_prep")
 qref_set_state_p.multiple_results = True
@@ -157,6 +161,8 @@ qref_qinst_p.multiple_results = True
 qref_gphase_p = Primitive("qref_gphase")
 qref_gphase_p.multiple_results = True
 qref_pauli_measure_p = Primitive("pref_pauli_measure")
+qref_fabricate_p = Primitive("qref_fabricate")
+qref_fabricate_p.multiple_results = True
 qref_pauli_rot_p = Primitive("qref_pauli_rot")
 qref_pauli_rot_p.multiple_results = True
 qref_unitary_p = Primitive("qref_unitary")
@@ -212,6 +218,21 @@ def _qref_dealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
+    return ()
+
+
+#
+# qref_dealloc_qb_p
+#
+@qref_dealloc_qb_p.def_abstract_eval
+def _qref_dealloc_qb_abstract_eval(qubit):
+    return ()
+
+
+def _qref_dealloc_qb_lowering(jax_ctx: mlir.LoweringRuleContext, qubit):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+    DeallocQubitOp(qubit=qubit)
     return ()
 
 
@@ -543,6 +564,24 @@ def _qref_pauli_measure_lowering(
 
 
 #
+# fabricate operation
+#
+@qref_fabricate_p.def_abstract_eval
+def _qref_fabricate_abstract_eval(*_, init_state=""):
+    return (AbstractQubit(),)
+
+
+def _qref_fabricate_lowering(jax_ctx: mlir.LoweringRuleContext, *_, init_state=""):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
+    return RefFabricateOp(
+        qubits=[qubit_type], init_state=_logical_init_attr(ctx, init_state)
+    ).results
+
+
+#
 # qubit unitary operation
 #
 @qref_unitary_p.def_abstract_eval
@@ -826,6 +865,7 @@ CUSTOM_LOWERING_RULES = (
     (qref_operator_p, _qref_operator_p_lowering),
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
+    (qref_dealloc_qb_p, _qref_dealloc_qb_lowering),
     (qref_get_p, _qref_get_lowering),
     (qref_set_state_p, _qref_set_state_lowering),
     (qref_set_basis_state_p, _qref_set_basis_state_lowering),
@@ -833,6 +873,7 @@ CUSTOM_LOWERING_RULES = (
     (qref_gphase_p, _qref_gphase_lowering),
     (qref_pauli_rot_p, _qref_pauli_rot_lowering),
     (qref_pauli_measure_p, _qref_pauli_measure_lowering),
+    (qref_fabricate_p, _qref_fabricate_lowering),
     (qref_unitary_p, _qref_unitary_lowering),
     (qref_measure_p, _qref_measure_lowering),
     (qref_measure_in_basis_p, _qref_measure_in_basis_lowering),

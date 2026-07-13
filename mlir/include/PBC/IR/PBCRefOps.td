@@ -37,3 +37,25 @@ def RefPPMeasurementOp : PBC_Op<"ref.ppm"> {
 
     let hasVerifier = 1;
 }
+
+def RefFabricateOp : PBC_Op<"ref.fabricate"> {
+    let summary = "Fabricate auxiliary qubits from qubit factories (reference semantics).";
+
+    let description = [{
+        Identical to the pbc.fabricate operation, except in reference semantics.
+    }];
+
+    let arguments = (ins
+        LogicalInit:$init_state
+    );
+
+    let results = (outs
+        Variadic<QubitRefType>:$qubits
+    );
+
+    let assemblyFormat = [{
+        $init_state attr-dict `:` type($qubits)
+    }];
+
+    let hasVerifier = 1;
+}

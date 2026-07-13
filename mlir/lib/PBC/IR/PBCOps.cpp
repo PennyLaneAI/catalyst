@@ -23,6 +23,7 @@
 #include "mlir/IR/Region.h"
 
 #include "QRef/IR/QRefDialect.h"
+#include "QRef/IR/QRefTypes.h"
 #include "Quantum/IR/QuantumDialect.h"
 
 using namespace mlir;
@@ -89,6 +90,16 @@ LogicalResult RefPPMeasurementOp::verify()
         return emitOpError("Number of qubits must match number of pauli operators");
     }
     return success();
+}
+
+LogicalResult RefFabricateOp::verify()
+{
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
+        initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
+        return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
+    }
+    return mlir::success();
 }
 
 LogicalResult SelectPPMeasurementOp::verify()
