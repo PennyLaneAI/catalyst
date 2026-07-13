@@ -170,6 +170,10 @@
 * Removes support for `Transform.plxpr_transform` from the `qp.qjit(capture=True)` capture pipeline.
   All transforms must now have a MLIR or XDSL implementation and a corresponding `pass_name`.
 
+* Support for `qjit` integration with `cudaq` has been removed in order to feasbily drop support 
+  for Python 3.11.
+  [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
