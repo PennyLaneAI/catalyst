@@ -294,7 +294,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
 
 def _new_hybrid_arg(interp: PLxPRToQuantumJaxprInterpreter, arg) -> list:
-    """Create new flattened hybrid arguments by apping wire values to abstract qubits."""
+    """Create new flattened hybrid arguments by mapping wire values to abstract qubits."""
     new_args = []
     leaves_with_wires, _ = flatten(arg, is_leaf=lambda x: isinstance(x, Wires))
 
