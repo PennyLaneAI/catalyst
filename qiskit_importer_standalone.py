@@ -103,14 +103,47 @@ class QiskitToCatalystImporter:
     # U, gates with hard-coded defs, and the reset/barrier markers). Anything
     # else with a Qiskit definition gets inlined into these.
     _KNOWN_GATES = {
-        "h", "x", "y", "z", "s", "t", "sdg", "tdg", "sx", "sxdg",
-        "p", "phase", "id", "u", "u1", "u2", "u3",
-        "rx", "ry", "rz",
-        "cx", "cnot", "cy", "cz", "ch", "cp", "cu", "cu1", "cu3",
-        "crx", "cry", "crz",
-        "swap", "ccx", "cswap",
-        "rzz", "rxx", "ryy", "rccx",
-        "reset", "barrier",
+        "h",
+        "x",
+        "y",
+        "z",
+        "s",
+        "t",
+        "sdg",
+        "tdg",
+        "sx",
+        "sxdg",
+        "p",
+        "phase",
+        "id",
+        "u",
+        "u1",
+        "u2",
+        "u3",
+        "rx",
+        "ry",
+        "rz",
+        "cx",
+        "cnot",
+        "cy",
+        "cz",
+        "ch",
+        "cp",
+        "cu",
+        "cu1",
+        "cu3",
+        "crx",
+        "cry",
+        "crz",
+        "swap",
+        "ccx",
+        "cswap",
+        "rzz",
+        "rxx",
+        "ryy",
+        "rccx",
+        "reset",
+        "barrier",
     }
 
     def _process_instructions(self, instructions, loc):
@@ -120,10 +153,7 @@ class QiskitToCatalystImporter:
 
             # Check for legacy QASM2 classical condition FIRST so that named
             # gates like "h" or "cx" with op.condition don't bypass it.
-            if (
-                op.name not in self._CONTROL_FLOW_OPS
-                and getattr(op, "condition", None) is not None
-            ):
+            if op.name not in self._CONTROL_FLOW_OPS and getattr(op, "condition", None) is not None:
                 self._emit_conditional_gate(op, qubits, loc)
             elif op.name == "h":
                 self._emit_gate("h", qubits, [], loc)
@@ -207,9 +237,7 @@ class QiskitToCatalystImporter:
             i1_type = IntegerType.get_signless(1, self.ctx)
 
             attrs = self._creg_attrs(clbits[i]) if i < len(clbits) else None
-            op = self._emit_quantum_op(
-                "quantum.measure", [val_in], [i1_type, bit_type], loc, attrs
-            )
+            op = self._emit_quantum_op("quantum.measure", [val_in], [i1_type, bit_type], loc, attrs)
             self.qubit_map[q] = op.results[1]
             if i < len(clbits):
                 self.clbit_map[clbits[i]] = op.results[0]
@@ -327,9 +355,7 @@ class QiskitToCatalystImporter:
                 # test makes the whole conjunction constant false.
                 if expected == 0:
                     continue
-                return arith.ConstantOp(
-                    i1_type, IntegerAttr.get(i1_type, 0), loc=loc
-                ).result
+                return arith.ConstantOp(i1_type, IntegerAttr.get(i1_type, 0), loc=loc).result
             measured = self.clbit_map[clbit]
             if expected == 0:
                 one = arith.ConstantOp(i1_type, IntegerAttr.get(i1_type, 1), loc=loc).result
@@ -486,9 +512,7 @@ class QiskitToCatalystImporter:
                     if lhs[0] == "const":
                         lhs, rhs = rhs, lhs
                     if rhs[0] != "const":
-                        raise CompileError(
-                            "expr comparison requires one constant side"
-                        )
+                        raise CompileError("expr comparison requires one constant side")
                     value = rhs[1]
                     if lhs[0] == "reg":
                         cond = self._build_condition_value(lhs[1], value, loc)

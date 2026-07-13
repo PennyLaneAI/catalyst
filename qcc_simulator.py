@@ -378,14 +378,10 @@ def _load_qasm3_circuit(path: Path, content: str, inputs: Optional[dict] = None)
             n_stmts = len(program.statements)
             # Count a few interesting node types for the detail string
             gate_defs = sum(
-                1
-                for s in program.statements
-                if type(s).__name__ == "QuantumGateDefinition"
+                1 for s in program.statements if type(s).__name__ == "QuantumGateDefinition"
             )
             qubit_decls = sum(
-                1
-                for s in program.statements
-                if type(s).__name__ == "QubitDeclaration"
+                1 for s in program.statements if type(s).__name__ == "QubitDeclaration"
             )
             ast_detail = (
                 f"openqasm3 AST OK — {n_stmts} statements"
@@ -427,8 +423,7 @@ def _load_qasm3_circuit(path: Path, content: str, inputs: Optional[dict] = None)
             qc = _qasm3_mod.loads(content)
             detail = (
                 f"QASM3 — {qc.num_qubits} qubits, {qc.num_clbits} cbits, "
-                f"{len(qc.data)} gates"
-                + (f"  [{ast_detail}]" if ast_detail else "")
+                f"{len(qc.data)} gates" + (f"  [{ast_detail}]" if ast_detail else "")
             )
             return StageResult(True, qc, detail)
         except Exception as exc:

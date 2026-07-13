@@ -762,13 +762,23 @@ def run_hybrid_pipeline(qc, quantum_opt_path, quantum_translate_path):
     # input, and overwriting it in place SIGBUSes on larger modules.
     opt_path = tmp_path + ".opt.mlir"
     subprocess.run(
-        [str(quantum_opt_path),
-         "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
-         tmp_path, "-o", opt_path],
-        capture_output=True, text=True, check=True)
+        [
+            str(quantum_opt_path),
+            "--pass-pipeline=builtin.module(apply-transform-sequence, canonicalize, merge-rotations)",
+            tmp_path,
+            "-o",
+            opt_path,
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     result = subprocess.run(
         [str(quantum_translate_path), "--mlir-to-qasm3", opt_path],
-        capture_output=True, text=True, check=True)
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     Path(tmp_path).unlink()
     Path(opt_path).unlink()
     return result.stdout
@@ -780,9 +790,17 @@ class TestHybridFrontend:
 
     # Official spec examples that must translate through the full pipeline.
     SUPPORTED = [
-        "adder.qasm", "cphase.qasm", "inverseqft1.qasm", "inverseqft2.qasm",
-        "qec.qasm", "qft.qasm", "qpt.qasm", "rb.qasm", "rus.qasm",
-        "teleport.qasm", "varteleport.qasm",
+        "adder.qasm",
+        "cphase.qasm",
+        "inverseqft1.qasm",
+        "inverseqft2.qasm",
+        "qec.qasm",
+        "qft.qasm",
+        "qpt.qasm",
+        "rb.qasm",
+        "rus.qasm",
+        "teleport.qasm",
+        "varteleport.qasm",
     ]
     # Files in unsupported/ that must fail cleanly, with the named blocker
     # in the error (see openqasm3_official_example/unsupported/README.md).
@@ -815,9 +833,7 @@ class TestHybridFrontend:
         return run_hybrid_pipeline(qc, quantum_opt_path, quantum_translate_path)
 
     @pytest.mark.parametrize("filename", SUPPORTED)
-    def test_official_example_translates(
-        self, quantum_opt_path, quantum_translate_path, filename
-    ):
+    def test_official_example_translates(self, quantum_opt_path, quantum_translate_path, filename):
         import openqasm3
 
         from qasm3_frontend import load_qasm3
@@ -863,9 +879,11 @@ class TestHybridFrontend:
     def test_input_values_required(self):
         from qasm3_frontend import QASM3FrontendError, load_qasm3
 
-        src = ('OPENQASM 3.0;\ninclude "stdgates.inc";\n'
-               "input uint[4] a_in;\nqubit[4] q;\n"
-               "for uint i in [0:3] { if (bool(a_in[i])) x q[i]; }\n")
+        src = (
+            'OPENQASM 3.0;\ninclude "stdgates.inc";\n'
+            "input uint[4] a_in;\nqubit[4] q;\n"
+            "for uint i in [0:3] { if (bool(a_in[i])) x q[i]; }\n"
+        )
         with pytest.raises(QASM3FrontendError, match="input 'a_in'"):
             load_qasm3(src)
         qc = load_qasm3(src, inputs={"a_in": 5})
@@ -927,16 +945,23 @@ class TestQECCircuits:
         "rep3_phaseflip.qasm": {"syn": {"11"}, "out": {"000"}},
         "rep3_bitflip_while.qasm": {"syn": {"00"}, "out": {"111"}},
         "shor9_full.qasm": {
-            "s0": {"00"}, "s1": {"11"}, "s2": {"00"},
-            "xs": {"11"}, "out": {"000000001"},
+            "s0": {"00"},
+            "s1": {"11"},
+            "s2": {"00"},
+            "xs": {"11"},
+            "out": {"000000001"},
         },
         "steane7_lookup.qasm": {"zsyn": {"011"}, "xsyn": {"110"}, "out": {"0000000"}},
         "surface_d2_detect.qasm": {"det": {"000"}, "out": {"0000", "1111"}},
         "surface17_d3_round.qasm": {
-            "zs": {"0110"}, "xs": {"1010"}, "out": {"000000000"},
+            "zs": {"0110"},
+            "xs": {"1010"},
+            "out": {"000000000"},
         },
         "toric_2x2_detect.qasm": {
-            "xs": {"0000"}, "zs": {"0011"}, "out": {"00000000"},
+            "xs": {"0000"},
+            "zs": {"0011"},
+            "out": {"00000000"},
         },
         "toric_2x2_rounds.qasm": {"xs": {"000"}, "zs": {"011"}, "out": {"00000000"}},
         "mf_rep3_coherent.qasm": {"out": {"111"}},
@@ -960,9 +985,9 @@ class TestQECCircuits:
             assert len(parts) == len(names), (key, names)
             for name, value in zip(names, parts):
                 if name in expected:
-                    assert value in expected[name], (
-                        f"register {name}={value!r} not in {expected[name]}"
-                    )
+                    assert (
+                        value in expected[name]
+                    ), f"register {name}={value!r} not in {expected[name]}"
         # Every expected register must actually exist.
         for name in expected:
             assert name in names, f"register {name} missing from circuit"
@@ -996,9 +1021,7 @@ class TestQECCircuits:
 
     @pytest.mark.skipif(not AER_AVAILABLE, reason="qiskit-aer not installed")
     @pytest.mark.parametrize("filename", sorted(set(FILES) - WHILE_FILES))
-    def test_qec_translated_semantics(
-        self, quantum_opt_path, quantum_translate_path, filename
-    ):
+    def test_qec_translated_semantics(self, quantum_opt_path, quantum_translate_path, filename):
         """The TRANSLATED program must reproduce the same deterministic
         register outcomes as the source."""
         import qiskit.qasm3 as qasm3_mod

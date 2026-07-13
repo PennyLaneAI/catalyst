@@ -31,8 +31,7 @@ from qiskit.circuit import Clbit, ControlledGate, Gate, Qubit
 
 
 def _is_open_controlled(op):
-    return (isinstance(op, ControlledGate)
-            and op.ctrl_state != (1 << op.num_ctrl_qubits) - 1)
+    return isinstance(op, ControlledGate) and op.ctrl_state != (1 << op.num_ctrl_qubits) - 1
 
 
 def _expand_open_controls(qc):
@@ -52,11 +51,14 @@ def _expand_open_controls(qc):
     expanded = qc.copy_empty_like()
     for inst in qc.data:
         if _is_open_controlled(inst.operation):
-            expanded.compose(inst.operation.definition, qubits=inst.qubits,
-                             clbits=inst.clbits, inplace=True)
+            expanded.compose(
+                inst.operation.definition, qubits=inst.qubits, clbits=inst.clbits, inplace=True
+            )
         else:
             expanded.append(inst.operation, inst.qubits, inst.clbits)
     return expanded
+
+
 from qiskit.circuit.classical import expr as qexpr
 
 
@@ -72,33 +74,68 @@ class _Return(Exception):
 
 
 _CONSTANTS = {
-    "pi": math.pi, "π": math.pi,
-    "tau": math.tau, "τ": math.tau,
-    "euler": math.e, "ℇ": math.e,
+    "pi": math.pi,
+    "π": math.pi,
+    "tau": math.tau,
+    "τ": math.tau,
+    "euler": math.e,
+    "ℇ": math.e,
 }
 
 _MATH_FUNCS = {
-    "arccos": math.acos, "arcsin": math.asin, "arctan": math.atan,
-    "cos": math.cos, "sin": math.sin, "tan": math.tan,
-    "exp": math.exp, "log": math.log, "ln": math.log,
-    "sqrt": math.sqrt, "floor": math.floor, "ceil": math.ceil,
-    "mod": lambda a, b: a % b, "abs": abs,
+    "arccos": math.acos,
+    "arcsin": math.asin,
+    "arctan": math.atan,
+    "cos": math.cos,
+    "sin": math.sin,
+    "tan": math.tan,
+    "exp": math.exp,
+    "log": math.log,
+    "ln": math.log,
+    "sqrt": math.sqrt,
+    "floor": math.floor,
+    "ceil": math.ceil,
+    "mod": lambda a, b: a % b,
+    "abs": abs,
     "popcount": lambda v: bin(int(v)).count("1"),
 }
 
 # stdgates.inc / builtin gate name -> (qiskit method name, n_params, n_qubits)
 _STD_GATES = {
-    "U": ("u", 3, 1), "CX": ("cx", 0, 2), "gphase": (None, 1, 0),
-    "p": ("p", 1, 1), "phase": ("p", 1, 1), "x": ("x", 0, 1), "y": ("y", 0, 1),
-    "z": ("z", 0, 1), "h": ("h", 0, 1), "s": ("s", 0, 1), "sdg": ("sdg", 0, 1),
-    "t": ("t", 0, 1), "tdg": ("tdg", 0, 1), "sx": ("sx", 0, 1),
-    "rx": ("rx", 1, 1), "ry": ("ry", 1, 1), "rz": ("rz", 1, 1),
-    "cx": ("cx", 0, 2), "cy": ("cy", 0, 2), "cz": ("cz", 0, 2),
-    "cp": ("cp", 1, 2), "cphase": ("cp", 1, 2), "crx": ("crx", 1, 2),
-    "cry": ("cry", 1, 2), "crz": ("crz", 1, 2), "ch": ("ch", 0, 2),
-    "swap": ("swap", 0, 2), "ccx": ("ccx", 0, 3), "cswap": ("cswap", 0, 3),
-    "cu": ("cu", 4, 2), "id": ("id", 0, 1),
-    "u1": ("p", 1, 1), "u2": ("u", 2, 1), "u3": ("u", 3, 1),
+    "U": ("u", 3, 1),
+    "CX": ("cx", 0, 2),
+    "gphase": (None, 1, 0),
+    "p": ("p", 1, 1),
+    "phase": ("p", 1, 1),
+    "x": ("x", 0, 1),
+    "y": ("y", 0, 1),
+    "z": ("z", 0, 1),
+    "h": ("h", 0, 1),
+    "s": ("s", 0, 1),
+    "sdg": ("sdg", 0, 1),
+    "t": ("t", 0, 1),
+    "tdg": ("tdg", 0, 1),
+    "sx": ("sx", 0, 1),
+    "rx": ("rx", 1, 1),
+    "ry": ("ry", 1, 1),
+    "rz": ("rz", 1, 1),
+    "cx": ("cx", 0, 2),
+    "cy": ("cy", 0, 2),
+    "cz": ("cz", 0, 2),
+    "cp": ("cp", 1, 2),
+    "cphase": ("cp", 1, 2),
+    "crx": ("crx", 1, 2),
+    "cry": ("cry", 1, 2),
+    "crz": ("crz", 1, 2),
+    "ch": ("ch", 0, 2),
+    "swap": ("swap", 0, 2),
+    "ccx": ("ccx", 0, 3),
+    "cswap": ("cswap", 0, 3),
+    "cu": ("cu", 4, 2),
+    "id": ("id", 0, 1),
+    "u1": ("p", 1, 1),
+    "u2": ("u", 2, 1),
+    "u3": ("u", 3, 1),
 }
 
 
@@ -301,9 +338,7 @@ class AstFrontend:
             self._declare(stmt.identifier.name, value)
             return
         if tname in ("DurationType", "StretchType"):
-            raise QASM3FrontendError(
-                f"Timing type '{tname}' has no circuit representation"
-            )
+            raise QASM3FrontendError(f"Timing type '{tname}' has no circuit representation")
         raise QASM3FrontendError(f"Unsupported classical type: {tname}")
 
     def _zero_array(self, dims):
@@ -407,8 +442,7 @@ class AstFrontend:
             if isinstance(target, _SubroutineDef):
                 lval = self._resolve_ref(stmt.lvalue)
                 if isinstance(lval, _BitRef):
-                    self._call_subroutine(target, stmt.rvalue.arguments,
-                                          return_target=lval)
+                    self._call_subroutine(target, stmt.rvalue.arguments, return_target=lval)
                 else:
                     value = self._call_subroutine(target, stmt.rvalue.arguments)
                     self._store_classical(stmt.lvalue, op, value)
@@ -427,18 +461,12 @@ class AstFrontend:
         ltype = type(lvalue).__name__
         if ltype in ("IndexedIdentifier", "IndexExpression"):
             if op != "=":
-                raise QASM3FrontendError(
-                    "Compound assignment to indexed values is not supported"
-                )
-            base_node = (lvalue.name if ltype == "IndexedIdentifier"
-                         else lvalue.collection)
+                raise QASM3FrontendError("Compound assignment to indexed values is not supported")
+            base_node = lvalue.name if ltype == "IndexedIdentifier" else lvalue.collection
             base = self._resolve_ref(base_node)
             if not isinstance(base, list):
-                raise QASM3FrontendError(
-                    "Indexed assignment target must be a classical array"
-                )
-            indices = (lvalue.indices if ltype == "IndexedIdentifier"
-                       else [lvalue.index])
+                raise QASM3FrontendError("Indexed assignment target must be a classical array")
+            indices = lvalue.indices if ltype == "IndexedIdentifier" else [lvalue.index]
             flat = []
             for index_group in indices:
                 group = index_group if isinstance(index_group, list) else [index_group]
@@ -449,8 +477,11 @@ class AstFrontend:
             last = flat[-1]
             last_type = type(last).__name__
             if last_type in ("RangeDefinition", "DiscreteSet"):
-                items = self._eval_loop_set(last) if last_type == "RangeDefinition" \
+                items = (
+                    self._eval_loop_set(last)
+                    if last_type == "RangeDefinition"
                     else [self._eval_classical(v) for v in last.values]
+                )
                 if len(items) != len(value):
                     raise QASM3FrontendError("Slice assignment shape mismatch")
                 for i, v in zip(items, list(value)):
@@ -466,19 +497,22 @@ class AstFrontend:
             return
         current = self._lookup(name)
         ops = {
-            "+=": lambda a, b: a + b, "-=": lambda a, b: a - b,
-            "*=": lambda a, b: a * b, "/=": lambda a, b: a / b,
+            "+=": lambda a, b: a + b,
+            "-=": lambda a, b: a - b,
+            "*=": lambda a, b: a * b,
+            "/=": lambda a, b: a / b,
             "<<=": lambda a, b: int(a) << int(b),
             ">>=": lambda a, b: int(a) >> int(b),
-            "&=": lambda a, b: int(a) & int(b), "|=": lambda a, b: int(a) | int(b),
-            "^=": lambda a, b: int(a) ^ int(b), "%=": lambda a, b: a % b,
+            "&=": lambda a, b: int(a) & int(b),
+            "|=": lambda a, b: int(a) | int(b),
+            "^=": lambda a, b: int(a) ^ int(b),
+            "%=": lambda a, b: a % b,
         }
         if op not in ops:
             raise QASM3FrontendError(f"Unsupported assignment operator: {op}")
         if isinstance(current, _BitRef):
             raise QASM3FrontendError(
-                f"Runtime classical arithmetic on measured bits ('{op}') is "
-                "not supported"
+                f"Runtime classical arithmetic on measured bits ('{op}') is " "not supported"
             )
         self._assign_existing(name, ops[op](current, value))
 
@@ -527,9 +561,7 @@ class AstFrontend:
             target = None
         if isinstance(target, _SubroutineDef):
             if stmt.modifiers:
-                raise QASM3FrontendError(
-                    "Gate modifiers on subroutine calls are not supported"
-                )
+                raise QASM3FrontendError("Gate modifiers on subroutine calls are not supported")
             self._call_subroutine(target, list(stmt.arguments) + list(stmt.qubits))
             return
 
@@ -553,12 +585,10 @@ class AstFrontend:
             raise QASM3FrontendError("Mismatched register sizes in gate broadcast")
         reps = sizes.pop() if sizes else 1
         for i in range(reps):
-            qubits = [r.qubits[i] if len(r) > 1 else r.qubits[0]
-                      for r in operand_refs]
+            qubits = [r.qubits[i] if len(r) > 1 else r.qubits[0] for r in operand_refs]
             if len(qubits) != n_expected:
                 raise QASM3FrontendError(
-                    f"Gate '{stmt.name.name}' expects {n_expected} qubits, "
-                    f"got {len(qubits)}"
+                    f"Gate '{stmt.name.name}' expects {n_expected} qubits, " f"got {len(qubits)}"
                 )
             self.qc.append(gate, qubits)
 
@@ -650,8 +680,11 @@ class AstFrontend:
         finally:
             self.scopes = self.scopes[:-1]
             self._return_targets.pop()
-        if (return_target is not None and isinstance(result, _BitRef)
-                and result.clbits != return_target.clbits):
+        if (
+            return_target is not None
+            and isinstance(result, _BitRef)
+            and result.clbits != return_target.clbits
+        ):
             raise QASM3FrontendError(
                 "Subroutine returns measured bits that cannot be bound to the "
                 "assignment target (runtime bit copies are not supported)"
@@ -661,9 +694,11 @@ class AstFrontend:
     @staticmethod
     def _simple_return_identifier(body):
         for stmt in body:
-            if (type(stmt).__name__ == "ReturnStatement"
-                    and stmt.expression is not None
-                    and type(stmt.expression).__name__ == "Identifier"):
+            if (
+                type(stmt).__name__ == "ReturnStatement"
+                and stmt.expression is not None
+                and type(stmt.expression).__name__ == "Identifier"
+            ):
                 return stmt.expression.name
         return None
 
@@ -808,9 +843,7 @@ class AstFrontend:
                 return ref.clbits[0], 1, False
             # Bare register truthiness: creg != 0
             return self._condition_target(ref), 0, True
-        raise QASM3FrontendError(
-            f"Unsupported runtime condition: {tname}"
-        )
+        raise QASM3FrontendError(f"Unsupported runtime condition: {tname}")
 
     @staticmethod
     def _condition_target(ref):
@@ -818,9 +851,7 @@ class AstFrontend:
             return ref.clbits[0]
         if ref.register is not None and len(ref.register) == len(ref.clbits):
             return ref.register
-        raise QASM3FrontendError(
-            "Conditions on bit slices (not whole registers) are not supported"
-        )
+        raise QASM3FrontendError("Conditions on bit slices (not whole registers) are not supported")
 
     def _condition_initial_value(self, node):
         ref = self._peel_condition_operand(node)
@@ -919,8 +950,7 @@ class AstFrontend:
                 picked.extend(items)
             if len(picked) == 1:
                 return (int(base) >> picked[0]) & 1
-            return sum(((int(base) >> i) & 1) << pos
-                       for pos, i in enumerate(picked))
+            return sum(((int(base) >> i) & 1) << pos for pos, i in enumerate(picked))
         raise QASM3FrontendError("Cannot index into this value")
 
     def _eval_qubits(self, node):
@@ -941,9 +971,7 @@ class AstFrontend:
                 return self._resolve_ref(node)
         if isinstance(ref, _BitRef):
             raise QASM3FrontendError("Expected qubits, found classical bits")
-        raise QASM3FrontendError(
-            f"Cannot resolve qubit operand ({tname})"
-        )
+        raise QASM3FrontendError(f"Cannot resolve qubit operand ({tname})")
 
     def _eval_bits(self, node):
         ref = self._resolve_ref(node)
@@ -980,9 +1008,7 @@ class AstFrontend:
                     "compile-time evaluation is impossible"
                 )
             if isinstance(value, (_QubitRef, _GateDef, _SubroutineDef)):
-                raise QASM3FrontendError(
-                    f"'{node.name}' is not a classical value"
-                )
+                raise QASM3FrontendError(f"'{node.name}' is not a classical value")
             return value
         if tname == "UnaryExpression":
             v = self._eval_classical(node.expression)
@@ -1027,9 +1053,7 @@ class AstFrontend:
         if tname in ("IndexExpression", "IndexedIdentifier"):
             ref = self._resolve_ref(node)
             if isinstance(ref, _BitRef):
-                raise QASM3FrontendError(
-                    "Runtime bit used in compile-time expression"
-                )
+                raise QASM3FrontendError("Runtime bit used in compile-time expression")
             return ref
         if tname == "ArrayLiteral":
             return [self._eval_classical(v) for v in node.values]
@@ -1045,17 +1069,30 @@ class AstFrontend:
     @staticmethod
     def _binary_op(op, a, b):
         ops = {
-            "+": lambda: a + b, "-": lambda: a - b, "*": lambda: a * b,
-            "/": lambda: a / b if isinstance(a, float) or isinstance(b, float)
-                 or (isinstance(a, int) and isinstance(b, int) and a % b != 0)
-                 else a // b,
-            "%": lambda: a % b, "**": lambda: a ** b,
-            "<<": lambda: int(a) << int(b), ">>": lambda: int(a) >> int(b),
-            "==": lambda: a == b, "!=": lambda: a != b,
-            "<": lambda: a < b, ">": lambda: a > b,
-            "<=": lambda: a <= b, ">=": lambda: a >= b,
-            "&&": lambda: bool(a) and bool(b), "||": lambda: bool(a) or bool(b),
-            "&": lambda: int(a) & int(b), "|": lambda: int(a) | int(b),
+            "+": lambda: a + b,
+            "-": lambda: a - b,
+            "*": lambda: a * b,
+            "/": lambda: (
+                a / b
+                if isinstance(a, float)
+                or isinstance(b, float)
+                or (isinstance(a, int) and isinstance(b, int) and a % b != 0)
+                else a // b
+            ),
+            "%": lambda: a % b,
+            "**": lambda: a**b,
+            "<<": lambda: int(a) << int(b),
+            ">>": lambda: int(a) >> int(b),
+            "==": lambda: a == b,
+            "!=": lambda: a != b,
+            "<": lambda: a < b,
+            ">": lambda: a > b,
+            "<=": lambda: a <= b,
+            ">=": lambda: a >= b,
+            "&&": lambda: bool(a) and bool(b),
+            "||": lambda: bool(a) or bool(b),
+            "&": lambda: int(a) & int(b),
+            "|": lambda: int(a) | int(b),
             "^": lambda: int(a) ^ int(b),
         }
         if op not in ops:

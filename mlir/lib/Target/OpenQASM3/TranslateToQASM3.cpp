@@ -355,8 +355,7 @@ class QASM3Emitter {
         }
 
         if (auto orOp = dyn_cast<arith::OrIOp>(def))
-            return "(" + buildCondExpr(orOp.getLhs()) + " || " + buildCondExpr(orOp.getRhs()) +
-                   ")";
+            return "(" + buildCondExpr(orOp.getLhs()) + " || " + buildCondExpr(orOp.getRhs()) + ")";
 
         if (auto cmpOp = dyn_cast<arith::CmpIOp>(def)) {
             auto pred = cmpOp.getPredicate();
