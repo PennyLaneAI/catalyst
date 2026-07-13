@@ -109,9 +109,9 @@ def _general_validation(*args, op_cls, wire_lens, **kwargs):
 def _process_params(
     *args, op_cls, wire_lens, hybrid_lens, forward_mask
 ) -> tuple[list, list, dict[str, list[int]]]:
-    """Process non-qubit operands of an operator. This function returns the flattened sequence
-    of qubit operands of the operator, feed-through arguments of any operator arguments, and a
-    dictionary mapping argument names to the indices of their respective qubits.
+    """Process the dynamic arguments of an operator. This function returns the flattened sequence
+    of non-qubit operands of the operator, feed-through arguments of any operator arguments,
+    and a dictionary mapping argument names to the indices of their respective values.
     """
     params = []
     forward_params = []
