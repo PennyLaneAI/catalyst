@@ -28,9 +28,9 @@ from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
+from pennylane.capture.primitives import operator_p
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
 from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
-from pennylane.core.operator.operator2 import operator_p
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 from pennylane.wires import AbstractQubit, is_abstract_qubit
@@ -292,24 +292,40 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
+# pylint: disable=too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
-def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, **kwargs):
+def _handle_operator(self, *args, op_cls, hybrid_lens, hybrid_trees, adjoint, n_ctrls, **kwargs):
 
     if hybrid_lens or hybrid_trees or op_cls.static_argnames:
         # only support compilable_argnames for the moment
         raise NotImplementedError
 
-    wire_inputs = args[len(op_cls.dynamic_argnames) :]
+    if n_ctrls:
+        wire_inputs = args[len(op_cls.dynamic_argnames) : -2 * n_ctrls]
+        control_wire_inputs = args[-2 * n_ctrls : -n_ctrls]
+        control_values = args[-n_ctrls:]
+    else:
+        wire_inputs = args[len(op_cls.dynamic_argnames) :]
+        control_wire_inputs = control_values = ()
+
     new_wires = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs
+    ]
+    new_control_wires = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w)
+        for w in control_wire_inputs
     ]
 
     qref_operator_p.bind(
         *args[: len(op_cls.dynamic_argnames)],
         *new_wires,
+        *new_control_wires,
+        *control_values,
         op_cls=op_cls,
         hybrid_lens=hybrid_lens,
         hybrid_trees=hybrid_trees,
+        adjoint=adjoint,
+        n_ctrls=n_ctrls,
         **kwargs,
     )
     return []

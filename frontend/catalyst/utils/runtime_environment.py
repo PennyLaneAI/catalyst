@@ -63,23 +63,44 @@ BYTECODE_FILE_PATH = os.path.join(
 )
 
 
-def get_libpython_path() -> str:  # pragma: no cover
-    """Return the path to the python shared library, or empty string if failed to find."""
-    libdir = sysconfig.get_config_var("LIBDIR")
+def get_libpython_path() -> str:   # pragma: no cover
+    """Return the path to the python *shared* library, or empty string if failed to find.
+
+    The QPD plugin uses dlopen by the standalone ``catalyst`` compiler process, which does
+    not embed Python, so it needs ``libpython`` loaded with ``RTLD_GLOBAL`` to resolve CPython
+    symbols. Therefore, this path needs to return a shared object.
+    """
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
+    shlib_suffix = sysconfig.get_config_var("SHLIB_SUFFIX") or ".so"
 
     # macOS framework-style installations
-    if framework_prefix:
-        return os.path.join(framework_prefix, ldlibrary)
+    if framework_prefix and ldlibrary:
+        framework_path = os.path.join(framework_prefix, ldlibrary)
+        if os.path.exists(framework_path):
+            return framework_path
 
-    if not (libdir and ldlibrary):
+    libdir = sysconfig.get_config_var("LIBDIR")
+    if not libdir:
         return ""
 
-    # standard installation
-    ldlibrary_path = os.path.join(libdir, ldlibrary)
-    if os.path.exists(ldlibrary_path):
-        return ldlibrary_path
+    # Default: the library sysconfig reports, but only if it is a shared object.
+    if ldlibrary and shlib_suffix in ldlibrary:
+        ldlibrary_path = os.path.join(libdir, ldlibrary)
+        if os.path.exists(ldlibrary_path):
+            return ldlibrary_path
+
+    # Fall back to the conventionally-named shared library (e.g. libpython3.12.so). This is
+    # the case that a static-preferring build (e.g. conda) hits: LDLIBRARY names the .a, but
+    # the .so is present under its canonical, version-derived name.
+    # ``LDLIBRARY`` in ``sysconfig`` is not reliably the shared library: some builds (notably
+    # conda envs) report the static archive ``libpythonX.Y.a`` there even though a ``.so``
+    # is present alongside it. We accept ``LDLIBRARY`` only when it is a shared object
+    # that exists, and otherwise fall back to locating the shared library in ``LIBDIR``.
+    ldversion = sysconfig.get_config_var("LDVERSION") or sysconfig.get_config_var("VERSION") or ""
+    conventional_path = os.path.join(libdir, f"libpython{ldversion}{shlib_suffix}")
+    if os.path.exists(conventional_path):
+        return conventional_path
 
     return ""
 
