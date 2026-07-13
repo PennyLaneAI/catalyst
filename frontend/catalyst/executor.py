@@ -33,6 +33,11 @@ context manager::
 
     # or attach to one already running/tunnelled (neither local nor host):
     ex = Executor("127.0.0.1:1234").launch()
+
+    # persistent remote workspace: deploy the bundle once, reuse across runs, remove explicitly:
+    Executor(host="10.0.0.9", workspace="~/cat-ws", bundle="...").setup_workspace()  # deploy once
+    Executor(host="10.0.0.9", workspace="~/cat-ws").launch()                         # reuse each run
+    Executor(host="10.0.0.9", workspace="~/cat-ws").remove_workspace()               # remove when done
 """
 
 from __future__ import annotations
@@ -229,6 +234,38 @@ def _copy_bundle(bundle: Path, user: str, host: str, workspace: str) -> None:
     if subprocess.call(scp) != 0:
         raise SystemExit("scp of bundle failed")
     _log(f"copied in {time.monotonic() - t0:.1f}s", level=2)
+
+
+def _remote_path_expr(path: str) -> str:
+    """Shell expression for ``path`` that expands a leading ``~`` via ``$HOME`` and quotes the rest,
+    so it survives ``cd``/``rm`` without tilde-in-quotes breakage or word-splitting."""
+    if path == "~":
+        return '"$HOME"'
+    if path.startswith("~/"):
+        return '"$HOME"/' + shlex.quote(path[2:])
+    return shlex.quote(path)
+
+
+def _remove_remote_dir(user: str, host: str, workspace: str) -> None:
+    """``rm -rf`` a remote workspace, guarded so it can never delete ``/`` or the home directory.
+
+    Resolves ``workspace`` (including a leading ``~``) to a canonical path on the remote and refuses
+    if it is empty, ``/``, or ``$HOME`` itself. A missing directory is a no-op."""
+    remote = (
+        f"ws={_remote_path_expr(workspace)}; "
+        'd=$(cd "$ws" 2>/dev/null && pwd) || exit 0; '
+        'if [ -z "$d" ] || [ "$d" = "/" ] || [ "$d" = "$HOME" ]; then exit 3; fi; '
+        'rm -rf "$d"'
+    )
+    cmd = _ssh_base(user, host) + [remote]
+    _logcmd(cmd)
+    rc = subprocess.call(cmd, timeout=30, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if rc == 3:
+        raise ValueError(
+            f"refusing to remove workspace {workspace!r}: it resolves to '/' or the home directory"
+        )
+    if rc != 0:
+        raise RuntimeError(f"failed to remove remote workspace {workspace!r} (ssh rc={rc})")
 
 
 def _probe_auth(user: str, host: str) -> tuple[bool, bool]:
@@ -816,6 +853,14 @@ class Executor:
             return _triple_from_uname(system, machine)
         return None
 
+    def _remote_target(self) -> tuple[str, str, str]:
+        """Resolve ``(user, host, workspace)`` for a remote deploy or run. Remote only."""
+        assert self.host is not None
+        host = self.host.strip()
+        user = self._user or getpass.getuser()
+        workspace = self._workspace or _default_workspace()
+        return user, host, workspace
+
     def launch(self) -> "Executor":
         """Deploy the executor (idempotent). Returns ``self`` so ``ex = Executor(...).launch()`` works."""
         if self._launched:
@@ -840,11 +885,8 @@ class Executor:
                 )
 
         else:
-            assert self.host is not None
-            host = self.host.strip()
-            user = self._user or getpass.getuser()
+            user, host, workspace = self._remote_target()
             ws_pinned = self._workspace is not None  # a pinned dir is left in place on teardown
-            workspace = self._workspace or _default_workspace()
             sudo_pw = (
                 _resolve_sudo_password(user, host, self._sudo_password) if self._sudo else None
             )
@@ -889,6 +931,44 @@ class Executor:
         self._proc.teardown_workspace()
         _SESSIONS.pop(self.name, None)
         self._proc = None
+
+    def setup_workspace(self) -> "Executor":
+        """Deploy the bundle to a persistent remote workspace *without* starting the executor.
+
+        Requires a remote ``host``, a pinned ``workspace=`` (so later runs can reuse it), and a
+        ``bundle``. Idempotent — re-run to redeploy after rebuilding the bundle. Afterwards
+        ``launch()`` this instance, or a fresh ``Executor(..., workspace=<same>)`` from another run;
+        neither re-copies (``copy`` defaults off). Delete it with :meth:`remove_workspace`. Copies
+        as the login user (no sudo needed)."""
+        if not self.host:
+            raise ValueError("setup_workspace() needs a remote host= (nothing to deploy locally)")
+        if self._workspace is None:
+            raise ValueError(
+                "setup_workspace() needs a pinned workspace= so later runs can reuse it"
+            )
+        if not self._bundle:
+            raise ValueError("setup_workspace() needs a bundle= to deploy")
+        _set_verbosity(self._verbose)
+        user, host, workspace = self._remote_target()
+        _copy_bundle(Path(self._bundle), user, host, workspace)
+        self._copy = False  # bundle is deployed; launch() on this instance won't re-copy
+        return self
+
+    def remove_workspace(self, force: bool = False) -> None:
+        """Delete a pinned remote workspace (directory + bundle) — explicit teardown for a persistent
+        workspace, which is never auto-removed. Refuses to delete ``/`` or the home directory. SSH
+        errors are ignored unless ``force`` re-raises them; the safety refusal always raises."""
+        if not self.host:
+            raise ValueError("remove_workspace() needs a remote host=")
+        if self._workspace is None:
+            raise ValueError("remove_workspace() needs a pinned workspace= to remove")
+        _set_verbosity(self._verbose)
+        user, host, workspace = self._remote_target()
+        try:
+            _remove_remote_dir(user, host, workspace)
+        except RuntimeError:
+            if force:
+                raise
 
     def __enter__(self) -> "Executor":
         return self.launch()
