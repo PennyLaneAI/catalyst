@@ -230,6 +230,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
+  of the default else branch.
+  [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
+
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
   beneficial when the pass is executed multiple times within the compilation pipeline.
