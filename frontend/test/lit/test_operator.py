@@ -578,12 +578,12 @@ def c_hybrid_wires():
     # CHECK: qref.operator "HybridWires"() qubits([[q0]], [[q1]])
     # CHECK: UID({{[0-9]+}})
     # CHECK: qubit_map = {cwires = [0, 1]}
-    HybridWires(cwires=qp.wires.Wires([0, 1]))
+    HybridWires(cwires=[qp.wires.Wires(0), qp.wires.Wires(1)])
 
-    # CHECK: qref.operator "HybridWires"() qubits(
+    # CHECK: qref.operator "HybridWires"() qubits()
     # CHECK-NEXT: UID({{[0-9]+}})
     # CHECK-NOT: qubit_map
-    HybridWires(cwires=qp.wires.Wires([]))
+    HybridWires(cwires=[])
     return qp.state()
 
 
