@@ -152,6 +152,9 @@
   PennyLane.
   [(#2769)](https://github.com/PennyLaneAI/catalyst/pull/2769)
 
+* Added ``CZ`` support to ``to-ppr`` pass.
+  [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -390,6 +393,7 @@ Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+Korbinian Kottmann,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
