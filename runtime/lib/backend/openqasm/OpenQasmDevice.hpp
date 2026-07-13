@@ -16,6 +16,7 @@
 
 #define __device_openqasm
 
+#include <cstdint>
 #include <algorithm>
 #include <memory>
 #include <set>

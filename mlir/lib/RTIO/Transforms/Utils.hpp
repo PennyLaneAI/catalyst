@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Matchers.h"
 

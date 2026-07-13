@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <algorithm> // generate_n
 #include <cmath>
 #include <complex>
