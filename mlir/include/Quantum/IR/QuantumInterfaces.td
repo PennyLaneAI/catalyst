@@ -188,7 +188,7 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
 
     let methods = [
         InterfaceMethod<
-            "Return the name of the corresponding PennyLane operator.", "std::string", "getPlName"
+            "Return the name of the corresponding frontend operator (i.e. the rule supplier).", "std::string", "getOperatorName"
         >,
         InterfaceMethod<
             "Return the shape and dtype of dynamic data.",
