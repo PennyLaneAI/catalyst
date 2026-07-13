@@ -244,8 +244,7 @@ void handleAlloc(IRRewriter &builder, quantum::AllocOp vAllocOp, QubitValueTrack
     else {
         qregType = qref::QuregType::get(ctx, builder.getI64IntegerAttr(ShapedType::kDynamic));
         rAllocOp = qref::AllocOp::create(builder, loc, qregType, vAllocOp.getNqubits(), nullptr,
-                                         vAllocOp.getNqubitsAttrAttr(), vAllocOp.getStateAttr(),
-                                         vAllocOp.getRestoredAttr());
+                                         vAllocOp.getStateAttr(), vAllocOp.getRestoredAttr());
     }
 
     tracker.setRQreg(vAllocOp.getQreg(), rAllocOp.getQreg());
