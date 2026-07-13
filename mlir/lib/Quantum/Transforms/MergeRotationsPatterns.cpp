@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "merge-rotations"
 
+#include <cstdint>
 #include <array>
 #include <cassert> // assert
 

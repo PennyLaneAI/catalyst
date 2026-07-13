@@ -16,6 +16,7 @@
  * @file DGBuilder.cpp
  */
 
+#include <cstdint>
 #include "DGBuilder.hpp"
 
 #include <iostream>

@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "scatter"
 
+#include <cstdint>
 #include <algorithm>
 #include <vector>
 

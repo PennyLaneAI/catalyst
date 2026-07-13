@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "jvpvjp"
 
+#include <cstdint>
 #include "JVPVJPPatterns.hpp"
 
 #include <algorithm>

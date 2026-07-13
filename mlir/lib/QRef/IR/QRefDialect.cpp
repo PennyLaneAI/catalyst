@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstdint>
 #include "QRef/IR/QRefDialect.h"
 
 #include "llvm/ADT/TypeSwitch.h" // needed for generated type parser

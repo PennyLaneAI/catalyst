@@ -37,6 +37,7 @@ limitations under the License.
 // catalyst namespace.
 
 // This file implements logic for lowering Stablehlo dialect to SCF dialect.
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <utility>
