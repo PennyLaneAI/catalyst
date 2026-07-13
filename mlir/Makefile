@@ -15,7 +15,7 @@ ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 BUILD_TYPE ?= Release
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
-LLVM_TARGETS_TO_BUILD ?= host
+LLVM_TARGETS_TO_BUILD ?= host;X86;AArch64
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF

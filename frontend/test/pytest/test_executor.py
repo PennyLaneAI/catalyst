@@ -18,6 +18,7 @@ The lifecycle tests are pure Python (no executor process). The one that actually
 ``catalyst-executor`` subprocess is skipped unless the binary is present, and runs in a temp cwd so
 it never writes a log into the source tree.
 """
+import platform
 import types
 from pathlib import Path
 
@@ -25,12 +26,13 @@ import pytest
 
 from catalyst import Executor, kernel, target
 from catalyst.api_extensions.target import RemoteDispatch, get_dispatch, get_target
-from catalyst.executor import _default_executor_bin
+from catalyst.executor import _default_executor_bin, _triple_from_uname
 
 
 class _DispatchHandle:
     """A minimal stand-in for a dispatch target: any object carrying ``_catalyst_dispatch`` is
-    accepted by ``kernel.declare(remote=...)`` (the same duck-typed seam a backline endpoint uses)."""
+    accepted by ``kernel.declare(remote=...)`` (the same duck-typed seam a backline endpoint uses).
+    """
 
     def __init__(self, address):
         self._catalyst_dispatch = RemoteDispatch(address=address)
@@ -111,6 +113,64 @@ def test_kernel_declare_remote_true_inherits_program_executor():
 def test_kernel_declare_remote_without_dispatch_raises():
     with pytest.raises(ValueError):
         kernel.declare("sym", remote=types.SimpleNamespace())
+
+
+# --- executor triple: auto-detect + explicit + carry into target() (#2/#3) -----------------------
+
+
+def test_triple_from_uname_mapping():
+    assert _triple_from_uname("Linux", "x86_64") == "x86_64-unknown-linux-gnu"
+    assert _triple_from_uname("Linux", "aarch64") == "aarch64-unknown-linux-gnu"
+    assert _triple_from_uname("Darwin", "arm64") == "arm64-apple-darwin"
+    assert _triple_from_uname("Darwin", "x86_64") == "x86_64-apple-darwin"
+    assert _triple_from_uname("Plan9", "sparc") is None
+
+
+def test_triple_local_autodetect_matches_host():
+    """A local executor's triple is the host's, auto-detected from the platform."""
+    assert Executor(local=True).triple == _triple_from_uname(platform.system(), platform.machine())
+
+
+def test_triple_explicit_wins_without_probe():
+    """An explicit triple= is returned verbatim (no SSH probe, even for an unreachable host)."""
+    ex = Executor(host="unreachable.invalid", triple="x86_64-apple-darwin")
+    assert ex.triple == "x86_64-apple-darwin"
+
+
+def test_triple_attach_only_is_none():
+    """Attach-only (neither local nor host, no explicit triple): nothing to detect."""
+    assert Executor("127.0.0.1:1234").triple is None
+
+
+def test_target_from_executor_sources_address_and_triple():
+    """target(device, executor=ex) fills address + triple from the executor."""
+    ex = Executor("127.0.0.1:1234", triple="aarch64-unknown-linux-gnu").launch()
+    dev = target(types.SimpleNamespace(), executor=ex)
+    d, t = get_dispatch(dev), get_target(dev)
+    assert d is not None and d.address == "127.0.0.1:1234"
+    assert t is not None and t.triple == "aarch64-unknown-linux-gnu"
+    ex.stop()
+
+
+def test_target_explicit_overrides_executor():
+    """Explicit address=/triple= win over the executor's."""
+    ex = Executor("127.0.0.1:1234", triple="aarch64-unknown-linux-gnu").launch()
+    dev = target(
+        types.SimpleNamespace(), executor=ex, address="10.0.0.9:5", triple="x86_64-apple-darwin"
+    )
+    d, t = get_dispatch(dev), get_target(dev)
+    assert d is not None and d.address == "10.0.0.9:5"
+    assert t is not None and t.triple == "x86_64-apple-darwin"
+    ex.stop()
+
+
+def test_target_executor_is_duck_typed():
+    """executor= accepts any object exposing .address and .triple, not just Executor."""
+    fake = types.SimpleNamespace(address="1.2.3.4:9", triple="aarch64-unknown-linux-gnu")
+    dev = target(types.SimpleNamespace(), executor=fake)
+    d, t = get_dispatch(dev), get_target(dev)
+    assert d is not None and d.address == "1.2.3.4:9"
+    assert t is not None and t.triple == "aarch64-unknown-linux-gnu"
 
 
 # --- a real local launch (gated on a built binary; runs in a temp cwd) ----------------------------

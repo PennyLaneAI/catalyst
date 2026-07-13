@@ -43,6 +43,7 @@ import ctypes
 import faulthandler
 import getpass
 import os
+import platform
 import random
 import re
 import shlex
@@ -66,7 +67,9 @@ _READY_RE = re.compile(r"Listening on \S+:\d+|executor ready, waiting for next c
 # ssh login still wanting a password/passphrase means key auth isn't set up — we can't feed it.
 _SSH_PW_RE = re.compile(r"'s password:|Enter passphrase for key")
 # sudo telling us the password we fed (via sudo -S) was wrong.
-_SUDO_FAIL_RE = re.compile(r"Sorry, try again|incorrect password|authentication failure|sudo: \d+ incorrect")
+_SUDO_FAIL_RE = re.compile(
+    r"Sorry, try again|incorrect password|authentication failure|sudo: \d+ incorrect"
+)
 # A port collision — the remote bind or the local -L forward is already taken.
 _PORT_RE = re.compile(r"Address already in use|Could not request local forwarding")
 
@@ -105,6 +108,21 @@ def _default_executor_bin() -> str:
     return "catalyst-executor"
 
 
+def _triple_from_uname(system: str, machine: str) -> str | None:
+    """Map ``uname -s`` / ``uname -m`` to an LLVM target triple for the common cases."""
+    arch = {"aarch64": "aarch64", "arm64": "aarch64", "x86_64": "x86_64", "amd64": "x86_64"}.get(
+        machine.strip().lower()
+    )
+    if arch is None:
+        return None
+    system = system.strip().lower()
+    if system == "linux":
+        return f"{arch}-unknown-linux-gnu"
+    if system == "darwin":
+        return f"{'arm64' if arch == 'aarch64' else arch}-apple-darwin"
+    return None
+
+
 # Verbosity: 0 quiet (errors only) · 1 phases + executor stream (default) · 2 full ssh/scp commands
 # + scp -v + timings · 3+ adds `ssh -v`. The executor's output always streams regardless.
 _VERBOSITY = 1
@@ -126,8 +144,9 @@ def _logcmd(cmd: list[str]) -> None:
     _log("$ " + " ".join(shlex.quote(c) for c in cmd), level=2)
 
 
-def _resolve_log_path(host: str, explicit: str | None = None, disabled: bool = False,
-                      name: str = "executor") -> str | None:
+def _resolve_log_path(
+    host: str, explicit: str | None = None, disabled: bool = False, name: str = "executor"
+) -> str | None:
     """Host-side log file for an executor's output — one per launch in the cwd, named by the executor
     (so several executors each get their own file). ``explicit`` pins a path; ``disabled`` turns it
     off."""
@@ -143,13 +162,19 @@ def _resolve_log_path(host: str, explicit: str | None = None, disabled: bool = F
 # SSH helpers (remote launch)
 # --------------------------------------------------------------------------------------------------
 
+
 # Connection multiplexing: the first short op opens a master, the rest reuse it (no re-handshake),
 # and it self-expires. Applied to the chatty control ops (probe/mkdir/scp/pkill), NOT the long-lived
 # executor session — that keeps one clean connection whose close SIGHUPs the executor.
 def _ctl_opts() -> list[str]:
-    return ["-o", "ControlMaster=auto",
-            "-o", "ControlPath=~/.ssh/catalyst-cm-%r@%h:%p",
-            "-o", "ControlPersist=30"]
+    return [
+        "-o",
+        "ControlMaster=auto",
+        "-o",
+        "ControlPath=~/.ssh/catalyst-cm-%r@%h:%p",
+        "-o",
+        "ControlPersist=30",
+    ]
 
 
 def _set_pdeathsig() -> None:
@@ -163,12 +188,13 @@ def _set_pdeathsig() -> None:
 _PDEATHSIG = _set_pdeathsig if hasattr(os, "fork") else None
 
 
-def _ssh_base(user: str, host: str, opts: list[str] | None = None,
-              multiplex: bool = True) -> list[str]:
+def _ssh_base(
+    user: str, host: str, opts: list[str] | None = None, multiplex: bool = True
+) -> list[str]:
     cmd = ["ssh", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4"]
     if multiplex:
         cmd += _ctl_opts()
-    cmd += ["-v"] * max(0, _VERBOSITY - 2)   # ssh protocol debug at -vvv (verbosity 3+)
+    cmd += ["-v"] * max(0, _VERBOSITY - 2)  # ssh protocol debug at -vvv (verbosity 3+)
     if opts:
         cmd += opts
     cmd.append(f"{user}@{host}")
@@ -191,8 +217,13 @@ def _copy_bundle(bundle: Path, user: str, host: str, workspace: str) -> None:
     _logcmd(mkdir)
     if subprocess.call(mkdir) != 0:
         raise SystemExit("failed to create remote workspace")
-    scp = ["scp", *_ctl_opts(), "-v" if _VERBOSITY >= 2 else "-q",
-           *[str(f) for f in files], f"{user}@{host}:{workspace}/"]
+    scp = [
+        "scp",
+        *_ctl_opts(),
+        "-v" if _VERBOSITY >= 2 else "-q",
+        *[str(f) for f in files],
+        f"{user}@{host}:{workspace}/",
+    ]
     _logcmd(scp)
     t0 = time.monotonic()
     if subprocess.call(scp) != 0:
@@ -205,11 +236,12 @@ def _probe_auth(user: str, host: str) -> tuple[bool, bool]:
 
     Returns ``(ssh_ok, sudo_nopasswd)``. BatchMode means a missing key fails fast (rc 255) instead of
     prompting; ``sudo -n true`` returns 0 only when sudo needs no password."""
-    cmd = _ssh_base(user, host, ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]) \
-        + ["sudo -n true 2>/dev/null"]
+    cmd = _ssh_base(user, host, ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]) + [
+        "sudo -n true 2>/dev/null"
+    ]
     _logcmd(cmd)
     rc = subprocess.call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    if rc == 255:                 # ssh itself failed (no usable key, host unreachable, …)
+    if rc == 255:  # ssh itself failed (no usable key, host unreachable, …)
         return (False, False)
     return (True, rc == 0)
 
@@ -235,9 +267,15 @@ def _resolve_sudo_password(user: str, host: str, sudo_password: str | None = Non
         raise SystemExit("\nno sudo password provided — pass sudo_password= or run interactively")
 
 
-def _build_remote_cmd(workspace: str, remote_port: int, plugins: list[str], env: dict[str, str],
-                      use_password: bool = False, sudo: bool = True,
-                      executor_bin: str = "./catalyst-executor") -> str:
+def _build_remote_cmd(
+    workspace: str,
+    remote_port: int,
+    plugins: list[str],
+    env: dict[str, str],
+    use_password: bool = False,
+    sudo: bool = True,
+    executor_bin: str = "./catalyst-executor",
+) -> str:
     """The shell command run on the remote host: cd, export env, exec the executor.
 
     ``sudo`` wraps the executor in sudo (some devices need root): with ``use_password`` use ``sudo -S``
@@ -252,7 +290,11 @@ def _build_remote_cmd(workspace: str, remote_port: int, plugins: list[str], env:
 
     plugin_args = " ".join(_plugin_arg(p) for p in plugins)
     # scp drops the +x bit; only relevant for a workspace-local executor binary.
-    chmod = "chmod +x ./catalyst-executor 2>/dev/null; " if executor_bin == "./catalyst-executor" else ""
+    chmod = (
+        "chmod +x ./catalyst-executor 2>/dev/null; "
+        if executor_bin == "./catalyst-executor"
+        else ""
+    )
     if sudo:
         launcher = "exec sudo -S -E -p ''" if use_password else "exec sudo -E"
     else:
@@ -275,8 +317,9 @@ class _ExecutorProcess:
 
     ``.addr`` is what a client connects to; ``.name`` labels the streamed output as ``[<name>]``."""
 
-    def __init__(self, *, name: str, addr: str, bind_port: int, ready_timeout: float,
-                 log_path: str | None):
+    def __init__(
+        self, *, name: str, addr: str, bind_port: int, ready_timeout: float, log_path: str | None
+    ):
         self.name = name
         self.addr = addr
         self._bind_port = bind_port
@@ -312,7 +355,14 @@ class _ExecutorProcess:
 
     # --- shared lifecycle -------------------------------------------------------------------------
     def _say(self, msg: str, level: int = 1) -> None:
-        _log(msg if self.name == "executor" else f"{self.name}: {msg}", level)
+        line = msg if self.name == "executor" else f"{self.name}: {msg}"
+        _log(line, level)
+        # Tee the launcher's own narrative (launch cmd, readiness, teardown) into the log file too,
+        # so the file is self-contained rather than only the executor's stdout/stderr.
+        if self._log_fh is not None:
+            with contextlib.suppress(Exception):
+                self._log_fh.write(f"# [launcher] {line}\n")
+                self._log_fh.flush()
 
     def _open_log(self) -> None:
         if not self.log_path:
@@ -368,14 +418,18 @@ class _ExecutorProcess:
                 self._shutdown()
                 if self._port_conflict.is_set():
                     raise PortInUse(self._bind_port)
-                raise SystemExit(f"executor exited (code {returncode}) before becoming ready — "
-                                 f"see the [{self.name}] log above.")
+                raise SystemExit(
+                    f"executor exited (code {returncode}) before becoming ready — "
+                    f"see the [{self.name}] log above."
+                )
         self._shutdown()
-        raise SystemExit(f"executor did not become ready within {self.ready_timeout:.0f}s — see the "
-                         f"[{self.name}] log above (raise ready_timeout= if the host is slow).")
+        raise SystemExit(
+            f"executor did not become ready within {self.ready_timeout:.0f}s — see the "
+            f"[{self.name}] log above (raise ready_timeout= if the host is slow)."
+        )
 
     def _shutdown(self) -> None:
-        fh, self._log_fh = self._log_fh, None   # stop the pump teeing, then close
+        fh, self._log_fh = self._log_fh, None  # stop the pump teeing, then close
         if fh is not None:
             with contextlib.suppress(Exception):
                 fh.close()
@@ -396,11 +450,24 @@ class _ExecutorProcess:
 class _LocalProcess(_ExecutorProcess):
     """A ``catalyst-executor`` running as a local subprocess on ``127.0.0.1`` (no SSH, no tunnel)."""
 
-    def __init__(self, *, port: int, executor_bin: str, plugins: list[str] | None = None,
-                 env: dict[str, str] | None = None, ready_timeout: float = 60.0,
-                 name: str = "executor", log_path: str | None = None):
-        super().__init__(name=name, addr=f"127.0.0.1:{port}", bind_port=port,
-                         ready_timeout=ready_timeout, log_path=log_path)
+    def __init__(
+        self,
+        *,
+        port: int,
+        executor_bin: str,
+        plugins: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        ready_timeout: float = 60.0,
+        name: str = "executor",
+        log_path: str | None = None,
+    ):
+        super().__init__(
+            name=name,
+            addr=f"127.0.0.1:{port}",
+            bind_port=port,
+            ready_timeout=ready_timeout,
+            log_path=log_path,
+        )
         self._executor_bin = executor_bin
         self._plugins = plugins or []
         self._env = dict(env or {})
@@ -414,8 +481,15 @@ class _LocalProcess(_ExecutorProcess):
             proc_env[key] = os.path.expandvars(value)
         self._say(f"starting local executor on {self.addr}")
         _logcmd(argv)
-        self.proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                     text=True, bufsize=1, env=proc_env, preexec_fn=_PDEATHSIG)
+        self.proc = subprocess.Popen(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            env=proc_env,
+            preexec_fn=_PDEATHSIG,
+        )
 
 
 class _RemoteProcess(_ExecutorProcess):
@@ -423,14 +497,32 @@ class _RemoteProcess(_ExecutorProcess):
     local tunnel endpoint ``127.0.0.1:<local_port>``; closing the SSH connection stops the executor,
     with a port-scoped ``pkill`` backstop on teardown."""
 
-    def __init__(self, *, host: str, user: str, port: int, local_port: int | None = None,
-                 workspace: str, plugins: list[str] | None = None, env: dict[str, str] | None = None,
-                 sudo: bool = True, sudo_password: str | None = None,
-                 executor_bin: str = "./catalyst-executor", cleanup_ws: bool = False,
-                 ready_timeout: float = 60.0, name: str = "executor", log_path: str | None = None):
+    def __init__(
+        self,
+        *,
+        host: str,
+        user: str,
+        port: int,
+        local_port: int | None = None,
+        workspace: str,
+        plugins: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        sudo: bool = True,
+        sudo_password: str | None = None,
+        executor_bin: str = "./catalyst-executor",
+        cleanup_ws: bool = False,
+        ready_timeout: float = 60.0,
+        name: str = "executor",
+        log_path: str | None = None,
+    ):
         local_port = local_port or port
-        super().__init__(name=name, addr=f"127.0.0.1:{local_port}", bind_port=port,
-                         ready_timeout=ready_timeout, log_path=log_path)
+        super().__init__(
+            name=name,
+            addr=f"127.0.0.1:{local_port}",
+            bind_port=port,
+            ready_timeout=ready_timeout,
+            log_path=log_path,
+        )
         self.host = host
         self.user = user
         self.local_port = local_port
@@ -442,19 +534,21 @@ class _RemoteProcess(_ExecutorProcess):
         self.sudo_password = sudo_password
         self.executor_bin = executor_bin
         self._auth_prompt = threading.Event()
-        self._auth_kind = ""              # "ssh" or "sudo" — picks the help text
-        self._ready_reached = False       # gates the teardown pkill (don't kill others' ports)
+        self._auth_kind = ""  # "ssh" or "sudo" — picks the help text
+        self._ready_reached = False  # gates the teardown pkill (don't kill others' ports)
 
     def _log_header(self) -> str:
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        return (f"\n# ==== {self.name} @ {self.host}:{self._bind_port} | ws={self.workspace} | "
-                f"{ts} ====\n# plugins: {', '.join(self._plugins)}\n")
+        return (
+            f"\n# ==== {self.name} @ {self.host}:{self._bind_port} | ws={self.workspace} | "
+            f"{ts} ====\n# plugins: {', '.join(self._plugins)}\n"
+        )
 
     def _scan_line(self, line: str) -> None:
-        if _SSH_PW_RE.search(line):          # ssh login prompt — key auth isn't set up
+        if _SSH_PW_RE.search(line):  # ssh login prompt — key auth isn't set up
             self._auth_kind = "ssh"
             self._auth_prompt.set()
-        elif _SUDO_FAIL_RE.search(line):     # sudo rejected the password we fed
+        elif _SUDO_FAIL_RE.search(line):  # sudo rejected the password we fed
             self._auth_kind = "sudo"
             self._auth_prompt.set()
 
@@ -468,28 +562,44 @@ class _RemoteProcess(_ExecutorProcess):
 
     def _spawn(self) -> None:
         use_pw = self.sudo_password is not None
-        remote_cmd = _build_remote_cmd(self.workspace, self._bind_port, self._plugins, self._env,
-                                       use_password=use_pw, sudo=self.sudo,
-                                       executor_bin=self.executor_bin)
+        remote_cmd = _build_remote_cmd(
+            self.workspace,
+            self._bind_port,
+            self._plugins,
+            self._env,
+            use_password=use_pw,
+            sudo=self.sudo,
+            executor_bin=self.executor_bin,
+        )
         # -L: the port-forward the client connects through. ExitOnForwardFailure: fail loudly if the
         # local port is taken. multiplex=False: a dedicated connection. Password mode pipes into
         # `sudo -S` so NO PTY (a PTY would echo it and break the stdin pipe); NOPASSWD keeps -tt so
         # closing ssh SIGHUPs the executor.
-        opts = ["-o", "ExitOnForwardFailure=yes",
-                "-L", f"{self.local_port}:localhost:{self._bind_port}"]
+        opts = [
+            "-o",
+            "ExitOnForwardFailure=yes",
+            "-L",
+            f"{self.local_port}:localhost:{self._bind_port}",
+        ]
         if not use_pw:
             opts = ["-tt"] + opts
         ssh = _ssh_base(self.user, self.host, opts, multiplex=False) + [remote_cmd]
-        self._say(f"starting executor on {self.host}:{self._bind_port} "
-                  f"(tunnel {self.addr} -> remote:{self._bind_port})")
+        self._say(
+            f"starting executor on {self.host}:{self._bind_port} "
+            f"(tunnel {self.addr} -> remote:{self._bind_port})"
+        )
         self._say(f"remote: {remote_cmd}", level=2)
         _logcmd(ssh)
         self.proc = subprocess.Popen(
-            ssh, stdin=(subprocess.PIPE if use_pw else subprocess.DEVNULL),
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+            ssh,
+            stdin=(subprocess.PIPE if use_pw else subprocess.DEVNULL),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
             preexec_fn=_PDEATHSIG,
         )
-        if use_pw:   # feed the sudo password straight into `sudo -S` on stdin
+        if use_pw:  # feed the sudo password straight into `sudo -S` on stdin
             assert self.proc.stdin is not None and self.sudo_password is not None
             with contextlib.suppress(BrokenPipeError, OSError):
                 self.proc.stdin.write(self.sudo_password + "\n")
@@ -517,17 +627,29 @@ class _RemoteProcess(_ExecutorProcess):
         pat = f"catalyst-executor.*--bind=0.0.0.0:{self._bind_port}"
         with contextlib.suppress(Exception):
             if not self.sudo:
-                subprocess.call(_ssh_base(self.user, self.host) + [f"pkill -f {shlex.quote(pat)}"],
-                                timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.call(
+                    _ssh_base(self.user, self.host) + [f"pkill -f {shlex.quote(pat)}"],
+                    timeout=15,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
             elif self.sudo_password is not None:
                 subprocess.run(
-                    _ssh_base(self.user, self.host) + [f"sudo -S -p '' pkill -f {shlex.quote(pat)}"],
-                    input=self.sudo_password + "\n", text=True, timeout=15,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    _ssh_base(self.user, self.host)
+                    + [f"sudo -S -p '' pkill -f {shlex.quote(pat)}"],
+                    input=self.sudo_password + "\n",
+                    text=True,
+                    timeout=15,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
             else:
                 subprocess.call(
                     _ssh_base(self.user, self.host) + [f"sudo -n pkill -f {shlex.quote(pat)}"],
-                    timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    timeout=15,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
 
     def teardown_workspace(self) -> None:
         """Remove the auto-generated remote workspace. Guarded by the ``catalyst-exec-`` prefix so it
@@ -538,8 +660,12 @@ class _RemoteProcess(_ExecutorProcess):
             return
         self._say(f"removing remote workspace {self.workspace}", level=2)
         with contextlib.suppress(Exception):
-            subprocess.call(_ssh_base(self.user, self.host) + [f"rm -rf {self.workspace}"],
-                            timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.call(
+                _ssh_base(self.user, self.host) + [f"rm -rf {self.workspace}"],
+                timeout=15,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
 
     def stop(self) -> None:
         self._say("stopping executor + closing tunnel")
@@ -561,8 +687,8 @@ def _start_with_retry(make_process, pinned_port: int | None) -> _ExecutorProcess
             proc._say(f"port {port} is busy on the host (another user?) — trying another")
     raise SystemExit(
         f"couldn't get a free executor port after {tries} tries ({last}). Pin one with port=."
-        if pinned_port is None else
-        f"port {pinned_port} is busy on the host ({last}). Pick another port=."
+        if pinned_port is None
+        else f"port {pinned_port} is busy on the host ({last}). Pick another port=."
     )
 
 
@@ -601,18 +727,33 @@ class Executor:
     ``name`` labels it: output streams as ``[<name>]`` and the log is
     ``catalyst-executor-<name>-<host>-<ts>.log``. ``plugins`` are the device backends / runtime_call
     libraries to load; ``env`` is extra environment for the executor process (e.g.
-    ``LD_LIBRARY_PATH``); ``verbose`` (0-3) sets launcher detail. The port is randomized per launch
-    unless pinned via ``port``.
+    ``LD_LIBRARY_PATH``); ``verbose`` (0-3) sets launcher detail; ``triple`` overrides the
+    auto-detected target triple (see :attr:`triple`). The port is randomized per launch unless
+    pinned via ``port``.
     """
 
-    def __init__(self, address: str = "127.0.0.1:1373", *, host: str | None = None,
-                 local: bool = False, user: str = "", port: int | None = None,
-                 local_port: int | None = None, workspace: str | None = None,
-                 bundle=None, plugins: list[str] | None = None, copy: bool = False,
-                 ready_timeout: float = 60.0, name: str = "executor",
-                 sudo: bool = True, sudo_password: str | None = None,
-                 executor_bin: str | None = None,
-                 env: dict[str, str] | None = None, verbose: int = 1):
+    def __init__(
+        self,
+        address: str = "127.0.0.1:1373",
+        *,
+        host: str | None = None,
+        local: bool = False,
+        user: str = "",
+        port: int | None = None,
+        local_port: int | None = None,
+        workspace: str | None = None,
+        bundle=None,
+        plugins: list[str] | None = None,
+        copy: bool = False,
+        ready_timeout: float = 60.0,
+        name: str = "executor",
+        sudo: bool = True,
+        sudo_password: str | None = None,
+        executor_bin: str | None = None,
+        triple: str | None = None,
+        env: dict[str, str] | None = None,
+        verbose: int = 1,
+    ):
         self.host = host
         self.name = name
         self._local = local
@@ -628,6 +769,9 @@ class Executor:
         self._sudo = sudo
         self._sudo_password = sudo_password
         self._executor_bin = executor_bin
+        self._triple = triple
+        self._detected_triple: str | None = None
+        self._triple_detected = False
         self._env = env
         self._verbose = verbose
         self._proc: _ExecutorProcess | None = None
@@ -639,40 +783,91 @@ class Executor:
             raise RuntimeError("Executor not launched — call .launch() or use `with Executor(...)`")
         return self._address
 
+    @property
+    def triple(self) -> str | None:
+        """The executor's LLVM target triple, for cross-compiling a ``target`` to its architecture.
+
+        The explicit ``triple=`` if one was given, otherwise auto-detected: the local host's triple
+        for ``local=True``, or a ``uname`` probe over SSH for a remote ``host``. ``None`` when it
+        can't be determined (an attach-only executor); the compiler then falls back to the host
+        triple."""
+        if self._triple is not None:
+            return self._triple
+        if not self._triple_detected:
+            self._detected_triple = self._detect_triple()
+            self._triple_detected = True
+        return self._detected_triple
+
+    def _detect_triple(self) -> str | None:
+        if self._local:
+            return _triple_from_uname(platform.system(), platform.machine())
+        if self.host:
+            user = self._user or getpass.getuser()
+            cmd = _ssh_base(
+                user, self.host.strip(), ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
+            ) + ["uname -sm"]
+            try:
+                out = subprocess.check_output(
+                    cmd, text=True, timeout=15, stderr=subprocess.DEVNULL
+                ).strip()
+            except Exception:
+                return None
+            system, _, machine = out.partition(" ")
+            return _triple_from_uname(system, machine)
+        return None
+
     def launch(self) -> "Executor":
         """Deploy the executor (idempotent). Returns ``self`` so ``ex = Executor(...).launch()`` works."""
         if self._launched:
             return self
         if not (self._local or self.host):
-            self._launched = True   # manual mode: nothing to deploy, use the given address
+            self._launched = True  # manual mode: nothing to deploy, use the given address
             return self
         _set_verbosity(self._verbose)
         plugins = self._plugins if self._plugins is not None else []
 
         if self._local:
+
             def make(port: int) -> _ExecutorProcess:
                 return _LocalProcess(
-                    port=port, executor_bin=self._executor_bin or _default_executor_bin(),
-                    plugins=plugins, env=self._env, ready_timeout=self._ready_timeout,
-                    name=self.name, log_path=_resolve_log_path("localhost", name=self.name))
+                    port=port,
+                    executor_bin=self._executor_bin or _default_executor_bin(),
+                    plugins=plugins,
+                    env=self._env,
+                    ready_timeout=self._ready_timeout,
+                    name=self.name,
+                    log_path=_resolve_log_path("localhost", name=self.name),
+                )
+
         else:
             assert self.host is not None
             host = self.host.strip()
             user = self._user or getpass.getuser()
-            ws_pinned = self._workspace is not None   # a pinned dir is left in place on teardown
+            ws_pinned = self._workspace is not None  # a pinned dir is left in place on teardown
             workspace = self._workspace or _default_workspace()
-            sudo_pw = (_resolve_sudo_password(user, host, self._sudo_password)
-                       if self._sudo else None)
+            sudo_pw = (
+                _resolve_sudo_password(user, host, self._sudo_password) if self._sudo else None
+            )
             if self._copy and self._bundle:
                 _copy_bundle(Path(self._bundle), user, host, workspace)
 
             def make(port: int) -> _ExecutorProcess:
                 return _RemoteProcess(
-                    host=host, user=user, port=port, local_port=self._local_port,
-                    workspace=workspace, plugins=plugins, env=self._env, sudo=self._sudo,
-                    sudo_password=sudo_pw, executor_bin=self._executor_bin or "catalyst-executor",
-                    cleanup_ws=(not ws_pinned), ready_timeout=self._ready_timeout,
-                    name=self.name, log_path=_resolve_log_path(host, name=self.name))
+                    host=host,
+                    user=user,
+                    port=port,
+                    local_port=self._local_port,
+                    workspace=workspace,
+                    plugins=plugins,
+                    env=self._env,
+                    sudo=self._sudo,
+                    sudo_password=sudo_pw,
+                    executor_bin=self._executor_bin or "catalyst-executor",
+                    cleanup_ws=(not ws_pinned),
+                    ready_timeout=self._ready_timeout,
+                    name=self.name,
+                    log_path=_resolve_log_path(host, name=self.name),
+                )
 
         self._proc = _start_with_retry(make, self._port)
         self._address = self._proc.addr
@@ -702,5 +897,7 @@ class Executor:
         self.stop()
 
     def __repr__(self) -> str:
-        return (f"Executor(name={self.name!r}, host={self.host!r}, local={self._local}, "
-                f"launched={self._launched}, address={self._address!r})")
+        return (
+            f"Executor(name={self.name!r}, host={self.host!r}, local={self._local}, "
+            f"launched={self._launched}, address={self._address!r})"
+        )

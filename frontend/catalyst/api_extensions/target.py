@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tag a PennyLane device as a separate cross-compilation target, optionally remote.
-"""
+"""Tag a PennyLane device as a separate cross-compilation target, optionally remote."""
 
 from dataclasses import dataclass
 from typing import Optional
@@ -49,6 +48,7 @@ class RemoteDispatch:
 def target(
     device,
     *,
+    executor=None,
     pipeline: Optional[str] = None,
     triple: Optional[str] = None,
     address: Optional[str] = None,
@@ -61,8 +61,14 @@ def target(
     dispatched to a remote executor (``catalyst.dispatch = {address}``); without it, the object is
     statically linked and runs in-process.
 
+    Pass ``executor`` (a launched :class:`catalyst.Executor`, or any object exposing ``.address``
+    and an optional ``.triple``) to fill ``address`` and ``triple`` from it — a single source of
+    truth for *where* the target runs and *which* architecture it is cross-compiled for, so neither
+    needs to be typed by hand. Explicit ``address``/``triple`` still win if given.
+
     Args:
         device: A PennyLane device.
+        executor: Optional launched executor to source ``address`` (and ``triple``) from.
         pipeline: Optional lowering-pipeline name registered with the compiler.
         triple: Optional LLVM target triple. Defaults to the host triple.
         address: Optional executor address; when set, the target is dispatched remotely.
@@ -70,6 +76,11 @@ def target(
     Returns:
         The same device, now tagged with target (and, if ``address`` is given, dispatch) metadata.
     """
+    if executor is not None:
+        if address is None:
+            address = executor.address
+        if triple is None:
+            triple = getattr(executor, "triple", None)
     setattr(device, _TARGET_ATTR, Target(pipeline=pipeline, triple=triple))
     if address is not None:
         setattr(device, _DISPATCH_ATTR, RemoteDispatch(address=address))
