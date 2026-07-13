@@ -150,7 +150,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
   
   %reg = quantum.alloc(4) : !quantum.reg
 
-  %0 = quantum.operator "testOperatorQreg"(%flag: i1, %angle: f64, %index: i64) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) static_data={"myStaticArray"=[4,2,4], "myStaticString"="string", "myStaticInt"=8}
+  %0 = quantum.operator "testOperatorQreg"(%flag: i1, %angle: f64, %index: i64) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) static_data={"myStaticArray"=[4,2.4,4], "myStaticString"="string", "myStaticInt"=8}
   return
 }
     )mlir";
@@ -178,10 +178,10 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     ASSERT_EQ(op.getWireLens(), std::vector<size_t>({1, 2}));
 
     IntegerType i64 = IntegerType::get(&context, 64);
-    Float32Type f32 = mlir::Float32Type::get(&context);
+    Float64Type f64 = mlir::Float64Type::get(&context);
     llvm::SmallVector<mlir::Attribute> arr({
         mlir::IntegerAttr::get(i64, 4),
-        mlir::FloatAttr::get(f32, 2.4),
+        mlir::FloatAttr::get(f64, 2.4),
         mlir::IntegerAttr::get(i64, 4),
     });
     mlir::NamedAttribute arrAttr(mlir::StringAttr::get(&context, "myStaticArray"),
@@ -196,8 +196,9 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
         mlir::DictionaryAttr::get(&context, {arrAttr, stringAttr, intAttr});
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(op.getGraphOpId(), "testOperatorQreg[i1,f64,i64][1,2]{myStaticArray:[4,2.4,4],"
-                                 "myStaticInt:8,myStaticString:string}");
+    ASSERT_EQ(op.getGraphOpId(),
+              "testOperatorQreg[i1,f64,i64][1,2]{myStaticArray:[4,2.400000e+00,4],"
+              "myStaticInt:8,myStaticString:string}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpUID)

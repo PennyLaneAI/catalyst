@@ -90,7 +90,9 @@ std::string defaultGetGraphOpId(Operation *op)
     printIterable(gate.getDynamicShape(), ss);
     printIterable(gate.getWireLens(), ss);
     printAttr(gate.getStaticData(), ss);
-    ss << gate.getExtraData();
+    if (gate.getExtraData() != "") {
+        ss << '[' << gate.getExtraData() << ']';
+    }
     return out;
 }
 
