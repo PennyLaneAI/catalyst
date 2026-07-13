@@ -52,13 +52,13 @@ class TestCondToJaxpr:
                 { lambda ; a:i64[]. let
                     b:bool[] = eq a 5:i64[]
                     c:i64[] = cond[
-                    args_slice=(4, None, None)
-                    consts_slices=((2, 3, None), (3, 4, None))
+                    args_slice=(3, None, None)
+                    consts_slices=((1, 2, None), (2, 3, None))
                     jaxpr_branches=(
                         { lambda d:i64[]; . let e:i64[] = integer_pow[y=2] d in (e,) }
                         { lambda f:i64[]; . let g:i64[] = integer_pow[y=3] f in (g,) }
                     )
-                    ] b True:bool[] a a
+                    ] b a a
                 in (c,) }
                 """)
         else:
