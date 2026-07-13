@@ -64,7 +64,7 @@ nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
             return outTuple;
         })
         .Case<mlir::StringAttr>([](auto strAttr) { return nb::cast(strAttr.getValue().str()); })
-        .Default([](auto attr) { return nb::cast("placeholder"); });
+        .Default([](auto attr) { return nb::str("placeholder"); });
 }
 
 std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
@@ -78,9 +78,10 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
             nb::module_ wrapperModule = nb::module_::import_(moduleName);
             nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-            nb::object pythonResult = wrapperFunction(
-                op.getPlName(), op.getGraphOpId(), getPyvalFromTypeRange(op.getDynamicShape()),
-                op.getWireLens(), getPyvalFromMlirAttribute(op.getStaticData()));
+            nb::object pythonResult =
+                wrapperFunction(op.getOperatorName(), op.getGraphOpId(),
+                                getPyvalFromTypeRange(op.getDynamicShape()), op.getWireLens(),
+                                getPyvalFromMlirAttribute(op.getStaticData()));
 
             return nb::borrow<nb::str>(pythonResult).c_str();
         }

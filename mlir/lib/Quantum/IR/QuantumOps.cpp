@@ -1170,7 +1170,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 
 // PauliRotOp
 
-std::string PauliRotOp::getPlName() { return "PauliRot"; }
+std::string PauliRotOp::getOperatorName() { return "PauliRot"; }
 
 mlir::TypeRange PauliRotOp::getDynamicShape() { return getAllParams().getTypes(); }
 
@@ -1186,7 +1186,7 @@ mlir::DictionaryAttr PauliRotOp::getStaticData()
 
 // OperatorOp
 
-std::string OperatorOp::getPlName() { return getOpName().str(); }
+std::string OperatorOp::getOperatorName() { return getOpName().str(); }
 
 mlir::TypeRange OperatorOp::getDynamicShape() { return getParams().getTypes(); }
 

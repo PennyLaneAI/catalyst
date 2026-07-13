@@ -86,7 +86,7 @@ std::string defaultGetGraphOpId(Operation *op)
 
     DecomposableGate gate = cast<DecomposableGate>(op);
 
-    ss << gate.getPlName();
+    ss << gate.getOperatorName();
     printIterable(gate.getDynamicShape(), ss);
     printIterable(gate.getWireLens(), ss);
     printAttr(gate.getStaticData(), ss);

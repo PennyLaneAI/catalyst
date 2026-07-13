@@ -64,7 +64,7 @@ module {
     auto paulirots = module->getOps<PauliRotOp>();
     DecomposableGate paulirot = *paulirots.begin();
 
-    ASSERT_EQ(paulirot.getPlName(), "PauliRot");
+    ASSERT_EQ(paulirot.getOperatorName(), "PauliRot");
 
     // This is needed to keep the backing array from being deleted
     llvm::SmallVector<mlir::Type, 1> backing({mlir::Float64Type::get(&context)});
@@ -105,7 +105,7 @@ module {
     auto operators = module->getOps<OperatorOp>();
     DecomposableGate op = *operators.begin();
 
-    ASSERT_EQ(op.getPlName(), "testInterfaceOp");
+    ASSERT_EQ(op.getOperatorName(), "testInterfaceOp");
 
     // This is needed to keep the backing array from being deleted
     llvm::SmallVector<mlir::Type, 1> backing({mlir::IntegerType::get(&context, 1),
@@ -165,7 +165,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     DecomposableGate op;
     module->walk([&](OperatorOp walkOp) { op = walkOp; });
 
-    ASSERT_EQ(op.getPlName(), "testOperatorQreg");
+    ASSERT_EQ(op.getOperatorName(), "testOperatorQreg");
 
     // This is needed to keep the backing array from being deleted
     llvm::SmallVector<mlir::Type, 1> backing({mlir::IntegerType::get(&context, 1),
@@ -227,7 +227,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     DecomposableGate op;
     module->walk([&](OperatorOp walkOp) { op = walkOp; });
 
-    ASSERT_EQ(op.getPlName(), "testOperatorUID");
+    ASSERT_EQ(op.getOperatorName(), "testOperatorUID");
 
     // This is needed to keep the backing array from being deleted
     llvm::SmallVector<mlir::Type, 1> backing({mlir::IntegerType::get(&context, 1),
