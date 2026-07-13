@@ -26,7 +26,6 @@ def test_full_target():
 
     dev = target(
         qp.device("null.qubit", wires=1),
-        backend="my-backend",
         pipeline="my-pipeline",
         triple="my-triple",
     )
@@ -37,25 +36,25 @@ def test_full_target():
         qp.Hadamard(0)
         return qp.state()
 
-    # CHECK: module @module_circuit attributes {catalyst.target = {backend = "my-backend", pipeline = "my-pipeline", triple = "my-triple"}}
+    # CHECK: module @module_circuit attributes {catalyst.target = {pipeline = "my-pipeline", triple = "my-triple"}}
     print(circuit.mlir)
 
 
 test_full_target()
 
 
-def test_backend_only():
-    """Only backend is set; other fields must be absent from the dict."""
+def test_single_field():
+    """Only one field is set; the others must be absent from the dict."""
 
-    dev = target(qp.device("null.qubit", wires=1), backend="my-backend")
+    dev = target(qp.device("null.qubit", wires=1), triple="my-triple")
 
     @qjit(target="mlir")
     @qp.qnode(dev)
     def circuit_min():
         return qp.state()
 
-    # CHECK: module @module_circuit_min attributes {catalyst.target = {backend = "my-backend"}}
+    # CHECK: module @module_circuit_min attributes {catalyst.target = {triple = "my-triple"}}
     print(circuit_min.mlir)
 
 
-test_backend_only()
+test_single_field()
