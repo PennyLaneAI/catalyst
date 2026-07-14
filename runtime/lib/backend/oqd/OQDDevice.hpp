@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include <cstdint>
 #include <algorithm>
+#include <cstdint>
 #include <set>
 #include <string>
 #include <unordered_map>

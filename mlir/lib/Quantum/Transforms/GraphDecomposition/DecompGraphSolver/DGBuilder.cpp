@@ -16,9 +16,9 @@
  * @file DGBuilder.cpp
  */
 
-#include <cstdint>
 #include "DGBuilder.hpp"
 
+#include <cstdint>
 #include <iostream>
 #include <variant>
 

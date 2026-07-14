@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include "QRef/IR/QRefOps.h"
+
+#include <cstdint>
 
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/LogicalResult.h"

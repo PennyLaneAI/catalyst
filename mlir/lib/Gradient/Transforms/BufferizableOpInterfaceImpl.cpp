@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 
 #include <algorithm> // std::find
+#include <cstdint>
 #include <vector>
 
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include "Catalyst/Analysis/ResourceResult.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/ErrorHandling.h"

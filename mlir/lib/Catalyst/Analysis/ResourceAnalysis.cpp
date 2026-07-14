@@ -14,8 +14,9 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
-#include <cstdint>
 #include "Catalyst/Analysis/ResourceAnalysis.h"
+
+#include <cstdint>
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TypeSwitch.h"

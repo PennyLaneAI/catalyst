@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdint>
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/TypeRange.h"
 

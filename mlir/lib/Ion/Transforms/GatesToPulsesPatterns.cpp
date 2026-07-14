@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"

@@ -18,9 +18,9 @@
 #define VALUE_SEMANTICS_OBSERVABLE_OPS                                                             \
     quantum::ComputationalBasisOp, quantum::HermitianOp, quantum::NamedObsOp
 
-#include <cstdint>
 #include "reference_semantics_conversion.h"
 
+#include <cstdint>
 #include <optional>
 
 #include "llvm/ADT/DenseMap.h"

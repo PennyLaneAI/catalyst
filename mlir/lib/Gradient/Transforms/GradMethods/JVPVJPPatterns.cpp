@@ -14,10 +14,10 @@
 
 #define DEBUG_TYPE "jvpvjp"
 
-#include <cstdint>
 #include "JVPVJPPatterns.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <vector>
 

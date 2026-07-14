@@ -23,10 +23,10 @@
 // operation definition in the MLIR layer.
 // 3. The LUT decoder is not scalable in both spatial and temporal complexity.
 
-#include <cstdint>
 #include "LUTDecoder.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <vector>
 
 #include "DataView.hpp"

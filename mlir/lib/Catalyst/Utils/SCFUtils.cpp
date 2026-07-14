@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include <cmath> // std::ceil()
+#include <cstdint>
 #include <optional>
 
 #include "mlir/Dialect/SCF/IR/SCF.h"

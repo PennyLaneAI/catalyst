@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "decompose-non-clifford-ppr"
 #include <cstdint>
+
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Arith/IR/Arith.h" // for arith::XOrIOp and arith::ConstantOp

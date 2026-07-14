@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdint>
+
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "PBC/IR/PBCOps.h"

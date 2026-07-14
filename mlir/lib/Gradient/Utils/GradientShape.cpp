@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include "Gradient/Utils/GradientShape.h"
+
+#include <cstdint>
 
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 

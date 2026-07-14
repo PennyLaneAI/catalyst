@@ -14,8 +14,8 @@
 
 #define DEBUG_TYPE "adjoint"
 
-#include <cstdint>
 #include <algorithm>
+#include <cstdint>
 #include <queue>
 #include <string>
 #include <vector>

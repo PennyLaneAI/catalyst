@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "split-to-single-terms"
 
 #include <cstdint>
+
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

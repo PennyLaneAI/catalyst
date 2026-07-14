@@ -14,8 +14,8 @@
 
 #define DEBUG_TYPE "scatter"
 
-#include <cstdint>
 #include <algorithm>
+#include <cstdint>
 #include <vector>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"

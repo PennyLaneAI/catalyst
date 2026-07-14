@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdint>
+
 #include "catch2/catch_test_macros.hpp"
 
 #include "RuntimeCAPI.h"

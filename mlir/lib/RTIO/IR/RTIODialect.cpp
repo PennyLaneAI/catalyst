@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include "RTIO/IR/RTIODialect.h"
+
+#include <cstdint>
 
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/Builders.h"

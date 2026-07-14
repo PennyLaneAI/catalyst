@@ -14,9 +14,9 @@
 
 #define DEBUG_TYPE "merge-rotations"
 
-#include <cstdint>
 #include <array>
 #include <cassert> // assert
+#include <cstdint>
 
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"

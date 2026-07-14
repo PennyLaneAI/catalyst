@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #pragma once
-#include <cstdint>
 #include <algorithm>
+#include <cstdint>
 #include <mutex>
 #include <numeric>
 #include <string>

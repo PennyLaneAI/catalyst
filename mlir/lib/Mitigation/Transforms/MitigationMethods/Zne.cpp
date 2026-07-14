@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include "Zne.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <deque>
 #include <iostream>
 #include <sstream>

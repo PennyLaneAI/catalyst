@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include <cstdint>
 #include <complex>
+#include <cstdint>
 #include <optional>
 #include <random>
 #include <vector>

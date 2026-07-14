@@ -14,10 +14,10 @@
 
 #pragma once
 
-#include <cstdint>
 #include <algorithm> // generate_n
 #include <cmath>
 #include <complex>
+#include <cstdint>
 #include <cstdio>
 #include <optional>
 #include <random>
