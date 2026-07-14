@@ -58,9 +58,7 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
         return qp.capture.subroutine(decomp_rule)
 
     # let this fail with the standard error message if the op is not found
-    op_class = getattr(qp, op_name)
-
-    subroutines = [rule_to_subroutine(rule) for rule in qp.decomposition.list_decomps(op_class)]
+    subroutines = [rule_to_subroutine(rule) for rule in qp.decomposition.list_decomps(op_name)]
 
     @qp.qjit(
         target="mlir",
