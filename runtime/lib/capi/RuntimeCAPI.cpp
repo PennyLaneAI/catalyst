@@ -251,6 +251,13 @@ void __catalyst__rt__finalize()
     CTX.reset(nullptr);
 }
 
+// Uniform random number in [0, 1) from the PRNG (used by ZNE random local folding).
+double __catalyst__rt__random_double()
+{
+    RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
+    return CTX->getRandomNumber();
+}
+
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
                                              int64_t shots, bool auto_qubit_management)
 {
