@@ -30,7 +30,7 @@ class TestFabricateOp:
         """Test that valid init states are accepted."""
         op = Fabricate(init_state)
         assert op.init_state == init_state
-        assert op.num_wires == 0
+        assert len(op.wires) == 0
 
     def test_fabricate_invalid_init_state(self):
         """Test that invalid init states are rejected."""
