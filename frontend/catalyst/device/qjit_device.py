@@ -54,7 +54,6 @@ from catalyst.device.verification import (
     verify_operations,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.third_party.cuda import SoftwareQQPP
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -448,8 +447,6 @@ class QJITDevice(qp.devices.Device):
 
     def _measurement_transform_program(self, capabilities):
         measurement_pipeline = CompilePipeline()
-        if isinstance(self.original_device, SoftwareQQPP):
-            return measurement_pipeline
 
         supports_sum_observables = "Sum" in capabilities.observables
         if capabilities.non_commuting_observables is False:

@@ -177,6 +177,10 @@
 * Removes support for `Transform.plxpr_transform` from the `qp.qjit(capture=True)` capture pipeline.
   All transforms must now have a MLIR or XDSL implementation and a corresponding `pass_name`.
 
+* Support for `qjit` integration with `cudaq` has been removed in order to feasbily drop support 
+  for Python 3.11.
+  [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -236,6 +240,10 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
+  of the default else branch.
+  [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
