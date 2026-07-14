@@ -587,7 +587,11 @@ ExecutorAddr push_memref(ExecutorSession *s, RemoteAllocator &alloc, void *host_
         if (copy_data) {
             void *aligned_host = *reinterpret_cast<void **>(desc_host + kAlignedOff);
             if (aligned_host) {
-                remote_write(s, data_remote, aligned_host, data_size);
+                int64_t host_offset = 0;
+                std::memcpy(&host_offset, desc_host + kOffsetOff, sizeof(int64_t));
+                char *src = static_cast<char *>(aligned_host) +
+                            host_offset * static_cast<int64_t>(elem_size);
+                remote_write(s, data_remote, src, data_size);
             }
         }
     }
