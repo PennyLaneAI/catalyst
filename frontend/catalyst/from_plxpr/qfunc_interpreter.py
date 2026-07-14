@@ -28,11 +28,13 @@ from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
+from pennylane.capture.primitives import operator_p
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
 from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
-from pennylane.wires import AbstractQubit, is_abstract_qubit
+from pennylane.pytrees import flatten, unflatten
+from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
@@ -45,6 +47,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_measure_in_basis_p,
     qref_measure_p,
     qref_namedobs_p,
+    qref_operator_p,
     qref_pauli_measure_p,
     qref_pauli_rot_p,
     qref_qinst_p,
@@ -288,6 +291,82 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         and no **kwargs) and the results is a sequence of values
         """
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
+
+
+def _new_hybrid_arg(interp: PLxPRToQuantumJaxprInterpreter, arg) -> list:
+    """Create new flattened hybrid arguments by mapping wire values to abstract qubits."""
+    new_args = []
+    leaves_with_wires, _ = flatten(arg, is_leaf=lambda x: isinstance(x, Wires))
+
+    for l in leaves_with_wires:
+        if isinstance(l, Wires):
+            new_hwires = tuple(
+                w if is_abstract_qubit(w) else qref_get_p.bind(interp.init_qreg, w) for w in l
+            )
+            new_args.extend(new_hwires)
+        else:
+            new_args.append(l)
+
+    return new_args
+
+
+# pylint: disable=too-many-arguments
+@PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
+def handle_operator(
+    self,
+    *args,
+    op_cls,
+    wire_lens,
+    hybrid_lens,
+    hybrid_trees,
+    forward_mask,
+    adjoint,
+    n_ctrls,
+    **kwargs,
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the operator_p primitive."""
+    n_wires = sum(wire_lens)
+    wire_inputs = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + n_wires]
+    if n_ctrls:
+        control_wire_inputs = args[-2 * n_ctrls : -n_ctrls]
+        control_values = args[-n_ctrls:]
+    else:
+        control_wire_inputs = control_values = ()
+
+    new_wires = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs
+    ]
+    new_control_wires = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w)
+        for w in control_wire_inputs
+    ]
+
+    # Hybrid wire arguments: this contains wires that are in both wire_argnames and hybrid_argnames,
+    # and also the wires of any operators that are part of the hybrid arguments.
+    new_hybrid_args = []
+    args_idx = len(op_cls.dynamic_argnames) + n_wires
+
+    for size, tree in zip(hybrid_lens, hybrid_trees, strict=True):
+        unflattened_arg = unflatten(args[args_idx : args_idx + size], tree)
+        new_hybrid_args.extend(_new_hybrid_arg(self, unflattened_arg))
+        args_idx += size
+
+    qref_operator_p.bind(
+        *args[: len(op_cls.dynamic_argnames)],
+        *new_wires,
+        *new_hybrid_args,
+        *new_control_wires,
+        *control_values,
+        op_cls=op_cls,
+        wire_lens=wire_lens,
+        hybrid_lens=hybrid_lens,
+        hybrid_trees=hybrid_trees,
+        forward_mask=forward_mask,
+        adjoint=adjoint,
+        n_ctrls=n_ctrls,
+        **kwargs,
+    )
+    return []
 
 
 # pylint: disable=unused-argument, too-many-arguments

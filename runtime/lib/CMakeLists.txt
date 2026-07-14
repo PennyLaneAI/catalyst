@@ -16,7 +16,7 @@ include(FetchContent)
 # Locally we don't need to check for Boost::multiprecision explicitly.
 # Linking Boost::random automatically includes multiprecision headers
 # Explicitly adding it here and target_link_libraries will cause failure.
-find_package(Boost ${MIN_BOOST_VERSION} COMPONENTS random graph QUIET)
+find_package(Boost ${MIN_BOOST_VERSION} COMPONENTS random QUIET)
 
 if (Boost_FOUND)
     message(STATUS "Found System Boost ${Boost_VERSION}")
@@ -24,7 +24,7 @@ if (Boost_FOUND)
 else()
     message(STATUS "Boost >= ${MIN_BOOST_VERSION} not found on system. Fetching...")
 
-    set(BOOST_INCLUDE_LIBRARIES multiprecision random graph)
+    set(BOOST_INCLUDE_LIBRARIES multiprecision random)
     set(BOOST_ENABLE_CMAKE ON)
 
     FetchContent_Declare(
@@ -36,6 +36,24 @@ else()
     )
 
     FetchContent_MakeAvailable(Boost)
+
+    # Suppress -Werror on the fetched Boost targets so they build cleanly.
+    set(BOOST_TARGETS boost_container boost_random boost_core
+        boost_assert boost_throw_exception boost_config)
+
+    foreach(t_name IN LISTS BOOST_TARGETS)
+        if(TARGET ${t_name})
+            get_target_property(target_type ${t_name} TYPE)
+
+            if(target_type STREQUAL "INTERFACE_LIBRARY")
+                # Header-only targets: apply as INTERFACE so it reaches consumers.
+                target_compile_options(${t_name} INTERFACE -Wno-error -w)
+            else()
+                # Compiled targets: PRIVATE so Boost's own sources build without -Werror.
+                target_compile_options(${t_name} PRIVATE -Wno-error -w)
+            endif()
+        endif()
+    endforeach()
 
     set(CATALYST_BOOST_FETCHED TRUE CACHE BOOL "Boost was fetched via FetchContent" FORCE)
 endif()

@@ -19,6 +19,7 @@ import numpy as np
 import pennylane as qp
 import pytest
 
+import catalyst
 from catalyst import api_extensions, for_loop, measure, qjit, while_loop
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
@@ -271,15 +272,12 @@ class TestWhileLoops:
         error_msg = str(exc_info.value)
         assert "catalyst.while_loop is not supported with PennyLane's capture enabled" in error_msg
 
-    @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture_integration(self):
         """Test that while_loop raises PlxprCaptureCFCompatibilityError when
         capture mode is enabled."""
-        qp.capture.enable()
-
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qp.qjit
+            @qjit(capture=True)
             @qp.qnode(qp.device("lightning.qubit", wires=3))
             def test(n):
                 def condition(x):
@@ -452,16 +450,12 @@ class TestForLoops:
         error_msg = str(exc_info.value)
         assert "catalyst.for_loop is not supported with PennyLane's capture enabled" in error_msg
 
-    @pytest.mark.usefixtures("disable_capture")
     def test_for_loop_raises_compatibility_error_with_capture_integration(self):
         """Test that for_loop raises PlxprCaptureCFCompatibilityError when
         capture mode is enabled."""
-        # Enable capture mode
-        qp.capture.enable()
-
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qp.qjit
+            @qjit(capture=True)
             @qp.qnode(qp.device("lightning.qubit", wires=3))
             def test(n):
                 @for_loop(0, n, 1)
@@ -926,6 +920,63 @@ class TestWhileLoopOperatorAccess:
         assert func(10) == 1024
         assert func(5) == 32
         assert func(0) == 1
+
+
+class TestStaticLoopFolding:
+    """Test the global toggle that folds for loops with constant iteration ranges."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_toggle(self):
+        saved = catalyst.compile_without_static_loops
+        try:
+            yield
+        finally:
+            catalyst.compile_without_static_loops = saved
+
+    def test_toggle_default(self):
+        """Static loops are not folded by default."""
+        assert catalyst.compile_without_static_loops is False
+
+    def test_static_loop_not_folded_by_default(self):
+        """A constant iteration range keeps the for_loop primitive by default."""
+
+        @qjit(target="mlir")
+        def circuit():
+            @for_loop(0, 3, 1)
+            def loop(i, acc):
+                return acc + i
+
+            return loop(0)
+
+        assert "for_loop" in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
+
+    def test_static_loop_folded_when_enabled(self):
+        """Enabling the toggle unrolls a constant iteration range at trace time."""
+        catalyst.compile_without_static_loops = True
+
+        @qjit(target="mlir")
+        def circuit():
+            @for_loop(0, 3, 1)
+            def loop(i, acc):
+                return acc + i
+
+            return loop(0)
+
+        assert "for_loop" not in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
+
+    def test_dynamic_loop_not_folded_when_enabled(self):
+        """A loop with a traced bound is never folded, even when the toggle is enabled."""
+        catalyst.compile_without_static_loops = True
+
+        @qjit(target="mlir")
+        def circuit(n: int):
+            @for_loop(0, n, 1)
+            def loop(i, acc):
+                return acc + i
+
+            return loop(0)
+
+        assert "for_loop" in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
 
 
 if __name__ == "__main__":
