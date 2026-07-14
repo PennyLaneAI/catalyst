@@ -230,8 +230,8 @@ LogicalResult OperatorOp::verify()
     const bool hasQregMode = static_cast<bool>(getQreg());
     const bool hasQubitMode = !getQubits().empty();
 
-    // Exactly one mode must be used: explicit qubits or qreg-based addressing.
-    if (hasQregMode == hasQubitMode) {
+    // At most one mode must be used: explicit qubits or qreg-based addressing.
+    if (hasQregMode && hasQubitMode) {
         return emitOpError() << "must use either qubits or registers, but not both";
     }
 
@@ -391,6 +391,8 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        std::optional<int64_t> UID, DictionaryAttr static_data,
                        DictionaryAttr param_map, DictionaryAttr qubit_map)
 {
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
+
     build(odsBuilder, odsState,
           /*op_name=*/op_name,
           /*params=*/params,
@@ -403,7 +405,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/Value(),
           /*arr_ctrl_values=*/Value(),
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -415,6 +417,8 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        bool adjoint, std::optional<int64_t> UID, DictionaryAttr static_data,
                        DictionaryAttr param_map, DictionaryAttr qubit_map)
 {
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
+
     build(odsBuilder, odsState,
           /*op_name=*/op_name,
           /*params=*/params,
@@ -427,7 +431,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/arr_ctrl_indices,
           /*arr_ctrl_values=*/arr_ctrl_values,
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -477,13 +481,14 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 4. Qubits
-    if (!getQubits().empty()) {
+    if (!getQreg()) {
         p << " qubits(" << getQubits() << ")";
     }
 
     // 5. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {"static_data",         "param_map", "qubit_map",
-                                          "operandSegmentSizes", "op_name",   "adjoint"};
+    SmallVector<StringRef> elidedAttrs = {
+        "static_data", "param_map", "qubit_map", "operandSegmentSizes",
+        "op_name",     "adjoint",   "UID"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
@@ -596,7 +601,6 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         return failure();
     }
     result.addAttribute("op_name", builder.getStringAttr(opName));
-    auto &opProperties = result.getOrAddProperties<OperatorOp::Properties>();
 
     // 2. Parse variadic params: (%arg0: type, ...)
     SmallVector<OpAsmParser::UnresolvedOperand> params;
@@ -662,7 +666,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         if (parser.parseLParen() || parser.parseInteger(uid) || parser.parseRParen()) {
             return failure();
         }
-        opProperties.setUID(uid);
+        result.addAttribute("UID", builder.getI64IntegerAttr(uid));
 
         if (succeeded(parser.parseOptionalKeyword("forward"))) {
             auto parseForwardArgAndType = [&]() -> ParseResult {

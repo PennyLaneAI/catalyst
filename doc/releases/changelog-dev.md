@@ -17,6 +17,9 @@
   with the solver choosing the cheapest.
   [(#3001)](https://github.com/PennyLaneAI/catalyst/pull/3001)
 
+* Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
+  [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
+
 * The `decompose-lowering` pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
   The pass also no longer applies the `inline`, `cse` and `canonicalize` passes to avoid unnecessary IR mutations.
   Instead, decomposition rules are deterministically inlined by a custom function (`inline` is non-deterministic, using an estimated benefit and threshold as criteria for inlining).
@@ -34,6 +37,7 @@
   [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
   [(#2993)](https://github.com/PennyLaneAI/catalyst/pull/2993)
   [(#2998)](https://github.com/PennyLaneAI/catalyst/pull/2998)
+  [(#2981)](https://github.com/PennyLaneAI/catalyst/pull/2981)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
