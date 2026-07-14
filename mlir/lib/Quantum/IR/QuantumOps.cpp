@@ -1168,6 +1168,19 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 // Quantum op interface methods.
 //===----------------------------------------------------------------------===//
 
+// CustomOp
+
+std::string CustomOp::getOperatorName() { return getGateName().str(); }
+
+mlir::TypeRange CustomOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> CustomOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr CustomOp::getStaticData()
+{
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
 // MultiRZOp
 
 std::string MultiRZOp::getOperatorName() { return "MultiRZ"; }

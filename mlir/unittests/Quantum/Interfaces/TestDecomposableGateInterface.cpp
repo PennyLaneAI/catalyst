@@ -42,6 +42,41 @@
 using namespace mlir;
 using namespace catalyst::quantum;
 
+TEST(DecomposableGateInterfaceTests, CustomOp)
+{
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %oq0, %oq1 = quantum.custom "RX"(%angle) %q0, %q1 : !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate customOp = *module->getOps<CustomOp>().begin();
+
+    ASSERT_EQ(customOp.getOperatorName(), "RX");
+
+    // This is needed to keep the backing array from being deleted
+    llvm::SmallVector<mlir::Type, 1> backing({mlir::Float64Type::get(&context)});
+    mlir::TypeRange expectedDynamicShape(backing);
+    ASSERT_EQ(llvm::SmallVector<mlir::Type>(customOp.getDynamicShape()),
+              llvm::SmallVector<mlir::Type>(expectedDynamicShape));
+
+    ASSERT_EQ(customOp.getWireLens(), std::vector<size_t>({2}));
+
+    ASSERT_EQ(customOp.getStaticData().size(), 0);
+
+    ASSERT_EQ(customOp.getGraphOpId(), "RX[f64][2]{}");
+}
+
 TEST(DecomposableGateInterfaceTests, MultiRZOp)
 {
     std::string moduleStr = R"mlir(

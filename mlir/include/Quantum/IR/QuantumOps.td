@@ -410,7 +410,8 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 }
 
 def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                         AttrSizedOperandSegments, AttrSizedResultSegments,
+                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
