@@ -121,13 +121,6 @@ Value buildStackPtrArray(Location loc, RewriterBase &rewriter, ArrayRef<Value> p
     return alloca;
 }
 
-// Calculate the byte size of one memref element.
-// For complex<T>, the size is 2 * sizeof(T). 1 for real, 1 for imaginary.
-int64_t memrefElemSizeBytes(MemRefType ty)
-{
-    return primitiveByteSize(ty.getElementType());
-}
-
 /// Byte size of a primitive element, used for the byte-buffer marshalling path.
 int64_t primitiveByteSize(Type ty)
 {
@@ -146,6 +139,8 @@ int64_t primitiveByteSize(Type ty)
     }
     return -1;
 }
+
+int64_t memrefElemSizeBytes(MemRefType ty) { return primitiveByteSize(ty.getElementType()); }
 
 //===----------------------------------------------------------------------===//
 // executor.open  ->  __catalyst__remote__open(addr)
@@ -257,8 +252,13 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         SmallVector<int64_t> inputRanks, inputElemSizes;
         for (auto [origInput, llvmInput] : llvm::zip(op.getInputs(), adaptor.getInputs())) {
             auto memrefTy = cast<MemRefType>(origInput.getType());
+            int64_t elemSz = memrefElemSizeBytes(memrefTy);
+            if (elemSz < 0) {
+                return op->emitOpError("unsupported memref element type for executor.launch: ")
+                       << memrefTy.getElementType();
+            }
             inputRanks.push_back(memrefTy.getRank());
-            inputElemSizes.push_back(memrefElemSizeBytes(memrefTy));
+            inputElemSizes.push_back(elemSz);
             Value alloca = getStaticAlloca(loc, rewriter, llvmInput.getType(), 1);
             LLVM::StoreOp::create(rewriter, loc, llvmInput, alloca);
             inputDescPtrs.push_back(alloca);
@@ -268,8 +268,13 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         SmallVector<int64_t> outputRanks, outputElemSizes;
         for (Type resultTy : op.getResultTypes()) {
             auto memrefTy = cast<MemRefType>(resultTy);
+            int64_t elemSz = memrefElemSizeBytes(memrefTy);
+            if (elemSz < 0) {
+                return op->emitOpError("unsupported memref element type for executor.launch: ")
+                       << memrefTy.getElementType();
+            }
             outputRanks.push_back(memrefTy.getRank());
-            outputElemSizes.push_back(memrefElemSizeBytes(memrefTy));
+            outputElemSizes.push_back(elemSz);
             Type llvmDescTy = getTypeConverter()->convertType(resultTy);
             Value alloca = getStaticAlloca(loc, rewriter, llvmDescTy, 1);
             outputDescPtrs.push_back(alloca);
