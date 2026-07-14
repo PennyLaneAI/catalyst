@@ -54,3 +54,13 @@ func.func @call(%arg0: memref<4xf64>, %arg1: memref<4xf64>) {
       {num_input_args = 1 : i32} : (memref<4xf64>, memref<4xf64>) -> ()
   return
 }
+
+// -----
+
+// CHECK: llvm.func @__catalyst__remote__close(!llvm.ptr) -> i64
+// CHECK-LABEL: func.func @close
+func.func @close() {
+  // CHECK: llvm.call @__catalyst__remote__close
+  executor.close("127.0.0.1:9000")
+  return
+}

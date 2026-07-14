@@ -27,6 +27,7 @@ def ConvertExecutorToLLVMPass : Pass<"convert-executor-to-llvm", "mlir::ModuleOp
         * `executor.send_binary` -> `__catalyst__remote__send_binary(addr, path, format)`
         * `executor.launch`      -> `__catalyst__remote__launch(addr, "_catalyst_pyface_<callee>", ...)`
         * `executor.call`        -> `__catalyst__remote__call_wrapper(addr, sym, ...)` + `__catalyst__remote__free_result`
+        * `executor.close`       -> `__catalyst__remote__close(addr)`
     }];
 
     let dependentDialects = [

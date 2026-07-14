@@ -446,6 +446,35 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// executor.close  ->  __catalyst__remote__close(addr)
+//===----------------------------------------------------------------------===//
+
+struct CloseOpLowering : public OpConversionPattern<executor::CloseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(executor::CloseOp op, OpAdaptor /*adaptor*/,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        Type i64Ty = rewriter.getI64Type();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        Type closeSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy});
+        LLVM::LLVMFuncOp closeFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__remote__close", closeSig);
+
+        Value addrPtr =
+            getGlobalString(loc, rewriter, "remote_close_addr", op.getAddress().str() + '\0', mod);
+
+        LLVM::CallOp::create(rewriter, loc, closeFn, ValueRange{addrPtr});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
 
@@ -460,8 +489,8 @@ struct ConvertExecutorToLLVMPass : impl::ConvertExecutorToLLVMPassBase<ConvertEx
         LLVMTypeConverter typeConverter(ctx);
 
         RewritePatternSet patterns(ctx);
-        patterns.add<OpenOpLowering, SendBinaryOpLowering, LaunchOpLowering, CallOpLowering>(
-            typeConverter, ctx);
+        patterns.add<OpenOpLowering, SendBinaryOpLowering, LaunchOpLowering, CallOpLowering,
+                     CloseOpLowering>(typeConverter, ctx);
 
         LLVMConversionTarget target(*ctx);
         target.addLegalOp<ModuleOp>();
