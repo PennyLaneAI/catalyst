@@ -18,16 +18,16 @@
 include "mlir/Pass/PassBase.td"
 
 def ConvertExecutorToLLVMPass : Pass<"convert-executor-to-llvm", "mlir::ModuleOp"> {
-    let summary = "Lower the `executor` dialect to direct calls into the Catalyst remote runtime.";
+    let summary = "Lower the `executor` dialect to direct calls into the Catalyst executor runtime.";
     let description = [{
-        Replaces each `executor.*` op with the corresponding `__catalyst__remote__*`
+        Replaces each `executor.*` op with the corresponding `__catalyst__executor__*`
         runtime entry point:
 
-        * `executor.open`        -> `__catalyst__remote__open(addr)`
-        * `executor.send_binary` -> `__catalyst__remote__send_binary(addr, path, format)`
-        * `executor.launch`      -> `__catalyst__remote__launch(addr, "_catalyst_pyface_<callee>", ...)`
-        * `executor.call`        -> `__catalyst__remote__call_wrapper(addr, sym, ...)` + `__catalyst__remote__free_result`
-        * `executor.close`       -> `__catalyst__remote__close(addr)`
+        * `executor.open`        -> `__catalyst__executor__open(addr)`
+        * `executor.send_binary` -> `__catalyst__executor__send_binary(addr, path, format)`
+        * `executor.launch`      -> `__catalyst__executor__launch(addr, "_catalyst_pyface_<callee>", ...)`
+        * `executor.call`        -> `__catalyst__executor__call_wrapper(addr, sym, ...)` + `__catalyst__executor__free_result`
+        * `executor.close`       -> `__catalyst__executor__close(addr)`
     }];
 
     let dependentDialects = [
