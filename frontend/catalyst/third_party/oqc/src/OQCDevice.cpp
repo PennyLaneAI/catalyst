@@ -14,6 +14,8 @@
 
 #include "OQCDevice.hpp"
 
+#include <cstdint>
+
 #include "Exception.hpp"
 
 namespace Catalyst::Runtime::Device {

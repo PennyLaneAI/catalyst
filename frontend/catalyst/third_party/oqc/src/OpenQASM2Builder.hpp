@@ -15,6 +15,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <iomanip>
 #include <sstream>
 #include <string>

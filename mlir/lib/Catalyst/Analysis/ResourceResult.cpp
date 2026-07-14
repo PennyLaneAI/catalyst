@@ -15,6 +15,7 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/ErrorHandling.h"

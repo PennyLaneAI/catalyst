@@ -15,6 +15,7 @@
 #pragma once
 
 #include <complex>
+#include <cstdint>
 #include <optional>
 #include <random>
 #include <vector>

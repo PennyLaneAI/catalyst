@@ -14,6 +14,8 @@
 
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 
+#include <cstdint>
+
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"

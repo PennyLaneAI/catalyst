@@ -14,6 +14,8 @@
 
 #include "QRef/IR/QRefOps.h"
 
+#include <cstdint>
+
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
