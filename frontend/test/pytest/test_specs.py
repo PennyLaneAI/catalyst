@@ -239,7 +239,6 @@ class TestDeviceLevelSpecs:
         assert complex_meas_specs["resources"].measurements == expected_measurements
 
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
 class TestPassByPassSpecs:
     """Test qp.specs() pass-by-pass specs"""
 
@@ -969,6 +968,55 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    def test_operator2(self):
+        """Test that specs works with operator2 classes."""
+
+        # pylint: disable=useless-parent-delegation
+        class DummyOp(qp.core.Operator2):
+            """Dummy Local Operator."""
+
+            dynamic_argnames = ("phi",)
+            wire_argnames = ("reg1", "reg2")
+            compilable_argnames = ("metadata",)
+
+            def __init__(self, phi, reg1, reg2, metadata):
+                super().__init__(phi, reg1, reg2, metadata)
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.transforms.merge_rotations
+        @qp.qnode(qp.device("null.qubit", wires=10))
+        def c():
+            DummyOp(0.5, (0, 1), (2, 3, 4), metadata="word")
+            DummyOp(0.5, (2, 3, 4), (0,), metadata="word")
+            return qp.state()
+
+        for level in [0, 1]:
+            resources = qp.specs(c, level=level)().resources
+
+            assert resources.gate_types == {"DummyOp": 2}
+            assert resources.gate_sizes == {4: 1, 5: 1}
+
+    def test_symbolic_array(self):
+        """Test using specs with symbolic_array."""
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.transforms.merge_rotations
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c():
+            x = qp.capture.symbolic_array((), float)
+            qp.RX(x, 0)
+            qp.RX(2 * x, 0)
+            return qp.probs()
+
+        counts = qp.specs(c, level=0)().resources.gate_counts
+        assert counts == {"RX": 2}
+
+        counts1 = qp.specs(c, level=1)().resources.gate_counts
+        assert counts1 == {"RX": 1}
+
+        with pytest.raises(catalyst.utils.exceptions.CompileError, match="is a placeholder op"):
+            qp.specs(c, level="device")()
+
 
 class TestSpecsWithPPR:
     """Tests for using qp.specs with PPRs"""
@@ -1212,8 +1260,48 @@ class TestSymbolicSpecs:
                     ),
                 )
 
+    def test_symbolic_array_inside_loop(self):
+        """Test dynamic loop with symbolic_array in a loop."""
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
+        @qp.qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c(n):
+
+            # pylint: disable=unused-argument
+            @qp.for_loop(n)
+            def loop(i):
+                x = qp.capture.symbolic_array((), float)
+                qp.RX(x, 0)
+
+            loop()  # pylint: disable=no-value-for-parameter
+
+            return qp.state()
+
+        r = qp.specs(c, level=0)(2).resources
+        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
+
+    def test_symbolic_array_loop_arguemtn(self):
+        """Test dynamic loop with a symbolic array as a loop argument."""
+
+        @qp.qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c(n):
+
+            # pylint: disable=unused-argument
+            @qp.for_loop(n)
+            def loop(i, x):
+                qp.RX(x, 0)
+                return x
+
+            y = qp.capture.symbolic_array((), float)
+            loop(y)  # pylint: disable=no-value-for-parameter
+
+            return qp.state()
+
+        r = qp.specs(c, level=0)(2).resources
+        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
+
+
 class TestMarkerIntegration:
     """Tests the integration with qp.marker."""
 
