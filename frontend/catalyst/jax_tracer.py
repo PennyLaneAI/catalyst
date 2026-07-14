@@ -86,6 +86,7 @@ from catalyst.jax_extras.patches import (
 )
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import (
+    AbstractQbit,
     AbstractQreg,
     compbasis_p,
     counts_p,
@@ -398,6 +399,11 @@ def unify_convert_result_types(jaxprs, consts, nimplouts):
     return jaxpr_acc, type_acc[0], tracers_acc, consts_acc
 
 
+def _is_standalone_qubit(wire) -> bool:
+    """Return True if ``wire`` is a standalone value-semantics qubit tracer."""
+    return isinstance(wire, Tracer) and isinstance(get_aval(wire), AbstractQbit)
+
+
 class QRegPromise:
     """QReg adaptor tracing the qubit extractions and insertions. The adaptor works by postponing
     the insertions in order to re-use qubits later thus skipping the extractions."""
@@ -413,12 +419,21 @@ class QRegPromise:
         from cache"""
         # pylint: disable=consider-iterating-dictionary
         qrp = self
-        cached_tracers = {w for w in qrp.cache.keys() if isinstance(w, Tracer)}
-        requested_tracers = {w for w in wires if isinstance(w, Tracer)}
+        cached_tracers = {w for w in qrp.cache.keys() if _is_standalone_qubit(w)}
+        requested_tracers = {w for w in wires if _is_standalone_qubit(w)}
         if cached_tracers != requested_tracers:
             qrp.actualize()
         qubits = []
         for w in wires:
+            if _is_standalone_qubit(w):
+                if w in qrp.cache and qrp.cache[w] is not None:
+                    qubit = qrp.cache[w]
+                    qubits.append(qubit)
+                    if not allow_reuse:
+                        qrp.cache[w] = None
+                else:
+                    qubits.append(w)
+                continue
             if w in qrp.cache:
                 qubit = qrp.cache[w]
                 assert (
@@ -447,10 +462,15 @@ class QRegPromise:
         """Prune the qubit cache by performing the postponed insertions."""
         qrp = self
         qreg = qrp.base
+        standalone_cache = {}
         for w, qubit in qrp.cache.items():
-            if qubit is not None:
+            if qubit is None:
+                continue
+            if _is_standalone_qubit(w):
+                standalone_cache[w] = qubit
+            else:
                 qreg = qinsert_p.bind(qreg, w, qubit)
-        qrp.cache = {}
+        qrp.cache = standalone_cache
         qrp.base = qreg
         return qreg
 

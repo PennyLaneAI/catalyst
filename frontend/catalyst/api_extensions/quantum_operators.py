@@ -46,7 +46,14 @@ from catalyst.jax_extras import (
     deduce_avals,
     new_inner_tracer,
 )
-from catalyst.jax_primitives import AbstractQreg, adjoint_p, fabricate_p, measure_p, pauli_measure_p
+from catalyst.jax_primitives import (
+    AbstractQreg,
+    adjoint_p,
+    fabricate_p,
+    measure_p,
+    pauli_measure_p,
+    qdealloc_qb_p,
+)
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
@@ -248,8 +255,9 @@ def fabricate(init_state: str) -> DynamicJaxprTracer:
 
     .. important::
 
-        The :func:`qp.fabricate() <pennylane.fabricate>` function is **not** QJIT
-        compatible under the legacy tracing pathway; use :func:`catalyst.fabricate` instead.
+        Under the legacy tracing pathway, use :func:`catalyst.fabricate` or ensure
+        :func:`qp.fabricate() <pennylane.fabricate>` is called from within an active
+        :func:`~.qjit` compilation.
 
     Args:
         init_state (str): The logical state to fabricate. One of ``"plus_i"``,
@@ -272,6 +280,24 @@ def fabricate(init_state: str) -> DynamicJaxprTracer:
 
     (qubit,) = fabricate_p.bind(init_state=init_state)
     return qubit
+
+
+def deallocate(*qubits) -> None:
+    r"""A :func:`qjit` compatible deallocate operation for standalone fabricated qubits.
+
+    Deallocates one or more standalone value-semantics qubits, such as those returned
+    by :func:`fabricate`.
+
+    Args:
+        *qubits: Standalone qubit tracers to deallocate.
+    """
+    EvaluationContext.check_is_tracing("catalyst.deallocate can only be used from within @qjit.")
+    EvaluationContext.check_is_quantum_tracing(
+        "catalyst.deallocate can only be used from within a qp.qnode."
+    )
+
+    for qubit in qubits:
+        qdealloc_qb_p.bind(qubit)
 
 
 def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator]:

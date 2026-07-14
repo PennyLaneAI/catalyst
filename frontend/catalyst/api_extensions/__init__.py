@@ -37,6 +37,7 @@ from catalyst.api_extensions.quantum_operators import (
     MidCircuitPauliMeasure,
     adjoint,
     ctrl,
+    deallocate,
     measure,
     pauli_measure,
     fabricate,
@@ -60,6 +61,7 @@ __all__ = (
     "measure",
     "pauli_measure",
     "fabricate",
+    "deallocate",
     "adjoint",
     "ctrl",
 )

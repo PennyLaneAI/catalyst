@@ -77,3 +77,33 @@ class TestFabricateOp:
         mlir = circuit.mlir_opt
         assert "pbc.fabricate" in mlir and "magic_conj" in mlir
         assert "pbc.ref.fabricate" not in mlir
+
+    @pytest.mark.usefixtures("enable_graph_decomposition")
+    def test_fabricate_mlir_lowering_capture_false(self):
+        """Test fabricate lowering via the legacy tracing pathway."""
+        dev = qp.device("null.qubit", wires=2)
+        pipe = [
+            (
+                "pipe",
+                [
+                    "canonicalize",
+                    "verify-no-quantum-use-after-free",
+                    "convert-to-value-semantics",
+                    "canonicalize",
+                ],
+            )
+        ]
+
+        @qjit(pipelines=pipe, target="mlir", capture=False)
+        @qp.qnode(device=dev)
+        def circuit():
+            magic = fabricate("magic")
+            qp.pauli_measure("ZZ", wires=[0, magic])
+            qp.deallocate(magic)
+            return qp.expval(qp.Z(0))
+
+        mlir = circuit.mlir_opt
+        assert "pbc.fabricate" in mlir and "magic" in mlir
+        assert "pbc.ref.fabricate" not in mlir
+        assert "pbc.ppm" in mlir
+        assert "quantum.dealloc_qb" in mlir
