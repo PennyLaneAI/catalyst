@@ -21,6 +21,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
 using namespace mlir;
