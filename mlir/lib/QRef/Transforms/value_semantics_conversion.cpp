@@ -1215,10 +1215,8 @@ void handleFabricate(IRRewriter &builder, pbc::RefFabricateOp rFabricateOp,
     builder.setInsertionPoint(rFabricateOp);
     Location loc = rFabricateOp.getLoc();
 
-    auto vFabricateOp =
-        pbc::FabricateOp::create(builder, loc, rFabricateOp.getInitState());
-    tracker.setCurrentVQubit(rFabricateOp.getQubits().front(),
-                             vFabricateOp.getOutQubits().front());
+    auto vFabricateOp = pbc::FabricateOp::create(builder, loc, rFabricateOp.getInitState());
+    tracker.setCurrentVQubit(rFabricateOp.getQubits().front(), vFabricateOp.getOutQubits().front());
 }
 
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker)

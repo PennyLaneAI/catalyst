@@ -270,7 +270,7 @@ def fabricate(init_state: str) -> DynamicJaxprTracer:
             f"Allowed values are {sorted(valid_states)}."
         )
 
-    qubit, = fabricate_p.bind(init_state=init_state)
+    (qubit,) = fabricate_p.bind(init_state=init_state)
     return qubit
 
 

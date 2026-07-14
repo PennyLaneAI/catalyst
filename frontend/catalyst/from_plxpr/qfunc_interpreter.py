@@ -27,9 +27,9 @@ from jax._src.sharding_impls import UNSPECIFIED
 from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
+from pennylane.capture.primitives import fabricate_prim as plxpr_fabricate_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import operator_p
-from pennylane.capture.primitives import fabricate_prim as plxpr_fabricate_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
 from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
@@ -557,7 +557,7 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_fabricate_prim)
 def handle_fabricate(self, *_, init_state=""):
     """Handle the conversion from plxpr to Catalyst jaxpr for the fabricate primitive"""
-    qubit, = qref_fabricate_p.bind(init_state=init_state)
+    (qubit,) = qref_fabricate_p.bind(init_state=init_state)
     return (qubit,)
 
 
