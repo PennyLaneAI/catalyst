@@ -222,16 +222,27 @@ def _copy_bundle(bundle: Path, user: str, host: str, workspace: str) -> None:
     _logcmd(mkdir)
     if subprocess.call(mkdir) != 0:
         raise SystemExit("failed to create remote workspace")
-    scp = [
-        "scp",
-        *_ctl_opts(),
-        "-v" if _VERBOSITY >= 2 else "-q",
-        *[str(f) for f in files],
-        f"{user}@{host}:{workspace}/",
-    ]
-    _logcmd(scp)
+
+    def _scp(extra: list[str]) -> int:
+        cmd = [
+            "scp",
+            *extra,
+            *_ctl_opts(),
+            "-v" if _VERBOSITY >= 2 else "-q",
+            *[str(f) for f in files],
+            f"{user}@{host}:{workspace}/",
+        ]
+        _logcmd(cmd)
+        return subprocess.call(cmd)
+
     t0 = time.monotonic()
-    if subprocess.call(scp) != 0:
+    rc = _scp([])
+    if rc != 0:
+        # A modern scp uses the SFTP backend; hosts with no sftp subsystem reject it ("subsystem
+        # request failed"). Retry with the legacy SCP protocol (-O), which only needs remote scp.
+        _log("scp failed — retrying with the legacy protocol (scp -O)")
+        rc = _scp(["-O"])
+    if rc != 0:
         raise SystemExit("scp of bundle failed")
     _log(f"copied in {time.monotonic() - t0:.1f}s", level=2)
 
