@@ -89,7 +89,7 @@
 
 #include "RegisterAllPasses.h"
 
-#include "Remote/IR/RemoteDialect.h"
+#include "Executor/IR/ExecutorDialect.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -183,7 +183,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<mbqc::MBQCDialect>();
     registry.insert<ion::IonDialect>();
     registry.insert<rtio::RTIODialect>();
-    registry.insert<remote::RemoteDialect>();
+    registry.insert<executor::ExecutorDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
     registry.insert<pauli_frame::PauliFrameDialect>();

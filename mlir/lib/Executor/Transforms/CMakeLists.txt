@@ -1,7 +1,7 @@
-set(LIBRARY_NAME remote-transforms)
+set(LIBRARY_NAME executor-transforms)
 
 file(GLOB SRC
-    RemoteToLLVM.cpp
+    ExecutorToLLVM.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -9,12 +9,12 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
-    MLIRRemote
+    MLIRExecutor
     MLIRCatalyst
 )
 
 set(DEPENDS
-    MLIRRemotePassIncGen
+    MLIRExecutorPassIncGen
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})

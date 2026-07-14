@@ -12,19 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Remote/IR/RemoteOps.h"
+#include "Executor/IR/ExecutorDialect.h"
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/ImplicitLocOpBuilder.h"
-#include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/PatternMatch.h"
+#include "Executor/IR/ExecutorOps.h"
 
 using namespace mlir;
-using namespace catalyst::remote;
+using namespace catalyst::executor;
 
 //===----------------------------------------------------------------------===//
-// Remote Operations
+// Executor Dialect
 //===----------------------------------------------------------------------===//
 
-#define GET_OP_CLASSES
-#include "Remote/IR/RemoteOps.cpp.inc"
+#include "Executor/IR/ExecutorOpsDialect.cpp.inc"
+
+void catalyst::executor::ExecutorDialect::initialize()
+{
+    addOperations<
+#define GET_OP_LIST
+#include "Executor/IR/ExecutorOps.cpp.inc"
+        >();
+}

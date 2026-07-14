@@ -12,10 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#include "Executor/IR/ExecutorOps.h"
 
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/PatternMatch.h"
 
-#include "Remote/IR/RemoteOpsDialect.h.inc"
+using namespace mlir;
+using namespace catalyst::executor;
+
+//===----------------------------------------------------------------------===//
+// Executor Operations
+//===----------------------------------------------------------------------===//
+
+#define GET_OP_CLASSES
+#include "Executor/IR/ExecutorOps.cpp.inc"

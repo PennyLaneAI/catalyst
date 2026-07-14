@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef REMOTE_OPS
-#define REMOTE_OPS
+#ifndef EXECUTOR_OPS
+#define EXECUTOR_OPS
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/BuiltinAttributes.td"
-include "Remote/IR/RemoteDialect.td"
+include "Executor/IR/ExecutorDialect.td"
 
 //===----------------------------------------------------------------------===//
-// remote.open
+// executor.open
 //===----------------------------------------------------------------------===//
 
-def Remote_OpenOp : Remote_Op<"open"> {
-    let summary = "Open a session with a remote executor.";
+def Executor_OpenOp : Executor_Op<"open"> {
+    let summary = "Open a session with an executor.";
     let description = [{
-        Establish a connection to the remote executor reachable at `address`
-        Subsequent remote operations targeting the same `address` reuse this session.
+        Establish a connection to the executor reachable at `address`
+        Subsequent executor operations targeting the same `address` reuse this session.
     }];
 
     let arguments = (ins StrAttr:$address);
@@ -38,14 +38,14 @@ def Remote_OpenOp : Remote_Op<"open"> {
 }
 
 //===----------------------------------------------------------------------===//
-// remote.send_binary
+// executor.send_binary
 //===----------------------------------------------------------------------===//
 
-def Remote_SendBinaryOp : Remote_Op<"send_binary"> {
-    let summary = "Ship a compiled kernel object file to the remote executor.";
+def Executor_SendBinaryOp : Executor_Op<"send_binary"> {
+    let summary = "Ship a compiled kernel object file to the executor.";
     let description = [{
-        Transfer the compiled binary at `binary_path` to the remote executor at `address`.
-        The remote loads the file and exposes all of its symbols.
+        Transfer the compiled binary at `binary_path` to the executor at `address`.
+        The executor loads the file and exposes all of its symbols.
         `format` selects the wire encoding which is handled by the runtime.
     }];
 
@@ -61,24 +61,24 @@ def Remote_SendBinaryOp : Remote_Op<"send_binary"> {
 }
 
 //===----------------------------------------------------------------------===//
-// remote.launch
+// executor.launch
 //===----------------------------------------------------------------------===//
 
-def Remote_LaunchOp : Remote_Op<"launch"> {
-    let summary = "Dispatch a remote-compiled kernel and receive its results.";
+def Executor_LaunchOp : Executor_Op<"launch"> {
+    let summary = "Dispatch a cross-compiled kernel on the executor and receive its results.";
     let description = [{
-        Invoke the kernel previously registered via `remote.send_binary`.
+        Invoke the kernel previously registered via `executor.send_binary`.
         The `inputs` operand list mirrors the original host-side `func.call`
         to the kernel; `results` mirrors the kernel's return values.
     }];
 
     let arguments = (ins
-        Variadic<AnyType>:$inputs,
+        Variadic<AnyMemRef>:$inputs,
         StrAttr:$address,
         StrAttr:$kernel_callee
     );
 
-    let results = (outs Variadic<AnyType>:$results);
+    let results = (outs Variadic<AnyMemRef>:$results);
 
     let assemblyFormat = [{
         `(` $kernel_callee `,` $address `)` `(` $inputs `)` attr-dict
@@ -87,13 +87,13 @@ def Remote_LaunchOp : Remote_Op<"launch"> {
 }
 
 //===----------------------------------------------------------------------===//
-// remote.call
+// executor.call
 //===----------------------------------------------------------------------===//
 
-def Remote_CallOp : Remote_Op<"call"> {
+def Executor_CallOp : Executor_Op<"call"> {
     let summary = "Invoke a symbol in a previously-loaded shared library.";
     let description = [{
-        Invoke `symbol` in a shared library already loaded on the remote executor.
+        Invoke `symbol` in a shared library already loaded on the executor.
 
         The operand list packs input buffers followed by output buffers.
         `num_input_args`, when present, marks the boundary: operands `[0, num_input_args)`
@@ -102,13 +102,13 @@ def Remote_CallOp : Remote_Op<"call"> {
     }];
 
     let arguments = (ins
-        Variadic<AnyType>:$inputs,
+        Variadic<AnyMemRef>:$inputs,
         StrAttr:$address,
         StrAttr:$symbol,
         OptionalAttr<I32Attr>:$num_input_args
     );
 
-    let results = (outs Variadic<AnyType>:$results);
+    let results = (outs Variadic<AnyMemRef>:$results);
 
     let assemblyFormat = [{
         `(` $symbol `,` $address `)` `(` $inputs `)` attr-dict
@@ -116,4 +116,22 @@ def Remote_CallOp : Remote_Op<"call"> {
     }];
 }
 
-#endif // REMOTE_OPS
+//===----------------------------------------------------------------------===//
+// executor.close
+//===----------------------------------------------------------------------===//
+
+def Executor_CloseOp : Executor_Op<"close"> {
+    let summary = "Tear down the session with an executor.";
+    let description = [{
+        Close the session previously established via `executor.open` for `address`,
+        releasing the connection and any resources loaded on the executor.
+    }];
+
+    let arguments = (ins StrAttr:$address);
+
+    let assemblyFormat = [{
+        `(` $address `)` attr-dict
+    }];
+}
+
+#endif // EXECUTOR_OPS

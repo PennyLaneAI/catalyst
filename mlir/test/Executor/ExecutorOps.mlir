@@ -12,45 +12,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --convert-remote-to-llvm --split-input-file | FileCheck %s
+// RUN: quantum-opt %s --split-input-file | FileCheck %s
 
-// CHECK: llvm.func @__catalyst__remote__open(!llvm.ptr) -> i64
 // CHECK-LABEL: func.func @open
+// CHECK:         executor.open("127.0.0.1:9000")
 func.func @open() {
-  // CHECK: llvm.call @__catalyst__remote__open
-  remote.open("127.0.0.1:9000")
+  executor.open("127.0.0.1:9000")
   return
 }
 
 // -----
 
-// CHECK: llvm.func @__catalyst__remote__send_binary(!llvm.ptr, !llvm.ptr, i32) -> i64
 // CHECK-LABEL: func.func @send_binary
+// CHECK:         executor.send_binary("127.0.0.1:9000", "/tmp/qnode_0.o")
 func.func @send_binary() {
-  // CHECK: llvm.call @__catalyst__remote__send_binary
-  remote.send_binary("127.0.0.1:9000", "/tmp/qnode_0.o")
+  executor.send_binary("127.0.0.1:9000", "/tmp/qnode_0.o")
   return
 }
 
 // -----
 
-// CHECK: llvm.func @__catalyst__remote__launch
 // CHECK-LABEL: func.func @launch
+// CHECK:         executor.launch("qnode_0", "127.0.0.1:9000") (%{{.*}}) :
+// CHECK-SAME:    (memref<f64>) -> memref<f64>
 func.func @launch(%arg0: memref<f64>) -> memref<f64> {
-  // CHECK: llvm.call @__catalyst__remote__launch
-  %0 = remote.launch("qnode_0", "127.0.0.1:9000") (%arg0) : (memref<f64>) -> memref<f64>
+  %0 = executor.launch("qnode_0", "127.0.0.1:9000") (%arg0) : (memref<f64>) -> memref<f64>
   return %0 : memref<f64>
 }
 
 // -----
 
-// CHECK-DAG: llvm.func @__catalyst__remote__call_wrapper
-// CHECK-DAG: llvm.func @__catalyst__remote__free_result
 // CHECK-LABEL: func.func @call
+// CHECK:         executor.call("foo", "127.0.0.1:9000")
+// CHECK-SAME:    num_input_args = 1 : i32
+// CHECK-SAME:    (memref<4xf64>, memref<4xf64>) -> ()
 func.func @call(%arg0: memref<4xf64>, %arg1: memref<4xf64>) {
-  // CHECK: llvm.call @__catalyst__remote__call_wrapper
-  // CHECK: llvm.call @__catalyst__remote__free_result
-  remote.call("foo", "127.0.0.1:9000") (%arg0, %arg1)
+  executor.call("foo", "127.0.0.1:9000") (%arg0, %arg1)
       {num_input_args = 1 : i32} : (memref<4xf64>, memref<4xf64>) -> ()
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @close
+// CHECK:         executor.close("127.0.0.1:9000")
+func.func @close() {
+  executor.close("127.0.0.1:9000")
   return
 }

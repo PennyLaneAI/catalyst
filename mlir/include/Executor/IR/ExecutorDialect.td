@@ -12,37 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef REMOTE_DIALECT
-#define REMOTE_DIALECT
+#ifndef EXECUTOR_DIALECT
+#define EXECUTOR_DIALECT
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/DialectBase.td"
 
 //===----------------------------------------------------------------------===//
-// Remote Dialect Definition
+// Executor Dialect Definition
 //===----------------------------------------------------------------------===//
 
-def Remote_Dialect : Dialect {
-    let summary = "Operations for dispatching kernels and calling symbols in a remote executor.";
+def Executor_Dialect : Dialect {
+    let summary = "Operations for dispatching kernels and calling symbols on an executor.";
     let description = [{
-        The `remote` dialect models a small set of operations that describe how a host program
-        interacts with a remote executor service:
+        The `executor` dialect models a small set of operations that describe how a host program
+        interacts with an executor service:
 
-        * Opening a session with a remote endpoint
+        * Opening a session with an executor endpoint
         * Shipping a cross-compiled kernel object file or assets to that endpoint
         * Dispatching a previously-shipped qnode kernel
-        * Invoking an arbitrary symbol in a remote shared library
+        * Invoking an arbitrary symbol in a shared library
     }];
 
-    let name = "remote";
-    let cppNamespace = "::catalyst::remote";
+    let name = "executor";
+    let cppNamespace = "::catalyst::executor";
 }
 
 //===----------------------------------------------------------------------===//
-// Remote Operation Base
+// Executor Operation Base
 //===----------------------------------------------------------------------===//
 
-class Remote_Op<string mnemonic, list<Trait> traits = []> :
-    Op<Remote_Dialect, mnemonic, traits>;
+class Executor_Op<string mnemonic, list<Trait> traits = []> :
+    Op<Executor_Dialect, mnemonic, traits>;
 
-#endif // REMOTE_DIALECT
+#endif // EXECUTOR_DIALECT
