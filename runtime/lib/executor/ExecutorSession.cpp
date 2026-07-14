@@ -605,37 +605,6 @@ ExecutorAddr push_memref(ExecutorSession *s, RemoteAllocator &alloc, void *host_
 }
 
 /**
- * @brief Pull a remote memref descriptor + its data back into the host descriptor.
- *
- * @param s the session object
- * @param remote_desc the remote address of the memref descriptor
- * @param host_desc the host memref descriptor
- * @param rank the rank of the memref
- * @param elem_size the element size of the memref
- */
-void pull_memref(ExecutorSession *s, ExecutorAddr remote_desc, void *host_desc, size_t rank,
-                 size_t elem_size)
-{
-    size_t desc_size = memref_desc_size(rank);
-    std::vector<char> desc(desc_size);
-    remote_read(s, remote_desc, desc.data(), desc.size());
-
-    uintptr_t aligned_remote;
-    std::memcpy(&aligned_remote, desc.data() + kAlignedOff, sizeof(uintptr_t));
-
-    size_t data_size = memref_data_size(desc.data(), rank, elem_size);
-    size_t alloc_size = std::max<size_t>(data_size, 1);
-    void *aligned_host = __catalyst__rt__alloc_managed(alloc_size);
-    if (data_size && aligned_remote) {
-        remote_read(s, ExecutorAddr(aligned_remote), aligned_host, data_size);
-    }
-    uintptr_t aligned_addr = reinterpret_cast<uintptr_t>(aligned_host);
-    std::memcpy(desc.data() + kAllocatedOff, &aligned_addr, sizeof(uintptr_t));
-    std::memcpy(desc.data() + kAlignedOff, &aligned_addr, sizeof(uintptr_t));
-    std::memcpy(host_desc, desc.data(), desc_size);
-}
-
-/**
  * @brief Invoke a remote kernel.
  *
  * @param s the session object
