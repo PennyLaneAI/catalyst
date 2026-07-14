@@ -32,6 +32,7 @@
   [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
   [(#2993)](https://github.com/PennyLaneAI/catalyst/pull/2993)
   [(#2998)](https://github.com/PennyLaneAI/catalyst/pull/2998)
+  [(#2981)](https://github.com/PennyLaneAI/catalyst/pull/2981)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
