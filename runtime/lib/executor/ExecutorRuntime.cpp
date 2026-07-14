@@ -27,13 +27,12 @@
 
 namespace {
 
-struct RemoteEntry {
-    catalyst::executor::ExecutorSession *session = nullptr; // The remote session handle.
-    std::set<std::string> loaded_paths; // The paths of the binaries that are going to be loaded
-                                        // into the remote session.
-    std::mutex mu;                      // The mutex to protect the loaded paths.
+struct ExecutorEntry {
+    catalyst::executor::ExecutorSession *session = nullptr; // The executor session handle.
+    std::set<std::string> loaded_paths; // Paths of the binaries already loaded into the session.
+    std::mutex mu;                      // Guards this entry's `session` and `loaded_paths`.
 
-    ~RemoteEntry()
+    ~ExecutorEntry()
     {
         if (session) {
             catalyst::executor::close(session);
@@ -42,11 +41,11 @@ struct RemoteEntry {
     }
 };
 
+// Guards the `remote_sessions` map structure itself
 std::mutex g_map_mu;
 
-// Each address has its own RemoteEntry, so we can dispatch the object file to different remote
-// sessions.
-std::map<std::string, std::unique_ptr<RemoteEntry>> remote_sessions;
+// Entries are held by shared_ptr so a handle returned by `find_or_create_entry` stays valid
+std::map<std::string, std::shared_ptr<ExecutorEntry>> remote_sessions;
 
 // DEBUG logs
 bool remote_verbose()
@@ -58,8 +57,15 @@ bool remote_verbose()
     return v;
 }
 
-// Look up or create the entry for `addr`.
-RemoteEntry *find_or_create_entry(const char *addr, bool create_if_missing)
+// Look up (or optionally create) the entry for `addr`.
+//
+// Returns a `shared_ptr` so the entry outlives concurrent map mutation: if another thread
+// erases this address from `remote_sessions` (e.g. __catalyst__executor__close) right after we
+// return, the returned handle keeps the ExecutorEntry alive. The caller must lock `entry->mu`
+// before touching `session`, and re-check `session` (it may have been closed in the meantime).
+//
+// Returns nullptr if `addr` is empty, or if the entry is absent and `create_if_missing` is false.
+std::shared_ptr<ExecutorEntry> find_or_create_entry(const char *addr, bool create_if_missing)
 {
     if (!addr || !*addr) {
         return nullptr;
@@ -67,25 +73,25 @@ RemoteEntry *find_or_create_entry(const char *addr, bool create_if_missing)
     std::lock_guard<std::mutex> lock(g_map_mu);
     auto it = remote_sessions.find(addr);
     if (it != remote_sessions.end()) {
-        return it->second.get();
+        return it->second;
     }
     if (!create_if_missing) {
         return nullptr;
     }
-    auto inserted = remote_sessions.emplace(std::string(addr), std::make_unique<RemoteEntry>());
-    return inserted.first->second.get();
+    auto inserted = remote_sessions.emplace(std::string(addr), std::make_shared<ExecutorEntry>());
+    return inserted.first->second;
 }
 
 } // namespace
 
 extern "C" {
 
-int __catalyst__executor__open(const char *addr)
+int64_t __catalyst__executor__open(const char *addr)
 {
     if (!addr || !*addr) {
         RT_FAIL("Empty address");
     }
-    RemoteEntry *entry = find_or_create_entry(addr, /*create_if_missing=*/true);
+    auto entry = find_or_create_entry(addr, /*create_if_missing=*/true);
     std::string err_msg;
     {
         std::lock_guard<std::mutex> lock(entry->mu);
@@ -114,9 +120,9 @@ int __catalyst__executor__open(const char *addr)
     RT_FAIL(err_msg.c_str());
 }
 
-int __catalyst__executor__send_binary(const char *addr, const char *path, uint32_t format)
+int64_t __catalyst__executor__send_binary(const char *addr, const char *path, uint32_t format)
 {
-    RemoteEntry *entry = find_or_create_entry(addr, /*create_if_missing=*/false);
+    auto entry = find_or_create_entry(addr, /*create_if_missing=*/false);
     if (!entry) {
         RT_FAIL("No session found, call __catalyst__executor__open first.");
     }
@@ -183,7 +189,7 @@ int __catalyst__executor__call_wrapper(const char *addr, const char *symbol, con
     if (out_size) {
         *out_size = 0;
     }
-    RemoteEntry *entry = find_or_create_entry(addr, /*create_if_missing=*/false);
+    auto entry = find_or_create_entry(addr, /*create_if_missing=*/false);
     if (!entry) {
         RT_FAIL("No session found, call __catalyst__executor__open first.");
     }
@@ -219,18 +225,29 @@ int __catalyst__executor__call_wrapper(const char *addr, const char *symbol, con
 
 void __catalyst__executor__free_result(void *buf) { std::free(buf); }
 
-int __catalyst__executor__close()
+int64_t __catalyst__executor__close(const char *addr)
 {
-    std::lock_guard<std::mutex> mapLock(g_map_mu);
-    for (auto &[addr, entry] : remote_sessions) {
+    auto entry = find_or_create_entry(addr, /*create_if_missing=*/false);
+    if (!entry) {
+        return 0;
+    }
+    {
+        // Close under the entry lock only; do not hold g_map_mu here (see lock ordering above).
         std::lock_guard<std::mutex> lock(entry->mu);
         if (entry->session) {
+            if (remote_verbose()) {
+                std::fprintf(stderr, "[remote] close(addr=%s)\n", addr);
+            }
             catalyst::executor::close(entry->session);
             entry->session = nullptr;
             entry->loaded_paths.clear();
         }
     }
-    remote_sessions.clear();
+
+    {
+        std::lock_guard<std::mutex> mapLock(g_map_mu);
+        remote_sessions.erase(addr);
+    }
     return 0;
 }
 
@@ -240,7 +257,7 @@ void __catalyst__executor__launch(const char *addr, const char *entry_symbol, si
                                   void *const *output_descs, const size_t *output_ranks,
                                   const size_t *output_elem_sizes)
 {
-    RemoteEntry *entry = find_or_create_entry(addr, /*create_if_missing=*/false);
+    auto entry = find_or_create_entry(addr, /*create_if_missing=*/false);
     if (!entry) {
         RT_FAIL("Can't find opened session");
     }
