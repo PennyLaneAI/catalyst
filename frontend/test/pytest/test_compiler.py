@@ -176,17 +176,17 @@ class TestDefaultFlags:
 
         monkeypatch.setattr("catalyst.compiler.os.path.isfile", fake_isfile)
 
-    def test_rt_remote_linked_when_present(self, monkeypatch):
-        """-lrt_remote is added when librt_remote exists in the runtime lib dir."""
-        self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_remote"): True})
+    def test_rt_executor_linked_when_present(self, monkeypatch):
+        """-lrt_executor is added when librt_executor exists in the runtime lib dir."""
+        self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_executor"): True})
         flags = LinkerDriver.get_default_flags(CompileOptions())
-        assert "-lrt_remote" in flags
+        assert "-lrt_executor" in flags
 
-    def test_rt_remote_not_linked_when_absent(self, monkeypatch):
-        """-lrt_remote is omitted when librt_remote is missing."""
-        self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_remote"): False})
+    def test_rt_executor_not_linked_when_absent(self, monkeypatch):
+        """-lrt_executor is omitted when librt_executor is missing."""
+        self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_executor"): False})
         flags = LinkerDriver.get_default_flags(CompileOptions())
-        assert "-lrt_remote" not in flags
+        assert "-lrt_executor" not in flags
 
 
 class TestCompilerWarnings:

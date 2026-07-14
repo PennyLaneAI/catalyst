@@ -22,13 +22,13 @@
 #include <string>
 
 #include "Exception.hpp"
-#include "RemoteCAPI.h"
-#include "RemoteSession.hpp"
+#include "ExecutorCAPI.h"
+#include "ExecutorSession.hpp"
 
 namespace {
 
 struct RemoteEntry {
-    catalyst::remote::RemoteSession *session = nullptr; // The remote session handle.
+    catalyst::executor::ExecutorSession *session = nullptr; // The remote session handle.
     std::set<std::string> loaded_paths; // The paths of the binaries that are going to be loaded
                                         // into the remote session.
     std::mutex mu;                      // The mutex to protect the loaded paths.
@@ -36,7 +36,7 @@ struct RemoteEntry {
     ~RemoteEntry()
     {
         if (session) {
-            catalyst::remote::close(session);
+            catalyst::executor::close(session);
             session = nullptr;
         }
     }
@@ -80,7 +80,7 @@ RemoteEntry *find_or_create_entry(const char *addr, bool create_if_missing)
 
 extern "C" {
 
-int __catalyst__remote__open(const char *addr)
+int __catalyst__executor__open(const char *addr)
 {
     if (!addr || !*addr) {
         RT_FAIL("Empty address");
@@ -95,7 +95,7 @@ int __catalyst__remote__open(const char *addr)
         if (remote_verbose()) {
             std::fprintf(stderr, "[remote] open(addr=%s)\n", addr);
         }
-        entry->session = catalyst::remote::open(addr);
+        entry->session = catalyst::executor::open(addr);
         if (entry->session) {
             if (remote_verbose()) {
                 std::fprintf(stderr, "[remote] open(%s) OK\n", addr);
@@ -105,7 +105,7 @@ int __catalyst__remote__open(const char *addr)
         err_msg = "Could not connect to catalyst-executor at ";
         err_msg += addr;
         err_msg += ": ";
-        err_msg += catalyst::remote::last_error();
+        err_msg += catalyst::executor::last_error();
     }
     {
         std::lock_guard<std::mutex> mapLock(g_map_mu);
@@ -114,15 +114,15 @@ int __catalyst__remote__open(const char *addr)
     RT_FAIL(err_msg.c_str());
 }
 
-int __catalyst__remote__send_binary(const char *addr, const char *path, uint32_t format)
+int __catalyst__executor__send_binary(const char *addr, const char *path, uint32_t format)
 {
     RemoteEntry *entry = find_or_create_entry(addr, /*create_if_missing=*/false);
     if (!entry) {
-        RT_FAIL("No session found, call __catalyst__remote__open first.");
+        RT_FAIL("No session found, call __catalyst__executor__open first.");
     }
     std::lock_guard<std::mutex> lock(entry->mu);
     if (!entry->session) {
-        std::string msg = "__catalyst__remote__send_binary(";
+        std::string msg = "__catalyst__executor__send_binary(";
         msg += addr;
         msg += "): session is closed.";
         RT_FAIL(msg.c_str());
@@ -142,10 +142,10 @@ int __catalyst__remote__send_binary(const char *addr, const char *path, uint32_t
     int rc = 0;
     switch (format) {
     case 0:
-        rc = catalyst::remote::load_object_path(entry->session, path);
+        rc = catalyst::executor::load_object_path(entry->session, path);
         break;
     case 1:
-        rc = catalyst::remote::load_asset_path(entry->session, path);
+        rc = catalyst::executor::load_asset_path(entry->session, path);
         break;
     default: {
         std::string msg = "unknown binary format tag ";
@@ -156,7 +156,7 @@ int __catalyst__remote__send_binary(const char *addr, const char *path, uint32_t
     }
 
     if (rc != 0) {
-        std::string msg = catalyst::remote::last_error();
+        std::string msg = catalyst::executor::last_error();
         entry->loaded_paths.erase(key);
         RT_FAIL(msg.c_str());
     }
@@ -174,7 +174,7 @@ int __catalyst__remote__send_binary(const char *addr, const char *path, uint32_t
  * @param out_size The size of the result.
  * @return int 0 on success, -1 on error.
  */
-int __catalyst__remote__call_wrapper(const char *addr, const char *symbol, const char *args_buf,
+int __catalyst__executor__call_wrapper(const char *addr, const char *symbol, const char *args_buf,
                                      size_t args_size, void **out_buf, size_t *out_size)
 {
     if (out_buf) {
@@ -185,14 +185,14 @@ int __catalyst__remote__call_wrapper(const char *addr, const char *symbol, const
     }
     RemoteEntry *entry = find_or_create_entry(addr, /*create_if_missing=*/false);
     if (!entry) {
-        RT_FAIL("No session found, call __catalyst__remote__open first.");
+        RT_FAIL("No session found, call __catalyst__executor__open first.");
     }
     std::lock_guard<std::mutex> lock(entry->mu);
     if (!entry->session) {
         RT_FAIL("Session is closed");
     }
     if (!symbol || !*symbol) {
-        RT_FAIL("Empty symbol passed to __catalyst__remote__call_wrapper");
+        RT_FAIL("Empty symbol passed to __catalyst__executor__call_wrapper");
     }
     if (remote_verbose()) {
         std::fprintf(stderr, "[remote] call_wrapper(addr=%s, sym=%s, in_size=%zu)\n", addr, symbol,
@@ -201,9 +201,9 @@ int __catalyst__remote__call_wrapper(const char *addr, const char *symbol, const
     char *buf = nullptr;
     size_t n = 0;
     int rc =
-        catalyst::remote::call_wrapper_raw(entry->session, symbol, args_buf, args_size, &buf, &n);
+        catalyst::executor::call_wrapper_raw(entry->session, symbol, args_buf, args_size, &buf, &n);
     if (rc != 0) {
-        RT_FAIL(catalyst::remote::last_error());
+        RT_FAIL(catalyst::executor::last_error());
     }
     if (out_buf) {
         *out_buf = buf;
@@ -217,15 +217,15 @@ int __catalyst__remote__call_wrapper(const char *addr, const char *symbol, const
     return 0;
 }
 
-void __catalyst__remote__free_result(void *buf) { std::free(buf); }
+void __catalyst__executor__free_result(void *buf) { std::free(buf); }
 
-int __catalyst__remote__close()
+int __catalyst__executor__close()
 {
     std::lock_guard<std::mutex> mapLock(g_map_mu);
     for (auto &[addr, entry] : remote_sessions) {
         std::lock_guard<std::mutex> lock(entry->mu);
         if (entry->session) {
-            catalyst::remote::close(entry->session);
+            catalyst::executor::close(entry->session);
             entry->session = nullptr;
             entry->loaded_paths.clear();
         }
@@ -234,7 +234,7 @@ int __catalyst__remote__close()
     return 0;
 }
 
-void __catalyst__remote__launch(const char *addr, const char *entry_symbol, size_t num_inputs,
+void __catalyst__executor__launch(const char *addr, const char *entry_symbol, size_t num_inputs,
                                 void *const *input_descs, const size_t *input_ranks,
                                 const size_t *input_elem_sizes, size_t num_outputs,
                                 void *const *output_descs, const size_t *output_ranks,
@@ -253,14 +253,14 @@ void __catalyst__remote__launch(const char *addr, const char *entry_symbol, size
     if (!entry->session) {
         RT_FAIL("Session is closed");
     }
-    uint64_t entry_addr = catalyst::remote::lookup(entry->session, entry_symbol);
+    uint64_t entry_addr = catalyst::executor::lookup(entry->session, entry_symbol);
     if (!entry_addr) {
-        RT_FAIL(catalyst::remote::last_error());
+        RT_FAIL(catalyst::executor::last_error());
     }
-    if (catalyst::remote::invoke_kernel(entry->session, entry_addr, num_inputs, input_descs,
+    if (catalyst::executor::invoke_kernel(entry->session, entry_addr, num_inputs, input_descs,
                                         input_ranks, input_elem_sizes, num_outputs, output_descs,
                                         output_ranks, output_elem_sizes) != 0) {
-        RT_FAIL(catalyst::remote::last_error());
+        RT_FAIL(catalyst::executor::last_error());
     }
 }
 

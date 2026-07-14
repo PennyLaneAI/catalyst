@@ -51,6 +51,6 @@ if(ENABLE_OQD)
 add_subdirectory(OQDcapi)
 endif()
 
-if(ENABLE_REMOTE)
-add_subdirectory(remote)
+if(ENABLE_EXECUTOR)
+add_subdirectory(executor)
 endif()

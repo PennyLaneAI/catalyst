@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "RemoteSession.hpp"
+#include "ExecutorSession.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -180,9 +180,9 @@ Expected<std::unique_ptr<MemoryBuffer>> getFile(const Twine &filename)
 
 } // namespace
 
-namespace catalyst::remote {
+namespace catalyst::executor {
 
-struct RemoteSession {
+struct ExecutorSession {
     std::unique_ptr<ExecutionSession> ES;
 
     DataLayout DL;
@@ -197,7 +197,7 @@ struct RemoteSession {
     ExecutorAddr invoke_fn{0};
     ExecutorAddr store_asset_fn{0};
 
-    RemoteSession(std::unique_ptr<ExecutionSession> es, DataLayout dl)
+    ExecutorSession(std::unique_ptr<ExecutionSession> es, DataLayout dl)
         : ES(std::move(es)), DL(std::move(dl)), Mangle(*this->ES, this->DL), ObjectLayer(*this->ES),
           MainJD(this->ES->createBareJITDylib("<main>"))
     {
@@ -205,14 +205,14 @@ struct RemoteSession {
             cantFail(EPCDynamicLibrarySearchGenerator::GetForTargetProcess(*this->ES)));
     }
 
-    ~RemoteSession()
+    ~ExecutorSession()
     {
         if (auto Err = ES->endSession()) {
             ES->reportError(std::move(Err));
         }
     }
 
-    static Expected<std::unique_ptr<RemoteSession>> Create(StringRef remote_addr)
+    static Expected<std::unique_ptr<ExecutorSession>> Create(StringRef remote_addr)
     {
         initialize_targets();
 
@@ -248,7 +248,7 @@ struct RemoteSession {
         }
 
         auto ES = std::make_unique<ExecutionSession>(std::move(*EPC));
-        return std::make_unique<RemoteSession>(std::move(ES), std::move(*DL));
+        return std::make_unique<ExecutorSession>(std::move(ES), std::move(*DL));
     }
 
     Error addObjectFile(std::unique_ptr<MemoryBuffer> Buf)
@@ -271,7 +271,7 @@ struct RemoteSession {
 
 namespace {
 
-ExecutorAddr remote_alloc(RemoteSession *s, size_t size)
+ExecutorAddr remote_alloc(ExecutorSession *s, size_t size)
 {
     ExecutorAddr ret;
     auto &epc = s->getEPC();
@@ -285,7 +285,7 @@ ExecutorAddr remote_alloc(RemoteSession *s, size_t size)
     return ret;
 }
 
-void remote_free(RemoteSession *s, ExecutorAddr addr)
+void remote_free(ExecutorSession *s, ExecutorAddr addr)
 {
     auto &epc = s->getEPC();
     if (auto err = epc.callSPSWrapper<void(shared::SPSExecutorAddr)>(s->free_fn, addr)) {
@@ -293,14 +293,14 @@ void remote_free(RemoteSession *s, ExecutorAddr addr)
     }
 }
 
-void remote_write(RemoteSession *s, ExecutorAddr addr, const void *data, size_t size)
+void remote_write(ExecutorSession *s, ExecutorAddr addr, const void *data, size_t size)
 {
     auto &epc = s->getEPC();
     tpctypes::BufferWrite w{addr, ArrayRef<char>(static_cast<const char *>(data), size)};
     check(epc.getMemoryAccess().writeBuffers({w}), "write");
 }
 
-void remote_read(RemoteSession *s, ExecutorAddr addr, void *data, size_t size)
+void remote_read(ExecutorSession *s, ExecutorAddr addr, void *data, size_t size)
 {
     ExecutorAddrRange r(addr, addr + size);
     auto out = unwrap(s->getEPC().getMemoryAccess().readBuffers({r}), "read");
@@ -313,7 +313,7 @@ void remote_read(RemoteSession *s, ExecutorAddr addr, void *data, size_t size)
     std::memcpy(data, out[0].data(), size);
 }
 
-void remote_invoke(RemoteSession *s, ExecutorAddr entry, ArrayRef<ExecutorAddr> arg_addrs)
+void remote_invoke(ExecutorSession *s, ExecutorAddr entry, ArrayRef<ExecutorAddr> arg_addrs)
 {
     auto &epc = s->getEPC();
     check(epc.callSPSWrapper<void(shared::SPSExecutorAddr,
@@ -345,11 +345,11 @@ size_t memref_data_size(const char *desc, size_t rank, size_t elem_size)
 
 class RemoteAllocator {
   private:
-    RemoteSession *sess;
+    ExecutorSession *sess;
     std::vector<ExecutorAddr> addrs;
 
   public:
-    explicit RemoteAllocator(RemoteSession *s) : sess(s) {}
+    explicit RemoteAllocator(ExecutorSession *s) : sess(s) {}
     ~RemoteAllocator()
     {
         for (ExecutorAddr a : addrs) {
@@ -370,20 +370,20 @@ class RemoteAllocator {
 } // namespace
 
 // ---------------------------------------------------------------------------
-// RemoteSession's Exported APIs
+// ExecutorSession's Exported APIs
 // ---------------------------------------------------------------------------
 
 /**
  * @brief Open a session to the remote device.
  *
  * @param remote_addr the remote address
- * @return RemoteSession * the session object
+ * @return ExecutorSession * the session object
  */
-RemoteSession *open(const char *remote_addr)
+ExecutorSession *open(const char *remote_addr)
 {
     clear_error();
     try {
-        auto s = unwrap(RemoteSession::Create(remote_addr), "open(" + Twine(remote_addr) + ")");
+        auto s = unwrap(ExecutorSession::Create(remote_addr), "open(" + Twine(remote_addr) + ")");
         check(s->getEPC().getBootstrapSymbols({{s->alloc_fn, "catalyst_remote_alloc"},
                                                {s->free_fn, "catalyst_remote_free"},
                                                {s->invoke_fn, "catalyst_remote_invoke"},
@@ -403,7 +403,7 @@ RemoteSession *open(const char *remote_addr)
  *
  * @param s the session object
  */
-void close(RemoteSession *s) { delete s; }
+void close(ExecutorSession *s) { delete s; }
 
 /**
  * @brief Load an object file (cross-compiled for the remote arch) into the remote JIT.
@@ -412,7 +412,7 @@ void close(RemoteSession *s) { delete s; }
  * @param path the path to the object file
  * @return int 0 on success, non-zero on error
  */
-int load_object_path(RemoteSession *s, const char *path)
+int load_object_path(ExecutorSession *s, const char *path)
 {
     clear_error();
     try {
@@ -433,7 +433,7 @@ int load_object_path(RemoteSession *s, const char *path)
  * @param path the path to the asset file
  * @return int 0 on success, -1 on error
  */
-int load_asset_path(RemoteSession *s, const char *path)
+int load_asset_path(ExecutorSession *s, const char *path)
 {
     clear_error();
     try {
@@ -469,7 +469,7 @@ int load_asset_path(RemoteSession *s, const char *path)
  * @param out_size The size of the result.
  * @return int 0 on success, -1 on error.
  */
-int call_wrapper_raw(RemoteSession *s, const char *sym, const char *args_buf, size_t args_size,
+int call_wrapper_raw(ExecutorSession *s, const char *sym, const char *args_buf, size_t args_size,
                      char **out_buf, size_t *out_size)
 {
     clear_error();
@@ -507,7 +507,7 @@ int call_wrapper_raw(RemoteSession *s, const char *sym, const char *args_buf, si
  * @param name the name of the symbol
  * @return uint64_t the address of the symbol
  */
-uint64_t lookup(RemoteSession *s, const char *name)
+uint64_t lookup(ExecutorSession *s, const char *name)
 {
     clear_error();
     try {
@@ -527,7 +527,7 @@ uint64_t lookup(RemoteSession *s, const char *name)
  * @param argv the command line arguments
  * @return int32_t the exit code
  */
-int32_t run_as_main(RemoteSession *s, uint64_t entry_addr, int argc, const char *const *argv)
+int32_t run_as_main(ExecutorSession *s, uint64_t entry_addr, int argc, const char *const *argv)
 {
     clear_error();
     try {
@@ -562,7 +562,7 @@ int32_t run_as_main(RemoteSession *s, uint64_t entry_addr, int argc, const char 
  * @param copy_data whether to copy the data to the remote
  * @return ExecutorAddr the remote address of the memref descriptor
  */
-ExecutorAddr push_memref(RemoteSession *s, RemoteAllocator &alloc, void *host_desc, size_t rank,
+ExecutorAddr push_memref(ExecutorSession *s, RemoteAllocator &alloc, void *host_desc, size_t rank,
                          size_t elem_size, bool copy_data)
 {
     char *desc_host = static_cast<char *>(host_desc);
@@ -609,7 +609,7 @@ ExecutorAddr push_memref(RemoteSession *s, RemoteAllocator &alloc, void *host_de
  * @param rank the rank of the memref
  * @param elem_size the element size of the memref
  */
-void pull_memref(RemoteSession *s, ExecutorAddr remote_desc, void *host_desc, size_t rank,
+void pull_memref(ExecutorSession *s, ExecutorAddr remote_desc, void *host_desc, size_t rank,
                  size_t elem_size)
 {
     size_t desc_size = memref_desc_size(rank);
@@ -646,7 +646,7 @@ void pull_memref(RemoteSession *s, ExecutorAddr remote_desc, void *host_desc, si
  * @param output_elem_sizes the element sizes of the output memrefs
  * @return int 0 on success, non-zero on error
  */
-int invoke_kernel(RemoteSession *s, uint64_t entry_addr, size_t num_inputs,
+int invoke_kernel(ExecutorSession *s, uint64_t entry_addr, size_t num_inputs,
                   void *const *input_descs, const size_t *input_ranks,
                   const size_t *input_elem_sizes, size_t num_outputs, void *const *output_descs,
                   const size_t *output_ranks, const size_t *output_elem_sizes)
@@ -745,4 +745,4 @@ int invoke_kernel(RemoteSession *s, uint64_t entry_addr, size_t num_inputs,
 
 const char *last_error() { return g_last_error.c_str(); }
 
-} // namespace catalyst::remote
+} // namespace catalyst::executor

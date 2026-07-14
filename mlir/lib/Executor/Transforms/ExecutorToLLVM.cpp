@@ -152,7 +152,7 @@ int64_t primitiveByteSize(Type ty)
 }
 
 //===----------------------------------------------------------------------===//
-// executor.open  ->  __catalyst__remote__open(addr)
+// executor.open  ->  __catalyst__executor__open(addr)
 //===----------------------------------------------------------------------===//
 
 struct OpenOpLowering : public OpConversionPattern<executor::OpenOp> {
@@ -169,7 +169,7 @@ struct OpenOpLowering : public OpConversionPattern<executor::OpenOp> {
 
         Type openSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy});
         LLVM::LLVMFuncOp openFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, "__catalyst__remote__open", openSig);
+            rewriter, op, "__catalyst__executor__open", openSig);
 
         Value addrPtr =
             getGlobalString(loc, rewriter, "remote_setup_addr", op.getAddress().str() + '\0', mod);
@@ -181,7 +181,7 @@ struct OpenOpLowering : public OpConversionPattern<executor::OpenOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// executor.send_binary  ->  __catalyst__remote__send_binary(addr, path, format)
+// executor.send_binary  ->  __catalyst__executor__send_binary(addr, path, format)
 //===----------------------------------------------------------------------===//
 
 struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp> {
@@ -199,7 +199,7 @@ struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp>
 
         Type sendBinSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy, ptrTy, i32Ty});
         LLVM::LLVMFuncOp sendBinFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, "__catalyst__remote__send_binary", sendBinSig);
+            rewriter, op, "__catalyst__executor__send_binary", sendBinSig);
 
         std::string tag = llvm::sys::path::stem(op.getBinaryPath()).str();
         Value addrPtr =
@@ -216,7 +216,7 @@ struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp>
 };
 
 //===----------------------------------------------------------------------===//
-// executor.launch  ->  __catalyst__remote__launch(addr, sym,
+// executor.launch  ->  __catalyst__executor__launch(addr, sym,
 //                                               num_in,  in_descs,  in_ranks,  in_sizes,
 //                                               num_out, out_descs, out_ranks, out_sizes)
 //===----------------------------------------------------------------------===//
@@ -247,7 +247,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         Type launchSig = LLVM::LLVMFunctionType::get(
             voidTy, {ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
         LLVM::LLVMFuncOp launchFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, "__catalyst__remote__launch", launchSig);
+            rewriter, op, "__catalyst__executor__launch", launchSig);
 
         std::string callee = op.getKernelCallee().str();
         Value addrPtr = getGlobalString(loc, rewriter, "remote_addr_" + callee,
@@ -313,7 +313,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// executor.call  ->  __catalyst__remote__call_wrapper(addr, sym,
+// executor.call  ->  __catalyst__executor__call_wrapper(addr, sym,
 //                                                   args_buf, args_size,
 //                                                   &out_buf, &out_size)
 //===----------------------------------------------------------------------===//
@@ -364,10 +364,10 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
         Type callSig =
             LLVM::LLVMFunctionType::get(i32Ty, {ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy});
         LLVM::LLVMFuncOp callFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, "__catalyst__remote__call_wrapper", callSig);
+            rewriter, op, "__catalyst__executor__call_wrapper", callSig);
         Type freeSig = LLVM::LLVMFunctionType::get(voidTy, {ptrTy});
         LLVM::LLVMFuncOp freeFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, "__catalyst__remote__free_result", freeSig);
+            rewriter, op, "__catalyst__executor__free_result", freeSig);
 
         unsigned numInputs =
             op.getNumInputArgs().value_or(static_cast<int32_t>(op.getInputs().size()));
