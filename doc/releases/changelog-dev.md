@@ -56,7 +56,7 @@
   ops through dialect-agnostic MLIR OpInterfaces instead of hard-coded check.
   New dialects can opt in by implementing these interfaces without changing
   the analysis.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3025)](https://github.com/PennyLaneAI/catalyst/pull/3025)
 
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
