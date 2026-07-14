@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <exception>
-#include <iostream>
 #include <string>
 
 #include "llvm/ADT/TypeSwitch.h"
@@ -33,7 +32,9 @@
 
 namespace nb = nanobind;
 
-nb::object getPyvalFromTypeRange(mlir::TypeRange typerange)
+namespace {
+
+static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange)
 {
     nb::list pyTypes;
     for (auto type : typerange) {
@@ -45,7 +46,7 @@ nb::object getPyvalFromTypeRange(mlir::TypeRange typerange)
     return pyTypes;
 }
 
-nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
+static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
 {
     return llvm::TypeSwitch<mlir::Attribute, nb::object>(attr)
         .Case<mlir::DictionaryAttr>([](auto dictAttr) {
@@ -66,6 +67,8 @@ nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
         .Case<mlir::StringAttr>([](auto strAttr) { return nb::cast(strAttr.getValue().str()); })
         .Default([](auto attr) { return nb::str("placeholder"); });
 }
+
+} // namespace
 
 std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
 {
