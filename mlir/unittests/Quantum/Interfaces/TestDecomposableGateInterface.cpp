@@ -97,8 +97,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    auto paulirots = module->getOps<PauliRotOp>();
-    DecomposableGate paulirot = *paulirots.begin();
+    DecomposableGate paulirot = *module->getOps<PauliRotOp>().begin();
 
     ASSERT_EQ(paulirot.getOperatorName(), "PauliRot");
 
@@ -116,6 +115,45 @@ module {
     ASSERT_EQ(paulirot.getStaticData(), expectedStaticData);
 
     ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot[f64][3]{pauli_word:XYZ}");
+}
+
+TEST(DecomposableGateInterfaceTests, PCPhaseOP)
+{
+    std::string moduleStr = R"mlir(
+module {
+  %theta = arith.constant 3.7 : f64
+  %dim = arith.constant 42.0 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %oq0, %oq1, %oq2 = quantum.pcphase(%theta, %dim) %q0, %q1 ctrls(%q2) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate pcphase = *module->getOps<PCPhaseOp>().begin();
+
+    ASSERT_EQ(pcphase.getOperatorName(), "PCPhase");
+
+    // This is needed to keep the backing array from being deleted
+    Type f64Type = mlir::Float64Type::get(&context);
+    llvm::SmallVector<mlir::Type, 2> backing({f64Type, f64Type});
+    mlir::TypeRange expectedDynamicShape(backing);
+    ASSERT_EQ(llvm::SmallVector<mlir::Type>(pcphase.getDynamicShape()),
+              llvm::SmallVector<mlir::Type>(expectedDynamicShape));
+
+    // Controls are not part of the gate wires considered by the decomp interface
+    ASSERT_EQ(pcphase.getWireLens(), std::vector<size_t>({2}));
+
+    ASSERT_EQ(pcphase.getStaticData().size(), 0);
+
+    ASSERT_EQ(pcphase.getGraphOpId(), "PCPhase[f64,f64][2]{}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits)

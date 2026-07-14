@@ -818,7 +818,8 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
 }
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
-                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                           AttrSizedOperandSegments, AttrSizedResultSegments,
+                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a projector-controlled phase gate";
     let description = [{
         This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
@@ -858,8 +859,8 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
-            return getODSOperands(getParamOperandIdx());
+        mlir::OperandRange getAllParams() {
+            return getOperands().slice(getParamOperandIdx(), getParamOperandIdx()+2);
         }
     }];
 

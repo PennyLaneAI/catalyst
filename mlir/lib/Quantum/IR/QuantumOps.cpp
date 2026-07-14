@@ -1197,6 +1197,19 @@ mlir::DictionaryAttr PauliRotOp::getStaticData()
     return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
 }
 
+// PCPhaseOp
+
+std::string PCPhaseOp::getOperatorName() { return "PCPhase"; }
+
+mlir::TypeRange PCPhaseOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> PCPhaseOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr PCPhaseOp::getStaticData()
+{
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
 // OperatorOp
 
 std::string OperatorOp::getOperatorName() { return getOpName().str(); }
