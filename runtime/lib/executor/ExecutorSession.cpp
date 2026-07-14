@@ -520,31 +520,6 @@ uint64_t lookup(ExecutorSession *s, const char *name)
 }
 
 /**
- * @brief Run the kernel as a main function (take argv as arguments, argc is the length of argv).
- *
- * @param s the session object
- * @param entry the entry function address
- * @param argv the command line arguments
- * @return int32_t the exit code
- */
-int32_t run_as_main(ExecutorSession *s, uint64_t entry_addr, int argc, const char *const *argv)
-{
-    clear_error();
-    try {
-        std::vector<std::string> args;
-        args.reserve(argc);
-        for (int i = 0; i < argc; ++i) {
-            args.emplace_back(argv[i]);
-        }
-        return unwrap(s->getEPC().runAsMain(ExecutorAddr(entry_addr), args), "run_as_main");
-    }
-    catch (const std::exception &e) {
-        set_error(e.what());
-        return -1;
-    }
-}
-
-/**
  * @brief Push one host memref to the remote:
  *        1. allocates the data buffer on the remote
  *        2. allocates the descriptor on the remote (which has a pointer to the data buffer)

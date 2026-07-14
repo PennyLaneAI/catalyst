@@ -40,9 +40,6 @@ int call_wrapper_raw(ExecutorSession *s, const char *sym, const char *args_buf, 
 // Look up a symbol address on the remote. Returns 0 on error.
 uint64_t lookup(ExecutorSession *s, const char *name);
 
-// Run a remote function as `main(argc, argv)`.
-int32_t run_as_main(ExecutorSession *s, uint64_t entry_addr, int argc, const char *const *argv);
-
 // Invoke a remote kernel. Returns 0 on success, -1 on error.
 int invoke_kernel(ExecutorSession *s, uint64_t entry_addr, size_t num_inputs,
                   void *const *input_descs, const size_t *input_ranks,
