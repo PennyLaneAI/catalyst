@@ -58,6 +58,18 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
                                ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
+// Generate a global key for an executor address.
+std::string addrGlobalKey(StringRef address)
+{
+    std::string key = "executor_addr_";
+    for (char c : address) {
+        bool ok =
+            (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+        key.push_back(ok ? c : '_');
+    }
+    return key;
+}
+
 // Get or create a `internal constant !llvm.array<N x i64>` global.
 // And return a `!llvm.ptr` to its first element.
 //
@@ -140,6 +152,9 @@ int64_t primitiveByteSize(Type ty)
     return -1;
 }
 
+// Byte size of one memref element, or -1 on unsupported element types.
+// Delegates to primitiveByteSize so the launch and call paths agree
+// (in particular, index is treated as 8 bytes, not asserted on).
 int64_t memrefElemSizeBytes(MemRefType ty) { return primitiveByteSize(ty.getElementType()); }
 
 //===----------------------------------------------------------------------===//
@@ -162,8 +177,8 @@ struct OpenOpLowering : public OpConversionPattern<executor::OpenOp> {
         LLVM::LLVMFuncOp openFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__remote__open", openSig);
 
-        Value addrPtr =
-            getGlobalString(loc, rewriter, "remote_setup_addr", op.getAddress().str() + '\0', mod);
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
+                                        op.getAddress().str() + '\0', mod);
 
         LLVM::CallOp::create(rewriter, loc, openFn, ValueRange{addrPtr});
         rewriter.eraseOp(op);
@@ -193,8 +208,8 @@ struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp>
             rewriter, op, "__catalyst__remote__send_binary", sendBinSig);
 
         std::string tag = llvm::sys::path::stem(op.getBinaryPath()).str();
-        Value addrPtr =
-            getGlobalString(loc, rewriter, "remote_addr_" + tag, op.getAddress().str() + '\0', mod);
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
+                                        op.getAddress().str() + '\0', mod);
         Value pathPtr = getGlobalString(loc, rewriter, "remote_path_" + tag,
                                         op.getBinaryPath().str() + '\0', mod);
         Value formatTag =
@@ -241,7 +256,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
             rewriter, op, "__catalyst__remote__launch", launchSig);
 
         std::string callee = op.getKernelCallee().str();
-        Value addrPtr = getGlobalString(loc, rewriter, "remote_addr_" + callee,
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
                                         op.getAddress().str() + '\0', mod);
 
         std::string symbolName = "_catalyst_pyface_" + callee;
@@ -395,7 +410,7 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
         Type bufTy = LLVM::LLVMArrayType::get(i8Ty, totalInputBytes > 0 ? totalInputBytes : 1);
         std::string sym = op.getSymbol().str();
 
-        Value addrPtr = getGlobalString(loc, rewriter, "remote_lib_addr_" + sym,
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
                                         op.getAddress().str() + '\0', mod);
         Value symPtr = getGlobalString(loc, rewriter, "remote_lib_sym_" + sym, sym + '\0', mod);
 
@@ -465,8 +480,8 @@ struct CloseOpLowering : public OpConversionPattern<executor::CloseOp> {
         LLVM::LLVMFuncOp closeFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__remote__close", closeSig);
 
-        Value addrPtr =
-            getGlobalString(loc, rewriter, "remote_close_addr", op.getAddress().str() + '\0', mod);
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
+                                        op.getAddress().str() + '\0', mod);
 
         LLVM::CallOp::create(rewriter, loc, closeFn, ValueRange{addrPtr});
         rewriter.eraseOp(op);
