@@ -397,12 +397,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             moduleOp->walk([&](mlir::func::FuncOp func) {
-                if (func.getName().starts_with(opId)) {
+                if (func->hasAttr("target_gate")) {
                     mlir::OwningOpRef<mlir::func::FuncOp> outOp;
                     func->remove();
                     outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
                     mlir::func::FuncOp funcOp = outOp.get();
-                    funcOp->setAttr("target_gate", mlir::StringAttr::get(context, opId));
 
                     // if we fail to add one of the decomps, we still want to try for the rest
                     std::ignore = addRuleNode(funcOp, ruleNodes);
