@@ -116,4 +116,22 @@ def Remote_CallOp : Remote_Op<"call"> {
     }];
 }
 
+//===----------------------------------------------------------------------===//
+// remote.close
+//===----------------------------------------------------------------------===//
+
+def Remote_CloseOp : Remote_Op<"close"> {
+    let summary = "Tear down the session with a remote executor.";
+    let description = [{
+        Close the session previously established via `remote.open` for `address`,
+        releasing the connection and any resources loaded on the remote executor.
+    }];
+
+    let arguments = (ins StrAttr:$address);
+
+    let assemblyFormat = [{
+        `(` $address `)` attr-dict
+    }];
+}
+
 #endif // REMOTE_OPS

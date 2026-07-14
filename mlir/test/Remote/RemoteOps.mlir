@@ -51,3 +51,12 @@ func.func @call(%arg0: memref<4xf64>, %arg1: memref<4xf64>) {
       {num_input_args = 1 : i32} : (memref<4xf64>, memref<4xf64>) -> ()
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @close
+// CHECK:         remote.close("127.0.0.1:9000")
+func.func @close() {
+  remote.close("127.0.0.1:9000")
+  return
+}
