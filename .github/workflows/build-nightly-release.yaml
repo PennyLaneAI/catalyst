@@ -43,17 +43,23 @@ jobs:
     name: Build on Linux x86-64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
+    with:
+      build_dev_package: true
 
   linux-aarch:
     if: ${{ inputs.build-linux-arm }}
     name: Build on Linux aarch64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+    with:
+      build_dev_package: true
 
   macos-arm:
     name: Build on macOS arm64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
+    with:
+      build_dev_package: true
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
@@ -67,6 +73,7 @@ jobs:
     - name: Download wheels
       uses: actions/download-artifact@v4
       with:
+        pattern: "*wheel*"
         merge-multiple: true
         path: dist
 
@@ -86,3 +93,28 @@ jobs:
         repository-url: https://test.pypi.org/legacy/
         packages-dir: dist
         verbose: true
+
+  collect-dev-package:
+    name: Collect catalyst-dev archives
+    if: ${{ !failure() && !cancelled() }}  # needed in case linux-aarch is skipped
+    needs: [linux-x86, macos-arm, linux-aarch]
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Download catalyst-dev archives
+      uses: actions/download-artifact@v4
+      with:
+        pattern: catalyst-dev*
+        merge-multiple: true
+        path: catalyst-dev
+
+    - name: List collected archives
+      run: ls -lh catalyst-dev*
+
+    - name: Upload combined catalyst-dev archives
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalyst-dev-archives
+        path: catalyst-dev/
+        retention-days: 14
+        if-no-files-found: error

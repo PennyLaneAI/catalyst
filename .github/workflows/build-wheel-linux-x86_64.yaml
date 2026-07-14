@@ -38,6 +38,11 @@ on:
         required: false
         default: 'main'
         type: string
+      build_dev_package:
+        description: 'Build and upload the catalyst-dev CPack archive'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: Build Catalyst Wheel on Linux (x86_64)-${{ github.ref }}
@@ -396,6 +401,24 @@ jobs:
               -DLLVM_ENABLE_LLD=ON
 
         cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
+
+    # Package the Catalyst MLIR development subsystem (headers, static libs, CMake config).
+    # Only build once per platform (primary Python version) since the archive is Python-agnostic.
+    - name: Package catalyst-dev (CPack)
+      if: inputs.build_dev_package && matrix.python_version == needs.constants.outputs.primary_python_version
+      run: |
+        cd $GITHUB_WORKSPACE/quantum-build
+        cpack
+
+    - name: Upload catalyst-dev Archive
+      if: inputs.build_dev_package && matrix.python_version == needs.constants.outputs.primary_python_version
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalyst-dev_Linux_x86_64
+        path: |
+          ${{ github.workspace }}/quantum-build/catalyst-dev_Linux_x86_64*.tar.gz
+        retention-days: 14
+        if-no-files-found: error
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
