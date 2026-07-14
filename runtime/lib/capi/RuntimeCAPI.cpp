@@ -164,6 +164,8 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
+    RT_FAIL_IF(!CTX || !CTX->getMemoryManager(),
+        "Managed memory allocation requires an initialized runtime context.");
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
