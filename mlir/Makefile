@@ -49,13 +49,14 @@ help:
 	@echo "  enzyme             to build Enzyme"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  dialect-docs       to build custom Catalyst MLIR dialect documentation"
+	@echo "  pack-catalyst-dev  to build the catalyst-dev package"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
 	@echo "  clean              to delete all temporary, cache, and build files"
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm stablehlo enzyme dialects dialect-docs plugin
+all: llvm stablehlo enzyme dialects dialect-docs pack-catalyst-dev plugin
 
 .PHONY: llvm
 llvm:
@@ -219,6 +220,12 @@ dialect-docs:
 		-DCATALYST_DOCS_ONLY=ON
 
 	cmake --build $(DIALECTS_DOCS_BUILD_DIR) --target mlir-doc
+
+.PHONY: pack-catalyst-dev
+pack-catalyst-dev: dialects
+
+	@echo "build the catalyst-dev package"
+	cd $(DIALECTS_BUILD_DIR) && cpack
 
 .PHONY: test
 test:
