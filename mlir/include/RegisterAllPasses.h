@@ -28,7 +28,7 @@
 #include "Test/Transforms/Passes.h"
 #include "hlo-extensions/Transforms/Passes.h"
 
-#include "Remote/Transforms/Passes.h"
+#include "Executor/Transforms/Passes.h"
 
 namespace catalyst {
 
@@ -45,7 +45,7 @@ inline void registerAllPasses()
     qecp::registerQecPhysicalPasses();
     qref::registerQRefPasses();
     quantum::registerQuantumPasses();
-    remote::registerRemotePasses();
+    executor::registerExecutorPasses();
     rtio::registerRTIOPasses();
     test::registerTestPasses();
 }

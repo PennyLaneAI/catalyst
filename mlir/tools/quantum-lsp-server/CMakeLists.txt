@@ -16,7 +16,7 @@ set(LIBS
     MLIRPauliFrame
     MLIRIon
     MLIRRTIO
-    MLIRRemote
+    MLIRExecutor
     MLIRQecLogical
     MLIRQecPhysical
 )

@@ -12,27 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef REMOTE_PASSES
-#define REMOTE_PASSES
+#ifndef EXECUTOR_PASSES
+#define EXECUTOR_PASSES
 
 include "mlir/Pass/PassBase.td"
 
-def ConvertRemoteToLLVMPass : Pass<"convert-remote-to-llvm", "mlir::ModuleOp"> {
-    let summary = "Lower the `remote` dialect to direct calls into the Catalyst remote runtime.";
+def ConvertExecutorToLLVMPass : Pass<"convert-executor-to-llvm", "mlir::ModuleOp"> {
+    let summary = "Lower the `executor` dialect to direct calls into the Catalyst remote runtime.";
     let description = [{
-        Replaces each `remote.*` op with the corresponding `__catalyst__remote__*`
+        Replaces each `executor.*` op with the corresponding `__catalyst__remote__*`
         runtime entry point:
 
-        * `remote.open`        -> `__catalyst__remote__open(addr)`
-        * `remote.send_binary` -> `__catalyst__remote__send_binary(addr, path, format)`
-        * `remote.launch`      -> `__catalyst__remote__launch(addr, "_catalyst_pyface_<callee>", ...)`
-        * `remote.call`        -> `__catalyst__remote__call_wrapper(addr, sym, ...)` + `__catalyst__remote__free_result`
+        * `executor.open`        -> `__catalyst__remote__open(addr)`
+        * `executor.send_binary` -> `__catalyst__remote__send_binary(addr, path, format)`
+        * `executor.launch`      -> `__catalyst__remote__launch(addr, "_catalyst_pyface_<callee>", ...)`
+        * `executor.call`        -> `__catalyst__remote__call_wrapper(addr, sym, ...)` + `__catalyst__remote__free_result`
     }];
 
     let dependentDialects = [
         "mlir::LLVM::LLVMDialect",
-        "catalyst::remote::RemoteDialect",
+        "catalyst::executor::ExecutorDialect",
     ];
 }
 
-#endif // REMOTE_PASSES
+#endif // EXECUTOR_PASSES

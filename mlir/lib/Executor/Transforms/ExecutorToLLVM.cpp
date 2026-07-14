@@ -25,16 +25,16 @@
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
 
-#include "Remote/IR/RemoteOps.h"
-#include "Remote/Transforms/Passes.h"
+#include "Executor/IR/ExecutorOps.h"
+#include "Executor/Transforms/Passes.h"
 
 using namespace mlir;
 
 namespace catalyst {
-namespace remote {
+namespace executor {
 
-#define GEN_PASS_DEF_CONVERTREMOTETOLLVMPASS
-#include "Remote/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_CONVERTEXECUTORTOLLVMPASS
+#include "Executor/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -152,13 +152,13 @@ int64_t primitiveByteSize(Type ty)
 }
 
 //===----------------------------------------------------------------------===//
-// remote.open  ->  __catalyst__remote__open(addr)
+// executor.open  ->  __catalyst__remote__open(addr)
 //===----------------------------------------------------------------------===//
 
-struct OpenOpLowering : public OpConversionPattern<remote::OpenOp> {
+struct OpenOpLowering : public OpConversionPattern<executor::OpenOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(remote::OpenOp op, OpAdaptor /*adaptor*/,
+    LogicalResult matchAndRewrite(executor::OpenOp op, OpAdaptor /*adaptor*/,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
@@ -181,13 +181,13 @@ struct OpenOpLowering : public OpConversionPattern<remote::OpenOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// remote.send_binary  ->  __catalyst__remote__send_binary(addr, path, format)
+// executor.send_binary  ->  __catalyst__remote__send_binary(addr, path, format)
 //===----------------------------------------------------------------------===//
 
-struct SendBinaryOpLowering : public OpConversionPattern<remote::SendBinaryOp> {
+struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(remote::SendBinaryOp op, OpAdaptor /*adaptor*/,
+    LogicalResult matchAndRewrite(executor::SendBinaryOp op, OpAdaptor /*adaptor*/,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
@@ -216,15 +216,15 @@ struct SendBinaryOpLowering : public OpConversionPattern<remote::SendBinaryOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// remote.launch  ->  __catalyst__remote__launch(addr, sym,
+// executor.launch  ->  __catalyst__remote__launch(addr, sym,
 //                                               num_in,  in_descs,  in_ranks,  in_sizes,
 //                                               num_out, out_descs, out_ranks, out_sizes)
 //===----------------------------------------------------------------------===//
 
-struct LaunchOpLowering : public OpConversionPattern<remote::LaunchOp> {
+struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(remote::LaunchOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(executor::LaunchOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
@@ -313,12 +313,12 @@ struct LaunchOpLowering : public OpConversionPattern<remote::LaunchOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// remote.call  ->  __catalyst__remote__call_wrapper(addr, sym,
+// executor.call  ->  __catalyst__remote__call_wrapper(addr, sym,
 //                                                   args_buf, args_size,
 //                                                   &out_buf, &out_size)
 //===----------------------------------------------------------------------===//
 
-struct CallOpLowering : public OpConversionPattern<remote::CallOp> {
+struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
     using OpConversionPattern::OpConversionPattern;
 
     /// Static-shape memref byte count, or -1 on unsupported types.
@@ -326,23 +326,23 @@ struct CallOpLowering : public OpConversionPattern<remote::CallOp> {
     {
         auto memrefTy = dyn_cast<MemRefType>(ty);
         if (!memrefTy) {
-            op->emitOpError("remote.call requires memref-typed operands; got ") << ty;
+            op->emitOpError("executor.call requires memref-typed operands; got ") << ty;
             return -1;
         }
         if (!memrefTy.hasStaticShape()) {
-            op->emitOpError("remote.call requires static-shape memref args; got ") << memrefTy;
+            op->emitOpError("executor.call requires static-shape memref args; got ") << memrefTy;
             return -1;
         }
         int64_t elemSz = primitiveByteSize(memrefTy.getElementType());
         if (elemSz < 0) {
-            op->emitOpError("unsupported memref element type for remote.call: ")
+            op->emitOpError("unsupported memref element type for executor.call: ")
                 << memrefTy.getElementType();
             return -1;
         }
         return memrefTy.getNumElements() * elemSz;
     }
 
-    LogicalResult matchAndRewrite(remote::CallOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(executor::CallOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
@@ -448,8 +448,8 @@ struct CallOpLowering : public OpConversionPattern<remote::CallOp> {
 // Pass
 //===----------------------------------------------------------------------===//
 
-struct ConvertRemoteToLLVMPass : impl::ConvertRemoteToLLVMPassBase<ConvertRemoteToLLVMPass> {
-    using ConvertRemoteToLLVMPassBase::ConvertRemoteToLLVMPassBase;
+struct ConvertExecutorToLLVMPass : impl::ConvertExecutorToLLVMPassBase<ConvertExecutorToLLVMPass> {
+    using ConvertExecutorToLLVMPassBase::ConvertExecutorToLLVMPassBase;
 
     void runOnOperation() final
     {
@@ -464,7 +464,7 @@ struct ConvertRemoteToLLVMPass : impl::ConvertRemoteToLLVMPassBase<ConvertRemote
 
         LLVMConversionTarget target(*ctx);
         target.addLegalOp<ModuleOp>();
-        target.addIllegalDialect<remote::RemoteDialect>();
+        target.addIllegalDialect<executor::ExecutorDialect>();
 
         if (failed(applyPartialConversion(mod, target, std::move(patterns)))) {
             signalPassFailure();
@@ -474,5 +474,5 @@ struct ConvertRemoteToLLVMPass : impl::ConvertRemoteToLLVMPassBase<ConvertRemote
 
 } // namespace
 
-} // namespace remote
+} // namespace executor
 } // namespace catalyst
