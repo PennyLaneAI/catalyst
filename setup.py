@@ -137,17 +137,11 @@ requirements = [
 entry_points = {
     "pennylane.plugins": [
         "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
-        "softwareq.qpp = catalyst.third_party.cuda:SoftwareQQPP",
-        "nvidia.custatevec = catalyst.third_party.cuda:NvidiaCuStateVec",
-        "nvidia.cutensornet = catalyst.third_party.cuda:NvidiaCuTensorNet",
     ],
     "pennylane.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
         "catalyst.ops = catalyst.api_extensions",
         "catalyst.qjit = catalyst:qjit",
-        "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
-        "cuda_quantum.ops = catalyst.api_extensions",
-        "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
     "xdsl.universe": [
         "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
