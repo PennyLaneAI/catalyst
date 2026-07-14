@@ -18,12 +18,15 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 # pylint: disable=protected-access
 
 import warnings
+from contextlib import nullcontext
 from copy import copy
 from functools import partial
 from typing import Callable
 
 import jax
 import pennylane as qp
+from jax._src import config as jax_config
+from jax.core import ensure_compile_time_eval
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.primitives import transform_prim
@@ -40,6 +43,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
 from catalyst.jax_extras import deduce_avals, make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
+    CatxprPrimitive,
     device_init_p,
     device_release_p,
     quantum_kernel_p,
@@ -54,7 +58,7 @@ from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 # we want to have the same tracers as inputs to plxpr capture and from_plxpr
 # translation, as this tells jax which inputs match which dynamic shapes
 # if we have concrete inputs to both, jax will get confused.
-_dummy_hop = jax.extend.core.Primitive("dummy_hop")
+_dummy_hop = CatxprPrimitive("dummy_hop")
 _dummy_hop.multiple_results = True
 
 
@@ -468,6 +472,7 @@ def trace_from_pennylane(
     static_argnums,
     abstracted_axes,
     skip_preprocess=False,
+    const_eval=True,
     debug_info=None,
 ):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
@@ -508,9 +513,11 @@ def trace_from_pennylane(
         # Therefore we need to coordinate them manually
         fn.static_argnums = static_argnums
 
+    const_eval_ctx_manager = ensure_compile_time_eval() if const_eval else nullcontext()
+
     with transient_jax_config(
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
-    ), Patcher(*get_jax_patches()):
+    ), Patcher(*get_jax_patches()), const_eval_ctx_manager:
 
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
@@ -534,7 +541,6 @@ def trace_from_pennylane(
             jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(
                 *abstract_shapes, *flat_inputs
             )
-
             return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
 
         nested_jaxpr = jax.make_jaxpr(wrapper, **make_jaxpr_kwargs)(*args, **kwargs)

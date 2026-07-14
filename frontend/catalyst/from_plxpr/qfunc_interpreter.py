@@ -626,11 +626,10 @@ def handle_measure(self, wire, reset, postselect):
 
         pl_cond_prim.bind(
             result,
-            jnp.array(True),
             in_qubit,
             jaxpr_branches=correction,
-            consts_slices=[(2, 3, None), (3, 3, None)],
-            args_slice=(3, None, None),
+            consts_slices=[(1, 2, None), (2, 2, None)],
+            args_slice=(2, None, None),
         )
 
     result = jnp.astype(result, int)

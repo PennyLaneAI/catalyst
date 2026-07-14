@@ -96,6 +96,7 @@ def qjit(
     dialect_plugins=None,
     capture="global",
     skip_preprocess=False,
+    const_eval=True,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -808,6 +809,7 @@ class QJIT(CatalystCallable):
                     static_argnums=static_argnums,
                     abstracted_axes=abstracted_axes,
                     skip_preprocess=self.compile_options.skip_preprocess,
+                    const_eval=self.compile_options.const_eval,
                     debug_info=dbg,
                 )
                 return jaxpr, out_type, out_treedef, full_sig
