@@ -42,6 +42,42 @@
 using namespace mlir;
 using namespace catalyst::quantum;
 
+TEST(DecomposableGateInterfaceTests, MultiRZOp)
+{
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %mrz:3 = quantum.multirz(%angle) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate multiRZ = *module->getOps<MultiRZOp>().begin();
+
+    ASSERT_EQ(multiRZ.getOperatorName(), "MultiRZ");
+
+    // This is needed to keep the backing array from being deleted
+    llvm::SmallVector<mlir::Type, 1> backing({mlir::Float64Type::get(&context)});
+    mlir::TypeRange expectedDynamicShape(backing);
+    ASSERT_EQ(llvm::SmallVector<mlir::Type>(multiRZ.getDynamicShape()),
+              llvm::SmallVector<mlir::Type>(expectedDynamicShape));
+
+    ASSERT_EQ(multiRZ.getWireLens(), std::vector<size_t>({3}));
+
+    ASSERT_EQ(multiRZ.getStaticData().size(), 0);
+
+    ASSERT_EQ(multiRZ.getGraphOpId(), "MultiRZ[f64][3]{}");
+}
+
 TEST(DecomposableGateInterfaceTests, PauliRotOp)
 {
     std::string moduleStr = R"mlir(
@@ -147,7 +183,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
   %angle = arith.constant 3.1 : f64
   %flag = arith.constant 0 : i1
   %index = arith.constant 5 : i64
-  
+
   %reg = quantum.alloc(4) : !quantum.reg
 
   %0 = quantum.operator "testOperatorQreg"(%flag: i1, %angle: f64, %index: i64) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) static_data={"myStaticArray"=[4,2.4,4], "myStaticString"="string", "myStaticInt"=8}
@@ -208,12 +244,12 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
   %angle = arith.constant 3.1 : f64
   %flag = arith.constant 0 : i1
   %index = arith.constant 5 : i64
-  
+
   %reg = quantum.alloc(4) : !quantum.reg
   %q0 = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
- 
-  %0 = quantum.operator "testOperatorUID"(%flag: i1, %angle: f64, %index: i64) 
-    UID(248) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) 
+
+  %0 = quantum.operator "testOperatorUID"(%flag: i1, %angle: f64, %index: i64)
+    UID(248) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>)
   return
 }
     )mlir";
