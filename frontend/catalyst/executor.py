@@ -211,8 +211,8 @@ def _copy_bundle(bundle: Path, user: str, host: str, workspace: str) -> None:
     files = sorted(p for p in bundle.iterdir() if p.is_file() and p.name != "README.md")
     if not files:
         raise SystemExit(
-            f"no artifacts in {bundle} — point bundle= at a directory of the prebuilt "
-            "catalyst-executor + plugin .so files for the remote host."
+            f"no artifacts in {bundle} — pass build=<recipe> to cross-compile the executor + "
+            "runtime libs for the target, or point bundle= at a prebuilt directory."
         )
     total = sum(f.stat().st_size for f in files)
     _log(f"copying {len(files)} artifact(s), {total/1e6:.1f} MB -> {user}@{host}:{workspace}/")
@@ -758,15 +758,18 @@ class Executor:
     * ``local=True``  — run catalyst-executor as a local subprocess on ``127.0.0.1`` (no SSH). Uses
       the shipped/built binary unless ``executor_bin=`` overrides it.
     * ``host=<addr>`` — run it on that host over a forwarded SSH (``user``/``sudo``/``sudo_password``
-      as needed; ``copy=True`` + ``bundle=<dir>`` first scp's a prebuilt bundle there).
+      as needed; ``copy=True`` + ``bundle=<dir>`` first scp's the bundle there, cross-building it via
+      ``build=`` if given).
     * neither         — carry ``address`` for an executor already running/tunnelled there.
 
     ``name`` labels it: output streams as ``[<name>]`` and the log is
     ``catalyst-executor-<name>-<host>-<ts>.log``. ``plugins`` are the device backends / runtime_call
     libraries to load; ``env`` is extra environment for the executor process (e.g.
     ``LD_LIBRARY_PATH``); ``verbose`` (0-3) sets launcher detail; ``triple`` overrides the
-    auto-detected target triple (see :attr:`triple`). The port is randomized per launch unless
-    pinned via ``port``.
+    auto-detected target triple (see :attr:`triple`). ``build`` is an optional ``build(triple,
+    bundle_dir)`` recipe invoked on every ``copy=True`` deploy to (re)produce the bundle for the
+    target; it must be idempotent — it is called on each deploy, not only when the bundle is missing,
+    so return fast when nothing changed. The port is randomized per launch unless pinned via ``port``.
     """
 
     def __init__(
@@ -782,6 +785,7 @@ class Executor:
         bundle=None,
         plugins: list[str] | None = None,
         copy: bool = False,
+        build=None,
         ready_timeout: float = 60.0,
         name: str = "executor",
         sudo: bool = True,
@@ -802,6 +806,7 @@ class Executor:
         self._bundle = bundle
         self._plugins = plugins
         self._copy = copy
+        self._build = build
         self._ready_timeout = ready_timeout
         self._sudo = sudo
         self._sudo_password = sudo_password
@@ -891,7 +896,12 @@ class Executor:
                 _resolve_sudo_password(user, host, self._sudo_password) if self._sudo else None
             )
             if self._copy and self._bundle:
-                _copy_bundle(Path(self._bundle), user, host, workspace)
+                bundle = Path(self._bundle)
+                if self._build is not None:
+                    self._build(
+                        self.triple, bundle
+                    )  # idempotent recipe (see build=); may cross-build
+                _copy_bundle(bundle, user, host, workspace)
 
             def make(port: int) -> _ExecutorProcess:
                 return _RemoteProcess(
@@ -950,7 +960,10 @@ class Executor:
             raise ValueError("setup_workspace() needs a bundle= to deploy")
         _set_verbosity(self._verbose)
         user, host, workspace = self._remote_target()
-        _copy_bundle(Path(self._bundle), user, host, workspace)
+        bundle = Path(self._bundle)
+        if self._build is not None:
+            self._build(self.triple, bundle)  # idempotent recipe (see build=); may cross-build
+        _copy_bundle(bundle, user, host, workspace)
         self._copy = False  # bundle is deployed; launch() on this instance won't re-copy
         return self
 
