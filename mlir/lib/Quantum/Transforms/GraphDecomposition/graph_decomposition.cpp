@@ -60,6 +60,7 @@
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
+#include "DecompUtils.hpp"
 
 #define DEBUG_TYPE "graph-decomposition"
 
@@ -104,10 +105,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Step 1: Gather inputs for graph
         std::vector<OperatorNode> setOfOps;
         std::vector<RuleNode> setOfRules;
-        llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> ruleNameToFuncOp;
         llvm::StringSet<> userRuleNames;
-        llvm::SmallVector<mlir::OwningOpRef<func::FuncOp>>
-            allUserRules; // includes rules unused in this decomp
         llvm::StringMap<std::string> opToFixedDecompName;
         llvm::StringMap<llvm::SmallVector<std::string>> opToAltDecompNames;
         WeightedGateset targetGateSet;
@@ -128,7 +126,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // NOTE: getOperators must be after getRuleNodes, which removes user rules from the module.
         // This prevents operators in user rules from being added to the graph.
-        getRuleNodes(bytecodeRulesFile, setOfRules, userRuleNames, allUserRules, ruleNameToFuncOp);
+        if (failed(getRuleNodes(bytecodeRulesFile, setOfRules, userRuleNames))) {
+            return signalPassFailure();
+        }
         getOperators(setOfOps);
 
         ///////////////////////////
@@ -139,30 +139,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
         auto solution = solver.solve();
-        ///////////////////////////
-        // Step 3: Insert decomposition rules picked by the graph solver (solution) into the
-        // module
-        insertChosenRules(solution, ruleNameToFuncOp);
 
         ///////////////////////////
-        // Step 4: Convert python-decompositions from reference to value semantics and run
+        // Step 3: Convert python-decompositions from reference to value semantics and run
         // decompose-lowering to apply the chosen decomposition rules
         ModuleOp module = getOperation();
         OpPassManager pm("builtin.module");
+
+        DecomposeLoweringPassOptions dlOptions;
+        for (auto &[op, chosenRule] : solution) {
+            dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+        }
+
         pm.addPass(qref::createValueSemanticsConversionPass());
-        pm.addPass(createDecomposeLoweringPass());
+        pm.addPass(createDecomposeLoweringPass(dlOptions));
 
         if (failed(runPipeline(pm, module))) {
             return signalPassFailure();
-        }
-
-        ///////////////////////////
-        // Step 5: Re-introduce any missing user rules for future decompositions
-        SymbolTable symbolTable(module);
-        for (auto &rule : allUserRules) {
-            if (!symbolTable.lookup<func::FuncOp>(rule->getName())) {
-                module.getBody()->push_back(rule.release());
-            }
         }
     }
 
@@ -236,144 +229,203 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
-    void loadBuiltInDecompositionRules(
-        llvm::StringRef filename,
-        llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &ruleRegistry)
+    LogicalResult addRuleNode(mlir::func::FuncOp rule, std::vector<RuleNode> &ruleNodes)
+    {
+        llvm::StringRef ruleName = rule.getName();
+
+        // 1. Mandatory Attribute Check (Target Gate and Resources)
+        auto targetGateAttr = rule->getAttrOfType<StringAttr>(DecompUtils::target_gate_attr_name);
+        auto resourcesAttr = rule->getAttrOfType<DictionaryAttr>("resources");
+        if (!targetGateAttr) {
+            llvm::errs() << "Cannot parse decomposition rule " << ruleName
+                         << " without the `target_gate` attribute.\n";
+            LDBG() << rule;
+            return failure();
+        }
+
+        // Try to generate resources if they're missing
+        if (!resourcesAttr) {
+            ResourceAnalysis analysis(rule);
+            if (const ResourceResult *flat = analysis.getFlattenedResource(rule.getName())) {
+                rule->setAttr("resources", buildResourceDict(&getContext(), *flat));
+            }
+            resourcesAttr = rule->getAttrOfType<DictionaryAttr>("resources");
+        }
+
+        // Fail if resources are missing
+        if (!resourcesAttr) {
+            llvm::errs() << "Decomposition rule " << ruleName
+                         << " was provided without resources, and resources could not be generated "
+                            "for it.\n";
+            return failure();
+        }
+
+        // 2. Extract 'operations' dictionary from resources
+        auto operations = mlir::dyn_cast_or_null<DictionaryAttr>(resourcesAttr.get("operations"));
+        if (!operations) {
+            llvm::errs() << "Cannot parse resource for decomposition rule " << ruleName
+                         << " without `operations` attribute.\n";
+            LDBG() << rule;
+            return failure();
+        }
+
+        // 3. Populate RuleNode
+        RuleNode ruleNode;
+        ruleNode.name = ruleName.str();
+        ruleNode.output = parseOperator(targetGateAttr.getValue());
+
+        for (const auto &namedAttr : operations) {
+            if (auto intAttr = mlir::dyn_cast<IntegerAttr>(namedAttr.getValue())) {
+                ruleNode.inputs.push_back({parseOperator(namedAttr.getName().strref()),
+                                           static_cast<uint32_t>(intAttr.getInt())});
+            }
+        }
+
+        // 4. Add RuleNode
+        ruleNodes.push_back(std::move(ruleNode));
+        return success();
+    }
+
+    LogicalResult loadBuiltInDecompositionRules(llvm::StringRef filename,
+                                                std::vector<RuleNode> &ruleNodes)
     {
         mlir::MLIRContext *context = &getContext();
+        mlir::ModuleOp module = getOperation();
         mlir::ParserConfig config(context);
-        mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
+        mlir::OwningOpRef<mlir::ModuleOp> builtinModule =
             mlir::parseSourceFile<mlir::ModuleOp>(filename, config);
 
-        if (!moduleOp) {
-            mlir::emitError(mlir::UnknownLoc::get(context))
-                << "failed to load built-in decomposition rules from '" << filename
-                << "': the rules file could not be parsed";
-            return;
+        SymbolTable symbolTable(module);
+
+        if (!builtinModule) {
+            llvm::errs() << "failed to load built-in decomposition rules from '" << filename
+                         << "': the rules file could not be parsed\n";
+            return failure();
         }
 
-        for (auto rule : llvm::make_early_inc_range(moduleOp.get().getOps<mlir::func::FuncOp>())) {
-            rule->remove();
-            ruleRegistry.push_back(std::move(rule));
+        for (auto rule :
+             llvm::make_early_inc_range(builtinModule.get().getOps<mlir::func::FuncOp>())) {
+            if (failed(addRuleNode(rule, ruleNodes))) {
+                return failure();
+            }
+            // avoid double-insertion
+            if (!symbolTable.lookup<mlir::func::FuncOp>(rule.getName())) {
+                rule->remove();
+                module.push_back(std::move(rule));
+            }
         }
-        return;
+        return success();
     }
 
     /**
-     * @brief Remove user rules from the module, loading into
+     * @brief Load the listed user rules into the set of RuleNodes for the graph.
      */
-    LogicalResult
-    loadUserDecompositionRules(llvm::StringSet<> &userRuleNames,
-                               llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &graphRules,
-                               llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &rules)
+    LogicalResult loadUserDecompositionRules(llvm::StringSet<> &userRuleNames,
+                                             std::vector<RuleNode> &ruleNodes)
     {
         mlir::ModuleOp module = getOperation();
         if (userRuleNames.empty()) {
             return success();
         }
 
-        PassManager pm(&getContext());
-        pm.addPass(createRegisterDecompRuleResourcePass());
-        if (failed(pm.run(module))) {
-            module.emitError() << "failed to load user decomposition rules: unable to run resource "
-                                  "annotation pass";
-            return failure();
-        }
-
-        llvm::SmallVector<mlir::func::FuncOp> userRules;
-
-        module.walk([&](mlir::func::FuncOp func) {
-            if (func->hasAttr("target_gate")) {
-                userRules.push_back(func);
+        WalkResult walkResult = module.walk([&](mlir::func::FuncOp func) {
+            if (func->hasAttr(DecompUtils::target_gate_attr_name)) {
                 if (userRuleNames.contains(func.getName())) {
-                    graphRules.push_back(mlir::OwningOpRef<mlir::func::FuncOp>(func.clone()));
+                    if (failed(addRuleNode(func, ruleNodes))) {
+                        return WalkResult::interrupt();
+                    }
                 }
             }
             return WalkResult::skip();
         });
 
-        for (auto rule : llvm::make_early_inc_range(userRules)) {
-            rule->remove();
-            rules.push_back(std::move(rule));
+        if (walkResult.wasInterrupted()) {
+            return failure();
         }
+
         return success();
     }
 
     /**
      * @brief
-     * Use python to lower decomposition rules for all `quantum.paulirot` operations in the circuit,
-     * annotating the lowered decomposition rules with resources and target gates. The target gate
-     * for the decomposition rule associated with Pauli word `ABC` will be `paulirotABC`.
+     * Use python to lower decomposition rules for all unhandled decomposable operations in the
+     * circuit, annotating the lowered decomposition rules with resources and target gates.
      */
-    mlir::LogicalResult
-    loadPauliRotRules(llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> &ruleRegistry)
+    mlir::LogicalResult loadPythonDecomps(std::vector<RuleNode> &ruleNodes)
     {
         mlir::ModuleOp module = getOperation();
         MLIRContext *context = &getContext();
 
-        llvm::StringSet<> addedWords;
+        llvm::StringSet<> handledOpIds;
+        // Add IDs from existing decomposable ops with decomposition rules
+        // NOTE: we assume in general that if one decomposition rule for an op is available, then
+        // all decomposition rules for that op are available. No system should introduce a subset of
+        // the rules for an op.
+        module.walk([&](mlir::func::FuncOp func) {
+            if (func->hasAttr("target_gate")) {
+                handledOpIds.insert(func->getAttrOfType<StringAttr>("target_gate").str());
+            }
+        });
 
-        llvm::SmallVector<quantum::PauliRotOp> pauliRotOps;
-        module.walk([&](quantum::PauliRotOp op) { pauliRotOps.push_back(op); });
+        llvm::SmallVector<quantum::DecomposableGate> decomposableOps;
+        module.walk([&](quantum::DecomposableGate op) { decomposableOps.push_back(op); });
 
-        if (!pauliRotOps.empty()) {
-            loadQPD(libQPDPath, libpythonPath);
+        if (!decomposableOps.empty()) {
+            if (!loadQPD(libQPDPath, libpythonPath)) {
+                llvm::errs() << "failed to load libQuantumPythonCallbacks\n";
+                return failure();
+            }
         }
 
-        for (quantum::PauliRotOp pauliRot : pauliRotOps) {
-            std::string pauliWord = pauliRot.getPauliWord();
+        for (quantum::DecomposableGate op : decomposableOps) {
+            std::string opId = op.getGraphOpId();
 
-            if (addedWords.contains(pauliWord)) {
+            if (handledOpIds.contains(opId)) {
                 continue;
             }
-            addedWords.insert(pauliWord);
+            handledOpIds.insert(opId);
 
-            std::vector<int> wires(pauliRot.getInQubits().size());
-            std::iota(wires.begin(), wires.end(), 0);
-
-            std::string mlirText = pythonLowerPauliRot(0.2, pauliWord, wires);
+            std::string mlirText = pythonRuleLowering(op);
 
             mlir::ParserConfig config(context);
             auto moduleOp = mlir::parseSourceString(llvm::StringRef(mlirText), config);
             if (!moduleOp) {
+                // If we fail to parse the lowered module this op will be left without a
+                // decomposition, so we must fail here.
                 llvm::errs() << "failed to parse MLIR from python-decomposition\n";
                 return failure();
             }
 
-            mlir::OwningOpRef<mlir::func::FuncOp> outOp;
             moduleOp->walk([&](mlir::func::FuncOp func) {
-                // TODO: enable multiple decomposition rules for the same operator
-                if (func.getName() == "paulirot_decomp_rule") {
+                if (func.getName().starts_with(opId)) {
+                    mlir::OwningOpRef<mlir::func::FuncOp> outOp;
                     func->remove();
                     outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
-                    return mlir::WalkResult::interrupt();
+                    mlir::func::FuncOp funcOp = outOp.get();
+                    funcOp->setAttr("target_gate", mlir::StringAttr::get(context, opId));
+
+                    // if we fail to add one of the decomps, we still want to try for the rest
+                    std::ignore = addRuleNode(funcOp, ruleNodes);
+                    LDBG() << "adding rule " << funcOp.getName();
+                    module.push_back(std::move(outOp.release()));
                 }
                 return mlir::WalkResult::advance();
             });
-
-            if (!outOp) {
-                llvm::errs() << "failed to find paulirot_decomp_rule in parsed MLIR\n";
-                return failure();
-            }
-
-            mlir::func::FuncOp funcOp = outOp.get();
-            outOp->setName((outOp->getName() + "_" + pauliWord).str()); // unique name per pauliword
-            funcOp->setAttr("target_gate", mlir::StringAttr::get(context, "paulirot" + pauliWord));
-
-            auto analysis = ResourceAnalysis(funcOp);
-            if (const ResourceResult *flat = analysis.getFlattenedResource(funcOp.getName())) {
-                funcOp->setAttr("resources", buildResourceDict(context, *flat));
-            }
-
-            ruleRegistry.push_back(std::move(outOp));
         }
-
         return success();
     }
 
     void getOperators(std::vector<OperatorNode> &operators)
     {
+        // TODO: replace this with DecomposableGate interface. We will drop support for any other op
+        // types once the interface has been implemented for the core operations in the quantum
+        // dialect.
+        // The interface will provide one unified way of generating operator nodes from operations,
+        // with consistent getter methods for all relevant data fields.
         getOperation().walk([&](quantum::QuantumGate op) {
+            if (DecompUtils::isInDecompRule(op)) {
+                return;
+            }
             OperatorNode node;
             node.numWires = op.getNonCtrlQubitOperands().size();
             node.adjoint = op.getAdjointFlag();
@@ -388,7 +440,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     name = "GlobalPhase";
                 }
                 else if (name == "paulirot") {
-                    name = "paulirot" + cast<quantum::PauliRotOp>(op.getOperation()).getPauliWord();
+                    name = cast<DecomposableGate>(op.getOperation()).getGraphOpId();
                 }
                 node.name = name;
             }
@@ -455,84 +507,22 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     /**
      * @brief Create RuleNodes for each rule available to be used in graph decomposition.
      */
-    void getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
-                      llvm::StringSet<> &userRuleNames,
-                      llvm::SmallVector<mlir::OwningOpRef<func::FuncOp>> &userRules,
-                      llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
+    LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
+                               llvm::StringSet<> &userRuleNames)
     {
-        llvm::SmallVector<mlir::OwningOpRef<mlir::func::FuncOp>> graphRules;
+        // Load pre-compiled rules (ignore failure, we can try to solve without)
+        std::ignore = loadBuiltInDecompositionRules(filename, rules);
 
-        // Load rules from bytecode and user-defined rules
-        loadBuiltInDecompositionRules(filename, graphRules);
-        if (failed(loadPauliRotRules(graphRules))) {
-            return signalPassFailure();
-        }
-        if (failed(loadUserDecompositionRules(userRuleNames, graphRules, userRules))) {
-            return signalPassFailure();
+        // Lower and load compile-time rules
+        if (failed(loadPythonDecomps(rules))) {
+            return failure();
         }
 
-        for (auto &ruleOpRef : graphRules) {
-            mlir::func::FuncOp func = ruleOpRef.get();
-            llvm::StringRef ruleName = func.getName();
-
-            // 1. Mandatory Attribute Check (Target Gate and Resources)
-            auto targetGateAttr = func->getAttrOfType<StringAttr>("target_gate");
-            auto resourcesAttr = func->getAttrOfType<DictionaryAttr>("resources");
-            if (!targetGateAttr || !resourcesAttr)
-                continue;
-
-            // 2. Extract 'operations' dictionary from resources
-            auto operations =
-                mlir::dyn_cast_or_null<DictionaryAttr>(resourcesAttr.get("operations"));
-            if (!operations)
-                continue;
-
-            // 3. Populate RuleNode
-            RuleNode ruleNode;
-            ruleNode.name = ruleName.str();
-            ruleNode.output = parseOperator(targetGateAttr.getValue());
-
-            for (const auto &namedAttr : operations) {
-                if (auto intAttr = mlir::dyn_cast<IntegerAttr>(namedAttr.getValue())) {
-                    ruleNode.inputs.push_back({parseOperator(namedAttr.getName().strref()),
-                                               static_cast<uint32_t>(intAttr.getInt())});
-                }
-            }
-
-            // 4. Finalize: move the OpRef to the map to keep IR alive and store the node
-            ruleNameToFuncOp[ruleNode.name] = std::move(ruleOpRef);
-            rules.push_back(std::move(ruleNode));
+        // Load user-rules
+        if (failed(loadUserDecompositionRules(userRuleNames, rules))) {
+            return failure();
         }
-    }
-
-    /**
-     * @brief Insert the decomposition rules picked by the graph solver into the module for
-     * later use in the decompose-lowering patterns to apply the decomposition rules and rewrite
-     * the quantum operations.
-     *
-     * @param solution The chosen decomposition rules from the graph solver.
-     * @param ruleNameToFuncOp A mapping from rule names to their corresponding function
-     * operations.
-     */
-    void insertChosenRules(GraphResult &solution,
-                           llvm::StringMap<mlir::OwningOpRef<func::FuncOp>> &ruleNameToFuncOp)
-    {
-        mlir::ModuleOp module = getOperation();
-        for (const auto &[_, chosenRule] : solution) {
-            if (chosenRule.isBasis) {
-                continue; // skip basis rules as they don't correspond to actual decomposition
-                          // functions to insert
-            }
-            auto it = ruleNameToFuncOp.find(chosenRule.ruleName);
-
-            if (it == ruleNameToFuncOp.end() || !it->second) {
-                // skip if the rule is not found or
-                // the function op is null or
-                // it is already moved
-                continue;
-            }
-            module.push_back(it->second.release());
-        }
+        return success();
     }
 
     /**
@@ -573,7 +563,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * For each entry, looks up the corresponding RuleNodes in setOfRules by name.
      * Individual rules not found are skipped with a diagnostic.
      *
-     * @param opToAltDecompNames  Parsed mapping from operator name to alternative-rule names.
+     * @param opToAltDecompNames  Parsed mapping from operator name to alternative-rule
+     * names.
      * @param setOfRules          The full list of available decomposition rules.
      * @return Core::AltDecomps   Mapping from OperatorNode to its alternative RuleNodes.
      */

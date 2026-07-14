@@ -2,8 +2,18 @@
 
 <h3>New features since last release</h3>
 
+* The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
+  reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
+  times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
+  gates. Non-integer scale factors are now also accepted for `local-random`. The `mitigation.zne`
+  operation's `numFolds` operand is now always a floating-point tensor; the integer folding methods
+  require integral values and convert the count internally.
+  [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
+
+* Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
+  [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
 
 * The `decompose-lowering` pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
   The pass also no longer applies the `inline`, `cse` and `canonicalize` passes to avoid unnecessary IR mutations.
@@ -22,6 +32,7 @@
   [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
   [(#2993)](https://github.com/PennyLaneAI/catalyst/pull/2993)
   [(#2998)](https://github.com/PennyLaneAI/catalyst/pull/2998)
+  [(#2981)](https://github.com/PennyLaneAI/catalyst/pull/2981)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
@@ -157,6 +168,9 @@
   PennyLane.
   [(#2769)](https://github.com/PennyLaneAI/catalyst/pull/2769)
 
+* Added ``CZ`` support to ``to-ppr`` pass.
+  [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
@@ -164,6 +178,10 @@
 
 * Removes support for `Transform.plxpr_transform` from the `qp.qjit(capture=True)` capture pipeline.
   All transforms must now have a MLIR or XDSL implementation and a corresponding `pass_name`.
+
+* Support for `qjit` integration with `cudaq` has been removed in order to feasbily drop support 
+  for Python 3.11.
+  [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
 
 <h3>Deprecations 👋</h3>
 
@@ -224,6 +242,17 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
+  of the default else branch.
+  [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
+* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass. This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph. This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
+  [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
+
+* The `graph-decomposition` pass eliminates three redundant IR manipulations:
+  the cloning, removal, and re-insertion of user rules. This optimization is particularly
+  beneficial when the pass is executed multiple times within the compilation pipeline.
+  [(#2977)](https://github.com/PennyLaneAI/catalyst/pull/2977)
 
 * `from_plxpr` no longer depends on the `Transform.plxpr_transform` property.
   [(#3004)](https://github.com/PennyLaneAI/catalyst/pull/3004)
@@ -380,10 +409,19 @@
   used in conjunction with the `measurements-from-samples` pass.
   [(#2958)](https://github.com/PennyLaneAI/catalyst/pull/2958)
 
+* Rename the pipeline names in the default pipeline specification (e.g. `quantum-compilation-pipeline`) to match the
+  `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
+  [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
   [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
+
+* The [MLIR Plugins](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html)
+  documentation has been updated to fix a number of typos and formatting issues, and to improve
+  overall readability.
+  [(#3005)](https://github.com/PennyLaneAI/catalyst/pull/3005)
 
 <h3>Contributors ✍️</h3>
 
@@ -395,6 +433,9 @@ Yushao Chen,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+JiaRung Jian,
+Jacob Kitchen,
+Korbinian Kottmann,
 Christina Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,

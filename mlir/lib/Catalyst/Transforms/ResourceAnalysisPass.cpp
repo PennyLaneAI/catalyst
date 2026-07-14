@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
+#include <cstdint>
 #include <fstream>
 #include <string>
 
