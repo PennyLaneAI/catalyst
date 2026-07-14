@@ -1223,6 +1223,19 @@ mlir::DictionaryAttr PCPhaseOp::getStaticData()
     return mlir::DictionaryAttr::get(getContext(), {});
 }
 
+// GlobalPhaseOp
+
+std::string GlobalPhaseOp::getOperatorName() { return "GlobalPhase"; }
+
+mlir::TypeRange GlobalPhaseOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> GlobalPhaseOp::getWireLens() { return {0}; }
+
+mlir::DictionaryAttr GlobalPhaseOp::getStaticData()
+{
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
 // OperatorOp
 
 std::string OperatorOp::getOperatorName() { return getOpName().str(); }

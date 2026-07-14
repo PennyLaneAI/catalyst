@@ -191,6 +191,39 @@ module {
     ASSERT_EQ(pcphase.getGraphOpId(), "PCPhase[f64,f64][2]{}");
 }
 
+TEST(DecomposableGateInterfaceTests, GlobalPhaseOp)
+{
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  quantum.gphase(%angle)
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate gphase = *module->getOps<GlobalPhaseOp>().begin();
+
+    ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
+
+    // This is needed to keep the backing array from being deleted
+    llvm::SmallVector<mlir::Type, 1> backing({mlir::Float64Type::get(&context)});
+    mlir::TypeRange expectedDynamicShape(backing);
+    ASSERT_EQ(llvm::SmallVector<mlir::Type>(gphase.getDynamicShape()),
+              llvm::SmallVector<mlir::Type>(expectedDynamicShape));
+
+    ASSERT_EQ(gphase.getWireLens(), std::vector<size_t>({0}));
+
+    ASSERT_EQ(gphase.getStaticData().size(), 0);
+
+    ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase[f64][0]{}");
+}
+
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits)
 {
     std::string moduleStr = R"mlir(

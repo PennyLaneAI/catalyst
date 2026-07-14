@@ -738,7 +738,8 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
     let hasVerifier = 1;
 }
 
-def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments,
+                                              DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Global Phase.";
 
     let description = [{
