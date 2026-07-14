@@ -125,11 +125,7 @@ Value buildStackPtrArray(Location loc, RewriterBase &rewriter, ArrayRef<Value> p
 // For complex<T>, the size is 2 * sizeof(T). 1 for real, 1 for imaginary.
 int64_t memrefElemSizeBytes(MemRefType ty)
 {
-    Type elem = ty.getElementType();
-    if (auto cplx = dyn_cast<ComplexType>(elem)) {
-        return 2 * ((cplx.getElementType().getIntOrFloatBitWidth() + 7) / 8);
-    }
-    return (elem.getIntOrFloatBitWidth() + 7) / 8;
+    return primitiveByteSize(ty.getElementType());
 }
 
 /// Byte size of a primitive element, used for the byte-buffer marshalling path.
