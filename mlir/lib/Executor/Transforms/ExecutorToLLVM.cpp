@@ -58,6 +58,18 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
                                ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
+// Generate a global key for an executor address.
+std::string addrGlobalKey(StringRef address)
+{
+    std::string key = "executor_addr_";
+    for (char c : address) {
+        bool ok =
+            (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+        key.push_back(ok ? c : '_');
+    }
+    return key;
+}
+
 // Get or create a `internal constant !llvm.array<N x i64>` global.
 // And return a `!llvm.ptr` to its first element.
 //
@@ -121,17 +133,6 @@ Value buildStackPtrArray(Location loc, RewriterBase &rewriter, ArrayRef<Value> p
     return alloca;
 }
 
-// Calculate the byte size of one memref element.
-// For complex<T>, the size is 2 * sizeof(T). 1 for real, 1 for imaginary.
-int64_t memrefElemSizeBytes(MemRefType ty)
-{
-    Type elem = ty.getElementType();
-    if (auto cplx = dyn_cast<ComplexType>(elem)) {
-        return 2 * ((cplx.getElementType().getIntOrFloatBitWidth() + 7) / 8);
-    }
-    return (elem.getIntOrFloatBitWidth() + 7) / 8;
-}
-
 /// Byte size of a primitive element, used for the byte-buffer marshalling path.
 int64_t primitiveByteSize(Type ty)
 {
@@ -150,6 +151,11 @@ int64_t primitiveByteSize(Type ty)
     }
     return -1;
 }
+
+// Byte size of one memref element, or -1 on unsupported element types.
+// Delegates to primitiveByteSize so the launch and call paths agree
+// (in particular, index is treated as 8 bytes, not asserted on).
+int64_t memrefElemSizeBytes(MemRefType ty) { return primitiveByteSize(ty.getElementType()); }
 
 //===----------------------------------------------------------------------===//
 // executor.open  ->  __catalyst__executor__open(addr)
@@ -171,8 +177,8 @@ struct OpenOpLowering : public OpConversionPattern<executor::OpenOp> {
         LLVM::LLVMFuncOp openFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__executor__open", openSig);
 
-        Value addrPtr =
-            getGlobalString(loc, rewriter, "remote_setup_addr", op.getAddress().str() + '\0', mod);
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
+                                        op.getAddress().str() + '\0', mod);
 
         LLVM::CallOp::create(rewriter, loc, openFn, ValueRange{addrPtr});
         rewriter.eraseOp(op);
@@ -202,9 +208,9 @@ struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp>
             rewriter, op, "__catalyst__executor__send_binary", sendBinSig);
 
         std::string tag = llvm::sys::path::stem(op.getBinaryPath()).str();
-        Value addrPtr =
-            getGlobalString(loc, rewriter, "remote_addr_" + tag, op.getAddress().str() + '\0', mod);
-        Value pathPtr = getGlobalString(loc, rewriter, "remote_path_" + tag,
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
+                                        op.getAddress().str() + '\0', mod);
+        Value pathPtr = getGlobalString(loc, rewriter, "executor_path_" + tag,
                                         op.getBinaryPath().str() + '\0', mod);
         Value formatTag =
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(op.getFormat()));
@@ -235,7 +241,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
 
         // parameters:
-        // - addr: the address of the remote executor
+        // - addr: the address of the executor
         // - symbol: the symbol to invoke
         // - num_inputs: the number of input arguments
         // - input_descs: the input descriptor array
@@ -250,19 +256,24 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
             rewriter, op, "__catalyst__executor__launch", launchSig);
 
         std::string callee = op.getKernelCallee().str();
-        Value addrPtr = getGlobalString(loc, rewriter, "remote_addr_" + callee,
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
                                         op.getAddress().str() + '\0', mod);
 
         std::string symbolName = "_catalyst_pyface_" + callee;
         Value symbolPtr =
-            getGlobalString(loc, rewriter, "remote_sym_" + callee, symbolName + '\0', mod);
+            getGlobalString(loc, rewriter, "executor_sym_" + callee, symbolName + '\0', mod);
 
         SmallVector<Value> inputDescPtrs;
         SmallVector<int64_t> inputRanks, inputElemSizes;
         for (auto [origInput, llvmInput] : llvm::zip(op.getInputs(), adaptor.getInputs())) {
             auto memrefTy = cast<MemRefType>(origInput.getType());
+            int64_t elemSz = memrefElemSizeBytes(memrefTy);
+            if (elemSz < 0) {
+                return op->emitOpError("unsupported memref element type for executor.launch: ")
+                       << memrefTy.getElementType();
+            }
             inputRanks.push_back(memrefTy.getRank());
-            inputElemSizes.push_back(memrefElemSizeBytes(memrefTy));
+            inputElemSizes.push_back(elemSz);
             Value alloca = getStaticAlloca(loc, rewriter, llvmInput.getType(), 1);
             LLVM::StoreOp::create(rewriter, loc, llvmInput, alloca);
             inputDescPtrs.push_back(alloca);
@@ -272,8 +283,13 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         SmallVector<int64_t> outputRanks, outputElemSizes;
         for (Type resultTy : op.getResultTypes()) {
             auto memrefTy = cast<MemRefType>(resultTy);
+            int64_t elemSz = memrefElemSizeBytes(memrefTy);
+            if (elemSz < 0) {
+                return op->emitOpError("unsupported memref element type for executor.launch: ")
+                       << memrefTy.getElementType();
+            }
             outputRanks.push_back(memrefTy.getRank());
-            outputElemSizes.push_back(memrefElemSizeBytes(memrefTy));
+            outputElemSizes.push_back(elemSz);
             Type llvmDescTy = getTypeConverter()->convertType(resultTy);
             Value alloca = getStaticAlloca(loc, rewriter, llvmDescTy, 1);
             outputDescPtrs.push_back(alloca);
@@ -283,13 +299,13 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         Value outputDescsArr = buildStackPtrArray(loc, rewriter, outputDescPtrs);
 
         Value inputRanksArr =
-            getGlobalI64Array(loc, rewriter, "remote_in_ranks_" + callee, inputRanks, mod);
+            getGlobalI64Array(loc, rewriter, "executor_in_ranks_" + callee, inputRanks, mod);
         Value inputSizesArr =
-            getGlobalI64Array(loc, rewriter, "remote_in_sizes_" + callee, inputElemSizes, mod);
+            getGlobalI64Array(loc, rewriter, "executor_in_sizes_" + callee, inputElemSizes, mod);
         Value outputRanksArr =
-            getGlobalI64Array(loc, rewriter, "remote_out_ranks_" + callee, outputRanks, mod);
+            getGlobalI64Array(loc, rewriter, "executor_out_ranks_" + callee, outputRanks, mod);
         Value outputSizesArr =
-            getGlobalI64Array(loc, rewriter, "remote_out_sizes_" + callee, outputElemSizes, mod);
+            getGlobalI64Array(loc, rewriter, "executor_out_sizes_" + callee, outputElemSizes, mod);
 
         Value numInputs = LLVM::ConstantOp::create(
             rewriter, loc, rewriter.getI64IntegerAttr(inputDescPtrs.size()));
@@ -355,7 +371,7 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
 
         // parameters:
-        // - addr: the address of the remote executor
+        // - addr: the address of the executor
         // - symbol: the symbol to invoke
         // - args_buf: the input buffer
         // - args_size: the size of the input buffer
@@ -394,9 +410,9 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
         Type bufTy = LLVM::LLVMArrayType::get(i8Ty, totalInputBytes > 0 ? totalInputBytes : 1);
         std::string sym = op.getSymbol().str();
 
-        Value addrPtr = getGlobalString(loc, rewriter, "remote_lib_addr_" + sym,
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
                                         op.getAddress().str() + '\0', mod);
-        Value symPtr = getGlobalString(loc, rewriter, "remote_lib_sym_" + sym, sym + '\0', mod);
+        Value symPtr = getGlobalString(loc, rewriter, "executor_lib_sym_" + sym, sym + '\0', mod);
 
         Value argsBuf = getStaticAlloca(loc, rewriter, bufTy, 1);
         for (unsigned i = 0; i < numInputs; ++i) {
@@ -445,6 +461,35 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// executor.close  ->  __catalyst__executor__close(addr)
+//===----------------------------------------------------------------------===//
+
+struct CloseOpLowering : public OpConversionPattern<executor::CloseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(executor::CloseOp op, OpAdaptor /*adaptor*/,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        Type i64Ty = rewriter.getI64Type();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        Type closeSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy});
+        LLVM::LLVMFuncOp closeFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__executor__close", closeSig);
+
+        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
+                                        op.getAddress().str() + '\0', mod);
+
+        LLVM::CallOp::create(rewriter, loc, closeFn, ValueRange{addrPtr});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
 
@@ -459,8 +504,8 @@ struct ConvertExecutorToLLVMPass : impl::ConvertExecutorToLLVMPassBase<ConvertEx
         LLVMTypeConverter typeConverter(ctx);
 
         RewritePatternSet patterns(ctx);
-        patterns.add<OpenOpLowering, SendBinaryOpLowering, LaunchOpLowering, CallOpLowering>(
-            typeConverter, ctx);
+        patterns.add<OpenOpLowering, SendBinaryOpLowering, LaunchOpLowering, CallOpLowering,
+                     CloseOpLowering>(typeConverter, ctx);
 
         LLVMConversionTarget target(*ctx);
         target.addLegalOp<ModuleOp>();
