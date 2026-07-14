@@ -104,3 +104,20 @@ func.func @test_ppr_to_ppm_with_condition(%q0 : !quantum.bit, %q1 : !quantum.bit
     // CHECK:   scf.yield [[arg1]], [[arg2]], [[arg3]]
     // CHECK: }
 }
+
+// -----
+
+// ppr-to-ppm generates Pauli product measurements, which cannot be reversed by
+// the adjoint-lowering pass, so a quantum.adjoint region in the input must be
+// rejected up front with a clear error instead of asserting later.
+func.func @test_ppr_to_ppm_rejects_adjoint(%r: !quantum.reg) -> !quantum.reg {
+    // expected-error@+1 {{ppr-to-ppm cannot be applied to operations inside a 'quantum.adjoint' region}}
+    %r_out = quantum.adjoint(%r) : !quantum.reg {
+    ^bb0(%arg0: !quantum.reg):
+        %0 = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+        %1 = pbc.ppr ["Z"](4) %0 : !quantum.bit
+        %2 = quantum.insert %arg0[0], %1 : !quantum.reg, !quantum.bit
+        quantum.yield %2 : !quantum.reg
+    }
+    return %r_out : !quantum.reg
+}

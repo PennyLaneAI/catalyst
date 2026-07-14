@@ -178,6 +178,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `ppr-to-ppm` pass now raises a clear error when its input contains a `quantum.adjoint`
+  region, instead of failing later with a raw compiler assertion. The generated Pauli product
+  measurements cannot be reversed by the `adjoint-lowering` pass, so this input is now rejected
+  up front.
+  [(#2934)](https://github.com/PennyLaneAI/catalyst/pull/2934)
+
 * Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
   the top-level module. Functions inside nested modules, such as kernels called through
   `catalyst.launch_kernel`, are now included in the output.
