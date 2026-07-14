@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Path.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
@@ -42,12 +43,28 @@ namespace {
 // Local conversion helpers
 //===----------------------------------------------------------------------===//
 
+// Map a string to a safe LLVM global symbol name (non-alphanumerics -> '_'), so a value like a
+// "host:port" address can key a distinct per-value global.
+std::string sanitizeSymbolName(StringRef s)
+{
+    std::string out = s.str();
+    for (char &c : out) {
+        if (!llvm::isAlnum(c)) {
+            c = '_';
+        }
+    }
+    return out;
+}
+
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
                       ModuleOp mod)
 {
     auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
     LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
-    if (!glb) {
+    if (glb) {
+        assert(glb.getValueOrNull() == rewriter.getStringAttr(value) &&
+               "getGlobalString: global key reused with a different value");
+    } else {
         OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(mod.getBody());
         glb = LLVM::GlobalOp::create(rewriter, loc, type, true, LLVM::Linkage::Internal, key,
@@ -171,8 +188,9 @@ struct OpenOpLowering : public OpConversionPattern<remote::OpenOp> {
         LLVM::LLVMFuncOp openFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__remote__open", openSig);
 
-        Value addrPtr =
-            getGlobalString(loc, rewriter, "remote_setup_addr", op.getAddress().str() + '\0', mod);
+        std::string address = op.getAddress().str();
+        std::string key = "remote_open_addr_" + sanitizeSymbolName(address);
+        Value addrPtr = getGlobalString(loc, rewriter, key, address + '\0', mod);
 
         LLVM::CallOp::create(rewriter, loc, openFn, ValueRange{addrPtr});
         rewriter.eraseOp(op);
