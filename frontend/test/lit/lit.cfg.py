@@ -23,7 +23,7 @@ config.test_format = lit.formats.ShTest(True)
 
 # Define the file extensions to treat as test files (with the exception of this file).
 config.suffixes = [".py", ".mlir"]
-config.excludes = ["lit.cfg.py", "utils.py", "catalyst.autograph.exclusion.py"]
+config.excludes = ["lit.cfg.py", "utils.py", "catalyst.autograph.exclusion.py", "test_rules.mlir"]
 
 # Define the root path of where to look for tests.
 config.test_source_root = os.path.dirname(__file__)
@@ -68,6 +68,9 @@ if os.environ.get("ENABLE_LIT_COVERAGE", "0") == "1":
     )
 
 config.substitutions.append(("%PYTHON", python_executable))
+config.substitutions.append(
+    ("%BYTECODE_PATH", config.test_source_root + "/GraphDecomposition/test_rules.mlirbc")
+)
 
 # allow virtual env for embedded interpreter
 config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", "")
