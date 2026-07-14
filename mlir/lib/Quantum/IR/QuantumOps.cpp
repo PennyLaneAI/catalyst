@@ -14,23 +14,47 @@
 
 #include "Quantum/IR/QuantumOps.h"
 
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <sstream>
+#include <string>
 #include <type_traits>
 #include <vector>
 
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
 
 #include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -1141,4 +1165,51 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
                                       static_cast<int32_t>(inCtrlQubits.size()), inQreg ? 1 : 0}));
 
     return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Quantum op interface methods.
+//===----------------------------------------------------------------------===//
+
+// PauliRotOp
+
+std::string PauliRotOp::getOperatorName() { return "PauliRot"; }
+
+mlir::TypeRange PauliRotOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> PauliRotOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr PauliRotOp::getStaticData()
+{
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
+        mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+    return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
+}
+
+// OperatorOp
+
+std::string OperatorOp::getOperatorName() { return getOpName().str(); }
+
+mlir::TypeRange OperatorOp::getDynamicShape() { return getParams().getTypes(); }
+
+std::vector<size_t> OperatorOp::getWireLens()
+{
+    if (getInQreg()) {
+        std::vector<size_t> lens;
+        // This assumes static lengths!
+        // If we enable support for dynamic lengths, we need to update this
+        for (mlir::Type indexTensor : getArrQubitIndices().getType()) {
+            for (size_t dim : cast<RankedTensorType>(indexTensor).getShape()) {
+                lens.push_back(size_t(dim));
+            }
+        }
+        return lens;
+    }
+    return {getInQubits().size()};
+}
+
+std::string OperatorOp::getExtraData()
+{
+    return getUID().has_value() ? std::to_string(getUID().value()) : "";
 }
