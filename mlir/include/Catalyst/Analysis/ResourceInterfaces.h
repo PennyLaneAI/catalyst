@@ -12,16 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
 #pragma once
-
-#include <vector>
-
 #include "mlir/IR/OpDefinition.h"
-
-#include "Catalyst/Analysis/ResourceInterfaces.h"
-
-//===----------------------------------------------------------------------===//
-// QRef interface declarations.
-//===----------------------------------------------------------------------===//
-
-#include "QRef/IR/QRefInterfaces.h.inc"
+#include "Catalyst/Analysis/ResourceInterfaces.h.inc"

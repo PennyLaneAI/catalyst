@@ -52,6 +52,12 @@
   duplicate serialization logic and keeping its output consistent.
   [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
 
+* The `ResourceAnalysis` pass now counts quantum, measurement, and allocation
+  ops through dialect-agnostic MLIR OpInterfaces instead of hard-coded check.
+  New dialects can opt in by implementing these interfaces without changing
+  the analysis.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
   [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)

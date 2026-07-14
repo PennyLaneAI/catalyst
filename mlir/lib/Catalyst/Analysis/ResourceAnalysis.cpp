@@ -72,66 +72,6 @@ static bool isCustomDialectOp(Operation *op)
 // Operation categorization helpers
 //===----------------------------------------------------------------------===//
 
-/// Get the name to use for a quantum gate op.
-static std::string getGateOpName(Operation *op, bool isAdjoint)
-{
-    std::string name =
-        llvm::TypeSwitch<Operation *, std::string>(op)
-            .Case<quantum::CustomOp, qref::CustomOp>(
-                [](auto customOp) { return customOp.getGateName().str(); })
-            .Case<quantum::OperatorOp, qref::OperatorOp>(
-                [](auto operatorOp) { return operatorOp.getOpName().str(); })
-            .Case<quantum::PauliRotOp, qref::PauliRotOp>([](auto) { return "PauliRot"; })
-            .Case<quantum::GlobalPhaseOp, qref::GlobalPhaseOp>([](auto) { return "GlobalPhase"; })
-            .Case<quantum::MultiRZOp, qref::MultiRZOp>([](auto) { return "MultiRZ"; })
-            .Case<quantum::PCPhaseOp, qref::PCPhaseOp>([](auto) { return "PCPhase"; })
-            .Case<quantum::QubitUnitaryOp, qref::QubitUnitaryOp>(
-                [](auto) { return "QubitUnitary"; })
-            .Case<quantum::SetStateOp, qref::SetStateOp>([](auto) { return "SetState"; })
-            .Case<quantum::SetBasisStateOp, qref::SetBasisStateOp>(
-                [](auto) { return "SetBasisState"; })
-            .Default([](Operation *o) { return o->getName().getStringRef().str(); });
-
-    // Combine region-level adjoint (from quantum.adjoint) with
-    // op-level adjoint flag (from the adj attribute on the gate).
-    if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
-        isAdjoint ^= gate.getAdjointFlag();
-    }
-
-    if (auto gate = dyn_cast<qref::QuantumGate>(op)) {
-        isAdjoint ^= gate.getAdjointFlag();
-    }
-
-    if (isAdjoint) {
-        name = "Adjoint(" + name + ")";
-    }
-    return name;
-}
-
-/// Get the number of qubits for a gate operation.
-static int getGateQubitCount(Operation *op)
-{
-    if (auto qOp = dyn_cast<quantum::QuantumOperation>(op)) {
-        return static_cast<int>(qOp.getQubitOperands().size());
-    }
-    if (auto qOp = dyn_cast<qref::QuantumOperation>(op)) {
-        return static_cast<int>(qOp.getQubitOperands().size());
-    }
-    return 0;
-}
-
-/// Get the number of parameters for a gate operation.
-static int getGateParamCount(Operation *op)
-{
-    if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
-        return static_cast<int>(gate.getAllParams().size());
-    }
-    if (auto gate = dyn_cast<qref::ParametrizedGate>(op)) {
-        return static_cast<int>(gate.getAllParams().size());
-    }
-    return 0;
-}
-
 /// Get the name for a PBC operation.
 static std::string getPBCOpName(Operation *op)
 {
@@ -158,54 +98,6 @@ static int getPBCQubitCount(Operation *op)
               pbc::SelectPPMeasurementOp>(
             [](auto typedOp) { return static_cast<int>(typedOp.getInQubits().size()); })
         .Default(0);
-}
-
-/// Resolve the observable name from its defining operation.
-/// Mirrors the Python `xdsl_to_qml_measurement_name` in xdsl_conversion.py.
-static std::string getObservableName(Operation *obsOp)
-{
-    if (!obsOp) {
-        return "all wires";
-    }
-
-    return llvm::TypeSwitch<Operation *, std::string>(obsOp)
-        .Case<quantum::ComputationalBasisOp, qref::ComputationalBasisOp>([](auto cbOp) {
-            unsigned n = cbOp.getQubits().size();
-            return n == 0 ? std::string("all wires") : std::to_string(n) + " wires";
-        })
-        .Case<quantum::NamedObsOp, qref::NamedObsOp>(
-            [](auto op) { return stringifyNamedObservable(op.getType()).str(); })
-        .Case<quantum::TensorOp>(
-            [](auto op) { return "Prod(num_terms=" + std::to_string(op.getTerms().size()) + ")"; })
-        .Case<quantum::HamiltonianOp>([](auto op) {
-            return "Hamiltonian(num_terms=" + std::to_string(op.getTerms().size()) + ")";
-        })
-        .Default([](Operation *) { return std::string("all wires"); });
-}
-
-/// Get the full measurement name including observable info.
-/// e.g. "MidCircuitMeasure", "expval(PauliZ)", "sample(all wires)", "probs(2 wires)".
-static std::string getMeasurementName(Operation *op)
-{
-    if (isa<quantum::MeasureOp, qref::MeasureOp>(op)) {
-        return "MidCircuitMeasure";
-    }
-
-    std::string baseName =
-        llvm::TypeSwitch<Operation *, std::string>(op)
-            .Case<quantum::SampleOp>([](auto) { return "sample"; })
-            .Case<quantum::CountsOp>([](auto) { return "counts"; })
-            .Case<quantum::ExpvalOp>([](auto) { return "expval"; })
-            .Case<quantum::VarianceOp>([](auto) { return "var"; })
-            .Case<quantum::ProbsOp>([](auto) { return "probs"; })
-            .Case<quantum::StateOp>([](auto) { return "state"; })
-            .Default([](Operation *o) { return o->getName().getStringRef().str(); });
-
-    if (auto measProc = dyn_cast<quantum::MeasurementProcess>(op)) {
-        return baseName + "(" + getObservableName(measProc.getObs().getDefiningOp()) + ")";
-    }
-
-    return baseName;
 }
 
 /**
@@ -473,23 +365,26 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  */
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
 {
-    // Quantum gates
-    if (isa<quantum::CustomOp, qref::CustomOp, quantum::OperatorOp, qref::OperatorOp,
-            quantum::PauliRotOp, qref::PauliRotOp, quantum::GlobalPhaseOp, qref::GlobalPhaseOp,
-            quantum::MultiRZOp, qref::MultiRZOp, quantum::PCPhaseOp, qref::PCPhaseOp,
-            quantum::QubitUnitaryOp, qref::QubitUnitaryOp, quantum::SetStateOp, qref::SetStateOp,
-            quantum::SetBasisStateOp, qref::SetBasisStateOp>(op)) {
-        std::string name = getGateOpName(op, isAdjoint);
-        int nQubits = getGateQubitCount(op);
-        int nParams = getGateParamCount(op);
+
+    // Skipped ops
+    if (isSkippedOp(op)) {
+        return;
+    }
+
+    if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
+        std::string name = inst.getResourceName().str();
+        if (isAdjoint ^ inst.getResourceAdjointFlag()) {
+            name = "Adjoint(" + name + ")";
+        }
+        uint64_t nQubits = inst.getResourceNumQubits();
+        uint64_t nParams = inst.getResourceNumParams();
         result.operations[name][{nQubits, nParams}] += 1;
         return;
     }
 
     // Measurements
-    if (isa<quantum::MeasureOp, qref::MeasureOp, quantum::SampleOp, quantum::CountsOp,
-            quantum::ExpvalOp, quantum::VarianceOp, quantum::ProbsOp, quantum::StateOp>(op)) {
-        result.measurements[getMeasurementName(op)] += 1;
+    if (auto inst = dyn_cast<ResourceMeasurementOpInterface>(op)) {
+        result.measurements[inst.getResourceMeasurementName()] += 1;
         return;
     }
 
@@ -517,23 +412,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         return;
     }
 
-    // Metadata: qubit allocations
-    if (auto allocOp = dyn_cast<quantum::AllocOp>(op)) {
-        uint64_t nqubits = allocOp.getNqubitsAttr().value_or(0);
-        result.numAllocQubits += nqubits;
-        return;
-    }
-
-    // Metadata: qubit allocations
-    if (auto allocOp = dyn_cast<qref::AllocOp>(op)) {
-        uint64_t nqubits = allocOp.getNqubitsAttr().value_or(0);
-        result.numAllocQubits += nqubits;
-        return;
-    }
-
-    // Metadata: qubit allocation
-    if (isa<quantum::AllocQubitOp, qref::AllocQubitOp>(op)) {
-        result.numAllocQubits += 1;
+    // Qubit allocations
+    if (auto inst = dyn_cast<ResourceAllocQubitOpInterface>(op)) {
+        result.numAllocQubits += inst.getResourceNumAllocQubits();
         return;
     }
 
@@ -547,11 +428,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
                                  << "'. Recursive calls are not flattened, so resource counts may "
                                     "be incomplete.";
         }
-        return;
-    }
-
-    // Skipped ops
-    if (isSkippedOp(op)) {
         return;
     }
 

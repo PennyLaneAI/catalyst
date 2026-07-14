@@ -111,7 +111,7 @@ def NumQubitsOp : Quantum_Op<"num_qubits", [MemoryEffects<[MemRead]>]> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-def AllocOp : Memory_Op<"alloc"> {
+def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];
@@ -132,7 +132,7 @@ def AllocOp : Memory_Op<"alloc"> {
     let hasCanonicalizeMethod = 1;
 }
 
-def AllocQubitOp : Memory_Op<"alloc_qb"> {
+def AllocQubitOp : Memory_Op<"alloc_qb", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate a single qubit.";
     let description = [{
     }];
@@ -264,6 +264,16 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
             values.insert(values.end(), getOutQubits().begin(), getOutQubits().end());
             return values;
         }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getQubitOperands().size();
+        }
+
+        uint64_t getResourceNumParams() { return 0; }
+
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -341,6 +351,25 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
         mlir::ResultRange getCtrlQubitResults() {
             return getOutCtrlQubits();
         }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getQubitOperands().size();
+        }
+
+        uint64_t getResourceNumParams() {
+            if (auto gate = mlir::dyn_cast<quantum::ParametrizedGate>(getOperation())){
+                return gate.getAllParams().size();
+            }
+            return 0;
+        }
+
+        bool getResourceAdjointFlag() {
+            return getAdjointFlag();
+        }
+
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -1152,9 +1181,10 @@ def HamiltonianOp : Observable_Op<"hamiltonian"> {
 // -----
 
 class Measurement_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
+        Quantum_Op<mnemonic, traits # [MeasurementProcess,
+                                        DeclareOpInterfaceMethods<ResourceMeasurementOpInterface>]>;
 
-def MeasureOp : Quantum_Op<"measure"> {
+def MeasureOp : Quantum_Op<"measure", [DeclareOpInterfaceMethods<ResourceMeasurementOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];

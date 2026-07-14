@@ -833,4 +833,31 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
     return success();
 }
 
+//===----------------------------------------------------------------------===//
+// Implement ResourceQuantumOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+llvm::StringRef CustomOp::getResourceName() { return getGateName(); }
+llvm::StringRef SetStateOp::getResourceName() { return "SetState"; }
+llvm::StringRef SetBasisStateOp::getResourceName() { return "SetBasisState"; }
+llvm::StringRef OperatorOp::getResourceName() { return getOpName(); }
+llvm::StringRef PauliRotOp::getResourceName() { return "PauliRot"; }
+llvm::StringRef GlobalPhaseOp::getResourceName() { return "GlobalPhase"; }
+llvm::StringRef MultiRZOp::getResourceName() { return "MultiRZ"; }
+llvm::StringRef PCPhaseOp::getResourceName() { return "PCPhase"; }
+llvm::StringRef QubitUnitaryOp::getResourceName() { return "QubitUnitary"; }
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceMeasurementOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+llvm::StringRef MeasureOp::getResourceMeasurementName() { return "MidCircuitMeasure"; }
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceAllocQubitOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+uint64_t AllocOp::getResourceNumAllocQubits() { return getNqubitsAttr().value_or(0); }
+uint64_t AllocQubitOp::getResourceNumAllocQubits() { return 1; }
+
 } // namespace catalyst::qref

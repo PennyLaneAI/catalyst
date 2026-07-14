@@ -19,6 +19,8 @@
 #include "mlir/IR/OpDefinition.h" // for QuantumInterfaces.h..inc
 #include "mlir/IR/Operation.h"
 
+#include "Catalyst/Analysis/ResourceInterfaces.h"
+
 //===----------------------------------------------------------------------===//
 // Quantum interface declarations.
 //===----------------------------------------------------------------------===//
