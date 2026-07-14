@@ -40,6 +40,7 @@
 
 #define DEBUG_TYPE "split-non-commuting"
 
+#include <cstdint>
 #include <deque>
 
 #include "llvm/ADT/DenseMap.h"
