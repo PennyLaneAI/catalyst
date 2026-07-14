@@ -238,9 +238,14 @@
 
 <h3>Internal changes ⚙️</h3>
 
+<<<<<<< Updated upstream
 * The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
+=======
+* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass. This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph. This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
+  [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
+>>>>>>> Stashed changes
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
