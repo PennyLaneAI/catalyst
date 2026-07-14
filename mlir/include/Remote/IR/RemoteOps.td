@@ -73,12 +73,12 @@ def Remote_LaunchOp : Remote_Op<"launch"> {
     }];
 
     let arguments = (ins
-        Variadic<AnyType>:$inputs,
+        Variadic<AnyMemRef>:$inputs,
         StrAttr:$address,
         StrAttr:$kernel_callee
     );
 
-    let results = (outs Variadic<AnyType>:$results);
+    let results = (outs Variadic<AnyMemRef>:$results);
 
     let assemblyFormat = [{
         `(` $kernel_callee `,` $address `)` `(` $inputs `)` attr-dict
@@ -102,13 +102,13 @@ def Remote_CallOp : Remote_Op<"call"> {
     }];
 
     let arguments = (ins
-        Variadic<AnyType>:$inputs,
+        Variadic<AnyMemRef>:$inputs,
         StrAttr:$address,
         StrAttr:$symbol,
         OptionalAttr<I32Attr>:$num_input_args
     );
 
-    let results = (outs Variadic<AnyType>:$results);
+    let results = (outs Variadic<AnyMemRef>:$results);
 
     let assemblyFormat = [{
         `(` $symbol `,` $address `)` `(` $inputs `)` attr-dict
