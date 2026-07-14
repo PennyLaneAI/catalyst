@@ -439,9 +439,9 @@ def handle_deallocate(self, *wires):
             qreg = parent_eqn.in_tracers[0]
             qregs.add(qreg)
         else:
-            assert (
-                parent_eqn.primitive is qref_get_p
-            ), "Manual deallocation is only supported for manually allocated or fabricated wires"
+            raise AssertionError(
+                "Manual deallocation is only supported for manually allocated or fabricated wires"
+            )
     for qubit in standalone_qubits:
         qref_dealloc_qb_p.bind(qubit)
     if qregs:

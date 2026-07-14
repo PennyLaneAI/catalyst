@@ -102,6 +102,16 @@ LogicalResult RefFabricateOp::verify()
     return mlir::success();
 }
 
+LogicalResult RefFabricateOp::canonicalize(RefFabricateOp op, PatternRewriter &rewriter)
+{
+    if (op->use_empty()) {
+        rewriter.eraseOp(op);
+        return success();
+    }
+
+    return failure();
+}
+
 LogicalResult SelectPPMeasurementOp::verify()
 {
     if (getInQubits().size() != getPauliProduct_0().size() ||

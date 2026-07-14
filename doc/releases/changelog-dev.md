@@ -2,6 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* A new PennyLane operation :func:`~.fabricate` has been added to expose the PBC
+  ``pbc.fabricate`` instruction from the frontend. The operation produces a new auxiliary
+  qubit in a logical factory state (``plus_i``, ``minus_i``, ``magic``, or ``magic_conj``)
+  and is lowered through the ``pbc.ref.fabricate`` reference-semantics op to
+  ``pbc.fabricate`` during compilation.
+  [(#3019)](https://github.com/PennyLaneAI/catalyst/pull/3019)
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
@@ -393,12 +400,6 @@
 * Rename the pipeline names in the default pipeline specification (e.g. `quantum-compilation-pipeline`) to match the
   `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
   [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
-
-* A new PennyLane operation :func:`~.fabricate` has been added to expose the PBC
-  ``pbc.fabricate`` instruction from the frontend. The operation produces a new auxiliary
-  qubit in a logical factory state (``plus_i``, ``minus_i``, ``magic``, or ``magic_conj``)
-  and is lowered through the ``pbc.ref.fabricate`` reference-semantics op to
-  ``pbc.fabricate`` during compilation.
 
 <h3>Documentation 📝</h3>
 

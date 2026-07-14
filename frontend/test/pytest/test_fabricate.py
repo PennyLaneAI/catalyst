@@ -76,3 +76,4 @@ class TestFabricateOp:
 
         mlir = circuit.mlir_opt
         assert "pbc.fabricate" in mlir and "magic_conj" in mlir
+        assert "pbc.ref.fabricate" not in mlir

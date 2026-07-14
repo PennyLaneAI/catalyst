@@ -46,6 +46,7 @@ def test_fabricate_lowering():
         return qp.expval(qp.Z(0))
 
     # CHECK: pbc.fabricate magic
+    # CHECK-NOT: pbc.ref.fabricate
     # CHECK: pbc.ppm ["Z", "Z"]
     print(circuit.mlir_opt)
 

@@ -57,5 +57,6 @@ def RefFabricateOp : PBC_Op<"ref.fabricate"> {
         $init_state attr-dict `:` type($qubits)
     }];
 
+    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
 }
