@@ -191,7 +191,9 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
                 auto &currentLayer = layers[idx];
                 auto &prevLayer = layers[idx - 1];
 
-                for (PBCOpInterface op : currentLayer.getOps()) {
+                SmallVector<PBCOpInterface> currentOps(currentLayer.getOps().begin(),
+                                                       currentLayer.getOps().end());
+                for (PBCOpInterface op : currentOps) {
                     auto [isCommute, mergeOp] = checkCommutationAndFindMerge(op, prevLayer);
 
                     if (isCommute && mergeOp) {

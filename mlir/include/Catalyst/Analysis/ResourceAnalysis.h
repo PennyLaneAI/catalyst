@@ -15,6 +15,7 @@
 #pragma once
 
 #include "llvm/ADT/StringMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
@@ -29,6 +30,7 @@ class ResourceAnalysis {
   public:
     // walk all func::FuncOps within the operation.
     explicit ResourceAnalysis(ModuleOp moduleOp);
+    explicit ResourceAnalysis(func::FuncOp funcOp);
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 
@@ -46,6 +48,12 @@ class ResourceAnalysis {
 
     const ResourceResult *getFlattenedResource(llvm::StringRef funcName) const;
 
+    // Maps synthetic loop names to their `scf::ForOp` for depth analysis in the pass.
+    const llvm::StringMap<scf::ForOp> &getSyntheticLoopBodies() const
+    {
+        return syntheticLoopBodies;
+    }
+
   private:
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
@@ -60,6 +68,8 @@ class ResourceAnalysis {
     // so each prefix gets its own numbering sequence.
     int64_t forLoopCounter = 0;
     int64_t dynForLoopCounter = 0;
+
+    llvm::StringMap<scf::ForOp> syntheticLoopBodies;
 
     // `prefix` + counter; advance counter until the name is free in `funcResults`
     std::string makeUniqueSyntheticName(llvm::StringRef prefix, int64_t &counter);

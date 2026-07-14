@@ -36,11 +36,13 @@ void eraseUnusedOps(PBCLayer &layer, IRRewriter &writer)
     // Bound iterations to avoid pathological loops
     int maxIter = static_cast<int>(layer.getOps().size()) * 2;
     while (!layer.empty() && maxIter > 0) {
-        for (auto op : llvm::reverse(layer.getOps())) {
+        SmallVector<PBCOpInterface> currentOps(layer.getOps().begin(), layer.getOps().end());
+        for (auto op : llvm::reverse(currentOps)) {
             // Only erase if now unused
             if (op->use_empty()) {
-                writer.eraseOp(op);
+                // update layer bookkeeping before the op's memory is freed
                 layer.eraseOp(op);
+                writer.eraseOp(op);
             }
         }
         maxIter--;

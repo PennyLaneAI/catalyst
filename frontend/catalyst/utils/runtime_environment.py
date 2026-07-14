@@ -12,93 +12,122 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Utility code for keeping paths
-"""
+"""Utility code for keeping paths."""
 
+import importlib.util
 import os
 import os.path
-import sys
 import sysconfig
-from pathlib import Path
 
-from catalyst._configuration import INSTALLED
-from catalyst._revision import __revision__
-from catalyst._version import __version__
+package_root = os.path.join(os.path.dirname(__file__), "..")
 
-package_root = os.path.dirname(__file__)
+
+def _load_config(filename, attr):
+    """Read Catalyst config flags without importing Catalyst via the usual machinery.
+
+    This enables us to use this utility module from outside the Catalyst package as well.
+    """
+    path = os.path.join(package_root, filename)
+    spec = importlib.util.spec_from_file_location("", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return getattr(mod, attr)
+
+
+INSTALLED = _load_config("_configuration.py", "INSTALLED")
+__revision__ = _load_config("_revision.py", "__revision__")
+__version__ = _load_config("_version.py", "__version__")
 
 # Default paths to dep libraries
 DEFAULT_LIB_PATHS = {
-    "llvm": os.path.join(package_root, "../../../mlir/llvm-project/build/lib"),
-    "catalyst": os.path.join(package_root, "../../../mlir/build/lib"),
-    "runtime": os.path.join(package_root, "../../../runtime/build/lib"),
-    "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
-    "oqc_runtime": os.path.join(package_root, "../../catalyst/third_party/oqc/src/build"),
-    "oqd_runtime": os.path.join(package_root, "../../../runtime/build/lib"),
+    "llvm": os.path.join(package_root, "..", "..", "mlir", "llvm-project", "build", "lib"),
+    "catalyst": os.path.join(package_root, "..", "..", "mlir", "build", "lib"),
+    "runtime": os.path.join(package_root, "..", "..", "runtime", "build", "lib"),
+    "enzyme": os.path.join(package_root, "..", "..", "mlir", "Enzyme", "build", "Enzyme"),
+    "oqc_runtime": os.path.join(package_root, "third_party", "oqc", "src", "build"),
+    "oqd_runtime": os.path.join(package_root, "..", "..", "runtime", "build", "lib"),
 }
 
 DEFAULT_INCLUDE_PATHS = {
-    "mlir": os.path.join(package_root, "../../../mlir/include"),
+    "mlir": os.path.join(package_root, "..", "..", "mlir", "include"),
 }
 
 DEFAULT_BIN_PATHS = {
-    "cli": os.path.join(package_root, "../../../mlir/build/bin"),
+    "cli": os.path.join(package_root, "..", "..", "mlir", "build", "bin"),
 }
 
-BYTECODE_FILE_PATH = (
-    Path(__file__).parent.parent
-    / Path("resources")
-    / Path("decomposition_rules_" + (__revision__ if __revision__ else __version__) + ".mlirbc")
+BYTECODE_FILE_PATH = os.path.join(
+    package_root,
+    "resources",
+    "decomposition_rules_" + (__revision__ if __revision__ else __version__) + ".mlirbc",
 )
 
 
+def get_libpython_path() -> str:   # pragma: no cover
+    """Return the path to the python *shared* library, or empty string if failed to find.
+
+    The QPD plugin uses dlopen by the standalone ``catalyst`` compiler process, which does
+    not embed Python, so it needs ``libpython`` loaded with ``RTLD_GLOBAL`` to resolve CPython
+    symbols. Therefore, this path needs to return a shared object.
+    """
+    ldlibrary = sysconfig.get_config_var("LDLIBRARY")
+    framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
+    shlib_suffix = sysconfig.get_config_var("SHLIB_SUFFIX") or ".so"
+
+    # macOS framework-style installations
+    if framework_prefix and ldlibrary:
+        framework_path = os.path.join(framework_prefix, ldlibrary)
+        if os.path.exists(framework_path):
+            return framework_path
+
+    libdir = sysconfig.get_config_var("LIBDIR")
+    if not libdir:
+        return ""
+
+    # Default: the library sysconfig reports, but only if it is a shared object.
+    if ldlibrary and shlib_suffix in ldlibrary:
+        ldlibrary_path = os.path.join(libdir, ldlibrary)
+        if os.path.exists(ldlibrary_path):
+            return ldlibrary_path
+
+    # Fall back to the conventionally-named shared library (e.g. libpython3.12.so). This is
+    # the case that a static-preferring build (e.g. conda) hits: LDLIBRARY names the .a, but
+    # the .so is present under its canonical, version-derived name.
+    # ``LDLIBRARY`` in ``sysconfig`` is not reliably the shared library: some builds (notably
+    # conda envs) report the static archive ``libpythonX.Y.a`` there even though a ``.so``
+    # is present alongside it. We accept ``LDLIBRARY`` only when it is a shared object
+    # that exists, and otherwise fall back to locating the shared library in ``LIBDIR``.
+    ldversion = sysconfig.get_config_var("LDVERSION") or sysconfig.get_config_var("VERSION") or ""
+    conventional_path = os.path.join(libdir, f"libpython{ldversion}{shlib_suffix}")
+    if os.path.exists(conventional_path):
+        return conventional_path
+
+    return ""
+
+
 def get_lib_path(project, env_var):
-    """Get the library path."""
-    if INSTALLED:
-        return os.path.join(package_root, "..", "lib")  # pragma: no cover
+    """Get the path to Catalyst's shared libraries."""
+    if INSTALLED:  # pragma: no cover
+        return os.path.join(package_root, "lib")
+
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
 def get_include_path():
     """Return the path to Catalyst's include directory."""
-    if INSTALLED:
-        return os.path.join(package_root, "..", "include")  # pragma: no cover
+    if INSTALLED:  # pragma: no cover
+        return os.path.join(package_root, "include")
+
     return os.getenv("CATALYST_INCLUDE_DIRS", DEFAULT_INCLUDE_PATHS.get("mlir", ""))
 
 
-def get_bin_path(project, env_var):
-    """Get the library path."""
-    if INSTALLED:
-        return os.path.join(package_root, "..", "bin")  # pragma: no cover
-    return os.getenv(env_var, DEFAULT_BIN_PATHS.get(project, ""))
-
-
-def get_cli_path() -> str:  # pragma: nocover
-    """Method to obtain the Catalyst CLI path packaged via the data_files mechanism."""
+def get_cli_path() -> str:
+    """Method to obtain the Catalyst CLI path whether installed or locally built."""
     catalyst_cli = "catalyst"
 
-    if not INSTALLED:
-        return os.path.join(
-            os.getenv("CATALYST_BIN_DIR", DEFAULT_BIN_PATHS.get("cli", "")), catalyst_cli
-        )
+    if INSTALLED:  # pragma: nocover
+        return os.path.join(package_root, "bin", catalyst_cli)
 
-    # Default path
-    path = os.path.join(sysconfig.get_path("scripts"), catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    # User path
-    user_scheme = sysconfig.get_preferred_scheme("user")
-    path = os.path.join(sysconfig.get_path("scripts", scheme=user_scheme), catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    # Fallback to python location
-    path = os.path.join(os.path.dirname(sys.executable), catalyst_cli)
-    if os.path.isfile(path):
-        return path
-
-    raise RuntimeError(
-        "Could not locate the Catalyst executable, please report this issue on GitHub."
+    return os.path.join(
+        os.getenv("CATALYST_BIN_DIR", DEFAULT_BIN_PATHS.get("cli", "")), catalyst_cli
     )
