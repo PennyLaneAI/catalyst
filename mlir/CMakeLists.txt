@@ -75,7 +75,7 @@ foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
     )
 endforeach()
 
-add_library(ExternalStablehloLib INTERFACE)
+add_library(ExternalStablehloLib INTERFACE IMPORTED GLOBAL)
 
 foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
     target_link_libraries(ExternalStablehloLib INTERFACE ${STABLEHLO_LIB})
@@ -280,3 +280,86 @@ endif()
 if(NOT CATALYST_DOCS_ONLY)
   add_subdirectory(test)
 endif()
+
+
+###################################################################
+## Generate a Catalyst Development Package for External Projects ##
+###################################################################
+
+include(GNUInstallDirs)
+
+# Re-fetch the exported targets and strip the same third-party ones the
+# build-tree export already excludes (see cmake/modules/CMakeLists.txt).
+get_property(CATALYST_INSTALL_TARGETS GLOBAL PROPERTY MLIR_EXPORTS)
+set(TARGETS_TO_REMOVE
+    nlohmann_json
+    tomlplusplus_tomlplusplus
+    ion-transforms
+    CatalystCompilerDriver
+    PBCUtils
+    QuantumCAPI
+    pbc-transforms
+    quantum-transforms  # depends on decompsolver, which depends on boost; exclude
+    decompsolver        # depends on boost; exclude
+    )
+list(REMOVE_ITEM CATALYST_INSTALL_TARGETS ${TARGETS_TO_REMOVE})
+
+# Static archives, shared libs, and any runtime artifacts from the dialects,
+# transforms and utils. INCLUDES DESTINATION records the include path in the
+# exported targets so consumers get it transitively.
+# We use `COMPONENT catalyst-dev` since `add_mlir_public_c_api_library(QuantumCAPI ...)
+# auto-generates its own install rule that we want to bypass.
+install(TARGETS ${CATALYST_INSTALL_TARGETS}
+    EXPORT CatalystTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT catalyst-dev
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT catalyst-dev
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT catalyst-dev
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Uncomment the lines below to include tools in catalyst-dev.
+# They are currently excluded due to their large size.
+# # Tools (binaries). These are usually not in MLIR_EXPORTS, so install by name.
+# if(NOT CATALYST_DOCS_ONLY)
+#     # Need to wrap in `if(NOT CATALYST_DOCS_ONLY)` since `add_subdirectory(tools)`
+#     # is also conditional on this predicate
+#     install(TARGETS catalyst-cli quantum-opt quantum-lsp-server
+#         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT catalyst-dev)
+# endif()
+
+# Hand-written headers (*.h and the *.td that TableGen consumers may want).
+install(DIRECTORY ${CATALYST_MAIN_INCLUDE_DIR}/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT catalyst-dev
+    FILES_MATCHING
+      PATTERN "*.h"
+      PATTERN "*.td"
+      PATTERN "*.capi.h.inc")
+
+# TableGen-generated headers (*.h.inc, *.cpp.inc) AND the generated
+# frontend_catalyst_version_py.h all live under the build-tree include dir.
+install(DIRECTORY ${CATALYST_GEN_INCLUDE_DIR}/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT catalyst-dev
+    FILES_MATCHING
+      PATTERN "*.h"
+      PATTERN "*.h.inc"
+      PATTERN "*.cpp.inc"
+    PATTERN "CMakeFiles" EXCLUDE)
+
+# Bundle the StableHLO static archives that Catalyst links against.
+install(DIRECTORY "${STABLEHLO_BUILD_DIR}/lib/"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    COMPONENT catalyst-dev
+    FILES_MATCHING PATTERN "lib*.a")
+
+set(CPACK_PACKAGE_NAME "catalyst-dev")
+set(CPACK_PACKAGE_VERSION "${CATALYST_PACKAGE_VERSION}")
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}_${CMAKE_SYSTEM_NAME}_${CMAKE_SYSTEM_PROCESSOR}_${CATALYST_PACKAGE_VERSION}")
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)             # extracts into catalyst-dev-<ver>/
+set(CPACK_COMPONENTS_ALL catalyst-dev)               # only catalyst-dev component
+set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE) # single archive, no per-component split
+
+message(STATUS "Preparing CPack package ${CPACK_PACKAGE_FILE_NAME}")
+include(CPack)
