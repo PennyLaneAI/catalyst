@@ -33,8 +33,9 @@ void __catalyst__executor__launch(const char *addr, const char *entry_symbol, si
                                   const size_t *input_elem_sizes, size_t num_outputs,
                                   void *const *output_descs, const size_t *output_ranks,
                                   const size_t *output_elem_sizes);
-int __catalyst__executor__call_wrapper(const char *addr, const char *symbol, const char *args_buf,
-                                       size_t args_size, void **out_buf, size_t *out_size);
+int64_t __catalyst__executor__call_wrapper(const char *addr, const char *symbol,
+                                           const char *args_buf, size_t args_size, void **out_buf,
+                                           size_t *out_size);
 void __catalyst__executor__free_result(void *buf);
 
 int64_t __catalyst__executor__close(const char *addr);
