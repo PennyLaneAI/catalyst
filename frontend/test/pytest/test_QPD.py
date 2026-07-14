@@ -41,7 +41,7 @@ class TestQPD:
                 return {qp.X: 1}
 
             @qp.register_resources(test_resources)
-            def test_decomp(angle, wires, pauli_word):
+            def test_decomp(angle, wires, pauli_word):  # pylint: disable=unused-argument
                 qp.RX(angle, wires[0])
 
             qp.add_decomps(qp.PauliRot, test_decomp)
