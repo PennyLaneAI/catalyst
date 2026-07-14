@@ -12,23 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Remote/IR/RemoteDialect.h"
+#pragma once
 
-#include "Remote/IR/RemoteOps.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
-using namespace mlir;
-using namespace catalyst::remote;
+#include "Executor/IR/ExecutorDialect.h"
 
-//===----------------------------------------------------------------------===//
-// Remote Dialect
-//===----------------------------------------------------------------------===//
-
-#include "Remote/IR/RemoteOpsDialect.cpp.inc"
-
-void catalyst::remote::RemoteDialect::initialize()
-{
-    addOperations<
-#define GET_OP_LIST
-#include "Remote/IR/RemoteOps.cpp.inc"
-        >();
-}
+#define GET_OP_CLASSES
+#include "Executor/IR/ExecutorOps.h.inc"

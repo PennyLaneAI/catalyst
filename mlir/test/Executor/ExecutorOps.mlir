@@ -15,39 +15,39 @@
 // RUN: quantum-opt %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL: func.func @open
-// CHECK:         remote.open("127.0.0.1:9000")
+// CHECK:         executor.open("127.0.0.1:9000")
 func.func @open() {
-  remote.open("127.0.0.1:9000")
+  executor.open("127.0.0.1:9000")
   return
 }
 
 // -----
 
 // CHECK-LABEL: func.func @send_binary
-// CHECK:         remote.send_binary("127.0.0.1:9000", "/tmp/qnode_0.o")
+// CHECK:         executor.send_binary("127.0.0.1:9000", "/tmp/qnode_0.o")
 func.func @send_binary() {
-  remote.send_binary("127.0.0.1:9000", "/tmp/qnode_0.o")
+  executor.send_binary("127.0.0.1:9000", "/tmp/qnode_0.o")
   return
 }
 
 // -----
 
 // CHECK-LABEL: func.func @launch
-// CHECK:         remote.launch("qnode_0", "127.0.0.1:9000") (%{{.*}}) :
+// CHECK:         executor.launch("qnode_0", "127.0.0.1:9000") (%{{.*}}) :
 // CHECK-SAME:    (memref<f64>) -> memref<f64>
 func.func @launch(%arg0: memref<f64>) -> memref<f64> {
-  %0 = remote.launch("qnode_0", "127.0.0.1:9000") (%arg0) : (memref<f64>) -> memref<f64>
+  %0 = executor.launch("qnode_0", "127.0.0.1:9000") (%arg0) : (memref<f64>) -> memref<f64>
   return %0 : memref<f64>
 }
 
 // -----
 
 // CHECK-LABEL: func.func @call
-// CHECK:         remote.call("foo", "127.0.0.1:9000")
+// CHECK:         executor.call("foo", "127.0.0.1:9000")
 // CHECK-SAME:    num_input_args = 1 : i32
 // CHECK-SAME:    (memref<4xf64>, memref<4xf64>) -> ()
 func.func @call(%arg0: memref<4xf64>, %arg1: memref<4xf64>) {
-  remote.call("foo", "127.0.0.1:9000") (%arg0, %arg1)
+  executor.call("foo", "127.0.0.1:9000") (%arg0, %arg1)
       {num_input_args = 1 : i32} : (memref<4xf64>, memref<4xf64>) -> ()
   return
 }
@@ -55,8 +55,8 @@ func.func @call(%arg0: memref<4xf64>, %arg1: memref<4xf64>) {
 // -----
 
 // CHECK-LABEL: func.func @close
-// CHECK:         remote.close("127.0.0.1:9000")
+// CHECK:         executor.close("127.0.0.1:9000")
 func.func @close() {
-  remote.close("127.0.0.1:9000")
+  executor.close("127.0.0.1:9000")
   return
 }

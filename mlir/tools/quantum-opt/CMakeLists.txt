@@ -33,7 +33,7 @@ set(LIBS
     ion-transforms
     MLIRRTIO
     rtio-transforms
-    MLIRRemote
+    MLIRExecutor
     MLIRQecLogical
     MLIRQecPhysical
     MLIRCatalystTest
