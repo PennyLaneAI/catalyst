@@ -17,29 +17,27 @@
 """Test fabricate lowering to pbc.fabricate."""
 
 import pennylane as qp
-from pennylane.transforms import to_ppr
 
 from catalyst import qjit
+
+_PIPELINE = [
+    (
+        "pipe",
+        [
+            "canonicalize",
+            "verify-no-quantum-use-after-free",
+            "convert-to-value-semantics",
+            "canonicalize",
+        ],
+    )
+]
 
 
 def test_fabricate_lowering():
     """Test that qp.fabricate is lowered to pbc.fabricate."""
-    qp.capture.enable()
     dev = qp.device("null.qubit", wires=2)
 
-    pipeline = [
-        (
-            "pipe",
-            [
-                "canonicalize",
-                "verify-no-quantum-use-after-free",
-                "convert-to-value-semantics",
-                "canonicalize",
-            ],
-        )
-    ]
-
-    @qjit(pipelines=pipeline, target="mlir")
+    @qjit(pipelines=_PIPELINE, target="mlir", capture=True)
     @qp.qnode(device=dev)
     def circuit():
         magic = qp.fabricate("magic")
@@ -50,7 +48,6 @@ def test_fabricate_lowering():
     # CHECK: pbc.fabricate magic
     # CHECK: pbc.ppm ["Z", "Z"]
     print(circuit.mlir_opt)
-    qp.capture.disable()
 
 
 test_fabricate_lowering()

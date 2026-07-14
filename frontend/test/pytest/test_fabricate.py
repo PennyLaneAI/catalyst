@@ -21,6 +21,18 @@ from pennylane.ops.qubit.fabricate import Fabricate, fabricate, _VALID_INIT_STAT
 
 from catalyst import qjit
 
+_FABRICATE_PIPELINE = [
+    (
+        "pipe",
+        [
+            "canonicalize",
+            "verify-no-quantum-use-after-free",
+            "convert-to-value-semantics",
+            "canonicalize",
+        ],
+    )
+]
+
 
 class TestFabricateOp:
     """Tests for the Fabricate operator and function."""
@@ -38,38 +50,23 @@ class TestFabricateOp:
             Fabricate("zero")
 
     @pytest.mark.parametrize("init_state", sorted(_VALID_INIT_STATES))
+    @pytest.mark.usefixtures("use_capture")
     def test_fabricate_function_capture(self, init_state):
         """Test fabricate primitive binding under capture."""
         import jax
-
-        qp.capture.enable()
 
         def circuit():
             fabricate(init_state)
 
         jaxpr = jax.make_jaxpr(circuit)().jaxpr
         assert any(eqn.primitive.name == "fabricate" for eqn in jaxpr.eqns)
-        qp.capture.disable()
 
+    @pytest.mark.usefixtures("enable_graph_decomposition")
     def test_fabricate_mlir_lowering(self):
         """Test that fabricate appears as pbc.fabricate in optimized MLIR."""
-        qp.capture.enable()
         dev = qp.device("null.qubit", wires=1)
 
-        @qjit(
-            pipelines=[
-                (
-                    "pipe",
-                    [
-                        "canonicalize",
-                        "verify-no-quantum-use-after-free",
-                        "convert-to-value-semantics",
-                        "canonicalize",
-                    ],
-                )
-            ],
-            target="mlir",
-        )
+        @qjit(pipelines=_FABRICATE_PIPELINE, target="mlir", capture=True)
         @qp.qnode(device=dev)
         def circuit():
             magic = fabricate("magic_conj")
@@ -79,4 +76,3 @@ class TestFabricateOp:
 
         mlir = circuit.mlir_opt
         assert "pbc.fabricate" in mlir and "magic_conj" in mlir
-        qp.capture.disable()

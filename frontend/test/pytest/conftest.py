@@ -58,14 +58,19 @@ def use_capture():
 
 
 @pytest.fixture(scope="function")
-def use_capture_dgraph():
+def enable_graph_decomposition():
+    """Enable graph-decomposition around each test."""
+    with qp.decomposition.toggle_graph_ctx(True):
+        yield
+
+
+@pytest.fixture(scope="function")
+def use_capture_dgraph(enable_graph_decomposition):
     """Enable capture and graph-decomposition before and disable them both after the test."""
     qp.capture.enable()
-    qp.decomposition.enable_graph()
     try:
         yield
     finally:
-        qp.decomposition.disable_graph()
         qp.capture.disable()
 
 
