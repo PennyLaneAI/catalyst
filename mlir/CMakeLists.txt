@@ -316,15 +316,14 @@ install(TARGETS ${CATALYST_INSTALL_TARGETS}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT catalyst-dev
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-# Uncomment the lines below to include tools in catalyst-dev.
-# They are currently excluded due to their large size.
-# # Tools (binaries). These are usually not in MLIR_EXPORTS, so install by name.
-# if(NOT CATALYST_DOCS_ONLY)
-#     # Need to wrap in `if(NOT CATALYST_DOCS_ONLY)` since `add_subdirectory(tools)`
-#     # is also conditional on this predicate
-#     install(TARGETS catalyst-cli quantum-opt quantum-lsp-server
-#         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT catalyst-dev)
-# endif()
+# Tools (binaries). These are usually not in MLIR_EXPORTS, so install by name.
+# NOTE: We use the catalyst-bin component for tools to exclude from catalyst-dev.
+if(NOT CATALYST_DOCS_ONLY)
+    # Need to wrap in `if(NOT CATALYST_DOCS_ONLY)` since `add_subdirectory(tools)`
+    # is also conditional on this predicate
+    install(TARGETS catalyst-cli quantum-opt quantum-lsp-server
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT catalyst-bin)
+endif()
 
 # Hand-written headers (*.h and the *.td that TableGen consumers may want).
 install(DIRECTORY ${CATALYST_MAIN_INCLUDE_DIR}/
