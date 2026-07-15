@@ -86,7 +86,7 @@ def get_libpython_path() -> str:  # pragma: no cover
         return ""
 
     # Default: the library sysconfig reports, but only if it is a shared object.
-    if ldlibrary and shlib_suffix in ldlibrary:
+    if ldlibrary and not ldlibrary.endswith(".a"):
         ldlibrary_path = os.path.join(libdir, ldlibrary)
         if os.path.exists(ldlibrary_path):
             return ldlibrary_path
