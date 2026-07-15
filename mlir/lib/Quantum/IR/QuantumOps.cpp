@@ -1239,6 +1239,19 @@ mlir::DictionaryAttr GlobalPhaseOp::getStaticData()
     return mlir::DictionaryAttr::get(getContext(), {});
 }
 
+// QubitUnitaryOp
+
+std::string QubitUnitaryOp::getOperatorName() { return "QubitUnitary"; }
+
+mlir::TypeRange QubitUnitaryOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> QubitUnitaryOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr QubitUnitaryOp::getStaticData()
+{
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
 // OperatorOp
 
 std::string OperatorOp::getOperatorName() { return getOpName().str(); }

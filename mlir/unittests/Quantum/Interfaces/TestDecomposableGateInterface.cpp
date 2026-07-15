@@ -42,6 +42,13 @@
 using namespace mlir;
 using namespace catalyst::quantum;
 
+/// The upstream MLIR Test dialect does not have a header we can include
+/// We must declare the registration function, and link to the corresponding upstream target
+/// in CMake.
+namespace test {
+void registerTestDialect(mlir::DialectRegistry &);
+} // namespace test
+
 TEST(DecomposableGateInterfaceTests, CustomOp)
 {
     std::string moduleStr = R"mlir(
@@ -222,6 +229,45 @@ module {
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
     ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase[f64][0]{}");
+}
+
+TEST(DecomposableGateInterfaceTests, QubitUnitaryOp)
+{
+    std::string moduleStr = R"mlir(
+module {
+  %matrix = "test.op"() : () -> tensor<4x4xcomplex<f64>>
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %oq0, %oq1, %oq2 = quantum.unitary(%matrix : tensor<4x4xcomplex<f64>>) %q0, %q1 ctrls(%q2) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    test::registerTestDialect(registry);
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate unitary = *module->getOps<QubitUnitaryOp>().begin();
+
+    ASSERT_EQ(unitary.getOperatorName(), "QubitUnitary");
+
+    // This is needed to keep the backing array from being deleted
+    Type f64type = mlir::Float64Type::get(&context);
+    Type tensorType = mlir::RankedTensorType::get({4, 4}, mlir::ComplexType::get(f64type));
+    llvm::SmallVector<mlir::Type, 1> backing({tensorType});
+    mlir::TypeRange expectedDynamicShape(backing);
+    ASSERT_EQ(llvm::SmallVector<mlir::Type>(unitary.getDynamicShape()),
+              llvm::SmallVector<mlir::Type>(expectedDynamicShape));
+
+    ASSERT_EQ(unitary.getWireLens(), std::vector<size_t>({2}));
+
+    ASSERT_EQ(unitary.getStaticData().size(), 0);
+
+    ASSERT_EQ(unitary.getGraphOpId(), "QubitUnitary[tensor<4x4xcomplex<f64>>][2]{}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits)

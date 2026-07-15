@@ -871,7 +871,8 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
 
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
-                                                AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                                AttrSizedOperandSegments, AttrSizedResultSegments,
+                                                DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
