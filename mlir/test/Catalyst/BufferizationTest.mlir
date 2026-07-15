@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --split-input-file \
+// RUN: quantum-opt --split-input-file --verify-diagnostics \
 // RUN:   --pass-pipeline="builtin.module( \
 // RUN:     one-shot-bufferize{unknown-type-conversion=identity-layout-map} \
 // RUN:   )" %s | FileCheck %s
@@ -48,6 +48,15 @@ func.func @dbprint_str() {
     // CHECK: "catalyst.print"() <{const_val = "Hello, Catalyst"}> : () -> ()
     "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
 
+    return
+}
+
+// -----
+
+func.func public @symbolic_array_error() attributes {llvm.emit_c_interface} {
+    // expected-error @below {{catalyst::symbolic_array is a placeholder op}}
+    // expected-error @below {{failed to bufferize op}}
+    %0 = catalyst.symbolic_array : tensor<i64>
     return
 }
 
