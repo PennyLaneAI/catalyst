@@ -21,6 +21,7 @@ This module provides infrastructure for compile-time lowering of decomposition r
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
+from jaxlib.mlir.dialects.builtin import ModuleOp
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
@@ -83,16 +84,21 @@ def get_graph_op_id(op: qp.decomposition.CompressedResourceOp | qp.Operator2):
     if isinstance(op, qp.decomposition.CompressedResourceOp):
         # NOTE: handling this the old-fashioned way, remove once Operator2 migration is complete
         op_type = op.op_type
-        name = op.op_type.__name__
+    else:
+        op_type = op
+
+    if issubclass(op_type, qp.core.operator.Operator):
+        name = op_type.__name__
         num_params = str(op_type.num_params)
         num_wires = str(op_type.num_wires) if op_type.num_wires else "0"
         return name + "(" + num_params + "," + num_wires + ")"
-    elif isinstance(op, qp.core.operator.Operator2):
-        name = op.__name__
-        dynamic_shape = op.getDynamicShape()
-        wire_lens = op.getWireLens()
-        static_data = op.getStaticData()
-        extra_data = op.uid
+    elif isinstance(op_type, qp.core.operator.Operator2):
+        # TODO: use real getters here
+        name = op_type.__name__
+        dynamic_shape = op_type.getDynamicShape()
+        wire_lens = op_type.getWireLens()
+        static_data = op_type.getStaticData()
+        extra_data = op_type.uid
         return (
             name
             + ("[" + dynamic_shape + "]")
@@ -107,8 +113,9 @@ def get_graph_op_id(op: qp.decomposition.CompressedResourceOp | qp.Operator2):
         )
 
 
-def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:
-    """Generic decomposition wrapper."""
+def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) -> ModuleOp:
+    """Python decomposition rule lowering."""
+    # TODO update docstring
     device = qp.device("null.qubit", wires=sum(wire_lens))
     wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
 
@@ -167,4 +174,9 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
     with module.context:
         module.operation.walk(update_funcop_attributes)
 
-    return str(module)
+    return module
+
+
+def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:
+    """Generic decomposition wrapper."""
+    return str(python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data))

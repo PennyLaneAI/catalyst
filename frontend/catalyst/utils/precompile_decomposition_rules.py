@@ -20,16 +20,16 @@ from pathlib import Path
 import jax
 import pennylane as qp
 from jax._src.lib.mlir import ir
-from pennylane.operation import Operator
+from jaxlib.mlir.dialects.builtin import ModuleOp
+from pennylane.operation import Operator, Operator2
 
 from catalyst.compiler import _quantum_opt
+from catalyst.device.python_decompositions import get_graph_op_id, python_decomposition
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # TODO: Uncomment dynamic size wires ops once they are supported
-# FIXME: Use the Gate class instead of this list of compiler ops
-#              https://github.com/PennyLaneAI/pennylane/pull/8767
 COMPILER_OPS_FOR_DECOMPOSITION = {
     qp.CNOT,
     qp.ControlledPhaseShift,
@@ -96,113 +96,52 @@ def get_abstract_args(op_class: type[Operator]) -> list[type]:
     return [float for _ in range(op_class.num_params)]
 
 
-def get_func_from_circuit(module) -> str | None:
+def get_rules_from_module(module) -> str:
     """
-    Get the string representation of `rule_wrapper` from module, if it exists.
+    Parse and modify decomposition rules from a ModuleOp.
 
     Args:
         module: an MLIR module object containing a FuncOp named `rule_wrapper` to be extracted
 
     Returns:
-        str: string representation of FuncOp named `rule_wrapper` from module
-        None: if no such FuncOp can be found
+        str: The string representation of any decomposition rules from `module`, pre-pending the
+             `__builtin_` prefix to their names.
     """
-    decomp_func_op = None
+    funcOps = []
 
     def find_condition(op):
-        nonlocal decomp_func_op
         if op.name == "func.func":
-            if ir.StringAttr(op.attributes["sym_name"]).value == "rule_wrapper":
-                decomp_func_op = op
-                return ir.WalkResult.INTERRUPT
+            if "target_gate" in op.attributes:
+                op.attributes["sym_name"] = ir.StringAttr.get(
+                    "__builtin_" + str(op.attributes["sym_name"])
+                )
+                funcOps.append(op)
+                return ir.WalkResult.SKIP
         return ir.WalkResult.ADVANCE
 
     module.operation.walk(find_condition)
 
-    return str(decomp_func_op) + "\n" if decomp_func_op else None
+    return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
-def compile_rule(
-    op_class,
-    abstract_args,
-    op_num_wires,
-    rule,
-    dev,
-) -> str | None:
-    """
-    Get the string representation of a compiled rule from a python decomposition rule, if possible.
-
-    NOTE: rules with string params are not currently supported.
-
-    Args:
-        op_class: A PennyLane class subclassing Operation
-        op_num_wires: the number of wires used by op_class
-        rule (DecompositionRule): the decomposition rule to be compiled
-        dev (Device): a device for qjit
-
-    Returns:
-        str: string representation of the mlir of the decomposition rule.
-    """
-    qp.decomposition.enable_graph()
-
-    # WARNING: do not rename this function, we use it to extract the rule from the compiled
-    # circuit
-    @decomposition_rule(is_qreg=True, op_type=op_class.__name__)
-    def rule_wrapper(*args, wires, **_):
-        return rule(*args, wires=wires, **_)
-
-    @qp.qjit(capture=True, target="mlir")
-    @qp.qnode(dev)
-    def circuit():
-        rule_wrapper(*abstract_args, wires=jax.core.ShapedArray((op_num_wires,), int))
-        return qp.probs()
-
-    return get_func_from_circuit(circuit.mlir_module)
-
-
-def compile_op_decomp_rules(
-    op_class: type[Operator],
-) -> dict[str, str | None]:
-    """
-    Compile all decomposition rules for op_class.
-
-    Note: the modules include the full circuit IR.
-
-    Args:
-        op_class (type[Operator]): the op class to compile decomposition rules for.
-
-    Returns:
-        dict[str, str | None]: decomposition rule names to compiled mlir modules.
-    """
-    op_decomp_rules = qp.decomposition.decomposition_graph.list_decomps(op_class)
-
-    mlir_modules: dict[str, str | None] = {}
-
-    if not hasattr(op_class, "num_wires") or not op_class.num_wires:
-        warnings.warn(
-            f"Cannot compile decomposition rules for op {op_class.__name__} with an unknown number "
-            + "of wires."
+def parse_operator_data(op):
+    """Parse operator data from an Operator/Operator2 instance."""
+    if isinstance(op, Operator2):
+        # TODO: use real getters here
+        dynamic_shape = op.getDynamicShape()
+        wire_lens = op.getWireLens()
+        static_data = op.getStaticData()
+        return dynamic_shape, wire_lens, static_data
+    if issubclass(op, Operator):
+        # NOTE: handling this the old-fashioned way, remove once Operator2 migration is complete
+        dynamic_shape = get_abstract_args(op)
+        num_wires = op.num_wires if op.num_wires else 0
+        return dynamic_shape, [num_wires], {}
+    else:
+        raise ValueError(
+            "Only AbstractOperator and CompressedResourceOp types are supported for generating a "
+            f"graph ID, got {op} of type {type(op)}"
         )
-        return mlir_modules
-
-    dev = qp.device("null.qubit", wires=op_class.num_wires)
-
-    abstract_args = get_abstract_args(op_class)  # pylint: disable=protected-access
-
-    for rule in op_decomp_rules:
-        try:
-            rule_name = rule._impl.__name__  # pylint: disable=protected-access
-            mlir_modules[rule_name] = compile_rule(
-                op_class, abstract_args, op_class.num_wires, rule, dev
-            )
-        except CompileError as e:
-            warnings.warn(f"Failed to compile {rule_name}: {e}")
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            warnings.warn(f"Unexpected error while trying to compile {rule_name}: {e}")
-        finally:
-            qp.decomposition.disable_graph()
-
-    return mlir_modules
 
 
 def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
@@ -216,11 +155,21 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
     """
     Path(decomp_file_path).parent.mkdir(parents=True, exist_ok=True)
 
-    mlir_rules = "".join(
-        str(mlir).replace("@rule_wrapper", f"@__builtin_{name}")
-        for func in COMPILER_OPS_FOR_DECOMPOSITION
-        for name, mlir in compile_op_decomp_rules(func).items()
-    )
+    bytecode_lib = ""
+
+    with ir.Context():
+        # TODO: update this for Operator2, PL will implement a precompilation registry
+        for op in COMPILER_OPS_FOR_DECOMPOSITION:
+            dynamic_data, wire_lens, static_data = parse_operator_data(op)
+            if static_data:
+                # we cannot precompile if the rule takes static data
+                continue
+
+            mlir_rules = python_decomposition(
+                op.__name__, get_graph_op_id(op), dynamic_data, wire_lens, {}
+            )
+
+            bytecode_lib += get_rules_from_module(mlir_rules)
 
     bytecode = _quantum_opt(
         "--emit-bytecode",
@@ -228,7 +177,7 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
         "--convert-to-value-semantics",
         "--canonicalize",
         "--register-decomp-rule-resource",
-        stdin=mlir_rules.encode("utf-8"),
+        stdin=bytecode_lib.encode("utf-8"),
         text=None,
     )
 
