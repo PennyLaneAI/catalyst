@@ -534,7 +534,8 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 }
 
 def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
-                                             AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                             AttrSizedOperandSegments, AttrSizedResultSegments,
+                                             DeclareOpInterfaceMethods<DecomposableGate, ["getExtraData"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
         The `quantum.operator` is a generic representation for arbitrary quantum operations
@@ -630,7 +631,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
         // additional functionality provided by quantum.operator, being last allows the builder
         // to use default values in the signature, so that these args are truly optional
         UnitAttr:$adjoint,
-        OptionalProp<I64Prop>:$UID,
+        OptionalAttr<I64Attr>:$UID,
         DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
@@ -688,7 +689,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
 }
 
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                         AttrSizedOperandSegments, AttrSizedResultSegments,
+                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
         The `quantum.paulirot` operation applies a rotation around a Pauli product
@@ -720,7 +722,8 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
             return getODSOperands(getParamOperandIdx());
         }
 
-        std::string getPauliWord() {
+        std::string getPauliWord()
+        {
             std::string pauliWord;
 
             for (mlir::Attribute pauliChar : getPauliProduct()) {

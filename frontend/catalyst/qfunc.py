@@ -110,14 +110,6 @@ def _resolve_mcm_config(qnode):
 
 def _is_one_shot_compatible_device(qnode):
     # TODO: remove the need for a hardcoded list of devices
-    device_name = qnode.device.name
-    exclude_devices = {"softwareq.qpp", "nvidia.custatevec", "nvidia.cutensornet"}
-
-    # Check device name against exclude list
-    if device_name in exclude_devices:
-        return False
-
-    # Additional check for OQDDevice class
     device_class_name = qnode.device.__class__.__name__
     return device_class_name != "OQDDevice"
 

@@ -14,6 +14,8 @@
 
 #include "ParameterShift.hpp"
 
+#include <cstdint>
+
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "Gradient/Utils/DifferentialQNode.h"
