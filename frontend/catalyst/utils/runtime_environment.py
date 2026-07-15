@@ -17,6 +17,7 @@
 import importlib.util
 import os
 import os.path
+import sys
 import sysconfig
 
 package_root = os.path.join(os.path.dirname(__file__), "..")
@@ -63,7 +64,7 @@ BYTECODE_FILE_PATH = os.path.join(
 )
 
 
-def get_libpython_path() -> str:   # pragma: no cover
+def get_libpython_path() -> str:  # pragma: no cover
     """Return the path to the python *shared* library, or empty string if failed to find.
 
     The QPD plugin uses dlopen by the standalone ``catalyst`` compiler process, which does
@@ -97,6 +98,7 @@ def get_libpython_path() -> str:   # pragma: no cover
     # conda envs) report the static archive ``libpythonX.Y.a`` there even though a ``.so``
     # is present alongside it. We accept ``LDLIBRARY`` only when it is a shared object
     # that exists, and otherwise fall back to locating the shared library in ``LIBDIR``.
+    shlib_suffix = ".dylib" if sys.platform == "darwin" else ".so"
     ldversion = sysconfig.get_config_var("LDVERSION") or sysconfig.get_config_var("VERSION") or ""
     conventional_path = os.path.join(libdir, f"libpython{ldversion}{shlib_suffix}")
     if os.path.exists(conventional_path):
