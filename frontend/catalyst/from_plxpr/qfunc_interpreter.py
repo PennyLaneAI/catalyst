@@ -462,11 +462,13 @@ def handle_allocate(self, *, num_wires, state=None, restored=False):
 
     self.has_dynamic_allocation = True
 
-    state = qp.allocation.AllocateState(state) if state is not None else qp.allocation.AllocateState.ZERO
+    state = (
+        qp.allocation.AllocateState(state)
+        if state is not None
+        else qp.allocation.AllocateState.ZERO
+    )
     if state in (qp.allocation.AllocateState.MAGIC, qp.allocation.AllocateState.MAGIC_CONJ):
-        return [
-            qref_fabricate_p.bind(init_state=state.value) for _ in range(num_wires)
-        ]
+        return [qref_fabricate_p.bind(init_state=state.value) for _ in range(num_wires)]
 
     new_qreg = qref_alloc_p.bind(static_num_qubits=num_wires)
     return [qref_get_p.bind(new_qreg, i) for i in range(num_wires)]

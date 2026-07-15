@@ -116,6 +116,10 @@ from catalyst.jax_primitives import (
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.patching import DictPatchWrapper, Patcher
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 _MAGIC_ALLOC_STATES = frozenset(
     {qp.allocation.AllocateState.MAGIC, qp.allocation.AllocateState.MAGIC_CONJ}
@@ -128,10 +132,7 @@ def _uses_compbasis_obs(obs_tracer: DynamicJaxprTracer) -> bool:
     )
 
     return obs_tracer.primitive in (compbasis_p, qref_compbasis_p)
-from catalyst.utils.patching import DictPatchWrapper, Patcher
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
 
 # TODO: refactor the tracer module
 # pylint: disable=too-many-lines

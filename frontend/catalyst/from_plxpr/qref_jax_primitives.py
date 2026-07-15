@@ -229,9 +229,7 @@ def _qref_fabricate_abstract_eval(*, init_state):
 
 def _pbc_logical_init_attr(ctx, init_state: str):
     """Create a PBC LogicalInit enum attribute from its string value."""
-    return ir.OpaqueAttr.get(
-        "pbc", f"enum {init_state}".encode("utf-8"), ir.NoneType.get(ctx), ctx
-    )
+    return ir.OpaqueAttr.get("pbc", f"enum {init_state}".encode("utf-8"), ir.NoneType.get(ctx), ctx)
 
 
 def _qref_fabricate_lowering(jax_ctx: mlir.LoweringRuleContext, *, init_state):
