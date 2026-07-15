@@ -116,6 +116,18 @@ from catalyst.jax_primitives import (
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
+
+_MAGIC_ALLOC_STATES = frozenset(
+    {qp.allocation.AllocateState.MAGIC, qp.allocation.AllocateState.MAGIC_CONJ}
+)
+
+
+def _uses_compbasis_obs(obs_tracer: DynamicJaxprTracer) -> bool:
+    from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+        qref_compbasis_p,
+    )
+
+    return obs_tracer.primitive in (compbasis_p, qref_compbasis_p)
 from catalyst.utils.patching import DictPatchWrapper, Patcher
 
 logger = logging.getLogger(__name__)
@@ -403,9 +415,28 @@ class QRegPromise:
     the insertions in order to re-use qubits later thus skipping the extractions."""
 
     @debug_logger_init
-    def __init__(self, qreg: DynamicJaxprTracer):
+    def __init__(self, qreg: DynamicJaxprTracer, num_device_wires: Optional[int] = None):
         self.base: DynamicJaxprTracer = qreg
+        self.num_device_wires = num_device_wires
         self.cache: Dict[Any, DynamicJaxprTracer] = {}
+        self.dynamic_wire_to_qubit: Dict[Any, DynamicJaxprTracer] = {}
+        self.dynamic_wire_to_qreg: Dict[Any, DynamicJaxprTracer] = {}
+        self.qref_mode = False
+        self.qref_device_reg: Optional[DynamicJaxprTracer] = None
+
+    @debug_logger
+    def enable_qref_mode(self) -> None:
+        """Switch to the qref primitive path for dynamic wire support."""
+        if self.qref_mode:
+            return
+        from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+            qref_alloc_p,
+        )
+
+        if self.num_device_wires is None:
+            raise CompileError("Cannot use dynamic wire allocation without a static device size.")
+        self.qref_mode = True
+        self.qref_device_reg = qref_alloc_p.bind(static_num_qubits=self.num_device_wires)
 
     @debug_logger
     def extract(self, wires: List[Any], allow_reuse=False) -> List[DynamicJaxprTracer]:
@@ -419,7 +450,17 @@ class QRegPromise:
             qrp.actualize()
         qubits = []
         for w in wires:
-            if w in qrp.cache:
+            if isinstance(w, qp.wires.DynamicWire):
+                if w not in qrp.dynamic_wire_to_qubit:
+                    raise CompileError(f"Dynamic wire {w} was used before being allocated.")
+                qubits.append(qrp.dynamic_wire_to_qubit[w])
+            elif qrp.qref_mode and w not in qrp.cache:
+                from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+                    qref_get_p,
+                )
+
+                qubits.append(qref_get_p.bind(qrp.qref_device_reg, w))
+            elif w in qrp.cache:
                 qubit = qrp.cache[w]
                 assert (
                     qubit is not None
@@ -453,6 +494,64 @@ class QRegPromise:
         qrp.cache = {}
         qrp.base = qreg
         return qreg
+
+
+def _trace_allocate(qrp: QRegPromise, op: qp.allocation.Allocate) -> QRegPromise:
+    """Trace a dynamic wire allocation onto the tape."""
+    from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+        qref_alloc_p,
+        qref_fabricate_p,
+        qref_get_p,
+    )
+
+    state = op.hyperparameters["state"]
+    qrp.enable_qref_mode()
+    if state in _MAGIC_ALLOC_STATES:
+        for wire in op.wires:
+            qubit = qref_fabricate_p.bind(init_state=state.value)
+            qrp.dynamic_wire_to_qubit[wire] = qubit
+    else:
+        qreg = qref_alloc_p.bind(static_num_qubits=len(op.wires))
+        for idx, wire in enumerate(op.wires):
+            qubit = qref_get_p.bind(qreg, idx)
+            qrp.dynamic_wire_to_qubit[wire] = qubit
+            qrp.dynamic_wire_to_qreg[wire] = qreg
+    return qrp
+
+
+def _trace_deallocate(qrp: QRegPromise, op: qp.allocation.Deallocate) -> QRegPromise:
+    """Trace a dynamic wire deallocation from the tape."""
+    from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+        qref_dealloc_p,
+        qref_dealloc_qb_p,
+    )
+
+    fabricated_qubits = []
+    qregs = set()
+    for wire in op.wires:
+        if wire not in qrp.dynamic_wire_to_qubit:
+            raise CompileError(f"Attempted to deallocate unknown dynamic wire {wire}.")
+        qubit = qrp.dynamic_wire_to_qubit.pop(wire)
+        if wire in qrp.dynamic_wire_to_qreg:
+            qreg = qrp.dynamic_wire_to_qreg.pop(wire)
+            qregs.add(qreg)
+        else:
+            fabricated_qubits.append(qubit)
+
+    if fabricated_qubits and qregs:
+        raise CompileError(
+            "Expected all wires to deallocate to come from the same allocation instruction"
+        )
+
+    for qubit in fabricated_qubits:
+        qref_dealloc_qb_p.bind(qubit)
+    if len(qregs) > 1:
+        raise CompileError(
+            "Expected all wires to deallocate to come from the same allocation instruction"
+        )
+    for qreg in qregs:
+        qref_dealloc_p.bind(qreg)
+    return qrp
 
 
 @dataclass
@@ -926,7 +1025,12 @@ def trace_quantum_operations(
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         return qrp
 
-    qrp = QRegPromise(qreg)
+    num_device_wires = (
+        len(device.wires)
+        if device.wires and not catalyst.device.qjit_device.is_dynamic_wires(device.wires)
+        else None
+    )
+    qrp = QRegPromise(qreg, num_device_wires=num_device_wires)
 
     if isinstance(device, qp.devices.LegacyDevice):
         # Old device API expands tapes here. Note: this way some ops might bypass the verification.
@@ -945,6 +1049,10 @@ def trace_quantum_operations(
             else:
                 kwargs = {"mcm_config": mcm_config}  # propagate
             qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
+        elif isinstance(op, qp.allocation.Allocate):
+            qrp2 = _trace_allocate(qrp, op)
+        elif isinstance(op, qp.allocation.Deallocate):
+            qrp2 = _trace_deallocate(qrp, op)
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
         else:
@@ -994,12 +1102,27 @@ def trace_observables(
             # If measuring all wires on the device, pass in the qreg to compbasis op
             # TODO: "all wires on the device" is None when number of wires is static,
             # but a tracer when dynamic. Update to handle dynamic case.
-            qreg_out = qrp.actualize()
-            obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
+            if qrp.qref_mode:
+                from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+                    qref_compbasis_p,
+                )
+
+                obs_tracers = qref_compbasis_p.bind(qrp.qref_device_reg, qreg_available=True)
+            else:
+                qreg_out = qrp.actualize()
+                obs_tracers = compbasis_p.bind(qreg_out, qreg_available=True)
         else:
             qubits = qrp.extract(wires, allow_reuse=True)
-            obs_tracers = compbasis_p.bind(*qubits)
-            insert_observable_wires_into_cache(qrp, wires, qubits)
+            if qrp.qref_mode:
+                from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+                    qref_compbasis_p,
+                )
+
+                obs_tracers = qref_compbasis_p.bind(*qubits)
+            else:
+                obs_tracers = compbasis_p.bind(*qubits)
+            if not qrp.qref_mode:
+                insert_observable_wires_into_cache(qrp, wires, qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
         # The MLIR NamedObs operation only takes in a single qubit value, instead of a variadic
         # range.
@@ -1009,8 +1132,15 @@ def trace_observables(
         # But of course we should fix this at some time.
         # TODO: make the NamedObs op take in multiple qubit values
         qubits = qrp.extract([wires[0]], allow_reuse=True)
-        obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
-        insert_observable_wires_into_cache(qrp, [wires[0]], [qubits[0]])
+        if qrp.qref_mode:
+            from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+                qref_namedobs_p,
+            )
+
+            obs_tracers = qref_namedobs_p.bind(qubits[0], kind=type(obs).__name__)
+        else:
+            obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
+            insert_observable_wires_into_cache(qrp, [wires[0]], [qubits[0]])
     elif isinstance(obs, qp.Hermitian):
         # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
@@ -1137,7 +1267,7 @@ def trace_quantum_measurements(
             obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
             nqubits = d_wires if nqubits is None else nqubits
 
-            using_compbasis = obs_tracers.primitive == compbasis_p
+            using_compbasis = _uses_compbasis_obs(obs_tracers)
 
             if (
                 mcm_config.mcm_method == "single-branch-statistics"
@@ -1547,11 +1677,7 @@ def _trace_classical_phase(
         # Therefore we need to compute the tree with measurements as leaves and it comes
         # with an extra computational cost
 
-        if any(isinstance(wire, qp.wires.DynamicWire) for wire in quantum_tape.wires):
-            msg = "qp.allocate() with qjit is only supported with program capture enabled."
-            raise CompileError(msg)
-
-        # 1. Recompute the original return
+        # Dynamic wire allocation is supported via qref allocation primitives.
         with QueuingManager.stop_recording():
             return_values = tree_unflatten(out_tree_promise(), return_values_flat)
 

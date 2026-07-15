@@ -41,6 +41,8 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_compbasis_p,
     qref_dealloc_p,
+    qref_dealloc_qb_p,
+    qref_fabricate_p,
     qref_get_p,
     qref_gphase_p,
     qref_hermitian_p,
@@ -459,6 +461,13 @@ def handle_allocate(self, *, num_wires, state=None, restored=False):
     ), "number of dynamically allocated qubits must be statically known"
 
     self.has_dynamic_allocation = True
+
+    state = qp.allocation.AllocateState(state) if state is not None else qp.allocation.AllocateState.ZERO
+    if state in (qp.allocation.AllocateState.MAGIC, qp.allocation.AllocateState.MAGIC_CONJ):
+        return [
+            qref_fabricate_p.bind(init_state=state.value) for _ in range(num_wires)
+        ]
+
     new_qreg = qref_alloc_p.bind(static_num_qubits=num_wires)
     return [qref_get_p.bind(new_qreg, i) for i in range(num_wires)]
 
@@ -467,17 +476,30 @@ def handle_allocate(self, *, num_wires, state=None, restored=False):
 def handle_deallocate(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.deallocate primitive"""
     qregs = set()
+    fabricated_qubits = []
     for w in wires:
         get_op = w.parent
+        if get_op.primitive is qref_fabricate_p:
+            fabricated_qubits.append(w)
+        elif get_op.primitive is qref_get_p:
+            qreg = get_op.in_tracers[0]
+            qregs.add(qreg)
+        else:
+            raise AssertionError(
+                "Manual deallocation is only supported for manually allocated wires"
+            )
+    if fabricated_qubits and qregs:
+        raise AssertionError(
+            "Expected all wires to deallocate to come from the same allocation instruction"
+        )
+    if fabricated_qubits:
+        for qubit in fabricated_qubits:
+            qref_dealloc_qb_p.bind(qubit)
+    else:
         assert (
-            get_op.primitive is qref_get_p
-        ), "Manual deallocation is only supported for manually allocated wires"
-        qreg = get_op.in_tracers[0]
-        qregs.add(qreg)
-    assert (
-        len(qregs) == 1
-    ), "Expected all wires to deallocate to come from the same allocation instruction"
-    qref_dealloc_p.bind(list(qregs)[0])
+            len(qregs) == 1
+        ), "Expected all wires to deallocate to come from the same allocation instruction"
+        qref_dealloc_p.bind(list(qregs)[0])
     return []
 
 

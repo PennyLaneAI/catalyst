@@ -48,3 +48,26 @@ func.func @test_PPM_op(%angle: f64) -> (i1, i1, i1) attributes {quantum.node} {
     // CHECK: return [[m0]], [[m1]], [[m2]] : i1, i1, i1
     return %m0, %m1, %m2 : i1, i1, i1
 }
+
+// -----
+
+// CHECK-LABEL: test_ref_fabricate_magic
+func.func @test_ref_fabricate_magic() attributes {quantum.node} {
+    // CHECK: [[magic:%.+]] = pbc.fabricate magic : !quantum.bit
+    %q = pbc.ref.fabricate magic : !qref.bit
+    qref.custom "PauliX"() %q : !qref.bit
+    // CHECK: quantum.dealloc_qb [[magic]] : !quantum.bit
+    qref.dealloc_qb %q : !qref.bit
+    return
+}
+
+// -----
+
+// CHECK-LABEL: test_ref_fabricate_magic_conj
+func.func @test_ref_fabricate_magic_conj() attributes {quantum.node} {
+    // CHECK: [[magic_conj:%.+]] = pbc.fabricate magic_conj : !quantum.bit
+    %q = pbc.ref.fabricate magic_conj : !qref.bit
+    qref.custom "PauliX"() %q : !qref.bit
+    qref.dealloc_qb %q : !qref.bit
+    return
+}

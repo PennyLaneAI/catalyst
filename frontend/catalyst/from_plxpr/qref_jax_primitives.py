@@ -61,13 +61,14 @@ with Patcher(
     ),
 ):
     from mlir_quantum.dialects.mbqc import RefMeasureInBasisOp
-    from mlir_quantum.dialects.pbc import RefPPMeasurementOp
+    from mlir_quantum.dialects.pbc import RefFabricateOp, RefPPMeasurementOp
     from mlir_quantum.dialects.qref import (
         AdjointOp,
         AllocOp,
         ComputationalBasisOp,
         CustomOp,
         DeallocOp,
+        DeallocQubitOp,
         GetOp,
         GlobalPhaseOp,
         HermitianOp,
@@ -147,6 +148,9 @@ class MeasurementPlane(Enum):
 qref_alloc_p = Primitive("qref_alloc")
 qref_dealloc_p = Primitive("qref_dealloc")
 qref_dealloc_p.multiple_results = True
+qref_fabricate_p = Primitive("qref_fabricate")
+qref_dealloc_qb_p = Primitive("qref_dealloc_qb")
+qref_dealloc_qb_p.multiple_results = True
 qref_get_p = Primitive("qref_get")
 qref_set_state_p = Primitive("qref_state_prep")
 qref_set_state_p.multiple_results = True
@@ -212,6 +216,44 @@ def _qref_dealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
+    return ()
+
+
+#
+# qref_fabricate_p
+#
+@qref_fabricate_p.def_abstract_eval
+def _qref_fabricate_abstract_eval(*, init_state):
+    return AbstractQubit()
+
+
+def _pbc_logical_init_attr(ctx, init_state: str):
+    """Create a PBC LogicalInit enum attribute from its string value."""
+    return ir.OpaqueAttr.get(
+        "pbc", f"enum {init_state}".encode("utf-8"), ir.NoneType.get(ctx), ctx
+    )
+
+
+def _qref_fabricate_lowering(jax_ctx: mlir.LoweringRuleContext, *, init_state):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+    qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
+    init_state_attr = _pbc_logical_init_attr(ctx, init_state)
+    return RefFabricateOp(qubit=qubit_type, init_state=init_state_attr).results
+
+
+#
+# qref_dealloc_qb_p
+#
+@qref_dealloc_qb_p.def_abstract_eval
+def _qref_dealloc_qb_abstract_eval(qubit):
+    return ()
+
+
+def _qref_dealloc_qb_lowering(jax_ctx: mlir.LoweringRuleContext, qubit):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+    DeallocQubitOp(qubit)
     return ()
 
 
@@ -841,6 +883,8 @@ CUSTOM_LOWERING_RULES = (
     (qref_operator_p, _qref_operator_p_lowering),
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
+    (qref_fabricate_p, _qref_fabricate_lowering),
+    (qref_dealloc_qb_p, _qref_dealloc_qb_lowering),
     (qref_get_p, _qref_get_lowering),
     (qref_set_state_p, _qref_set_state_lowering),
     (qref_set_basis_state_p, _qref_set_basis_state_lowering),

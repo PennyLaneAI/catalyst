@@ -195,6 +195,26 @@ def test_pass_multiple_regs_into_whileloop(N: int):
 print(test_pass_multiple_regs_into_whileloop.mlir)
 
 
+@qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("lightning.qubit", wires=2))
+def test_magic_state_fabricate():
+    """
+    Test that magic state allocation lowers to pbc.ref.fabricate.
+    """
+
+    # CHECK: [[magic:%.+]] = pbc.ref.fabricate magic : !qref.bit
+    # CHECK: qref.custom "PauliX"() [[magic]]
+    # CHECK: qref.dealloc_qb [[magic]]
+
+    with qp.allocate(1, state="magic") as q:
+        qp.X(q[0])
+
+    return qp.probs(wires=[0])
+
+
+print(test_magic_state_fabricate.mlir)
+
+
 # pylint: disable=line-too-long
 def test_quantum_subroutine():
     """

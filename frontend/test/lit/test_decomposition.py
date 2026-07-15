@@ -1861,3 +1861,34 @@ def test_paulirot_python_decomposition():
 
 
 test_paulirot_python_decomposition()
+
+
+def test_decompose_with_magic_state_allocation():
+    """Test decomposition rules can allocate magic states as work wires."""
+
+    qp.decomposition.enable_graph()
+
+    @qp.register_resources({qp.CNOT: 1})
+    def magic_decomp(wire):
+        with qp.allocate(1, state="magic") as work:
+            qp.CNOT(wires=[work[0], wire])
+
+    @qjit(capture=True, target="mlir")
+    @partial(
+        qp.transforms.decompose,
+        gate_set={"CNOT"},
+        fixed_decomps={qp.X: magic_decomp},
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    def circuit():
+        qp.X(0)
+        return qp.probs(wires=[0])
+
+    # CHECK: pbc.ref.fabricate magic
+    # CHECK: qref.custom "CNOT"
+    print(circuit.mlir)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_with_magic_state_allocation()

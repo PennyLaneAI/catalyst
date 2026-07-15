@@ -91,6 +91,16 @@ LogicalResult RefPPMeasurementOp::verify()
     return success();
 }
 
+LogicalResult RefFabricateOp::verify()
+{
+    auto initState = getInitState();
+    if (initState != LogicalInitKind::magic && initState != LogicalInitKind::magic_conj) {
+        return emitOpError(
+            "Only magic states (magic, magic_conj) are supported by ref.fabricate.");
+    }
+    return success();
+}
+
 LogicalResult SelectPPMeasurementOp::verify()
 {
     if (getInQubits().size() != getPauliProduct_0().size() ||

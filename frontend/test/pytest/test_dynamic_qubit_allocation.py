@@ -532,21 +532,84 @@ def test_adjoint(backend):
     assert np.allclose(observed, expected)
 
 
-def test_no_capture(backend):
+def test_no_capture_magic_state(backend):
     """
-    Test error message when used without capture.
+    Test that magic state allocation works without capture enabled.
     """
-    with pytest.raises(
-        CompileError,
-        match=r".*\.allocate\(\) with qjit is only supported with program capture enabled\.",
-    ):
 
-        @qjit
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            with qp.allocate(1) as _:
-                pass
-            return qp.probs(wires=[0])
+    @qjit
+    @qp.qnode(qp.device(backend, wires=2))
+    def baseline():
+        qp.H(1)
+        qp.T(1)
+        qp.CNOT(wires=[1, 0])
+        return qp.probs(wires=[0])
+
+    @qjit
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit():
+        q = qp.allocate(1, state="magic")
+        qp.CNOT(wires=[q[0], 0])
+        return qp.probs(wires=[0])
+
+    assert np.allclose(baseline(), circuit())
+
+
+@pytest.mark.parametrize("capture", (True, False))
+@pytest.mark.parametrize(
+    ("state", "prep"),
+    (
+        ("magic", lambda w: (qp.H(w), qp.T(w))),
+        ("magic_conj", lambda w: (qp.H(w), qp.adjoint(qp.T(w), lazy=False))),
+    ),
+)
+def test_magic_state_allocation(backend, capture, state, prep):
+    """Test magic state allocation lowers correctly and produces expected states."""
+
+    @qjit(capture=capture)
+    @qp.qnode(qp.device(backend, wires=2))
+    def baseline():
+        prep(1)
+        qp.CNOT(wires=[1, 0])
+        return qp.probs(wires=[0])
+
+    @qjit(capture=capture)
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit():
+        q = qp.allocate(1, state=state)
+        qp.CNOT(wires=[q[0], 0])
+        return qp.probs(wires=[0])
+
+    assert np.allclose(baseline(), circuit())
+
+
+def test_magic_state_manual_deallocate(backend):
+    """Test manual deallocation of a magic state wire without entangling gates."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        q = qp.allocate(1, state="magic_conj")
+        qp.deallocate(q[0])
+        return qp.probs(wires=[0])
+
+    assert np.allclose([1, 0], circuit())
+
+
+def test_magic_state_mlir_lowering(backend):
+    """Test that magic state allocation lowers to pbc.ref.fabricate."""
+
+    @qjit(target="mlir", capture=True)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        with qp.allocate(1, state="magic") as q:
+            qp.X(q[0])
+        return qp.probs(wires=[0])
+
+    mlir_str = circuit.mlir
+    assert "pbc.ref.fabricate" in mlir_str
+    assert "magic" in mlir_str
+    assert "qref.dealloc_qb" in mlir_str
 
 
 def test_use_after_free(backend):

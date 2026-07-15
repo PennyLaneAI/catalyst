@@ -532,7 +532,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // Metadata: qubit allocation
-    if (isa<quantum::AllocQubitOp, qref::AllocQubitOp>(op)) {
+    if (isa<quantum::AllocQubitOp, qref::AllocQubitOp, pbc::RefFabricateOp>(op)) {
         result.numAllocQubits += 1;
         return;
     }

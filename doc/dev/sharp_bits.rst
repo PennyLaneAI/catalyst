@@ -1376,9 +1376,14 @@ Currently, however, this is not the case for the following functionalities.
 - **Dynamic wire allocation behaviour**: The ``qp.allocate()`` function currently
   behaves differently when Catalyst is present or not. In particular:
 
-  - The ``state`` and ``restored`` keyword arguments of ``qp.allocate()`` are
-    ignored in Catalyst. The reason is that the only supported mode is to always allocate in the
-    zero state.
+  - The ``state`` and ``restored`` keyword arguments for ``state="zero"`` and
+    ``state="any"`` are ignored in Catalyst. The reason is that the only
+    supported mode for these states is to always allocate in the zero state.
+
+  - Magic state allocation via ``state="magic"`` or ``state="magic_conj"`` is
+    supported in Catalyst and lowers to ``pbc.ref.fabricate`` (and ultimately
+    ``pbc.fabricate``) under the hood. These allocations use single-qubit
+    fabricate/deallocate semantics rather than register allocation.
 
   - Related to the above point, in PennyLane, dynamic wire allocations do not
     increase the total number of wires used in the circuit. This is because

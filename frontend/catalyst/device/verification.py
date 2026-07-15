@@ -19,6 +19,7 @@ with the compiler and device.
 
 from typing import Any, Callable, List, Sequence
 
+import pennylane as qp
 from pennylane import transform
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.measurements import (
@@ -200,6 +201,8 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # Specialized control op classes (e.g. CRZ) should be checked directly though, which is why
         # we can't use isinstance(op, Controlled).
         if type(op) in (Controlled, ControlledOp) or isinstance(op, (Adjoint)):
+            pass
+        elif isinstance(op, (qp.allocation.Allocate, qp.allocation.Deallocate)):
             pass
         elif not op.name in supported_ops:
             raise CompileError(
