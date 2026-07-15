@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #pragma once
 #include "mlir/IR/OpDefinition.h"
+
 #include "Catalyst/Analysis/ResourceInterfaces.h.inc"
