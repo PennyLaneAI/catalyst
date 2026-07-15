@@ -73,7 +73,6 @@ def get_libpython_path() -> str:  # pragma: no cover
     """
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
-    shlib_suffix = sysconfig.get_config_var("SHLIB_SUFFIX") or ".so"
 
     # macOS framework-style installations
     if framework_prefix and ldlibrary:
@@ -98,8 +97,8 @@ def get_libpython_path() -> str:  # pragma: no cover
     # conda envs) report the static archive ``libpythonX.Y.a`` there even though a ``.so``
     # is present alongside it. We accept ``LDLIBRARY`` only when it is a shared object
     # that exists, and otherwise fall back to locating the shared library in ``LIBDIR``.
-    shlib_suffix = ".dylib" if sys.platform == "darwin" else ".so"
     ldversion = sysconfig.get_config_var("LDVERSION") or sysconfig.get_config_var("VERSION") or ""
+    shlib_suffix = ".dylib" if sys.platform == "darwin" else ".so"
     conventional_path = os.path.join(libdir, f"libpython{ldversion}{shlib_suffix}")
     if os.path.exists(conventional_path):
         return conventional_path
