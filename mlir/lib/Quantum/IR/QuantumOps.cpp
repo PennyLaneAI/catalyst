@@ -249,14 +249,6 @@ struct RedirectExtractThroughDistinctInsert : public mlir::OpRewritePattern<Extr
         if (!staticallyDistinct) {
             return failure();
         }
-        // Skip when the insert's only users are extracts: redirecting them all leaves the insert
-        // dead, and DCE then removes it along with the gate feeding its qubit operand.
-        bool insertHasNonExtractUser = llvm::any_of(
-            insert.getResult().getUsers(), [](Operation *user) { return !isa<ExtractOp>(user); });
-        if (!insertHasNonExtractUser) {
-            return failure();
-        }
-
         // Read the pre-insert register.
         rewriter.modifyOpInPlace(extract,
                                  [&] { extract.getQregMutable().assign(insert.getInQreg()); });

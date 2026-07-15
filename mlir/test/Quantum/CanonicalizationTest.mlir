@@ -89,20 +89,6 @@ func.func @test_extract_insert_distinct_static_folds(%r1: !quantum.reg, %i1: i64
     return %r4 : !quantum.reg
 }
 
-// CHECK-LABEL: test_extract_no_redirect_when_insert_is_leaf
-func.func @test_extract_no_redirect_when_insert_is_leaf(%r0: !quantum.reg) -> !quantum.bit {
-    // CHECK: [[Q0:%.+]] = quantum.extract %arg0[ 0]
-    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[Q0]]
-    // CHECK: [[INS:%.+]] = quantum.insert %arg0[ 0], [[X]]
-    // CHECK: [[Q1:%.+]] = quantum.extract [[INS]][ 1]
-    // CHECK: return [[Q1]]
-    %q0 = quantum.extract %r0[0] : !quantum.reg -> !quantum.bit
-    %x = quantum.custom "PauliX"() %q0 : !quantum.bit
-    %r1 = quantum.insert %r0[0], %x : !quantum.reg, !quantum.bit
-    %q1 = quantum.extract %r1[1] : !quantum.reg -> !quantum.bit
-    return %q1 : !quantum.bit
-}
-
 // CHECK-LABEL: test_extract_through_insert_distinct_index
 func.func @test_extract_through_insert_distinct_index(%r0: !quantum.reg) -> !quantum.reg {
     // CHECK: [[Q0:%.+]] = quantum.extract %arg0[ 0]
