@@ -22,7 +22,6 @@ import pytest
 from catalyst.compiler import _quantum_opt
 from catalyst.device.python_decompositions import python_decomposition_wrapper
 from catalyst.utils.precompile_decomposition_rules import (
-    compile_op_decomp_rules,
     get_abstract_args,
     precompile_decomp_rules,
 )
@@ -58,76 +57,7 @@ class TestPrecompiled:
         with pytest.raises(ValueError, match="Cannot generate arguments"):
             get_abstract_args(qp.ControlledQubitUnitary)
 
-    # Tests for compile_op_decomp_rules helper
-
-    def test_compile_hadamard_rules(self):
-        """Test that compile_op_decomp_rules successfully compiles each decomp rule for Hadamard."""
-        rules = compile_op_decomp_rules(qp.H)
-
-        assert "_hadamard_to_rz_rx" in rules
-        assert "_hadamard_to_rz_ry" in rules
-
-    def test_compile_rx_rules(self):
-        """Test that compile_op_decomp_rules successfully compiles each decomp rule for RX gates."""
-        rules = compile_op_decomp_rules(qp.RX)
-
-        assert "_rx_to_rot" in rules
-        assert "_rx_to_rz_ry" in rules
-        assert "_rx_to_ry_cliff" in rules
-        assert "_rx_to_rz_cliff" in rules
-        assert "_rx_to_ppr" in rules
-
-    def test_fails_with_unknown_wires(self):
-        """
-        Test that compile_op_decomp_rules warns when the number of wires is unknown.
-        """
-        with pytest.warns():
-            compile_op_decomp_rules(qp.Identity)
-
-    def test_compile_error(self):
-        """Test that compile_op_decomp_rules warns when compilation of a rule fails."""
-
-        with pytest.warns(match="Failed to compile"):
-            with qp.decomposition.local_decomps():
-
-                class FakeOp(qp.operation.Operator):
-                    """Test class with incompatible decomp rule."""
-
-                    num_wires = 3
-                    num_params = 1
-                    ndim_params = (0,)
-
-                @qp.register_resources({})
-                def fake_op_decomp(param, wires):
-                    _quantum_opt(stdin="module {")
-                    return param, wires
-
-                qp.add_decomps(FakeOp, fake_op_decomp)
-
-                compile_op_decomp_rules(FakeOp)
-
-    def test_unexpected_error(self):
-        """Test that compile_op_decomp_rules warns when an unexpected exception is thrown."""
-
-        with pytest.warns(match="Unexpected error"):
-
-            with qp.decomposition.local_decomps():
-
-                class NewFakeOp(qp.operation.Operator):
-                    """Test class without ndim_params."""
-
-                    num_wires = 1
-                    num_params = 1
-
-                @qp.register_resources({})
-                def fake_op_decomp(string):
-                    qp.PauliRot(2, string, list(range(len(string))))
-
-                qp.add_decomps(NewFakeOp, fake_op_decomp)
-
-                compile_op_decomp_rules(NewFakeOp)
-
-    # bytecode file tests
+    # Test for bytecode file
 
     def test_bytecode_file(self):
         """Test that the bytecode file is generated correctly."""
@@ -150,11 +80,11 @@ class TestPrecompiled:
         # NOTE: empty pass is needed to prevent running default pipeline
         rules = _quantum_opt("--empty", BYTECODE_FILE_PATH)
 
-        assert "_isingxy_to_h_cy" in rules
-        assert "_doublexcit" in rules
-        assert "_pauliz_to_ps" in rules
-        assert "_cphase_to_ppr" in rules
-        assert "_crot" in rules
+        assert "__builtin__isingxy_to_h_cy" in rules
+        assert "__builtin__doublexcit" in rules
+        assert "__builtin__pauliz_to_ps" in rules
+        assert "__builtin__cphase_to_ppr" in rules
+        assert "__builtin__crot" in rules
 
 
 class TestTraceTime:
@@ -197,6 +127,7 @@ class TestOnDemand:
             )
 
             assert "test_decomp" in result
+            assert "_pauli_rot_decomp" in result
             assert 'target_gate = "PauliRot[f64][3]{pauli_word:XYX}"' in result
 
 
