@@ -174,7 +174,7 @@
 * Removes support for `Transform.plxpr_transform` from the `qp.qjit(capture=True)` capture pipeline.
   All transforms must now have a MLIR or XDSL implementation and a corresponding `pass_name`.
 
-* Support for `qjit` integration with `cudaq` has been removed in order to feasbily drop support 
+* Support for `qjit` integration with `cudaq` has been removed in order to feasbily drop support
   for Python 3.11.
   [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
 
@@ -238,14 +238,15 @@
 
 <h3>Internal changes ⚙️</h3>
 
-<<<<<<< Updated upstream
 * The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
-=======
-* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass. This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph. This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
+
+* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
+  This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
+  This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
   [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
->>>>>>> Stashed changes
+  [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
