@@ -18,6 +18,7 @@
 
 #include "DGBuilder.hpp"
 
+#include <cstdint>
 #include <iostream>
 #include <variant>
 

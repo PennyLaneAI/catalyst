@@ -14,6 +14,7 @@
 
 #pragma once
 #include <algorithm>
+#include <cstdint>
 #include <mutex>
 #include <numeric>
 #include <string>
