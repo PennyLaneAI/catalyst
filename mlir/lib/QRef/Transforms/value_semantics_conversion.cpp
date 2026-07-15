@@ -218,6 +218,16 @@ void eraseAllRemainingAnchorRValues(func::FuncOp f)
                "qref.reg Values must have no uses after the semantic conversion");
         graphStatePrepOp->erase();
     });
+    f.walk([&](qref::AllocQubitOp allocQbOp) {
+        assert(allocQbOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        allocQbOp->erase();
+    });
+    f.walk([&](pbc::RefFabricateOp fabricateOp) {
+        assert(fabricateOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        fabricateOp->erase();
+    });
 }
 
 /**
