@@ -168,6 +168,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
+  [(#2974)](https://github.com/PennyLaneAI/catalyst/pull/2974)
+
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
   [(#2840)](https://github.com/PennyLaneAI/catalyst/pull/2840)
 
