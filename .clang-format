@@ -13,12 +13,16 @@ IncludeBlocks: Regroup
 # NOTE: Ensure that lists are always sorted alphabetically.
 
 IncludeCategories:
+  # Python & nanobind & pybind11
+  - Regex: '^(")(Python|nanobind)(\/.*)?\.([hp]+)(")$'
+    Priority: 0  
+
   # System/STL
   - Regex:    '^(<)(([^.]+)|((std.*|complex|sys.*|dlfcn)\.h))(>)$'
     Priority: 1
 
   # Dependencies
-  - Regex:    '^(")(llvm|Enzyme|absl|boost|catch2|gmock|gtest|jax_cpu_lapack_kernels|mlir|nanobind|nlohmann|numpy|pybind11|Python|stablehlo|stim|toml\+\+|xla)(\/.*)?\.([hcp]+)(")$'
+  - Regex:    '^(")(llvm|Enzyme|absl|boost|catch2|gmock|gtest|jax_cpu_lapack_kernels|mlir|nlohmann|numpy|pybind11|stablehlo|stim|toml\+\+|xla)(\/.*)?\.([hcp]+)(")$'
     Priority: 2
 
   # Local headers
