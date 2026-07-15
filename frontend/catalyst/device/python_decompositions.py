@@ -34,6 +34,8 @@ _MLIR_DTYPES = {
     "f16": jnp.float16,
     "f32": jnp.float32,
     "f64": jnp.float64,
+    "complex<f64>": jnp.complex64,
+    "complex<f128>": jnp.complex128,
 }
 
 
@@ -141,16 +143,20 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
 
-    @qp.qjit(
-        target="mlir",
-        capture=True,
-    )
-    @qp.qnode(device=device)
-    def circuit():
-        for subroutine in subroutines:
-            subroutine(*get_dummy_values_for_container(dynamic_shape), wires=wires)
+    try:
 
-    module = circuit.mlir_module
+        @qp.qjit(
+            target="mlir",
+            capture=True,
+        )
+        @qp.qnode(device=device)
+        def circuit():
+            for subroutine in subroutines:
+                subroutine(*get_dummy_values_for_container(dynamic_shape), wires=wires)
+
+        module = circuit.mlir_module
+    except:
+        return ModuleOp()
 
     def update_funcop_attributes(op):
         """Update the decomposition rule attributes if op is a decomposition rule.
