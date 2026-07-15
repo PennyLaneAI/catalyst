@@ -46,6 +46,8 @@ class _EndpointHandle:
         self.role = endpoint.role
         self.name = endpoint.name
         self.local = endpoint.local
+        # The decoder this endpoint runs (coprocessors only); None elsewhere.
+        self.decoder = endpoint.decoder
         if not endpoint.local:
             self._catalyst_dispatch = RemoteDispatch(address=endpoint.host)
 
@@ -58,19 +60,21 @@ class HeterogeneousDevice(Device):
         backline (Backline): The placement (controller, coprocessors, transport), constructed via
             :func:`pennylane.backline`.
         emulate (str): Emulate locally. Defaults to `"False"`. Not yet implemented.
-        decoder: The decoder to use. Defaults to ``None``.
     """
 
-    def __init__(self, wires, backline, emulate="local", decoder=None, **kwargs):
+    def __init__(self, wires, backline, emulate="local", **kwargs):
         self._backline = backline
         self._emulate = emulate
-        self._decoder = decoder
         super().__init__(wires=wires, **kwargs)
 
-        # Carry the transport to the runtime via rtd_kwargs in device_init as a device_kwarg
+        # Carry the transport to the runtime via rtd_kwargs in device_init as a device_kwarg.
         self.device_kwargs = {"transport": str(backline.transport)}
 
-        # We use `null.qubit` for our runtime library for now
+        decoders = [c.decoder for c in backline.coprocessors if c.decoder is not None]
+        if len(decoders) == 1 and isinstance(decoders[0], str):
+            self.device_kwargs["decoder"] = decoders[0]
+
+        # We use `null.qubit` for our runtime library for now.
         self.config_filepath = os.path.join(
             get_lib_path("runtime", "RUNTIME_LIB_DIR"), "backend", "null_qubit.toml"
         )

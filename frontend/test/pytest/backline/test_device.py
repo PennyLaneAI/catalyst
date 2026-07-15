@@ -51,10 +51,32 @@ class TestConstruction:
         dev = HeterogeneousDevice(wires=49, backline=bl)
         assert dev.backline is bl
 
-    def test_accepts_emulate_and_decoder_kwargs(self):
-        # emulate is a recorded no-op in this slice; decoder is stored but not yet dispatched.
-        dev = HeterogeneousDevice(wires=2, backline=_backline(), emulate="local", decoder="steane")
-        assert dev.backline is not None
+    def test_decoder_kwarg_is_rejected(self):
+        # decoder is no longer a device kwarg; it lives on the coprocessor Endpoint.
+        with pytest.raises(TypeError):
+            HeterogeneousDevice(wires=2, backline=_backline(), decoder="steane")
+
+    def test_endpoint_handle_exposes_decoder(self):
+        bl = qp.backline(
+            controller=qp.Endpoint("fpga-qpu.ip", role="fpga-qpu"),
+            coprocessors=(qp.Endpoint("gpu.ip", role="gpu-decoder", decoder="steane"),),
+            transport="roce",
+        )
+        dev = HeterogeneousDevice(wires=2, backline=bl)
+        assert dev.endpoint("gpu-decoder").decoder == "steane"
+
+    def test_device_kwargs_carries_single_coprocessor_decoder(self):
+        bl = qp.backline(
+            controller=qp.Endpoint("fpga-qpu.ip", role="fpga-qpu"),
+            coprocessors=(qp.Endpoint("gpu.ip", role="gpu-decoder", decoder="steane"),),
+            transport="roce",
+        )
+        dev = HeterogeneousDevice(wires=2, backline=bl)
+        assert dev.device_kwargs["decoder"] == "steane"
+
+    def test_device_kwargs_omits_decoder_when_absent(self):
+        dev = HeterogeneousDevice(wires=2, backline=_backline())  # coprocessor has no decoder
+        assert "decoder" not in dev.device_kwargs
 
     def test_device_kwargs_carries_transport(self):
         # The transport reaches the runtime via device_kwargs -> device_init's rtd_kwargs.
