@@ -121,16 +121,19 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
     device = qp.device("null.qubit", wires=sum(wire_lens))
     wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
 
-    decomp_rules = qp.decomposition.list_decomps(op_name)
+    decomp_rules = list(qp.decomposition.list_decomps(op_name))
 
     # map rules to resource resources, in a more generic format
-    name_to_resources = {
-        rule.name: {
-            get_graph_op_id(op): count
-            for op, count in rule.compute_resources(**static_data).gate_counts.items()
-        }
-        for rule in decomp_rules
-    }
+
+    name_to_resources = {}
+    for rule in decomp_rules:
+        try:
+            name_to_resources[rule.name] = {
+                get_graph_op_id(op): count
+                for op, count in rule.compute_resources(**static_data).gate_counts.items()
+            }
+        except:  # pylint: disable=bare-except
+            decomp_rules.remove(rule)
 
     def rule_to_subroutine(rule):
         def decomp_rule(*params, wires):
@@ -143,20 +146,16 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
 
-    try:
+    @qp.qjit(
+        target="mlir",
+        capture=True,
+    )
+    @qp.qnode(device=device)
+    def circuit():
+        for subroutine in subroutines:
+            subroutine(*get_dummy_values_for_container(dynamic_shape), wires=wires)
 
-        @qp.qjit(
-            target="mlir",
-            capture=True,
-        )
-        @qp.qnode(device=device)
-        def circuit():
-            for subroutine in subroutines:
-                subroutine(*get_dummy_values_for_container(dynamic_shape), wires=wires)
-
-        module = circuit.mlir_module
-    except:
-        return ModuleOp()
+    module = circuit.mlir_module
 
     def update_funcop_attributes(op):
         """Update the decomposition rule attributes if op is a decomposition rule.
