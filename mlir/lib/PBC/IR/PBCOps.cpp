@@ -18,12 +18,15 @@
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Region.h"
 
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
+
+#include <llvm/ADT/StringRef.h>
 
 using namespace mlir;
 using namespace catalyst::pbc;
@@ -238,3 +241,59 @@ void LayerOp::print(OpAsmPrinter &p)
                   /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/!getInitArgs().empty());
 }
+
+//===----------------------------------------------------------------------===//
+// ResourceQuantumOpInterface methods.
+//===----------------------------------------------------------------------===//
+llvm::StringRef PrepareStateOp::getResourceName() { return "PrepareState"; }
+llvm::StringRef FabricateOp::getResourceName() { return "Fabricate"; }
+llvm::StringRef PPRotationOp::getResourceName()
+{
+    switch (std::abs(getRotationKind())) {
+    case 0:
+        return "PPR-identity";
+    case 2:
+        return "PPR-pi/2";
+    case 4:
+        return "PPR-pi/4";
+    case 8:
+        return "PPR-pi/8";
+    }
+    assert(false && "PPRotationOp::getResourceName: invalid rotation kind");
+}
+llvm::StringRef PPRotationArbitraryOp::getResourceName() { return "PPR-Phi"; }
+llvm::StringRef PPMeasurementOp::getResourceName() { return "PPM"; }
+llvm::StringRef SelectPPMeasurementOp::getResourceName() { return "PPM"; }
+
+bool PPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
+bool PPMeasurementOp::getResourceAdjointFlag() { return getNegated(); }
+
+// TODO: Once PBC's interface is improved, we can remove these methods 
+// and use the ones from the interface.
+uint64_t PrepareStateOp::getResourceNumQubits() { return 0; }
+uint64_t FabricateOp::getResourceNumQubits() { return 0; }
+uint64_t PPRotationOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t PPRotationArbitraryOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t PPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t SelectPPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
+
+uint64_t PrepareStateOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t FabricateOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t PPRotationOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t PPRotationArbitraryOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t PPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t SelectPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
+
+uint64_t PrepareStateOp::getResourceNumParams() { return 0; }
+uint64_t FabricateOp::getResourceNumParams() { return 0; }
+uint64_t PPRotationOp::getResourceNumParams() { return 0; }
+uint64_t PPRotationArbitraryOp::getResourceNumParams() { return 0; }
+uint64_t PPMeasurementOp::getResourceNumParams() { return 0; }
+uint64_t SelectPPMeasurementOp::getResourceNumParams() { return 0; }
+
+//===----------------------------------------------------------------------===//
+// ResourceAllocQubitOpInterface methods.
+//===----------------------------------------------------------------------===//
+
+uint64_t PrepareStateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }
+uint64_t FabricateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }

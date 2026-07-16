@@ -41,8 +41,12 @@ def ResourceQuantumOpInterface : OpInterface<"ResourceQuantumOpInterface"> {
         "llvm::StringRef", "getResourceName", (ins), /*methodBody*/[{}]
     >,
     InterfaceMethod<
-        "Return the number of qubits this op acts on (including controls).",
+        "Return the number of target qubits this op acts on (excluding controls).",
         "uint64_t", "getResourceNumQubits", (ins), /*methodBody*/[{}]
+    >,
+    InterfaceMethod<
+        "Return the number of control qubits for this op.",
+        "uint64_t", "getResourceNumCtrlQubits", (ins), /*methodBody*/[{}]
     >,
     InterfaceMethod<
         "Return the number of classical gate parameters for this op.",

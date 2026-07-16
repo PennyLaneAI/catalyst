@@ -153,7 +153,7 @@ func.func @rule_with_nested_loop(%arg0: !quantum.bit) -> !quantum.bit attributes
 // -----
 
 // Rules with parametric ops
-// CHECK:  operations = {"Adjoint(Rot)(4,3)" = 1 : i64, "Rot(4,3)" = 1 : i64}}
+// CHECK:  operations = {"2C(Adjoint(Rot))(4,3)" = 1 : i64, "2C(Rot)(4,3)" = 1 : i64}}
 func.func @rule_with_parametric_ops(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate="gate"} {
     %cst_0 = arith.constant 0.1 : f64
     %cst_1 = arith.constant 0.2 : f64

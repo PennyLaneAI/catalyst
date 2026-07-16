@@ -269,8 +269,10 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         llvm::StringRef getResourceName();
 
         uint64_t getResourceNumQubits() {
-            return getQubitOperands().size();
+            return getInQubits().size();
         }
+
+        uint64_t getResourceNumCtrlQubits() { return 0; }
 
         uint64_t getResourceNumParams() { return 0; }
 
@@ -356,7 +358,11 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
         llvm::StringRef getResourceName();
 
         uint64_t getResourceNumQubits() {
-            return getQubitOperands().size();
+            return getInQubits().size();
+        }
+
+        uint64_t getResourceNumCtrlQubits() {
+            return getInCtrlQubits().size();
         }
 
         uint64_t getResourceNumParams() {

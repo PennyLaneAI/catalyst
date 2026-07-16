@@ -19,6 +19,8 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"  // for ReturnLike
 include "mlir/Interfaces/SideEffectInterfaces.td" // for Pure
 
+include "Catalyst/Analysis/ResourceInterfaces.td"
+
 include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
@@ -32,7 +34,8 @@ include "PBC/IR/PBCOpInterfaces.td"
 
 include "PBC/IR/PBCRefOps.td"
 
-def PrepareStateOp : PBC_Op<"prepare"> {
+def PrepareStateOp : PBC_Op<"prepare", 
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Prepare auxiliary qubits in a given state.";
     let description = [{
         Prepares simple (non-magic) states in new qubits, such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩.
@@ -71,7 +74,8 @@ def PrepareStateOp : PBC_Op<"prepare"> {
     let hasVerifier = 1;
 }
 
-def FabricateOp : PBC_Op<"fabricate"> {
+def FabricateOp : PBC_Op<"fabricate", 
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Fabricate axillary qubits from qubit factories.";
     let description = [{
         The FabricateOp represents a operation that produces/fetches auxiliary qubits from a qubit factory.
@@ -131,7 +135,8 @@ def FabricateOp : PBC_Op<"fabricate"> {
     let hasVerifier = 1;
 }
 
-def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments]> {
+def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag"]>]> {
     let summary = "Pauli Product Rotation on qubits.";
 
     let description = [{
@@ -248,7 +253,8 @@ def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments]> {
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOperandSegments]> {
+def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "Pauli Product Rotation with arbitrary angle.";
     let description = [{
         The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
@@ -350,7 +356,8 @@ def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOp
     let hasCanonicalizeMethod = 1;
 }
 
-def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface]> {
+def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag"]>]> {
     let summary = "Pauli Product Measurement on qubits.";
 
     let description = [{
@@ -419,7 +426,7 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface]> {
     let hasVerifier = 1;
 }
 
-def SelectPPMeasurementOp : PBC_Op<"select.ppm"> {
+def SelectPPMeasurementOp : PBC_Op<"select.ppm", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "Multiplexed Pauli product measurement.";
 
     let description = [{

@@ -72,33 +72,33 @@ static bool isCustomDialectOp(Operation *op)
 // Operation categorization helpers
 //===----------------------------------------------------------------------===//
 
-/// Get the name for a PBC operation.
-static std::string getPBCOpName(Operation *op)
-{
-    return llvm::TypeSwitch<Operation *, std::string>(op)
-        .Case<pbc::PPRotationOp>([](auto pprOp) -> std::string {
-            int8_t rk = pprOp.getRotationKind();
-            if (rk == 0) {
-                return "PPR-identity";
-            }
-            return "PPR-pi/" + std::to_string(std::abs(rk));
-        })
-        .Case<pbc::PPRotationArbitraryOp>([](auto) -> std::string { return "PPR-Phi"; })
-        .Case<pbc::PPMeasurementOp, pbc::RefPPMeasurementOp, pbc::SelectPPMeasurementOp>(
-            [](auto) -> std::string { return "PPM"; })
-        .Default([](Operation *o) { return o->getName().getStringRef().str(); });
-}
+// /// Get the name for a PBC operation.
+// static std::string getPBCOpName(Operation *op)
+// {
+//     return llvm::TypeSwitch<Operation *, std::string>(op)
+//         .Case<pbc::PPRotationOp>([](auto pprOp) -> std::string {
+//             int8_t rk = pprOp.getRotationKind();
+//             if (rk == 0) {
+//                 return "PPR-identity";
+//             }
+//             return "PPR-pi/" + std::to_string(std::abs(rk));
+//         })
+//         .Case<pbc::PPRotationArbitraryOp>([](auto) -> std::string { return "PPR-Phi"; })
+//         .Case<pbc::PPMeasurementOp, pbc::RefPPMeasurementOp, pbc::SelectPPMeasurementOp>(
+//             [](auto) -> std::string { return "PPM"; })
+//         .Default([](Operation *o) { return o->getName().getStringRef().str(); });
+// }
 
-/// Get the qubit count for a PBC operation.
-static int getPBCQubitCount(Operation *op)
-{
-    // if the operation is one of these operations, it will return the number of qubits in the input
-    return llvm::TypeSwitch<Operation *, int>(op)
-        .Case<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
-              pbc::SelectPPMeasurementOp>(
-            [](auto typedOp) { return static_cast<int>(typedOp.getInQubits().size()); })
-        .Default(0);
-}
+// /// Get the qubit count for a PBC operation.
+// static int getPBCQubitCount(Operation *op)
+// {
+//     // if the operation is one of these operations, it will return the number of qubits in the
+//     input return llvm::TypeSwitch<Operation *, int>(op)
+//         .Case<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
+//               pbc::SelectPPMeasurementOp>(
+//             [](auto typedOp) { return static_cast<int>(typedOp.getInQubits().size()); })
+//         .Default(0);
+// }
 
 /**
  * @brief Collect a single MBQC operation into the ResourceResult.
@@ -371,13 +371,30 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         return;
     }
 
+    // Metadata: device init
+    if (auto deviceOp = dyn_cast<quantum::DeviceInitOp>(op)) {
+        result.deviceName = deviceOp.getDeviceName().str();
+        result.autoQubitManagement = deviceOp.getAutoQubitManagement();
+        return;
+    }
+
+    // Quantum operations
     if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
         std::string name = inst.getResourceName().str();
         if (isAdjoint ^ inst.getResourceAdjointFlag()) {
             name = "Adjoint(" + name + ")";
         }
-        uint64_t nQubits = inst.getResourceNumQubits();
+        uint64_t nCtrlQubits = inst.getResourceNumCtrlQubits();
+
+        if (nCtrlQubits == 1) {
+            name = "C(" + name + ")";
+        }
+        else if (nCtrlQubits > 1) {
+            name = std::to_string(nCtrlQubits) + "C(" + name + ")";
+        }
+
         uint64_t nParams = inst.getResourceNumParams();
+        uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;
         result.operations[name][{nQubits, nParams}] += 1;
         return;
     }
@@ -388,27 +405,10 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         return;
     }
 
-    // PBC operations
-    if (isa<pbc::PPRotationOp, pbc::RefPPMeasurementOp, pbc::PPRotationArbitraryOp,
-            pbc::PPMeasurementOp, pbc::SelectPPMeasurementOp, pbc::PrepareStateOp,
-            pbc::FabricateOp>(op)) {
-        std::string name = getPBCOpName(op);
-        int nQubits = getPBCQubitCount(op);
-        result.operations[name][{nQubits, 0}] += 1;
-        return;
-    }
-
     // MBQC operations
     if (isa<mbqc::MeasureInBasisOp, mbqc::RefMeasureInBasisOp, mbqc::GraphStatePrepOp,
             mbqc::RefGraphStatePrepOp>(op)) {
         collectMBQCOperation(op, result, isAdjoint);
-        return;
-    }
-
-    // Metadata: device init
-    if (auto deviceOp = dyn_cast<quantum::DeviceInitOp>(op)) {
-        result.deviceName = deviceOp.getDeviceName().str();
-        result.autoQubitManagement = deviceOp.getAutoQubitManagement();
         return;
     }
 
