@@ -172,7 +172,7 @@
   k-fold before the bufferization and LLVM stages amplify it, reducing compile time,
   peak memory, and IR size on workloads with many structurally identical circuit
   segments. The pass runs by default in the HLO lowering stage.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3036)](https://github.com/PennyLaneAI/catalyst/pull/3036)
 
 <h3>Breaking changes 💔</h3>
 
