@@ -77,8 +77,9 @@ def _to_hashable(spec):
     return tuple(entries)
 
 
-def declare(name: str, artifact: Optional[str] = None, outputs=None, *,
-            remote: bool | object = False) -> KernelDescriptor:
+def declare(
+    name: str, artifact: Optional[str] = None, outputs=None, *, remote: bool | object = False
+) -> KernelDescriptor:
     """Declare an external kernel for use with :func:`kernel.runtime_call`.
 
     Args:

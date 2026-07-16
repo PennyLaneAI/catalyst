@@ -62,9 +62,7 @@ def collect_runtime_artifacts(mlir_module, compile_options):
     compile_options.runtime_artifacts = tuple(seen)
 
 
-_RUNTIME_ARTIFACTS_TEXT_RE = re.compile(
-    rf"{re.escape(RUNTIME_ARTIFACTS_ATTR)}\s*=\s*\[([^\]]*)\]"
-)
+_RUNTIME_ARTIFACTS_TEXT_RE = re.compile(rf"{re.escape(RUNTIME_ARTIFACTS_ATTR)}\s*=\s*\[([^\]]*)\]")
 _RUNTIME_ARTIFACTS_PATH_RE = re.compile(r'"([^"]*)"')
 
 
