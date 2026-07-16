@@ -48,6 +48,10 @@
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
+* `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
+  duplicate serialization logic and keeping its output consistent.
+  [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
+
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
   [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
