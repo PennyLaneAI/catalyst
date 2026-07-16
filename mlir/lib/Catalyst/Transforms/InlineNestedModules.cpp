@@ -160,8 +160,6 @@ SymbolRefAttr getFullyQualifiedNameUntil(SymbolOpInterface symbol, const Operati
 static constexpr llvm::StringRef fullyQualifiedNameAttr = "catalyst.fully_qualified_name";
 static constexpr llvm::StringRef quantumNodeAttr = "quantum.node";
 static constexpr llvm::StringRef legacyQNodeAttr = "qnode";
-// Modules carrying this attribute are cross-compiled to standalone objects, so this pass leaves
-// them un-renamed, un-inlined, and un-flattened.
 static constexpr llvm::StringRef targetAttr = "catalyst.target";
 
 struct AnnotateWithFullyQualifiedName : public OpInterfaceRewritePattern<SymbolOpInterface> {
@@ -295,7 +293,6 @@ struct InlineNestedModule : public RewritePattern {
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
     {
         bool isSymbolTable = op->hasTrait<OpTrait::SymbolTable>();
-        // Modules annotated with catalyst.target are compiled separately; skip inlining.
         bool mustInline = isSymbolTable && !op->hasAttr(targetAttr);
         if (!mustInline) {
             return failure();
@@ -401,14 +398,12 @@ struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::LaunchKernelO
     LogicalResult matchAndRewrite(catalyst::LaunchKernelOp op,
                                   PatternRewriter &rewriter) const override
     {
-        // Dispatch-module entries are excluded from the map (their modules are left intact for
-        // dispatch-executor-targets), so their launch_kernel is not matched here and stays as-is.
-        auto found = _map->find(op.getCallee());
-        if (found == _map->end()) {
+        auto it = _map->find(op.getCallee());
+        if (it == _map->end()) {
             return failure();
         }
 
-        rewriter.replaceOpWithNewOp<func::CallOp>(op, found->getSecond(), op.getResultTypes(),
+        rewriter.replaceOpWithNewOp<func::CallOp>(op, it->getSecond(), op.getResultTypes(),
                                                   op.getOperands());
         return success();
     }
@@ -527,8 +522,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         symbolTable->walk<WalkOrder::PreOrder>([&](Operation *nested) {
             if (nested == symbolTable)
                 return WalkResult::advance();
-            // Any module still nested at this point is a catalyst.target module (ordinary ones were
-            // inlined above): leave it and its contents entirely untouched.
+            // Any module still nested at this point is a catalyst.target module.
             if (isa<ModuleOp>(nested))
                 return WalkResult::skip();
             if (!isa<SymbolOpInterface>(nested) || !nested->hasAttr(fullyQualifiedNameAttr))
