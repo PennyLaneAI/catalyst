@@ -61,7 +61,7 @@ LogicalResult RefGraphStatePrepOp::verify()
 }
 
 //===----------------------------------------------------------------------===//
-// Resource interface methods.
+// Implement ResourceQuantumOpInterface methods.
 //===----------------------------------------------------------------------===//
 
 llvm::StringRef MeasureInBasisOp::getResourceName() { return getOperationName(); }

@@ -243,7 +243,7 @@ void LayerOp::print(OpAsmPrinter &p)
 }
 
 //===----------------------------------------------------------------------===//
-// ResourceQuantumOpInterface methods.
+// Implement ResourceQuantumOpInterface methods.
 //===----------------------------------------------------------------------===//
 llvm::StringRef PrepareStateOp::getResourceName() { return "PrepareState"; }
 llvm::StringRef FabricateOp::getResourceName() { return "Fabricate"; }
@@ -268,8 +268,8 @@ llvm::StringRef SelectPPMeasurementOp::getResourceName() { return "PPM"; }
 bool PPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
 bool PPMeasurementOp::getResourceAdjointFlag() { return getNegated(); }
 
-// TODO: Once PBC's interface is improved, we can remove these methods
-// and use the ones from the interface.
+// TODO: Once PBC's interface is improved, we can remove these implementation
+// and only implement one in the interface definition.
 uint64_t PrepareStateOp::getResourceNumQubits() { return 0; }
 uint64_t FabricateOp::getResourceNumQubits() { return 0; }
 uint64_t PPRotationOp::getResourceNumQubits() { return getInQubits().size(); }
@@ -292,7 +292,7 @@ uint64_t PPMeasurementOp::getResourceNumParams() { return 0; }
 uint64_t SelectPPMeasurementOp::getResourceNumParams() { return 0; }
 
 //===----------------------------------------------------------------------===//
-// ResourceAllocQubitOpInterface methods.
+// Implement ResourceAllocQubitOpInterface methods.
 //===----------------------------------------------------------------------===//
 
 uint64_t PrepareStateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }
