@@ -37,8 +37,10 @@ int load_asset_path(ExecutorSession *s, const char *path);
 int call_wrapper_raw(ExecutorSession *s, const char *sym, const char *args_buf, size_t args_size,
                      char **out_buf, size_t *out_size);
 
-// Look up a symbol address on the remote. Returns 0 on error.
-uint64_t lookup(ExecutorSession *s, const char *name);
+// Look up a symbol address on the remote. When `object` is non-null/non-empty, the lookup is
+// scoped to that object's JITDylib. Otherwise it resolves against the shared
+// process namespace. Returns 0 on error.
+uint64_t lookup(ExecutorSession *s, const char *name, const char *object = nullptr);
 
 // Run a remote function as `main(argc, argv)`.
 int32_t run_as_main(ExecutorSession *s, uint64_t entry_addr, int argc, const char *const *argv);
