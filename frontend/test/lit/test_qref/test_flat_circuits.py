@@ -143,7 +143,7 @@ def test_dynamic_qubit_allocation(i: int):
         # CHECK: qref.multirz({{%.+}}) [[alloc_q1]] : !qref.bit
         qp.MultiRZ(0.1, wires=q[1])
 
-        # CHECK: qref.pcphase({{%.+}}, {{%.+}}) [[alloc_q0]], [[alloc_q1]] : !qref.bit, !qref.bit
+        # CHECK: qref.pcphase({{%.+}}, dim : 0) [[alloc_q0]], [[alloc_q1]] : !qref.bit, !qref.bit
         qp.PCPhase(0.1, dim=0, wires=[q[0], q[1]])
 
         # CHECK: qref.gphase({{%.+}}) ctrls([[alloc_q0]]) ctrlvals({{%.+}}) : ctrls !qref.bit
@@ -213,8 +213,6 @@ def test_pcphase():
     Test pcphase.
     """
     # CHECK-DAG: [[true:%.+]] = arith.constant true
-    # CHECK-DAG: [[stablehlo_two:%.+]] = stablehlo.constant dense<2> : tensor<i64>
-    # CHECK-DAG: [[stablehlo_one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
     # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 3) : !qref.reg<3>
@@ -222,17 +220,13 @@ def test_pcphase():
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
-    # CHECK: [[_two:%.+]] = stablehlo.convert [[stablehlo_two]] : (tensor<i64>) -> tensor<f64>
-    # CHECK: [[dim_2:%.+]] = tensor.extract [[_two]][] : tensor<f64>
-    # CHECK: qref.pcphase([[angle]], [[dim_2]]) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
+    # CHECK: qref.pcphase([[angle]], dim : 2) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
     qp.PCPhase(0.1, dim=2, wires=[0, 1, 2])
 
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
-    # CHECK: [[_one:%.+]] = stablehlo.convert [[stablehlo_one]] : (tensor<i64>) -> tensor<f64>
-    # CHECK: [[dim_1:%.+]] = tensor.extract [[_one]][] : tensor<f64>
-    # CHECK: qref.pcphase([[angle]], [[dim_1]]) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # CHECK: qref.pcphase([[angle]], dim : 1) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
     qp.ctrl(qp.PCPhase, control=0, control_values=True)(0.1, dim=1, wires=[1, 2])
 
     return qp.expval(qp.X(0))
