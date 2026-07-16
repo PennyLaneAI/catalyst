@@ -36,4 +36,29 @@ def ConvertExecutorToLLVMPass : Pass<"convert-executor-to-llvm", "mlir::ModuleOp
     ];
 }
 
+def DispatchExecutorTargetsPass : Pass<"dispatch-executor-targets", "mlir::ModuleOp"> {
+    let summary = "Ship cross-compiled catalyst.target modules to a executor executor.";
+    let description = [{
+        For every `builtin.module` carrying a `catalyst.dispatch` attribute and the
+        `catalyst.object_file` path, this pass will perform the following:
+
+        1. Injects `executor.open` into `setup()` (once per unique address) and `executor.send_binary`
+           into `setup()` (once per module).
+        2. Replaces every host-side `func.call` to the module's entry functions with a
+           `executor.launch` op carrying the executor address and the entry callee.
+        3. Erases the bodyless external declarations and the nested module from the host.
+
+        Session teardown is handled by the runtime, which closes every open session when the
+        process exits, so no explicit close op is emitted.
+
+        The pass is a no-op when no `catalyst.dispatch` modules are present.
+    }];
+
+    let dependentDialects = [
+        "catalyst::executor::ExecutorDialect",
+        "catalyst::CatalystDialect",
+        "mlir::func::FuncDialect"
+    ];
+}
+
 #endif // EXECUTOR_PASSES
