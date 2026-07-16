@@ -91,9 +91,9 @@ def get_graph_op_id(op: qp.decomposition.CompressedResourceOp | qp.Operator2):
 
     if issubclass(op_type, qp.core.operator.Operator):
         name = op_type.__name__
-        num_params = str(op_type.num_params)
+        num_params = op_type.num_params
         num_wires = str(op_type.num_wires) if op_type.num_wires else "0"
-        return name + "(" + num_params + "," + num_wires + ")"
+        return name + "[" + ",".join(["f64"] * num_params) + "][" + num_wires + "]{}"
     elif isinstance(op_type, qp.core.operator.Operator2):
         # TODO: use real getters here
         name = op_type.__name__

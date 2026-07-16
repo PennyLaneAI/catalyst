@@ -113,7 +113,7 @@ def get_rules_from_module(module) -> str:
         if op.name == "func.func":
             if "target_gate" in op.attributes:
                 op.attributes["sym_name"] = ir.StringAttr.get(
-                    "__builtin_" + str(op.attributes["sym_name"])
+                    "__builtin_" + op.attributes["sym_name"].value.strip('"')
                 )
                 funcOps.append(op)
                 return ir.WalkResult.SKIP
@@ -169,7 +169,7 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
                 op.__name__, get_graph_op_id(op), dynamic_data, wire_lens, {}
             )
 
-            bytecode_lib += get_rules_from_module(mlir_rules)
+            bytecode_lib += get_rules_from_module(mlir_rules) + "\n"
 
     bytecode = _quantum_opt(
         "--emit-bytecode",
