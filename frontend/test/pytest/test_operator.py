@@ -176,8 +176,24 @@ class TestOperator2Execution:
         assert qp.math.allclose(r1, -1)
         assert qp.math.allclose(r2, -1)
 
-    @pytest.mark.parametrize("dim", [2, 3])
-    def test_PCPhase(self, dim):
+    @pytest.mark.parametrize(
+        "dim, expected",
+        [
+            (
+                2,
+                jnp.array(
+                    [jnp.exp(0.5j) / 2, jnp.exp(0.5j) / 2, jnp.exp(-0.5j) / 2, jnp.exp(-0.5j) / 2]
+                ),
+            ),
+            (
+                3,
+                jnp.array(
+                    [jnp.exp(0.5j) / 2, jnp.exp(0.5j) / 2, jnp.exp(0.5j) / 2, jnp.exp(-0.5j) / 2]
+                ),
+            ),
+        ],
+    )
+    def test_PCPhase(self, dim, expected):
         """Test that PCPhase can be executed."""
 
         @qp.qjit(capture=True)
@@ -189,12 +205,4 @@ class TestOperator2Execution:
             return qp.state()
 
         state = c(0.5)
-
-        plus = jnp.exp(0.5j) / 2
-        minus = jnp.exp(-0.5j) / 2
-        if dim == 2:
-            expected = jnp.array([plus, plus, minus, minus])
-        if dim == 3:
-            expected = jnp.array([plus, plus, plus, minus])
-
         assert qp.math.allclose(state, expected)
