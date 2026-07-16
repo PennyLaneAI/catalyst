@@ -1240,3 +1240,42 @@ func.func @pbc_prepare_fabricate() {
     %mres, %out0, %out1 = pbc.ppm ["X", "Z"] %m0, %m1 : i1, !quantum.bit, !quantum.bit
     return
 }
+
+
+// -----
+
+// Test OperatorOp: name, params, adjoint, and control qubits.
+
+// CHECK-LABEL: "operator2"
+// CHECK-DAG: "MyOpA(2)": 1
+// CHECK-DAG: "C(MyOpB)(2)": 1
+// CHECK-DAG: "2C(MyOpC)(3)": 1
+// CHECK-DAG: "Adjoint(MyOpD)(1)": 1
+
+func.func @operator2() {
+    %false = arith.constant false
+    %true = arith.constant true
+    %theta = arith.constant 0.5 : f64
+    %phi = arith.constant 0.25 : f64
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %q0 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %q1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %q2 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+
+    %o0, %o1 = quantum.operator "MyOpA"(%theta : f64) qubits(%q0, %q1)
+
+    %o2, %oc0 = quantum.operator "MyOpB"(%theta : f64) qubits(%o0)
+      ctrls(%o1) ctrl_vals(%true)
+
+    %o3, %oc1, %oc2 = quantum.operator "MyOpC"(%theta : f64, %phi : f64) qubits(%o2)
+      ctrls(%oc0, %q2) ctrl_vals(%true, %false)
+
+    %o4 = quantum.operator "MyOpD"(%theta : f64) adj qubits(%o3)
+      static_data = {pauli_string = "XYZ"}
+
+    %r0 = quantum.insert %0[ 0], %o4 : !quantum.reg, !quantum.bit
+    %r1 = quantum.insert %r0[ 1], %oc1 : !quantum.reg, !quantum.bit
+    %r2 = quantum.insert %r1[ 2], %oc2 : !quantum.reg, !quantum.bit
+    quantum.dealloc %r2 : !quantum.reg
+    return
+}
