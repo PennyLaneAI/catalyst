@@ -26,6 +26,7 @@
 #include "LUTDecoder.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <vector>
 
 #include "DataView.hpp"

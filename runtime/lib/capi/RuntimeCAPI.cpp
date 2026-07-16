@@ -15,6 +15,7 @@
 #include "RuntimeCAPI.h"
 
 #include <cstdarg>
+#include <cstdint>
 #include <cstdlib>
 #include <ctime>
 #include <memory>
