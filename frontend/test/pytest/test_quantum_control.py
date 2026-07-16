@@ -1424,7 +1424,7 @@ class TestDecomposition:
                 OpWithDecomposition(0.123, wires=[0, 1]),
                 [
                     qp.CH(wires=[2, 0]),
-                    Controlled(qp.S(wires=1), control_wires=2),
+                    qp.ctrl(qp.S(wires=1), control=2),
                     qp.CRX(0.123, wires=[2, 0]),
                 ],
             ),
@@ -1441,7 +1441,10 @@ class TestDecomposition:
     def test_decomposition(self, target, decomp):
         """Test that we decompose a normal controlled operation"""
         op = C_ctrl(target, 2)
-        assert op.decomposition() == decomp
+        assert all(
+            qp.equal(actual, expected)
+            for actual, expected in zip(op.decomposition(), decomp, strict=True)
+        )
 
     def test_non_differentiable_one_qubit_special_unitary(self):
         """Assert that a non-differentiable on qubit special unitary uses the bisect

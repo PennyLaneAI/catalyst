@@ -171,8 +171,7 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         """
 
         self._operations.add(op)
-        data, struct = jax.tree_util.tree_flatten(op)
-        return jax.tree_util.tree_unflatten(struct, data)
+        return super().interpret_operation(op)
 
     def cleanup(self):
         """Cleanup after interpretation."""
@@ -194,8 +193,10 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         # Create decomposition rules for each operation in the solution
         # and compile them to Catalyst JAXPR decomposition rules
         for op, rule in self._decomp_graph_solution.items():
+            op_params = op.op.arguments if isinstance(op.op, qp.core.Operator2) else op.op.params
+
             # Get number of wires if exists
-            op_num_wires = op.op.params.get("num_wires", None)
+            op_num_wires = op_params.get("num_wires", None)
             if (
                 o := next(
                     (
@@ -222,7 +223,7 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                 # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                 # dictionary to get the number of wires.
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
-                pauli_word = op.op.params.get("pauli_word", None)
+                pauli_word = op_params.get("pauli_word", None)
                 requires_copy = num_wires == -1
 
                 if op.op.name in ("PauliRot", "PauliMeasure"):
@@ -238,12 +239,21 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                     pauli_word=pauli_word,
                 )
             elif not (
-                (op_type := getattr(op.op, "op_type", None)) is not None
+                (
+                    op_type := (
+                        type(op.op)
+                        if isinstance(op.op, qp.core.Operator2)
+                        else getattr(op.op, "op_type", None)
+                    )
+                )
+                is not None
                 and issubclass(
                     op_type,
                     (
                         qp.ops.Adjoint,
+                        qp.ops.Adjoint2,
                         qp.ops.Controlled,
+                        qp.ops.Controlled2,
                         qp.ops.ChangeOpBasis,
                         qp.ops.Prod,
                         qp.TemporaryAND,

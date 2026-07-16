@@ -166,6 +166,11 @@ class TestDeviceLevelSpecs:
         ]
         del cat_specs["resources"].gate_types["CY"]
 
+        # PennyLane's Operator2 resource name for Controlled(S) does not encode the number of
+        # control wires, while Catalyst's device-level resource tracking does.
+        pl_specs["resources"].gate_types["C(S)"] -= 1
+        pl_specs["resources"].gate_types["2C(S)"] = 1
+
         check_specs_same(cat_specs, pl_specs)
 
     def test_paulirot_and_measure(self):
