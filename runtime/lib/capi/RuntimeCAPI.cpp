@@ -164,6 +164,8 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
+    RT_FAIL_IF(!CTX || !CTX->getMemoryManager(),
+               "Managed memory allocation requires an initialized runtime context.");
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
@@ -173,6 +175,8 @@ void *__catalyst__rt__alloc_managed(size_t size) { return _mlir_memref_to_llvm_a
 
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
+    RT_FAIL_IF(!CTX || !CTX->getMemoryManager(),
+               "Managed memory allocation requires an initialized runtime context.");
     void *ptr = aligned_alloc(alignment, size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
