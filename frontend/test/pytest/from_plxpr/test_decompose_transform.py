@@ -119,7 +119,7 @@ class TestGraphDecomposition:
         """Test the conversion of a circuit with a custom decomposition."""
 
         @decomposition_rule(op_type=qp.CNOT)
-        def my_cnot(wires):
+        def my_cnot(wires, **__):
             qp.H(wires=wires[1])
             qp.CZ(wires=wires)
             qp.H(wires=wires[1])
@@ -571,7 +571,7 @@ class TestPlxPRDecomposition:
         qp.decomposition.enable_graph()
 
         @qp.register_resources({qp.H: 2, qp.CZ: 1})
-        def my_cnot(wires):
+        def my_cnot(wires, **__):
             qp.H(wires=wires[1])
             qp.CZ(wires=wires)
             qp.H(wires=wires[1])
