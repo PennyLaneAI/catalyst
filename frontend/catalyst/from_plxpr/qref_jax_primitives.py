@@ -285,6 +285,7 @@ def _qref_set_basis_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or
 #
 # qref_qinst_p
 #
+# pylint: disable=too-many-arguments
 @qref_qinst_p.def_abstract_eval
 def _qref_qinst_abstract_eval(
     *qubits_or_params,
@@ -306,7 +307,7 @@ def _qref_qinst_abstract_eval(
     # does not need to carry the PCPhase around
     # Or as an alternative, expand the kwarg so that it can be an arbitrary kwarg list for a general
     # primitive's attributes
-    assert not ((pcphase_dim is not None) ^ (op == "PCPhase"))
+    assert not (pcphase_dim is not None) ^ (op == "PCPhase")
     return ()
 
 
