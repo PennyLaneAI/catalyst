@@ -166,15 +166,13 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
-* IR amplification for circuits whose gate parameters are computed from runtime values
-  (e.g. `qml.TrotterProduct` with runtime Hamiltonian coefficients) is drastically reduced.
-  The new `scalarize-tensor-extracts` pass turns gate-angle dataflow into scalar arithmetic
-  instead of thousands of small tensors that each survive bufferization as an allocation,
-  the new `reroll-loops` pass reconstructs the loops that tracing unrolled by rewriting
-  repeated op sequences as `scf.for` loops, and the default pipeline now runs elementwise
-  fusion. On a Trotterized QPE workload with runtime coefficients, compile time, peak
-  memory, and final IR size all drop by large factors.
-  [(#3013)](https://github.com/PennyLaneAI/catalyst/pull/3013)
+* A new `reroll-loops` pass reconstructs the loops that tracing unrolled by detecting
+  repeated op sequences (e.g. Trotter steps, layers, folds) via structural hashing and
+  rewriting them as `scf.for` loops. A repeat of multiplicity k shrinks that IR region
+  k-fold before the bufferization and LLVM stages amplify it, reducing compile time,
+  peak memory, and IR size on workloads with many structurally identical circuit
+  segments. The pass runs by default in the HLO lowering stage.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
 
 <h3>Breaking changes 💔</h3>
 

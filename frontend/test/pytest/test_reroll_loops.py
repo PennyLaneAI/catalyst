@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Integration tests for the IR-amplification fixes for runtime-coefficient
-Hamiltonians: scalarize-tensor-extracts, elementwise fusion, and reroll-loops
-in the default pipeline must preserve numerics for Trotterized workloads with
-runtime coefficients."""
+"""Integration tests for the reroll-loops pass in the default pipeline:
+rerolling the unrolled Trotter steps of a QPE workload must preserve numerics
+and must actually reconstruct scf.for loops."""
 
 import re
 
@@ -75,9 +74,9 @@ def make_qpe(dev, runtime: bool):
     return qpe_circuit
 
 
-class TestRuntimeCoefficientTrotter:
-    """Numerical equivalence of runtime- and fixed-coefficient Trotterization
-    through the default pipeline (which scalarizes, fuses, and rerolls)."""
+class TestRerollLoops:
+    """Numerical equivalence and loop reconstruction for Trotterized workloads
+    through the default pipeline (which rerolls unrolled repeats)."""
 
     def test_runtime_matches_fixed(self):
         """qml.dot with traced coefficients must produce the same distribution

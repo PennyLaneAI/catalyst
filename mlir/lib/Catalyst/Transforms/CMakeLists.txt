@@ -24,7 +24,6 @@ file(GLOB SRC
     RegisterInactiveCallbackPass.cpp
     RerollLoopsPass.cpp
     ResourceAnalysisPass.cpp
-    ScalarizeTensorExtractsPass.cpp
     RegisterDecompRuleResourcePass.cpp
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
