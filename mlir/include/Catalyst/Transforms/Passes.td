@@ -333,47 +333,6 @@ def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
     }];
 }
 
-def RerollLoopsPass : Pass<"reroll-loops"> {
-    let summary = "Reconstruct loops from unrolled repetitive op sequences.";
-    let description = [{
-        Tracing a Python program unrolls its loops: N structurally identical
-        circuit segments (Trotter steps, layers, folds) arrive as N copies of the
-        same op sequence, and every downstream stage amplifies each copy.
-
-        This pass detects maximal tandem repeats of structurally isomorphic op
-        windows via shift-invariant structural hashing, verifies that
-        cross-window dataflow is limited to values threaded from the directly
-        preceding window (e.g. qubit SSA values) plus loop-invariant values, and
-        replaces the repeat with an `scf.for` whose iter_args are the threaded
-        values. A repeat of multiplicity k shrinks that region k-fold.
-    }];
-
-    let dependentDialects = [
-        "mlir::arith::ArithDialect",
-        "mlir::scf::SCFDialect"
-    ];
-
-    let options = [
-        Option<
-            /*C++ var name=*/"minPeriod",
-            /*CLI arg name=*/"min-period",
-            /*type=*/"unsigned",
-            /*default=*/"2",
-            /*description=*/"Minimum number of ops per repeated window."
-        >,
-        Option<
-            /*C++ var name=*/"minSavings",
-            /*CLI arg name=*/"min-savings",
-            /*type=*/"unsigned",
-            /*default=*/"32",
-            /*description=*/
-            "Minimum number of ops a reroll must eliminate to be applied. The "
-            "default is deliberately conservative so that only substantial "
-            "repeats (e.g. unrolled Trotter steps) are converted to loops."
-        >
-    ];
-}
-
 def ScalarizeTensorExtractsPass : Pass<"scalarize-tensor-extracts"> {
     let summary = "Sink scalar tensor.extract ops through small-tensor producers.";
     let description = [{

@@ -13,11 +13,9 @@
 # limitations under the License.
 
 """Integration tests for the IR-amplification fixes for runtime-coefficient
-Hamiltonians: scalarize-tensor-extracts, elementwise fusion, and reroll-loops
-in the default pipeline must preserve numerics for Trotterized workloads with
-runtime coefficients."""
-
-import re
+Hamiltonians: scalarize-tensor-extracts and elementwise fusion in the default
+pipeline must preserve numerics for Trotterized workloads with runtime
+coefficients."""
 
 import numpy as np
 import pennylane as qml
@@ -47,7 +45,7 @@ OPS_FACTORY = lambda: [
 
 N_QUBITS = 4
 N_EST = 2
-N_TROTTER = 6  # enough repetitions for reroll-loops to fire
+N_TROTTER = 6
 
 
 def make_qpe(dev, runtime: bool):
@@ -77,7 +75,7 @@ def make_qpe(dev, runtime: bool):
 
 class TestRuntimeCoefficientTrotter:
     """Numerical equivalence of runtime- and fixed-coefficient Trotterization
-    through the default pipeline (which scalarizes, fuses, and rerolls)."""
+    through the default pipeline (which scalarizes and fuses)."""
 
     def test_runtime_matches_fixed(self):
         """qml.dot with traced coefficients must produce the same distribution
@@ -89,36 +87,6 @@ class TestRuntimeCoefficientTrotter:
         fixed = qjit(make_qpe(dev, runtime=False))(coeffs)
 
         assert np.allclose(np.asarray(dyn), np.asarray(fixed), atol=1e-9)
-
-    def test_reroll_recovers_loops(self):
-        """The IR after HLO lowering must contain scf.for loops recovered from
-        the unrolled Trotter steps, and fewer gate ops than the unrolled
-        circuit (guards against silent regression of reroll-loops in the
-        default pipeline)."""
-        from catalyst.debug import get_compilation_stage
-
-        dev = qml.device("lightning.qubit", wires=N_QUBITS + N_EST)
-        coeffs = jnp.array(COEFFS)
-
-        compiled = qjit(make_qpe(dev, runtime=True), keep_intermediate=True)
-        compiled(coeffs)
-        try:
-            traced = get_compilation_stage(compiled, "QuantumCompilationStage")
-            lowered = get_compilation_stage(compiled, "HLOLoweringStage")
-            # Rerolled Trotter steps are scf.for loops threading qubit values
-            # through iter_args.
-            qubit_loops = re.findall(
-                r"scf\.for .*iter_args\([^)]*\).*->.*!quantum\.bit", lowered
-            )
-            assert qubit_loops, "reroll-loops did not produce qubit-threading loops"
-            unrolled_gates = traced.count("quantum.custom")
-            rerolled_gates = lowered.count("quantum.custom")
-            assert rerolled_gates < unrolled_gates / 2, (
-                f"expected reroll to shrink gate volume by >2x, got "
-                f"{unrolled_gates} -> {rerolled_gates}"
-            )
-        finally:
-            compiled.workspace.cleanup()
 
 
 if __name__ == "__main__":

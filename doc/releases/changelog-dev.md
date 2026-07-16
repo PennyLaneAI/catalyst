@@ -170,10 +170,9 @@
   (e.g. `qml.TrotterProduct` with runtime Hamiltonian coefficients) is drastically reduced.
   The new `scalarize-tensor-extracts` pass turns gate-angle dataflow into scalar arithmetic
   instead of thousands of small tensors that each survive bufferization as an allocation,
-  the new `reroll-loops` pass reconstructs the loops that tracing unrolled by rewriting
-  repeated op sequences as `scf.for` loops, and the default pipeline now runs elementwise
-  fusion. On a Trotterized QPE workload with runtime coefficients, compile time, peak
-  memory, and final IR size all drop by large factors.
+  and the default pipeline now runs elementwise fusion. On a Trotterized QPE workload with
+  runtime coefficients, compile time, peak memory, and final IR size all drop by large
+  factors.
   [(#3013)](https://github.com/PennyLaneAI/catalyst/pull/3013)
 
 <h3>Breaking changes 💔</h3>
