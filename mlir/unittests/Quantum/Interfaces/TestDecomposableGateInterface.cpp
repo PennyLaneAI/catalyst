@@ -267,7 +267,12 @@ module {
 
     ASSERT_EQ(unitary.getStaticData().size(), 0);
 
-    ASSERT_EQ(unitary.getGraphOpId(), "QubitUnitary[tensor<4x4xcomplex<f64>>][2]{}");
+    ASSERT_EQ(unitary.getGraphOpId(), "QubitUnitary["
+                                      "[[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
+                                      "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
+                                      "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
+                                      "[complex<f64>,complex<f64>,complex<f64>,complex<f64>]]"
+                                      "][2]{}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits)
