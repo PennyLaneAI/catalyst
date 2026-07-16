@@ -12,25 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Verify that modules annotated with catalyst.target are not inlined.
+// Verify that modules annotated with catalyst.target are not inlined, renamed, or flattened: their
+// launch_kernel survives intact for a later consumer (e.g. dispatch-executor-targets).
 
 // RUN: quantum-opt --inline-nested-module --split-input-file %s | FileCheck %s
 
 
 // CHECK-LABEL: module @host
 module @host {
-  // CHECK: func.func private @ghz_0() attributes {catalyst.target = {backend = "accel"}}
+  // No root declaration is emitted; the launch_kernel is kept (not flattened to a func.call).
+  // CHECK-NOT: func.func private @ghz
   // CHECK: func.func public @jit_main
   func.func public @jit_main() attributes {llvm.emit_c_interface} {
-    // CHECK-NOT: catalyst.launch_kernel
-    // CHECK: call @ghz_0()
+    // CHECK: catalyst.launch_kernel @module_accel::@ghz() : () -> ()
     catalyst.launch_kernel @module_accel::@ghz() : () -> ()
     func.return
   }
 
   // CHECK: module @module_accel attributes {catalyst.target
   // CHECK-NOT: catalyst.unique_names
-  // CHECK: func.func @ghz_0()
+  // CHECK: func.func @ghz()
   module @module_accel attributes {catalyst.target = {backend = "accel"}} {
     func.func @ghz() {
       func.return
@@ -43,14 +44,17 @@ module @host {
 
 // -----
 
+// A mix: the non-target module is inlined+flattened (call @work_0); the catalyst.target module
+// keeps its nested launch_kernel.
 // CHECK-LABEL: module @mixed
-// CHECK: func.func private @kernel_0() attributes {catalyst.target = {backend = "accel"}}
 // CHECK: func.func public @jit_run
 // CHECK: call @work_0()
-// CHECK: call @kernel_0()
+// CHECK: catalyst.launch_kernel @module_accel2::@kernel()
+// CHECK: func.func @work_0()
 // CHECK-NOT: module @module_cpu
 // CHECK: module @module_accel2 attributes {catalyst.target
 // CHECK-NOT: catalyst.unique_names
+// CHECK: func.func @kernel()
 module @mixed {
 
   func.func public @jit_run() attributes {llvm.emit_c_interface} {
@@ -77,12 +81,13 @@ module @mixed {
 
 // -----
 
+// Two target modules with the same entry name: since neither is inlined or renamed, both keep the
+// name @kernel in their own module (no collision — separate symbol tables), and both launch_kernels
+// survive.
 // CHECK-LABEL: module @duplicate_target_names
-// CHECK-DAG: func.func private @kernel_1() attributes {attr = "value", catalyst.target = {backend = "accel"}}
-// CHECK-DAG: func.func private @kernel_0() attributes {catalyst.target = {backend = "accel"}}
 // CHECK: func.func public @jit_run
-// CHECK: call @kernel_1()
-// CHECK: call @kernel_0()
+// CHECK: catalyst.launch_kernel @module_accel_a::@kernel()
+// CHECK: catalyst.launch_kernel @module_accel_b::@kernel()
 // CHECK-DAG: module @module_accel_a attributes {catalyst.target
 // CHECK-DAG: module @module_accel_b attributes {catalyst.target
 // CHECK-NOT: catalyst.unique_names
@@ -105,4 +110,33 @@ module @duplicate_target_names {
       func.return
     }
   }
+}
+
+// -----
+
+// Dispatch modules (catalyst.dispatch) are not inlined, not flattened, AND not renamed:
+// dispatch-executor-targets consumes the launch_kernel directly and resolves the entry in the
+// object's own JITDylib on the executor, so the kernel keeps its original name and no root
+// declaration is emitted.
+// CHECK-LABEL: module @host_dispatch
+// CHECK-NOT: func.func private @ghz
+// CHECK: func.func public @jit_main
+// CHECK: catalyst.launch_kernel @module_executor::@ghz() : () -> ()
+// CHECK: module @module_executor attributes {catalyst.dispatch
+// CHECK: func.func @ghz()
+module @host_dispatch {
+
+  func.func public @jit_main() attributes {llvm.emit_c_interface} {
+    catalyst.launch_kernel @module_executor::@ghz() : () -> ()
+    func.return
+  }
+
+  module @module_executor attributes {catalyst.target = {backend = "accel"}, catalyst.dispatch = {address = "h:1"}} {
+    func.func @ghz() {
+      func.return
+    }
+  }
+
+  func.func @setup()    { func.return }
+  func.func @teardown() { func.return }
 }
