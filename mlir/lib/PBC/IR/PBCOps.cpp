@@ -268,7 +268,7 @@ llvm::StringRef SelectPPMeasurementOp::getResourceName() { return "PPM"; }
 bool PPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
 bool PPMeasurementOp::getResourceAdjointFlag() { return getNegated(); }
 
-// TODO: Once PBC's interface is improved, we can remove these methods 
+// TODO: Once PBC's interface is improved, we can remove these methods
 // and use the ones from the interface.
 uint64_t PrepareStateOp::getResourceNumQubits() { return 0; }
 uint64_t FabricateOp::getResourceNumQubits() { return 0; }

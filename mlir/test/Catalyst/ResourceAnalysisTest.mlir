@@ -1154,3 +1154,89 @@ module @nested_resource_module {
     }
   }
 }
+
+// -----
+
+// Test operations with control qubits.
+
+// CHECK-LABEL: "test_ops_with_ctrl"
+// CHECK-DAG: "Adjoint(T)(1)": 1
+// CHECK-DAG: "CY(2)": 1
+// CHECK-DAG: "PauliX(1)": 1
+// CHECK-DAG: "C(S)(2)": 1
+// CHECK-DAG: "2C(S)(3)": 1
+
+func.func public @test_ops_with_ctrl() -> tensor<8xf64> {
+    %false = arith.constant false
+    %true = arith.constant true
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
+    %out_qubits_0 = quantum.custom "T"() %out_qubits adj : !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_qubits_1, %out_ctrl_qubits = quantum.custom "S"() %out_qubits_0 ctrls(%2) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %out_qubits_2, %out_ctrl_qubits_3:2 = quantum.custom "S"() %out_qubits_1 ctrls(%out_ctrl_qubits, %3) ctrlvals(%true, %false) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_4:2 = quantum.custom "CY"() %out_ctrl_qubits_3#1, %out_qubits_2 : !quantum.bit, !quantum.bit
+    %4 = quantum.insert %0[ 0], %out_qubits_4#1 : !quantum.reg, !quantum.bit
+    %5 = quantum.insert %4[ 1], %out_ctrl_qubits_3#0 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 2], %out_qubits_4#0 : !quantum.reg, !quantum.bit
+    %7 = quantum.compbasis qreg %6 : !quantum.obs
+    %8 = quantum.probs %7 : tensor<8xf64>
+    quantum.dealloc %6 : !quantum.reg
+    quantum.device_release
+    return %8 : tensor<8xf64>
+}
+
+// -----
+
+// Test operations with control qubits in reference semantics.
+
+// CHECK-LABEL: "test_ops_with_ctrl_ref"
+// CHECK-DAG: "Adjoint(T)(1)": 1
+// CHECK-DAG: "CY(2)": 1
+// CHECK-DAG: "PauliX(1)": 1
+// CHECK-DAG: "C(S)(2)": 1
+// CHECK-DAG: "2C(S)(3)": 1
+
+func.func public @test_ops_with_ctrl_ref() {
+    %false = arith.constant false
+    %true = arith.constant true
+    %0 = qref.alloc( 3) : !qref.reg<3>
+    %1 = qref.get %0[ 0] : !qref.reg<3> -> !qref.bit
+    qref.custom "PauliX"() %1 : !qref.bit
+    qref.custom "T"() %1 adj : !qref.bit
+    %2 = qref.get %0[ 1] : !qref.reg<3> -> !qref.bit
+    qref.custom "S"() %1 ctrls(%2) ctrlvals(%true) : !qref.bit ctrls !qref.bit
+    %3 = qref.get %0[ 2] : !qref.reg<3> -> !qref.bit
+    qref.custom "S"() %1 ctrls(%2, %3) ctrlvals(%true, %false) : !qref.bit ctrls !qref.bit, !qref.bit
+    qref.custom "CY"() %3, %1 : !qref.bit, !qref.bit
+    qref.dealloc %0 : !qref.reg<3>
+    return
+}
+
+// -----
+
+// Test PBC prepare/fabricate allocations and multi-qubit PPR/PPM counts.
+
+// CHECK-LABEL: "pbc_prepare_fabricate"
+// CHECK:   "num_alloc_qubits": 5
+// CHECK:   "num_arg_qubits": 0
+// CHECK:   "num_qubits": 5
+// CHECK:   "operations"
+// CHECK-DAG: "PrepareState(0)": 2
+// CHECK-DAG: "Fabricate(0)": 1
+// CHECK-DAG: "PPR-pi/4(2)": 1
+// CHECK-DAG: "PPR-pi/8(3)": 1
+// CHECK-DAG: "PPM(2)": 1
+
+func.func @pbc_prepare_fabricate() {
+    %q0, %q1 = pbc.prepare plus : !quantum.bit, !quantum.bit
+    %q2 = pbc.prepare zero : !quantum.bit
+    %m0, %m1 = pbc.fabricate magic : !quantum.bit, !quantum.bit
+    %r0:2 = pbc.ppr ["X", "Z"](4) %q0, %q1 : !quantum.bit, !quantum.bit
+    %r1:3 = pbc.ppr ["X", "Y", "Z"](8) %r0#0, %r0#1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+    %mres, %out0, %out1 = pbc.ppm ["X", "Z"] %m0, %m1 : i1, !quantum.bit, !quantum.bit
+    return
+}

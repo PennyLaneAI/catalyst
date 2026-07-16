@@ -59,4 +59,35 @@ LogicalResult RefGraphStatePrepOp::verify()
 
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// Resource interface methods.
+//===----------------------------------------------------------------------===//
+
+llvm::StringRef MeasureInBasisOp::getResourceName() { return getOperationName(); }
+llvm::StringRef RefMeasureInBasisOp::getResourceName() { return getOperationName(); }
+llvm::StringRef GraphStatePrepOp::getResourceName() { return getOperationName(); }
+llvm::StringRef RefGraphStatePrepOp::getResourceName() { return getOperationName(); }
+
+uint64_t MeasureInBasisOp::getResourceNumQubits() { return 0; }
+uint64_t RefMeasureInBasisOp::getResourceNumQubits() { return 0; }
+uint64_t GraphStatePrepOp::getResourceNumQubits() { return 0; }
+uint64_t RefGraphStatePrepOp::getResourceNumQubits() { return 0; }
+
+uint64_t MeasureInBasisOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefMeasureInBasisOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t GraphStatePrepOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefGraphStatePrepOp::getResourceNumCtrlQubits() { return 0; }
+
+uint64_t MeasureInBasisOp::getResourceNumParams() { return 0; }
+uint64_t RefMeasureInBasisOp::getResourceNumParams() { return 0; }
+uint64_t GraphStatePrepOp::getResourceNumParams() { return 0; }
+uint64_t RefGraphStatePrepOp::getResourceNumParams() { return 0; }
+
+uint64_t GraphStatePrepOp::getResourceNumAllocQubits() { return getNumQubitsFromAdjMatrixSize(); }
+uint64_t RefGraphStatePrepOp::getResourceNumAllocQubits()
+{
+    return getNumQubitsFromAdjMatrixSize();
+}
+
 } // namespace catalyst::mbqc

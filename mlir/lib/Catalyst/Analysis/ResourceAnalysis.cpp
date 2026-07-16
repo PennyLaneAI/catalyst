@@ -69,57 +69,6 @@ static bool isCustomDialectOp(Operation *op)
 }
 
 //===----------------------------------------------------------------------===//
-// Operation categorization helpers
-//===----------------------------------------------------------------------===//
-
-// /// Get the name for a PBC operation.
-// static std::string getPBCOpName(Operation *op)
-// {
-//     return llvm::TypeSwitch<Operation *, std::string>(op)
-//         .Case<pbc::PPRotationOp>([](auto pprOp) -> std::string {
-//             int8_t rk = pprOp.getRotationKind();
-//             if (rk == 0) {
-//                 return "PPR-identity";
-//             }
-//             return "PPR-pi/" + std::to_string(std::abs(rk));
-//         })
-//         .Case<pbc::PPRotationArbitraryOp>([](auto) -> std::string { return "PPR-Phi"; })
-//         .Case<pbc::PPMeasurementOp, pbc::RefPPMeasurementOp, pbc::SelectPPMeasurementOp>(
-//             [](auto) -> std::string { return "PPM"; })
-//         .Default([](Operation *o) { return o->getName().getStringRef().str(); });
-// }
-
-// /// Get the qubit count for a PBC operation.
-// static int getPBCQubitCount(Operation *op)
-// {
-//     // if the operation is one of these operations, it will return the number of qubits in the
-//     input return llvm::TypeSwitch<Operation *, int>(op)
-//         .Case<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
-//               pbc::SelectPPMeasurementOp>(
-//             [](auto typedOp) { return static_cast<int>(typedOp.getInQubits().size()); })
-//         .Default(0);
-// }
-
-/**
- * @brief Collect a single MBQC operation into the ResourceResult.
- *
- * This categorizes the operation into gates, measurements, classical instructions,
- * or function calls, and updates the corresponding counts in the ResourceResult.
- *
- * @param op The MBQC operation to collect.
- * @param result The ResourceResult to update with the operation's resource usage.
- * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
- */
-void collectMBQCOperation(Operation *op, ResourceResult &result, bool isAdjoint)
-{
-    std::string name = op->getName().getStringRef().str();
-    result.operations[name][{0, 0}] += 1;
-
-    llvm::TypeSwitch<Operation *, void>(op).Case<mbqc::GraphStatePrepOp, mbqc::RefGraphStatePrepOp>(
-        [&](auto graphOp) { result.numAllocQubits += graphOp.getNumQubitsFromAdjMatrixSize(); });
-}
-
-//===----------------------------------------------------------------------===//
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
 
@@ -396,19 +345,17 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         uint64_t nParams = inst.getResourceNumParams();
         uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;
         result.operations[name][{nQubits, nParams}] += 1;
+
+        // Ops may also allocate (e.g. mbqc.graph_state_prep, pbc.prepare, pbc.fabricate).
+        if (auto alloc = dyn_cast<ResourceAllocQubitOpInterface>(op)) {
+            result.numAllocQubits += alloc.getResourceNumAllocQubits();
+        }
         return;
     }
 
     // Measurements
     if (auto inst = dyn_cast<ResourceMeasurementOpInterface>(op)) {
         result.measurements[inst.getResourceMeasurementName()] += 1;
-        return;
-    }
-
-    // MBQC operations
-    if (isa<mbqc::MeasureInBasisOp, mbqc::RefMeasureInBasisOp, mbqc::GraphStatePrepOp,
-            mbqc::RefGraphStatePrepOp>(op)) {
-        collectMBQCOperation(op, result, isAdjoint);
         return;
     }
 
