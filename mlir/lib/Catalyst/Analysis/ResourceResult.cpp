@@ -15,9 +15,16 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 
 #include <algorithm>
-#include <sstream>
+#include <cstdint>
 
+#include "llvm/ADT/Hashing.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/JSON.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
+
+using namespace mlir;
 
 using namespace llvm;
 
@@ -36,44 +43,43 @@ static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method)
     case MergeMethod::Sum:
         return a + b;
     }
-    return -1; // unreachable, silences warning
+    llvm_unreachable("unknown ResourceResult::MergeMethod");
+}
+
+// Merge a flat StringMap<int64_t> with a single operator[] per key.
+template <typename Map> static void mergeStringMap(Map &dst, const Map &src, MergeMethod method)
+{
+    for (const auto &entry : src) {
+        auto &slot = dst[entry.getKey()];
+        slot = applyMerge(slot, entry.getValue(), method);
+    }
 }
 
 void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
 {
     for (const auto &opEntry : other.operations) {
-        StringRef opName = opEntry.getKey();
+        auto &innerDst = operations[opEntry.getKey()];
         for (const auto &sizeEntry : opEntry.getValue()) {
-            auto &[nQubits, nParams] = sizeEntry.first;
-            int64_t count = sizeEntry.second;
-            operations[opName][{nQubits, nParams}] =
-                applyMerge(operations[opName][{nQubits, nParams}], count, method);
+            auto &slot = innerDst[sizeEntry.first];
+            slot = applyMerge(slot, sizeEntry.second, method);
         }
     }
 
-    for (const auto &entry : other.measurements) {
-        measurements[entry.getKey()] =
-            applyMerge(measurements[entry.getKey()], entry.getValue(), method);
+    mergeStringMap(measurements, other.measurements, method);
+    mergeStringMap(classicalInstructions, other.classicalInstructions, method);
+    mergeStringMap(functionCalls, other.functionCalls, method);
+
+    // varFunctionCalls hold identifiers for unknown dynamic counts. If the
+    // same key appears twice, the merge result represents a new unknown value
+    // such as Sum/Max/Min(lhs, rhs), not either input identifier.
+    for (const auto &entry : other.varFunctionCalls) {
+        auto [it, inserted] = varFunctionCalls.try_emplace(entry.getKey(), entry.getValue());
+        if (!inserted) {
+            it->second = static_cast<size_t>(hash_combine(
+                entry.getKey(), it->second, entry.getValue(), static_cast<int>(method)));
+        }
     }
 
-    for (const auto &entry : other.classicalInstructions) {
-        classicalInstructions[entry.getKey()] =
-            applyMerge(classicalInstructions[entry.getKey()], entry.getValue(), method);
-    }
-
-    for (const auto &entry : other.functionCalls) {
-        functionCalls[entry.getKey()] =
-            applyMerge(functionCalls[entry.getKey()], entry.getValue(), method);
-    }
-
-    for (const auto &entry : other.unresolvedFunctionCalls) {
-        unresolvedFunctionCalls[entry.getKey()] =
-            applyMerge(unresolvedFunctionCalls[entry.getKey()], entry.getValue(), method);
-    }
-
-    if (deviceName.empty() && !other.deviceName.empty()) {
-        deviceName = other.deviceName;
-    }
     numAllocQubits = applyMerge(numAllocQubits, other.numAllocQubits, method);
     numArgQubits = applyMerge(numArgQubits, other.numArgQubits, method);
 
@@ -98,10 +104,6 @@ void ResourceResult::multiplyByScalar(int64_t scalar)
     }
 
     for (auto &entry : functionCalls) {
-        entry.getValue() *= scalar;
-    }
-
-    for (auto &entry : unresolvedFunctionCalls) {
         entry.getValue() *= scalar;
     }
 
@@ -150,12 +152,30 @@ std::string ResourceResult::toJson(int indent) const
     }
     root["function_calls"] = std::move(fcObj);
 
+    // Variable function calls (dynamic-loop hashes). Emitted as fixed-width
+    // hex strings so that the high-bit portion of the 64-bit hash space
+    // round-trips losslessly through JSON.
+    llvm::json::Object vfcObj;
+    for (const auto &entry : varFunctionCalls) {
+        vfcObj[entry.getKey()] = formatv("{0:x16}", entry.getValue()).str();
+    }
+    root["var_function_calls"] = std::move(vfcObj);
+
     root["num_qubits"] = numQubits();
     root["num_alloc_qubits"] = numAllocQubits;
     root["num_arg_qubits"] = numArgQubits;
     root["device_name"] = deviceName;
     root["has_branches"] = hasBranches;
-    root["has_dyn_loop"] = hasDynLoop;
+    if (autoQubitManagement.has_value()) {
+        root["auto_qubit_management"] = *autoQubitManagement;
+    }
+
+    llvm::json::Object depthObj;
+    if (pbcDepth) {
+        depthObj["any_commuting_depth"] = pbcDepth->first;
+        depthObj["qubit_disjoint_depth"] = pbcDepth->second;
+    }
+    root["depth"] = std::move(depthObj);
 
     llvm::json::Value jsonValue(std::move(root));
     std::string result;
@@ -163,6 +183,68 @@ std::string ResourceResult::toJson(int indent) const
     os << formatv("{0:2}", jsonValue);
     os.flush();
     return result;
+}
+
+/**
+ * @brief Build a DictionaryAttr from a ResourceResult for annotating functions.
+ *
+ * The structure of the DictionaryAttr will mirror the JSON output,
+ * but with MLIR attributes.
+ *
+ * Note that this is a simplified version of the ResourceResult
+ * only including operations, measurements, and num_qubits,
+ * but it can be extended to include more fields such as
+ * classical instructions and function calls as needed
+ * for the decomposition framework.
+ *
+ * @param ctx MLIRContext for creating attributes
+ * @param result The ResourceResult to convert into attributes
+ * @return DictionaryAttr representing the resource counts
+ *
+ */
+DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
+{
+    SmallVector<NamedAttribute> entries;
+
+    // operations
+    SmallVector<NamedAttribute> opsEntries;
+    for (const auto &opEntry : result.operations) {
+        llvm::StringRef opName = opEntry.getKey();
+        for (const auto &sizeEntry : opEntry.getValue()) {
+            auto &[nQubits, nParams] = sizeEntry.first;
+            int64_t count = sizeEntry.second;
+            std::string key =
+                (opName + "(" + std::to_string(nQubits) + "," + std::to_string(nParams) + ")")
+                    .str();
+            opsEntries.push_back(NamedAttribute(
+                StringAttr::get(ctx, key), IntegerAttr::get(IntegerType::get(ctx, 64), count)));
+        }
+    }
+    entries.push_back(
+        NamedAttribute(StringAttr::get(ctx, "operations"), DictionaryAttr::get(ctx, opsEntries)));
+
+    // measurements
+    SmallVector<NamedAttribute> measEntries;
+    for (const auto &entry : result.measurements) {
+        measEntries.push_back(
+            NamedAttribute(StringAttr::get(ctx, entry.getKey()),
+                           IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
+    }
+    entries.push_back(NamedAttribute(StringAttr::get(ctx, "measurements"),
+                                     DictionaryAttr::get(ctx, measEntries)));
+
+    // scalars
+    entries.push_back(
+        NamedAttribute(StringAttr::get(ctx, "num_qubits"),
+                       IntegerAttr::get(IntegerType::get(ctx, 64), result.numQubits())));
+    entries.push_back(
+        NamedAttribute(StringAttr::get(ctx, "num_arg_qubits"),
+                       IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
+    entries.push_back(
+        NamedAttribute(StringAttr::get(ctx, "num_alloc_qubits"),
+                       IntegerAttr::get(IntegerType::get(ctx, 64), result.numAllocQubits)));
+
+    return DictionaryAttr::get(ctx, entries);
 }
 
 } // namespace catalyst

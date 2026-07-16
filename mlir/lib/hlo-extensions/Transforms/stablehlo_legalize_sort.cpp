@@ -37,6 +37,7 @@ limitations under the License.
 // catalyst namespace.
 
 // This file implements logic for lowering stablehlo.sort to the SCF dialect.
+#include <cstdint>
 #include <iterator>
 #include <memory>
 #include <utility>

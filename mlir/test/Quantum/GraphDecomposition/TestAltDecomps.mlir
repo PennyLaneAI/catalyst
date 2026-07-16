@@ -27,9 +27,13 @@ func.func @circuit() -> !quantum.bit {
     // XZ: PauliX
     // XZ: PauliZ
     %qout = quantum.custom "PauliY"() %q : !quantum.bit
+
+    // needed to ensure we don't match in the following decomposition rules
+    // CHECK: return
     return %qout : !quantum.bit
 }
 
+// CHECK-LABEL: y_to_ry
 func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="PauliY"} {
     %pi = arith.constant 3.14 : f64
     %negpiby2 = arith.constant -1.57 : f64
@@ -38,6 +42,7 @@ func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="
     return %q1 : !quantum.bit
 }
 
+// CHECK-LABEL: y_to_x_z
 func.func @y_to_x_z(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="PauliY"} {
     %q1 = quantum.custom "PauliX"() %q0 : !quantum.bit
     %q2 = quantum.custom "PauliZ"() %q1 : !quantum.bit

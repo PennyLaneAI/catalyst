@@ -55,14 +55,7 @@ class TestCatalyst:
             qp.adjoint(quantum_func)(*args)
             return qp.state()
 
-        capture_enabled = qp.capture.enabled()
-        qp.capture.disable()
-        try:
-            pl_res = pennylane_workflow(*args)
-        finally:
-            if capture_enabled:
-                qp.capture.enable()
-
+        pl_res = pennylane_workflow(*args)
         assert_allclose(catalyst_workflow(*args), pl_res)
 
     def test_adjoint_func(self, backend, capture_mode):
@@ -777,7 +770,7 @@ class TestProperties:
     """Test Adjoint properties."""
 
     def test_data(self):
-        """Test base data can be get and set through Adjoint class."""
+        """Test that Adjoint data is read-only."""
         x = np.array(1.234)
 
         base = qp.RX(x, wires="a")
@@ -785,16 +778,10 @@ class TestProperties:
 
         assert adj.data == (x,)
 
-        # update parameters through adjoint
-        x_new = np.array(2.3456)
-        adj.data = (x_new,)
-        assert base.data == (x_new,)
-        assert adj.data == (x_new,)
-
-        # update base data updates Adjoint data
-        x_new2 = np.array(3.456)
-        base.data = (x_new2,)
-        assert adj.data == (x_new2,)
+        with pytest.raises(
+            AttributeError, match="property 'data' of 'AdjointOperation' object has no setter"
+        ):
+            setattr(adj, "data", (np.array(2.3456),))
 
     def test_has_matrix_true(self):
         """Test `has_matrix` property carries over when base op defines matrix."""
@@ -1071,11 +1058,13 @@ class TestAdjointOperation:
         base = qp.RX(param, wires=0)
         op = adjoint(base)
 
-        base_angles = base.single_qubit_rot_angles()
-        angles = op.single_qubit_rot_angles()
+        *base_angles, base_phase = qp.single_qubit_zyz_angles(base)
+        *angles, phase = qp.single_qubit_zyz_angles(op)
 
         for angle1, angle2 in zip(angles, reversed(base_angles)):
             assert angle1 == -angle2
+
+        assert base_phase == phase
 
     def test_control_wires(self):
         """Test the control_wires of an adjoint are the same as the base op."""
