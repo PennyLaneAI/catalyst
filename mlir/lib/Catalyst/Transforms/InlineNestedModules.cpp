@@ -61,6 +61,10 @@
  *     ```
  * 5. Cleanup: remove the catalyst.fully_qualified_name attribute
  *
+ * Exception: modules carrying `catalyst.target` are NOT inlined, renamed, or flattened. They are
+ * compiled to standalone objects elsewhere (cross-compile-targets), so their host launch_kernel is
+ * left in place for a later consumer.
+ *
  */
 
 #include <deque>
@@ -156,6 +160,7 @@ SymbolRefAttr getFullyQualifiedNameUntil(SymbolOpInterface symbol, const Operati
 static constexpr llvm::StringRef fullyQualifiedNameAttr = "catalyst.fully_qualified_name";
 static constexpr llvm::StringRef quantumNodeAttr = "quantum.node";
 static constexpr llvm::StringRef legacyQNodeAttr = "qnode";
+static constexpr llvm::StringRef targetAttr = "catalyst.target";
 
 struct AnnotateWithFullyQualifiedName : public OpInterfaceRewritePattern<SymbolOpInterface> {
     using OpInterfaceRewritePattern<SymbolOpInterface>::OpInterfaceRewritePattern;
@@ -206,8 +211,7 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
 {
     bool isSymbolTable = child->hasTrait<OpTrait::SymbolTable>();
     bool hasBeenRenamed = child->hasAttr(hasBeenRenamedAttrName);
-    // TODO: isQnode
-    bool mustRename = isSymbolTable && !hasBeenRenamed;
+    bool mustRename = isSymbolTable && !hasBeenRenamed && !child->hasAttr(targetAttr);
     if (!mustRename) {
         return failure();
     }
@@ -289,8 +293,7 @@ struct InlineNestedModule : public RewritePattern {
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
     {
         bool isSymbolTable = op->hasTrait<OpTrait::SymbolTable>();
-        // TODO: isQnode
-        bool mustInline = isSymbolTable;
+        bool mustInline = isSymbolTable && !op->hasAttr(targetAttr);
         if (!mustInline) {
             return failure();
         }
@@ -395,13 +398,12 @@ struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::LaunchKernelO
     LogicalResult matchAndRewrite(catalyst::LaunchKernelOp op,
                                   PatternRewriter &rewriter) const override
     {
-        auto found = _map->find(op.getCallee()) != _map->end();
-        if (!found) {
+        auto it = _map->find(op.getCallee());
+        if (it == _map->end()) {
             return failure();
         }
 
-        auto newSymbolRefAttr = _map->find(op.getCallee())->getSecond();
-        rewriter.replaceOpWithNewOp<func::CallOp>(op, newSymbolRefAttr, op.getResultTypes(),
+        rewriter.replaceOpWithNewOp<func::CallOp>(op, it->getSecond(), op.getResultTypes(),
                                                   op.getOperands());
         return success();
     }
@@ -417,7 +419,8 @@ struct CleanupPattern : public RewritePattern {
     {
         bool hasQualifiedName = op->hasAttr(fullyQualifiedNameAttr);
         bool hasQNodeAttr = op->hasAttr(quantumNodeAttr);
-        if (!hasQualifiedName && !hasQNodeAttr) {
+        bool hasBeenRenamed = op->hasAttr(hasBeenRenamedAttrName);
+        if (!hasQualifiedName && !hasQNodeAttr && !hasBeenRenamed) {
             return failure();
         }
 
@@ -428,6 +431,9 @@ struct CleanupPattern : public RewritePattern {
             }
             if (hasQualifiedName) {
                 op->removeAttr(fullyQualifiedNameAttr);
+            }
+            if (hasBeenRenamed) {
+                op->removeAttr(hasBeenRenamedAttrName);
             }
         });
 
@@ -513,22 +519,19 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         mlir::DenseMap<SymbolRefAttr, SymbolRefAttr> old_to_new;
-        for (auto &region : symbolTable->getRegions()) {
-            for (auto &block : region.getBlocks()) {
-                for (auto &op : block) {
-                    if (!isa<SymbolOpInterface>(op))
-                        continue;
-                    auto hasQualifiedName = op.hasAttr(fullyQualifiedNameAttr);
-                    if (!hasQualifiedName)
-                        continue;
-
-                    SymbolRefAttr old = op.getAttrOfType<SymbolRefAttr>(fullyQualifiedNameAttr);
-                    auto symbol = cast<SymbolOpInterface>(op);
-                    SymbolRefAttr _new = SymbolRefAttr::get(symbol);
-                    old_to_new.insert({old, _new});
-                }
-            }
-        }
+        symbolTable->walk<WalkOrder::PreOrder>([&](Operation *nested) {
+            if (nested == symbolTable)
+                return WalkResult::advance();
+            // Any module still nested at this point is a catalyst.target module.
+            if (isa<ModuleOp>(nested))
+                return WalkResult::skip();
+            if (!isa<SymbolOpInterface>(nested) || !nested->hasAttr(fullyQualifiedNameAttr))
+                return WalkResult::advance();
+            SymbolRefAttr old = nested->getAttrOfType<SymbolRefAttr>(fullyQualifiedNameAttr);
+            SymbolRefAttr _new = SymbolRefAttr::get(cast<SymbolOpInterface>(nested));
+            old_to_new.insert({old, _new});
+            return WalkResult::advance();
+        });
 
         RewritePatternSet nestedToFlat(context);
         nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern, ZNEReplacerPattern>(
