@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Optional
 
 import jax.numpy as jnp
 
@@ -77,20 +78,19 @@ def _to_hashable(spec):
 
 
 def declare(name: str, artifact: Optional[str] = None, outputs=None, *,
-            remote=False) -> KernelDescriptor:
+            remote: bool | object = False) -> KernelDescriptor:
     """Declare an external kernel for use with :func:`kernel.runtime_call`.
 
     Args:
         name:     C symbol name. For a local kernel, exported by ``artifact``; for a remote
-                  kernel, a symbol already loaded on the executor (e.g.
-                  ``"fpga_trampoline_a_setup"``).
+                  kernel, a symbol already loaded on the executor (e.g. ``"remote_setup"``).
         artifact: Path to the shared library for a local kernel (resolved relative to
                   ``os.getcwd()`` if not absolute; must exist at declare time). Omit for a
                   remote kernel.
         outputs:  :class:`jax.ShapeDtypeStruct` or tuple of them describing each output tensor.
                   JAX needs these at trace time to infer what the call returns.
         remote:   Mark the symbol as executor-side. Pass the **remote device**
-                  (``remote(target(...), address=...)``) to bind this call explicitly to that
+                  (``target(..., address=...)``) to bind this call explicitly to that
                   executor's address. ``True`` inheriting the program's single remote executor.
 
     Returns:
@@ -106,8 +106,8 @@ def declare(name: str, artifact: Optional[str] = None, outputs=None, *,
             dispatch = get_dispatch(remote)
             if dispatch is None:
                 raise ValueError(
-                    "kernel.declare(remote=<device>): the device has no remote dispatch; wrap it "
-                    "with remote(target(...), address=...) first, or pass remote=True to inherit "
+                    "kernel.declare(remote=<device>): the device has no remote dispatch; create it "
+                    "with target(..., address=...) first, or pass remote=True to inherit "
                     "the program's single executor."
                 )
             address = dispatch.address
@@ -126,6 +126,29 @@ def declare(name: str, artifact: Optional[str] = None, outputs=None, *,
         raise FileNotFoundError(f"kernel.declare: artifact not found: {artifact!r}")
 
     return KernelDescriptor(name=name, artifact=artifact, output_spec=output_spec)
+
+
+def define(builder, *, name: Optional[str] = None, outputs):
+    """Build a kernel with ``builder`` and declare it, as a single decorator.
+
+    Args:
+        builder: A backend-specific object implementing ``build(kernel_fn, *, name) -> path``,
+            where ``path`` points to a shared library exporting ``name`` with the
+            :func:`runtime_call` ABI.
+        name: Symbol the artifact must export. Defaults to ``kernel_fn.__name__``;
+            passed to both ``builder.build`` and :func:`declare`.
+        outputs: :class:`jax.ShapeDtypeStruct` or tuple of them, forwarded to :func:`declare`.
+
+    Returns:
+        KernelDescriptor: the declared kernel.
+    """
+
+    def wrap(kernel_fn):
+        sym = name or getattr(kernel_fn, "__name__", None)
+        artifact = builder.build(kernel_fn, name=sym)
+        return declare(sym, artifact=str(artifact), outputs=outputs)
+
+    return wrap
 
 
 def runtime_call(kernel_descriptor, *args):
