@@ -187,7 +187,6 @@ struct CustomCallOpInterface
             CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
                                  customCallOp.getCallTargetName(), numArgumentsAttr,
                                  customCallOp.getBackendConfigAttr());
->>>>>>> origin/update-customop
         size_t startIndex = bufferArgs.size() - customCallOp.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferResults);
