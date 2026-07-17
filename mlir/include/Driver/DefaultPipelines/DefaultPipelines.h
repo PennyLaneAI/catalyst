@@ -147,6 +147,7 @@ const PipelineList pipelineList{
       "memref-to-llvm-tbaa",
       "finalize-memref-to-llvm{use-generic-functions}",
       "convert-index-to-llvm",
+      "convert-remote-to-llvm",
       "convert-catalyst-to-llvm",
       // TODO: remove this once PBC has its own pipeline
       "convert-pbc-to-llvm",
@@ -167,7 +168,7 @@ const PipelineList pipelineList{
       "register-inactive-callback"}}};
 // clang-format on
 
-PipelineNames getPipelineNames()
+inline PipelineNames getPipelineNames()
 {
     static std::vector<std::string> names =
         std::accumulate(driver::pipelineList.begin(), driver::pipelineList.end(),
@@ -178,7 +179,7 @@ PipelineNames getPipelineNames()
     return names;
 }
 
-PassNames getQuantumCompilationStage(bool disableAssertion = true)
+inline PassNames getQuantumCompilationStage(bool disableAssertion = true)
 {
     PassNames ret;
     std::copy_if(pipelineList[0].passNames.begin(), pipelineList[0].passNames.end(),
@@ -188,11 +189,11 @@ PassNames getQuantumCompilationStage(bool disableAssertion = true)
     return ret;
 }
 
-PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
+inline PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
 
-PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
+inline PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
 
-PassNames getBufferizationStage(bool asyncQNodes = false)
+inline PassNames getBufferizationStage(bool asyncQNodes = false)
 {
     const std::string bufferizationOptions =
         std::string("{bufferize-function-boundaries ") + "allow-return-allocs-from-loops " +
@@ -210,7 +211,7 @@ PassNames getBufferizationStage(bool asyncQNodes = false)
     return ret;
 }
 
-PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false)
+inline PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false)
 {
     PassNames ret;
     std::copy_if(pipelineList[4].passNames.begin(), pipelineList[4].passNames.end(),

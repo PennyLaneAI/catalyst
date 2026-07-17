@@ -89,6 +89,8 @@
 
 #include "RegisterAllPasses.h"
 
+#include "Remote/IR/RemoteDialect.h"
+
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
@@ -181,6 +183,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<mbqc::MBQCDialect>();
     registry.insert<ion::IonDialect>();
     registry.insert<rtio::RTIODialect>();
+    registry.insert<remote::RemoteDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
     registry.insert<pauli_frame::PauliFrameDialect>();
@@ -480,6 +483,39 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
             return failure();
         }
         catalyst::utils::LinesCount::call(moduleOp);
+
+        // Cross-compile catalyst.target nested modules and dispatch for execution
+        if (pipeline.getName() == "BufferizationStage" && !options.workspace.empty()) {
+            Pipeline targetPipeline;
+            targetPipeline.setName("CrossCompileTargets");
+            std::string dumpIntermediate = options.keepIntermediate ? "true" : "false";
+            targetPipeline.setPasses({"cross-compile-targets{workspace=" + options.workspace.str() +
+                                          " dump-intermediate=" + dumpIntermediate + "}",
+                                      "dispatch-remote-targets"});
+            if (failed(catalyst::utils::Timer<>::timer(
+                    catalyst::driver::runPipeline, targetPipeline.getName(),
+                    /* add_endl */ false, pm, options, output, targetPipeline,
+                    /* clHasManualPipeline */ true, moduleOp))) {
+                return failure();
+            }
+            catalyst::utils::LinesCount::call(moduleOp);
+
+            // cross-compile-targets records the objects of local (statically-linked) targets on the
+            // root module. Write them to a manifest the frontend hands to the linker.
+            if (auto objFiles = moduleOp->getAttrOfType<mlir::ArrayAttr>("catalyst.object_files")) {
+                std::string manifestPath =
+                    options.workspace.str() + "/" + options.moduleName.str() + ".objects";
+                std::error_code ec;
+                llvm::raw_fd_ostream manifest(manifestPath, ec);
+                if (!ec) {
+                    for (mlir::Attribute pathAttr : objFiles) {
+                        if (auto s = mlir::dyn_cast<mlir::StringAttr>(pathAttr)) {
+                            manifest << s.getValue() << "\n";
+                        }
+                    }
+                }
+            }
+        }
     }
     return success();
 }

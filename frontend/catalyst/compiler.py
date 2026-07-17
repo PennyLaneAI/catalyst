@@ -176,10 +176,22 @@ class LinkerDriver:
             "-lrt_decoder",
         ]
 
+        rt_remote_so = "librt_remote" + file_extension
+        if os.path.isfile(os.path.join(rt_lib_path, rt_remote_so)):
+            default_flags.append("-lrt_remote")
+
         # If OQD runtime capi is built, link to it as well
         # TODO: This is not ideal and should be replaced when the compiler is device aware
         if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
             default_flags.append("-lrt_OQD_capi")
+
+        for artifact_path in options.runtime_artifacts:
+            dir_name = os.path.dirname(artifact_path)
+            default_flags += [
+                f"-Wl,-rpath,{dir_name}",
+                f"-L{dir_name}",
+                artifact_path,
+            ]
 
         return default_flags
 
@@ -210,9 +222,9 @@ class LinkerDriver:
                 yield compiler
 
     @staticmethod
-    def _attempt_link(compiler, flags, infile, outfile, options):
+    def _attempt_link(compiler, flags, infile, outfile, options, extra_objects=None):
         try:
-            command = [compiler] + flags + [infile, "-o", outfile]
+            command = [compiler] + flags + [infile] + list(extra_objects or []) + ["-o", outfile]
             run_writing_command(command, options)
             return True
         except subprocess.CalledProcessError as e:
@@ -239,7 +251,9 @@ class LinkerDriver:
 
     @staticmethod
     @debug_logger
-    def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):
+    def run(
+        infile, outfile=None, flags=None, fallback_compilers=None, options=None, extra_objects=None
+    ):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
@@ -249,6 +263,8 @@ class LinkerDriver:
             flags (Optional[List[str]]): flags to be passed down to the compiler
             fallback_compilers (Optional[List[str]]): name of executables to be looked for in PATH
             compile_options (Optional[CompileOptions]): generic compilation options.
+            extra_objects (Optional[List[str]]): additional object files to statically link
+                (e.g. locally cross-compiled catalyst.target kernels).
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
@@ -261,7 +277,9 @@ class LinkerDriver:
         if fallback_compilers is None:
             fallback_compilers = LinkerDriver._default_fallback_compilers
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
-            success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
+            success = LinkerDriver._attempt_link(
+                compiler, flags, infile, outfile, options, extra_objects
+            )
             if options.verbose:
                 print("Shared object linking successful", file=options.logfile)
             if success:
@@ -498,7 +516,16 @@ class Compiler:
             out_IR = None
 
         if self.options.link:
-            output = LinkerDriver.run(output_object_name, options=self.options)
+            # Locally cross-compiled catalyst.target kernels are emitted as separate objects; the
+            # driver lists them in `{module}.objects` for the linker to statically include.
+            extra_objects = []
+            objects_manifest = os.path.join(str(workspace), f"{module_name}.objects")
+            if os.path.exists(objects_manifest):
+                with open(objects_manifest, "r", encoding="utf-8") as f:
+                    extra_objects = [line.strip() for line in f if line.strip()]
+            output = LinkerDriver.run(
+                output_object_name, options=self.options, extra_objects=extra_objects
+            )
             output = str(pathlib.Path(output).absolute())
         else:
             output = None
@@ -706,41 +733,26 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        file_content = None
-        for dirpath, _, filenames in os.walk(str(workspace)):
-            filenames = [f for f in filenames if f.endswith(".mlir") or f.endswith(".ll")]
-            if not filenames:
-                break
-            filenames_no_ext = [os.path.splitext(f)[0] for f in filenames]
-            if pipeline == "mlir":
-                # Sort files and pick the first one
-                selected_file = [
-                    sorted(filenames)[0],
-                ]
-            elif pipeline == "last":
-                # Sort files and pick the last one
-                selected_file = [
-                    sorted(filenames)[-1],
-                ]
-            else:
-                selected_file = [
-                    f
-                    for f, name_no_ext in zip(filenames, filenames_no_ext)
-                    if pipeline in name_no_ext
-                ]
-            if len(selected_file) != 1:
-                msg = f"Attempting to get output for pipeline: {pipeline},"
-                msg += " but no or more than one file was found.\n"
-                raise CompileError(msg)
-            filename = selected_file[0]
-
-            full_path = os.path.join(dirpath, filename)
-            with open(full_path, "r", encoding="utf-8") as file:
-                file_content = file.read()
-
-        if file_content is None:
+        workspace = str(workspace)
+        filenames = [f for f in os.listdir(workspace) if f.endswith(".mlir") or f.endswith(".ll")]
+        if not filenames:
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"
             raise CompileError(msg)
-        return file_content
+
+        if pipeline == "mlir":
+            # Sort files and pick the first one
+            selected_file = [sorted(filenames)[0]]
+        elif pipeline == "last":
+            # Sort files and pick the last one
+            selected_file = [sorted(filenames)[-1]]
+        else:
+            selected_file = [f for f in filenames if pipeline in os.path.splitext(f)[0]]
+        if len(selected_file) != 1:
+            msg = f"Attempting to get output for pipeline: {pipeline},"
+            msg += " but no or more than one file was found.\n"
+            raise CompileError(msg)
+
+        with open(os.path.join(workspace, selected_file[0]), "r", encoding="utf-8") as file:
+            return file.read()

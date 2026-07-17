@@ -68,3 +68,7 @@ add_subdirectory(QEC)
 if(ENABLE_OQD)
 add_subdirectory(OQDcapi)
 endif()
+
+if(ENABLE_REMOTE)
+add_subdirectory(remote)
+endif()

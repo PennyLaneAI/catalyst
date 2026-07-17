@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <dlfcn.h>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -25,6 +26,7 @@
 #include <tuple>
 #include <unordered_set>
 
+#include "DataView.hpp"
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
@@ -81,15 +83,37 @@ class SharedLibraryManager final {
     {
 #ifdef __APPLE__
         auto rtld_flags = RTLD_LAZY;
+        constexpr const char *dl_ext = ".dylib";
 #else
         // Closing the dynamic library of Lightning simulators with dlclose() where OpenMP
         // directives (in Lightning simulators) are in use would raise memory segfaults.
         // Note that we use RTLD_NODELETE as a workaround to fix the issue.
         auto rtld_flags = RTLD_LAZY | RTLD_NODELETE;
+        constexpr const char *dl_ext = ".so";
 #endif
 
         _handler = dlopen(filename.c_str(), rtld_flags);
-        RT_FAIL_IF(!_handler, dlerror());
+        if (_handler) {
+            return;
+        }
+
+        // dlerror() is destructive: it returns the pending error and clears the state. Capture it
+        // into a local before any further use.
+        const char *primary_dlerror = dlerror();
+        std::string primary_error = primary_dlerror ? primary_dlerror : "unknown dlopen error";
+        auto basename = std::filesystem::path(filename).filename().string();
+
+        // rewrite the extension if it differs from the platform one.
+        if (!basename.ends_with(dl_ext)) {
+            auto dot = basename.find_last_of('.');
+            if (dot != std::string::npos) {
+                basename.resize(dot);
+            }
+            basename += dl_ext;
+        }
+
+        _handler = dlopen(basename.c_str(), rtld_flags);
+        RT_FAIL_IF(!_handler, ("dlopen failed to load " + filename + ": " + primary_error).c_str());
     }
 
     ~SharedLibraryManager()

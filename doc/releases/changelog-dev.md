@@ -60,6 +60,10 @@
   argument is at an arbitrary position in the argument list.
   [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
 
+* A new `catalyst.debug.compile_mlir` function has been added, allowing standalone MLIR files to be
+  compiled through the full Catalyst pipeline and returned as a callable Python object.
+  [(#2832)](https://github.com/PennyLaneAI/catalyst/pull/2832)
+
 * PPRs and PPMs can now be lowered properly into MLIR directly in the non-capture workflow.
   [(#2816)](https://github.com/PennyLaneAI/catalyst/pull/2816)
 
@@ -241,6 +245,10 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* A new compiler pass `mark-entry-points` has been added, which annotates externally-callable
+  entry functions with the `catalyst.entry_point` attribute.
+  [(#2899)](https://github.com/PennyLaneAI/catalyst/pull/2899)
 
 * The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
   (previously a dynamic float operand). This allows, among other things, the decomposition graph to
