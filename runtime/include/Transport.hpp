@@ -25,10 +25,7 @@ namespace catalyst::transport {
 enum class DataPath : std::uint8_t {
     CpuVerbs,    // Plain ibverbs on CPU.
     NicEngine,   // Hardware-embedded RNIC (e.g. ERNIC hardware handshake).
-    KernelFused, // Fused with a kernel (e.g. on GPU). The decode runs
-                 // inside this fused kernel (poll+decode as one GPU kernel), so
-                 // set_decoder / DecodeFn are not used - the user/compiler
-                 // supplies the fused kernel itself.
+    GpuEngine,   // Gpu-initiated comms.
 };
 
 /**
@@ -41,16 +38,9 @@ enum class MemKind : std::uint8_t {
     FpgaBram, // FPGA on-chip block RAM.
 };
 
-/**
- * @brief Endpoint role in a session: the controller drives requests; the
- * coprocessor handles (e.g. runs the decoder) and returns them.
- */
-enum class Role : std::uint8_t { Controller, Coprocessor };
-
 struct ConnectInfo {
     std::string peer;
     std::uint16_t oob_port;
-    Role role;
 };
 struct MemRegion {
     void *addr = nullptr;
@@ -67,28 +57,14 @@ struct PeerRef {
 struct ChannelDesc {
     DataPath data_path = DataPath::CpuVerbs;
     bool persistent = true;
-    std::uint64_t syndrome_bytes = 0;   // controller sends / coprocessor receives (decode in_len)
-    std::uint64_t correction_bytes = 0; // coprocessor sends / controller receives (decode out_len)
 };
-
-// Per-shot compute run on the coprocessor. Reads the syndrome from `in`
-// and writes the correction into `out`, in place on the transport's buffers.
-// Should not throw error.
-//
-// This is the per-shot host-callback model, used by the per-message data paths
-// (e.g. DataPath::CpuVerbs). A DataPath::KernelFused device does not use this:
-// its poll+decode is a single fused GPU kernel supplied by the user/compiler,
-// so no per-shot callback is registered or invoked.
-using DecodeFn = void (*)(void *ctx, const void *in, std::size_t in_len, void *out,
-                          std::size_t out_len);
 
 // Stateful session: methods must be called in this order:
 //   1. connect            - bring up QPs + the out-of-band channel
 //   2. alloc_memory       - register the region (needs the connected context)
 //   3. exchange_keys      - swap region handles over the out-of-band channel
 //   4. establish_channel  - program the channel from the local + peer regions
-//   5. set_decoder        - coprocessor only, before start()
-//   6. start / collect / stop
+//   5. start / collect / stop
 class TransportSession {
   public:
     virtual ~TransportSession() = default;
@@ -114,12 +90,30 @@ class TransportSession {
 
     // Stop the engine and join. Idempotent.
     virtual void stop() = 0;
+};
 
-    // Register the per-shot decoder (coprocessor role). No-op default so
-    // controller-only / non-decoding devices need not implement it. A
-    // DataPath::KernelFused device also leaves this unused: its fused poll+decode
-    // kernel is provided by the user/compiler, not registered here.
-    virtual void set_decoder(DecodeFn /*fn*/, void * /*ctx*/) {}
+// The decode I/O contract: a guarantee pinned by the frontend/compiler and
+// carried down to the coprocessor.
+struct DecoderSchema {
+    std::uint64_t in_bytes = 0;  // syndrome length (decode input)
+    std::uint64_t out_bytes = 0; // correction length (decode output)
+};
+
+// Controller role: writes syndrome out and receive correction.
+class ControllerSession : public TransportSession {
+  public:
+    // Sliding-window depth: how many syndromes to keep in flight. Call before
+    // start(). 1 = strict one-in-flight.
+    virtual void set_max_in_flight(std::uint32_t n) = 0;
+};
+
+// Coprocessor role: receives syndromes, decodes, returns corrections. The decode
+// definition is implemented on by the device; only the decode
+// schema (I/O shape guarantee) is part of this contract.
+class CoprocessorSession : public TransportSession {
+  public:
+    // Pin the decode I/O shape this coprocessor must honor. Call before start().
+    virtual void set_decoder_schema(const DecoderSchema &schema) = 0;
 };
 
 } // namespace catalyst::transport
