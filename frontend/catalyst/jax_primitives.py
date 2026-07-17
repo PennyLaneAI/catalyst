@@ -1368,7 +1368,7 @@ def _qinst_abstract_eval(
     for idx in range(qubits_len + ctrl_len):
         qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
-    assert not (pcphase_dim is not None) ^ (op == "PCPhase")
+    assert (pcphase_dim is not None) == (op == "PCPhase"), "pcphase_dim must be provided exactly for PCPhase ops"
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 
