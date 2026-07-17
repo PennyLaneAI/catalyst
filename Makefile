@@ -180,7 +180,7 @@ ifneq ($(findstring clang,$(C_COMPILER)),clang)
 endif
 endif
 	@echo "check the Catalyst lit test suite"
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
+	CATALYST_LIBPYTHON=$$($(PYTHON) -c 'from catalyst.utils.runtime_environment import get_libpython_path; print(get_libpython_path())') cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
 
 pytest:
 ifeq ($(ENABLE_ASAN),ON)
@@ -200,8 +200,8 @@ endif
 endif
 
 test-demos:
-    # Some demos fail with optax dependency pulling in latest jax
-    # We skip them for now. These demos should be properly moved to the qml repo.
+	# Some demos fail with optax dependency pulling in latest jax
+	# We skip them for now. These demos should be properly moved to the qml repo.
 ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
 	@echo "Cannot run Jupyter Notebooks with ASAN on macOS, likely due to subprocess invocation."
 	@exit 1
@@ -231,6 +231,7 @@ wheel:
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/default_pipelines.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/libQuantumPythonDecompositions.* $(MK_DIR)/frontend/catalyst/lib
 
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
@@ -238,8 +239,8 @@ wheel:
 	for file in gradient qref quantum _ods_common catalyst mbqc mitigation pbc _transform; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
-	mkdir -p $(MK_DIR)/frontend/bin
-	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/bin/
+	mkdir -p $(MK_DIR)/frontend/catalyst/bin
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/catalyst/bin/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 
@@ -291,8 +292,10 @@ clean:
 	find frontend/catalyst -name "*.so" -not -path "*/third_party/*" -exec rm -v {} +
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
-	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
+	rm -rf $(MK_DIR)/frontend/catalyst/include $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
 	rm -rf $(MK_DIR)/frontend/catalyst/resources
+	rm -rf $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlirbc
+	rm -rf $(MK_DIR)/frontend/mlir_quantum
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks
@@ -334,7 +337,7 @@ coverage: coverage-frontend coverage-runtime
 
 lit-coverage:
 	@echo "Running lit tests with coverage"
-	ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+	CATALYST_LIBPYTHON=$$($(PYTHON) -c 'from catalyst.utils.runtime_environment import get_libpython_path; print(get_libpython_path())') ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 
 coverage-frontend:
 ifeq ($(ENABLE_ASAN),ON)

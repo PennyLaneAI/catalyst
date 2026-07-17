@@ -14,6 +14,8 @@
 
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 
+#include <cstdint>
+
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"

@@ -13,6 +13,10 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "value-semantics-conversion"
+#define REFERENCE_SEMANTICS_GATE_OPS                                                               \
+    qref::QuantumOperation, qref::MeasureOp, mbqc::RefMeasureInBasisOp, pbc::RefPPMeasurementOp
+#define REFERENCE_SEMANTICS_OBSERVABLE_OPS                                                         \
+    qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp
 
 #include "value_semantics_conversion.h"
 
@@ -63,6 +67,23 @@ using namespace catalyst;
 // and variable names like "rQubit" stand for "qubits in reference semantics".
 
 namespace {
+
+LogicalResult ensureNoReferenceSemanticsOps(Operation *op)
+{
+    WalkResult walkResult = op->walk([](Operation *op) {
+        if (isa<REFERENCE_SEMANTICS_GATE_OPS, REFERENCE_SEMANTICS_OBSERVABLE_OPS>(op)) {
+            return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+    });
+
+    if (walkResult.wasInterrupted()) {
+        return failure();
+    }
+    else {
+        return success();
+    }
+}
 
 // A struct to store the register and the index of rQubits from a qref.get operation.
 // This struct is intended to be the keys in `llvm::DenseMap`s.
@@ -686,7 +707,7 @@ void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegion
 
     r.walk([&](Operation *op) {
         if (!isa<qref::QRefDialect>(op->getDialect()) &&
-            !isa<func::CallOp, mbqc::RefMeasureInBasisOp, pbc::RefPPMeasurementOp>(op)) {
+            !isa<func::CallOp, REFERENCE_SEMANTICS_GATE_OPS>(op)) {
             return;
         }
         if (isa<qref::GetOp>(op)) {
@@ -1121,6 +1142,21 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
     else if (auto rSetBasisStateOp = dyn_cast<qref::SetBasisStateOp>(_rGateOp)) {
         vGateOp = migrateOpToValueSemantics<quantum::SetBasisStateOp>(builder, rSetBasisStateOp,
                                                                       tracker, qubitResultsType);
+    }
+    else if (auto rOperatorOp = dyn_cast<qref::OperatorOp>(_rGateOp)) {
+        // Special case for the register mode of this op (existing vector only gathers qubits).
+        if (rOperatorOp.getQreg()) {
+            qubitResultsType.push_back(quantum::QuregType::get(ctx));
+        }
+
+        auto vGateOp = migrateOpToValueSemantics<quantum::OperatorOp>(builder, rOperatorOp, tracker,
+                                                                      qubitResultsType);
+        // quantum.operator has three result segments: out_qubits, out_ctrl_qubits, out_qreg.
+        int32_t nTargets = rOperatorOp.getNonCtrlQubitOperands().size();
+        int32_t nCtrls = rOperatorOp.getCtrlQubitOperands().size();
+        int32_t nQreg = rOperatorOp.getQreg() ? 1 : 0;
+        vGateOp->setAttr("resultSegmentSizes",
+                         builder.getDenseI32ArrayAttr({nTargets, nCtrls, nQreg}));
     }
     else {
         rGateOp->emitOpError("unknown gate op in qref dialect");
@@ -1899,12 +1935,10 @@ struct ValueSemanticsConversionPass
 
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
             if (!llvm::all_of(getOp->getUsers(),
-                              llvm::IsaPred<qref::QuantumOperation, qref::MeasureOp,
-                                            qref::ComputationalBasisOp, qref::NamedObsOp,
-                                            qref::HermitianOp, mbqc::RefMeasureInBasisOp,
-                                            pbc::RefPPMeasurementOp, func::CallOp>)) {
-                getOp.emitOpError(
-                    "qref.get operations can only be used by qref dialect gate operations");
+                              llvm::IsaPred<REFERENCE_SEMANTICS_GATE_OPS,
+                                            REFERENCE_SEMANTICS_OBSERVABLE_OPS, func::CallOp>)) {
+                getOp.emitOpError("qref.get operations can only be used by qref dialect gate or "
+                                  "observable operations");
                 return WalkResult::interrupt();
             }
             return WalkResult::advance();
@@ -1949,6 +1983,11 @@ struct ValueSemanticsConversionPass
 
             SubroutineInfo info(subroutine);
             handleSubroutine(builder, subroutine, info.getNecessarySubroutineRValues());
+            if (failed(ensureNoReferenceSemanticsOps(subroutine))) {
+                subroutine.emitOpError(
+                    "Detected remaining reference semantics operations after conversion");
+                return signalPassFailure();
+            }
 
             auto uses = SymbolTable::getSymbolUses(subroutine, mod);
             if (uses) {
@@ -1967,6 +2006,11 @@ struct ValueSemanticsConversionPass
             QubitValueTracker tracker;
             handleRegion(builder, targetFunc.getBody(), tracker);
             eraseAllRemainingAnchorRValues(targetFunc);
+            if (failed(ensureNoReferenceSemanticsOps(targetFunc))) {
+                targetFunc.emitOpError(
+                    "Detected remaining reference semantics operations after conversion");
+                return signalPassFailure();
+            }
         }
     }
 };

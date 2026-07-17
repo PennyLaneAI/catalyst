@@ -40,6 +40,16 @@ program as a whole, usually requiring many executions of the same circuit.
 
 ### Methods:
 
+#### `getObs`
+
+```c++
+mlir::Value getObs();
+```
+
+Return the observable
+
+NOTE: This method *must* be implemented by the user.
+
 ## ParametrizedGate (`ParametrizedGate`)
 
 This interface provides a generic way to interact with parametrized
@@ -213,29 +223,3 @@ std::vector<mlir::OpResult> getQubitResults();
 Return all results which are considered output qubit values (including controls).
 
 NOTE: This method *must* be implemented by the user.
-
-## QuantumRegion (`QuantumRegion`)
-
-This interface provides a generic way to interact with instructions that are
-considered quantum regions. These are characterized by operating on a single
-qubit register, and returning a new register value.
-
-### Methods:
-
-#### `getRegisterOperand`
-
-```c++
-mlir::Value getRegisterOperand();
-```
-
-Return the quantum register operand.
-
-
-#### `getRegisterResult`
-
-```c++
-mlir::Value getRegisterResult();
-```
-
-Return the quantum register result.
-

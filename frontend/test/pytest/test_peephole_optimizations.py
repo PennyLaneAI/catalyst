@@ -239,6 +239,28 @@ def test_convert_clifford_to_ppr():
     assert ppm_specs_output["f_0"]["depth_type"] == 0
 
 
+def test_convert_cz_to_ppr():
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_convert_cz_to_ppr_workflow():
+
+        @to_ppr
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def f():
+            qp.CZ(wires=[0, 1])
+
+        return f()
+
+    assert 'transform.apply_registered_pass "to-ppr"' in test_convert_cz_to_ppr_workflow.mlir
+    optimized_ir = test_convert_cz_to_ppr_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
+    assert 'pbc.ppr ["Z", "Z"](4)' in optimized_ir
+    assert 'pbc.ppr ["Z"](-4)' in optimized_ir
+    assert "quantum.custom" not in optimized_ir
+
+
 def test_convert_clifford_to_ppr_only_disjoint_qubit():
 
     @qjit(target="mlir")
@@ -331,7 +353,6 @@ def test_merge_ppr_ppm():
     assert ppm_specs_output["f_0"]["logical_qubits"] == 2
 
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
 def test_ppr_to_ppm_auto_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -360,7 +381,6 @@ def test_ppr_to_ppm_auto_corrected():
     assert gate_types["PPR-pi/8-w1"] == 1
 
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
 def test_ppr_to_ppm_inject_magic_state():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -388,7 +408,6 @@ def test_ppr_to_ppm_inject_magic_state():
     assert gate_types["PPM-w1"] == 2
 
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
 def test_ppr_to_ppm_pauli_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]

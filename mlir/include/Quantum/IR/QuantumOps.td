@@ -534,8 +534,164 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     let hasVerifier = 1;
 }
 
+def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
+                                             AttrSizedOperandSegments, AttrSizedResultSegments,
+                                             DeclareOpInterfaceMethods<DecomposableGate, ["getExtraData"]>]> {
+    let summary = "A generalized quantum operation with arbitrary input signature.";
+    let description = [{
+        The `quantum.operator` is a generic representation for arbitrary quantum operations
+        that cannot be expressed by the simpler `quantum.custom` op and don't have a dedicated
+        operation.
+        Its purpose is to represent high-level operations from frontend languages such as
+        PennyLane — in particular templates and operators parametrized by Python (or
+        frontend-language) data. The signature allows for an arbitrary number of dynamic data
+        arguments (of arbitrary MLIR type), as well as limited static data (e.g. Pauli-word
+        strings). Frontend-level data arguments are compressed into a unique identifier, since
+        in general they may not be lowerable to MLIR.
+
+        The operation has two mutually exclusive representations:
+
+        * **Qubit mode** (`in_qubits` / `out_qubits`):
+          Use this when the operator acts on a statically known set of wires. Qubits are
+          threaded through the op explicitly and can carry per-control values through
+          `in_ctrl_qubits` / `in_ctrl_values` (with matching `out_ctrl_qubits`).
+
+        * **Register mode** (`in_qreg` / `out_qreg` + index arrays):
+          Use this when the operator acts on a dynamic number of wires. The operation receives
+          one register and one or more index arrays selecting which qubits in that register
+          are targeted. Controls are expressed with matching control index/value arrays.
+
+        Besides one of the above, the operator can hold the following information:
+
+        * `op_name` — canonical operator name
+        * Operator inputs in one of several forms:
+          * `params` — dynamic operator inputs
+          * `static_data` — static inputs available to compiler passes
+          * `UID` — non-lowerable static inputs compressed into a unique ID; It can be used for
+                    equivalence checking but not much else. The decomposition rule functions
+                    (if provided) will reference the UID they were generated with.
+          * `forward_args` — dynamic inputs of operators that were themselves input to this
+                             operator; Can only be present if `UID` is also present. Usually
+                             just forwarded to decomposition functions after the params list.
+        * Optional frontend-level metadata:
+          * `param_map` — maps frontend argument names to the lowered `params` operand positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+
+        Examples:
+
+        A complex operator with one compilable static argument and an `adjoint`
+        modifier acting on a single qubit:
+
+        ```mlir
+        %out = quantum.operator "MyOp"(%theta: f64) adj qubits(%q)
+            static_data = {pauli_word = "XYZ", greedy = true}
+        ```
+
+        An operator with two qubit-mode controls:
+
+        ```mlir
+        %oq, %ocq:2 = quantum.operator "MyOp"() qubits(%q)
+            ctrls(%cq0, %cq1) ctrl_vals(%cv0, %cv1)
+        ```
+
+        An operator acting on a dynamic number of qubits, expressed in register mode,
+        with explicit name-to-position maps for its parameters and wire arguments:
+
+        ```mlir
+        %out_qreg = quantum.operator "MyOp"(%state: tensor<?xcomplex<f64>>)
+            quregs(%qreg) indices(%w0: tensor<?xi64>, %w1: tensor<1xi64>)
+            param_map = {state_vector = [0]}
+            qubit_map = {wires = [0], precision_wire = [1]}
+        ```
+
+        An operator carrying frontend-level data (summarized by `UID`), together with
+        extra dynamic data forwarded into those rules via `forward(...)`:
+
+        ```mlir
+        %out:3 = quantum.operator "MyOp"(%state: tensor<8xcomplex<f64>>) qubits(%q0, %q1, %q2)
+            UID(324958) forward(%phi: f64, %delta: f64)
+        ```
+    }];
+
+    let arguments = (ins
+        StrAttr:$op_name,
+        Variadic<AnyType>:$params,
+        Variadic<AnyType>:$forward_args,
+
+        // traditional qubit specification
+        Variadic<QubitType>:$in_qubits,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values,
+
+        // alternative spec for acting on a dynamic number of qubits
+        Optional<QuregType>:$in_qreg,
+        Variadic<1DTensorOf<[I64]>>:$arr_qubit_indices,
+        Optional<1DTensorOf<[I64]>>:$arr_ctrl_indices,
+        Optional<1DTensorOf<[I1]>>:$arr_ctrl_values,
+
+        // additional functionality provided by quantum.operator, being last allows the builder
+        // to use default values in the signature, so that these args are truly optional
+        UnitAttr:$adjoint,
+        OptionalAttr<I64Attr>:$UID,
+        DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits,
+        Optional<QuregType>:$out_qreg
+    );
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            // the ODS operands must be next to each other
+            auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/0);
+            auto [_, lenForwardArgs] = getODSOperandIndexAndLength(/*forward_args=*/1);
+            return getOperands().slice(start, lenParams + lenForwardArgs);
+        }
+    }];
+
+    let hasVerifier = 1;
+    let hasCustomAssemblyFormat = 1;
+
+    let builders = [
+        // qubit mode
+        OpBuilder<(ins
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::ValueRange":$in_qubits,
+            CArg<"mlir::ValueRange", "{}">:$in_ctrl_qubits,
+            CArg<"mlir::ValueRange", "{}">:$in_ctrl_values,
+            CArg<"mlir::ValueRange", "{}">:$forward_args,
+            CArg<"bool", "false">:$adjoint,
+            CArg<"std::optional<int64_t>", "std::nullopt">:$UID,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>,
+        // qureg mode
+        OpBuilder<(ins
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::Value":$in_qreg,
+            "mlir::ValueRange":$arr_qubit_indices,
+            CArg<"mlir::Value", "mlir::Value()">:$arr_ctrl_indices,
+            CArg<"mlir::Value", "mlir::Value()">:$arr_ctrl_values,
+            CArg<"mlir::ValueRange", "{}">:$forward_args,
+            CArg<"bool", "false">:$adjoint,
+            CArg<"std::optional<int64_t>", "std::nullopt">:$UID,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>
+    ];
+}
+
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                         AttrSizedOperandSegments, AttrSizedResultSegments,
+                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
         The `quantum.paulirot` operation applies a rotation around a Pauli product
@@ -567,7 +723,8 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
             return getODSOperands(getParamOperandIdx());
         }
 
-        std::string getPauliWord() {
+        std::string getPauliWord()
+        {
             std::string pauliWord;
 
             for (mlir::Attribute pauliChar : getPauliProduct()) {
@@ -675,15 +832,11 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
             ``quantum.custom``. The reason for this is that it needs to be handled in a special
             way during the lowering due to its C function being variadic on the number of qubits.
 
-        .. note::
-            `dim` is currently captured as a float number for compatibility with
-            runtime and device integration.
-
     }];
 
     let arguments = (ins
         F64:$theta,
-        F64:$dim,
+        I64Attr:$dim,
         Variadic<QubitType>:$in_qubits,
         UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
@@ -696,7 +849,10 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
     );
 
     let assemblyFormat = [{
-        `(` $theta `,` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $theta `,` `dim` `:` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )?
+        `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -765,7 +921,7 @@ def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, 
     );
 
     let assemblyFormat = [{
-        `(` $args `)` attr-dict `:` type($results) $region
+        `(` $args `)` (`:` type($results)^)? $region attr-dict
     }];
 
     let hasVerifier = 1;

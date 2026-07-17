@@ -14,6 +14,8 @@
 
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 
+#include <cstdint>
+
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -424,6 +426,41 @@ struct LaunchKernelOpInterface
         return success();
     }
 };
+                                                                     
+/// Bufferization of catalyst.symbolic_array. This op is a placeholder with no
+/// buffer semantics and is expected to be consumed before bufferization. If it
+/// reaches this stage, emit an informative diagnostic instead of the generic
+/// "op was not bufferized" error.
+struct SymbolicArrayOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<SymbolicArrayOpInterface,
+                                                                   SymbolicArrayOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
+    {
+        return op->emitError("catalyst::symbolic_array is a placeholder op for resource estimation "
+                             "and cannot currently be bufferized or executed.");
+    }
+};
 
 } // namespace
 
@@ -435,5 +472,6 @@ void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &re
         CallbackOp::attachInterface<CallbackOpInterface>(*ctx);
         CallbackCallOp::attachInterface<CallbackCallOpInterface>(*ctx);
         LaunchKernelOp::attachInterface<LaunchKernelOpInterface>(*ctx);
+        SymbolicArrayOp::attachInterface<SymbolicArrayOpInterface>(*ctx);
     });
 }

@@ -183,11 +183,11 @@ func.func @test_pcphase_op(%arg0: f64, %arg1: i1) attributes {quantum.node} {
 
     // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK: [[gate0:%.+]]:2 = quantum.pcphase(%arg0, %arg0) [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
-    qref.pcphase (%arg0, %arg0) %q0, %q1 : !qref.bit, !qref.bit
+    // CHECK: [[gate0:%.+]]:2 = quantum.pcphase(%arg0, dim : 1) [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
+    qref.pcphase (%arg0, dim : 1) %q0, %q1 : !qref.bit, !qref.bit
 
-    // CHECK: [[gate1:%.+]], [[gate1Ctrl:%.+]] = quantum.pcphase(%arg0, %arg0) [[gate0]]#0 ctrls([[gate0]]#1) ctrlvals(%arg1) : !quantum.bit ctrls !quantum.bit
-    qref.pcphase (%arg0, %arg0) %q0 ctrls (%q1) ctrlvals (%arg1) : !qref.bit ctrls !qref.bit
+    // CHECK: [[gate1:%.+]], [[gate1Ctrl:%.+]] = quantum.pcphase(%arg0, dim : 1) [[gate0]]#0 ctrls([[gate0]]#1) ctrlvals(%arg1) : !quantum.bit ctrls !quantum.bit
+    qref.pcphase (%arg0, dim : 1) %q0 ctrls (%q1) ctrlvals (%arg1) : !qref.bit ctrls !qref.bit
 
     // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[gate1]] : !quantum.reg, !quantum.bit
     // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[gate1Ctrl]] : !quantum.reg, !quantum.bit
@@ -544,6 +544,72 @@ func.func @test_adjoint_op_nested() attributes {quantum.node}
 
     // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
     qref.dealloc %r : !qref.reg<2>
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_operator_qubits
+func.func @test_operator_qubits(%arg0: f64, %cv: i1, %fwd: i64) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %a = qref.alloc(2) : !qref.reg<2>
+    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK:      [[op1:%.+]]:2 = quantum.operator "MyOp"(%arg0: f64) adj qubits([[bit0]], [[bit1]])
+    // CHECK-NEXT: static_data = {pauli_word = "XY"}
+    // CHECK-NEXT: param_map = {theta = [0]} qubit_map = {pair = [0, 1]}
+    qref.operator "MyOp"(%arg0 : f64) adj qubits(%q0, %q1)
+      static_data = {pauli_word = "XY"}
+      param_map = {theta = [0]} qubit_map = {pair = [0, 1]}
+
+    // CHECK:      [[op2:%.+]], [[op2c:%.+]] = quantum.operator "MyOp"() qubits([[op1]]#0)
+    // CHECK-NEXT: ctrls([[op1]]#1) ctrl_vals(%arg1)
+    qref.operator "MyOp"() qubits(%q0)
+      ctrls(%q1) ctrl_vals(%cv)
+
+    // CHECK:      [[op3:%.+]]:2 = quantum.operator "MyOp"() qubits([[op2]], [[op2c]])
+    // CHECK-NEXT: UID(42) forward(%arg2: i64)
+    qref.operator "MyOp"() qubits(%q0, %q1)
+      UID(42) forward(%fwd : i64)
+
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[op3]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[op3]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<2>
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_operator_register
+func.func @test_operator_register(%idx0: tensor<2xi64>, %idx1: tensor<1xi64>, %cidx: tensor<2xi64>, %cval: tensor<2xi1>) attributes {quantum.node} {
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 4) : !quantum.reg
+    %a = qref.alloc(4) : !qref.reg<4>
+
+    // CHECK:      [[op1:%.+]] = quantum.operator "MyOp"()
+    // CHECK-NEXT: quregs([[qreg]]) indices(%arg0: tensor<2xi64>, %arg1: tensor<1xi64>)
+    // CHECK-NEXT: qubit_map = {qi0 = [0], qi1 = [1]}
+    qref.operator "MyOp"()
+      quregs(%a : !qref.reg<4>) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+      qubit_map = {qi0 = [0], qi1 = [1]}
+
+    // CHECK:      [[op2:%.+]] = quantum.operator "MyOp"()
+    // CHECK-NEXT: quregs([[op1]]) indices(%arg0: tensor<2xi64>)
+    // CHECK-NEXT: ctrls(%arg2: tensor<2xi64>) ctrl_vals(%arg3: tensor<2xi1>)
+    qref.operator "MyOp"()
+      quregs(%a : !qref.reg<4>) indices(%idx0 : tensor<2xi64>)
+      ctrls(%cidx : tensor<2xi64>) ctrl_vals(%cval : tensor<2xi1>)
+
+    // CHECK: quantum.dealloc [[op2]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<4>
     return
 }
 

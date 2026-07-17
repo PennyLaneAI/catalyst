@@ -22,27 +22,7 @@ os.environ["OMP_PROC_BIND"] = "false"
 os.environ["OMP_NUM_THREADS"] = "2"
 
 # pylint: disable=unused-import,wrong-import-position
-import platform
 import pytest
-
-
-def is_cuda_available():
-    """Checks if cuda is available by trying an import.
-
-    Do not run from top level!
-    We do not want to import cudaq unless we absolutely need to.
-    This is because cudaq prevents kokkos kernels from executing properly.
-    See https://github.com/PennyLaneAI/catalyst/issues/513
-    """
-    try:
-        # pylint: disable=import-outside-toplevel
-        import cudaq
-    except (ImportError, ModuleNotFoundError):
-        cudaq_available = False
-    else:
-        cudaq_available = True
-    return cudaq_available
-
 
 # Default from PennyLane
 TOL_STOCHASTIC = 0.05
@@ -104,44 +84,9 @@ def pytest_configure(config):
         "braketremote: run on remote aws-braket devices backed by `OpenQasmDevice` in the runtime",
     )
 
-    config.addinivalue_line(
-        "markers",
-        "cuda: run cuda tests",
-    )
-
-
-def skip_cuda_tests(config, items):
-    """Skip cuda tests according to the following logic:
-    By default: RUN
-      except: if apple
-      except: if lightning.kokkos or lightning.gpu
-      except: is cuda-quantum not installed
-
-    Important! We should only check if cuda-quantum is installed
-    as a last resort. We don't want to check if cuda-quantum is
-    installed at all when we are running kokkos.
-    """
-    skipper = pytest.mark.skip()
-    is_kokkos_or_gpu = config.getoption("backend") in ("lightning.kokkos", "lightning.gpu")
-    is_apple = platform.system() == "Darwin"
-    # CUDA quantum is not supported in apple silicon.
-    # CUDA quantum cannot run with kokkos
-    skip_cuda_tests_val = is_kokkos_or_gpu or is_apple
-    if not skip_cuda_tests_val and not is_cuda_available():
-        # Only check this conditionally as it imports cudaq.
-        # And we don't even want to succeed with kokkos.
-        skip_cuda_tests_val = True
-    for item in items:
-        is_cuda_test = "cuda" in item.keywords
-        skip_cuda = is_cuda_test and skip_cuda_tests_val
-        if skip_cuda:
-            item.add_marker(skipper)
-
 
 def pytest_collection_modifyitems(config, items):
     """A pytest items modifier method"""
-
-    skip_cuda_tests(config, items)
 
     # skip braket tests
     skipper = pytest.mark.skip()
