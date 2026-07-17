@@ -12,6 +12,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* `quantum.extract` canonicalization now looks through a `quantum.insert` at a distinct
+  static index, rewriting the extract to read from the register feeding the insert and
+  sinking the bypassed insert below the gates acting on the extracted qubits. This removes
+  the false data dependency between wires that act on different qubits of the same register
+  and leaves extracts grouped above the gates and inserts below them.
+  [(#2965)](https://github.com/PennyLaneAI/catalyst/pull/2965)
+
 * Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
   [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
 
@@ -442,6 +449,7 @@ JiaRung Jian,
 Jacob Kitchen,
 Korbinian Kottmann,
 Christina Lee,
+Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
