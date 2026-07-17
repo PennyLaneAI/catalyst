@@ -179,7 +179,7 @@ TEST_CASE("Test graphOpId Support", "[DecompGraph::Core]")
 
     REQUIRE(id1 == id2);
 
-    // check ID hashes match for same IDs, doesn't match name:
+    // Unit test for `OperatorNodeHash`. Check that the hash function prefers ID over name
     const OperatorNode hash1{"name", -1, -1, false, {}, "id"};
     const OperatorNode hash2{"name2", 1, 1, true, {}, "id"};
     const OperatorNode hash3{"name2", 1, 1, true, {}};
