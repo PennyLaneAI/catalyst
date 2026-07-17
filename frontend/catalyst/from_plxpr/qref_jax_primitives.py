@@ -307,7 +307,7 @@ def _qref_qinst_abstract_eval(
     # does not need to carry the PCPhase around
     # Or as an alternative, expand the kwarg so that it can be an arbitrary kwarg list for a general
     # primitive's attributes
-    assert not (pcphase_dim is not None) ^ (op == "PCPhase")
+    assert (pcphase_dim is not None) == (op == "PCPhase"), "pcphase_dim must be provided exactly for PCPhase ops"
     return ()
 
 
