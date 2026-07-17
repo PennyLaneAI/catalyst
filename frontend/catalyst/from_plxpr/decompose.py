@@ -24,7 +24,6 @@ import warnings
 from collections.abc import Callable
 from typing import get_type_hints
 
-import jax
 import pennylane as qp
 from pennylane.decomposition import DecompositionGraph
 from pennylane.typing import TensorLike
