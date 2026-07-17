@@ -71,15 +71,14 @@ func.func @test_extract_insert_fold(%r1: !quantum.reg, %i: i64) -> !quantum.reg 
     return %r3 : !quantum.reg
 }
 
-// CHECK-LABEL: test_extract_insert_no_fold_static
-func.func @test_extract_insert_no_fold_static(%r1: !quantum.reg, %i1: i64, %i2: i64) -> !quantum.reg {
-    // CHECK: quantum.extract
-    // CHECK: quantum.insert
+// CHECK-LABEL: test_extract_insert_distinct_static_folds
+func.func @test_extract_insert_distinct_static_folds(%r1: !quantum.reg, %i1: i64, %i2: i64) -> !quantum.reg {
+    // CHECK: [[Q:%.+]] = quantum.extract %arg0[ 0]
+    // CHECK: [[R2:%.+]] = quantum.insert %arg0[ 1], [[Q]]
+    // CHECK: quantum.insert [[R2]][%arg2], [[Q]]
     %q1 = quantum.extract %r1[0] : !quantum.reg -> !quantum.bit
     %r2 = quantum.insert %r1[1], %q1 : !quantum.reg, !quantum.bit
 
-    // CHECK: quantum.extract
-    // CHECK: quantum.insert
     %q2 = quantum.extract %r2[0] : !quantum.reg -> !quantum.bit
     %r3 = quantum.insert %r2[%i1], %q2 : !quantum.reg, !quantum.bit
 
@@ -88,6 +87,36 @@ func.func @test_extract_insert_no_fold_static(%r1: !quantum.reg, %i1: i64, %i2: 
     %r4 = quantum.insert %r3[%i2], %q3 : !quantum.reg, !quantum.bit
 
     return %r4 : !quantum.reg
+}
+
+// CHECK-LABEL: test_extract_through_insert_distinct_index
+func.func @test_extract_through_insert_distinct_index(%r0: !quantum.reg) -> !quantum.reg {
+    // CHECK: [[Q0:%.+]] = quantum.extract %arg0[ 0]
+    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[Q0]]
+    // CHECK: [[Q1:%.+]] = quantum.extract %arg0[ 1]
+    // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() [[Q1]]
+    // CHECK: [[INS0:%.+]] = quantum.insert %arg0[ 0], [[X]]
+    // CHECK: [[INS1:%.+]] = quantum.insert [[INS0]][ 1], [[Z]]
+    // CHECK: return [[INS1]]
+    %q0 = quantum.extract %r0[0] : !quantum.reg -> !quantum.bit
+    %x = quantum.custom "PauliX"() %q0 : !quantum.bit
+    %r1 = quantum.insert %r0[0], %x : !quantum.reg, !quantum.bit
+    %q1 = quantum.extract %r1[1] : !quantum.reg -> !quantum.bit
+    %z = quantum.custom "PauliZ"() %q1 : !quantum.bit
+    %r2 = quantum.insert %r1[1], %z : !quantum.reg, !quantum.bit
+    return %r2 : !quantum.reg
+}
+
+// A same-index extract/insert round-trip cancels; the distinct-index redirect does not fire.
+// CHECK-LABEL: test_extract_through_insert_prefers_cancellation
+func.func @test_extract_through_insert_prefers_cancellation(%r0: !quantum.reg, %q: !quantum.bit) -> !quantum.reg {
+    // CHECK-NOT: quantum.extract
+    // CHECK: [[INS:%.+]] = quantum.insert %arg0[ 0], %arg1
+    // CHECK-NEXT: return [[INS]]
+    %r1 = quantum.insert %r0[0], %q : !quantum.reg, !quantum.bit
+    %q1 = quantum.extract %r1[1] : !quantum.reg -> !quantum.bit
+    %r2 = quantum.insert %r1[1], %q1 : !quantum.reg, !quantum.bit
+    return %r2 : !quantum.reg
 }
 
 // CHECK-LABEL: test_extract_insert_constant
