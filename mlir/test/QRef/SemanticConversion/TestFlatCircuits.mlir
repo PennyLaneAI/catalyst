@@ -183,11 +183,11 @@ func.func @test_pcphase_op(%arg0: f64, %arg1: i1) attributes {quantum.node} {
 
     // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK: [[gate0:%.+]]:2 = quantum.pcphase(%arg0, %arg0) [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
-    qref.pcphase (%arg0, %arg0) %q0, %q1 : !qref.bit, !qref.bit
+    // CHECK: [[gate0:%.+]]:2 = quantum.pcphase(%arg0, dim : 1) [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
+    qref.pcphase (%arg0, dim : 1) %q0, %q1 : !qref.bit, !qref.bit
 
-    // CHECK: [[gate1:%.+]], [[gate1Ctrl:%.+]] = quantum.pcphase(%arg0, %arg0) [[gate0]]#0 ctrls([[gate0]]#1) ctrlvals(%arg1) : !quantum.bit ctrls !quantum.bit
-    qref.pcphase (%arg0, %arg0) %q0 ctrls (%q1) ctrlvals (%arg1) : !qref.bit ctrls !qref.bit
+    // CHECK: [[gate1:%.+]], [[gate1Ctrl:%.+]] = quantum.pcphase(%arg0, dim : 1) [[gate0]]#0 ctrls([[gate0]]#1) ctrlvals(%arg1) : !quantum.bit ctrls !quantum.bit
+    qref.pcphase (%arg0, dim : 1) %q0 ctrls (%q1) ctrlvals (%arg1) : !qref.bit ctrls !qref.bit
 
     // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[gate1]] : !quantum.reg, !quantum.bit
     // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[gate1Ctrl]] : !quantum.reg, !quantum.bit

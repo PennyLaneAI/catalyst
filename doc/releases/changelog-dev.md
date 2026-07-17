@@ -48,6 +48,10 @@
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
+* `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
+  duplicate serialization logic and keeping its output consistent.
+  [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
+
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
   [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
@@ -237,6 +241,11 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
+  (previously a dynamic float operand). This allows, among other things, the decomposition graph to
+  distinguish pcphase gates with different `dim` values, since they need different decomposition rules.
+  [(#3034)](https://github.com/PennyLaneAI/catalyst/pull/3034)
 
 * The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
   of the default else branch.
