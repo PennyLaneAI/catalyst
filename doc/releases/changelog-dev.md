@@ -51,6 +51,10 @@
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
+* `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
+  duplicate serialization logic and keeping its output consistent.
+  [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
+
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
   [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
@@ -181,7 +185,7 @@
 * Removes support for `Transform.plxpr_transform` from the `qp.qjit(capture=True)` capture pipeline.
   All transforms must now have a MLIR or XDSL implementation and a corresponding `pass_name`.
 
-* Support for `qjit` integration with `cudaq` has been removed in order to feasbily drop support 
+* Support for `qjit` integration with `cudaq` has been removed in order to feasbily drop support
   for Python 3.11.
   [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
 
@@ -245,9 +249,15 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
+  (previously a dynamic float operand). This allows, among other things, the decomposition graph to
+  distinguish pcphase gates with different `dim` values, since they need different decomposition rules.
+  [(#3034)](https://github.com/PennyLaneAI/catalyst/pull/3034)
+
 * The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
+
 * Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass. This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph. This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
   [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
 
