@@ -20,6 +20,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -39,8 +40,6 @@
 
 #include "DecompUtils.hpp"
 #include "DecomposeLoweringImpl.hpp"
-
-#include <llvm/Support/LogicalResult.h>
 
 #define DEBUG_TYPE "decompose-lowering"
 
