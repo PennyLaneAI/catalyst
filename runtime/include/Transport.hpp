@@ -25,8 +25,7 @@ namespace catalyst::transport {
 enum class DataPath : std::uint8_t {
     CpuVerbs,    // Plain ibverbs on CPU.
     NicEngine,   // Hardware-embedded RNIC (e.g. ERNIC hardware handshake).
-    KernelFused, // Fused with a kernel (e.g. on GPU). The decode runs
-                 // inside this fused kernel.
+    GpuEngine,   // Gpu-initiated comms.
 };
 
 /**
