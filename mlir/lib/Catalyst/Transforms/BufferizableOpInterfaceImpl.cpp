@@ -187,6 +187,7 @@ struct CustomCallOpInterface
             CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
                                  customCallOp.getCallTargetName(), numArgumentsAttr,
                                  customCallOp.getBackendConfigAttr());
+        newCustomCallOp->setDiscardableAttrs(customCallOp->getDiscardableAttrDictionary());
         size_t startIndex = bufferArgs.size() - customCallOp.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferResults);
