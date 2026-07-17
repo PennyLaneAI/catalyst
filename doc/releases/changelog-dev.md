@@ -178,6 +178,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `adjoint-lowering` pass now raises a clear error when a `quantum.adjoint` region contains an
+  unsupported operation that produces or consumes quantum values, including operations from
+  non-Quantum dialects, instead of failing with a raw compiler assertion.
+  [(#2934)](https://github.com/PennyLaneAI/catalyst/issues/2934)
+
 * The `ppr-to-ppm` pass now raises a clear error when its input contains a `quantum.adjoint`
   region, instead of failing later with a raw compiler assertion. The generated Pauli product
   measurements cannot be reversed by the `adjoint-lowering` pass, so this input is now rejected

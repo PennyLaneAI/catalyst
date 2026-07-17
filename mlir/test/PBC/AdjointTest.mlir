@@ -31,3 +31,19 @@ func.func private @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
   }
   return %r_out : !quantum.reg
 }
+
+// -----
+
+func.func @workflow_unhandled_ppm() {
+  %0 = quantum.alloc(1) : !quantum.reg
+  %1 = quantum.adjoint (%0) : !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %qb = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+    // expected-error@+1 {{'pbc.ppm' op cannot be adjoint-lowered inside a quantum.adjoint region}}
+    %mres, %out = pbc.ppm ["Z"] %qb : i1, !quantum.bit
+    %inserted = quantum.insert %arg0[0], %out : !quantum.reg, !quantum.bit
+    quantum.yield %inserted : !quantum.reg
+  }
+  quantum.dealloc %1 : !quantum.reg
+  return
+}
