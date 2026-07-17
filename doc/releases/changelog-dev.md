@@ -12,6 +12,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
+  [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
+
 * The `decompose-lowering` pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
   The pass also no longer applies the `inline`, `cse` and `canonicalize` passes to avoid unnecessary IR mutations.
   Instead, decomposition rules are deterministically inlined by a custom function (`inline` is non-deterministic, using an estimated benefit and threshold as criteria for inlining).
@@ -29,6 +32,7 @@
   [(#2990)](https://github.com/PennyLaneAI/catalyst/pull/2990)
   [(#2993)](https://github.com/PennyLaneAI/catalyst/pull/2993)
   [(#2998)](https://github.com/PennyLaneAI/catalyst/pull/2998)
+  [(#2981)](https://github.com/PennyLaneAI/catalyst/pull/2981)
 
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
@@ -43,6 +47,10 @@
 * The `resource-analysis` pass JSON output now includes `depth` for worst-case PBC layer depth
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
+
+* `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
+  duplicate serialization logic and keeping its output consistent.
+  [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
 
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
@@ -237,6 +245,8 @@
 * The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
+* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass. This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph. This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
+  [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly

@@ -50,6 +50,7 @@ from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, IndexSwitchOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
+from pennylane.capture.primitives import symbolic_array_prim
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -76,6 +77,7 @@ with Patcher(
         CallbackCallOp,
         CallbackOp,
         PrintOp,
+        SymbolicArrayOp,
     )
     from mlir_quantum.dialects.gradient import (
         CustomGradOp,
@@ -3065,7 +3067,13 @@ def subroutine_lowering(*args, **kwargs):
     return retval
 
 
+def _symbolic_array_lowering(ctx, *, shape, dtype):
+    result_types = [mlir.aval_to_ir_types(a)[0] for a in ctx.avals_out]
+    return SymbolicArrayOp(result_types[0]).results
+
+
 CUSTOM_LOWERING_RULES = (
+    (symbolic_array_prim, _symbolic_array_lowering),
     (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
     (device_release_p, _device_release_lowering),
