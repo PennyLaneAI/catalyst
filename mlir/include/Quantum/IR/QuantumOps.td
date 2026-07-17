@@ -535,7 +535,8 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 }
 
 def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
-                                             AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                             AttrSizedOperandSegments, AttrSizedResultSegments,
+                                             DeclareOpInterfaceMethods<DecomposableGate, ["getExtraData"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
         The `quantum.operator` is a generic representation for arbitrary quantum operations
@@ -613,7 +614,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
     }];
 
     let arguments = (ins
-        StringProp:$op_name,
+        StrAttr:$op_name,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$forward_args,
 
@@ -630,8 +631,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
 
         // additional functionality provided by quantum.operator, being last allows the builder
         // to use default values in the signature, so that these args are truly optional
-        UnitProp:$adjoint,
-        OptionalProp<I64Prop>:$UID,
+        UnitAttr:$adjoint,
+        OptionalAttr<I64Attr>:$UID,
         DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
@@ -646,8 +647,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             // the ODS operands must be next to each other
-            auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/1);
-            auto [_, lenForwardArgs] = getODSOperandIndexAndLength(/*forward_args=*/2);
+            auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/0);
+            auto [_, lenForwardArgs] = getODSOperandIndexAndLength(/*forward_args=*/1);
             return getOperands().slice(start, lenParams + lenForwardArgs);
         }
     }];
@@ -689,7 +690,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
 }
 
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                         AttrSizedOperandSegments, AttrSizedResultSegments,
+                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
         The `quantum.paulirot` operation applies a rotation around a Pauli product
@@ -721,7 +723,8 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
             return getODSOperands(getParamOperandIdx());
         }
 
-        std::string getPauliWord() {
+        std::string getPauliWord()
+        {
             std::string pauliWord;
 
             for (mlir::Attribute pauliChar : getPauliProduct()) {
@@ -829,15 +832,11 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
             ``quantum.custom``. The reason for this is that it needs to be handled in a special
             way during the lowering due to its C function being variadic on the number of qubits.
 
-        .. note::
-            `dim` is currently captured as a float number for compatibility with
-            runtime and device integration.
-
     }];
 
     let arguments = (ins
         F64:$theta,
-        F64:$dim,
+        I64Attr:$dim,
         Variadic<QubitType>:$in_qubits,
         UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
@@ -850,7 +849,10 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
     );
 
     let assemblyFormat = [{
-        `(` $theta `,` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $theta `,` `dim` `:` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )?
+        `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum/Utils/QuantumSplitting.h"
+#include <cstdint>
 
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -20,6 +20,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -27,8 +28,12 @@
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
 
+#include "AdjointLowering.hpp"
+#include "QuantumCache.hpp"
+
 using namespace mlir;
 using namespace catalyst;
+using namespace catalyst::quantum;
 
 namespace {
 bool isQuantumType(Type type) { return isa<quantum::QuantumDialect>(type.getDialect()); }
@@ -43,75 +48,48 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
     }
 }
 
-} // namespace
-
-namespace catalyst {
-namespace quantum {
-
-void verifyTypeIsCacheable(Type ty, Operation *op)
-{
-    // Sanitizing inputs.
-    // Technically we know for a fact that none of this will ever issue an
-    // error. This is because QubitUnitary is guaranteed to have a
-    // tensor<NxNxcomplex<f64>> But this code in the future may be extended to
-    // support other types. Hence the sanitization.
-    if (ty.isF64()) {
-        return;
+/// Generates the forward "augmented circuit" of the adjoint operation: classical preprocessing is
+/// cloned as-is, while gate parameters, dynamic wires, and control-flow structure are recorded into
+/// the cache for the reverse pass to replay.
+class AugmentedCircuitGenerator {
+  public:
+    AugmentedCircuitGenerator(IRMapping &oldToCloned, QuantumCache &cache)
+        : oldToCloned(oldToCloned), cache(cache)
+    {
     }
 
-    // TODO: Generalize to unranked tensors
-    if (!isa<RankedTensorType>(ty)) {
-        op->emitOpError() << "Caching only supports tensors complex F64";
-    }
+    /// Given a `region` containing classical preprocessing and quantum operations, generate an
+    /// augmented version that caches all the parameters required to deterministically re-execute
+    /// the circuit (gate params, classical control flow, and dynamic wires).
+    void generate(Region &region, OpBuilder &builder);
 
-    auto aTensorType = cast<RankedTensorType>(ty);
-    ArrayRef<int64_t> shape = aTensorType.getShape();
+  private:
+    IRMapping &oldToCloned;
+    QuantumCache &cache;
 
-    // TODO: Generalize to arbitrary dimensions
-    if (2 != shape.size()) {
-        op->emitOpError() << "Caching only supports tensors complex F64";
-    }
-    // TODO: Generalize to other types
-    Type elementType = aTensorType.getElementType();
-    if (!isa<ComplexType>(elementType)) {
-        op->emitOpError() << "Caching only supports tensors complex F64";
-    }
-    // TODO: Generalize to other types
-    Type f64 = cast<ComplexType>(elementType).getElementType();
-    if (!f64.isF64()) {
-        op->emitOpError() << "Caching only supports tensors complex F64";
-    }
-}
+    void visitOperation(scf::ForOp forOp, OpBuilder &builder);
+    void visitOperation(scf::WhileOp whileOp, OpBuilder &builder);
+    void visitOperation(scf::IfOp ifOp, OpBuilder &builder);
+    void visitOperation(scf::IndexSwitchOp indexSwitchOp, OpBuilder &builder);
 
-QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc)
-{
-    MLIRContext *ctx = builder.getContext();
-    auto paramVectorType = ArrayListType::get(ctx, builder.getF64Type());
-    auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
-    auto controlFlowTapeType = ArrayListType::get(ctx, builder.getIndexType());
-    auto paramVector = ListInitOp::create(builder, loc, paramVectorType);
-    auto wireVector = ListInitOp::create(builder, loc, wireVectorType);
+    void cloneTerminatorClassicalOperands(Operation *terminator, OpBuilder &builder);
 
-    // Initialize the tapes that store the structure of control flow.
-    DenseMap<Operation *, TypedValue<ArrayListType>> controlFlowTapes;
-    region.walk([&](Operation *op) {
-        if (isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
-            auto tape = catalyst::ListInitOp::create(builder, loc, controlFlowTapeType);
-            controlFlowTapes.insert({op, tape});
+    /// Update the internal mapping of the results of `oldOp` to the results of `clonedOp` using the
+    /// given result remapping.
+    void mapResults(Operation *oldOp, Operation *clonedOp,
+                    const DenseMap<unsigned, unsigned> &argIdxMapping);
+
+    // Emit an operation to cache a dynamic wire for quantum.insert/extract ops.
+    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, OpBuilder &builder)
+    {
+        if (!op.getIdxAttr().has_value()) {
+            ListPushOp::create(builder, op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
+                               cache.wireVector);
         }
-    });
-    return quantum::QuantumCache{
-        .paramVector = paramVector, .wireVector = wireVector, .controlFlowTapes = controlFlowTapes};
-}
-
-void QuantumCache::emitDealloc(OpBuilder &builder, Location loc)
-{
-    ListDeallocOp::create(builder, loc, paramVector);
-    ListDeallocOp::create(builder, loc, wireVector);
-    for (const auto &[_key, controlFlowTape] : controlFlowTapes) {
-        ListDeallocOp::create(builder, loc, controlFlowTape);
     }
-}
+
+    void cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder);
+};
 
 void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder)
 {
@@ -257,9 +235,14 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &buil
         }
     }
 
-    // Store the start, stop, and step to this op's control flow tape.
+    // Store the start, stop, and step to this op's control flow tape, but only when dynamic.
+    // Constant values can be rematerialized directly in the backward pass, which preverses the
+    // static info.
     Value tape = cache.controlFlowTapes.at(forOp);
     for (Value param : {forOp.getLowerBound(), forOp.getUpperBound(), forOp.getStep()}) {
+        if (getConstantIntValue(param).has_value()) {
+            continue;
+        }
         ListPushOp::create(builder, forOp.getLoc(), oldToCloned.lookupOrDefault(param), tape);
     }
 
@@ -433,6 +416,18 @@ void AugmentedCircuitGenerator::mapResults(Operation *oldOp, Operation *clonedOp
             oldToCloned.map(oldOp->getResult(oldIdx), clonedOp->getResult(newIdx));
         }
     }
+}
+
+} // namespace
+
+namespace catalyst {
+namespace quantum {
+
+void generateAdjointForwardPass(Region &region, OpBuilder &builder, IRMapping &oldToCloned,
+                                QuantumCache &cache)
+{
+    AugmentedCircuitGenerator generator{oldToCloned, cache};
+    generator.generate(region, builder);
 }
 
 } // namespace quantum

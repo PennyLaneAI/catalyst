@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <complex>
+#include <cstdint>
 #include <iomanip>
 #include <memory>
 #include <sstream>

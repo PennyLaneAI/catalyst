@@ -16,6 +16,13 @@ operation ::= `mitigation.zne` $callee `(` $args `)` `folding` `(` $folding `)` 
 
 The `mitigation.zne` operation computes the results of the quantum function with ZNE mitigation.
 
+The `numFolds` operand holds one floating-point fold count
+`(scale_factor - 1) / 2` per scale factor. The `global` and `all` folding
+methods scale the circuit by an exact odd-integer factor and thus require
+integral values. `random` folding also accepts fractional values, realized
+as base folds plus one extra fold sampled with probability equal to the
+fractional remainder.
+
 Interfaces: `CallOpInterface`, `SymbolUserOpInterface`
 
 #### Attributes:
@@ -33,7 +40,7 @@ Interfaces: `CallOpInterface`, `SymbolUserOpInterface`
 | Operand | Description |
 | :-----: | ----------- |
 | `args` | variadic of any type |
-| `numFolds` | ranked tensor of signless integer or index values |
+| `numFolds` | ranked tensor of floating-point values |
 
 #### Results:
 

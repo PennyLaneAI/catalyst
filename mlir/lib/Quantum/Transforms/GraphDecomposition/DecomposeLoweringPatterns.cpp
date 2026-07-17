@@ -12,25 +12,69 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "decompose-lowering"
+#include <cassert>
+#include <cstddef>
+#include <string>
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/AllocatorBase.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/Block.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/IRMapping.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
 
+#include "DecompUtils.hpp"
 #include "DecomposeLoweringImpl.hpp"
+
+#define DEBUG_TYPE "decompose-lowering"
 
 using namespace mlir;
 using namespace catalyst::quantum;
 
 namespace catalyst {
 namespace quantum {
+
+/**
+ * @brief
+ * Inline the body of `rule` at `rewriter`'s current insertion point, using `operands` to
+ * replace the parameters of `rule` and returning the results. `rewriter`'s insertion point will be
+ * moved to the end of the inlined function body.
+ */
+static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule,
+                                         ValueRange operands)
+{
+    assert(rule.getBlocks().size() == 1);
+    Block &body = rule.front();
+    auto returnOp = cast<func::ReturnOp>(body.getTerminator());
+
+    IRMapping mapping;
+    mapping.map(body.getArguments(), operands);
+
+    for (Operation &op : body.without_terminator()) {
+        rewriter.clone(op, mapping);
+    }
+
+    SmallVector<Value> results;
+    for (Value operand : returnOp.getOperands()) {
+        results.push_back(mapping.lookupOrDefault(operand));
+    }
+    return results;
+}
 
 struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
   private:
@@ -54,18 +98,24 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
             return failure();
         }
 
-        // Find the corresponding decomposition function for the op
+        // do not nest decomposition rules, they're applied greedily and this can lead to
+        // cycles/identity rules
+        if (DecompUtils::isInDecompRule(op)) {
+            return failure();
+        }
+
+        // Find the corresponding decomposition rule for the op
         auto it = decompositionRegistry.find(gateName);
         if (it == decompositionRegistry.end()) {
             return failure();
         }
-        func::FuncOp decompFunc = it->second;
+        func::FuncOp rule = it->second;
 
         // For null decomp rules, the signature will not have any quantum values
         // This is a deviation from the standard decomp func signature, so we deal with it
         // separately
-        if (!llvm::any_of(llvm::concat<const Type>(decompFunc.getFunctionType().getInputs(),
-                                                   decompFunc.getFunctionType().getResults()),
+        if (!llvm::any_of(llvm::concat<const Type>(rule.getFunctionType().getInputs(),
+                                                   rule.getFunctionType().getResults()),
                           [](const mlir::Type t) {
                               return isa<quantum::QuregType, quantum::QubitType>(t);
                           })) {
@@ -76,32 +126,32 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
             return success();
         }
 
-        // Here is the assumption that the decomposition function must have at least one input and
+        // Here is the assumption that the decomposition rule must have at least one input and
         // one result
-        assert(decompFunc.getFunctionType().getNumInputs() > 0 &&
+        assert(rule.getFunctionType().getNumInputs() > 0 &&
                "Decomposition function must have at least one input");
-        assert(decompFunc.getFunctionType().getNumResults() >= 1 &&
+        assert(rule.getFunctionType().getNumResults() >= 1 &&
                "Decomposition function must have at least one result");
 
         rewriter.setInsertionPointAfter(op);
 
-        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
+        auto enableQreg = llvm::any_of(rule.getFunctionType().getInputs(),
                                        [](mlir::Type t) { return isa<quantum::QuregType>(t); });
         auto analyzer = CustomOpSignatureAnalyzer(op, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
-        auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
-        auto callOp =
-            func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
-                                 decompFunc.getSymName(), callOperands);
+        auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
+        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, rule, operands);
 
-        // Replace the op with the call op and adjust the insert ops for the qreg mode
-        if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {
-            auto results = analyzer.prepareCallResultForQreg(callOp, rewriter);
+        // Replace the op with the inlined function and adjust the insert ops for the qreg mode
+        if (inlinedFunctionResults.size() == 1 &&
+            isa<quantum::QuregType>(inlinedFunctionResults.front().getType())) {
+            auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
+                                                          op.getLoc(), rewriter);
             rewriter.replaceOp(op, results);
         }
         else {
-            rewriter.replaceOp(op, callOp->getResults());
+            rewriter.replaceOp(op, inlinedFunctionResults);
         }
 
         return success();
@@ -127,6 +177,12 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         // Only decompose the op if it is not in the target gate set
         if (targetGateSet.contains(gateName)) {
+            return failure();
+        }
+
+        // do not nest decomposition rules, they're applied greedily and this can lead to
+        // cycles/identity rules
+        if (DecompUtils::isInDecompRule(op)) {
             return failure();
         }
 
@@ -165,18 +221,18 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
         auto analyzer = MultiRZOpSignatureAnalyzer(op, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
-        auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
-        auto callOp =
-            func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
-                                 decompFunc.getSymName(), callOperands);
+        auto operands = analyzer.prepareOperands(decompFunc, rewriter, op.getLoc());
+        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, decompFunc, operands);
 
-        // Replace the op with the call op and adjust the insert ops for the qreg mode
-        if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {
-            auto results = analyzer.prepareCallResultForQreg(callOp, rewriter);
+        // Replace the op with the inlined function and adjust the insert ops for the qreg mode
+        if (inlinedFunctionResults.size() == 1 &&
+            isa<quantum::QuregType>(inlinedFunctionResults.front().getType())) {
+            auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
+                                                          op.getLoc(), rewriter);
             rewriter.replaceOp(op, results);
         }
         else {
-            rewriter.replaceOp(op, callOp->getResults());
+            rewriter.replaceOp(op, inlinedFunctionResults);
         }
 
         return success();
@@ -198,10 +254,16 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
 
     LogicalResult matchAndRewrite(PauliRotOp op, PatternRewriter &rewriter) const override
     {
-        std::string gateName = "paulirot" + op.getPauliWord();
+        std::string gateName = cast<DecomposableGate>(op.getOperation()).getGraphOpId();
 
         // Only decompose the op if it is not in the target gate set
         if (targetGateSet.contains("paulirot")) {
+            return failure();
+        }
+
+        // do not nest decomposition rules, they're applied greedily and this can lead to
+        // cycles/identity rules
+        if (DecompUtils::isInDecompRule(op)) {
             return failure();
         }
 
@@ -226,18 +288,18 @@ struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
         auto analyzer = PauliRotOpSignatureAnalyzer(op, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
-        auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
-        auto callOp =
-            func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
-                                 decompFunc.getSymName(), callOperands);
+        auto operands = analyzer.prepareOperands(decompFunc, rewriter, op.getLoc());
+        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, decompFunc, operands);
 
-        // Replace the op with the call op and adjust the insert ops for the qreg mode
-        if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {
-            auto results = analyzer.prepareCallResultForQreg(callOp, rewriter);
+        // Replace the op with the inlined results and adjust the insert ops for the qreg mode
+        if (inlinedFunctionResults.size() == 1 &&
+            isa<quantum::QuregType>(inlinedFunctionResults.front().getType())) {
+            auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
+                                                          op.getLoc(), rewriter);
             rewriter.replaceOp(op, results);
         }
         else {
-            rewriter.replaceOp(op, callOp->getResults());
+            rewriter.replaceOp(op, inlinedFunctionResults);
         }
 
         return success();
