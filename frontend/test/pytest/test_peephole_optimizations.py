@@ -31,7 +31,6 @@ from catalyst.passes import (
     ppr_to_ppm,
     to_ppr,
 )
-from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=missing-function-docstring
 
@@ -236,6 +235,59 @@ def test_convert_clifford_to_ppr():
     assert ppm_specs_output["f_0"]["max_weight_pi4"] == 2
     assert ppm_specs_output["f_0"]["pi8_ppr"] == 1
     assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
+    assert ppm_specs_output["f_0"]["depth"] == 3
+    assert ppm_specs_output["f_0"]["depth_type"] == 0
+
+
+def test_convert_cz_to_ppr():
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_convert_cz_to_ppr_workflow():
+
+        @to_ppr
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def f():
+            qp.CZ(wires=[0, 1])
+
+        return f()
+
+    assert 'transform.apply_registered_pass "to-ppr"' in test_convert_cz_to_ppr_workflow.mlir
+    optimized_ir = test_convert_cz_to_ppr_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
+    assert 'pbc.ppr ["Z", "Z"](4)' in optimized_ir
+    assert 'pbc.ppr ["Z"](-4)' in optimized_ir
+    assert "quantum.custom" not in optimized_ir
+
+
+def test_convert_clifford_to_ppr_only_disjoint_qubit():
+
+    @qjit(target="mlir")
+    def test_convert_clifford_to_ppr_workflow():
+
+        @to_ppr
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def f():
+            qp.H(0)
+            qp.S(1)
+            qp.T(0)
+            qp.CNOT([0, 1])
+
+        return f()
+
+    assert 'transform.apply_registered_pass "to-ppr"' in test_convert_clifford_to_ppr_workflow.mlir
+    optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
+    assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
+
+    ppm_specs_output = ppm_specs(test_convert_clifford_to_ppr_workflow, only_disjoint_qubit=True)
+    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
+    assert ppm_specs_output["f_0"]["pi4_ppr"] == 7
+    assert ppm_specs_output["f_0"]["max_weight_pi4"] == 2
+    assert ppm_specs_output["f_0"]["pi8_ppr"] == 1
+    assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
+    assert ppm_specs_output["f_0"]["depth"] == 6
+    assert ppm_specs_output["f_0"]["depth_type"] == 1
 
 
 def test_commute_ppr():
@@ -618,20 +670,6 @@ class TestPPMSpecsErrors:
                 return qp.probs()
 
             ppm_specs(jit_circuit)
-
-    def test_no_pipeline_error(self):
-        """Make sure ppm_specs only works when pipeline is present"""
-        with pytest.raises(CompileError, match=r"No pipeline found"):
-            dev = qp.device("lightning.qubit", wires=2)
-
-            @qjit(target="mlir")
-            @qp.qnode(dev)
-            def circuit_with_no_pipeline():  # JIT mode since x is unknown
-                qp.H(0)
-                qp.CNOT(wires=[0, 1])
-                return qp.probs()
-
-            ppm_specs(circuit_with_no_pipeline)
 
 
 if __name__ == "__main__":

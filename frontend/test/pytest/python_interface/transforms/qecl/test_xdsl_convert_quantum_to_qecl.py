@@ -14,9 +14,12 @@
 
 """Test module for the convert-quantum-to-qecl dialect-conversion transform."""
 
+# pylint: disable=too-many-lines
+
 import pennylane as qp
 import pytest
 
+from catalyst.python_interface.transforms import measurements_from_samples_pass
 from catalyst.python_interface.transforms.qecl import (
     ConvertQuantumToQecLogicalPass,
     convert_quantum_to_qecl_pass,
@@ -58,9 +61,14 @@ class TestAllocPattern:
         program = """
         func.func @test_program() {
             // CHECK: [[hreg10:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
-            // CHECK: [[cb10:%.+]] = qecl.extract_block [[hreg10]][0]
-            // CHECK: [[cb11:%.+]] = qecl.encode[zero] [[cb10]]
-            // CHECK: [[hreg11:%.+]] = qecl.insert_block [[hreg10]][0], [[cb11]]
+            // CHECK: [[lb:%.+]] = arith.constant 0 : index
+            // CHECK: [[ub:%.+]] = arith.constant 1 : index
+            // CHECK: [[step:%.+]] = arith.constant 1 : index
+            // CHECK: [[hreg11:%.+]] = scf.for [[idx:%.+]] = [[lb]] to [[ub]] step [[step]] iter_args([[hreg1arg:%.+]] = [[hreg10]])
+            // CHECK:     [[cb10:%.+]] = qecl.extract_block [[hreg1arg]][[[idx]]]
+            // CHECK:     [[cb11:%.+]] = qecl.encode[zero] [[cb10]]
+            // CHECK:     [[hreg12:%.+]] = qecl.insert_block [[hreg1arg]][[[idx]]], [[cb11]]
+            // CHECK:     scf.yield [[hreg12]]
             // CHECK-NOT: quantum.alloc
             %0 = quantum.alloc(1) : !quantum.reg
 
@@ -102,9 +110,15 @@ class TestAllocPattern:
         program = """
         func.func @test_program() {
             // CHECK: [[hreg0:%.+]] = qecl.alloc() : !qecl.hyperreg<1 x 1>
-            // CHECK: [[cb0:%.+]] = qecl.extract_block [[hreg0]][0]
-            // CHECK: [[cb1:%.+]] = qecl.encode[zero] [[cb0]]
-            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[cb1]]
+            // CHECK: [[lb:%.+]] = arith.constant 0 : index
+            // CHECK: [[ub:%.+]] = arith.constant 1 : index
+            // CHECK: [[step:%.+]] = arith.constant 1 : index
+            // CHECK: [[hreg1:%.+]] = scf.for [[idx:%.+]] = [[lb]] to [[ub]] step [[step]] iter_args([[hregarg:%.+]] = [[hreg0]])
+            // CHECK:     [[cb0:%.+]] = qecl.extract_block [[hregarg]][[[idx]]]
+            // CHECK:     [[cb1:%.+]] = qecl.encode[zero] [[cb0]]
+            // CHECK:     [[hreg_out:%.+]] = qecl.insert_block [[hregarg]][[[idx]]], [[cb1]]
+            // CHECK:     scf.yield [[hreg_out]]
+            // CHECK: }
             // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[hreg1]] : !qecl.hyperreg<1 x 1> to !quantum.reg
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.reg) -> !quantum.reg
             // CHECK-NOT: quantum.alloc
@@ -633,6 +647,73 @@ class TestGatePattern:
         """
         run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
+    def test_gate_t_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that T gates (`quantum.custom "T"() ops) are converted to their corresponding
+        `apply_T` subroutine for k = 1.
+        """
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+                // CHECK-NOT: builtin.unrealized_conversion_cast
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+                %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+                // CHECK: [[cb1:%.+]] = func.call @apply_T([[cb0]]) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                // CHECK: [[cb2:%.+]] = qecl.qec [[cb1]] : !qecl.codeblock<1>
+                %2 = quantum.custom "T"() %1 : !quantum.bit
+
+                // CHECK: [[cb3:%.+]] = func.call @apply_T_adj([[cb2]]) : (!qecl.codeblock<1>) -> !qecl.codeblock<1>
+                // CHECK: [[cb4:%.+]] = qecl.qec [[cb3]] : !qecl.codeblock<1>
+                // CHECK: [[conv_cast:%.+]] = builtin.unrealized_conversion_cast [[cb4]] : !qecl.codeblock<1> to !quantum.bit
+                %3 = quantum.custom "T"() %2 adj : !quantum.bit
+
+                // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
+                %4 = "test.op"(%3) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+                return
+            }
+            //      CHECK: func.func private @apply_T([[in_codeblock:%.+]]: !qecl.codeblock<1>)
+            // CHECK-NEXT: [[magic_cb:%.+]] = qecl.fabricate[magic] : !qecl.codeblock<1>
+            // CHECK-NEXT: [[magic_cb2:%.+]], [[in_codeblock2:%.+]] = qecl.cnot [[magic_cb]][0], [[in_codeblock]][0]
+            // CHECK-NEXT: [[mres:%.+]], [[in_codeblock3:%.+]] = qecl.measure [[in_codeblock2]][0]
+            // CHECK-NEXT: qecl.dealloc_cb [[in_codeblock3]]
+            // CHECK-NEXT: [[out_codeblock:%.+]] = scf.if [[mres]] -> (!qecl.codeblock<1>)
+            // CHECK-NEXT:     [[x_corrected_cb:%.+]] = qecl.x [[magic_cb2]][0]
+            // CHECK-NEXT:     [[corrected_cb:%.+]] = qecl.s [[x_corrected_cb]]
+            // CHECK-NEXT:     scf.yield [[corrected_cb]]
+            // CHECK-NEXT: else
+            // CHECK-NEXT:     scf.yield [[magic_cb2]]
+            //      CHECK: func.return [[out_codeblock]]
+            //      CHECK: func.func private @apply_T_adj([[in_codeblock:%.+]]: !qecl.codeblock<1>)
+            // CHECK-NEXT: [[magic_cb:%.+]] = qecl.fabricate[magic_conj] : !qecl.codeblock<1>
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_no_apply_t_subroutine_for_clifford_circuit(
+        self, run_filecheck, quantum_to_qecl_pipeline_k_1
+    ):
+        """Test that the `apply_T` magic-state subroutine is NOT emitted for a Clifford-only
+        circuit (one with no T gates).
+
+        """
+        program = """
+        builtin.module @module_circuit {
+            func.func @test_func() attributes {quantum.node} {
+                // CHECK: qecl.hadamard
+                %0 = "test.op"() : () -> !qecl.codeblock<1>
+                %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+                %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
+                %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+                return
+            }
+            // CHECK-NOT: @apply_T
+            // CHECK-NOT: qecl.fabricate
+            // CHECK-NOT: @apply_T_adj
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
     def test_gate_cnot_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
         """Test that CNOT gates (`quantum.custom "CNOT"() ops) are converted to their corresponding
         `qecl.cnot` ops for k = 1.
@@ -704,6 +785,65 @@ class TestMeasurePattern:
 
             // CHECK: "test.op"([[conv_cast]]) : (!quantum.bit) -> !quantum.bit
             %3 = "test.op"(%2) : (!quantum.bit) -> !quantum.bit  // To prevent DCE
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+
+# MARK: TestCompBasisPattern
+
+
+class TestCompBasisPattern:
+    """Unit tests for the `compbasis` op conversion pattern of the convert-quantum-to-qecl pass."""
+
+    def test_compbasis_qubits_1_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that computational-basis observable ops (`quantum.compbasis`) acting on qubits are
+        converted to `qecl.measure` and `quantum.mcmobs` where the number of qubits is 1, and for
+        k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[mres:%.+]], [[cb1:%.+]] = qecl.measure [[cb0]][0] : i1, !qecl.codeblock<1>
+            // CHECK: [[obs:%.+]] = quantum.mcmobs %1 : !quantum.obs
+            %obs = quantum.compbasis qubits %1 : !quantum.obs
+
+            // CHECK: quantum.sample [[obs]] : tensor<100x1xf64>
+            %samples = quantum.sample %obs : tensor<100x1xf64>
+            return
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_compbasis_qubits_2_k_1(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test that computational-basis observable ops (`quantum.compbasis`) acting on qubits are
+        converted to `qecl.measure` and `quantum.mcmobs` where the number of qubits is 2, and for
+        k = 1.
+        """
+        program = """
+        func.func @test_program() {
+            // CHECK: [[cb0:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %0 = "test.op"() : () -> !qecl.codeblock<1>
+            %1 = builtin.unrealized_conversion_cast %0 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK: [[cb1:%.+]] = "test.op"() : () -> !qecl.codeblock<1>
+            // CHECK-NOT: builtin.unrealized_conversion_cast
+            %2 = "test.op"() : () -> !qecl.codeblock<1>
+            %3 = builtin.unrealized_conversion_cast %2 : !qecl.codeblock<1> to !quantum.bit
+
+            // CHECK-DAG: [[mres2:%.+]], [[cb2:%.+]] = qecl.measure [[cb0]][0] : i1, !qecl.codeblock<1>
+            // CHECK-DAG: [[mres3:%.+]], [[cb3:%.+]] = qecl.measure [[cb1]][0] : i1, !qecl.codeblock<1>
+            //     CHECK: [[obs:%.+]] = quantum.mcmobs [[mres2]], [[mres3]] : !quantum.obs
+            %obs = quantum.compbasis qubits %1, %3 : !quantum.obs
+
+            // CHECK: quantum.sample [[obs]] : tensor<100x1xf64>
+            %samples = quantum.sample %obs : tensor<100x1xf64>
             return
         }
         """
@@ -813,6 +953,804 @@ class TestInvalidInputIR:
             run_filecheck(program, quantum_to_qecl_pipeline_k_1)
 
 
+# MARK: Control Flow Tests
+
+
+class TestControlFlow:
+    """Unit/integrations tests for input quantum-dialect programs that contain control-flow."""
+
+    def test_conditional_gate(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with an `scf.if` conditional, which applies gates conditional on
+        some input value.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program(%arg0: tensor<i1>) {
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: [[cond:%.+]] = tensor.extract
+            %cond = tensor.extract %arg0[] : tensor<i1>
+
+            // CHECK: [[out_hreg:%.+]] = scf.if [[cond]] -> (!qecl.hyperreg<1 x 1>)
+            // CHECK:     qecl.extract_block [[hreg0:%.+]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     qecl.x
+            //   COM:     <qec cycle>
+            // CHECK:     [[hreg_true:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[hreg_true]] : !qecl.hyperreg<1 x 1>
+            // CHECK: else
+            // CHECK:     qecl.extract_block [[hreg0]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     qecl.z
+            //   COM:     <qec cycle>
+            // CHECK:     [[hreg_false:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[hreg_false]] : !qecl.hyperreg<1 x 1>
+            %1 = scf.if %cond -> (!quantum.reg) {
+                %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %3 = quantum.custom "PauliX"() %2 : !quantum.bit
+                %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+                scf.yield %4 : !quantum.reg
+            } else {
+                %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %3 = quantum.custom "PauliZ"() %2 : !quantum.bit
+                %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+                scf.yield %4 : !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[out_hreg]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %1 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_conditional_gate_without_register_packing(
+        self, run_filecheck, quantum_to_qecl_pipeline_k_1
+    ):
+        """Test a simple program with an `scf.if` conditional, which applies gates conditional on
+        some input value.
+
+        This program does not not pack qubits back into a register before entering the `scf.if`
+        region, which allows testing the case where the return type of the `scf.if` op is a
+        !quantum.bit in the input program, rather than a !quantum.reg.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program(%arg0: tensor<i1>) {
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: {{%.+}} = qecl.extract_block [[hreg0:%.+]][0]
+            //   COM: <qecl.qec>
+            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+            // CHECK: [[cond:%.+]] = tensor.extract
+            %cond = tensor.extract %arg0[] : tensor<i1>
+
+            // CHECK: [[out_cb:%.+]] = scf.if [[cond]] -> (!qecl.codeblock<1>)
+            // CHECK:     qecl.z [[cb0:%.+]][0]
+            //   COM:     <qecl.qec>
+            // CHECK:     scf.yield {{%.+}} : !qecl.codeblock<1>
+            // CHECK: else
+            // CHECK:     scf.yield [[cb0]] : !qecl.codeblock<1>
+            %2 = scf.if %cond -> (!quantum.bit) {
+                %4 = quantum.custom "PauliZ"() %1 : !quantum.bit
+                scf.yield %4 : !quantum.bit
+            } else {
+                scf.yield %1 : !quantum.bit
+            }
+
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[out_cb]]
+            // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
+            %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+            quantum.dealloc %3 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_conditional_measure(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with an `scf.if` conditional, which applies mid-circuit
+        measurements conditional on some input value. Note that both branches apply the same MCM,
+        but this is immaterial for the purposes of this test.
+
+        Importantly, this test checks that the lowering for `scf.if` ops that return both quantum
+        and classical types works as expected.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program(%arg0: tensor<i1>) {
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: [[cond:%.+]] = tensor.extract
+            %cond = tensor.extract %arg0[] : tensor<i1>
+
+            // CHECK: [[mres:%.+]], [[out_hreg:%.+]] = scf.if [[cond]] -> (i1, !qecl.hyperreg<1 x 1>)
+            // CHECK:     qecl.extract_block [[hreg0:%.+]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     [[mres_true:%.+]], {{%.+}} = qecl.measure
+            //   COM:     <qec cycle>
+            // CHECK:     [[hreg_true:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[mres_true]], [[hreg_true]] : i1, !qecl.hyperreg<1 x 1>
+            // CHECK: else
+            // CHECK:     qecl.extract_block [[hreg0]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     [[mres_false:%.+]], {{%.+}} = qecl.measure
+            //   COM:     <qec cycle>
+            // CHECK:     [[hreg_false:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[mres_false]], [[hreg_false]] : i1, !qecl.hyperreg<1 x 1>
+            %1, %2 = scf.if %cond -> (i1, !quantum.reg) {
+                %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %mres, %4 = quantum.measure %3 : i1, !quantum.bit
+                %5 = quantum.insert %0[ 0], %4 : !quantum.reg, !quantum.bit
+                scf.yield %mres, %5 : i1, !quantum.reg
+            } else {
+                %3 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %mres, %4 = quantum.measure %3 : i1, !quantum.bit
+                %5 = quantum.insert %0[ 0], %4 : !quantum.reg, !quantum.bit
+                scf.yield %mres, %5 : i1, !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[out_hreg]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %2 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_conditional_nested(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with a nested `scf.if` conditional ops."""
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program(%arg0: tensor<i1>, %arg1: tensor<i1>) {
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: [[cond0:%.+]] = tensor.extract
+            %cond0 = tensor.extract %arg0[] : tensor<i1>
+
+            // CHECK: [[outer_hreg:%.+]] = scf.if [[cond0]] -> (!qecl.hyperreg<1 x 1>)
+            // CHECK:     qecl.extract_block [[hreg0:%.+]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     qecl.x
+            //   COM:     <qec cycle>
+            // CHECK:     [[outer_hreg_true:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     scf.yield [[outer_hreg_true]] : !qecl.hyperreg<1 x 1>
+            // CHECK: else
+            // CHECK:     qecl.extract_block [[hreg0]][0]
+            //   COM:     <qec cycle>
+            // CHECK:     qecl.z
+            //   COM:     <qec cycle>
+            // CHECK:     [[outer_hreg_false:%.+]] = qecl.insert_block [[hreg0]][0]
+            // CHECK:     [[cond1:%.+]] = tensor.extract
+            // CHECK:     [[inner_hreg:%.+]] = scf.if [[cond1]] -> (!qecl.hyperreg<1 x 1>)
+            // CHECK:         qecl.extract_block [[outer_hreg_false]][0]
+            //   COM:         <qec cycle>
+            // CHECK:         qecl.y
+            //   COM:         <qec cycle>
+            // CHECK:         [[inner_hreg_true:%.+]] = qecl.insert_block [[outer_hreg_false]][0]
+            // CHECK:         scf.yield [[inner_hreg_true]] : !qecl.hyperreg<1 x 1>
+            // CHECK:     else
+            // CHECK:         scf.yield [[outer_hreg_false]] : !qecl.hyperreg<1 x 1>
+            // CHECK:     scf.yield [[inner_hreg]] : !qecl.hyperreg<1 x 1>
+            %1 = scf.if %cond0 -> (!quantum.reg) {
+                %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %3 = quantum.custom "PauliX"() %2 : !quantum.bit
+                %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+                scf.yield %4 : !quantum.reg
+            } else {
+                %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+                %3 = quantum.custom "PauliZ"() %2 : !quantum.bit
+                %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+                %cond1 = tensor.extract %arg1[] : tensor<i1>
+                %5 = scf.if %cond1 -> (!quantum.reg) {
+                    %6 = quantum.extract %4[ 0] : !quantum.reg -> !quantum.bit
+                    %7 = quantum.custom "PauliY"() %6 : !quantum.bit
+                    %8 = quantum.insert %4[ 0], %7 : !quantum.reg, !quantum.bit
+                    scf.yield %8 : !quantum.reg
+                } else {
+                    scf.yield %4 : !quantum.reg
+                }
+                scf.yield %5 : !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[outer_hreg]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %1 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_for_loop_gate(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with an `scf.for` loop, which applies gates on each iteration of
+        the loop.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program() {
+            // CHECK: [[c1:%.+]] = arith.constant 1
+            // CHECK: [[c5:%.+]] = arith.constant 5
+            // CHECK: [[c0:%.+]] = arith.constant 0
+            %c1 = arith.constant 1 : index
+            %c5 = arith.constant 5 : index
+            %c0 = arith.constant 0 : index
+
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            //      CHECK: [[out_hreg:%.+]] = scf.for %arg0 = [[c0]] to [[c5]] step [[c1]]
+            // CHECK-SAME:         iter_args([[hreg_arg:%.+]] = {{%.+}}) -> (!qecl.hyperreg<1 x 1>)
+            //      CHECK:     [[hreg1:%.+]] = qecl.extract_block [[hreg_arg]][0]
+            //        COM:     <qec cycle>
+            //      CHECK:     qecl.x
+            //        COM:     <qec cycle>
+            //      CHECK:     [[hreg2:%.+]] = qecl.insert_block [[hreg_arg]][0]
+            //      CHECK:     scf.yield [[hreg2]] : !qecl.hyperreg<1 x 1>
+            %1 = scf.for %arg0 = %c0 to %c5 step %c1 iter_args(%arg1 = %0) -> (!quantum.reg) {
+                %5 = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
+                %out_qubits = quantum.custom "PauliX"() %5 : !quantum.bit
+                %6 = quantum.insert %arg1[ 0], %out_qubits : !quantum.reg, !quantum.bit
+                scf.yield %6 : !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[out_hreg]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %1 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_for_loop_gate_without_register_packing(
+        self, run_filecheck, quantum_to_qecl_pipeline_k_1
+    ):
+        """Test a simple program with an `scf.for` loop, which applies gates on each iteration of
+        the loop.
+
+        This program does not pack qubits back into a register before entering the `scf.for`
+        region, which allows testing the case where the return type of the `scf.for` op is a
+        !quantum.bit in the input program, rather than a !quantum.reg.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program() {
+            // CHECK: [[c1:%.+]] = arith.constant 1
+            // CHECK: [[c5:%.+]] = arith.constant 5
+            // CHECK: [[c0:%.+]] = arith.constant 0
+            %c1 = arith.constant 1 : index
+            %c5 = arith.constant 5 : index
+            %c0 = arith.constant 0 : index
+
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: {{%.+}} = qecl.extract_block [[hreg0:%.+]][0]
+            //   COM: <qec cycle>
+            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+            //      CHECK: [[out_cb:%.+]] = scf.for %arg0 = [[c0]] to [[c5]] step [[c1]]
+            // CHECK-SAME:         iter_args([[cb_arg:%.+]] = {{%.+}}) -> (!qecl.codeblock<1>)
+            //      CHECK:     qecl.x
+            //        COM:     <qecl.qec>
+            //      CHECK:     scf.yield {{.+}} : !qecl.codeblock<1>
+            %2 = scf.for %arg0 = %c0 to %c5 step %c1 iter_args(%arg1 = %1) -> (!quantum.bit) {
+                %out_qubits = quantum.custom "PauliX"() %arg1 : !quantum.bit
+                scf.yield %out_qubits : !quantum.bit
+            }
+
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[out_cb]]
+            // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
+            %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+            quantum.dealloc %3 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_for_loop_gate_and_counter(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with an `scf.for` loop, which applies gates on each iteration of
+        the loop, as well as increments a counter variable in order to check that the lowering for
+        `scf.for` ops that return both quantum and classical types works as expected.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program() {
+            // CHECK: [[c1:%.+]] = arith.constant 1
+            // CHECK: [[c5:%.+]] = arith.constant 5
+            // CHECK: [[c0:%.+]] = arith.constant 0
+            %c1 = arith.constant 1 : index
+            %c5 = arith.constant 5 : index
+            %c0 = arith.constant 0 : index
+
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: [[c1_i64:%.+]] = arith.constant dense<1> : tensor<i64>
+            %c1_i64 = arith.constant dense<1> : tensor<i64>
+
+            //      CHECK: [[c_out:%.+]], [[hreg_out:%.+]] = scf.for %arg1 = %c0 to %c5 step %c1
+            // CHECK-SAME:         iter_args([[c_arg:%.+]] = [[c1_i64]], [[hreg_arg:%.+]] = {{%.+}}) ->
+            // CHECK-SAME:         (tensor<i64>, !qecl.hyperreg<1 x 1>)
+            //      CHECK:     [[hreg1:%.+]] = qecl.extract_block [[hreg_arg]][0]
+            //        COM:     <qec cycle>
+            //      CHECK:     qecl.x
+            //        COM:     <qec cycle>
+            //      CHECK:     [[counter:%.+]] = arith.addi [[c_arg]], [[c1_i64]] : tensor<i64>
+            //      CHECK:     [[hreg2:%.+]] = qecl.insert_block [[hreg_arg]][0]
+            //      CHECK:     scf.yield [[counter]], [[hreg2]] : tensor<i64>, !qecl.hyperreg<1 x 1>
+            %1, %2 = scf.for %arg1 = %c0 to %c5 step %c1 iter_args(%arg2 = %c1_i64, %arg3 = %0) -> (tensor<i64>, !quantum.reg) {
+                %3 = quantum.extract %arg3[ 0] : !quantum.reg -> !quantum.bit
+                %4 = quantum.custom "PauliX"() %3 : !quantum.bit
+                %5 = arith.addi %arg2, %c1_i64 : tensor<i64>
+                %6 = quantum.insert %arg3[ 0], %4 : !quantum.reg, !quantum.bit
+                scf.yield %5, %6 : tensor<i64>, !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[hreg_out]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %2 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_for_loop_nested(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with a nested `scf.for` loop."""
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        func.func @test_program() {
+            // CHECK: [[c1:%.+]] = arith.constant 1
+            // CHECK: [[c5:%.+]] = arith.constant 5
+            // CHECK: [[c0:%.+]] = arith.constant 0
+            %c1 = arith.constant 1 : index
+            %c5 = arith.constant 5 : index
+            %c0 = arith.constant 0 : index
+
+            // CHECK: {{%.+}} = qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: {{%.+}} = qecl.extract_block [[hreg0:%.+]][0]
+            %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+
+            //      CHECK: [[outer_cb:%.+]] = scf.for {{%.+}} = [[c0]] to [[c5]] step [[c1]]
+            // CHECK-SAME:         iter_args([[cb_arg_outer:%.+]] = {{%.+}}) -> (!qecl.codeblock<1>)
+            //      CHECK:     qecl.x [[cb_arg_outer]][0]
+            //        COM:     <qecl.qec>
+            //      CHECK:     [[inner_cb:%.+]] = scf.for {{%.+}} = [[c0]] to [[c5]] step [[c1]]
+            // CHECK-SAME:             iter_args([[cb_arg_inner:%.+]] = {{%.+}}) -> (!qecl.codeblock<1>)
+            //      CHECK:         [[cb4:%.+]] = qecl.z [[cb_arg_inner]][0]
+            //        COM:         <qecl.qec>
+            //      CHECK:         scf.yield {{%.+}} : !qecl.codeblock<1>
+            //      CHECK:     scf.yield [[inner_cb]] : !qecl.codeblock<1>
+            %2 = scf.for %arg2 = %c0 to %c5 step %c1 iter_args(%arg3 = %1) -> (!quantum.bit) {
+                %4 = quantum.custom "PauliX"() %arg3 : !quantum.bit
+                %5 = scf.for %arg4 = %c0 to %c5 step %c1 iter_args(%arg5 = %4) -> (!quantum.bit) {
+                    %6 = quantum.custom "PauliZ"() %arg5 : !quantum.bit
+                    scf.yield %6 : !quantum.bit
+                }
+                scf.yield %5 : !quantum.bit
+            }
+
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[outer_cb]]
+            // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
+            %3 = quantum.insert %0[0], %2 : !quantum.reg, !quantum.bit
+            quantum.dealloc %3 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_while_loop_gate(self, run_filecheck, quantum_to_qecl_pipeline_k_1):
+        """Test a simple program with an `scf.while` loop, which applies gates on each iteration of
+        the loop and increments a counter variable. The loop terminates when the counter variable
+        no longer satisfies the condition.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        //  CHECK-SAME:     [[arg0:%.+]]: f64
+        func.func @test_program(%arg0: f64) {
+            // CHECK: [[c2:%.+]] = arith.constant 2
+            // CHECK: [[c9:%.+]] = arith.constant 9
+            %c2 = arith.constant 2.000000e+00 : f64
+            %c9 = arith.constant 9.000000e+00 : f64
+
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            //      CHECK: [[c_out:%.+]], [[hreg_out:%.+]] = scf.while
+            // CHECK-SAME:         ([[c_arg_0:%.+]] = [[arg0]], [[hreg_arg_0:%.+]] = {{%.+}}) :
+            // CHECK-SAME:         (f64, !qecl.hyperreg<1 x 1>) -> (f64, !qecl.hyperreg<1 x 1>)
+            //      CHECK:     [[cond:%.+]] = arith.cmpf
+            //      CHECK:     scf.condition([[cond]]) [[c_arg_0]], [[hreg_arg_0]] : f64, !qecl.hyperreg<1 x 1>
+            //      CHECK: do
+            //      CHECK: ^bb0([[c_arg_1:%.+]]: f64, [[hreg_arg_1:%.+]]: !qecl.hyperreg<1 x 1>):
+            //      CHECK:     [[cb0:%.+]] = qecl.extract_block [[hreg_arg_1]][0]
+            //        COM:     <qec cycle>
+            //      CHECK:     qecl.x
+            //        COM:     <qec cycle>
+            //      CHECK:     [[fres:%.+]] = arith.addf
+            //      CHECK:     [[hreg_1:%.+]] = qecl.insert_block [[hreg_arg_1]][0]
+            //      CHECK:     scf.yield [[fres]], [[hreg_1]] : f64, !qecl.hyperreg<1 x 1>
+            %1, %2 = scf.while (%arg1 = %arg0, %arg2 = %0) : (f64, !quantum.reg) -> (f64, !quantum.reg) {
+                %5 = arith.cmpf olt, %arg1, %c9 : f64
+                scf.condition(%5) %arg1, %arg2 : f64, !quantum.reg
+            } do {
+            ^bb0(%arg1: f64, %arg2: !quantum.reg):
+                %5 = quantum.extract %arg2[ 0] : !quantum.reg -> !quantum.bit
+                %6 = quantum.custom "PauliX"() %5 : !quantum.bit
+                %7 = arith.addf %arg1, %c2 : f64
+                %8 = quantum.insert %arg2[ 0], %6 : !quantum.reg, !quantum.bit
+                scf.yield %7, %8 : f64, !quantum.reg
+            }
+
+            // CHECK: qecl.dealloc [[hreg_out]] : !qecl.hyperreg<1 x 1>
+            quantum.dealloc %2 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+    def test_while_loop_gate_without_register_packing(
+        self, run_filecheck, quantum_to_qecl_pipeline_k_1
+    ):
+        """Test a simple program with an `scf.while` loop, which applies gates on each iteration of
+        the loop and increments a counter variable. The loop terminates when the counter variable
+        no longer satisfies the condition.
+
+        This program does not pack qubits back into a register before entering the `scf.while`
+        region, which allows testing the case where the return type of the `scf.while` op is a
+        !quantum.bit in the input program, rather than a !quantum.reg.
+        """
+        program = """
+        builtin.module @top {
+        // CHECK-LABEL: func.func @test_program(
+        //  CHECK-SAME:     [[arg0:%.+]]: f64
+        func.func @test_program(%arg0: f64) {
+            // CHECK: [[c2:%.+]] = arith.constant 2
+            // CHECK: [[c9:%.+]] = arith.constant 9
+            %c2 = arith.constant 2.000000e+00 : f64
+            %c9 = arith.constant 9.000000e+00 : f64
+
+            // CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
+            //   COM: <qecl.encode>
+            %0 = quantum.alloc( 1) : !quantum.reg
+
+            // CHECK: {{%.+}} = qecl.extract_block [[hreg0:%.+]][0]
+            //   COM: <qecl.qec>
+            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+            //      CHECK: [[c_out:%.+]], [[cb_out:%.+]] = scf.while
+            // CHECK-SAME:         ([[c_arg_0:%.+]] = [[arg0]], [[cb_arg_0:%.+]] = {{%.+}}) :
+            // CHECK-SAME:         (f64, !qecl.codeblock<1>) -> (f64, !qecl.codeblock<1>)
+            //      CHECK:     [[cond:%.+]] = arith.cmpf
+            //      CHECK:     scf.condition([[cond]]) [[c_arg_0]], [[cb_arg_0]] : f64, !qecl.codeblock<1>
+            //      CHECK: do
+            //      CHECK: ^bb0([[c_arg_1:%.+]]: f64, [[cb_arg_1:%.+]]: !qecl.codeblock<1>):
+            //      CHECK:     qecl.x
+            //        COM:     <qec cycle>
+            //      CHECK:     [[fres:%.+]] = arith.addf
+            //      CHECK:     scf.yield [[fres]], {{%.+}} : f64, !qecl.codeblock<1>
+            %2, %3 = scf.while (%arg1 = %arg0, %arg2 = %1) : (f64, !quantum.bit) -> (f64, !quantum.bit) {
+                %5 = arith.cmpf olt, %arg1, %c9 : f64
+                scf.condition(%5) %arg1, %arg2 : f64, !quantum.bit
+            } do {
+            ^bb0(%arg1: f64, %arg2: !quantum.bit):
+                %6 = quantum.custom "PauliX"() %1 : !quantum.bit
+                %7 = arith.addf %arg1, %c2 : f64
+                scf.yield %7, %6 : f64, !quantum.bit
+            }
+
+            // CHECK: [[hreg1:%.+]] = qecl.insert_block [[hreg0]][0], [[cb_out]]
+            // CHECK: qecl.dealloc [[hreg1]] : !qecl.hyperreg<1 x 1>
+            %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+            quantum.dealloc %4 : !quantum.reg
+            func.return
+        }
+        }
+        """
+        run_filecheck(program, quantum_to_qecl_pipeline_k_1)
+
+
+# MARK: Measurement Processes
+
+
+class TestMeasurementProcesses:
+    """Unit/integration tests for input quantum-dialect programs with various terminal measurement
+    processes.
+
+    In all the tests below, we use the dynamic-one-shot MCM method, which creates a kernel function
+    in the IR that computes the result for a single shot, with a post-processing function to pack
+    these results into a tensor that contains the results of all shots. When the observable to the
+    sampling op is an MCM observable, the MCM results are used directly (after casting to the
+    appropriate type) and the `quantum.sample` op is removed.
+    """
+
+    def test_sample_mcms_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with a samples terminal measurement on
+        a single MCM.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            # CHECK-NOT: quantum.measure
+            # CHECK-NOT: quantum.mcmobs
+            # CHECK-NOT: quantum.sample
+            # CHECK: qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui {{%.+}} : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+            m0 = qp.measure(0)
+            return qp.sample([m0])
+
+        run_filecheck_qjit(circuit)
+
+    def test_sample_qubit_1_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with a samples terminal measurement on
+        a single qubit.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            # CHECK-NOT: quantum.compbasis
+            # CHECK-NOT: quantum.sample
+            # CHECK: [[mres:%.+]], [[cb0:%.+]] = qecl.measure
+            # CHECK: [[hreg:%.+]] = qecl.insert_block {{.*}}, [[cb0]]
+            # CHECK: qecl.dealloc [[hreg]]
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+            return qp.sample(wires=[0])
+
+        run_filecheck_qjit(circuit)
+
+    def test_sample_qubit_2_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with a samples terminal measurement on
+        two qubits.
+        """
+        dev = qp.device("null.qubit", wires=2)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # pylint: disable=line-too-long
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            # CHECK-NOT: quantum.compbasis
+            # CHECK-NOT: quantum.sample
+            # CHECK: [[mres0:%.+]], [[cb0:%.+]] = qecl.measure
+            # CHECK: [[mres1:%.+]], [[cb1:%.+]] = qecl.measure
+            # CHECK: [[hreg0:%.+]] = qecl.insert_block {{.*}}, [[cb0]]
+            # CHECK: [[hreg1:%.+]] = qecl.insert_block {{.*}}, [[cb1]]
+            # CHECK: qecl.dealloc [[hreg1]]
+            # CHECK: [[mres0_i64:%.+]] = arith.extui [[mres0]] : i1 to i64
+            # CHECK: [[mres0_f64:%.+]] = arith.sitofp [[mres0_i64]] : i64 to f64
+            # CHECK: [[mres1_i64:%.+]] = arith.extui [[mres1]] : i1 to i64
+            # CHECK: [[mres1_f64:%.+]] = arith.sitofp [[mres1_i64]] : i64 to f64
+            # CHECK: [[mres_1x2xf64:%.+]] = tensor.from_elements [[mres0_f64]], [[mres1_f64]] : tensor<1x2xf64>
+            # CHECK: return [[mres_1x2xf64]] : tensor<1x2xf64>
+            return qp.sample(wires=[0, 1])
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.xfail(reason="Sampling quantum register not implemented", raises=CompileError)
+    def test_sample_register_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with a samples terminal measurement on
+        the quantum register.
+        """
+        dev = qp.device("null.qubit", wires=2)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            return qp.sample()
+
+        run_filecheck_qjit(circuit)
+
+    def test_expval_pauli_z_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with an expectation-value terminal
+        measurement of a Pauli Z observable.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: qecl.hadamard
+            # CHECK: [[mres:%.+]], {{%.+}} = qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+
+            # CHECK-LABEL: func.func public @circuit() -> tensor<f64>
+            # CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<100x1xf64>
+            # CHECK: [[expval:%.+]] = func.call @expval_from_samples{{.*}}([[samples]])
+            # CHECK: func.return [[expval]] : tensor<f64>
+            return qp.expval(qp.PauliZ(0))
+
+        run_filecheck_qjit(circuit)
+
+    def test_expval_pauli_x_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with an expectation-value terminal
+        measurement of a Pauli X observable.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+
+        The output IR should be the same as for the Pauli-Z observable, except that the
+        measurements-from-samples pass inserts the diagonalizing Hadamard gate before measuring the
+        target qubit (codeblock).
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK: qecl.hadamard
+            # CHECK: [[mres:%.+]], {{%.+}} = qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+
+            # CHECK-LABEL: func.func public @circuit() -> tensor<f64>
+            # CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<100x1xf64>
+            # CHECK: [[expval:%.+]] = func.call @expval_from_samples{{.*}}([[samples]])
+            # CHECK: func.return [[expval]] : tensor<f64>
+            return qp.expval(qp.PauliX(0))
+
+        run_filecheck_qjit(circuit)
+
+    def test_var_pauli_z_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with an variance terminal measurement
+        of a Pauli Z observable.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: qecl.hadamard
+            # CHECK: [[mres:%.+]], {{%.+}} = qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+
+            # CHECK-LABEL: func.func public @circuit() -> tensor<f64>
+            # CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<100x1xf64>
+            # CHECK: [[var:%.+]] = func.call @var_from_samples{{.*}}([[samples]])
+            # CHECK: func.return [[var]] : tensor<f64>
+            return qp.var(qp.PauliZ(0))
+
+        run_filecheck_qjit(circuit)
+
+    def test_probs_qubit_1_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with a probabilities terminal
+        measurement on a single qubit.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+        """
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: qecl.hadamard
+            # CHECK: [[mres:%.+]], {{%.+}} = qecl.measure
+            # CHECK: [[mres_i64:%.+]] = arith.extui [[mres]] : i1 to i64
+            # CHECK: [[mres_f64:%.+]] = arith.sitofp [[mres_i64]] : i64 to f64
+            # CHECK: [[mres_1x1xf64:%.+]] = tensor.from_elements [[mres_f64]] : tensor<1x1xf64>
+            # CHECK: return [[mres_1x1xf64]] : tensor<1x1xf64>
+
+            # CHECK-LABEL: func.func public @circuit() -> tensor<2xf64>
+            # CHECK: [[samples:%.+]] = func.call @circuit.from_samples() : () -> tensor<100x1xf64>
+            # CHECK: [[probs:%.+]] = func.call @probs_from_samples{{.*}}([[samples]])
+            # CHECK: func.return [[probs]] : tensor<2xf64>
+            return qp.probs(wires=0)
+
+        run_filecheck_qjit(circuit)
+
+    @pytest.mark.xfail(reason="Sampling quantum register not implemented", raises=CompileError)
+    def test_probs_register_integration(self, run_filecheck_qjit):
+        """Test the convert-quantum-to-qecl pass on a program with a probabilities terminal
+        measurement on two qubits.
+
+        The measurements-from-samples pass is applied first since the convert-quantum-to-qecl pass
+        can only handle conversion of sampling measurements, with measurements-from-samples
+        inserting the appropriate post-processing functions to recover the expectation value
+        measurement from the samples.
+        """
+        dev = qp.device("null.qubit", wires=2)
+
+        @qp.qjit(capture=True, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=100, mcm_method="one-shot")
+        def circuit():
+            # CHECK-NOT: builtin.unrealized_conversion_cast
+            return qp.probs()
+
+        run_filecheck_qjit(circuit)
+
+
 # MARK: Integration Tests
 
 
@@ -828,21 +1766,25 @@ class TestQuantumToQecLogicalPassIntegration:
         @qp.qnode(dev, shots=1)
         def circuit():
             # CHECK: qecl.alloc() : !qecl.hyperreg<1 x 1>
-            # CHECK: qecl.extract_block {{%.+}}[0] : !qecl.hyperreg<1 x 1> -> !qecl.codeblock<1>
-            # CHECK: qecl.encode[zero]
-            # CHECK: qecl.insert_block {{%.+}}[0], {{%.+}}
+            # CHECK: scf.for {{.*}} {
+            # CHECK:   qecl.extract_block
+            # CHECK:   qecl.encode[zero]
+            # CHECK:   qecl.insert_block
+            # CHECK:   scf.yield
+            # CHECK: }
             # CHECK: qecl.extract_block
             # CHECK: qecl.qec
             # CHECK: qecl.hadamard {{%.+}}[0]
             # CHECK: qecl.qec
+            # CHECK: apply_T
             # CHECK: qecl.measure {{%.+}}[0]
             # CHECK: quantum.mcmobs
-            # CHECK: quantum.sample
             # CHECK: qecl.insert_block
+            # CHECK: quantum.sample
             # CHECK: qecl.dealloc
             qp.H(0)
-            m0 = qp.measure(0)
-            return qp.sample([m0])
+            qp.T(0)
+            return qp.sample(wires=[0])
 
         run_filecheck_qjit(circuit)
 
@@ -874,15 +1816,12 @@ class TestQuantumToQecLogicalPassIntegration:
             # CHECK: qecl.measure
             # CHECK: qecl.measure
             # CHECK: quantum.mcmobs
-            # CHECK: quantum.sample
             # CHECK: qecl.insert_block
+            # CHECK: quantum.sample
             # CHECK: qecl.dealloc
             qp.H(0)
             qp.CNOT([0, 1])
             qp.CNOT([1, 2])
-            m0 = qp.measure(0)
-            m1 = qp.measure(1)
-            m2 = qp.measure(2)
-            return qp.sample([m0, m1, m2])
+            return qp.sample(wires=[0, 1, 2])
 
         run_filecheck_qjit(circuit)

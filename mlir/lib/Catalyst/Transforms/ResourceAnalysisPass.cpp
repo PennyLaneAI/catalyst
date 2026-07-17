@@ -14,15 +14,17 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
-#include <chrono>
+#include <cstdint>
 #include <fstream>
 #include <string>
 
 #include "llvm/Support/JSON.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "PBC/Utils/PBCLayer.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -55,16 +57,16 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
     void runOnOperation() final
     {
-        auto &analysis = getAnalysis<ResourceAnalysis>();
+        auto &analysis = getAnalysis<ResourceAnalysis, ModuleOp>();
         const auto &results = analysis.getResults();
 
-        // Populate statistics from the entry function only (to avoid
-        // double-counting resolved callees). Fall back to summing all
-        // functions when no entry function is present.
+        // Populate statistics from the entry function. The flattened view
+        // walks the structural call graph (function_calls) for us, so we
+        // just sum its fields directly.
         StringRef entry = analysis.getEntryFunc();
         if (!entry.empty()) {
-            if (const ResourceResult *r = analysis.getResult(entry)) {
-                accumulateStats(*r);
+            if (const ResourceResult *flat = analysis.getFlattenedResource(entry)) {
+                accumulateStats(*flat);
             }
         }
         else {
@@ -75,7 +77,9 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         std::string jsonStr = "";
 
         if (outputJson) {
-            jsonStr = buildJsonString(results);
+            llvm::StringMap<ResourceResult> resultsWithDepth = results;
+            populatePBCDepths(resultsWithDepth, analysis);
+            jsonStr = buildJsonString(resultsWithDepth);
 
             if (outputFname.empty()) {
                 printJsonOutput(jsonStr);
@@ -89,82 +93,62 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     }
 
   private:
-    /**
-     * @brief Accumulate resource counts from a ResourceResult into the pass statistics.
-     *
-     * This is used to populate the pass's Statistic members with totals from the ResourceResult.
-     *
-     * @param result The ResourceResult to accumulate stats from.
-     */
-    void accumulateStats(const ResourceResult &result)
+    /// Populate PBC worst-case depth on each function and lifted loop body entry.
+    void populatePBCDepths(llvm::StringMap<ResourceResult> &results,
+                           const ResourceAnalysis &analysis)
     {
-        for (const auto &opEntry : result.operations) {
+        // Swallow expected errors
+        // Errors arise when attempting to compute depth of dynamic loops.
+        ScopedDiagnosticHandler depthDiagHandler(
+            getOperation()->getContext(), [](Diagnostic &diag) {
+                if (diag.getSeverity() == DiagnosticSeverity::Error &&
+                    diag.str().find("worst-case depth") != std::string::npos) {
+                    return success();
+                }
+                return failure();
+            });
+
+        // Handle static loop bodies.
+        getOperation()->walk([&](func::FuncOp funcOp) {
+            if (funcOp.isDeclaration()) {
+                return;
+            }
+
+            pbc::PBCLayerContext layerContext;
+            results[funcOp.getName()].pbcDepth =
+                layerContext.computePBCDepth(&funcOp.getBody().front());
+        });
+
+        // Handle dynamic loop bodies.
+        for (const auto &entry : analysis.getSyntheticLoopBodies()) {
+            scf::ForOp forOp = entry.getValue();
+            pbc::PBCLayerContext layerContext;
+            results[entry.getKey()].pbcDepth = layerContext.computePBCDepth(forOp.getBody());
+        }
+    }
+
+    /// Sum a ResourceResult's content into the pass's
+    /// Statistic counters. Caller is responsible for choosing whether to
+    /// pass a per-function or flattened result.
+    void accumulateStats(const ResourceResult &r)
+    {
+        for (const auto &opEntry : r.operations) {
             for (const auto &sizeEntry : opEntry.getValue()) {
                 totalGates += sizeEntry.second;
             }
         }
-
-        for (const auto &measEntry : result.measurements) {
+        for (const auto &measEntry : r.measurements) {
             totalMeasurements += measEntry.getValue();
         }
-
-        totalQubits += result.numQubits();
-        totalAllocQubits += result.numAllocQubits;
-        totalArgQubits += result.numArgQubits;
-
-        for (const auto &classEntry : result.classicalInstructions) {
+        for (const auto &classEntry : r.classicalInstructions) {
             totalClassicalOps += classEntry.getValue();
         }
-
-        for (const auto &fcEntry : result.functionCalls) {
+        totalAllocQubits += r.numAllocQubits;
+        totalArgQubits += r.numArgQubits;
+        totalQubits += r.numQubits();
+        for (const auto &fcEntry : r.functionCalls) {
             totalFunctionCalls += fcEntry.getValue();
         }
-    }
-
-    /// Serialize a single ResourceResult into a JSON object.
-    static llvm::json::Object resultToJson(const ResourceResult &result)
-    {
-        llvm::json::Object funcObj;
-
-        llvm::json::Object opsObj;
-        for (const auto &opEntry : result.operations) {
-            StringRef opName = opEntry.getKey();
-            for (const auto &sizeEntry : opEntry.getValue()) {
-                const auto &[nQubits, nParams] = sizeEntry.first;
-                int64_t count = sizeEntry.second;
-                std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
-                opsObj[key] = count;
-            }
-        }
-        funcObj["operations"] = std::move(opsObj);
-
-        llvm::json::Object measObj;
-        for (const auto &entry : result.measurements) {
-            measObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["measurements"] = std::move(measObj);
-
-        llvm::json::Object classObj;
-        for (const auto &entry : result.classicalInstructions) {
-            classObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["classical_instructions"] = std::move(classObj);
-
-        llvm::json::Object fcObj;
-        for (const auto &entry : result.functionCalls) {
-            fcObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["function_calls"] = std::move(fcObj);
-
-        funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
-        funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
-        funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
-        funcObj["device_name"] = result.deviceName;
-        funcObj["qnode"] = result.isQnode;
-        funcObj["has_branches"] = result.hasBranches;
-        funcObj["has_dyn_loop"] = result.hasDynLoop;
-
-        return funcObj;
     }
 
     /// Serialize all per-function ResourceResults into a JSON string.
@@ -176,12 +160,12 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
         for (const auto &funcEntry : results) {
             if (funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                root[funcEntry.getKey()] = funcEntry.getValue().toJson();
             }
         }
         for (const auto &funcEntry : results) {
             if (!funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                root[funcEntry.getKey()] = funcEntry.getValue().toJson();
             }
         }
 

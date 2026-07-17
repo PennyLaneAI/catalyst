@@ -13,10 +13,14 @@
 // limitations under the License.
 
 #include <cmath> // std::ceil()
+#include <cstdint>
+#include <optional>
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
+
+#include "Catalyst/Utils/ConstantResolve.h"
 
 using namespace mlir;
 
@@ -46,6 +50,48 @@ bool isOpInIfOp(Operation *op) { return hasAncestorOfType<scf::IfOp>(op); }
 // Returns true if an operation is nested in a scf.while operation at any depth.
 bool isOpInWhileOp(Operation *op) { return hasAncestorOfType<scf::WhileOp>(op); }
 
+// Returns the static trip count of `forOp` if all three bounds are
+// arith.constant ops, or -1 if any bound is dynamic.
+int64_t countStaticForOpIterations(scf::ForOp forOp)
+{
+    Operation *lowerBoundOp = forOp.getLowerBound().getDefiningOp();
+    if (!lowerBoundOp || !isa<arith::ConstantOp>(lowerBoundOp)) {
+        return -1;
+    }
+    int64_t l = getIntFromArithConstantOp(cast<arith::ConstantOp>(lowerBoundOp));
+
+    Operation *upperBoundOp = forOp.getUpperBound().getDefiningOp();
+    if (!upperBoundOp || !isa<arith::ConstantOp>(upperBoundOp)) {
+        return -1;
+    }
+    int64_t u = getIntFromArithConstantOp(cast<arith::ConstantOp>(upperBoundOp));
+
+    Operation *stepOp = forOp.getStep().getDefiningOp();
+    if (!stepOp || !isa<arith::ConstantOp>(stepOp)) {
+        return -1;
+    }
+    int64_t s = getIntFromArithConstantOp(cast<arith::ConstantOp>(stepOp));
+
+    return getNumIterations(l, u, s);
+}
+
+std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp)
+{
+    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
+        return estAttr.getValue().getSExtValue();
+    }
+    if (auto staticTrip = forOp.getStaticTripCount()) {
+        return staticTrip->getSExtValue();
+    }
+    auto lb = resolveConstantInt(forOp.getLowerBound());
+    auto ub = resolveConstantInt(forOp.getUpperBound());
+    auto step = resolveConstantInt(forOp.getStep());
+    if (lb && ub && step && *step != 0 && *ub > *lb) {
+        return (*ub - *lb + *step - 1) / *step;
+    }
+    return std::nullopt;
+}
+
 // Given an op in a for loop body with a static number of start, end and step,
 // compute the number of iterations that will be executed by the for loop.
 // Returns -1 if any of the above for loop information is not static.
@@ -60,31 +106,12 @@ int64_t countStaticForloopIterations(Operation *op)
 
     Operation *parent = op->getParentOp();
     while (parent) {
-        if (isa<scf::ForOp>(parent)) {
-            scf::ForOp forOp = cast<scf::ForOp>(parent);
-
-            Operation *lowerBoundOp = forOp.getLowerBound().getDefiningOp();
-            if (!lowerBoundOp || !isa<arith::ConstantOp>(lowerBoundOp)) {
-                // Dynamic
+        if (auto forOp = dyn_cast<scf::ForOp>(parent)) {
+            int64_t iterations = countStaticForOpIterations(forOp);
+            if (iterations == -1) {
                 return -1;
             }
-            int64_t l = getIntFromArithConstantOp(cast<arith::ConstantOp>(lowerBoundOp));
-
-            Operation *upperBoundOp = forOp.getUpperBound().getDefiningOp();
-            if (!upperBoundOp || !isa<arith::ConstantOp>(upperBoundOp)) {
-                // Dynamic
-                return -1;
-            }
-            int64_t u = getIntFromArithConstantOp(cast<arith::ConstantOp>(upperBoundOp));
-
-            Operation *stepOp = forOp.getStep().getDefiningOp();
-            if (!stepOp || !isa<arith::ConstantOp>(stepOp)) {
-                // Dynamic
-                return -1;
-            }
-            int64_t s = getIntFromArithConstantOp(cast<arith::ConstantOp>(stepOp));
-
-            count *= getNumIterations(l, u, s);
+            count *= iterations;
         }
         parent = parent->getParentOp();
     }

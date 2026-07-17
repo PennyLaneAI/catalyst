@@ -14,7 +14,11 @@
 
 #pragma once
 
+#include <optional>
+#include <utility>
+
 #include "llvm/ADT/SetVector.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "PBC/IR/PBCDialect.h"
 #include "PBC/IR/PBCOpInterfaces.h"
@@ -23,6 +27,9 @@
 
 namespace catalyst {
 namespace pbc {
+
+// (any_commuting_depth, qubit_disjoint_depth), or nullopt if there is nothing to report.
+using PBCDepths = std::optional<std::pair<int64_t, int64_t>>;
 
 class PBCLayer;
 /// Each pass instance creates its own context to ensure
@@ -49,6 +56,31 @@ class PBCLayerContext {
     // Returns op lists only; operand/result bookkeeping is deferred until layer construction.
     llvm::SmallVector<std::vector<PBCOpInterface>> groupLayers(mlir::Operation *root,
                                                                bool onlyOnDisjointQubit = false);
+
+    // Worst-case layer depth in `block`. Fails on `scf.while` and unresolved dynamic `scf.for`
+    // unless `skipDynamic` is true (dynamic loops then contribute 0).
+    mlir::FailureOr<int64_t> computeBlockWorstCaseDepth(mlir::Block *block,
+                                                        bool onlyOnDisjointQubit = false,
+                                                        bool skipDynamic = false,
+                                                        bool liftForLoops = false);
+
+    // Returns (any_commuting_depth, qubit_disjoint_depth), or nullopt.
+    // Falls back to skip-dynamic on strict failure.
+    PBCDepths computePBCDepth(mlir::Block *block);
+
+  private:
+    // Recursive worker for computeBlockWorstCaseDepth.
+    mlir::FailureOr<int64_t> worstCaseDepthOfBlock(mlir::Block *block, bool liftForLoops);
+
+    mlir::FailureOr<int64_t> ifWorstCaseDepth(mlir::scf::IfOp ifOp);
+
+    mlir::FailureOr<int64_t> switchWorstCaseDepth(mlir::scf::IndexSwitchOp switchOp);
+
+    mlir::FailureOr<int64_t> forWorstCaseDepth(mlir::scf::ForOp forOp);
+
+    // Traversal-invariant flags for the current depth computation.
+    bool onlyOnDisjointQubit_ = false;
+    bool skipDynamic_ = false;
 };
 
 class PBCLayer {
@@ -58,6 +90,10 @@ class PBCLayer {
 
     // Cached canonical entry qubit set for the layer
     llvm::DenseSet<mlir::Value> layerEntryQubits;
+
+    // Cached set of all SSA results from layer ops.
+    // It's used to detect insert-then-extract dependencies without rescanning the layer.
+    llvm::DenseSet<mlir::Value> layerOpResults;
 
     // Per-layer deterministic mapping from any seen qubit SSA value to its
     // canonical entry (the block argument it originated from in this layer)
@@ -73,6 +109,9 @@ class PBCLayer {
     mlir::Value resolveEntry(mlir::Value v) const;
 
     void updateResultAndOperand(PBCOpInterface op);
+
+    // True if following value's SSA producers backward reaches any result from an op in this layer.
+    bool dependsOnLayerOps(mlir::Value value) const;
 
   public:
     LayerOp layerOp;
@@ -114,17 +153,15 @@ class PBCLayer {
     // Check if the op is in the same block as the layer
     bool isSameBlock(PBCOpInterface op) const;
 
-    // Extract ops defining operands must be before existing ops;
-    // no insert users before existing ops
-    bool extractsAreBeforeExistingOps(PBCOpInterface op) const;
-    bool insertsAreAfterExistingOps(PBCOpInterface op) const;
+    // True if `op` consumes a qubit extracted from a register updated by a layer op.
+    bool extractOperandsDependOnLayerOps(PBCOpInterface op) const;
 
     // Directly insert an op to the layer without checking commutation
     void insertToLayer(PBCOpInterface op);
 
     // Op can be inserted into the layer if:
     // 1. It is in the same block
-    // 2. It does not have extract(insert) op before(after) existing ops
+    // 2. No extract operand reads a register updated by a layer op
     // 3. It acts on disjoint qubits
     // 4. Or it commutes with all the ops in the layer
     bool insert(PBCOpInterface op, bool onlyOnDisjointQubit = false);

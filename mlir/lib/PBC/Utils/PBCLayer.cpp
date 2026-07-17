@@ -14,17 +14,223 @@
 
 #include "PBC/Utils/PBCLayer.h"
 
-#include "llvm/ADT/STLExtras.h"
+#include <algorithm>
+#include <cstdint>
 
+#include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+
+#include "Catalyst/Utils/SCFUtils.h"
 #include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h" // for quantum.extract op
 
-using namespace catalyst::pbc;
+using namespace mlir;
 
 namespace catalyst {
 namespace pbc {
+
+FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp)
+{
+    FailureOr<int64_t> thenDepth =
+        worstCaseDepthOfBlock(&ifOp.getThenRegion().front(), /*liftForLoops=*/false);
+    if (failed(thenDepth)) {
+        return failure();
+    }
+
+    int64_t elseDepth = 0;
+    if (!ifOp.getElseRegion().empty()) {
+        FailureOr<int64_t> elseD =
+            worstCaseDepthOfBlock(&ifOp.getElseRegion().front(), /*liftForLoops=*/false);
+        if (failed(elseD)) {
+            return failure();
+        }
+        elseDepth = *elseD;
+    }
+    return std::max(*thenDepth, elseDepth);
+}
+
+FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp switchOp)
+{
+    FailureOr<int64_t> defaultDepth =
+        worstCaseDepthOfBlock(&switchOp.getDefaultBlock(), /*liftForLoops=*/false);
+    if (failed(defaultDepth)) {
+        return failure();
+    }
+
+    int64_t maxDepth = *defaultDepth;
+
+    for (unsigned i = 0, n = switchOp.getNumCases(); i < n; ++i) {
+        FailureOr<int64_t> caseDepth =
+            worstCaseDepthOfBlock(&switchOp.getCaseBlock(i), /*liftForLoops=*/false);
+        if (failed(caseDepth)) {
+            return failure();
+        }
+        maxDepth = std::max(maxDepth, *caseDepth);
+    }
+    return maxDepth;
+}
+
+FailureOr<int64_t> PBCLayerContext::forWorstCaseDepth(scf::ForOp forOp)
+{
+    // Same trip-count rules as resource counting (`estimated_iterations`, static bounds, …).
+    std::optional<int64_t> tripCount = resolveForLoopTripCount(forOp);
+
+    if (!tripCount) {
+        if (skipDynamic_) {
+            return 0;
+        }
+        return forOp.emitOpError(
+            "worst-case depth is not available when there are dynamically sized for loops");
+    }
+
+    FailureOr<int64_t> bodyDepth = worstCaseDepthOfBlock(forOp.getBody(), /*liftForLoops=*/false);
+    if (failed(bodyDepth)) {
+        return failure();
+    }
+    return *bodyDepth;
+}
+
+FailureOr<int64_t> PBCLayerContext::computeBlockWorstCaseDepth(Block *block,
+                                                               bool onlyOnDisjointQubit,
+                                                               bool skipDynamic, bool liftForLoops)
+{
+    // These flags are invariant across the whole traversal, so stash them once instead of
+    // threading them through every recursion level; the worker reads them from member state.
+    onlyOnDisjointQubit_ = onlyOnDisjointQubit;
+    skipDynamic_ = skipDynamic;
+    return worstCaseDepthOfBlock(block, liftForLoops);
+}
+
+FailureOr<int64_t> PBCLayerContext::worstCaseDepthOfBlock(Block *block, bool liftForLoops)
+{
+    int64_t depth = 0;
+    PBCLayer layer(this);
+
+    auto flushLayer = [&]() {
+        if (!layer.empty()) {
+            depth += 1;
+            layer = PBCLayer(this);
+        }
+    };
+
+    for (Operation &op : *block) {
+        if (isa<scf::WhileOp>(&op)) {
+            return op.emitOpError(
+                "worst-case depth is not available when PBC ops are inside scf.while");
+        }
+        if (auto ifOp = dyn_cast<scf::IfOp>(&op)) {
+            flushLayer();
+            FailureOr<int64_t> branchDepth = ifWorstCaseDepth(ifOp);
+            if (failed(branchDepth)) {
+                return failure();
+            }
+            depth += *branchDepth;
+            continue;
+        }
+
+        if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(&op)) {
+            flushLayer();
+            FailureOr<int64_t> branchDepth = switchWorstCaseDepth(switchOp);
+            if (failed(branchDepth)) {
+                return failure();
+            }
+            depth += *branchDepth;
+            continue;
+        }
+
+        if (auto forOp = dyn_cast<scf::ForOp>(&op)) {
+            flushLayer();
+            if (liftForLoops) {
+                continue;
+            }
+            FailureOr<int64_t> loopDepth = forWorstCaseDepth(forOp);
+            if (failed(loopDepth)) {
+                return failure();
+            }
+            depth += *loopDepth;
+            continue;
+        }
+
+        if (auto pbcOp = dyn_cast<PBCOpInterface>(&op)) {
+            if (!layer.insert(pbcOp, onlyOnDisjointQubit_)) {
+                flushLayer();
+                bool inserted = layer.insert(pbcOp, onlyOnDisjointQubit_);
+                assert(inserted && "PBCLayer::insert must accept any op into an empty layer");
+            }
+            continue;
+        }
+
+        // PPM variants without PBCOpInterface still contribute one layer each.
+        if (isa<SelectPPMeasurementOp>(&op)) {
+            flushLayer();
+            depth += 1;
+            continue;
+        }
+
+        // plain ops
+        if (op.getNumRegions() == 0) {
+            continue;
+        }
+
+        // multi-region ops
+        if (op.getNumRegions() != 1) {
+            return op.emitOpError(
+                "worst-case depth cannot analyze operations with multiple regions");
+        }
+
+        // Recurse into the op's single-block region body (e.g. quantum.adjoint)
+        Region &region = op.getRegion(0);
+        if (region.empty()) {
+            continue;
+        }
+        if (!region.hasOneBlock()) {
+            return op.emitOpError("worst-case depth cannot analyze regions with multiple blocks");
+        }
+
+        flushLayer();
+        FailureOr<int64_t> innerDepth =
+            worstCaseDepthOfBlock(&region.front(), /*liftForLoops=*/false);
+        if (failed(innerDepth)) {
+            return failure();
+        }
+
+        depth += *innerDepth;
+    }
+
+    flushLayer();
+    return depth;
+}
+
+PBCDepths PBCLayerContext::computePBCDepth(Block *block)
+{
+    // Try to calculate the depth with static first, then fallback to skip-dynamic.
+    auto d0 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false,
+                                         /*skipDynamic=*/false, /*liftForLoops=*/true);
+    if (failed(d0)) {
+        auto p0 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false,
+                                             /*skipDynamic=*/true, /*liftForLoops=*/true);
+        if (failed(p0) || *p0 == 0) {
+            return std::nullopt;
+        }
+        auto p1 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/true,
+                                             /*skipDynamic=*/true, /*liftForLoops=*/true);
+        if (failed(p1) || *p1 == 0) {
+            return std::nullopt;
+        }
+        return {{*p0, *p1}};
+    }
+    if (*d0 == 0) {
+        return std::nullopt;
+    }
+    auto d1 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/true,
+                                         /*skipDynamic=*/false, /*liftForLoops=*/true);
+    if (failed(d1) || *d1 == 0) {
+        return std::nullopt;
+    }
+    return {{*d0, *d1}};
+}
 
 // Partition PBC ops into layer groups using commutation/disjoint-qubit rules.
 // Only op membership is recorded; operand/result bookkeeping is deferred until
@@ -68,9 +274,20 @@ void PBCLayer::insertToLayer(PBCOpInterface op)
     // Update the cached entry qubit set when inserting
     auto entryQubits = getEntryQubitsFrom(op);
     layerEntryQubits.insert(entryQubits.begin(), entryQubits.end());
+
+    // Track the op's results for dependency lookups
+    for (Value r : op->getResults()) {
+        layerOpResults.insert(r);
+    }
 }
 
-void PBCLayer::eraseOp(PBCOpInterface op) { llvm::erase(ops, op); }
+void PBCLayer::eraseOp(PBCOpInterface op)
+{
+    llvm::erase(ops, op);
+    for (Value r : op->getResults()) {
+        layerOpResults.erase(r);
+    }
+}
 
 void PBCLayer::updateResultAndOperand(PBCOpInterface op)
 {
@@ -176,45 +393,53 @@ bool PBCLayer::commuteToLayer(PBCOpInterface op)
 
 bool PBCLayer::isSameBlock(PBCOpInterface op) const
 {
-    if (ops.empty())
+    if (ops.empty()) {
         return true;
+    }
     return op->getBlock() == ops.back()->getBlock();
 }
 
-// Check if the op has extract op that must be occurred before the operations in layers
-bool PBCLayer::extractsAreBeforeExistingOps(PBCOpInterface op) const
+bool PBCLayer::dependsOnLayerOps(mlir::Value value) const
 {
-    for (auto existingOp : ops) {
-        for (auto operand : op->getOperands()) {
-            auto defOp = operand.getDefiningOp();
-            // Only meaningful to compare within the same block
-            if (auto extractOp = llvm::dyn_cast_or_null<quantum::ExtractOp>(defOp)) {
-                if (extractOp->getBlock() == existingOp->getBlock() &&
-                    !extractOp->isBeforeInBlock(existingOp)) {
-                    return false;
-                }
-            }
+    if (layerOpResults.empty()) {
+        return false;
+    }
+
+    llvm::SmallVector<Value> worklist = {value};
+    llvm::DenseSet<Value> visited;
+
+    while (!worklist.empty()) {
+        Value current = worklist.pop_back_val();
+        if (!visited.insert(current).second) {
+            continue;
+        }
+        if (layerOpResults.contains(current)) {
+            return true;
+        }
+        Operation *defOp = current.getDefiningOp();
+        if (!defOp) {
+            continue; // block argument
+        }
+        for (Value operand : defOp->getOperands()) {
+            worklist.push_back(operand);
         }
     }
-    return true;
+    return false;
 }
 
-// Ensure the new op does not have insert op before existing ops
-bool PBCLayer::insertsAreAfterExistingOps(PBCOpInterface op) const
+bool PBCLayer::extractOperandsDependOnLayerOps(PBCOpInterface op) const
 {
-    for (auto existingOp : ops) {
-        for (auto result : op->getResults()) {
-            for (auto user : result.getUsers()) {
-                if (auto insertOp = llvm::dyn_cast<quantum::InsertOp>(user)) {
-                    if (insertOp->getBlock() == existingOp->getBlock() &&
-                        insertOp->isBeforeInBlock(existingOp)) {
-                        return false;
-                    }
+    for (mlir::Value operand : op->getOperands()) {
+        mlir::Operation *defOp = operand.getDefiningOp();
+        if (llvm::isa_and_nonnull<quantum::ExtractOp>(defOp)) {
+            for (mlir::Value extractOperand : defOp->getOperands()) {
+                if (dependsOnLayerOps(extractOperand)) {
+                    return true;
                 }
             }
         }
     }
-    return true;
+    return false;
 }
 
 bool PBCLayer::insert(PBCOpInterface op, bool onlyDisjointQubit)
@@ -225,8 +450,8 @@ bool PBCLayer::insert(PBCOpInterface op, bool onlyDisjointQubit)
     }
 
     // 1. It is in the same block
-    // 2. Extracts for operands occur before, and there are no inserts before existing ops
-    if (!isSameBlock(op) || !extractsAreBeforeExistingOps(op) || !insertsAreAfterExistingOps(op)) {
+    // 2. No operand depends on a layer op result through an insert→extract chain
+    if (!isSameBlock(op) || extractOperandsDependOnLayerOps(op)) {
         return false;
     }
 

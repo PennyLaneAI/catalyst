@@ -119,7 +119,7 @@ class TestGraphDecomposition:
         """Test the conversion of a circuit with a custom decomposition."""
 
         @decomposition_rule(op_type=qp.CNOT)
-        def my_cnot(wires):
+        def my_cnot(wires, **__):
             qp.H(wires=wires[1])
             qp.CZ(wires=wires)
             qp.H(wires=wires[1])
@@ -479,6 +479,23 @@ class TestGraphDecomposition:
 
             circuit()
 
+    def test_paulirot_python_decomp(self):
+        """Test that paulirot is successfully decomposed by compile-time lowered rules."""
+
+        def circuit():
+            qp.PauliRot(0.3, "YXZ", [0, 1, 2])
+            return qp.state()
+
+        qnode = qp.QNode(circuit, qp.device("null.qubit", wires=3))
+
+        without_qjit = qnode()
+
+        with_qjit = qp.qjit(
+            graph_decomposition(qnode, gate_set={qp.H, qp.RX, qp.MultiRZ, qp.GlobalPhase})
+        )()
+
+        assert np.allclose(without_qjit, with_qjit)
+
 
 class TestPlxPRDecomposition:
     """Test the PLxPR-based graph-based decomposition integration with from_plxpr."""
@@ -554,7 +571,7 @@ class TestPlxPRDecomposition:
         qp.decomposition.enable_graph()
 
         @qp.register_resources({qp.H: 2, qp.CZ: 1})
-        def my_cnot(wires):
+        def my_cnot(wires, **__):
             qp.H(wires=wires[1])
             qp.CZ(wires=wires)
             qp.H(wires=wires[1])
@@ -834,9 +851,8 @@ class TestPlxPRDecomposition:
         result_with_qjit = with_qjit()
         resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
 
-        with qp.capture.pause():
-            result_without_qjit = circuit()
-            expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        result_without_qjit = circuit()
+        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
 
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         assert qp.math.allclose(result_without_qjit, result_with_qjit)
@@ -1093,47 +1109,49 @@ class TestPlxPRDecomposition:
         wire count cannot be inferred.
         """
 
-        class _UnknownOp(qp.operation.Operation):
-            num_wires = 1
-            num_params = 0
-            name = "_UnknownOp"
+        with qp.decomposition.local_decomps():
 
-        def _unknown_resources():
-            return {qp.resource_rep(qp.PauliX): 1}
+            class _UnknownOp(qp.operation.Operation):
+                num_wires = 1
+                num_params = 0
+                name = "_UnknownOp"
 
-        @qp.register_resources(_unknown_resources)
-        def _unknown_decomp(wires):
-            qp.PauliX(wires)
+            def _unknown_resources():
+                return {qp.resource_rep(qp.PauliX): 1}
 
-        qp.add_decomps(_UnknownOp, _unknown_decomp)
+            @qp.register_resources(_unknown_resources)
+            def _unknown_decomp(wires):
+                qp.PauliX(wires)
 
-        def _rx_resources():
-            return {qp.resource_rep(_UnknownOp): 1}
+            qp.add_decomps(_UnknownOp, _unknown_decomp)
 
-        @qp.register_resources(_rx_resources)
-        def _rx_decomp(_, wires):
-            _UnknownOp(wires=wires)
+            def _rx_resources():
+                return {qp.resource_rep(_UnknownOp): 1}
 
-        qp.decomposition.enable_graph()
+            @qp.register_resources(_rx_resources)
+            def _rx_decomp(_, wires):
+                _UnknownOp(wires=wires)
 
-        @qp.qjit(capture=True)
-        @qp.decompose(
-            gate_set={"PauliX"},
-            fixed_decomps={qp.RX: _rx_decomp},
-        )
-        @qp.qnode(qp.device("null.qubit", wires=1))
-        def f(phi):
-            qp.RX(phi, 0)
-            return qp.state()
+            qp.decomposition.enable_graph()
 
-        try:
-            with pytest.raises(
-                ValueError,
-                match=r"Could not capture _UnknownOp without the number of wires\.",
-            ):
-                f(0.5)
-        finally:
-            qp.decomposition.disable_graph()
+            @qp.qjit(capture=True)
+            @qp.decompose(
+                gate_set={"PauliX"},
+                fixed_decomps={qp.RX: _rx_decomp},
+            )
+            @qp.qnode(qp.device("null.qubit", wires=1))
+            def f(phi):
+                qp.RX(phi, 0)
+                return qp.state()
+
+            try:
+                with pytest.raises(
+                    ValueError,
+                    match=r"Could not capture _UnknownOp without the number of wires\.",
+                ):
+                    f(0.5)
+            finally:
+                qp.decomposition.disable_graph()
 
     def test_symbolic_controlled_op_is_skipped(self):
         """Symbolic Controlled ops produced by ``qml.ctrl`` must be skipped when
