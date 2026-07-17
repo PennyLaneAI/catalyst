@@ -101,6 +101,7 @@ struct DecompositionGraph::Impl {
           fixedDecomps(std::move(_fixedDecomps)), altDecomps(std::move(_altDecomps))
     {
         materializeRules();
+        generateControlledRules();
     }
 
     void materializeRules()
@@ -154,6 +155,98 @@ struct DecompositionGraph::Impl {
         }
 
         rules = std::move(effectiveRules);
+    }
+
+    /**
+     * @brief Operators whose controlled form must be produced by a dedicated rule
+     * rather than by controlling their decomposition, so control-each-gate is
+     * suppressed for them.
+     */
+    static bool isCtrlRuleRequired(const std::string &opName) { return opName == "GlobalPhase"; }
+
+    /**
+     * @brief Index non-empty, uncontrolled decompositions by their output operator.
+     */
+    std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>
+    indexUncontrolledBaseRules() const
+    {
+        std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash> baseByOutput;
+        for (const auto &rule : rules) {
+            if (rule.output.numControlWires == 0 && !rule.isEmpty()) {
+                baseByOutput[rule.output].push_back(rule);
+            }
+        }
+        return baseByOutput;
+    }
+
+    /**
+     * @brief Generate Controlled decomposition rules.
+     *
+     * For a needed controlled operator `Controlled(Op)` with k control wires this synthesizes,
+     * from every base decomposition `Op`, a rule `Controlled(Op)`with the same k control wires,
+     * so a controlled operator can be decomposed by controlling the decomposition of its base.
+     * These coexist with any explicitly registered controlled rules. The solver then compares
+     * their costs and picks the cheapest rules.
+     *
+     * Rules are synthesized lazily: only controlled operators that actually appear in the problem
+     * seed the process, and controlling a decomposition introduces new `Controlled(Op)` operators
+     * that require their own synthesized rules, so it runs to a fixpoint.
+     *
+     * Only non-empty, uncontrolled base rules are used as a base, and control-each-gate is
+     * suppressed for operators in `isCtrlRuleRequired`. Those operators require dedicated
+     * decomposition rules.
+     */
+    void generateControlledRules()
+    {
+        const auto baseByOutput = indexUncontrolledBaseRules();
+        if (baseByOutput.empty()) {
+            return;
+        }
+
+        // Breadth-first over controlled operators
+        // the controlled inputs each synthesized rule introduces, until no new ones appear:
+        std::unordered_set<OperatorNode, OperatorNodeHash> seen;
+        std::vector<OperatorNode> worklist;
+        auto enqueue = [&](const OperatorNode &op) {
+            if (op.numControlWires > 0 && seen.insert(op).second) {
+                worklist.push_back(op);
+            }
+        };
+        for (const auto &op : operators) {
+            enqueue(op);
+        }
+        for (const auto &rule : rules) {
+            enqueue(rule.output);
+            for (const auto &term : rule.inputs) {
+                enqueue(term.op);
+            }
+        }
+
+        std::vector<RuleNode> generated;
+        while (!worklist.empty()) {
+            const OperatorNode ctrlOp = worklist.back();
+            worklist.pop_back();
+
+            if (isCtrlRuleRequired(ctrlOp.name)) {
+                continue;
+            }
+
+            const auto it = baseByOutput.find(withoutControls(ctrlOp));
+            if (it == baseByOutput.end()) {
+                continue;
+            }
+            for (const auto &baseRule : it->second) {
+                RuleNode ctrlRule = makeControlledRule(baseRule, ctrlOp.numControlWires);
+                for (const auto &term : ctrlRule.inputs) {
+                    enqueue(term.op);
+                }
+                generated.push_back(std::move(ctrlRule));
+            }
+        }
+
+        for (auto &rule : generated) {
+            rules.push_back(std::move(rule));
+        }
     }
 
     void buildGraph()

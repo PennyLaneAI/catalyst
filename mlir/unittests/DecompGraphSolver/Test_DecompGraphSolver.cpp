@@ -562,8 +562,8 @@ TEST_CASE("Test GraphSolver with PauliRot specialized by static argument pauli_w
 {
     // Query: PauliRot[w:1][p:1][pauli_word:X] should match a rule whose output is
     // PauliRot[w:-1][p:-1][pauli_word:X] (wildcards on wires/params, exact match on pauli_word).
-    const OperatorNode pauliRotQuery{"PauliRot", 1, 1, false, {{"pauli_word", "X"}}};
-    const OperatorNode pauliRotRuleOutput{"PauliRot", -1, -1, false, {{"pauli_word", "X"}}};
+    const OperatorNode pauliRotQuery{"PauliRot", 1, 1, false, 0, {{"pauli_word", "X"}}};
+    const OperatorNode pauliRotRuleOutput{"PauliRot", -1, -1, false, 0, {{"pauli_word", "X"}}};
     const OperatorNode hadamard{"Hadamard", 1, 0, false};
     const OperatorNode multiRZ{"MultiRZ", 1, 1, false};
 
@@ -585,16 +585,16 @@ TEST_CASE("Test GraphSolver with PauliRot specialized by static argument pauli_w
     REQUIRE(chosen.basisCounts.at(hadamard) == 2);
     REQUIRE(chosen.basisCounts.at(multiRZ) == 1);
 
-    const OperatorNode pauliRotQueryY{"PauliRot", 1, 1, false, {{"pauli_word", "Y"}}};
+    const OperatorNode pauliRotQueryY{"PauliRot", 1, 1, false, 0, {{"pauli_word", "Y"}}};
     REQUIRE_FALSE(pauliRotQuery == pauliRotQueryY);
     REQUIRE(pauliRotQuery == pauliRotRuleOutput);
 }
 
 TEST_CASE("Test OperatorNode equality with staticNamedArgs", "[DecompGraph::Core]")
 {
-    const OperatorNode pauliRotX{"PauliRot", 1, 1, false, {{"pauli_word", "X"}}};
-    const OperatorNode pauliRotXWildcard{"PauliRot", -1, -1, false, {{"pauli_word", "X"}}};
-    const OperatorNode pauliRotY{"PauliRot", 1, 1, false, {{"pauli_word", "Y"}}};
+    const OperatorNode pauliRotX{"PauliRot", 1, 1, false, 0, {{"pauli_word", "X"}}};
+    const OperatorNode pauliRotXWildcard{"PauliRot", -1, -1, false, 0, {{"pauli_word", "X"}}};
+    const OperatorNode pauliRotY{"PauliRot", 1, 1, false, 0, {{"pauli_word", "Y"}}};
     const OperatorNode pauliRotNoArgs{"PauliRot", 1, 1, false};
 
     REQUIRE(pauliRotX == pauliRotXWildcard);

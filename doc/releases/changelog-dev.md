@@ -12,6 +12,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* Add controlled support to the decomposition graph solver, enabling `C(Op)`
+  to be decomposed either via registered controlled rules or by controlling
+  the base operator's decomposition rule, with the solver choosing the cheapest.
+  [(#3003)](https://github.com/PennyLaneAI/catalyst/pull/3003)
+
 * Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
   [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
 

@@ -25,6 +25,7 @@ include(Catch)
 add_executable(runner_tests_dgsolver
     Test_DecompGraphCore.cpp
     Test_DecompGraphSolver.cpp
+    Test_DecompGraphSolverSymbolicOps.cpp
 )
 
 target_link_libraries(runner_tests_dgsolver PRIVATE

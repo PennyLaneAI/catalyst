@@ -52,9 +52,10 @@ namespace DecompGraph::Core {
  */
 struct OperatorNode {
     std::string name;
-    int numWires{-1};
-    int numParams{-1};
+    int64_t numWires{-1};  // -1 = any number of wires
+    int64_t numParams{-1}; // -1 = any number of params
     bool adjoint{false};
+    std::size_t numControlWires{0};
 
     // Optional static arguments for operators that require additional data.
     std::unordered_map<std::string, std::string> staticNamedArgs{};
@@ -75,7 +76,7 @@ struct OperatorNode {
                                        staticNamedArgs == other.staticNamedArgs;
 
         return name == other.name && default_wires && default_params && adjoint == other.adjoint &&
-               static_args_match;
+               static_args_match && numControlWires == other.numControlWires;
     }
     bool operator!=(const OperatorNode &other) const { return !(*this == other); }
 };
@@ -140,8 +141,9 @@ struct RuleTerm {
  * - Default: The default rule for decomposing an operator as defined in the decomposition graph.
  * - Fixed: A fixed rule that cannot be changed or overridden by the solver.
  * - Alternative: An alternative rule that can be used in place of the default rule.
+ * - ControlGenerated: A rule synthesized by controlling a base decomposition rule.
  */
-enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2 };
+enum class RuleOrigin : uint8_t { Default = 0, Fixed, Alternative, ControlGenerated };
 
 /**
  * @brief This represents the decomposition rules in the graph decomposition problem.
@@ -152,7 +154,7 @@ enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2 };
  * decomposition rules to break down complex operators into simpler ones that are part of
  * the target gateset.
  *
- * TODO:
+ * @todo
  * - We can add a field for work_wires_required if we want to consider the number of ancillary
  * wires needed for the decomposition, which can be an important factor in resource optimization.
  * - We can also consider adding a field for the decomposition function or a pointer to it,
@@ -186,6 +188,54 @@ using FixedDecomps = std::unordered_map<OperatorNode, RuleNode, OperatorNodeHash
 using AltDecomps = std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>;
 
 /**
+ * @brief This returns a copy of the given operator wrapped in `numControlWires`
+ * additional controls (Controlled(op)). Control wires accumulate, so applying it
+ * repeatedly yields a multi-controlled operator.
+ */
+inline OperatorNode makeControlled(OperatorNode op, std::size_t numControlWires = 1)
+{
+    op.numControlWires += numControlWires;
+    return op;
+}
+
+/**
+ * @brief This returns a copy of the given operator with all controls removed.
+ */
+inline OperatorNode withoutControls(OperatorNode op)
+{
+    op.numControlWires = 0;
+    return op;
+}
+
+/**
+ * @brief Constructs the Controlled decomposition rule from a base rule.
+ *
+ * Given a rule `output -> {inputs}`, produces `Controlled(output) -> {Controlled(input), ...}`
+ * where every operator gains `numControlWires` control wires: controlling a decomposition means
+ * applying the same controls to each gate it produces.
+ *
+ * The `numControlWires` count is encoded in the rule name so distinct control counts over
+ * the same base rule stay unique. The result is tagged with `RuleOrigin::ControlGenerated`
+ * so later stages can lower it by controlling each gate.
+ *
+ * @note: PennyLane counts `PauliX` flips for zero `control_values`.
+ * Those flips and `control_values` are not supported yet; the cost reflects only the
+ * cost of controlling each produced gate.
+ */
+inline RuleNode makeControlledRule(const RuleNode &base, std::size_t numControlWires)
+{
+    RuleNode ctrl;
+    ctrl.name = base.name + "_controlled_" + std::to_string(numControlWires);
+    ctrl.output = makeControlled(base.output, numControlWires);
+    ctrl.origin = RuleOrigin::ControlGenerated;
+    ctrl.inputs.reserve(base.inputs.size());
+    for (const auto &term : base.inputs) {
+        ctrl.inputs.push_back({makeControlled(term.op, numControlWires), term.multiplicity});
+    }
+    return ctrl;
+}
+
+/**
  * @brief This represents the chosen decomposition rule for an operator in
  * the solution of the graph decomposition problem.
  */
@@ -196,6 +246,7 @@ struct ChosenDecompRule {
     std::vector<RuleTerm> inputs;
     double totalCost{0.0};
     std::unordered_map<OperatorNode, std::size_t, OperatorNodeHash> basisCounts;
+    RuleOrigin origin{RuleOrigin::Default};
 };
 
 /**

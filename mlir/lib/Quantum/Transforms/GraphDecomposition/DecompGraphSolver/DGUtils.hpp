@@ -40,6 +40,9 @@ static inline auto print_op(const OperatorNode &op) -> std::string
     if (op.adjoint) {
         oss << "[adj]";
     }
+    if (op.numControlWires > 0) {
+        oss << "[c:" << op.numControlWires << "]";
+    }
     if (!op.staticNamedArgs.empty()) {
         std::vector<std::string> keys;
         keys.reserve(op.staticNamedArgs.size());
