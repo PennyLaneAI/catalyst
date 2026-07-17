@@ -16,8 +16,7 @@
 
 func.func @circuit(%q0: !quantum.bit) {
     %pi = arith.constant 3.14 : f64
-    %dim = arith.constant 3.0 : f64
-    %out = quantum.pcphase (%pi, %dim) %q0 : !quantum.bit
+    %out = quantum.pcphase (%pi, dim : 3) %q0 : !quantum.bit
     // CHECK: GraphSolverFailedError
     // CHECK: Decomposition rule not found for operator 'pcphase
     return
