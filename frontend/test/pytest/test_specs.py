@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 from jax import numpy as jnp
 from pennylane.measurements import Shots
-from pennylane.resource import CircuitSpecs, SpecsResources
+from pennylane.resource import CircuitSpecs, SpecsResources, SymbolicSpecsResources
 
 import catalyst
 from catalyst import qjit
@@ -239,7 +239,6 @@ class TestDeviceLevelSpecs:
         assert complex_meas_specs["resources"].measurements == expected_measurements
 
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
 class TestPassByPassSpecs:
     """Test qp.specs() pass-by-pass specs"""
 
@@ -969,6 +968,59 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    def test_operator2(self):
+        """Test that specs works with operator2 classes."""
+
+        # pylint: disable=useless-parent-delegation
+        class DummyOp(qp.core.Operator2):
+            """Dummy Local Operator."""
+
+            dynamic_argnames = ("phi",)
+            wire_argnames = ("reg1", "reg2")
+            compilable_argnames = ("metadata",)
+
+            def __init__(self, phi, reg1, reg2, metadata):
+                super().__init__(phi, reg1, reg2, metadata)
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.transforms.merge_rotations
+        @qp.qnode(qp.device("null.qubit", wires=10))
+        def c():
+            DummyOp(0.5, (0, 1), (2, 3, 4), metadata="word")
+            DummyOp(0.5, (2, 3, 4), (0,), metadata="word")
+            return qp.state()
+
+        for level in [0, 1]:
+            resources = qp.specs(c, level=level)().resources
+
+            assert resources.gate_types == {"DummyOp": 2}
+            assert resources.gate_sizes == {4: 1, 5: 1}
+
+    def test_symbolic_array(self):
+        """Test using specs with symbolic_array."""
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.transforms.merge_rotations
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c():
+            x = qp.capture.symbolic_array((), float)
+            qp.RX(x, 0)
+            qp.RX(2 * x, 0)
+            return qp.probs()
+
+        counts = qp.specs(c, level=0)().resources.gate_counts
+        assert counts == {"RX": 2}
+
+        counts1 = qp.specs(c, level=1)().resources.gate_counts
+        assert counts1 == {"RX": 1}
+
+        with pytest.raises(catalyst.utils.exceptions.CompileError, match="is a placeholder op"):
+            qp.specs(c, level="device")()
+
+
+class TestSpecsWithPPR:
+    """Tests for using qp.specs with PPRs"""
+
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
@@ -1028,25 +1080,228 @@ class TestPassByPassSpecs:
         actual = qp.specs(circ, level=2)()
         check_specs_same(actual, expected)
 
-    def test_loop_warning(self):
-        """Test that a warning is raised when dynamic loops are present in the circuit,
-        as resource counting may be inaccurate."""
 
-        @qp.qjit(autograph=True)
-        @qp.qnode(qp.device("null.qubit", wires=1))
+class TestSymbolicSpecs:
+    """Tests for using qp.specs with dynamic loops whose bounds are not known at compile time"""
+
+    def test_dynamic_loop(self, capture_mode):
+        """Test specs with a dynamic loop that can't be resolved at compile time"""
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(x):
+            qp.Hadamard(0)
+            qp.PauliX(0)
             for _ in range(x):
                 qp.PauliX(0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(
-            UserWarning,
-            match="Specs was unable to determine the number of loop iterations.",
-        ):
-            qp.specs(circuit, level=0)(5)
+        s = qp.specs(circuit, level=0)(5)
+        assert s.level == "Before MLIR Passes"
+        assert s.device_name == "lightning.qubit"
+        res = s.resources
+        assert isinstance(res, SymbolicSpecsResources)
+        assert len(res.vars) == 1
+
+        concrete_res = res.subs({var: 5 for var in res.vars})
+        assert isinstance(concrete_res, SpecsResources)
+
+        expected_res = SpecsResources(
+            gate_types={"Hadamard": 1, "PauliX": 6},
+            gate_sizes={1: 7},
+            measurements={"expval(PauliX)": 1},
+            num_allocs=1,
+        )
+        check_specs_resources_same(concrete_res, expected_res)
+
+    def test_dynamic_loop_and_static_loop(self, capture_mode):
+        """
+        Test specs with a dynamic loop that can't be resolved at compile time and
+        a static loop nested inside it
+        """
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qp.Hadamard(0)
+            qp.PauliX(0)
+            for _ in range(x):
+                qp.PauliX(0)
+                for _ in range(3):
+                    qp.PauliY(0)
+                for _ in range(5):
+                    qp.PauliZ(0)
+
+            return qp.expval(qp.PauliX(0))
+
+        s = qp.specs(circuit, level=0)(5)
+        assert s.level == "Before MLIR Passes"
+        assert s.device_name == "lightning.qubit"
+
+        res = s.resources
+        assert isinstance(res, SymbolicSpecsResources)
+        assert len(res.vars) == 1
+
+        concrete_res = res.subs({var: 5 for var in res.vars})
+        assert isinstance(concrete_res, SpecsResources)
+
+        expected_res = SpecsResources(
+            gate_types={"Hadamard": 1, "PauliX": 6, "PauliY": 15, "PauliZ": 25},
+            gate_sizes={1: 47},
+            measurements={"expval(PauliX)": 1},
+            num_allocs=1,
+        )
+        check_specs_resources_same(concrete_res, expected_res)
+
+    def test_dynamic_loop_and_static_loop2(self, capture_mode):
+        """
+        Test specs with a static loop and a dynamic loop that can't be resolved at compile time
+        nested inside it
+        """
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qp.Hadamard(0)
+            qp.PauliX(0)
+            for _ in range(3):
+                qp.PauliZ(0)
+                for _ in range(x):
+                    qp.PauliX(0)
+
+            return qp.expval(qp.PauliX(0))
+
+        s = qp.specs(circuit, level=0)(5)
+        assert s.level == "Before MLIR Passes"
+        assert s.device_name == "lightning.qubit"
+
+        res = s.resources
+        assert isinstance(res, SymbolicSpecsResources)
+        assert len(res.vars) == 1
+
+        concrete_res = res.subs({var: 5 for var in res.vars})
+        assert isinstance(concrete_res, SpecsResources)
+
+        expected_res = SpecsResources(
+            gate_types={"Hadamard": 1, "PauliX": 16, "PauliZ": 3},
+            gate_sizes={1: 20},
+            measurements={"expval(PauliX)": 1},
+            num_allocs=1,
+        )
+        check_specs_resources_same(concrete_res, expected_res)
+
+    def test_nested_dynamic_loop(self, capture_mode):
+        """Test specs with a nested dynamic loops that can't be resolved at compile time"""
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x, y):
+            qp.Hadamard(0)
+            for _ in range(x):
+                qp.PauliX(0)
+                for _ in range(y):
+                    qp.Hadamard(0)
+            return qp.expval(qp.PauliX(0))
+
+        s = qp.specs(circuit, level=0)(5, 3)
+        assert s.level == "Before MLIR Passes"
+        assert s.device_name == "lightning.qubit"
+        res = s.resources
+        assert isinstance(res, SymbolicSpecsResources)
+        assert len(res.vars) == 2
+
+        for n in [2, 3]:
+            concrete_res = res.subs({var: n for var in res.vars})
+            assert isinstance(concrete_res, SpecsResources)
+            expected_res = SpecsResources(
+                gate_types={"Hadamard": 1 + n * n, "PauliX": n},
+                gate_sizes={1: 1 + n * n + n},
+                measurements={"expval(PauliX)": 1},
+                num_allocs=1,
+            )
+            check_specs_resources_same(concrete_res, expected_res)
+
+    def test_dynamic_loops_multi_level(self, capture_mode):
+        """Test smulti-level specs with dynamic loops"""
+
+        @qp.qjit(autograph=True, capture=capture_mode)
+        @qp.transforms.cancel_inverses
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(x, y):
+            qp.Hadamard(0)
+            for _ in range(x):
+                qp.Hadamard(0)
+                qp.PauliX(0)
+                for _ in range(y):
+                    qp.Hadamard(0)
+            return qp.expval(qp.PauliX(0))
+
+        s = qp.specs(circuit, level="all")(3, 5)
+        assert s.level == {0: "Before MLIR Passes", 1: "cancel-inverses"}
+        assert s.device_name == "lightning.qubit"
+        all_res = s.resources
+
+        assert isinstance(all_res, dict)
+        for res in all_res.values():
+            assert isinstance(res, SymbolicSpecsResources)
+            assert len(res.vars) == 2
+
+        for n in [2, 3]:
+            for res in all_res.values():
+                concrete_res = res.subs({var: n for var in res.vars})
+
+                check_specs_resources_same(
+                    concrete_res,
+                    SpecsResources(
+                        gate_types={"Hadamard": n * n + n + 1, "PauliX": n},
+                        gate_sizes={1: n * n + 2 * n + 1},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=1,
+                    ),
+                )
+
+    def test_symbolic_array_inside_loop(self):
+        """Test dynamic loop with symbolic_array in a loop."""
+
+        @qp.qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c(n):
+
+            # pylint: disable=unused-argument
+            @qp.for_loop(n)
+            def loop(i):
+                x = qp.capture.symbolic_array((), float)
+                qp.RX(x, 0)
+
+            loop()  # pylint: disable=no-value-for-parameter
+
+            return qp.state()
+
+        r = qp.specs(c, level=0)(2).resources
+        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
+
+    def test_symbolic_array_loop_arguemtn(self):
+        """Test dynamic loop with a symbolic array as a loop argument."""
+
+        @qp.qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c(n):
+
+            # pylint: disable=unused-argument
+            @qp.for_loop(n)
+            def loop(i, x):
+                qp.RX(x, 0)
+                return x
+
+            y = qp.capture.symbolic_array((), float)
+            loop(y)  # pylint: disable=no-value-for-parameter
+
+            return qp.state()
+
+        r = qp.specs(c, level=0)(2).resources
+        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
 
 
-@pytest.mark.skip  # FIXME: Remove in followup PR
 class TestMarkerIntegration:
     """Tests the integration with qp.marker."""
 

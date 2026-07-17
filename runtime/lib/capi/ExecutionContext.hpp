@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cstdio>
 #include <dlfcn.h>
 #include <filesystem>
@@ -310,6 +311,9 @@ class ExecutionContext final {
     // PRNG
     uint32_t *seed;
     std::mt19937 gen;
+    // Separate PRNG for ZNE random local folding, kept distinct from `gen` so
+    // folding draws do not perturb the device's measurement-readout stream.
+    std::mt19937 foldGen;
 
   public:
     explicit ExecutionContext(uint32_t *seed = nullptr) : seed(seed)
@@ -318,6 +322,13 @@ class ExecutionContext final {
 
         if (this->seed != nullptr) {
             this->gen = std::mt19937(*seed);
+            // Derive a decoupled (but reproducible) stream for folding.
+            std::seed_seq foldSeq{static_cast<uint32_t>(*seed), static_cast<uint32_t>(0x9e3779b9U)};
+            this->foldGen = std::mt19937(foldSeq);
+        }
+        else {
+            // No user seed: make folding non-deterministic across runs.
+            this->foldGen = std::mt19937(std::random_device{}());
         }
     }
 
@@ -337,6 +348,14 @@ class ExecutionContext final {
     [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> &
     {
         return memory_man_ptr;
+    }
+
+    // Uniform random number in [0, 1) from the dedicated folding PRNG (used by
+    // ZNE random local folding). Decoupled from the measurement-readout stream.
+    [[nodiscard]] double getRandomNumber()
+    {
+        std::uniform_real_distribution<double> distribution(0.0, 1.0);
+        return distribution(foldGen);
     }
 
     [[nodiscard]] auto getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,

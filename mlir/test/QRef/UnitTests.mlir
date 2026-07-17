@@ -176,23 +176,23 @@ func.func @test_multirz(%q0: !qref.bit, %q1: !qref.bit,
 // -----
 
 func.func @test_pcphase(%q0: !qref.bit, %q1: !qref.bit,
-    %q2: !qref.bit, %q3: !qref.bit, %theta: f64, %dim: f64) {
+    %q2: !qref.bit, %q3: !qref.bit, %theta: f64) {
 
     // Basic
-    qref.pcphase (%theta, %dim) %q0 : !qref.bit
-    qref.pcphase (%theta, %dim) %q0, %q1, %q2 : !qref.bit, !qref.bit, !qref.bit
+    qref.pcphase (%theta, dim : 1) %q0 : !qref.bit
+    qref.pcphase (%theta, dim : 1) %q0, %q1, %q2 : !qref.bit, !qref.bit, !qref.bit
 
     // With adjoint
-    qref.pcphase (%theta, %dim) %q0, %q1 adj : !qref.bit, !qref.bit
+    qref.pcphase (%theta, dim : 1) %q0, %q1 adj : !qref.bit, !qref.bit
 
     // With control
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
-    qref.pcphase (%theta, %dim) %q0 ctrls (%q1) ctrlvals (%true) : !qref.bit ctrls !qref.bit
-    qref.pcphase (%theta, %dim) %q0, %q1 ctrls (%q2, %q3) ctrlvals (%true, %false) : !qref.bit, !qref.bit ctrls !qref.bit, !qref.bit
+    qref.pcphase (%theta, dim : 1) %q0 ctrls (%q1) ctrlvals (%true) : !qref.bit ctrls !qref.bit
+    qref.pcphase (%theta, dim : 1) %q0, %q1 ctrls (%q2, %q3) ctrlvals (%true, %false) : !qref.bit, !qref.bit ctrls !qref.bit, !qref.bit
 
     // With control and adjoint
-    qref.pcphase (%theta, %dim) %q0, %q1 adj ctrls (%q2, %q3) ctrlvals (%true, %false) : !qref.bit, !qref.bit ctrls !qref.bit, !qref.bit
+    qref.pcphase (%theta, dim : 1) %q0, %q1 adj ctrls (%q2, %q3) ctrlvals (%true, %false) : !qref.bit, !qref.bit ctrls !qref.bit, !qref.bit
 
     return
 }
