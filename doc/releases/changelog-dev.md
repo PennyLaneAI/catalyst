@@ -12,6 +12,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* Add adjoint support to the decomposition graph solver, enabling `Adjoint(Op)` to be decomposed either
+  via registered adjoint rules or by adjointing the base operator's decomposition rule,
+  with the solver choosing the cheapest.
+  [(#3001)](https://github.com/PennyLaneAI/catalyst/pull/3001)
+
 * Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
   [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
 

@@ -101,6 +101,7 @@ struct DecompositionGraph::Impl {
           fixedDecomps(std::move(_fixedDecomps)), altDecomps(std::move(_altDecomps))
     {
         materializeRules();
+        generateAdjointRules();
     }
 
     void materializeRules()
@@ -154,6 +155,79 @@ struct DecompositionGraph::Impl {
         }
 
         rules = std::move(effectiveRules);
+    }
+
+    /**
+     * @brief Generate Adjoint decomposition rules
+     *
+     * For a needed adjoint operator `Adjoint(Op)` this synthesizes, from every base decomposition
+     * `Op`, a rule `Adjoint(Op)` so the adjoint operator can be decomposed by adjointing the
+     * decomposition of its base. These coexist with any explicitly registered adjoint rules;
+     * the solver then compares their costs and picks the cheapest.
+     *
+     * @note Rules are synthesized only on-demand: only Adjoint operators that actually appear
+     * in the circuit (as roots) seed the process, and adjointing a decomposition may introduce
+     * new Adjoint(input) operators that require their own synthesized rules, so the process
+     * runs to a fixpoint. We leave the graph untouched when there aren't any adjoint ops.
+     *
+     * Two families of rules are never used as a base in this method:
+     * - rules whose output is already adjoint: we only derive adjoint rules from base
+     *   decompositions.
+     * - empty rules in the graph: these mark basis/target gates, and the adjoint of
+     *   a basis gate is not necessarily available for free, so it must be provided
+     *   explicitly (e.g. a self_adjoint rule) rather than synthesized.
+     *   TODO: we'll revisit this when integrating this with graph-decomposition.
+     */
+    void generateAdjointRules()
+    {
+        // Index valid base decompositions by their (non-adjoint) output.
+        std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash> baseByOutput;
+        for (const auto &rule : rules) {
+            if (!rule.output.adjoint && !rule.isEmpty()) {
+                baseByOutput[rule.output].push_back(rule);
+            }
+        }
+        if (baseByOutput.empty()) {
+            return;
+        }
+
+        // for every Adjoint(Op) in the circuit:
+        std::unordered_set<OperatorNode, OperatorNodeHash> seen;
+        std::vector<OperatorNode> worklist;
+        auto enqueue = [&](const OperatorNode &op) {
+            if (op.adjoint && seen.insert(op).second) {
+                worklist.push_back(op);
+            }
+        };
+        for (const auto &op : operators) {
+            enqueue(op);
+        }
+        for (const auto &rule : rules) {
+            enqueue(rule.output);
+            for (const auto &term : rule.inputs) {
+                enqueue(term.op);
+            }
+        }
+
+        std::vector<RuleNode> generated;
+        while (!worklist.empty()) {
+            const OperatorNode adjOp = worklist.back();
+            worklist.pop_back();
+            const auto it = baseByOutput.find(makeAdjoint(adjOp));
+            if (it == baseByOutput.end()) {
+                continue;
+            }
+            for (const auto &baseRule : it->second) {
+                RuleNode adjRule = makeAdjointRule(baseRule);
+                for (const auto &term : adjRule.inputs) {
+                    enqueue(term.op);
+                }
+                generated.push_back(std::move(adjRule));
+            }
+        }
+        for (auto &rule : generated) {
+            rules.push_back(std::move(rule));
+        }
     }
 
     void buildGraph()
