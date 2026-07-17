@@ -258,8 +258,9 @@
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
 
-* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass. This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph. This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
+* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass. This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph. This also allows the use of python-decompositions for any operator pre-registered in the frontend graph. The graph solver now supports the new `graphOpId`s provided by the interface, as well as the legacy pathway with `name`, `numWires` etc.
   [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
+  [(#3039)](https://github.com/PennyLaneAI/catalyst/pull/3039)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly

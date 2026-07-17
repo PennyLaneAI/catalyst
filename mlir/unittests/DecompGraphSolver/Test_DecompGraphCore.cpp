@@ -146,3 +146,45 @@ TEST_CASE("Test ChosenDecompRule construction", "[DecompGraph::Core]")
     REQUIRE(chosenRule.basisCounts[rz] == 2);
     REQUIRE(chosenRule.basisCounts[rx] == 1);
 }
+
+TEST_CASE("Test graphOpId Support", "[DecompGraph::Core]")
+{
+    // comparing an op without an ID should fallback to legacy match
+    const OperatorNode h{"H"};
+    const OperatorNode hId{"H", -1, -1, false, {}, "H[][1]{}"};
+
+    REQUIRE(h == hId);
+
+    // id + legacy match with non-wildcard params
+    const OperatorNode x{"X", 1, 0};
+    const OperatorNode xId{"X", -1, -1, false, {}, "X[][1]{}"};
+
+    REQUIRE(x == xId);
+
+    // id nodes should fail legacy match if params differ
+    const OperatorNode op1{"op", 1, 1};
+    const OperatorNode op2{"op", 2, 2, false, {}, "op[f64,f64][2]{}"};
+
+    REQUIRE_FALSE(op1 == op2);
+
+    // nodes with same ids should match
+    const OperatorNode pr1{"PauliRot", -1, -1, false, {}, "PauliRot[f64][2]{pauli_word:XX}"};
+    const OperatorNode pr2{"PauliRot", -1, -1, false, {}, "PauliRot[f64][2]{pauli_word:XX}"};
+
+    REQUIRE(pr1 == pr2);
+
+    // nodes with matching ids should ignore other parameters (id is source of truth)
+    const OperatorNode id1{"name1", 1, 1, false, {}, "sameID"};
+    const OperatorNode id2{"name2", 2, 2, true, {}, "sameID"};
+
+    REQUIRE(id1 == id2);
+
+    // check ID hashes match for same IDs, doesn't match name:
+    const OperatorNode hash1{"name", -1, -1, false, {}, "id"};
+    const OperatorNode hash2{"name2", 1, 1, true, {}, "id"};
+    const OperatorNode hash3{"name2", 1, 1, true, {}};
+
+    const OperatorNodeHash hashFunc;
+    REQUIRE(hashFunc(hash1) == hashFunc(hash2));
+    REQUIRE(hashFunc(hash2) != hashFunc(hash3));
+}
