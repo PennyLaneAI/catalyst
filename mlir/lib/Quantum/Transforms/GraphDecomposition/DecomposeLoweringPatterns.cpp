@@ -92,7 +92,6 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override
     {
         std::string gateName = op.getOperatorName();
-        llvm::errs() << "visiting " << gateName << "\n";
 
         // Only decompose the op if it is not in the target gate set
         if (targetGateSet.contains(gateName)) {
