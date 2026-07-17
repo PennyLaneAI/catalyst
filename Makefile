@@ -262,7 +262,7 @@ wheel:
 		    cp $(COPY_FLAGS) $$file $$dest_dir; \
 	    done' sh {} +
 
-	$(PYTHON) -m pip wheel . -w bootstrap_dist --extra-index-url https://test.pypi.org/simple
+	$(PYTHON) -m pip wheel --no-deps . -w bootstrap_dist --extra-index-url https://test.pypi.org/simple
 	$(PYTHON) -m pip install bootstrap_dist/*.whl
 
 	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
