@@ -64,7 +64,8 @@ struct ChannelDesc {
 //   2. alloc_memory       - register the region (needs the connected context)
 //   3. exchange_keys      - swap region handles over the out-of-band channel
 //   4. establish_channel  - program the channel from the local + peer regions
-//   5. start / collect / stop
+//   5. (coprocessor) set_decoder_schema / (controller) set_max_in_flight - before start()
+//   6. start / collect / stop
 class TransportSession {
   public:
     virtual ~TransportSession() = default;
