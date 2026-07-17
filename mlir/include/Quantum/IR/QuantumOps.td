@@ -409,7 +409,8 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 }
 
 def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                         AttrSizedOperandSegments, AttrSizedResultSegments,
+                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -736,7 +737,8 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
     let hasVerifier = 1;
 }
 
-def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments,
+                                              DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Global Phase.";
 
     let description = [{
@@ -777,7 +779,8 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 }
 
 def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
-                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                           AttrSizedOperandSegments, AttrSizedResultSegments,
+                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -816,7 +819,8 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
 }
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
-                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                           AttrSizedOperandSegments, AttrSizedResultSegments,
+                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a projector-controlled phase gate";
     let description = [{
         This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
@@ -855,8 +859,8 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getAllParams() {
-            return getODSOperands(getParamOperandIdx());
+        mlir::OperandRange getAllParams() {
+            return getOperands().slice(getParamOperandIdx(), getParamOperandIdx()+2);
         }
     }];
 
@@ -865,7 +869,8 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
 
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
-                                                AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                                AttrSizedOperandSegments, AttrSizedResultSegments,
+                                                DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the

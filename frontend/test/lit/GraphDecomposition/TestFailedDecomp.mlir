@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RY=1.0,RZ=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+// RUN: not --crash catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=PauliX=1.0 bytecode-rules="%BYTECODE_PATH"})' %s 2>&1 | FileCheck %s
 
-func.func public @circuit() attributes {quantum.node} {
-    %0 = quantum.alloc( 1) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
-    quantum.dealloc %2 : !quantum.reg
-    // CHECK-NOT: Hadamard
-    // CHECK-DAG: RZ
-    // CHECK-DAG: RY
+func.func @circuit(%q0: !quantum.bit) {
+    // Gateset only has X, can never make a Hadamard
+    %out = quantum.custom "Hadamard"() %q0 : !quantum.bit
+
+    // CHECK: GraphSolverFailedError
+    // CHECK: Decomposition rule not found for operator 'Hadamard
     return
 }

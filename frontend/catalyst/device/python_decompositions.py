@@ -16,7 +16,7 @@
 This module provides infrastructure for compile-time lowering of decomposition rules via python.
 """
 
-# pylint: disable=protected-access,unused-argument
+# pylint: disable=protected-access,bare-except
 
 import jax.numpy as jnp
 import pennylane as qp
@@ -127,6 +127,9 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
 
     name_to_resources = {}
     for rule in decomp_rules:
+        # TODO: not all PL ops have been migrated to the operator 2 format expected by mlir graph
+        # decomp This means some rules will fail the python callback compilation. When migration is
+        # complete, remove the try-except.
         try:
             name_to_resources[rule.name] = {
                 get_graph_op_id(op): count
