@@ -581,8 +581,8 @@ module @circuit_with_multirz {
     return %out_qubits_1 : !quantum.bit
   }
 
-  // CHECK: func.func private @_multi_rz_decomposition_wires_1
-  func.func private @_multi_rz_decomposition_wires_1(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "MultiRZ"} {
+  // CHECK: func.func private @_multi_rz_decomposition_wires
+  func.func private @_multi_rz_decomposition_wires(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "MultiRZ"} {
     %0 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
     %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
     %extracted = tensor.extract %1[] : tensor<i64>

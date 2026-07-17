@@ -21,7 +21,6 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/IRMapping.h"
@@ -40,6 +39,8 @@
 
 #include "DecompUtils.hpp"
 #include "DecomposeLoweringImpl.hpp"
+
+#include <llvm/Support/LogicalResult.h>
 
 #define DEBUG_TYPE "decompose-lowering"
 
@@ -76,22 +77,23 @@ static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp
     return results;
 }
 
-struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
+struct DecomposableGatePattern final : public OpInterfaceRewritePattern<DecomposableGate> {
   private:
     const llvm::StringMap<func::FuncOp> &decompositionRegistry;
     const llvm::StringSet<llvm::MallocAllocator> &targetGateSet;
 
   public:
-    DLCustomOpPattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
-                      const llvm::StringSet<llvm::MallocAllocator> &gateSet)
-        : OpRewritePattern<CustomOp>(context), decompositionRegistry(registry),
+    DecomposableGatePattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
+                            const llvm::StringSet<llvm::MallocAllocator> &gateSet)
+        : OpInterfaceRewritePattern<DecomposableGate>(context), decompositionRegistry(registry),
           targetGateSet(gateSet)
     {
     }
 
-    LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override
     {
-        StringRef gateName = op.getGateName();
+        std::string gateName = op.getOperatorName();
+        llvm::errs() << "visiting " << gateName << "\n";
 
         // Only decompose the op if it is not in the target gate set
         if (targetGateSet.contains(gateName)) {
@@ -105,11 +107,31 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
         }
 
         // Find the corresponding decomposition rule for the op
-        auto it = decompositionRegistry.find(gateName);
-        if (it == decompositionRegistry.end()) {
-            return failure();
+        // TODO: migration to use the DecomposableGate interface gateID for all decomp rules is not
+        // yet complete. Some rules' target_gate is already gateID, but some other gates' are still
+        // the simple gate class name.
+        // To maintain legacy compatibility, we fallback to the old pattern, where only the
+        // gate class name is used (i.e. without distinguishing different static data on the same
+        // gate class)
+        // When the migration is complete, all rules need to be identified through gate ID.
+        std::string gateID = op.getGraphOpId();
+        func::FuncOp rule;
+        auto it_gateID = decompositionRegistry.find(gateID);
+        if (it_gateID != decompositionRegistry.end()) {
+            // Found a rule with the wanted ID, highest priority rule, just use this one
+            rule = it_gateID->second;
         }
-        func::FuncOp rule = it->second;
+        else {
+            // Didn't find ID match, try matching gate name
+            auto it_gateName = decompositionRegistry.find(gateName);
+            if (it_gateName != decompositionRegistry.end()) {
+                rule = it_gateName->second;
+            }
+            else {
+                // Didn't find any rule
+                return failure();
+            }
+        }
 
         // For null decomp rules, the signature will not have any quantum values
         // This is a deviation from the standard decomp func signature, so we deal with it
@@ -137,7 +159,7 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
 
         auto enableQreg = llvm::any_of(rule.getFunctionType().getInputs(),
                                        [](mlir::Type t) { return isa<quantum::QuregType>(t); });
-        auto analyzer = CustomOpSignatureAnalyzer(op, enableQreg);
+        auto analyzer = DecomposableGateSignatureAnalyzer(op, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
@@ -158,161 +180,12 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
     }
 };
 
-struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
-  private:
-    const llvm::StringMap<func::FuncOp> &decompositionRegistry;
-    const llvm::StringSet<llvm::MallocAllocator> &targetGateSet;
-
-  public:
-    DLMultiRZOpPattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
-                       const llvm::StringSet<llvm::MallocAllocator> &gateSet)
-        : OpRewritePattern<MultiRZOp>(context), decompositionRegistry(registry),
-          targetGateSet(gateSet)
-    {
-    }
-
-    LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override
-    {
-        std::string gateName = "MultiRZ";
-
-        // Only decompose the op if it is not in the target gate set
-        if (targetGateSet.contains(gateName)) {
-            return failure();
-        }
-
-        // do not nest decomposition rules, they're applied greedily and this can lead to
-        // cycles/identity rules
-        if (DecompUtils::isInDecompRule(op)) {
-            return failure();
-        }
-
-        // Find the corresponding decomposition function for the op
-        auto numQubits = op.getInQubits().size();
-        auto MRZNameWithQubits = gateName + "_" + std::to_string(numQubits);
-
-        auto it = decompositionRegistry.find(MRZNameWithQubits);
-        if (it == decompositionRegistry.end()) {
-            return failure();
-        }
-
-        func::FuncOp decompFunc = it->second;
-        // Here is the assumption that the decomposition function must have
-        // at least one input and one result
-        assert(decompFunc.getFunctionType().getNumInputs() > 0 &&
-               "Decomposition function must have at least one input");
-        assert(decompFunc.getFunctionType().getNumResults() >= 1 &&
-               "Decomposition function must have at least one result");
-
-        rewriter.setInsertionPointAfter(op);
-
-        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
-                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
-        auto numQbitsAttr = decompFunc->getAttrOfType<IntegerAttr>("num_wires");
-        if (!numQbitsAttr) {
-            op.emitError("Decomposition function missing 'num_wires' attribute");
-            return failure();
-        }
-        if (numQubits != static_cast<size_t>(numQbitsAttr.getInt())) {
-            op.emitError("Mismatch in number of qubits: expected ")
-                << numQbitsAttr.getInt() << ", got " << numQubits;
-            return failure();
-        }
-
-        auto analyzer = MultiRZOpSignatureAnalyzer(op, enableQreg);
-        assert(analyzer && "Analyzer should be valid");
-
-        auto operands = analyzer.prepareOperands(decompFunc, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, decompFunc, operands);
-
-        // Replace the op with the inlined function and adjust the insert ops for the qreg mode
-        if (inlinedFunctionResults.size() == 1 &&
-            isa<quantum::QuregType>(inlinedFunctionResults.front().getType())) {
-            auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
-                                                          op.getLoc(), rewriter);
-            rewriter.replaceOp(op, results);
-        }
-        else {
-            rewriter.replaceOp(op, inlinedFunctionResults);
-        }
-
-        return success();
-    }
-};
-
-struct DLPauliRotOpPattern : public OpRewritePattern<PauliRotOp> {
-  private:
-    const llvm::StringMap<func::FuncOp> &decompositionRegistry;
-    const llvm::StringSet<llvm::MallocAllocator> &targetGateSet;
-
-  public:
-    DLPauliRotOpPattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
-                        const llvm::StringSet<llvm::MallocAllocator> &gateSet)
-        : OpRewritePattern<PauliRotOp>(context), decompositionRegistry(registry),
-          targetGateSet(gateSet)
-    {
-    }
-
-    LogicalResult matchAndRewrite(PauliRotOp op, PatternRewriter &rewriter) const override
-    {
-        std::string gateName = cast<DecomposableGate>(op.getOperation()).getGraphOpId();
-
-        // Only decompose the op if it is not in the target gate set
-        if (targetGateSet.contains("paulirot")) {
-            return failure();
-        }
-
-        // do not nest decomposition rules, they're applied greedily and this can lead to
-        // cycles/identity rules
-        if (DecompUtils::isInDecompRule(op)) {
-            return failure();
-        }
-
-        // Find the corresponding decomposition function for the op
-        auto it = decompositionRegistry.find(gateName);
-        if (it == decompositionRegistry.end()) {
-            return failure();
-        }
-        func::FuncOp decompFunc = it->second;
-
-        // Here is the assumption that the decomposition function must have at least one input
-        // and one result
-        assert(decompFunc.getFunctionType().getNumInputs() > 0 &&
-               "Decomposition function must have at least one input");
-        assert(decompFunc.getFunctionType().getNumResults() >= 1 &&
-               "Decomposition function must have at least one result");
-
-        rewriter.setInsertionPointAfter(op);
-
-        auto enableQreg = llvm::any_of(decompFunc.getFunctionType().getInputs(),
-                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
-        auto analyzer = PauliRotOpSignatureAnalyzer(op, enableQreg);
-        assert(analyzer && "Analyzer should be valid");
-
-        auto operands = analyzer.prepareOperands(decompFunc, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, decompFunc, operands);
-
-        // Replace the op with the inlined results and adjust the insert ops for the qreg mode
-        if (inlinedFunctionResults.size() == 1 &&
-            isa<quantum::QuregType>(inlinedFunctionResults.front().getType())) {
-            auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
-                                                          op.getLoc(), rewriter);
-            rewriter.replaceOp(op, results);
-        }
-        else {
-            rewriter.replaceOp(op, inlinedFunctionResults);
-        }
-
-        return success();
-    }
-};
-
 void populateDecomposeLoweringPatterns(RewritePatternSet &patterns,
                                        const llvm::StringMap<func::FuncOp> &decompositionRegistry,
                                        const llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
 {
-    patterns.add<DLCustomOpPattern>(patterns.getContext(), decompositionRegistry, targetGateSet);
-    patterns.add<DLMultiRZOpPattern>(patterns.getContext(), decompositionRegistry, targetGateSet);
-    patterns.add<DLPauliRotOpPattern>(patterns.getContext(), decompositionRegistry, targetGateSet);
+    patterns.add<DecomposableGatePattern>(patterns.getContext(), decompositionRegistry,
+                                          targetGateSet);
 }
 
 } // namespace quantum
