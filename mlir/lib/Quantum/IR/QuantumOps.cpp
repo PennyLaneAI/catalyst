@@ -178,45 +178,107 @@ OpFoldResult ExtractOp::fold(FoldAdaptor adaptor)
     return nullptr;
 }
 
-LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &rewriter)
-{
-    // Handle the pattern: %reg2 = insert %reg1[idx], %qubit -> %q = extract %reg2[idx]
-    // Convert to: %q = %qubit, and replace other uses of %reg2 with %reg1
-    if (auto insert = dyn_cast_if_present<InsertOp>(extract.getQreg().getDefiningOp())) {
+namespace {
+
+// Fold an extract of a qubit written by an insert at the same index:
+//   %reg2 = insert %reg1[i], %q ; %out = extract %reg2[i]  ->  %out = %q
+// Remaining users of %reg2 are forwarded to %reg1.
+struct FoldExtractOfSameIndexInsert : public mlir::OpRewritePattern<ExtractOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(ExtractOp extract, mlir::PatternRewriter &rewriter) const override
+    {
+        auto insert = dyn_cast_if_present<InsertOp>(extract.getQreg().getDefiningOp());
+        if (!insert || extract->getBlock() != insert->getBlock()) {
+            return failure();
+        }
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
-
-        bool inSameBlock = extract->getBlock() == insert->getBlock();
-
-        if ((staticallyEqual || dynamicallyEqual) && inSameBlock) {
-            rewriter.replaceOp(extract, insert.getQubit());
-            rewriter.replaceOp(insert, insert.getInQreg());
-            return success();
+        if (!staticallyEqual && !dynamicallyEqual) {
+            return failure();
         }
+        rewriter.replaceOp(extract, insert.getQubit());
+        rewriter.replaceOp(insert, insert.getInQreg());
+        return success();
     }
-    return failure();
-}
+};
 
-LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rewriter)
-{
-    if (auto extract = dyn_cast_if_present<ExtractOp>(insert.getQubit().getDefiningOp())) {
+// Fold an extract/insert round-trip at a single index:
+//   %q = extract %reg[i] ; %reg2 = insert %reg[i], %q  ->  %reg2 = %reg
+struct FoldExtractInsertRoundTrip : public mlir::OpRewritePattern<ExtractOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(ExtractOp extract, mlir::PatternRewriter &rewriter) const override
+    {
+        if (!extract.getResult().hasOneUse()) {
+            return failure();
+        }
+        auto insert = dyn_cast<InsertOp>(*extract.getResult().getUsers().begin());
+        if (!insert || insert.getInQreg() != extract.getQreg()) {
+            return failure();
+        }
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
-        bool sameQreg = extract.getQreg() == insert.getInQreg();
-        bool oneUse = extract.getResult().hasOneUse();
-
-        if ((staticallyEqual || dynamicallyEqual) && oneUse && sameQreg) {
-            rewriter.replaceOp(insert, insert.getInQreg());
-            rewriter.eraseOp(extract);
-            return success();
+        if (!staticallyEqual && !dynamicallyEqual) {
+            return failure();
         }
+        rewriter.replaceOp(insert, insert.getInQreg());
+        rewriter.eraseOp(extract);
+        return success();
     }
+};
 
-    return failure();
+// Redirect an extract through an insert at a statically distinct index:
+//   %reg2 = insert %reg1[i], %v ; %q = extract %reg2[j]  (i != j)  ->  %q = extract %reg1[j]
+// The bypassed insert is sunk to just above the earliest remaining user of its result.
+struct RedirectExtractThroughDistinctInsert : public mlir::OpRewritePattern<ExtractOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(ExtractOp extract, mlir::PatternRewriter &rewriter) const override
+    {
+        auto insert = dyn_cast_if_present<InsertOp>(extract.getQreg().getDefiningOp());
+        if (!insert || extract->getBlock() != insert->getBlock()) {
+            return failure();
+        }
+        bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
+        bool staticallyDistinct = bothStatic && extract.getIdxAttrAttr() != insert.getIdxAttrAttr();
+        if (!staticallyDistinct) {
+            return failure();
+        }
+        // Read the pre-insert register.
+        rewriter.modifyOpInPlace(extract,
+                                 [&] { extract.getQregMutable().assign(insert.getInQreg()); });
+
+        // Sink the bypassed insert to just above the earliest remaining user of its result.
+        Operation *earliestUser = nullptr;
+        for (Operation *user : insert.getResult().getUsers()) {
+            if (user->getBlock() != insert->getBlock()) {
+                continue;
+            }
+            if (!earliestUser || user->isBeforeInBlock(earliestUser)) {
+                earliestUser = user;
+            }
+        }
+        if (earliestUser && insert->getNextNode() != earliestUser) {
+            rewriter.modifyOpInPlace(insert, [&] { insert->moveBefore(earliestUser); });
+        }
+        return success();
+    }
+};
+
+} // namespace
+
+void ExtractOp::getCanonicalizationPatterns(mlir::RewritePatternSet &patterns,
+                                            mlir::MLIRContext *context)
+{
+    // Same-index folds run at a higher benefit than the distinct-index redirect.
+    patterns.add<FoldExtractOfSameIndexInsert>(context, /*benefit=*/2);
+    patterns.add<FoldExtractInsertRoundTrip>(context, /*benefit=*/2);
+    patterns.add<RedirectExtractThroughDistinctInsert>(context, /*benefit=*/1);
 }
 
 OpFoldResult InsertOp::fold(FoldAdaptor adaptor)
