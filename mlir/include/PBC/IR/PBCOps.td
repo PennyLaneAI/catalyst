@@ -34,7 +34,7 @@ include "PBC/IR/PBCOpInterfaces.td"
 
 include "PBC/IR/PBCRefOps.td"
 
-def PrepareStateOp : PBC_Op<"prepare", 
+def PrepareStateOp : PBC_Op<"prepare",
     [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Prepare auxiliary qubits in a given state.";
     let description = [{
@@ -74,7 +74,7 @@ def PrepareStateOp : PBC_Op<"prepare",
     let hasVerifier = 1;
 }
 
-def FabricateOp : PBC_Op<"fabricate", 
+def FabricateOp : PBC_Op<"fabricate",
     [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Fabricate axillary qubits from qubit factories.";
     let description = [{

@@ -14,7 +14,7 @@
 
 include "QRef/IR/QRefTypes.td"
 
-def RefPPMeasurementOp : PBC_Op<"ref.ppm"> {
+def RefPPMeasurementOp : PBC_Op<"ref.ppm", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "Pauli Product Measurement on qubit references.";
 
     let description = [{

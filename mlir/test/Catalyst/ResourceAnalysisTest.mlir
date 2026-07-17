@@ -1096,7 +1096,7 @@ func.func @auto_qm_flag_unset() {
 // CHECK-DAG: "CNOT(2)": 1
 // CHECK-DAG: "Adjoint(T)(1)": 1
 // CHECK-DAG: "S(1)": 1
-// CHECK-PPM: "PPM(0)": 1,
+// CHECK-DAG: "PPM(0)": 1,
 // CHECK-DAG: "mbqc.ref.graph_state_prep(0)": 1,
 // CHECK-DAG: "mbqc.ref.measure_in_basis(0)": 1
 
@@ -1163,7 +1163,7 @@ module @nested_resource_module {
 // CHECK-DAG: "Adjoint(T)(1)": 1
 // CHECK-DAG: "CY(2)": 1
 // CHECK-DAG: "PauliX(1)": 1
-// CHECK-DAG: "C(S)(2)": 1
+// CHECK-DAG: "C(Adjoint(S))(2)": 1
 // CHECK-DAG: "2C(S)(3)": 1
 
 func.func public @test_ops_with_ctrl() -> tensor<8xf64> {
@@ -1175,7 +1175,7 @@ func.func public @test_ops_with_ctrl() -> tensor<8xf64> {
     %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
     %out_qubits_0 = quantum.custom "T"() %out_qubits adj : !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    %out_qubits_1, %out_ctrl_qubits = quantum.custom "S"() %out_qubits_0 ctrls(%2) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+    %out_qubits_1, %out_ctrl_qubits = quantum.custom "S"() %out_qubits_0 adj ctrls(%2) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
     %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
     %out_qubits_2, %out_ctrl_qubits_3:2 = quantum.custom "S"() %out_qubits_1 ctrls(%out_ctrl_qubits, %3) ctrlvals(%true, %false) : !quantum.bit ctrls !quantum.bit, !quantum.bit
     %out_qubits_4:2 = quantum.custom "CY"() %out_ctrl_qubits_3#1, %out_qubits_2 : !quantum.bit, !quantum.bit
@@ -1227,8 +1227,11 @@ func.func public @test_ops_with_ctrl_ref() {
 // CHECK:   "operations"
 // CHECK-DAG: "PrepareState(0)": 2
 // CHECK-DAG: "Fabricate(0)": 1
+// CHECK-DAG: "Adjoint(PPR-identity)(1)": 1
+// CHECK-DAG: "PPR-identity(1)": 1
 // CHECK-DAG: "PPR-pi/4(2)": 1
 // CHECK-DAG: "PPR-pi/8(3)": 1
+// CHECK-DAG: "Adjoint(PPM)(2)": 1
 // CHECK-DAG: "PPM(2)": 1
 
 func.func @pbc_prepare_fabricate() {
@@ -1237,7 +1240,10 @@ func.func @pbc_prepare_fabricate() {
     %m0, %m1 = pbc.fabricate magic : !quantum.bit, !quantum.bit
     %r0:2 = pbc.ppr ["X", "Z"](4) %q0, %q1 : !quantum.bit, !quantum.bit
     %r1:3 = pbc.ppr ["X", "Y", "Z"](8) %r0#0, %r0#1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+    %r2 = pbc.ppr ["X"](1) %r1#0 : !quantum.bit
+    %r3 = pbc.ppr ["X"](-1) %r2 : !quantum.bit
     %mres, %out0, %out1 = pbc.ppm ["X", "Z"] %m0, %m1 : i1, !quantum.bit, !quantum.bit
+    %mres2, %out2, %out3 = pbc.ppm ["X", "Z"](-) %out0, %out1 : i1, !quantum.bit, !quantum.bit
     return
 }
 
