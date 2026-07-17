@@ -860,8 +860,8 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::OperandRange getAllParams() {
-            return getOperands().slice(getParamOperandIdx(), getParamOperandIdx()+2);
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
         }
     }];
 
