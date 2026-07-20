@@ -39,3 +39,8 @@ repos:
           "--rcfile=.pylintrc",  # link to the repo config
         ]
       files: ^frontend/
+
+- repo: https://github.com/pre-commit/mirrors-clang-format
+  rev: v22.1.8
+  hooks:
+    - id: clang-format
