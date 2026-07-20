@@ -16,6 +16,7 @@
 from contextlib import contextmanager
 from inspect import getsource
 from io import StringIO
+from textwrap import dedent
 
 import pytest
 from xdsl.context import Context
@@ -45,6 +46,35 @@ def debug_pipeline_fixture(request: pytest.FixtureRequest):
     return request.config.getoption("--debug-pipeline")
 
 
+def print_dbg(message: str, **kwargs):
+    """Print `message` prepended by '[DEBUG]'."""
+    print(f"[DEBUG] {message}", **kwargs)
+
+
+def print_dbg_banner(message: str, max_text_len: int = 80, **kwargs):
+    """Print `message` as a banner.
+
+    Example:
+
+    >>> conftest.print_dbg_banner("Sgt. Pepper's Lonely Hearts Club Band")
+    [DEBUG] ================ Sgt. Pepper's Lonely Hearts Club Band =================
+    >>> conftest.print_dbg_banner("Sgt. Pepper's Lonely Hearts Club Band", max_text_len=46)
+    [DEBUG] === Sgt. Pepper's Lonely Hearts... ===
+    """
+    assert max_text_len >= 20, "I need at least 20 characters to print a banner!"
+
+    # Reduce max text length to account for '[DEBUG] ' prepended to message
+    _max_len = max_text_len - 8
+
+    if len(message) > (_max_len - 6):
+        # Cut it down to fit, ensuring room for ellipses and at least 3 banner chars on either side
+        message = message[: _max_len - 11] + "..."
+
+    message = f" {message} "
+
+    print_dbg(message.center(_max_len, "="), **kwargs)
+
+
 @contextmanager
 def debug_step(message, enabled=True):
     """A convenience context manager that prints a debug message before running a block of code.
@@ -52,7 +82,7 @@ def debug_step(message, enabled=True):
     If the block of code executes without error, "OK" is appended to the debug message.
     """
     if enabled:
-        print(f"[DEBUG] {message}... ", end="", flush=True)
+        print_dbg(f"{message}... ", end="", flush=True)
 
     yield  # The code inside the 'with' block runs here
 
@@ -79,8 +109,9 @@ def _run_filecheck_impl(
     xdsl_module = QuantumParser(ctx, program_str, extra_dialects=(test.Test,)).parse_module()
 
     if debug_pipeline:
-        print("\n[DEBUG] ========== RUNNING FILECHECK ==========")
-        print("[DEBUG] Initial xDSL module:")
+        print("\n")
+        print_dbg_banner("RUNNING FILECHECK")
+        print_dbg("Initial xDSL module:")
         print(xdsl_module)
 
     if roundtrip:
@@ -111,7 +142,7 @@ def _run_filecheck_impl(
         pipeline.apply(ctx, xdsl_module)
 
     if debug_pipeline:
-        print("[DEBUG] After:")
+        print_dbg("After:")
         print(xdsl_module)
 
     if verify:
@@ -192,15 +223,37 @@ def _get_filecheck_directives(qjit_fn):
     return "\n".join(filecheck_directives)
 
 
-def _run_filecheck_qjit_impl(qjit_fn, verify=False):
+def _get_qjit_fn_src(qjit_fn) -> str:
+    """Return a string containing the source code of the input QJIT function (including comments and
+    FileCheck directives).
+
+    This function is primarily used for debugging purposes.
+    """
+    try:
+        src = getsource(qjit_fn)
+    except Exception as e:
+        raise RuntimeError(f"Could not get source for {qjit_fn}") from e
+
+    return dedent(src)
+
+
+def _run_filecheck_qjit_impl(debug_pipeline, qjit_fn, verify=False):
     """Run filecheck on a qjit-ed function, using FileCheck directives in its inline
     comments to assert correctness."""
     if not deps_available:
         return
 
+    if debug_pipeline:
+        print("\n")
+        print_dbg_banner("RUNNING FILECHECK")
+        print_dbg("QJIT source:")
+        print(_get_qjit_fn_src(qjit_fn))
+
     checks = _get_filecheck_directives(qjit_fn)
     compiler = Compiler()
-    mlir_module = compiler.run(qjit_fn.mlir_module)
+
+    with debug_step("Compiling QJIT function", debug_pipeline):
+        mlir_module = compiler.run(qjit_fn.mlir_module)
 
     # The following is done because ``mlir_module`` will be in the generic syntax, and
     # we want as many ops to be pretty printed as possible.
@@ -208,6 +261,10 @@ def _run_filecheck_qjit_impl(qjit_fn, verify=False):
         binary=False, print_generic_op_form=True, assume_verified=True
     )
     xdsl_module = parse_generic_to_xdsl_module(mod_str)
+
+    if debug_pipeline:
+        print_dbg("After:")
+        print(xdsl_module)
 
     if verify:
         xdsl_module.verify()
@@ -233,7 +290,7 @@ def _run_filecheck_qjit_impl(qjit_fn, verify=False):
 
 
 @pytest.fixture(scope="function")
-def run_filecheck_qjit():
+def run_filecheck_qjit(debug_pipeline):
     """Fixture to run filecheck on a qjit-ed function.
 
     This fixture yields a function that takes a QJIT object as input, parses its
@@ -273,4 +330,7 @@ def run_filecheck_qjit():
     if not deps_available:
         pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
 
-    yield _run_filecheck_qjit_impl
+    def wrapper(*args, **kwargs):
+        return _run_filecheck_qjit_impl(debug_pipeline, *args, **kwargs)
+
+    yield wrapper

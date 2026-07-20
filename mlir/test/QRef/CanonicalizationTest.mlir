@@ -182,10 +182,10 @@ func.func @test_multirz_adjoint_canonicalize(%arg0: f64, %q0: !qref.bit, %q1: !q
 // -----
 
 // CHECK-LABEL: test_pcphase_adjoint_canonicalize
-func.func @test_pcphase_adjoint_canonicalize(%arg0: f64, %dim: f64, %q0: !qref.bit, %q1: !qref.bit) {
+func.func @test_pcphase_adjoint_canonicalize(%arg0: f64, %q0: !qref.bit, %q1: !qref.bit) {
     // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
-    // CHECK: qref.pcphase([[arg0neg]], %arg1) %arg2, %arg3 : !qref.bit, !qref.bit
-    qref.pcphase (%arg0, %dim) %q0, %q1 adj : !qref.bit, !qref.bit
+    // CHECK: qref.pcphase([[arg0neg]], dim : 2) %arg1, %arg2 : !qref.bit, !qref.bit
+    qref.pcphase (%arg0, dim : 2) %q0, %q1 adj : !qref.bit, !qref.bit
     return
 }
 
@@ -218,7 +218,7 @@ func.func @test_canonicalize_no_dce(%arg0: tensor<2xcomplex<f64>>, %arg1 : tenso
     qref.multirz (%arg2) %q0, %q1 : !qref.bit, !qref.bit
 
     // CHECK: qref.pcphase
-    qref.pcphase (%arg2, %arg2) %q0 : !qref.bit
+    qref.pcphase (%arg2, dim : 0) %q0 : !qref.bit
 
     // CHECK: qref.unitary
     qref.unitary (%arg3 : tensor<2x2xcomplex<f64>>) %q0 : !qref.bit

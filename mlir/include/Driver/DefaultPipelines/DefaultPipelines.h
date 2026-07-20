@@ -32,7 +32,7 @@ using PipelineList = std::vector<PipelineInfo>;
 
 // clang-format off
 const PipelineList pipelineList{
-    {"quantum-compilation-pipeline",
+    {"quantum-compilation-stage",
      {"canonicalize",
       "verify-no-quantum-use-after-free",
       "convert-to-value-semantics",
@@ -58,7 +58,7 @@ const PipelineList pipelineList{
       "lower-pbc-init-ops",
       "disable-assertion",
       "symbol-dce"}},  // to remove user decomposition rules after all graph-decomposition passes
-    {"hlo-lowering-pipeline",
+    {"hlo-lowering-stage",
      {"canonicalize",
       "func.func(chlo-legalize-to-stablehlo)",
       "func.func(stablehlo-legalize-control-flow)",
@@ -76,10 +76,10 @@ const PipelineList pipelineList{
       "detensorize-function-boundary",
       "canonicalize",
       "symbol-dce"}},
-    {"gradient-lowering-pipeline",
+    {"gradient-lowering-stage",
      {"annotate-invalid-gradient-functions",
       "lower-gradients"}},
-    {"bufferization-pipeline",
+    {"bufferization-stage",
      {// tensor.pad
       "convert-tensor-to-linalg",
       // Must be run before --one-shot-bufferize.
@@ -116,7 +116,7 @@ const PipelineList pipelineList{
        * "cse",
        */
       "cp-global-memref"}},
-    {"llvm-dialect-lowering-pipeline",
+    {"llvm-dialect-lowering-stage",
      {"qnode-to-async-lowering",
       "async-func-to-async-runtime",
       "async-to-async-runtime",

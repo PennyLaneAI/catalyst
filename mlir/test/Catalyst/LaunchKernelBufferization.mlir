@@ -17,10 +17,6 @@
 // RUN:     one-shot-bufferize{unknown-type-conversion=identity-layout-map} \
 // RUN:   )" %s | FileCheck %s
 
-// launch_kernel must survive bufferization with its results intact: tensor operands become memref
-// buffers and tensor results become memref results (no out-param marshalling), matching
-// remote.launch's contract.
-
 // CHECK-LABEL: func.func @host
 // CHECK: %[[ARG:.*]] = bufferization.to_buffer %{{.*}} : tensor<4xf64> to memref<4xf64>
 // CHECK: %[[RES:.*]] = catalyst.launch_kernel @target::@entry(%[[ARG]]) : (memref<4xf64>) -> memref<4xf64>
@@ -39,8 +35,7 @@ module @target {
 // -----
 
 // A non-identity-layout (strided/offset) operand must be copied into a fresh contiguous buffer
-// before the call: the remote/kernel ABI sends a contiguous block from the aligned pointer and
-// ignores strides/offset, so passing the subview directly would ship the wrong bytes.
+// before the call.
 
 // CHECK-LABEL: func.func @host_strided
 // CHECK: %[[SUB:.*]] = memref.subview %{{.*}} : memref<8xf64> to memref<4xf64, strided<[1], offset: 2>>

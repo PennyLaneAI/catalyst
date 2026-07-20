@@ -33,7 +33,7 @@ target_link_libraries(runner_tests_dgsolver PRIVATE
 )
 
 target_include_directories(runner_tests_dgsolver PRIVATE
-    ${CMAKE_SOURCE_DIR}/lib/Quantum/Transforms/DecompGraphSolver
+    ${CMAKE_SOURCE_DIR}/lib/Quantum/Transforms/GraphDecomposition/DecompGraphSolver
 )
 
 catch_discover_tests(runner_tests_dgsolver)

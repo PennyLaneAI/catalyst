@@ -59,4 +59,12 @@ def RefGraphStatePrepOp : MBQC_Op<"ref.graph_state_prep"> {
     }];
 
     let hasVerifier = 1;
+
+    let extraClassDeclaration = getNumQubitsFromAdjMatrixSize # [{
+        size_t getAdjMatrixSizeFromNumQubits() {
+            size_t qregSize = getQreg().getType().getSize().getInt();
+            size_t expectedAdjMatrixSize = qregSize * (qregSize - 1) / 2;
+            return expectedAdjMatrixSize;
+        }
+    }];
 }

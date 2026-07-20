@@ -15,6 +15,7 @@
 #include "RuntimeCAPI.h"
 
 #include <cstdarg>
+#include <cstdint>
 #include <cstdlib>
 #include <ctime>
 #include <memory>
@@ -251,6 +252,13 @@ void __catalyst__rt__finalize()
 {
     RTD_PTR = nullptr;
     CTX.reset(nullptr);
+}
+
+// Uniform random number in [0, 1) from the PRNG (used by ZNE random local folding).
+double __catalyst__rt__random_double()
+{
+    RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
+    return CTX->getRandomNumber();
 }
 
 static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs,
@@ -503,11 +511,11 @@ void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits
     getQuantumDevicePtr()->SetState(data_view, wires);
 }
 
-void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifiers,
+void __catalyst__qis__PCPhase(double theta, int64_t dim, const Modifiers *modifiers,
                               int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
-    RT_ASSERT(dim >= 0 && dim == static_cast<int64_t>(dim));
+    RT_ASSERT(dim >= 0);
 
     va_list args;
     va_start(args, numQubits);
@@ -517,7 +525,7 @@ void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifie
     }
     va_end(args);
 
-    getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, dim}, wires,
+    getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, static_cast<double>(dim)}, wires,
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 
