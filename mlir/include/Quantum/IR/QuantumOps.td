@@ -211,7 +211,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     }];
 
-    let hasCanonicalizeMethod = 1;
+    let hasCanonicalizer = 1;
     let hasVerifier = 1;
     let hasFolder = 1;
 }
@@ -236,7 +236,6 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
         $in_qreg `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` type($in_qreg) `,` type($qubit)
     }];
 
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
     let hasFolder = 1;
 }

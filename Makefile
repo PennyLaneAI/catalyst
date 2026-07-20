@@ -234,8 +234,9 @@ wheel:
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/libQuantumPythonDecompositions.* $(MK_DIR)/frontend/catalyst/lib
 
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
+	mkdir -p $(MK_DIR)/frontend/mlir_quantum
+	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
-	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
 	for file in gradient qref quantum _ods_common catalyst mbqc mitigation pbc _transform; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
@@ -261,8 +262,8 @@ wheel:
 		    cp $(COPY_FLAGS) $$file $$dest_dir; \
 	    done' sh {} +
 
-	$(PYTHON) -m pip wheel . -w bootstrap_dist --extra-index-url https://test.pypi.org/simple
-	$(PYTHON) -m pip install bootstrap_dist/*.whl
+	$(PYTHON) -m pip wheel --no-deps . -w bootstrap_dist
+	$(PYTHON) -m pip install bootstrap_dist/*.whl --extra-index-url https://test.pypi.org/simple
 
 	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 

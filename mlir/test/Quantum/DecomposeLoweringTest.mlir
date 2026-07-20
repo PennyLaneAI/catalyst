@@ -694,7 +694,7 @@ module @test_paulirot {
         // CHECK-DAG: RX
         %reg2 = quantum.insert %inreg[ 0], %out#0 : !quantum.reg, !quantum.bit
         %reg3 = quantum.insert %reg2[ 1], %out#1 : !quantum.reg, !quantum.bit
-        %reg4 = quantum.insert %reg2[ 2], %out#2 : !quantum.reg, !quantum.bit
+        %reg4 = quantum.insert %reg3[ 2], %out#2 : !quantum.reg, !quantum.bit
         quantum.dealloc %reg4 : !quantum.reg
         return
     }

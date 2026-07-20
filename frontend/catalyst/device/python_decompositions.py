@@ -38,6 +38,8 @@ Python decomposition wrappers should adhere to the following specifications:
 
 # pylint: disable=protected-access,bare-except
 
+import warnings
+
 import jax.numpy as jnp
 import pennylane as qp
 
@@ -79,4 +81,10 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
 
         return str(circuit.mlir_module)
     except:
+        warnings.warn(
+            f"Python decomposition rule compilation failed for operator "
+            f"'{op_name}' (id: {op_id}); it will be treated as non-decomposable "
+            f"by the graph solver.",
+            UserWarning,
+        )
         return "builtin.module{}"
