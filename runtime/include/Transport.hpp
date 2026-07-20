@@ -24,18 +24,18 @@ namespace catalyst::transport {
  */
 enum class DataPath : std::uint8_t {
     CpuVerbs,    // Plain ibverbs on CPU.
-    NicEngine,
     GpuEngine,   // Gpu-initiated comms.
+    NicEngine,
 };
 
 /**
  * @brief Memory kind: selects the allocation and registration path.
  */
 enum class MemKind : std::uint8_t {
-    CpuRam,   // Plain host RAM.
-    GpuHbm,   // GPU HBM, registered via dma-buf.
-    FpgaDdr,  // FPGA DDR
-    FpgaBram, // FPGA on-chip block RAM.
+    CpuRam,
+    GpuHbm,
+    Ddr,
+    Bram,
 };
 
 struct ConnectInfo {
