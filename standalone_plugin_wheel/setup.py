@@ -30,10 +30,11 @@ setup(
     entry_points=entry_points,
     include_package_data=True,
     install_requires=["pennylane", "pennylane_catalyst"],
+    python_requires=">=3.12",
     classifiers=[
         "Development Status :: 1 - Planning",
         "Intended Audience :: Science/Research",
         "Operating System :: POSIX :: Linux",
-        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
 )

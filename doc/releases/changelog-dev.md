@@ -12,6 +12,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
+  [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
+
 * `quantum.extract` canonicalization now looks through a `quantum.insert` at a distinct
   static index, rewriting the extract to read from the register feeding the insert and
   sinking the bypassed insert below the gates acting on the extracted qubits. This removes
@@ -178,6 +181,9 @@
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
 <h3>Breaking changes 💔</h3>
+
+* Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
+  [(#2974)](https://github.com/PennyLaneAI/catalyst/pull/2974)
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
   [(#2840)](https://github.com/PennyLaneAI/catalyst/pull/2840)
