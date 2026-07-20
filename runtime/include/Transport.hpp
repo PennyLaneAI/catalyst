@@ -25,7 +25,7 @@ namespace catalyst::transport {
 enum class DataPath : std::uint8_t {
     CpuVerbs,  // Plain ibverbs on CPU.
     GpuEngine, // Gpu-initiated comms.
-    NicEngine,
+    Other,
 };
 
 /**
