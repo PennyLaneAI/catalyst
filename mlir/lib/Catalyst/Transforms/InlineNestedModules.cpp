@@ -520,13 +520,16 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
 
         mlir::DenseMap<SymbolRefAttr, SymbolRefAttr> old_to_new;
         symbolTable->walk<WalkOrder::PreOrder>([&](Operation *nested) {
-            if (nested == symbolTable)
+            if (nested == symbolTable) {
                 return WalkResult::advance();
+            }
             // Any module still nested at this point is a catalyst.target module.
-            if (isa<ModuleOp>(nested))
+            if (isa<ModuleOp>(nested)) {
                 return WalkResult::skip();
-            if (!isa<SymbolOpInterface>(nested) || !nested->hasAttr(fullyQualifiedNameAttr))
+            }
+            if (!isa<SymbolOpInterface>(nested) || !nested->hasAttr(fullyQualifiedNameAttr)) {
                 return WalkResult::advance();
+            }
             SymbolRefAttr old = nested->getAttrOfType<SymbolRefAttr>(fullyQualifiedNameAttr);
             SymbolRefAttr _new = SymbolRefAttr::get(cast<SymbolOpInterface>(nested));
             old_to_new.insert({old, _new});
