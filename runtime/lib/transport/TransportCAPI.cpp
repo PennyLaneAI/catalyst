@@ -29,7 +29,6 @@ using catalyst::transport::ChannelDesc;
 using catalyst::transport::ConnectInfo;
 using catalyst::transport::ControllerSession;
 using catalyst::transport::DataPath;
-using catalyst::transport::MemKind;
 using catalyst::transport::MemRegion;
 using catalyst::transport::PeerRef;
 
@@ -37,27 +36,9 @@ using catalyst::transport::PeerRef;
 struct CatalystTransportSession {
     std::unique_ptr<DynamicLibraryLoader> backend;
     ControllerSession *sess = nullptr; // heap-allocated by the backend factory
-    MemRegion reply = {};
-    bool have_reply = false;
 };
 
 namespace {
-
-MemKind to_mem_kind(std::int32_t k)
-{
-    switch (k) {
-    case CATALYST_TRANSPORT_MEM_CPU_RAM:
-        return MemKind::CpuRam;
-    case CATALYST_TRANSPORT_MEM_GPU_HBM:
-        return MemKind::GpuHbm;
-    case CATALYST_TRANSPORT_MEM_DDR:
-        return MemKind::Ddr;
-    case CATALYST_TRANSPORT_MEM_OTHER:
-        return MemKind::Other;
-    default:
-        return MemKind::Ddr;
-    }
-}
 
 DataPath to_data_path(std::int32_t p)
 {
@@ -133,35 +114,13 @@ int __catalyst__transport__connect(CatalystTransportSession *s, const char *peer
     });
 }
 
-int __catalyst__transport__alloc_reply(CatalystTransportSession *s, std::uint64_t size,
-                                       std::int32_t mem_kind, std::uint32_t access,
-                                       CatalystTransportMemRegion *out)
-{
-    if (!s || !s->sess) {
-        return CATALYST_TRANSPORT_ERR;
-    }
-    return guard([&] {
-        MemRegion r = s->sess->alloc_memory(size, to_mem_kind(mem_kind), access);
-        s->reply = r;
-        s->have_reply = true;
-        if (out) {
-            out->addr = r.addr;
-            out->size = r.size;
-            out->lkey = r.lkey;
-            out->rkey = r.rkey;
-            out->kind = mem_kind;
-        }
-        return CATALYST_TRANSPORT_OK;
-    });
-}
-
 int __catalyst__transport__exchange_keys(CatalystTransportSession *s, CatalystTransportPeerRef *out)
 {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
     return guard([&] {
-        PeerRef p = s->sess->exchange_keys(s->have_reply ? s->reply : MemRegion{});
+        PeerRef p = s->sess->exchange_keys(MemRegion{});
         if (out) {
             out->rkey = p.rkey;
             out->remote_addr = p.remote_addr;
@@ -184,7 +143,7 @@ int __catalyst__transport__establish_channel(CatalystTransportSession *s, std::i
         p.rkey = peer->rkey;
         p.remote_addr = peer->remote_addr;
         p.size = peer->size;
-        s->sess->establish_channel(desc, s->have_reply ? s->reply : MemRegion{}, p);
+        s->sess->establish_channel(desc, MemRegion{}, p);
         return CATALYST_TRANSPORT_OK;
     });
 }
@@ -249,6 +208,21 @@ std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s)
         return 0;
     }
     return s->sess->last_rtt_ns();
+}
+
+void __catalyst__transport__start(CatalystTransportSession *s)
+{
+    if (!s || !s->sess) {
+        return;
+    }
+    try {
+        s->sess->start();
+    }
+    catch (const std::exception &e) {
+        std::cerr << "[transport] start: " << e.what() << "\n";
+    }
+    catch (...) {
+    }
 }
 
 void __catalyst__transport__stop(CatalystTransportSession *s)
