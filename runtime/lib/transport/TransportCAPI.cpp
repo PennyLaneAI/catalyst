@@ -68,7 +68,7 @@ DataPath to_data_path(std::int32_t p)
         return DataPath::GpuEngine;
     case CATALYST_TRANSPORT_PATH_OTHER:
     default:
-        return DataPath::Other; // Other == hardware RNIC engine (e.g. ERNIC HH)
+        return DataPath::Other;
     }
 }
 
