@@ -167,7 +167,7 @@ class ControllerSession : public TransportSession {
 
     // Fire one round using work item `work_item_idx` and whatever payload is currently in
     // data_slot(). Pairs with a subsequent collect(). Returns 0 on success.
-    virtual int kick(std::uint32_t work_item_idx = 0) = 0;
+    virtual int kick(std::uint32_t work_item_idx) = 0;
 
     // Current round's outbound slot in the transport-owned ring.
     virtual void *data_slot() = 0;
