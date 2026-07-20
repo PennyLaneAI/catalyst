@@ -71,7 +71,6 @@ struct PeerRef {
  */
 struct ChannelDesc {
     DataPath data_path = DataPath::CpuVerbs;
-    bool persistent = true;
 };
 
 /**
@@ -82,7 +81,7 @@ struct ChannelDesc {
  *   2. alloc_memory      - register the region (needs the connected context)
  *   3. exchange_keys     - swap region handles over the out-of-band channel
  *   4. establish_channel - program the channel from the local + peer regions
- *   5. (coprocessor) set_coprocessor_fn / (controller) set_max_in_flight - before start()
+ *   5. (coprocessor) set_coprocessor_fn before start()
  *   6. start / collect / stop
  */
 class TransportSession {
@@ -150,19 +149,9 @@ class TransportSession {
 };
 
 /**
- * @brief Controller role: writes syndromes out and receives corrections.
+ * @brief Controller role: writes messages out and receives corrections.
  */
-class ControllerSession : public TransportSession {
-  public:
-    /**
-     * @brief Set the sliding-window depth: how many syndromes to keep in flight.
-     *
-     * Call before start(). A value of 1 means strict one-in-flight.
-     *
-     * @param n Maximum number of syndromes in flight.
-     */
-    virtual void set_max_in_flight(std::uint32_t n) = 0;
-};
+class ControllerSession : public TransportSession {};
 
 /**
  * @brief Opaque function to run on the coprocessor. May include a persistent kernel on the GPU.
@@ -171,7 +160,7 @@ using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *
                                       std::size_t out_cap, void *ctx);
 
 /**
- * @brief Coprocessor role: receives syndromes, decodes, and returns corrections.
+ * @brief Coprocessor role: receives messages, process, and returns corrections.
  */
 class CoprocessorSession : public TransportSession {
   public:
@@ -181,7 +170,7 @@ class CoprocessorSession : public TransportSession {
      * Call before start(). `fn` is a local function pointer; `ctx` is passed
      * back to `fn` on every invocation and may be null.
      *
-     * @param fn The coprocessor function to run per received syndrome.
+     * @param fn The coprocessor function to run per received message.
      * @param ctx Opaque context passed to `fn` on each invocation; may be null.
      */
     virtual void set_coprocessor_fn(CoprocessorFn fn, void *ctx) = 0;
