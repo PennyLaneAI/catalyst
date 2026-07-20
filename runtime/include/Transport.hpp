@@ -136,22 +136,42 @@ class TransportSession {
      * @brief Wait for a result and write it out.
      *
      * @param outputs Array of output buffers to write into.
+     * @param output_bytes Array of output buffer sizes.
      * @param n Number of output buffers.
      *
      * @return `int`
      */
-    virtual int collect(void *const *outputs, std::size_t n) = 0;
+    virtual int collect(void *const *outputs, const std::size_t *output_bytes, std::size_t n) = 0;
 
     /**
      * @brief Stop the engine and join. Idempotent.
      */
     virtual void stop() = 0;
+
+    /**
+     * @brief Last round-trip time, in nanoseconds (for testing purposes).
+     *
+     * @return `std::uint64_t`
+     */
+    virtual std::uint64_t last_rtt_ns() const { return 0; }
 };
 
 /**
  * @brief Controller role: writes messages out and receives corrections.
  */
-class ControllerSession : public TransportSession {};
+class ControllerSession : public TransportSession {
+  public:
+    // Build the work item in slot `work_item_idx` from `schema`.
+    virtual void commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
+                                  std::uint64_t out_bytes) = 0;
+
+    // Fire one round using work item `work_item_idx` and whatever payload is currently in
+    // data_slot(). Pairs with a subsequent collect(). Returns 0 on success.
+    virtual int kick(std::uint32_t work_item_idx = 0) = 0;
+
+    // Current round's outbound slot in the transport-owned ring.
+    virtual void *data_slot() = 0;
+};
 
 /**
  * @brief Opaque function to run on the coprocessor. May include a persistent kernel on the GPU.
