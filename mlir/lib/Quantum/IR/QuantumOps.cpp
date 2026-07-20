@@ -1233,6 +1233,32 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 // Quantum op interface methods.
 //===----------------------------------------------------------------------===//
 
+// CustomOp
+
+std::string CustomOp::getOperatorName() { return getGateName().str(); }
+
+mlir::TypeRange CustomOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> CustomOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr CustomOp::getStaticData()
+{
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// MultiRZOp
+
+std::string MultiRZOp::getOperatorName() { return "MultiRZ"; }
+
+mlir::TypeRange MultiRZOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> MultiRZOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr MultiRZOp::getStaticData()
+{
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
 // PauliRotOp
 
 std::string PauliRotOp::getOperatorName() { return "PauliRot"; }
@@ -1247,6 +1273,48 @@ mlir::DictionaryAttr PauliRotOp::getStaticData()
     mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
         mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
     return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
+}
+
+// PCPhaseOp
+
+std::string PCPhaseOp::getOperatorName() { return "PCPhase"; }
+
+mlir::TypeRange PCPhaseOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> PCPhaseOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr PCPhaseOp::getStaticData()
+{
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute dimEntry =
+        mlir::NamedAttribute(mlir::StringAttr::get(ctx, "dim"), getDimAttr());
+    return mlir::DictionaryAttr::get(ctx, {dimEntry});
+}
+
+// GlobalPhaseOp
+
+std::string GlobalPhaseOp::getOperatorName() { return "GlobalPhase"; }
+
+mlir::TypeRange GlobalPhaseOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> GlobalPhaseOp::getWireLens() { return {0}; }
+
+mlir::DictionaryAttr GlobalPhaseOp::getStaticData()
+{
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// QubitUnitaryOp
+
+std::string QubitUnitaryOp::getOperatorName() { return "QubitUnitary"; }
+
+mlir::TypeRange QubitUnitaryOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> QubitUnitaryOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr QubitUnitaryOp::getStaticData()
+{
+    return mlir::DictionaryAttr::get(getContext(), {});
 }
 
 // OperatorOp
