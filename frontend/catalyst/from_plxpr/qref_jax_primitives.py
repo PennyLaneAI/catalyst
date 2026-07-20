@@ -234,13 +234,18 @@ def _pbc_logical_init_attr(ctx, init_state: str):
     return ir.OpaqueAttr.get("pbc", f"enum {init_state}".encode("utf-8"), ir.NoneType.get(ctx), ctx)
 
 
-_MAGIC_ALLOC_STATES = frozenset({"magic", "magic_conj"})
+_MLIR_MAGIC_STATES = {
+    "magic-T": "magic",
+    "magic-T-adj": "magic_conj",
+}
 
 
 def _normalize_allocate_state(state):
     if hasattr(state, "value"):
-        return state.value
-    return state
+        state_val = state.value
+    else:
+        state_val = state
+    return _MLIR_MAGIC_STATES.get(state_val, state_val)
 
 
 def _allocate_prim_lowering(
@@ -251,7 +256,7 @@ def _allocate_prim_lowering(
     ctx.allow_unregistered_dialects = True
     state_val = _normalize_allocate_state(state)
 
-    if state_val in _MAGIC_ALLOC_STATES:
+    if state_val in ("magic", "magic_conj"):
         qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
         init_state_attr = _pbc_logical_init_attr(ctx, state_val)
         return [

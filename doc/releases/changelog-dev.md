@@ -2,7 +2,7 @@
 
 <h3>New features since last release</h3>
 
-* ``qp.allocate`` now supports ``state="magic"`` and ``state="magic_conj"``. Both
+* ``qp.allocate`` now supports ``state="magic-T"`` and ``state="magic-T-adj"``. Both
   capture and legacy frontends emit the same ``allocate`` / ``deallocate`` jaxpr
   primitives; MLIR lowering selects ``qref.alloc`` or ``pbc.ref.fabricate`` based
   on the ``state`` argument.

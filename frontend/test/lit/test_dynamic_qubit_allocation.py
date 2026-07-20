@@ -206,7 +206,7 @@ def test_magic_state_fabricate():
     # CHECK: qref.custom "PauliX"() [[magic]]
     # CHECK: qref.dealloc_qb [[magic]]
 
-    with qp.allocate(1, state="magic") as q:
+    with qp.allocate(1, state="magic-T") as q:
         qp.X(q[0])
 
     return qp.probs(wires=[0])

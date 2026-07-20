@@ -1380,7 +1380,7 @@ Currently, however, this is not the case for the following functionalities.
     ``state="any"`` are ignored in Catalyst. The reason is that the only
     supported mode for these states is to always allocate in the zero state.
 
-  - Magic state allocation via ``state="magic"`` or ``state="magic_conj"`` is
+  - Magic state allocation via ``state="magic-T"`` or ``state="magic-T-adj"`` is
     supported in Catalyst and lowers to ``pbc.ref.fabricate`` (and ultimately
     ``pbc.fabricate``) under the hood. These allocations use single-qubit
     fabricate/deallocate semantics rather than register allocation. Both capture

@@ -1870,7 +1870,7 @@ def test_decompose_with_magic_state_allocation():
 
     @qp.register_resources({qp.CNOT: 1})
     def magic_decomp(wire):
-        with qp.allocate(1, state="magic") as work:
+        with qp.allocate(1, state="magic-T") as work:
             qp.CNOT(wires=[work[0], wire])
 
     @qjit(capture=True, target="mlir")

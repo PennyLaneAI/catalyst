@@ -548,7 +548,7 @@ def test_no_capture_magic_state(backend):
     @qjit
     @qp.qnode(qp.device(backend, wires=2))
     def circuit():
-        q = qp.allocate(1, state="magic")
+        q = qp.allocate(1, state="magic-T")
         qp.CNOT(wires=[q[0], 0])
         return qp.probs(wires=[0])
 
@@ -559,8 +559,8 @@ def test_no_capture_magic_state(backend):
 @pytest.mark.parametrize(
     ("state", "prep"),
     (
-        ("magic", lambda w: (qp.H(w), qp.T(w))),
-        ("magic_conj", lambda w: (qp.H(w), qp.adjoint(qp.T(w), lazy=False))),
+        ("magic-T", lambda w: (qp.H(w), qp.T(w))),
+        ("magic-T-adj", lambda w: (qp.H(w), qp.adjoint(qp.T(w), lazy=False))),
     ),
 )
 def test_magic_state_allocation(backend, capture, state, prep):
@@ -589,7 +589,7 @@ def test_magic_state_manual_deallocate(backend):
     @qjit(capture=True)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
-        q = qp.allocate(1, state="magic_conj")
+        q = qp.allocate(1, state="magic-T-adj")
         qp.deallocate(q[0])
         return qp.probs(wires=[0])
 
@@ -602,7 +602,7 @@ def test_magic_state_mlir_lowering(backend):
     @qjit(target="mlir", capture=True)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
-        with qp.allocate(1, state="magic") as q:
+        with qp.allocate(1, state="magic-T") as q:
             qp.X(q[0])
         return qp.probs(wires=[0])
 
