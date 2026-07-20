@@ -53,7 +53,7 @@ MemKind to_mem_kind(std::int32_t k)
     case CATALYST_TRANSPORT_MEM_DDR:
         return MemKind::Ddr;
     case CATALYST_TRANSPORT_MEM_OTHER:
-        return MemKind::Other; // Other == FPGA on-chip BRAM
+        return MemKind::Other;
     default:
         return MemKind::Ddr;
     }
