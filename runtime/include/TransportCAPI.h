@@ -55,20 +55,6 @@ enum {
     CATALYST_TRANSPORT_MEM_OTHER = 3,
 };
 
-// ibverbs access flags for the advertised reply region
-enum {
-    CATALYST_TRANSPORT_ACCESS_REPLY = 7,
-};
-
-// Registered memory region handed back to the caller
-typedef struct {
-    void *addr;
-    uint64_t size;
-    uint32_t lkey;
-    uint32_t rkey;
-    int32_t kind; // one of MemKind enum values
-} CatalystTransportMemRegion;
-
 // Remote peer region descriptor
 typedef struct {
     uint32_t rkey;
