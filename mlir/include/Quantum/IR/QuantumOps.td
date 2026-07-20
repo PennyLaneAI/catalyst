@@ -211,7 +211,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     }];
 
-    let hasCanonicalizeMethod = 1;
+    let hasCanonicalizer = 1;
     let hasVerifier = 1;
     let hasFolder = 1;
 }
@@ -236,7 +236,6 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
         $in_qreg `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` type($in_qreg) `,` type($qubit)
     }];
 
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
     let hasFolder = 1;
 }
@@ -832,15 +831,11 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
             ``quantum.custom``. The reason for this is that it needs to be handled in a special
             way during the lowering due to its C function being variadic on the number of qubits.
 
-        .. note::
-            `dim` is currently captured as a float number for compatibility with
-            runtime and device integration.
-
     }];
 
     let arguments = (ins
         F64:$theta,
-        F64:$dim,
+        I64Attr:$dim,
         Variadic<QubitType>:$in_qubits,
         UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
@@ -853,7 +848,10 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
     );
 
     let assemblyFormat = [{
-        `(` $theta `,` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $theta `,` `dim` `:` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )?
+        `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
