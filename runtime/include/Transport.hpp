@@ -161,7 +161,7 @@ class TransportSession {
  */
 class ControllerSession : public TransportSession {
   public:
-    // Build the work item in slot `work_item_idx` from `schema`.
+    // Build the work item in slot `work_item_idx` from in_bytes and out_bytes.
     virtual void commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
                                   std::uint64_t out_bytes) = 0;
 
