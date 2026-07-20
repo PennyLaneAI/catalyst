@@ -141,7 +141,7 @@ class TransportSession {
      *
      * @return `int`
      */
-    virtual int collect(void *const *outputs, const std::size_t *output_bytes, std::size_t n) = 0;
+    virtual int collect(void *const *outputs, const std::uint64_t *output_bytes, std::size_t n) = 0;
 
     /**
      * @brief Stop the engine and join. Idempotent.
