@@ -38,6 +38,8 @@ Python decomposition wrappers should adhere to the following specifications:
 
 # pylint: disable=protected-access,bare-except
 
+import warnings
+
 import jax.numpy as jnp
 import pennylane as qp
 
@@ -79,4 +81,5 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
 
         return str(circuit.mlir_module)
     except:
+        warnings.warn(f"Failed to compile python decomposition rules for {op_name}", UserWarning)
         return "builtin.module{}"

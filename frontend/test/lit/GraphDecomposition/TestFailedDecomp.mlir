@@ -18,6 +18,7 @@ func.func @circuit(%q0: !quantum.bit) {
     %pi = arith.constant 3.14 : f64
     %out = quantum.pcphase (%pi, dim : 3) %q0 : !quantum.bit
 
+    // CHECK: UserWarning: Failed to compile python decomposition rules for PCPhase
     // CHECK: GraphSolverFailedError
     // CHECK: Decomposition rule not found for operator 'pcphase
     return
