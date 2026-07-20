@@ -91,6 +91,7 @@ int __catalyst__transport__establish_channel(CatalystTransportSession *s, int32_
 int __catalyst__transport__commit_work_item(CatalystTransportSession *s, uint32_t work_item_idx,
                                             uint64_t in_bytes, uint64_t out_bytes);
 void *__catalyst__transport__data_slot(CatalystTransportSession *s);
+void __catalyst__transport__start(CatalystTransportSession *s);
 int __catalyst__transport__kick(CatalystTransportSession *s, uint32_t work_item_idx);
 int __catalyst__transport__collect(CatalystTransportSession *s, void *correction, uint64_t bytes);
 uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s);
