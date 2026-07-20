@@ -1383,7 +1383,10 @@ Currently, however, this is not the case for the following functionalities.
   - Magic state allocation via ``state="magic"`` or ``state="magic_conj"`` is
     supported in Catalyst and lowers to ``pbc.ref.fabricate`` (and ultimately
     ``pbc.fabricate``) under the hood. These allocations use single-qubit
-    fabricate/deallocate semantics rather than register allocation.
+    fabricate/deallocate semantics rather than register allocation. Both capture
+    and legacy pathways use the same ``allocate`` / ``deallocate`` jaxpr
+    primitives; the choice between register allocation and fabrication is made
+    during MLIR lowering based on the ``state`` argument.
 
   - Related to the above point, in PennyLane, dynamic wire allocations do not
     increase the total number of wires used in the circuit. This is because

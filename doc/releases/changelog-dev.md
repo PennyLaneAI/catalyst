@@ -2,10 +2,12 @@
 
 <h3>New features since last release</h3>
 
-* ``qp.allocate`` now supports ``state="magic"`` and ``state="magic_conj"``, lowered via
-  ``pbc.ref.fabricate`` to ``pbc.fabricate`` (H+T / H+T†) with ``qref.dealloc_qb`` deallocation.
+* ``qp.allocate`` now supports ``state="magic"`` and ``state="magic_conj"``. Both
+  capture and legacy frontends emit the same ``allocate`` / ``deallocate`` jaxpr
+  primitives; MLIR lowering selects ``qref.alloc`` or ``pbc.ref.fabricate`` based
+  on the ``state`` argument.
   Requires the corresponding PennyLane release for the new ``AllocateState`` values.
-  [(#3027)](https://github.com/PennyLaneAI/catalyst/pull/3027)
+  [(#3027)](https://github.com/PennyLaneAI/catalyst/pull/3027), [(#3029)](https://github.com/PennyLaneAI/catalyst/pull/3029)
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``

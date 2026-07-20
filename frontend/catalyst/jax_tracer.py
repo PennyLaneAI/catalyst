@@ -118,13 +118,6 @@ from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import DictPatchWrapper, Patcher
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
-
-_MAGIC_ALLOC_STATES = frozenset(
-    {qp.allocation.AllocateState.MAGIC, qp.allocation.AllocateState.MAGIC_CONJ}
-)
-
 
 def _uses_compbasis_obs(obs_tracer: DynamicJaxprTracer) -> bool:
     from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
@@ -133,6 +126,9 @@ def _uses_compbasis_obs(obs_tracer: DynamicJaxprTracer) -> bool:
 
     return obs_tracer.primitive in (compbasis_p, qref_compbasis_p)
 
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # TODO: refactor the tracer module
 # pylint: disable=too-many-lines
@@ -421,7 +417,6 @@ class QRegPromise:
         self.num_device_wires = num_device_wires
         self.cache: Dict[Any, DynamicJaxprTracer] = {}
         self.dynamic_wire_to_qubit: Dict[Any, DynamicJaxprTracer] = {}
-        self.dynamic_wire_to_qreg: Dict[Any, DynamicJaxprTracer] = {}
         self.qref_mode = False
         self.qref_device_reg: Optional[DynamicJaxprTracer] = None
 
@@ -499,59 +494,28 @@ class QRegPromise:
 
 def _trace_allocate(qrp: QRegPromise, op: qp.allocation.Allocate) -> QRegPromise:
     """Trace a dynamic wire allocation onto the tape."""
-    from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
-        qref_alloc_p,
-        qref_fabricate_p,
-        qref_get_p,
-    )
-
     state = op.hyperparameters["state"]
+    restored = op.hyperparameters["restored"]
     qrp.enable_qref_mode()
-    if state in _MAGIC_ALLOC_STATES:
-        for wire in op.wires:
-            qubit = qref_fabricate_p.bind(init_state=state.value)
-            qrp.dynamic_wire_to_qubit[wire] = qubit
-    else:
-        qreg = qref_alloc_p.bind(static_num_qubits=len(op.wires))
-        for idx, wire in enumerate(op.wires):
-            qubit = qref_get_p.bind(qreg, idx)
-            qrp.dynamic_wire_to_qubit[wire] = qubit
-            qrp.dynamic_wire_to_qreg[wire] = qreg
+    qubits = qp.allocation.allocate_prim.bind(
+        num_wires=len(op.wires),
+        state=state,
+        restored=restored,
+    )
+    for wire, qubit in zip(op.wires, qubits):
+        qrp.dynamic_wire_to_qubit[wire] = qubit
     return qrp
 
 
 def _trace_deallocate(qrp: QRegPromise, op: qp.allocation.Deallocate) -> QRegPromise:
     """Trace a dynamic wire deallocation from the tape."""
-    from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
-        qref_dealloc_p,
-        qref_dealloc_qb_p,
-    )
-
-    fabricated_qubits = []
-    qregs = set()
+    qubits = []
     for wire in op.wires:
         if wire not in qrp.dynamic_wire_to_qubit:
             raise CompileError(f"Attempted to deallocate unknown dynamic wire {wire}.")
-        qubit = qrp.dynamic_wire_to_qubit.pop(wire)
-        if wire in qrp.dynamic_wire_to_qreg:
-            qreg = qrp.dynamic_wire_to_qreg.pop(wire)
-            qregs.add(qreg)
-        else:
-            fabricated_qubits.append(qubit)
+        qubits.append(qrp.dynamic_wire_to_qubit.pop(wire))
 
-    if fabricated_qubits and qregs:
-        raise CompileError(
-            "Expected all wires to deallocate to come from the same allocation instruction"
-        )
-
-    for qubit in fabricated_qubits:
-        qref_dealloc_qb_p.bind(qubit)
-    if len(qregs) > 1:
-        raise CompileError(
-            "Expected all wires to deallocate to come from the same allocation instruction"
-        )
-    for qreg in qregs:
-        qref_dealloc_p.bind(qreg)
+    qp.allocation.deallocate_prim.bind(*qubits)
     return qrp
 
 

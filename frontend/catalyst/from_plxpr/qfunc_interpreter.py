@@ -40,9 +40,6 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
     qref_alloc_p,
     qref_compbasis_p,
-    qref_dealloc_p,
-    qref_dealloc_qb_p,
-    qref_fabricate_p,
     qref_get_p,
     qref_gphase_p,
     qref_hermitian_p,
@@ -467,41 +464,20 @@ def handle_allocate(self, *, num_wires, state=None, restored=False):
         if state is not None
         else qp.allocation.AllocateState.ZERO
     )
-    if state in (qp.allocation.AllocateState.MAGIC, qp.allocation.AllocateState.MAGIC_CONJ):
-        return [qref_fabricate_p.bind(init_state=state.value) for _ in range(num_wires)]
-
-    new_qreg = qref_alloc_p.bind(static_num_qubits=num_wires)
-    return [qref_get_p.bind(new_qreg, i) for i in range(num_wires)]
+    # `restored` is intentionally ignored; see doc/dev/sharp_bits.rst.
+    return list(
+        qp.allocation.allocate_prim.bind(
+            num_wires=num_wires,
+            state=state,
+            restored=restored,
+        )
+    )
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.deallocate_prim)
 def handle_deallocate(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.deallocate primitive"""
-    qregs = set()
-    fabricated_qubits = []
-    for w in wires:
-        get_op = w.parent
-        if get_op.primitive is qref_fabricate_p:
-            fabricated_qubits.append(w)
-        elif get_op.primitive is qref_get_p:
-            qreg = get_op.in_tracers[0]
-            qregs.add(qreg)
-        else:
-            raise AssertionError(
-                "Manual deallocation is only supported for manually allocated wires"
-            )
-    if fabricated_qubits and qregs:
-        raise AssertionError(
-            "Expected all wires to deallocate to come from the same allocation instruction"
-        )
-    if fabricated_qubits:
-        for qubit in fabricated_qubits:
-            qref_dealloc_qb_p.bind(qubit)
-    else:
-        assert (
-            len(qregs) == 1
-        ), "Expected all wires to deallocate to come from the same allocation instruction"
-        qref_dealloc_p.bind(list(qregs)[0])
+    qp.allocation.deallocate_prim.bind(*wires)
     return []
 
 
