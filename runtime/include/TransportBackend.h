@@ -14,8 +14,8 @@
 
 // The plugin ABI for out-of-tree transport backends.
 //
-// A transport backend is a shared library that implements a TransportSession role and exports a
-// factory symbol.
+// A transport backend is a shared library that implements a TransportSession role (controller or
+// coprocessor) and exports the matching factory symbol.
 
 #pragma once
 #ifndef TRANSPORTBACKEND_H
@@ -27,10 +27,13 @@
 #include "Transport.hpp"
 
 #define CATALYST_TRANSPORT_CONTROLLER_FACTORY_SYMBOL "CatalystTransportControllerFactory"
+#define CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL "CatalystTransportCoprocessorFactory"
 
-// The factory signature backends must export with C linkage.
+// The factory signatures backends must export with C linkage.
 extern "C" {
 using CatalystTransportControllerFactoryFn = catalyst::transport::ControllerSession *(const char *);
+using CatalystTransportCoprocessorFactoryFn =
+    catalyst::transport::CoprocessorSession *(const char *);
 }
 
 // A helper template macro to generate the <IDENTIFIER>Factory function.
@@ -48,6 +51,24 @@ using CatalystTransportControllerFactoryFn = catalyst::transport::ControllerSess
         }                                                                                          \
         catch (...) {                                                                              \
             std::fprintf(stderr, "[transport] controller factory failed: unknown exception\n");    \
+            return nullptr;                                                                        \
+        }                                                                                          \
+    }
+
+// e.g. GENERATE_TRANSPORT_COPROCESSOR_FACTORY(CatalystTransportCoprocessor, make_coprocessor)
+// where `make_coprocessor(const std::string &config) -> CoprocessorSession*`.
+#define GENERATE_TRANSPORT_COPROCESSOR_FACTORY(IDENTIFIER, BUILDER)                                \
+    extern "C" catalyst::transport::CoprocessorSession *IDENTIFIER##Factory(const char *config)    \
+    {                                                                                              \
+        try {                                                                                      \
+            return (BUILDER)(config ? std::string(config) : std::string());                        \
+        }                                                                                          \
+        catch (const std::exception &e) {                                                          \
+            std::fprintf(stderr, "[transport] coprocessor factory failed: %s\n", e.what());        \
+            return nullptr;                                                                        \
+        }                                                                                          \
+        catch (...) {                                                                              \
+            std::fprintf(stderr, "[transport] coprocessor factory failed: unknown exception\n");   \
             return nullptr;                                                                        \
         }                                                                                          \
     }
