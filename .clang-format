@@ -15,7 +15,7 @@ IncludeBlocks: Regroup
 IncludeCategories:
   # Python & nanobind & pybind11
   - Regex: '^(")(pybind11|Python|nanobind)(\/.*)?\.([hp]+)(")$'
-    Priority: 0  
+    Priority: -1  
 
   # System/STL
   - Regex:    '^(<)(([^.]+)|((std.*|complex|sys.*|dlfcn)\.h))(>)$'
