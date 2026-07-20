@@ -35,24 +35,24 @@ typedef struct CatalystTransportSession CatalystTransportSession;
 enum {
     CATALYST_TRANSPORT_OK = 0,
     CATALYST_TRANSPORT_ERR = -1,         // Generic exception
-    CATALYST_TRANSPORT_ERR_AXI = -2,     // AXI error
-    CATALYST_TRANSPORT_ERR_TIMEOUT = -3, // Reply timeout
-    CATALYST_TRANSPORT_ERR_STUCK = -4,   // Host poll timeout
+    CATALYST_TRANSPORT_ERR_MEMORY = -2,  // Memory error
+    CATALYST_TRANSPORT_ERR_TIMEOUT = -3, // Timeout error
+    CATALYST_TRANSPORT_ERR_STUCK = -4,   // Something got stuck
 };
 
-// DataPath enum
+// DataPath enum (mirrors catalyst::transport::DataPath)
 enum {
     CATALYST_TRANSPORT_PATH_CPU_VERBS = 0,
-    CATALYST_TRANSPORT_PATH_NIC_ENGINE = 1,
-    CATALYST_TRANSPORT_PATH_KERNEL_FUSED = 2,
+    CATALYST_TRANSPORT_PATH_GPU_ENGINE = 1,
+    CATALYST_TRANSPORT_PATH_OTHER = 2,
 };
 
-// MemKind enum
+// MemKind enum (mirrors catalyst::transport::MemKind)
 enum {
     CATALYST_TRANSPORT_MEM_CPU_RAM = 0,
     CATALYST_TRANSPORT_MEM_GPU_HBM = 1,
-    CATALYST_TRANSPORT_MEM_FPGA_DDR = 2,
-    CATALYST_TRANSPORT_MEM_FPGA_BRAM = 3,
+    CATALYST_TRANSPORT_MEM_DDR = 2,
+    CATALYST_TRANSPORT_MEM_OTHER = 3,
 };
 
 // ibverbs access flags for the advertised reply region
@@ -91,7 +91,6 @@ int __catalyst__transport__exchange_keys(CatalystTransportSession *s,
                                          CatalystTransportPeerRef *out);
 int __catalyst__transport__establish_channel(CatalystTransportSession *s, int32_t data_path,
                                              const CatalystTransportPeerRef *peer);
-int __catalyst__transport__set_max_in_flight(CatalystTransportSession *s, uint32_t n);
 int __catalyst__transport__commit_work_item(CatalystTransportSession *s, uint32_t work_item_idx,
                                             uint64_t in_bytes, uint64_t out_bytes);
 void *__catalyst__transport__data_slot(CatalystTransportSession *s);

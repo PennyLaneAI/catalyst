@@ -29,7 +29,6 @@ using catalyst::transport::ChannelDesc;
 using catalyst::transport::ConnectInfo;
 using catalyst::transport::ControllerSession;
 using catalyst::transport::DataPath;
-using catalyst::transport::DecoderSchema;
 using catalyst::transport::MemKind;
 using catalyst::transport::MemRegion;
 using catalyst::transport::PeerRef;
@@ -51,12 +50,12 @@ MemKind to_mem_kind(std::int32_t k)
         return MemKind::CpuRam;
     case CATALYST_TRANSPORT_MEM_GPU_HBM:
         return MemKind::GpuHbm;
-    case CATALYST_TRANSPORT_MEM_FPGA_DDR:
-        return MemKind::FpgaDdr;
-    case CATALYST_TRANSPORT_MEM_FPGA_BRAM:
-        return MemKind::FpgaBram;
+    case CATALYST_TRANSPORT_MEM_DDR:
+        return MemKind::Ddr;
+    case CATALYST_TRANSPORT_MEM_OTHER:
+        return MemKind::Other; // Other == FPGA on-chip BRAM
     default:
-        return MemKind::FpgaDdr;
+        return MemKind::Ddr;
     }
 }
 
@@ -65,11 +64,11 @@ DataPath to_data_path(std::int32_t p)
     switch (p) {
     case CATALYST_TRANSPORT_PATH_CPU_VERBS:
         return DataPath::CpuVerbs;
-    case CATALYST_TRANSPORT_PATH_KERNEL_FUSED:
-        return DataPath::KernelFused;
-    case CATALYST_TRANSPORT_PATH_NIC_ENGINE:
+    case CATALYST_TRANSPORT_PATH_GPU_ENGINE:
+        return DataPath::GpuEngine;
+    case CATALYST_TRANSPORT_PATH_OTHER:
     default:
-        return DataPath::NicEngine;
+        return DataPath::Other; // Other == hardware RNIC engine (e.g. ERNIC HH)
     }
 }
 
@@ -181,23 +180,11 @@ int __catalyst__transport__establish_channel(CatalystTransportSession *s, std::i
     return guard([&] {
         ChannelDesc desc;
         desc.data_path = to_data_path(data_path);
-        desc.persistent = true;
         PeerRef p;
         p.rkey = peer->rkey;
         p.remote_addr = peer->remote_addr;
         p.size = peer->size;
         s->sess->establish_channel(desc, s->have_reply ? s->reply : MemRegion{}, p);
-        return CATALYST_TRANSPORT_OK;
-    });
-}
-
-int __catalyst__transport__set_max_in_flight(CatalystTransportSession *s, std::uint32_t n)
-{
-    if (!s || !s->sess) {
-        return CATALYST_TRANSPORT_ERR;
-    }
-    return guard([&] {
-        s->sess->set_max_in_flight(n);
         return CATALYST_TRANSPORT_OK;
     });
 }
@@ -210,7 +197,7 @@ int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
         return CATALYST_TRANSPORT_ERR;
     }
     return guard([&] {
-        s->sess->commit_work_item(work_item_idx, DecoderSchema{in_bytes, out_bytes});
+        s->sess->commit_work_item(work_item_idx, in_bytes, out_bytes);
         return CATALYST_TRANSPORT_OK;
     });
 }
