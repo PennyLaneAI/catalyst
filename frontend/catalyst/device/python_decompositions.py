@@ -84,6 +84,7 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
         warnings.warn(
             f"Python decomposition rule compilation failed for operator "
             f"'{op_name}' (id: {op_id}); it will be treated as non-decomposable "
-            f"by the graph solver.", UserWarning,
+            f"by the graph solver.",
+            UserWarning,
         )
         return "builtin.module{}"
