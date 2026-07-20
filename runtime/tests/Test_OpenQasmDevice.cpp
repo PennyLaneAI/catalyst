@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "pybind11/embed.h"
+
 #include <cstdint>
 
 #include "catch2/catch_test_macros.hpp"
