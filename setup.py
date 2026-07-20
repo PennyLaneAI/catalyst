@@ -396,7 +396,12 @@ setup(
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
-        include=["catalyst", "catalyst.*", "mlir_quantum"],
+        include=[
+            "catalyst",
+            "catalyst.*",
+            "mlir_quantum",
+            "mlir_quantum.*",
+        ],
         exclude=[
             "catalyst.third_party.oqc.*",
             "catalyst.third_party.oqd.*",
