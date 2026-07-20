@@ -1258,7 +1258,11 @@ static llvm::StringRef getObservableName(MLIRContext *ctx, llvm::StringRef baseN
     return StringAttr::get(ctx, (baseName + "(" + obs + ")").str()).getValue();
 }
 
-llvm::StringRef MeasureOp::getResourceMeasurementName() { return "MidCircuitMeasure"; }
+llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
+uint64_t MeasureOp::getResourceNumQubits() { return 1; }
+uint64_t MeasureOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasureOp::getResourceNumParams() { return 0; }
+
 llvm::StringRef SampleOp::getResourceMeasurementName()
 {
     return getObservableName(getContext(), "sample", getObs().getDefiningOp());

@@ -1190,7 +1190,7 @@ class Measurement_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [MeasurementProcess,
                                         DeclareOpInterfaceMethods<ResourceMeasurementOpInterface>]>;
 
-def MeasureOp : Quantum_Op<"measure", [DeclareOpInterfaceMethods<ResourceMeasurementOpInterface>]> {
+def MeasureOp : Quantum_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];

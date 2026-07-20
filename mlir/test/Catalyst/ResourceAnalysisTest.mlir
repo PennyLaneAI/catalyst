@@ -676,11 +676,11 @@ func.func private @for_loop_1(%arg0: !quantum.bit) -> !quantum.bit {
 // the parent.
 
 // CHECK-LABEL: "for_loop_1": {
-// CHECK: "measurements"
-// CHECK-DAG: "MidCircuitMeasure": 1
+// CHECK: "measurements": {}
 // CHECK: "num_alloc_qubits": 1
 // CHECK: "operations"
 // CHECK-DAG: "Hadamard(1)": 1
+// CHECK-DAG: "MidCircuitMeasure(1)": 1
 
 // CHECK-LABEL: "loop_with_measurement_and_alloc": {
 // CHECK: "function_calls"
@@ -708,11 +708,13 @@ func.func @loop_with_measurement_and_alloc() {
 // Measurements at the top level (not inside a loop)
 
 // CHECK-LABEL: "measurement_ops"
-// CHECK: "measurements"
-// CHECK-DAG: "MidCircuitMeasure": 1
+// CHECK: "measurements": {}
 // CHECK: "num_alloc_qubits": 1
 // CHECK: "num_arg_qubits": 0
 // CHECK: "num_qubits": 1
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 1
+// CHECK-DAG: "MidCircuitMeasure(1)": 1
 func.func @measurement_ops() {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -959,8 +961,8 @@ func.func @mixed_alloc_and_arg_qubits(%q0: !quantum.bit) -> !quantum.bit attribu
 // STATS: 2 total-alloc-qubits
 // STATS: 0 total-arg-qubits
 // STATS: 1 total-classical-ops
-// STATS: 1 total-gates
-// STATS: 1 total-measurements
+// STATS: 2 total-gates
+// STATS: 0 total-measurements
 // STATS: 2 total-qubits
 func.func @stats_test() {
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -1084,8 +1086,7 @@ func.func @auto_qm_flag_unset() {
 
 // CHECK-LABEL: "qref"
 
-// CHECK: "measurements"
-// CHECK-DAG: "MidCircuitMeasure": 1
+// CHECK: "measurements": {}
 
 // CHECK:   "num_alloc_qubits": 6
 // CHECK:   "num_arg_qubits": 3
@@ -1096,6 +1097,7 @@ func.func @auto_qm_flag_unset() {
 // CHECK-DAG: "CNOT(2)": 1
 // CHECK-DAG: "Adjoint(T)(1)": 1
 // CHECK-DAG: "S(1)": 1
+// CHECK-DAG: "MidCircuitMeasure(1)": 1
 // CHECK-DAG: "PPM(0)": 1,
 // CHECK-DAG: "mbqc.ref.graph_state_prep(0)": 1,
 // CHECK-DAG: "mbqc.ref.measure_in_basis(0)": 1

@@ -56,7 +56,7 @@ func.func @pbc_operations() attributes {target_gate="pbc"} {
 
 // Rule with measure
 
-// CHECK: resources = {measurements = {MidCircuitMeasure = 1 : i64},
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 1 : i64, num_arg_qubits = 0 : i64, num_qubits = 1 : i64, operations = {"Hadamard(1,0)" = 1 : i64, "MidCircuitMeasure(1,0)" = 1 : i64}}, target_gate = "gate"
 func.func @rule_mcm() attributes {target_gate="gate"} {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit

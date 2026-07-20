@@ -847,11 +847,10 @@ llvm::StringRef MultiRZOp::getResourceName() { return "MultiRZ"; }
 llvm::StringRef PCPhaseOp::getResourceName() { return "PCPhase"; }
 llvm::StringRef QubitUnitaryOp::getResourceName() { return "QubitUnitary"; }
 
-//===----------------------------------------------------------------------===//
-// Implement ResourceMeasurementOpInterface interface methods.
-//===----------------------------------------------------------------------===//
-
-llvm::StringRef MeasureOp::getResourceMeasurementName() { return "MidCircuitMeasure"; }
+llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
+uint64_t MeasureOp::getResourceNumQubits() { return 1; }
+uint64_t MeasureOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasureOp::getResourceNumParams() { return 0; }
 
 //===----------------------------------------------------------------------===//
 // Implement ResourceAllocQubitOpInterface interface methods.

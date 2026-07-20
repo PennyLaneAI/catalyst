@@ -824,7 +824,7 @@ def HermitianOp : Observable_Op<"hermitian"> {
 
 // -----
 
-def MeasureOp : QRef_Op<"measure", [DeclareOpInterfaceMethods<ResourceMeasurementOpInterface>]> {
+def MeasureOp : QRef_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
         This operation represents a single-qubit computational basis measurement.
