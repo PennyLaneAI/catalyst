@@ -21,6 +21,6 @@ func.func @circuit(%q0: !quantum.bit) {
     // CHECK: UserWarning: Python decomposition rule compilation failed for operator 'PCPhase' (id: PCPhase[f64][1]{dim:3})
     // CHECK-SAME:  it will be treated as non-decomposable by the graph solver
     // CHECK: GraphSolverFailedError
-    // CHECK: Decomposition rule not found for operator 'Hadamard
+    // CHECK: Decomposition rule not found for operator 'pcphase
     return
 }
