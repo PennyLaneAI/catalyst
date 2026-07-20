@@ -84,9 +84,6 @@ CatalystTransportSession *__catalyst__transport__controller_create(const char *b
 void __catalyst__transport__close(CatalystTransportSession *s);
 int __catalyst__transport__connect(CatalystTransportSession *s, const char *peer,
                                    uint16_t oob_port);
-int __catalyst__transport__alloc_reply(CatalystTransportSession *s, uint64_t size, int32_t mem_kind,
-                                       uint32_t access, CatalystTransportMemRegion *out);
-
 int __catalyst__transport__exchange_keys(CatalystTransportSession *s,
                                          CatalystTransportPeerRef *out);
 int __catalyst__transport__establish_channel(CatalystTransportSession *s, int32_t data_path,
