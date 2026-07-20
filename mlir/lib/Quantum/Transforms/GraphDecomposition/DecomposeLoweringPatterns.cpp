@@ -121,6 +121,10 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         }
         else {
             // Didn't find ID match, try matching gate name
+            // TODO: remove multirz's special name editing
+            if (isa<quantum::MultiRZOp>(op)) {
+                gateName = gateName + "_" + std::to_string(op.getWireLens()[0]);
+            }
             auto it_gateName = decompositionRegistry.find(gateName);
             if (it_gateName != decompositionRegistry.end()) {
                 rule = it_gateName->second;
