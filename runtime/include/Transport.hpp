@@ -135,13 +135,12 @@ class TransportSession {
     /**
      * @brief Wait for a result and write it out.
      *
-     * @param outputs Array of output buffers to write into.
-     * @param output_bytes Array of output buffer sizes.
-     * @param n Number of output buffers.
+     * @param correction Output buffer to write the result into.
+     * @param bytes Capacity of the output buffer, in bytes.
      *
      * @return `int`
      */
-    virtual int collect(void *const *outputs, const std::uint64_t *output_bytes, std::size_t n) = 0;
+    virtual int collect(void *correction, std::uint64_t bytes) = 0;
 
     /**
      * @brief Stop the engine and join. Idempotent.

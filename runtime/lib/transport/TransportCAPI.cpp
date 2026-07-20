@@ -195,11 +195,7 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *correction
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
-    return guard([&] {
-        void *outputs[1] = {correction};
-        std::size_t caps[1] = {static_cast<std::size_t>(bytes)};
-        return s->sess->collect(outputs, caps, 1);
-    });
+    return guard([&] { return s->sess->collect(correction, bytes); });
 }
 
 std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s)
