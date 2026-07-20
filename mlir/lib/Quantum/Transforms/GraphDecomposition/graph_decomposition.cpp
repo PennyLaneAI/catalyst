@@ -453,6 +453,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 node.numParams = 0;
             }
 
+            if (auto decompGate = dyn_cast<DecomposableGate>(op.getOperation())) {
+                node.id = decompGate.getGraphOpId();
+            }
+
             operators.push_back(node);
         });
     }
@@ -475,6 +479,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             node.name = raw.take_front(closeIdx).trim().str();
             raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
+        }
+        else if (raw.contains('[') || raw.contains('{')) {
+            node.id = raw.str();
+            node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
         }
         else {
             auto openIdx = raw.find('(');
