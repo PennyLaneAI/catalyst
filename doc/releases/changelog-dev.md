@@ -12,6 +12,16 @@
 
 <h3>Improvements 🛠</h3>
 
+* A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
+  [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
+
+* `quantum.extract` canonicalization now looks through a `quantum.insert` at a distinct
+  static index, rewriting the extract to read from the register feeding the insert and
+  sinking the bypassed insert below the gates acting on the extracted qubits. This removes
+  the false data dependency between wires that act on different qubits of the same register
+  and leaves extracts grouped above the gates and inserts below them.
+  [(#2965)](https://github.com/PennyLaneAI/catalyst/pull/2965)
+
 * Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
   [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
 
@@ -171,6 +181,9 @@
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
 <h3>Breaking changes 💔</h3>
+
+* Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
+  [(#2974)](https://github.com/PennyLaneAI/catalyst/pull/2974)
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
   [(#2840)](https://github.com/PennyLaneAI/catalyst/pull/2840)
@@ -426,6 +439,9 @@
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
   [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
 
+* The documentation for `QJIT.mlir` and `QJIT.mlir_opt` was updated with type hints and docstrings that better reflect the compilation-dependent nature of the properties.
+  [(#2975)](https://github.com/PennyLaneAI/catalyst/pull/2975)
+
 * The [MLIR Plugins](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html)
   documentation has been updated to fix a number of typos and formatting issues, and to improve
   overall readability.
@@ -445,6 +461,7 @@ JiaRung Jian,
 Jacob Kitchen,
 Korbinian Kottmann,
 Christina Lee,
+Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
