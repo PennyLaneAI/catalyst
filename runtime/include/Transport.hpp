@@ -24,7 +24,7 @@ namespace catalyst::transport {
  */
 enum class DataPath : std::uint8_t {
     CpuVerbs,    // Plain ibverbs on CPU.
-    NicEngine,   // Hardware-embedded RNIC (e.g. ERNIC hardware handshake).
+    NicEngine,
     GpuEngine,   // Gpu-initiated comms.
 };
 
@@ -34,7 +34,7 @@ enum class DataPath : std::uint8_t {
 enum class MemKind : std::uint8_t {
     CpuRam,   // Plain host RAM.
     GpuHbm,   // GPU HBM, registered via dma-buf.
-    FpgaDdr,  // FPGA DDR, allocated via the Xilinx UMM allocator.
+    FpgaDdr,  // FPGA DDR
     FpgaBram, // FPGA on-chip block RAM.
 };
 
