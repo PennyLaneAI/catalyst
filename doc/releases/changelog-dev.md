@@ -161,8 +161,10 @@
   that have multiple quantum operands, of either quantum register or qubit type.
   [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
-* The `--decompose-lowering` pass now supports `quantum.paulirot` operators.
+* The `--decompose-lowering` pass now uses the `DecomposableGate` interface, allowing it to support
+  many new gate operations, including `quantum.paulirot`.
   [(#2893)](https://github.com/PennyLaneAI/catalyst/pull/2893)
+  [(#3040)](https://github.com/PennyLaneAI/catalyst/pull/3040)
 
 * Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
   to tracing errors.
@@ -173,6 +175,10 @@
 
 * Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
+
+* The `catalyst.custom_call` operation now accepts an optional `backend_config` attribute,
+  which allows backend-specific configuration to be attached to custom calls.
+  [(#3037)](https://github.com/PennyLaneAI/catalyst/pull/3037)
 
 * Introduced compile-time python-decompositions, allowing compiler passes to lower decomposition
   rules instantiated with static data (ex. pauli strings). Using this, the `graph-decomposition`
