@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/JSON.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
 
@@ -81,7 +82,8 @@ struct ResourceResult {
     // multiply all counts by a scalar
     void multiplyByScalar(int64_t scalar);
 
-    std::string toJson(int indent = 4) const;
+    // Serialize this function's resources into a JSON object.
+    llvm::json::Object toJson() const;
 };
 
 mlir::DictionaryAttr buildResourceDict(mlir::MLIRContext *ctx, const ResourceResult &result);

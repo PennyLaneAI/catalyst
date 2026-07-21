@@ -15,6 +15,7 @@
 #include "RuntimeCAPI.h"
 
 #include <cstdarg>
+#include <cstdint>
 #include <cstdlib>
 #include <ctime>
 #include <memory>
@@ -164,6 +165,8 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
+    RT_FAIL_IF(!CTX || !CTX->getMemoryManager(),
+               "Managed memory allocation requires an initialized runtime context.");
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
@@ -173,6 +176,8 @@ void *__catalyst__rt__alloc_managed(size_t size) { return _mlir_memref_to_llvm_a
 
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
+    RT_FAIL_IF(!CTX || !CTX->getMemoryManager(),
+               "Managed memory allocation requires an initialized runtime context.");
     void *ptr = aligned_alloc(alignment, size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
@@ -510,11 +515,11 @@ void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *data, uint64_t numQubits
     getQuantumDevicePtr()->SetState(data_view, wires);
 }
 
-void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifiers,
+void __catalyst__qis__PCPhase(double theta, int64_t dim, const Modifiers *modifiers,
                               int64_t numQubits, ...)
 {
     RT_ASSERT(numQubits >= 0);
-    RT_ASSERT(dim >= 0 && dim == static_cast<int64_t>(dim));
+    RT_ASSERT(dim >= 0);
 
     va_list args;
     va_start(args, numQubits);
@@ -524,7 +529,7 @@ void __catalyst__qis__PCPhase(double theta, double dim, const Modifiers *modifie
     }
     va_end(args);
 
-    getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, dim}, wires,
+    getQuantumDevicePtr()->NamedOperation("PCPhase", {theta, static_cast<double>(dim)}, wires,
                                           /* modifiers */ MODIFIERS_ARGS(modifiers));
 }
 

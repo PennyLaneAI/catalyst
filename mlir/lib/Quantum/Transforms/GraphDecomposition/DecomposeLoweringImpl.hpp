@@ -34,6 +34,7 @@
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
 
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
 #include "Quantum/Utils/QubitIndex.h"
@@ -413,40 +414,18 @@ class BaseSignatureAnalyzer {
     }
 };
 
-class CustomOpSignatureAnalyzer : public BaseSignatureAnalyzer {
+class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
   public:
-    CustomOpSignatureAnalyzer() = delete;
+    DecomposableGateSignatureAnalyzer() = delete;
 
-    CustomOpSignatureAnalyzer(CustomOp op, bool enableQregMode)
-        : BaseSignatureAnalyzer(op, op.getParams(), op.getNonCtrlQubitOperands(),
-                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
-                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
-                                enableQregMode)
-    {
-    }
-};
-
-class PauliRotOpSignatureAnalyzer : public BaseSignatureAnalyzer {
-  public:
-    PauliRotOpSignatureAnalyzer() = delete;
-
-    PauliRotOpSignatureAnalyzer(PauliRotOp op, bool enableQregMode)
-        : BaseSignatureAnalyzer(op, op.getAngle(), op.getNonCtrlQubitOperands(),
-                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
-                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
-                                enableQregMode)
-    {
-    }
-};
-class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
-  public:
-    MultiRZOpSignatureAnalyzer() = delete;
-
-    MultiRZOpSignatureAnalyzer(MultiRZOp op, bool enableQregMode)
-        : BaseSignatureAnalyzer(op, op.getTheta(), op.getNonCtrlQubitOperands(),
-                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
-                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
-                                enableQregMode)
+    DecomposableGateSignatureAnalyzer(DecomposableGate op, bool enableQregMode)
+        : BaseSignatureAnalyzer(op,
+                                isa<ParametrizedGate>(op.getOperation())
+                                    ? cast<ParametrizedGate>(op.getOperation()).getAllParams()
+                                    : mlir::ValueRange{},
+                                op.getNonCtrlQubitOperands(), op.getCtrlQubitOperands(),
+                                op.getCtrlValueOperands(), op.getNonCtrlQubitResults(),
+                                op.getCtrlQubitResults(), enableQregMode)
     {
     }
 };

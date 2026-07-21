@@ -541,31 +541,6 @@ uint64_t lookup(ExecutorSession *s, const char *name, const char *object)
 }
 
 /**
- * @brief Run the kernel as a main function (take argv as arguments, argc is the length of argv).
- *
- * @param s the session object
- * @param entry the entry function address
- * @param argv the command line arguments
- * @return int32_t the exit code
- */
-int32_t run_as_main(ExecutorSession *s, uint64_t entry_addr, int argc, const char *const *argv)
-{
-    clear_error();
-    try {
-        std::vector<std::string> args;
-        args.reserve(argc);
-        for (int i = 0; i < argc; ++i) {
-            args.emplace_back(argv[i]);
-        }
-        return unwrap(s->getEPC().runAsMain(ExecutorAddr(entry_addr), args), "run_as_main");
-    }
-    catch (const std::exception &e) {
-        set_error(e.what());
-        return -1;
-    }
-}
-
-/**
  * @brief Push one host memref to the remote:
  *        1. allocates the data buffer on the remote
  *        2. allocates the descriptor on the remote (which has a pointer to the data buffer)
@@ -608,7 +583,11 @@ ExecutorAddr push_memref(ExecutorSession *s, RemoteAllocator &alloc, void *host_
         if (copy_data) {
             void *aligned_host = *reinterpret_cast<void **>(desc_host + kAlignedOff);
             if (aligned_host) {
-                remote_write(s, data_remote, aligned_host, data_size);
+                int64_t host_offset = 0;
+                std::memcpy(&host_offset, desc_host + kOffsetOff, sizeof(int64_t));
+                char *src = static_cast<char *>(aligned_host) +
+                            host_offset * static_cast<int64_t>(elem_size);
+                remote_write(s, data_remote, src, data_size);
             }
         }
     }
@@ -619,37 +598,6 @@ ExecutorAddr push_memref(ExecutorSession *s, RemoteAllocator &alloc, void *host_
     ExecutorAddr desc_remote = alloc.alloc(desc_size);
     remote_write(s, desc_remote, desc.data(), desc.size());
     return desc_remote;
-}
-
-/**
- * @brief Pull a remote memref descriptor + its data back into the host descriptor.
- *
- * @param s the session object
- * @param remote_desc the remote address of the memref descriptor
- * @param host_desc the host memref descriptor
- * @param rank the rank of the memref
- * @param elem_size the element size of the memref
- */
-void pull_memref(ExecutorSession *s, ExecutorAddr remote_desc, void *host_desc, size_t rank,
-                 size_t elem_size)
-{
-    size_t desc_size = memref_desc_size(rank);
-    std::vector<char> desc(desc_size);
-    remote_read(s, remote_desc, desc.data(), desc.size());
-
-    uintptr_t aligned_remote;
-    std::memcpy(&aligned_remote, desc.data() + kAlignedOff, sizeof(uintptr_t));
-
-    size_t data_size = memref_data_size(desc.data(), rank, elem_size);
-    size_t alloc_size = std::max<size_t>(data_size, 1);
-    void *aligned_host = __catalyst__rt__alloc_managed(alloc_size);
-    if (data_size && aligned_remote) {
-        remote_read(s, ExecutorAddr(aligned_remote), aligned_host, data_size);
-    }
-    uintptr_t aligned_addr = reinterpret_cast<uintptr_t>(aligned_host);
-    std::memcpy(desc.data() + kAllocatedOff, &aligned_addr, sizeof(uintptr_t));
-    std::memcpy(desc.data() + kAlignedOff, &aligned_addr, sizeof(uintptr_t));
-    std::memcpy(host_desc, desc.data(), desc_size);
 }
 
 /**

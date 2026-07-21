@@ -179,6 +179,46 @@ def DifferentiableGate : OpInterface<"DifferentiableGate", [ParametrizedGate]> {
     ];
 }
 
+def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
+    let description = [{
+        This interface provides a generic way to query decomposition data from a quantum operation. An operation must implement this interface in order to compatible with the `graph-decomposition` pass. Note that implementing this interface does not guarantee that an operation will decomposed successfully, only that it will be registered with the graph.
+    }];
+
+    let cppNamespace = "::catalyst::quantum";
+
+    let methods = [
+        InterfaceMethod<
+            "Return the name of the corresponding frontend operator (i.e. the rule supplier).", "std::string", "getOperatorName"
+        >,
+        InterfaceMethod<
+            "Return the shape and dtype of dynamic data.",
+            "mlir::TypeRange", "getDynamicShape"
+        >,
+        InterfaceMethod<
+            "Return the number of wires the operation acts on for each wire argument (excluding control wires).",
+            "std::vector<size_t>", "getWireLens"
+        >,
+        InterfaceMethod<
+            "Return the values of static data.",
+            "mlir::DictionaryAttr", "getStaticData"
+        >,
+        InterfaceMethod<
+            "Return a string representation of any additional data an operator may need to provide"
+            " for uniqueness (ex. UID).",
+            "std::string", "getExtraData", (ins), [{}], [{ return ""; }]
+        >,
+        InterfaceMethod<
+            "Return the operation's ID for use with the graph. "
+            "This should be computed by the following convention:\n"
+            "```\n"
+            "name + {dtype tree of args} + {number of wires per wires arg} + {static data} + {uid}\n"
+            "```\n"
+            "Note that UID is currently specific to `OperatorOp`s.",
+            "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpId($_op.getOperation()); }]
+        >
+    ];
+}
+
 def MeasurementProcess : OpInterface<"MeasurementProcess"> {
     let description = [{
         This interface provides a generic way to interact with quantum measurement processes.
