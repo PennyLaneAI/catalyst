@@ -135,12 +135,12 @@ class TransportSession {
     /**
      * @brief Wait for a result and write it out.
      *
-     * @param correction Output buffer to write the result into.
+     * @param replies Output buffer to write the result into.
      * @param bytes Capacity of the output buffer, in bytes.
      *
      * @return `int`
      */
-    virtual int collect(void *correction, std::uint64_t bytes) = 0;
+    virtual int collect(void *replies, std::uint64_t bytes) = 0;
 
     /**
      * @brief Stop the engine and join. Idempotent.
@@ -156,7 +156,7 @@ class TransportSession {
 };
 
 /**
- * @brief Controller role: writes messages out and receives corrections.
+ * @brief Controller role: writes messages out and receives replies.
  */
 class ControllerSession : public TransportSession {
   public:
@@ -179,7 +179,7 @@ using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *
                                       std::size_t out_cap, void *ctx);
 
 /**
- * @brief Coprocessor role: receives messages, process, and returns corrections.
+ * @brief Coprocessor role: receives messages, process, and returns replies.
  */
 class CoprocessorSession : public TransportSession {
   public:
