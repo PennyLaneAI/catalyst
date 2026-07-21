@@ -861,6 +861,7 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             return getODSOperands(getParamOperandIdx());
+        }
     }];
 
     let hasCanonicalizeMethod = 1;
