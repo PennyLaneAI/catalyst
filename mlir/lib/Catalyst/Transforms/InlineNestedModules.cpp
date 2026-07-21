@@ -519,22 +519,20 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         mlir::DenseMap<SymbolRefAttr, SymbolRefAttr> old_to_new;
-        symbolTable->walk<WalkOrder::PreOrder>([&](Operation *nested) {
-            if (nested == symbolTable) {
-                return WalkResult::advance();
+        for (auto &region : symbolTable->getRegions()) {
+            for (auto &block : region.getBlocks()) {
+                for (auto &op : block) {
+                    // Skip catalyst.target modules and only remap symbols carrying a qualified name
+                    if (isa<ModuleOp>(op) || !isa<SymbolOpInterface>(op) ||
+                        !op.hasAttr(fullyQualifiedNameAttr)) {
+                        continue;
+                    }
+                    SymbolRefAttr old = op.getAttrOfType<SymbolRefAttr>(fullyQualifiedNameAttr);
+                    SymbolRefAttr _new = SymbolRefAttr::get(cast<SymbolOpInterface>(op));
+                    old_to_new.insert({old, _new});
+                }
             }
-            // Any module still nested at this point is a catalyst.target module.
-            if (isa<ModuleOp>(nested)) {
-                return WalkResult::skip();
-            }
-            if (!isa<SymbolOpInterface>(nested) || !nested->hasAttr(fullyQualifiedNameAttr)) {
-                return WalkResult::advance();
-            }
-            SymbolRefAttr old = nested->getAttrOfType<SymbolRefAttr>(fullyQualifiedNameAttr);
-            SymbolRefAttr _new = SymbolRefAttr::get(cast<SymbolOpInterface>(nested));
-            old_to_new.insert({old, _new});
-            return WalkResult::advance();
-        });
+        }
 
         RewritePatternSet nestedToFlat(context);
         nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern, ZNEReplacerPattern>(
