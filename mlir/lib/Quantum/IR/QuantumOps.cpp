@@ -1285,7 +1285,10 @@ std::vector<size_t> PCPhaseOp::getWireLens() { return {getNonCtrlQubitOperands()
 
 mlir::DictionaryAttr PCPhaseOp::getStaticData()
 {
-    return mlir::DictionaryAttr::get(getContext(), {});
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute dimEntry =
+        mlir::NamedAttribute(mlir::StringAttr::get(ctx, "dim"), getDimAttr());
+    return mlir::DictionaryAttr::get(ctx, {dimEntry});
 }
 
 // GlobalPhaseOp

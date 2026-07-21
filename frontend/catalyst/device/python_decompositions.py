@@ -18,6 +18,8 @@ This module provides infrastructure for compile-time lowering of decomposition r
 
 # pylint: disable=protected-access,bare-except
 
+import warnings
+
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
@@ -63,7 +65,7 @@ def get_dummy_values_for_container(container):
     return tuple(dummy_args)
 
 
-def get_graph_op_id(op: qp.decomposition.CompressedResourceOp | qp.Operator2):
+def get_graph_op_id(op: qp.decomposition.CompressedResourceOp | qp.core.Operator2):
     """
     Return the graph operator id for the operator2 instance `op`.
 
@@ -149,40 +151,53 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
 
-    @qp.qjit(
-        target="mlir",
-        capture=True,
-    )
-    @qp.qnode(device=device)
-    def circuit():
-        for subroutine in subroutines:
-            subroutine(*get_dummy_values_for_container(dynamic_shape), wires=wires)
+    # TODO: not all PL ops have been migrated to the operator 2 format expected by mlir graph decomp
+    # This means some rules will fail the python callback compilation.
+    # When migration is complete, remove the try-except.
+    try:
 
-    module = circuit.mlir_module
+        @qp.qjit(
+            target="mlir",
+            capture=True,
+        )
+        @qp.qnode(device=device)
+        def circuit():
+            for subroutine in subroutines:
+                subroutine(*get_dummy_values_for_container(dynamic_shape), wires=wires)
 
-    def update_funcop_attributes(op):
-        """Update the decomposition rule attributes if op is a decomposition rule.
+        module = circuit.mlir_module
 
-        For use with module.walk
+        def update_funcop_attributes(op):
+            """Update the decomposition rule attributes if op is a decomposition rule.
 
-        This function updates the following attributes:
-            - Adds the `target_gate` attribute.
-            - Adds the `resources` attribute.
-        """
-        if op.name == "func.func":
-            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + op_id)
-            if rule_name in name_to_resources:
-                op.attributes["resources"] = get_mlir_attribute_from_pyval(
-                    {"operations": name_to_resources[rule_name]}
-                )
-                op.attributes["target_gate"] = ir.StringAttr.get(op_id)
+            For use with module.walk
 
-        return ir.WalkResult.ADVANCE
+            This function updates the following attributes:
+                - Adds the `target_gate` attribute.
+                - Adds the `resources` attribute.
+            """
+            if op.name == "func.func":
+                rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + op_id)
+                if rule_name in name_to_resources:
+                    op.attributes["resources"] = get_mlir_attribute_from_pyval(
+                        {"operations": name_to_resources[rule_name]}
+                    )
+                    op.attributes["target_gate"] = ir.StringAttr.get(op_id)
 
-    with module.context:
-        module.operation.walk(update_funcop_attributes)
+            return ir.WalkResult.ADVANCE
 
-    return module
+        with module.context:
+            module.operation.walk(update_funcop_attributes)
+
+        return module
+    except:
+        warnings.warn(
+            f"Python decomposition rule compilation failed for operator "
+            f"'{op_name}' (id: {op_id}); it will be treated as non-decomposable "
+            f"by the graph solver.",
+            UserWarning,
+        )
+        return "builtin.module{}"
 
 
 def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:

@@ -12,6 +12,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
+  [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
+
 * `quantum.extract` canonicalization now looks through a `quantum.insert` at a distinct
   static index, rewriting the extract to read from the register feeding the insert and
   sinking the bypassed insert below the gates acting on the extracted qubits. This removes
@@ -179,6 +182,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
+  [(#2974)](https://github.com/PennyLaneAI/catalyst/pull/2974)
+
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
   [(#2840)](https://github.com/PennyLaneAI/catalyst/pull/2840)
 
@@ -258,7 +264,10 @@
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
 
-* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass. This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph. This also allows the use of python-decompositions for any operator pre-registered in the frontend graph. The graph solver now supports the new `graphOpId`s provided by the interface, as well as the legacy pathway with `name`, `numWires` etc.
+* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
+  This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
+  This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
+  The graph solver now supports the new `graphOpId`s provided by the interface, as well as the legacy pathway with `name`, `numWires` etc.
   [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
   [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
   [(#3039)](https://github.com/PennyLaneAI/catalyst/pull/3039)

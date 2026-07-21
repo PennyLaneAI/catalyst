@@ -168,11 +168,10 @@ TEST(DecomposableGateInterfaceTests, PCPhaseOP)
     std::string moduleStr = R"mlir(
 module {
   %theta = arith.constant 3.7 : f64
-  %dim = arith.constant 42.0 : f64
   %q0 = quantum.alloc_qb : !quantum.bit
   %q1 = quantum.alloc_qb : !quantum.bit
   %q2 = quantum.alloc_qb : !quantum.bit
-  %oq0, %oq1, %oq2 = quantum.pcphase(%theta, %dim) %q0, %q1 ctrls(%q2) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+  %oq0, %oq1, %oq2 = quantum.pcphase(%theta, dim : 0) %q0, %q1 ctrls(%q2) : !quantum.bit, !quantum.bit ctrls !quantum.bit
 }
     )mlir";
 
@@ -189,7 +188,7 @@ module {
 
     // This is needed to keep the backing array from being deleted
     Type f64Type = mlir::Float64Type::get(&context);
-    llvm::SmallVector<mlir::Type, 2> backing({f64Type, f64Type});
+    llvm::SmallVector<mlir::Type, 1> backing({f64Type});
     mlir::TypeRange expectedDynamicShape(backing);
     ASSERT_EQ(llvm::SmallVector<mlir::Type>(pcphase.getDynamicShape()),
               llvm::SmallVector<mlir::Type>(expectedDynamicShape));
@@ -197,9 +196,12 @@ module {
     // Controls are not part of the gate wires considered by the decomp interface
     ASSERT_EQ(pcphase.getWireLens(), std::vector<size_t>({2}));
 
-    ASSERT_EQ(pcphase.getStaticData().size(), 0);
+    mlir::NamedAttribute entry(mlir::StringAttr::get(&context, "dim"),
+                               mlir::IntegerAttr::get(mlir::IntegerType::get(&context, 64), 0));
+    mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
+    ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(pcphase.getGraphOpId(), "PCPhase[f64,f64][2]{}");
+    ASSERT_EQ(pcphase.getGraphOpId(), "PCPhase[f64][2]{dim:0}");
 }
 
 TEST(DecomposableGateInterfaceTests, GlobalPhaseOp)
@@ -208,6 +210,41 @@ TEST(DecomposableGateInterfaceTests, GlobalPhaseOp)
 module {
   %angle = arith.constant 3.1 : f64
   quantum.gphase(%angle)
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate gphase = *module->getOps<GlobalPhaseOp>().begin();
+
+    ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
+
+    // This is needed to keep the backing array from being deleted
+    llvm::SmallVector<mlir::Type, 1> backing({mlir::Float64Type::get(&context)});
+    mlir::TypeRange expectedDynamicShape(backing);
+    ASSERT_EQ(llvm::SmallVector<mlir::Type>(gphase.getDynamicShape()),
+              llvm::SmallVector<mlir::Type>(expectedDynamicShape));
+
+    ASSERT_EQ(gphase.getWireLens(), std::vector<size_t>({0}));
+
+    ASSERT_EQ(gphase.getStaticData().size(), 0);
+
+    ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase[f64][0]{}");
+}
+
+TEST(DecomposableGateInterfaceTests, ControlledGlobalPhaseOp)
+{
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %true = arith.constant true
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %oq = quantum.gphase(%angle) ctrls (%q0) ctrlvals (%true) : ctrls !quantum.bit
 }
     )mlir";
 

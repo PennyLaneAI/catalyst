@@ -15,10 +15,12 @@
 // RUN: not --crash catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=PauliX=1.0 bytecode-rules="%BYTECODE_PATH"})' %s 2>&1 | FileCheck %s
 
 func.func @circuit(%q0: !quantum.bit) {
-    // Gateset only has X, can never make a Hadamard
-    %out = quantum.custom "Hadamard"() %q0 : !quantum.bit
+    %pi = arith.constant 3.14 : f64
+    %out = quantum.pcphase (%pi, dim : 3) %q0 : !quantum.bit
 
+    // CHECK: UserWarning: Python decomposition rule compilation failed for operator 'PCPhase' (id: PCPhase[f64][1]{dim:3})
+    // CHECK-SAME:  it will be treated as non-decomposable by the graph solver
     // CHECK: GraphSolverFailedError
-    // CHECK: Decomposition rule not found for operator 'Hadamard
+    // CHECK: Decomposition rule not found for operator 'pcphase
     return
 }
