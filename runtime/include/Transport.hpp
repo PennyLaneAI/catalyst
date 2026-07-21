@@ -135,7 +135,7 @@ class TransportSession {
     /**
      * @brief Wait for a result and write it out.
      *
-     * @param correction Output buffer to write the result into.
+     * @param replies Output buffer to write the result into.
      * @param bytes Capacity of the output buffer, in bytes.
      *
      * @return `int`
