@@ -27,21 +27,44 @@ from catalyst import qjit
 # H2/STO-3G-like coefficients; the structure (15 terms, runtime values) is what
 # exercises the pipeline, the values just need to be a valid Hamiltonian.
 COEFFS = [
-    -0.0996, 0.1711, 0.1711, -0.2225, -0.2225, 0.1686, 0.0453, -0.0453,
-    -0.0453, 0.0453, 0.1205, 0.1658, 0.1658, 0.1205, 0.1743,
+    -0.0996,
+    0.1711,
+    0.1711,
+    -0.2225,
+    -0.2225,
+    0.1686,
+    0.0453,
+    -0.0453,
+    -0.0453,
+    0.0453,
+    0.1205,
+    0.1658,
+    0.1658,
+    0.1205,
+    0.1743,
 ]
-OPS_FACTORY = lambda: [
-    qml.Identity(0),
-    qml.PauliZ(0), qml.PauliZ(1), qml.PauliZ(2), qml.PauliZ(3),
-    qml.PauliZ(0) @ qml.PauliZ(1),
-    qml.PauliY(0) @ qml.PauliX(1) @ qml.PauliX(2) @ qml.PauliY(3),
-    qml.PauliY(0) @ qml.PauliY(1) @ qml.PauliX(2) @ qml.PauliX(3),
-    qml.PauliX(0) @ qml.PauliX(1) @ qml.PauliY(2) @ qml.PauliY(3),
-    qml.PauliX(0) @ qml.PauliY(1) @ qml.PauliY(2) @ qml.PauliX(3),
-    qml.PauliZ(0) @ qml.PauliZ(2), qml.PauliZ(0) @ qml.PauliZ(3),
-    qml.PauliZ(1) @ qml.PauliZ(2), qml.PauliZ(1) @ qml.PauliZ(3),
-    qml.PauliZ(2) @ qml.PauliZ(3),
-]
+
+
+def make_ops():
+    """Build a fresh list of the Hamiltonian's Pauli-word operators."""
+    return [
+        qml.Identity(0),
+        qml.PauliZ(0),
+        qml.PauliZ(1),
+        qml.PauliZ(2),
+        qml.PauliZ(3),
+        qml.PauliZ(0) @ qml.PauliZ(1),
+        qml.PauliY(0) @ qml.PauliX(1) @ qml.PauliX(2) @ qml.PauliY(3),
+        qml.PauliY(0) @ qml.PauliY(1) @ qml.PauliX(2) @ qml.PauliX(3),
+        qml.PauliX(0) @ qml.PauliX(1) @ qml.PauliY(2) @ qml.PauliY(3),
+        qml.PauliX(0) @ qml.PauliY(1) @ qml.PauliY(2) @ qml.PauliX(3),
+        qml.PauliZ(0) @ qml.PauliZ(2),
+        qml.PauliZ(0) @ qml.PauliZ(3),
+        qml.PauliZ(1) @ qml.PauliZ(2),
+        qml.PauliZ(1) @ qml.PauliZ(3),
+        qml.PauliZ(2) @ qml.PauliZ(3),
+    ]
+
 
 N_QUBITS = 4
 N_EST = 2
@@ -57,13 +80,14 @@ def make_qpe(dev, runtime: bool):
         qml.PauliX(1)
         for k in range(N_EST):
             qml.Hadamard(wires=N_QUBITS + k)
-        H = qml.dot(coeffs if runtime else COEFFS, OPS_FACTORY())
+        H = qml.dot(coeffs if runtime else COEFFS, make_ops())
         for k in range(N_EST):
             t = 2 ** (N_EST - 1 - k)
             qml.ctrl(
                 qml.adjoint(
-                    qml.TrotterProduct(H, time=t, n=N_TROTTER, order=2,
-                                       check_hermitian=False)
+                    qml.TrotterProduct(
+                        H, time=t, n=N_TROTTER, order=2, check_hermitian=False
+                    )
                 ),
                 control=N_QUBITS + k,
             )
