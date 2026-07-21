@@ -285,9 +285,16 @@ def _qref_set_basis_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or
 #
 # qref_qinst_p
 #
+# pylint: disable=too-many-arguments
 @qref_qinst_p.def_abstract_eval
 def _qref_qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
+    *qubits_or_params,
+    op=None,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
+    pcphase_dim=None,
 ):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
@@ -295,6 +302,14 @@ def _qref_qinst_abstract_eval(
     ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
     all_qubits = qubits + ctrl_qubits
     assert all(isinstance(qubit, AbstractQubit) for qubit in all_qubits[: qubits_len + ctrl_len])
+
+    # TODO: make a specialized primitive for PCPhase so that the main qinst primitive's kwarg
+    # does not need to carry the PCPhase around
+    # Or as an alternative, expand the kwarg so that it can be an arbitrary kwarg list for a general
+    # primitive's attributes
+    assert (pcphase_dim is not None) == (
+        op == "PCPhase"
+    ), "pcphase_dim must be provided exactly for PCPhase ops"
     return ()
 
 
@@ -307,6 +322,7 @@ def _qref_qinst_lowering(
     params_len=0,
     ctrl_len=0,
     adjoint=False,
+    pcphase_dim=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -354,12 +370,11 @@ def _qref_qinst_lowering(
         return ()
 
     if name_str == "PCPhase":
-        assert len(float_params) == 2, "PCPhase takes two float parameters"
-        float_param = float_params[0]
-        dim_param = float_params[1]
+        assert len(float_params) == 1, "PCPhase takes one float parameter (theta)"
+        theta = float_params[0]
         PCPhaseOp(
-            theta=float_param,
-            dim=dim_param,
+            theta=theta,
+            dim=ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), pcphase_dim),
             qubits=qubits,
             ctrl_qubits=ctrl_qubits,
             ctrl_values=ctrl_values_i1,

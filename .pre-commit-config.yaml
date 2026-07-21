@@ -4,7 +4,7 @@ repos:
     hooks:
       - id: gitleaks
         name: "🔒 gitleaks · Detect hardcoded secrets"
-repos:
+
 -   repo: https://github.com/psf/black
     rev: 26.3.1
     hooks:
@@ -14,6 +14,7 @@ repos:
               "--config",
               "./pyproject.toml",
             ]
+
 -   repo: https://github.com/PyCQA/isort
     rev: 7.0.0
     hooks:
@@ -24,6 +25,7 @@ repos:
           "--settings-path",
           "./pyproject.toml",
         ]
+
 - repo: local
   hooks:
     - id: pylint
@@ -39,3 +41,10 @@ repos:
           "--rcfile=.pylintrc",  # link to the repo config
         ]
       files: ^frontend/
+
+- repo: https://github.com/pre-commit/mirrors-clang-format
+  rev: v22.1.8
+  hooks:
+    - id: clang-format
+      name: "⚡️ clang-format · Format code"
+      types_or: [c, c++]

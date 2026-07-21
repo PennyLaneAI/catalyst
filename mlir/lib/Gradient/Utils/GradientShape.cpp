@@ -14,6 +14,8 @@
 
 #include "Gradient/Utils/GradientShape.h"
 
+#include <cstdint>
+
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 using namespace mlir;

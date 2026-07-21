@@ -14,10 +14,21 @@
 
 #pragma once
 
-#include "mlir/IR/OpDefinition.h"
+#include <string>
+
+#include "mlir/IR/OpDefinition.h" // for QuantumInterfaces.h..inc
+#include "mlir/IR/Operation.h"
 
 //===----------------------------------------------------------------------===//
 // Quantum interface declarations.
 //===----------------------------------------------------------------------===//
+
+namespace catalyst {
+namespace quantum {
+
+std::string defaultGetGraphOpId(mlir::Operation *op);
+
+}
+} // namespace catalyst
 
 #include "Quantum/IR/QuantumInterfaces.h.inc"
