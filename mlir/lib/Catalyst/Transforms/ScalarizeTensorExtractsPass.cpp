@@ -43,6 +43,79 @@ namespace {
 /// keeping the worst-case code growth per extract small.
 constexpr int64_t kMaxScalarizedElements = 16;
 
+/// Whether the generic's payload is speculatable scalar code that never reads
+/// the accumulator (output block arguments), so it can be inlined verbatim.
+bool hasInlinablePayload(linalg::GenericOp genericOp)
+{
+    Block *body = genericOp.getBody();
+    for (Operation &op : body->without_terminator()) {
+        if (!isPure(&op)) {
+            return false;
+        }
+    }
+    for (OpOperand &outOperand : genericOp.getDpsInitsMutable()) {
+        BlockArgument outArg = body->getArgument(outOperand.getOperandNumber());
+        if (!outArg.use_empty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// Whether every tensor input's indexing map is built only from dimension and
+/// constant expressions, so per-input extraction indices can be derived from
+/// the iteration indices. Validated up front: patterns must not mutate the IR
+/// on the failure path, and ops are created per input during the rewrite.
+bool hasScalarizableInputMaps(linalg::GenericOp genericOp)
+{
+    for (OpOperand *inOperand : genericOp.getDpsInputOperands()) {
+        if (!isa<RankedTensorType>(inOperand->get().getType())) {
+            continue;
+        }
+        AffineMap inputMap = genericOp.getMatchingIndexingMap(inOperand);
+        for (AffineExpr expr : inputMap.getResults()) {
+            if (!isa<AffineDimExpr, AffineConstantExpr>(expr)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/// Materialize scalar operands for the generic's payload: one tensor.extract
+/// per tensor input, at indices given by composing that input's indexing map
+/// with the iteration indices. Scalar operands map through unchanged. Returns
+/// the block-argument-to-scalar mapping used to clone the payload.
+IRMapping materializeScalarOperands(PatternRewriter &rewriter, Location loc,
+                                    linalg::GenericOp genericOp, ArrayRef<Value> iterIndices)
+{
+    Block *body = genericOp.getBody();
+    IRMapping mapping;
+    for (OpOperand *inOperand : genericOp.getDpsInputOperands()) {
+        BlockArgument blockArg = body->getArgument(inOperand->getOperandNumber());
+        Value input = inOperand->get();
+        if (!isa<RankedTensorType>(input.getType())) {
+            mapping.map(blockArg, input);
+            continue;
+        }
+        AffineMap inputMap = genericOp.getMatchingIndexingMap(inOperand);
+        SmallVector<Value> inputIndices;
+        for (AffineExpr expr : inputMap.getResults()) {
+            if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+                inputIndices.push_back(iterIndices[dimExpr.getPosition()]);
+            }
+            else {
+                auto constExpr = cast<AffineConstantExpr>(expr);
+                inputIndices.push_back(
+                    arith::ConstantIndexOp::create(rewriter, loc, constExpr.getValue()));
+            }
+        }
+        Value scalar = tensor::ExtractOp::create(rewriter, loc, input, inputIndices);
+        mapping.map(blockArg, scalar);
+    }
+    return mapping;
+}
+
 /// Fold tensor.extract(linalg.generic) by inlining the generic's scalar payload
 /// at the extraction point, for elementwise (all-parallel) generics.
 struct ExtractOfGeneric : public OpRewritePattern<tensor::ExtractOp> {
@@ -78,68 +151,16 @@ struct ExtractOfGeneric : public OpRewritePattern<tensor::ExtractOp> {
             return failure();
         }
 
-        Block *body = genericOp.getBody();
-
-        // The payload must be speculatable scalar code and must not read the
-        // accumulator (output block argument).
-        for (Operation &op : body->without_terminator()) {
-            if (!isPure(&op)) {
-                return failure();
-            }
-        }
-        for (OpOperand &outOperand : genericOp.getDpsInitsMutable()) {
-            BlockArgument outArg = body->getArgument(outOperand.getOperandNumber());
-            if (!outArg.use_empty()) {
-                return failure();
-            }
-        }
-
-        // Validate every input indexing map up front: patterns must not mutate
-        // the IR on the failure path, and ops are created per input below.
-        for (OpOperand *inOperand : genericOp.getDpsInputOperands()) {
-            if (!isa<RankedTensorType>(inOperand->get().getType())) {
-                continue;
-            }
-            AffineMap inputMap = genericOp.getMatchingIndexingMap(inOperand);
-            for (AffineExpr expr : inputMap.getResults()) {
-                if (!isa<AffineDimExpr, AffineConstantExpr>(expr)) {
-                    return failure();
-                }
-            }
+        if (!hasInlinablePayload(genericOp) || !hasScalarizableInputMaps(genericOp)) {
+            return failure();
         }
 
         Location loc = extractOp.getLoc();
         SmallVector<Value> iterIndices(extractOp.getIndices());
-
-        // Materialize scalar operands: one tensor.extract per generic input, at
-        // indices given by composing that input's indexing map with the
-        // extraction indices.
-        IRMapping mapping;
-        for (OpOperand *inOperand : genericOp.getDpsInputOperands()) {
-            BlockArgument blockArg = body->getArgument(inOperand->getOperandNumber());
-            Value input = inOperand->get();
-            if (!isa<RankedTensorType>(input.getType())) {
-                // Scalar operands of the generic map through unchanged.
-                mapping.map(blockArg, input);
-                continue;
-            }
-            AffineMap inputMap = genericOp.getMatchingIndexingMap(inOperand);
-            SmallVector<Value> inputIndices;
-            for (AffineExpr expr : inputMap.getResults()) {
-                if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-                    inputIndices.push_back(iterIndices[dimExpr.getPosition()]);
-                }
-                else {
-                    auto constExpr = cast<AffineConstantExpr>(expr);
-                    inputIndices.push_back(
-                        arith::ConstantIndexOp::create(rewriter, loc, constExpr.getValue()));
-                }
-            }
-            Value scalar = tensor::ExtractOp::create(rewriter, loc, input, inputIndices);
-            mapping.map(blockArg, scalar);
-        }
+        IRMapping mapping = materializeScalarOperands(rewriter, loc, genericOp, iterIndices);
 
         // Clone the payload, resolving linalg.index to the extraction indices.
+        Block *body = genericOp.getBody();
         for (Operation &op : body->without_terminator()) {
             if (auto indexOp = dyn_cast<linalg::IndexOp>(op)) {
                 mapping.map(indexOp.getResult(), iterIndices[indexOp.getDim()]);
