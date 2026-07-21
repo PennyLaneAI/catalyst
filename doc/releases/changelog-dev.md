@@ -12,6 +12,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new runtime transport layer for remote/local executors is introduced.
+  [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
@@ -469,6 +472,7 @@ JiaRung Jian,
 Jacob Kitchen,
 Korbinian Kottmann,
 Christina Lee,
+Joseph Lee,
 Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
