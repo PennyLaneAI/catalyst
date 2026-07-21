@@ -158,8 +158,10 @@
   that have multiple quantum operands, of either quantum register or qubit type.
   [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
-* The `--decompose-lowering` pass now supports `quantum.paulirot` operators.
+* The `--decompose-lowering` pass now uses the `DecomposableGate` interface, allowing it to support
+  many new gate operations, including `quantum.paulirot`.
   [(#2893)](https://github.com/PennyLaneAI/catalyst/pull/2893)
+  [(#3040)](https://github.com/PennyLaneAI/catalyst/pull/3040)
 
 * Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
   to tracing errors.
