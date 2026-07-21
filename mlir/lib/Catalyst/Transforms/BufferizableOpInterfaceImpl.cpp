@@ -14,6 +14,8 @@
 
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 
+#include <cstdint>
+
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -183,7 +185,8 @@ struct CustomCallOpInterface
         // Create an updated custom call operation
         auto newCustomCallOp =
             CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
-                                 customCallOp.getCallTargetName(), numArgumentsAttr);
+                                 customCallOp.getCallTargetName(), numArgumentsAttr,
+                                 customCallOp.getBackendConfigAttr());
         newCustomCallOp->setDiscardableAttrs(customCallOp->getDiscardableAttrDictionary());
         size_t startIndex = bufferArgs.size() - customCallOp.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
@@ -370,6 +373,87 @@ struct SymbolicArrayOpInterface
     }
 };
 
+/// Bufferization of catalyst.launch_kernel. The callee reads its operands and returns each result
+/// in its own freshly allocated buffer. Bufferization therefore converts the operands to buffers
+/// and the tensor results to memref results (return-by-value): no operand is written in place and
+/// no result aliases an operand.
+struct LaunchKernelOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<LaunchKernelOpInterface,
+                                                                   LaunchKernelOp> {
+    // Each result is returned in a buffer the op allocates.
+    bool bufferizesToAllocation(Operation *op, Value value) const { return true; }
+
+    // The callee reads its operands.
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const
+    {
+        return true;
+    }
+
+    // Operands are not written in place: every result is returned in a separate allocation.
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const
+    {
+        return false;
+    }
+
+    // Results are fresh allocations, so they alias none of the operands.
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const
+    {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const
+    {
+        auto launchOp = cast<LaunchKernelOp>(op);
+
+        SmallVector<Value> bufferOperands;
+        for (Value operand : launchOp.getInputs()) {
+            Value buffer;
+            if (isa<TensorType>(operand.getType())) {
+                FailureOr<Value> opBuffer = getBuffer(rewriter, operand, options, state);
+                if (failed(opBuffer)) {
+                    return failure();
+                }
+                buffer = *opBuffer;
+            }
+            else {
+                buffer = operand;
+            }
+
+            // The callee receives each operand as a contiguous block, addressed through the
+            // memref's aligned pointer with its strides/offset ignored. Copy any
+            // non-identity-layout operand into a fresh contiguous buffer first so the callee sees
+            // the intended elements.
+            if (auto memrefTy = dyn_cast<MemRefType>(buffer.getType())) {
+                if (!memrefTy.getLayout().isIdentity()) {
+                    MemRefType contiguousTy =
+                        MemRefType::get(memrefTy.getShape(), memrefTy.getElementType());
+                    auto alloc = memref::AllocOp::create(rewriter, op->getLoc(), contiguousTy);
+                    memref::CopyOp::create(rewriter, op->getLoc(), buffer, alloc.getResult());
+                    buffer = alloc.getResult();
+                }
+            }
+            bufferOperands.push_back(buffer);
+        }
+
+        SmallVector<Type> memrefResultTypes;
+        convertTypes(SmallVector<Type>(launchOp.getResultTypes()), memrefResultTypes);
+
+        auto newLaunchOp = LaunchKernelOp::create(
+            rewriter, op->getLoc(), memrefResultTypes, launchOp.getCallee(), bufferOperands,
+            launchOp.getArgAttrsAttr(), launchOp.getResAttrsAttr());
+        // Carry over any discardable attributes, since create() only sets the declared ones.
+        newLaunchOp->setDiscardableAttrs(launchOp->getDiscardableAttrDictionary());
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, newLaunchOp.getResults());
+        return success();
+    }
+};
+
 } // namespace
 
 void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
@@ -380,5 +464,6 @@ void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &re
         CallbackOp::attachInterface<CallbackOpInterface>(*ctx);
         CallbackCallOp::attachInterface<CallbackCallOpInterface>(*ctx);
         SymbolicArrayOp::attachInterface<SymbolicArrayOpInterface>(*ctx);
+        LaunchKernelOp::attachInterface<LaunchKernelOpInterface>(*ctx);
     });
 }

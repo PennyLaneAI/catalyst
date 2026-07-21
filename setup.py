@@ -174,7 +174,6 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -392,12 +391,17 @@ setup(
     classifiers=classifiers,
     name="pennylane_catalyst",
     version=version,
-    python_requires=">=3.11",
+    python_requires=">=3.12",
     entry_points=entry_points,
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
-        include=["catalyst", "catalyst.*", "mlir_quantum"],
+        include=[
+            "catalyst",
+            "catalyst.*",
+            "mlir_quantum",
+            "mlir_quantum.*",
+        ],
         exclude=[
             "catalyst.third_party.oqc.*",
             "catalyst.third_party.oqd.*",

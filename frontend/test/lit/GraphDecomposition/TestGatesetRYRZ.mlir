@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Test that decomposition chooses cheapest decomposition path
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RY=1.0,RZ=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
-// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,RY=1.0,RZ=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
-
-
-func.func @circuit() -> !quantum.bit {
-    %0 = quantum.alloc(1) : !quantum.reg
-    %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+func.func public @circuit() attributes {quantum.node} {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
+    %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    quantum.dealloc %2 : !quantum.reg
     // CHECK-NOT: Hadamard
     // CHECK-DAG: RZ
     // CHECK-DAG: RY
-    // CHECK-DAG: gphase
-    %qout = quantum.custom "Hadamard"() %q : !quantum.bit
-    return %qout : !quantum.bit
+    return
 }

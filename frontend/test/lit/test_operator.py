@@ -499,7 +499,8 @@ print(circuit_qubitunitary.mlir)
 
 class PCPhase(qp.core.Operator2):
 
-    dynamic_argnames = ("phi", "dim")
+    dynamic_argnames = ("phi",)
+    compilable_argnames = ("dim",)
 
     def __init__(self, phi, dim, wires):
         super().__init__(phi, dim, wires)
@@ -507,15 +508,15 @@ class PCPhase(qp.core.Operator2):
 
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
-def c_pcphase(x: float, dim: int):
+def c_pcphase(x: float):
     # CHECK-LABEL: func.func public @c_pcphase
     # CHECK: [[false:%.+]] = arith.constant false
 
     # CHECK: [[q11:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q12:%.+]] = qref.get {{%.+}}[ 1]
-    # CHECK: qref.pcphase({{%.+}}, {{%.+}}) [[q11]], [[q12]] : !qref.bit, !qref.bit
+    # CHECK: qref.pcphase({{%.+}}, dim : 0) [[q11]], [[q12]] : !qref.bit, !qref.bit
 
-    PCPhase(x, dim, (0, 1))
+    PCPhase(x, 0, (0, 1))
 
     # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
@@ -523,10 +524,10 @@ def c_pcphase(x: float, dim: int):
 
     # PCPhase gets automatically canonicalized, so it will never have the `adj` attribute
     # CHECK: [[theta:%.+]] = arith.negf {{%.+}} : f64
-    # CHECK: qref.pcphase([[theta]], {{%.+}}) [[q3]], [[q4]] ctrls([[q5]]) ctrlvals([[false]]) :
+    # CHECK: qref.pcphase([[theta]], dim : 3) [[q3]], [[q4]] ctrls([[q5]]) ctrlvals([[false]]) :
     # CHECK-SAME: !qref.bit, !qref.bit ctrls !qref.bit
 
-    qp.ctrl(qp.adjoint(PCPhase(x, dim, (0, 1))), [2], [False])
+    qp.ctrl(qp.adjoint(PCPhase(x, 3, (0, 1))), [2], [False])
     return qp.state()
 
 
