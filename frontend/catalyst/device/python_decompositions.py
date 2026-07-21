@@ -65,7 +65,7 @@ def get_dummy_values_for_container(container):
     return tuple(dummy_args)
 
 
-def get_graph_op_id(op: qp.decomposition.CompressedResourceOp | qp.core.Operator2):
+class GraphOpID:
     """
     Return the graph operator id for the operator2 instance `op`.
 
@@ -85,36 +85,77 @@ def get_graph_op_id(op: qp.decomposition.CompressedResourceOp | qp.core.Operator
     Note that this function should not be updated without updating the corresponding method on the
     DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp.
     """
-    if isinstance(op, qp.decomposition.CompressedResourceOp):
-        # NOTE: handling this the old-fashioned way, remove once Operator2 migration is complete
-        op_type = op.op_type
-    else:
-        op_type = op
 
-    if issubclass(op_type, qp.core.operator.Operator):
-        name = op_type.__name__
-        num_params = op_type.num_params
-        num_wires = str(op_type.num_wires) if op_type.num_wires else "0"
-        return name + "[" + ",".join(["f64"] * num_params) + "][" + num_wires + "]{}"
-    elif isinstance(op_type, qp.core.operator.Operator2):
-        # TODO: use real getters here
-        name = op_type.__name__
-        dynamic_shape = op_type.getDynamicShape()
-        wire_lens = op_type.getWireLens()
-        static_data = op_type.getStaticData()
-        extra_data = op_type.uid
-        return (
-            name
-            + ("[" + dynamic_shape + "]")
-            + ("[" + wire_lens + "]")
-            + ("{" + static_data + "}")
-            + ("[" + extra_data + "]")
+    def __init__(self, op: qp.decomposition.CompressedResourceOp | qp.core.Operator2):
+        if isinstance(op, qp.decomposition.CompressedResourceOp):
+            # NOTE: handling this the old-fashioned way, remove once Operator2 migration is complete
+            op_type = op.op_type
+        else:
+            op_type = op
+
+        if issubclass(op_type, qp.core.operator.Operator):
+            self.name = op_type.__name__
+            self.dynamic_shape = ",".join(["f64"] * op_type.num_params)
+            self.wire_lens = str(op_type.num_wires) if op_type.num_wires else "0"
+            self.static_data = {}
+            self.extra_data = ""
+            # return name + "[" + ",".join(["f64"] * num_params) + "][" + num_wires + "]{}"
+        elif isinstance(op_type, qp.core.operator.Operator2):
+            # TODO: use real getters here
+            self.name = op_type.__name__
+            self.dynamic_shape = op_type.getDynamicShape()
+            self.wire_lens = op_type.getWireLens()
+            self.static_data = op_type.getStaticData()
+            self.extra_data = op_type.uid
+            # return (
+            #     name
+            #     + ("[" + dynamic_shape + "]")
+            #     + ("[" + wire_lens + "]")
+            #     + ("{" + static_data + "}")
+            #     + ("[" + extra_data + "]")
+            # )
+        else:
+            raise ValueError(
+                "Only AbstractOperator and CompressedResourceOp types are supported for generating a "
+                f"graph ID, got {op} of type {type(op)}"
+            )
+
+    def getID(self):
+        ID_string = (
+            self.name
+            + ("[" + self.dynamic_shape + "]")
+            + ("[" + self.wire_lens + "]")
+            + ("{" + self.static_data + "}")
         )
-    else:
-        raise ValueError(
-            "Only AbstractOperator and CompressedResourceOp types are supported for generating a "
-            f"graph ID, got {op} of type {type(op)}"
-        )
+        if self.extra_data:
+            ID_string += "[" + self.extra_data + "]"
+        return ID_string
+
+
+def collect_resources_for_op(op_name, static_data):
+    print(f"collecting resources for {op_name}")
+    decomp_rules = list(qp.decomposition.list_decomps(op_name))
+
+    # map rules to resource resources, in a more generic format
+
+    name_to_resource_ids = {}
+    name_to_resources = {}
+    for rule in decomp_rules:
+        # TODO: not all PL ops have been migrated to the operator 2 format expected by mlir graph
+        # decomp This means some rules will fail the python callback compilation. When migration is
+        # complete, remove the try-except.
+        try:
+            resources = rule.compute_resources(**static_data)
+            print(f"computed resources {resources}")
+            name_to_resources[rule.name] = resources.gate_counts
+            name_to_resource_ids[rule.name] = {
+                GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
+            }
+        except:  # pylint: disable=bare-except
+            print(f"whoops, removing rule {rule} for {op_name}")
+            decomp_rules.remove(rule)
+
+    return name_to_resources, name_to_resource_ids, decomp_rules
 
 
 def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) -> ModuleOp:
@@ -123,22 +164,7 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
     device = qp.device("null.qubit", wires=sum(wire_lens))
     wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
 
-    decomp_rules = list(qp.decomposition.list_decomps(op_name))
-
-    # map rules to resource resources, in a more generic format
-
-    name_to_resources = {}
-    for rule in decomp_rules:
-        # TODO: not all PL ops have been migrated to the operator 2 format expected by mlir graph
-        # decomp This means some rules will fail the python callback compilation. When migration is
-        # complete, remove the try-except.
-        try:
-            name_to_resources[rule.name] = {
-                get_graph_op_id(op): count
-                for op, count in rule.compute_resources(**static_data).gate_counts.items()
-            }
-        except:  # pylint: disable=bare-except
-            decomp_rules.remove(rule)
+    _, name_to_resource_ids, decomp_rules = collect_resources_for_op(op_name, static_data)
 
     def rule_to_subroutine(rule):
         def decomp_rule(*params, wires):
@@ -178,9 +204,9 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
             """
             if op.name == "func.func":
                 rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + op_id)
-                if rule_name in name_to_resources:
+                if rule_name in name_to_resource_ids:
                     op.attributes["resources"] = get_mlir_attribute_from_pyval(
-                        {"operations": name_to_resources[rule_name]}
+                        {"operations": name_to_resource_ids[rule_name]}
                     )
                     op.attributes["target_gate"] = ir.StringAttr.get(op_id)
 

@@ -21,7 +21,7 @@ from jax._src.lib.mlir import ir
 from pennylane.operation import Operator, Operator2
 
 from catalyst.compiler import _quantum_opt
-from catalyst.device.python_decompositions import get_graph_op_id, python_decomposition
+from catalyst.device.python_decompositions import GraphOpID, python_decomposition
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # TODO: Uncomment dynamic size wires ops once they are supported
@@ -71,6 +71,40 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
 }
 
 
+def get_rule_funcs_from_module(module: ir.Module) -> list[ir.Operation]:
+    funcOps = []
+
+    def find_condition(op):
+        if op.name == "func.func":
+            if "target_gate" in op.attributes:
+                old_attr = op.attributes["sym_name"]
+                op.attributes["sym_name"] = ir.StringAttr.get(
+                    "__builtin_" + old_attr.value.strip('"'), context=old_attr.context
+                )
+                funcOps.append(op)
+                return ir.WalkResult.SKIP
+        return ir.WalkResult.ADVANCE
+
+    module.operation.walk(find_condition)
+    return funcOps
+
+
+def get_rules_from_module(module: ir.Module) -> str:
+    """
+    Parse and modify decomposition rules from a ModuleOp.
+
+    Args:
+        module: an MLIR module object containing a FuncOp named `rule_wrapper` to be extracted
+
+    Returns:
+        str: The string representation of any decomposition rules from `module`, pre-pending the
+             `__builtin_` prefix to their names.
+    """
+    funcOps = get_rule_funcs_from_module(module)
+
+    return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
+
+
 def get_abstract_args(op_class: type[Operator]) -> list[type]:
     """
     Create jax-compatible abstract args for catalyst DecompositionRules that apply to op_class.
@@ -89,34 +123,6 @@ def get_abstract_args(op_class: type[Operator]) -> list[type]:
             f"Cannot generate arguments for {op_class.__name__} with multi-dimensional parameters."
         )
     return [float for _ in range(op_class.num_params)]
-
-
-def get_rules_from_module(module) -> str:
-    """
-    Parse and modify decomposition rules from a ModuleOp.
-
-    Args:
-        module: an MLIR module object containing a FuncOp named `rule_wrapper` to be extracted
-
-    Returns:
-        str: The string representation of any decomposition rules from `module`, pre-pending the
-             `__builtin_` prefix to their names.
-    """
-    funcOps = []
-
-    def find_condition(op):
-        if op.name == "func.func":
-            if "target_gate" in op.attributes:
-                op.attributes["sym_name"] = ir.StringAttr.get(
-                    "__builtin_" + op.attributes["sym_name"].value.strip('"')
-                )
-                funcOps.append(op)
-                return ir.WalkResult.SKIP
-        return ir.WalkResult.ADVANCE
-
-    module.operation.walk(find_condition)
-
-    return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
 def parse_operator_data(op):
@@ -161,7 +167,7 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
                 continue
 
             mlir_rules = python_decomposition(
-                op.__name__, get_graph_op_id(op), dynamic_data, wire_lens, {}
+                op.__name__, GraphOpID(op).getID(), dynamic_data, wire_lens, {}
             )
 
             bytecode_lib += get_rules_from_module(mlir_rules) + "\n"
