@@ -179,7 +179,7 @@ using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *
                                       std::size_t out_cap, void *ctx);
 
 /**
- * @brief Coprocessor role: receives messages, process, and returns corrections.
+ * @brief Coprocessor role: receives messages, process, and returns replies.
  */
 class CoprocessorSession : public TransportSession {
   public:
