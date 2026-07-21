@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "scatter"
 
+#include <cstdint>
+
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -132,7 +134,8 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::
         newOperands.append(operands.begin(), operands.end());
         auto callTargetAttr = rewriter.getStringAttr(calleeName);
         rewriter.replaceOpWithNewOp<CustomCallOp>(op, resultsType, newOperands, callTargetAttr,
-                                                  nullptr);
+                                                  /*number_original_arg=*/nullptr,
+                                                  /*backend_config=*/nullptr);
 
         return success();
     }

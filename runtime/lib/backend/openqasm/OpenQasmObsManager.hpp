@@ -15,6 +15,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <utility>
 
 #include "Exception.hpp"
