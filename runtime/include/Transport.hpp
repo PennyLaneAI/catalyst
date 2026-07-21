@@ -156,7 +156,7 @@ class TransportSession {
 };
 
 /**
- * @brief Controller role: writes messages out and receives corrections.
+ * @brief Controller role: writes messages out and receives replies.
  */
 class ControllerSession : public TransportSession {
   public:
