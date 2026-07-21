@@ -76,6 +76,10 @@
 * Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
+* The `catalyst.custom_call` operation now accepts an optional `backend_config` attribute,
+  which allows backend-specific configuration to be attached to custom calls.
+  [(#3037)](https://github.com/PennyLaneAI/catalyst/pull/3037)
+
 <h3>Breaking changes 💔</h3>
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
