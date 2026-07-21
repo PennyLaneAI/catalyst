@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
+#include <cstdint>
 #include <fstream>
 #include <string>
 
@@ -150,67 +151,6 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         }
     }
 
-    /// Serialize a single ResourceResult into a JSON object.
-    static llvm::json::Object resultToJson(const ResourceResult &result)
-    {
-        llvm::json::Object funcObj;
-
-        llvm::json::Object opsObj;
-        for (const auto &opEntry : result.operations) {
-            StringRef opName = opEntry.getKey();
-            for (const auto &sizeEntry : opEntry.getValue()) {
-                const auto &[nQubits, nParams] = sizeEntry.first;
-                int64_t count = sizeEntry.second;
-                std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
-                opsObj[key] = count;
-            }
-        }
-        funcObj["operations"] = std::move(opsObj);
-
-        llvm::json::Object measObj;
-        for (const auto &entry : result.measurements) {
-            measObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["measurements"] = std::move(measObj);
-
-        llvm::json::Object classObj;
-        for (const auto &entry : result.classicalInstructions) {
-            classObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["classical_instructions"] = std::move(classObj);
-
-        llvm::json::Object fcObj;
-        for (const auto &entry : result.functionCalls) {
-            fcObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["function_calls"] = std::move(fcObj);
-
-        // Store hashes as hex strings so JSON readers don't break high bits
-        llvm::json::Object vfcObj;
-        for (const auto &entry : result.varFunctionCalls) {
-            vfcObj[entry.getKey()] = formatv("{0:x16}", entry.getValue()).str();
-        }
-        funcObj["var_function_calls"] = std::move(vfcObj);
-
-        funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
-        funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
-        funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
-        funcObj["device_name"] = result.deviceName;
-        funcObj["qnode"] = result.isQnode;
-        funcObj["has_branches"] = result.hasBranches;
-        if (result.autoQubitManagement.has_value()) {
-            funcObj["auto_qubit_management"] = *result.autoQubitManagement;
-        }
-        llvm::json::Object depthObj;
-        if (result.pbcDepth) {
-            depthObj["any_commuting_depth"] = result.pbcDepth->first;
-            depthObj["qubit_disjoint_depth"] = result.pbcDepth->second;
-        }
-        funcObj["depth"] = std::move(depthObj);
-
-        return funcObj;
-    }
-
     /// Serialize all per-function ResourceResults into a JSON string.
     /// qnode functions are inserted first so that the PennyLane reader
     /// (which uses the first entry) picks the correct function.
@@ -220,12 +160,12 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
         for (const auto &funcEntry : results) {
             if (funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                root[funcEntry.getKey()] = funcEntry.getValue().toJson();
             }
         }
         for (const auto &funcEntry : results) {
             if (!funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                root[funcEntry.getKey()] = funcEntry.getValue().toJson();
             }
         }
 
