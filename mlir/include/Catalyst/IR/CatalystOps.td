@@ -110,7 +110,8 @@ def CustomCallOp: Catalyst_Op<"custom_call",
   let arguments = (ins
     Variadic<AnyType>:$inputs,
     StrAttr:$call_target_name,
-    OptionalAttr<I32Attr>: $number_original_arg
+    OptionalAttr<I32Attr>: $number_original_arg,
+    OptionalAttr<DictionaryAttr>: $backend_config
   );
   let results = (outs Variadic<AnyType>);
 
