@@ -140,7 +140,7 @@ class TransportSession {
      *
      * @return `int`
      */
-    virtual int collect(void *correction, std::uint64_t bytes) = 0;
+    virtual int collect(void *replies, std::uint64_t bytes) = 0;
 
     /**
      * @brief Stop the engine and join. Idempotent.
