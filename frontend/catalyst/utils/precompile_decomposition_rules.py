@@ -14,19 +14,14 @@
 
 """Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
 
-import warnings
 from pathlib import Path
 
-import jax
 import pennylane as qp
 from jax._src.lib.mlir import ir
-from jaxlib.mlir.dialects.builtin import ModuleOp
 from pennylane.operation import Operator, Operator2
 
 from catalyst.compiler import _quantum_opt
 from catalyst.device.python_decompositions import get_graph_op_id, python_decomposition
-from catalyst.jax_primitives import decomposition_rule
-from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # TODO: Uncomment dynamic size wires ops once they are supported

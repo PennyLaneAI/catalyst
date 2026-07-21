@@ -90,8 +90,6 @@ class TestPrecompiled:
 class TestTraceTime:
     """Placeholder for future tests of trace-time decomposition rule lowering."""
 
-    pass
-
 
 class TestOnDemand:
     """
