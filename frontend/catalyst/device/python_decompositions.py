@@ -19,6 +19,7 @@ This module provides infrastructure for compile-time lowering of decomposition r
 # pylint: disable=protected-access,bare-except
 
 import warnings
+from collections import deque
 
 import jax.numpy as jnp
 import pennylane as qp
@@ -125,19 +126,17 @@ class GraphOpID:
             self.name
             + ("[" + self.dynamic_shape + "]")
             + ("[" + self.wire_lens + "]")
-            + ("{" + self.static_data + "}")
+            + ("{" + str(self.static_data) + "}")
         )
         if self.extra_data:
-            ID_string += "[" + self.extra_data + "]"
+            ID_string += "[" + str(self.extra_data) + "]"
         return ID_string
 
 
 def collect_resources_for_op(op_name, static_data):
-    print(f"collecting resources for {op_name}")
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
 
     # map rules to resource resources, in a more generic format
-
     name_to_resource_ids = {}
     name_to_resources = {}
     for rule in decomp_rules:
@@ -146,16 +145,33 @@ def collect_resources_for_op(op_name, static_data):
         # complete, remove the try-except.
         try:
             resources = rule.compute_resources(**static_data)
-            print(f"computed resources {resources}")
             name_to_resources[rule.name] = resources.gate_counts
             name_to_resource_ids[rule.name] = {
                 GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
             }
         except:  # pylint: disable=bare-except
-            print(f"whoops, removing rule {rule} for {op_name}")
             decomp_rules.remove(rule)
 
     return name_to_resources, name_to_resource_ids, decomp_rules
+
+
+def BFS_decomp_rules(op_name, static_data):
+    q = deque()
+    q.append((op_name, static_data))
+    visited = [(op_name, static_data)]
+    while len(q) != 0:
+        this = q.popleft()
+        resources, _, _ = collect_resources_for_op(*this)
+        for _rule_name, resource in resources.items():
+            for op, _count in resource.items():
+                if issubclass(op.op_type, qp.ops.ChangeOpBasis):
+                    continue
+                graph_op_id = GraphOpID(op)
+                probe = (graph_op_id.name, graph_op_id.static_data)
+                if not probe in visited:
+                    visited.append(probe)
+                    q.append(probe)
+    return visited
 
 
 def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) -> ModuleOp:
