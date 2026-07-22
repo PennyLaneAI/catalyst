@@ -374,9 +374,9 @@ def test_ppr_to_ppm_auto_corrected():
 
     specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
-
     assert gate_types["GlobalPhase"] == 4
-    assert gate_types["PPR-pi/4-w1"] == 6
+    assert gate_types["PPR-pi/4-w1"] == 4
+    assert gate_types["Adjoint(PPR-pi/4)"] == 2
     assert gate_types["PPR-pi/4-w2"] == 1
     assert gate_types["PPR-pi/8-w1"] == 1
 
@@ -402,7 +402,8 @@ def test_ppr_to_ppm_inject_magic_state():
 
     specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
-    assert gate_types["PPR-pi/4-w1"] == 6
+    assert gate_types["Adjoint(PPR-pi/4)"] == 2
+    assert gate_types["PPR-pi/4-w1"] == 4
     assert gate_types["PPR-pi/4-w2"] == 1
     assert gate_types["PPR-pi/8-w1"] == 1
     assert gate_types["PPM-w1"] == 2
@@ -429,7 +430,8 @@ def test_ppr_to_ppm_pauli_corrected():
 
     specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.gate_types
-    assert gate_types["PPR-pi/4-w1"] == 6
+    assert gate_types["PPR-pi/4-w1"] == 4
+    assert gate_types["Adjoint(PPR-pi/4)"] == 2
     assert gate_types["PPR-pi/4-w2"] == 1
     assert gate_types["PPR-pi/8-w1"] == 1
     assert gate_types["PPM-w1"] == 2
@@ -598,8 +600,6 @@ def test_decompose_arbitrary_ppr():
 
     ir = test_decompose_arbitrary_ppr_workflow.mlir
     ir_opt = test_decompose_arbitrary_ppr_workflow.mlir_opt
-
-    print(ir_opt)
 
     assert 'transform.apply_registered_pass "decompose-arbitrary-ppr"' in ir
     assert 'pbc.ppr.arbitrary ["X", "Y", "Z"]' not in ir_opt

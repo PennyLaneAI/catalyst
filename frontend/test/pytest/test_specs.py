@@ -1064,7 +1064,7 @@ class TestSpecsWithPPR:
             level="decompose-arbitrary-ppr",
             resources=SpecsResources(
                 gate_types={
-                    "pbc.prepare": 1,
+                    "PrepareState": 1,
                     "PPM-w3": 1,
                     "PPM-w1": 1,
                     "PPR-pi/2-w1": 1,
@@ -1073,7 +1073,7 @@ class TestSpecsWithPPR:
                 },
                 gate_sizes={0: 1, 1: 3, 2: 1, 3: 1},
                 measurements={},
-                num_allocs=3,
+                num_allocs=4,
             ),
         )
 

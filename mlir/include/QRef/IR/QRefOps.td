@@ -35,7 +35,7 @@ include "QRef/IR/QRefTypes.td"
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : QRef_Op<mnemonic, traits>;
 
-def AllocOp : Memory_Op<"alloc"> {
+def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate n qubits.";
     let description = [{
         This operation represents the allocation of some number of qubits.
@@ -58,7 +58,7 @@ def AllocOp : Memory_Op<"alloc"> {
     let hasVerifier = 1;
 }
 
-def AllocQubitOp : Memory_Op<"alloc_qb"> {
+def AllocQubitOp : Memory_Op<"alloc_qb", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate a single qubit.";
     let description = [{
         This operation represents the allocation of a single qubit.
@@ -174,6 +174,17 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
             assert(qubits.size() == replacements.size() && "must provide values for all qubits");
             qubits.assign(replacements);
         }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getQubitOperands().size();
+        }
+
+        uint64_t getResourceNumCtrlQubits() { return 0; }
+
+        uint64_t getResourceNumParams() { return 0; }
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -243,6 +254,28 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
             } else {
                (*this)->removeAttr("adjoint");
             }
+        }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getQubits().size();
+        }
+
+        uint64_t getResourceNumCtrlQubits() {
+            return getCtrlQubits().size();
+        }
+
+        uint64_t getResourceNumParams() {
+            if (auto gate = mlir::dyn_cast<qref::ParametrizedGate>(getOperation())){
+                return gate.getAllParams().size();
+            }
+            return 0;
+        }
+
+        bool getResourceAdjointFlag() {
+            return getAdjointFlag();
         }
     }];
 
@@ -787,7 +820,7 @@ def HermitianOp : Observable_Op<"hermitian"> {
 
 // -----
 
-def MeasureOp : QRef_Op<"measure"> {
+def MeasureOp : QRef_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
         This operation represents a single-qubit computational basis measurement.
