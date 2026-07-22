@@ -92,28 +92,35 @@ class SharedLibraryManager final {
         constexpr const char *dl_ext = ".so";
 #endif
 
-        _handler = dlopen(filename.c_str(), rtld_flags);
+        // Normalize to the platform-native extension up front.
+        std::filesystem::path path(filename);
+        auto name = path.filename().string();
+        if (!name.ends_with(dl_ext)) {
+            auto dot = name.find_last_of('.');
+            if (dot != std::string::npos) {
+                name.resize(dot);
+            }
+            name += dl_ext;
+            path = path.has_parent_path() ? path.parent_path() / name : std::filesystem::path(name);
+        }
+
+        const std::string candidate = path.string();
+        _handler = dlopen(candidate.c_str(), rtld_flags);
         if (_handler) {
             return;
         }
 
-        // dlerror() is destructive: it returns the pending error and clears the state. Capture it
-        // into a local before any further use.
+        // dlerror() is destructive: capture before any further use.
         const char *primary_dlerror = dlerror();
         std::string primary_error = primary_dlerror ? primary_dlerror : "unknown dlopen error";
-        auto basename = std::filesystem::path(filename).filename().string();
-        
-        // rewrite the extension if it differs from the platform one.
-        if (!basename.ends_with(dl_ext)) {
-            auto dot = basename.find_last_of('.');
-            if (dot != std::string::npos) {
-                basename.resize(dot);
-            }
-            basename += dl_ext;
+
+        // retry with basename via the loader search path.
+        if (path.has_parent_path()) {
+            _handler = dlopen(name.c_str(), rtld_flags);
         }
 
-        _handler = dlopen(basename.c_str(), rtld_flags);
-        RT_FAIL_IF(!_handler, ("dlopen failed to load " + filename + ": " + primary_error).c_str());
+        const std::string err = "dlopen failed to load " + filename + ": " + primary_error;
+        RT_FAIL_IF(!_handler, err.c_str());
     }
 
     ~SharedLibraryManager()
