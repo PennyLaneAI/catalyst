@@ -262,8 +262,10 @@ void invoke_teardown(nb::object teardown_fn)
     using teardown_fn_t = void (*)();
     teardown_fn_t fn = extract_fn_ptr<teardown_fn_t>(teardown_fn);
 
-    nb::gil_scoped_release lock;
-    fn();
+    {
+        nb::gil_scoped_release lock;
+        fn();
+    }
 }
 
 NB_MODULE(wrapper, m)
