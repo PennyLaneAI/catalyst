@@ -97,10 +97,11 @@ class GraphOpID:
         if issubclass(op_type, qp.core.operator.Operator):
             self.name = op_type.__name__
             self.dynamic_shape = ",".join(["f64"] * op_type.num_params)
-            self.wire_lens = str(op_type.num_wires) if op_type.num_wires else "0"
+            self.wire_lens = (
+                str(op_type.num_wires) if op_type.num_wires else op.params.get("num_wires", "0")
+            )
             self.static_data = {}
             self.extra_data = ""
-            # return name + "[" + ",".join(["f64"] * num_params) + "][" + num_wires + "]{}"
         elif isinstance(op_type, qp.core.operator.Operator2):
             # TODO: use real getters here
             self.name = op_type.__name__
@@ -108,13 +109,6 @@ class GraphOpID:
             self.wire_lens = op_type.getWireLens()
             self.static_data = op_type.getStaticData()
             self.extra_data = op_type.uid
-            # return (
-            #     name
-            #     + ("[" + dynamic_shape + "]")
-            #     + ("[" + wire_lens + "]")
-            #     + ("{" + static_data + "}")
-            #     + ("[" + extra_data + "]")
-            # )
         else:
             raise ValueError(
                 "Only AbstractOperator and CompressedResourceOp types are supported for generating a "
@@ -144,26 +138,35 @@ def collect_resources_for_op(op_name, static_data):
         # decomp This means some rules will fail the python callback compilation. When migration is
         # complete, remove the try-except.
         try:
+            # The `compute_resources` function's signature is the same as the Operator2 signature
+            # for the original op of the rule
             resources = rule.compute_resources(**static_data)
             name_to_resources[rule.name] = resources.gate_counts
             name_to_resource_ids[rule.name] = {
                 GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
             }
         except:  # pylint: disable=bare-except
+            warnings.warn(
+                f"Encountered rule {rule} that has not been migrated to Operator2 yet, ignoring this rule"
+            )
             decomp_rules.remove(rule)
 
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
-def BFS_decomp_rules(op_name, static_data):
+def BFS_decomp_rules(op: qp.core.Operation | qp.core.Operator2, static_data):
     q = deque()
+    op_name = op.__name__
     q.append((op_name, static_data))
     visited = [(op_name, static_data)]
     while len(q) != 0:
         this = q.popleft()
+        print(f"Visiting {this}")
         resources, _, _ = collect_resources_for_op(*this)
+        print(f"Collected resources {resources}")
         for _rule_name, resource in resources.items():
             for op, _count in resource.items():
+                print(f"   Probing neighbour {op}")
                 if issubclass(op.op_type, qp.ops.ChangeOpBasis):
                     continue
                 graph_op_id = GraphOpID(op)
@@ -171,6 +174,8 @@ def BFS_decomp_rules(op_name, static_data):
                 if not probe in visited:
                     visited.append(probe)
                     q.append(probe)
+                    print(f"      Added {probe}, traversal is {visited}, queue is {q}")
+
     return visited
 
 
