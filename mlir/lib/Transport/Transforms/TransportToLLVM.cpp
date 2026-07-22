@@ -15,13 +15,13 @@
 // Lower the `transport` dialect to `llvm.call`s on the __catalyst__transport__*
 // CAPI (runtime/include/TransportCAPI.h).
 
+#include "llvm/ADT/Twine.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "llvm/ADT/Twine.h"
 
 #include "Transport/IR/TransportOps.h"
 #include "Transport/Transforms/Passes.h"
@@ -242,9 +242,9 @@ struct LastRttLowering : public OpConversionPattern<LastRttNsOp> {
     LogicalResult matchAndRewrite(LastRttNsOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        Value r = emitCall(rewriter, op.getLoc(), moduleOf(op),
-                           "__catalyst__transport__last_rtt_ns", {ptrTy(op.getContext())},
-                           i64Ty(op.getContext()), {adaptor.getSession()});
+        Value r =
+            emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__last_rtt_ns",
+                     {ptrTy(op.getContext())}, i64Ty(op.getContext()), {adaptor.getSession()});
         rewriter.replaceOp(op, r);
         return success();
     }
@@ -283,8 +283,8 @@ struct ConvertTransportToLLVMPass
         RewritePatternSet patterns(ctx);
         patterns.add<CreateLowering, ConnectLowering, ConnectAsyncLowering, ExchangeKeysLowering,
                      ExchangeKeysAsyncLowering, BarrierLowering, EstablishChannelLowering,
-                     SetCoprocessorFnLowering, CommitWorkItemLowering, KickLowering, CollectLowering,
-                     LastRttLowering>(tc, ctx);
+                     SetCoprocessorFnLowering, CommitWorkItemLowering, KickLowering,
+                     CollectLowering, LastRttLowering>(tc, ctx);
         patterns.add<VoidSessionLowering<StartOp>>(tc, ctx, "__catalyst__transport__start");
         patterns.add<VoidSessionLowering<StopOp>>(tc, ctx, "__catalyst__transport__stop");
         patterns.add<VoidSessionLowering<CloseOp>>(tc, ctx, "__catalyst__transport__close");
