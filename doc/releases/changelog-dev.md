@@ -445,6 +445,11 @@
   `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
   [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
 
+* New build configurations have been added to allow building "development" packages of Catalyst and
+  LLVM/MLIR. These dev packages will allow Catalyst plugin developers to build against the pre-built
+  libraries included therein, rather than having to build Catalyst and its dependencies from source.
+  [#3023](https://github.com/PennyLaneAI/catalyst/pull/3023)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
