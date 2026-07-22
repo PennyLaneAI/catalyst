@@ -83,7 +83,7 @@ struct OperatorNodeHash {
     std::size_t operator()(const OperatorNode &node) const {
         return std::hash<std::string>{}(node.id);
     }
-};
+}; // namespace DecompGraph::Core
 
 /**
  * @brief This represents the weighted target gateset for the graph decomposition problem.
