@@ -433,10 +433,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 node.numParams = 0;
             }
 
-            if (auto decompGate = dyn_cast<DecomposableGate>(op.getOperation())) {
-                node.id = decompGate.getGraphOpId();
-            }
-
             operators.push_back(node);
         });
     }
