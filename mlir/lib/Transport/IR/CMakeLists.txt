@@ -7,6 +7,7 @@ add_mlir_library(MLIRTransport
 
     DEPENDS
     MLIRTransportOpsIncGen
+    MLIRTransportEnumsIncGen
 
     LINK_LIBS PRIVATE
     MLIRLLVMDialect
