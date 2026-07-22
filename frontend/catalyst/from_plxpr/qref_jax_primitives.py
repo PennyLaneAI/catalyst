@@ -18,6 +18,7 @@ of quantum operations, measurements, and observables to reference semantics JAXP
 
 from enum import Enum
 
+import pennylane as qp
 from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue, ShapedArray
@@ -28,7 +29,6 @@ from jaxlib.mlir.dialects.arith import (
     ConstantOp,
     ExtUIOp,
 )
-import pennylane as qp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.wires import AbstractQubit
@@ -248,9 +248,7 @@ def _normalize_allocate_state(state):
     return _MLIR_MAGIC_STATES.get(state_val, state_val)
 
 
-def _allocate_prim_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *, num_wires, state, restored=False
-):
+def _allocate_prim_lowering(jax_ctx: mlir.LoweringRuleContext, *, num_wires, state, restored=False):
     del restored
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
