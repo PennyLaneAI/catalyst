@@ -33,20 +33,22 @@ namespace executor {
 
 namespace {
 
-// Ships cross-compiled `catalyst.target` modules to a executor using the `executor` dialect.
+// Ships cross-compiled target modules to an executor using the `executor` dialect.
 //
-// This pass should be run after `cross-compile-targets`, which records each module's object file in
+// This pass runs after `cross-compile-targets`, which records each module's object file in
 // `catalyst.object_file`. For every nested module carrying a `catalyst.dispatch` attribute this
 // pass:
 //   1. Injects `executor.open` into `setup()` (once per unique address) and `executor.send_binary`
 //      into `setup()` (once per module; the object holds every entry).
-//   2. Rewrites every host-side `func.call` to an entry function into a `executor.launch` op carrying
-//      the executor address and the entry callee. Its lowering resolves `_catalyst_pyface_<callee>`
-//      in the shipped object.
-//   3. Erases the bodyless external declarations and the nested module from the host.
+//   2. Rewrites every host-side `catalyst.launch_kernel` targeting the module into an
+//      `executor.launch` carrying the executor address, the entry callee, and the object-file path.
+//   3. Erases the nested module from the host after its `catalyst.launch_kernel`s are rewritten.
 //
-// Session teardown is handled by the runtime, which closes every open session when the process
-// exits, so no explicit close op is emitted.
+// A `catalyst.custom_call` carrying a `dispatch` entry in its `backend_config` is rewritten into an
+// `executor.call` on the resolved executor address.
+//
+// Session teardown is handled by the runtime, which closes every open session at process exit, so
+// no explicit close op is emitted.
 struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<DispatchExecutorTargetsPass> {
     using DispatchExecutorTargetsPassBase::DispatchExecutorTargetsPassBase;
 
@@ -81,7 +83,7 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
         StringAttr executorAddress;
 
         for (auto nested : targetMods) {
-            if (failed(dispatchViaOrcExecutor(host, nested, openedAddresses, executorAddress))) {
+            if (failed(dispatchTargetModule(host, nested, openedAddresses, executorAddress))) {
                 return signalPassFailure();
             }
             nested.erase();
@@ -187,8 +189,8 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
     }
 
     // Open a session (once per address), ship the object recorded in
-    // `catalyst.object_file`, and rewrite each host-side func.call into a `executor.launch`.
-    LogicalResult dispatchViaOrcExecutor(ModuleOp host, ModuleOp nested,
+    // `catalyst.object_file`, and rewrite each host-side launch_kernel into an `executor.launch`.
+    LogicalResult dispatchTargetModule(ModuleOp host, ModuleOp nested,
                                        llvm::SmallSet<std::string, 4> &openedAddresses,
                                        StringAttr &executorAddress)
     {
@@ -226,7 +228,7 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
         // entry function, and executor.launch resolves individual symbols within it.
         injectExecutorSendBinaryIntoSetup(host, addressAttr, pathAttr);
 
-        // Rewrite each host-side launch_kernel targeting this module into a executor.launch.
+        // Rewrite each host-side launch_kernel targeting this module into an executor.launch.
         StringRef moduleName = nested.getSymName().value_or("");
         SmallVector<catalyst::LaunchKernelOp> launches;
         host.walk([&](catalyst::LaunchKernelOp launchKernel) {
@@ -249,8 +251,8 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
             }
             auto calleeAttr = StringAttr::get(ctx, launchKernel.getCalleeName().getValue());
             OpBuilder b(launchKernel);
-            // `pathAttr` (the object-file path, same value shipped by send_binary) keys the
-            // per-kernel JITDylib on the executor so the entry resolves in its own object.
+            // `pathAttr` (the object-file path shipped by send_binary) identifies which object the
+            // entry resolves in, so executor.launch is resolved against the right binary.
             auto launch = executor::LaunchOp::create(
                 b, launchKernel.getLoc(), launchKernel.getResultTypes(), launchKernel.getOperands(),
                 addressAttr, calleeAttr, pathAttr);
