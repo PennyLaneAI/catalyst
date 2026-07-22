@@ -49,7 +49,8 @@ namespace {
 //
 // Session teardown is handled by the runtime, which closes every open session at process exit, so
 // no explicit close op is emitted.
-struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<DispatchExecutorTargetsPass> {
+struct DispatchExecutorTargetsPass
+    : impl::DispatchExecutorTargetsPassBase<DispatchExecutorTargetsPass> {
     using DispatchExecutorTargetsPassBase::DispatchExecutorTargetsPassBase;
 
     void runOnOperation() final
@@ -132,7 +133,7 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
     }
 
     LogicalResult rewriteExecutorLibCalls(ArrayRef<catalyst::CustomCallOp> libCalls,
-                                        StringAttr fallbackAddress)
+                                          StringAttr fallbackAddress)
     {
         MLIRContext *ctx = &getContext();
         for (catalyst::CustomCallOp call : libCalls) {
@@ -147,17 +148,18 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
             if (auto n = call.getNumberOriginalArg()) {
                 numInputAttr = b.getI32IntegerAttr(*n);
             }
-            auto executorCall =
-                executor::CallOp::create(b, call.getLoc(), call.getResultTypes(), call.getOperands(),
-                                       /*address=*/addressAttr, /*symbol=*/symAttr,
-                                       /*num_input_args=*/numInputAttr);
+            auto executorCall = executor::CallOp::create(
+                b, call.getLoc(), call.getResultTypes(), call.getOperands(),
+                /*address=*/addressAttr, /*symbol=*/symAttr,
+                /*num_input_args=*/numInputAttr);
             call.replaceAllUsesWith(executorCall.getResults());
             call.erase();
         }
         return success();
     }
 
-    // Insert `executor.open` before the terminator of `setup`. No-op if setup is absent or bodyless.
+    // Insert `executor.open` before the terminator of `setup`. No-op if setup is absent or
+    // bodyless.
     void injectExecutorOpenIntoSetup(ModuleOp host, StringAttr addressAttr)
     {
         auto setupFn = host.lookupSymbol<func::FuncOp>("setup");
@@ -174,7 +176,8 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
 
     // Insert `executor.send_binary` before the terminator of `setup`. No-op if setup is absent or
     // bodyless. Always called after `injectExecutorOpenIntoSetup` so the session is opened first.
-    void injectExecutorSendBinaryIntoSetup(ModuleOp host, StringAttr addressAttr, StringAttr pathAttr)
+    void injectExecutorSendBinaryIntoSetup(ModuleOp host, StringAttr addressAttr,
+                                           StringAttr pathAttr)
     {
         auto setupFn = host.lookupSymbol<func::FuncOp>("setup");
         if (!setupFn || setupFn.getBody().empty()) {
@@ -237,10 +240,10 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
             }
         });
         for (catalyst::LaunchKernelOp launchKernel : launches) {
-            // executor.launch marshals memref descriptors, so its lowering only accepts memref-typed
-            // operands and results. Reject anything else here with a clear error rather than
-            // crashing later in convert-executor-to-llvm. This runs after bufferization, so a
-            // well-formed entry call is already memref-typed.
+            // executor.launch marshals memref descriptors, so its lowering only accepts
+            // memref-typed operands and results. Reject anything else here with a clear error
+            // rather than crashing later in convert-executor-to-llvm. This runs after
+            // bufferization, so a well-formed entry call is already memref-typed.
             auto isMemref = [](Type ty) { return isa<MemRefType>(ty); };
             if (!llvm::all_of(launchKernel.getOperandTypes(), isMemref) ||
                 !llvm::all_of(launchKernel.getResultTypes(), isMemref)) {
