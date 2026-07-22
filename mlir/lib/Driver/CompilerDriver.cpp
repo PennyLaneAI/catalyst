@@ -507,7 +507,11 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
                     options.workspace.str() + "/" + options.moduleName.str() + ".objects";
                 std::error_code ec;
                 llvm::raw_fd_ostream manifest(manifestPath, ec);
-                if (!ec) {
+                if (ec) {
+                    moduleOp->emitError("failed to write object manifest '")
+                        << manifestPath << "': " << ec.message();
+                    return failure();
+                } else {
                     for (mlir::Attribute pathAttr : objFiles) {
                         if (auto s = mlir::dyn_cast<mlir::StringAttr>(pathAttr)) {
                             manifest << s.getValue() << "\n";
