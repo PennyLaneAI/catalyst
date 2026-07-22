@@ -559,6 +559,58 @@ def test_magic_state_allocation(backend, state, prep):
     assert np.allclose(baseline(), circuit())
 
 
+def test_no_capture(backend):
+    """Test error message when allocate is used without program capture."""
+    with pytest.raises(
+        CompileError,
+        match=r".*\.allocate\(\) with qjit is only supported with program capture enabled\.",
+    ):
+
+        @qjit
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit():
+            with qp.allocate(1) as _:
+                pass
+            return qp.probs(wires=[0])
+
+
+def test_deallocate_mixed_fabricate_and_register():
+    """Test deallocating fabricate and register wires together is rejected."""
+    with pytest.raises(ValueError, match="same allocation instruction"):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
+        def circuit():
+            q_magic = qp.allocate(1, state="magic-T")
+            q_reg = qp.allocate(1)
+            qp.deallocate([q_magic[0], q_reg[0]])
+            return qp.probs(wires=[0])
+
+
+def test_deallocate_multiple_register_allocations():
+    """Test deallocating wires from separate register allocations is rejected."""
+    with pytest.raises(ValueError, match="same allocation instruction"):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
+        def circuit():
+            q1 = qp.allocate(1)
+            q2 = qp.allocate(1)
+            qp.deallocate([q1[0], q2[0]])
+            return qp.probs(wires=[0])
+
+
+def test_deallocate_non_allocated_wire():
+    """Test deallocating a device wire is rejected at compile time."""
+    with pytest.raises(TypeError, match="Manual deallocation is only supported"):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit():
+            qp.deallocate(0)
+            return qp.probs(wires=[0])
+
+
 def test_magic_state_manual_deallocate(backend):
     """Test manual deallocation of a magic state wire without entangling gates."""
 

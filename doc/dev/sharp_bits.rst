@@ -1387,7 +1387,7 @@ Currently, however, this is not the case for the following functionalities.
     Capture and legacy pathways share the same ``allocate`` / ``deallocate`` jaxpr
     primitives; the choice between register allocation and fabrication is made
     during MLIR lowering based on the ``state`` argument. Legacy tracing support
-    is added in [#3027](https://github.com/PennyLaneAI/catalyst/pull/3027).
+    is added in `#3027 <https://github.com/PennyLaneAI/catalyst/pull/3027>`_.
 
   - Related to the above point, in PennyLane, dynamic wire allocations do not
     increase the total number of wires used in the circuit. This is because

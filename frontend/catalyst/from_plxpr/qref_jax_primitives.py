@@ -152,6 +152,8 @@ qref_dealloc_p = Primitive("qref_dealloc")
 qref_dealloc_p.multiple_results = True
 qref_fabricate_p = Primitive("qref_fabricate")
 qref_dealloc_qb_p = Primitive("qref_dealloc_qb")
+# Capture lowering uses allocate_prim/deallocate_prim directly; the rules below are
+# registered for the legacy tracing path in #3027.
 qref_dealloc_qb_p.multiple_results = True
 qref_get_p = Primitive("qref_get")
 qref_set_state_p = Primitive("qref_state_prep")
@@ -292,17 +294,13 @@ def _deallocate_prim_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits):
                 f"got {defining_op.name}"
             )
 
-    if fabricated_qubits and qregs:
+    if (fabricated_qubits and qregs) or len(qregs) > 1:
         raise ValueError(
             "Expected all wires to deallocate to come from the same allocation instruction"
         )
 
     for qubit in fabricated_qubits:
         DeallocQubitOp(qubit)
-    if len(qregs) > 1:
-        raise ValueError(
-            "Expected all wires to deallocate to come from the same allocation instruction"
-        )
     for qreg in qregs:
         DeallocOp(qreg)
     return ()
