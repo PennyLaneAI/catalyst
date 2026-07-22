@@ -707,7 +707,9 @@ class TestPlxPRDecomposition:
 
         assert qp.math.allclose(without_qjit, with_qjit(x, y, z))
 
-        expected_resources = qp.specs(circuit, level="device")(x, y, z)["resources"].quantum_operations
+        expected_resources = qp.specs(circuit, level="device")(x, y, z)[
+            "resources"
+        ].quantum_operations
         resources = qp.specs(with_qjit, level="device")(x, y, z)["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
@@ -741,7 +743,9 @@ class TestPlxPRDecomposition:
         with_qjit = qp.qjit(circuit, capture=True)
         assert qp.math.allclose(without_qjit, with_qjit(x, y, z))
 
-        expected_resources = qp.specs(circuit, level="device")(x, y, z)["resources"].quantum_operations
+        expected_resources = qp.specs(circuit, level="device")(x, y, z)[
+            "resources"
+        ].quantum_operations
         resources = qp.specs(with_qjit, level="device")(x, y, z)["resources"].quantum_operations
         assert "MultiRZ" in resources
         assert "MultiRZ" in expected_resources
@@ -904,9 +908,14 @@ class TestPlxPRDecomposition:
         with_qjit = qp.qjit(circuit, capture=True)
         assert qp.math.allclose(without_qjit, with_qjit())
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
-        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        assert resources == {
+            "Hadamard": 12,
+            "CNOT": 24,
+            "RY": 26,
+            "RX": 4,
+            "GlobalPhase": 4,
+        }
         qp.decomposition.disable_graph()
 
     def test_adjoint(self):

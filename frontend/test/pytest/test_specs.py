@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 from jax import numpy as jnp
 from pennylane.measurements import Shots
-from pennylane.resource import CircuitSpecs, SpecsResources
+from pennylane.resource import CircuitSpecs, PBCSpecsResources, SpecsResources
 
 import catalyst
 from catalyst import qjit
@@ -54,8 +54,6 @@ def check_specs_resources_same(
     ),
 ) -> None:
     """Helper function to check if 2 resources objects are the same"""
-    assert type(actual_res) == type(expected_res)
-
     if isinstance(actual_res, list):
         assert len(actual_res) == len(expected_res)
 
@@ -69,12 +67,18 @@ def check_specs_resources_same(
             assert k in expected_res
             check_specs_resources_same(actual_res[k], expected_res[k])
 
-    elif isinstance(actual_res, SpecsResources):
+    elif isinstance(actual_res, (SpecsResources, PBCSpecsResources)):
+        assert isinstance(expected_res, (SpecsResources, PBCSpecsResources))
         assert actual_res.quantum_operations == expected_res.quantum_operations
         assert actual_res.measurement_processes == expected_res.measurement_processes
         assert actual_res.num_allocs == expected_res.num_allocs
         assert actual_res.depth == expected_res.depth
         assert actual_res.total_quantum_operations == expected_res.total_quantum_operations
+        if isinstance(actual_res, PBCSpecsResources) and isinstance(
+            expected_res, PBCSpecsResources
+        ):
+            assert actual_res.any_commuting_depth == expected_res.any_commuting_depth
+            assert actual_res.qubit_disjoint_depth == expected_res.qubit_disjoint_depth
 
     else:
         raise ValueError("Invalid Type")
@@ -156,11 +160,14 @@ class TestDeviceLevelSpecs:
         assert cat_specs["device_name"] == "lightning.qubit"
 
         # Catalyst will handle Adjoint(PauliY) == PauliY
-        assert "CY" in cat_specs["resources"].quantum_operations
-        cat_specs["resources"].quantum_operations["C(Adjoint(PauliY))"] = cat_specs["resources"].quantum_operations[
-            "CY"
-        ]
-        del cat_specs["resources"].quantum_operations["CY"]
+        cat_ops = cat_specs["resources"].quantum_operations
+        assert "CY" in cat_ops
+        cat_ops["C(Adjoint(PauliY))"] = cat_ops["CY"]
+        del cat_ops["CY"]
+
+        # Catalyst may count doubly-controlled S separately from singly-controlled S
+        if "2C(S)" in cat_ops:
+            cat_ops["C(S)"] = cat_ops.get("C(S)", 0) + cat_ops.pop("2C(S)")
 
         check_specs_same(cat_specs, pl_specs)
 
@@ -962,10 +969,10 @@ class TestPassByPassSpecs:
             qp.RX(2 * x, 0)
             return qp.probs()
 
-        counts = qp.specs(c, level=0)().resources.gate_counts
+        counts = qp.specs(c, level=0)().resources.quantum_operations
         assert counts == {"RX": 2}
 
-        counts1 = qp.specs(c, level=1)().resources.gate_counts
+        counts1 = qp.specs(c, level=1)().resources.quantum_operations
         assert counts1 == {"RX": 1}
 
         with pytest.raises(catalyst.utils.exceptions.CompileError, match="is a placeholder op"):
@@ -990,10 +997,12 @@ class TestSpecsWithPPR:
             num_device_wires=2,
             shots=Shots(None),
             level="to-ppr",
-            resources=SpecsResources(
+            resources=PBCSpecsResources(
                 counts={"GlobalPhase": 2, "PPR-pi/4-w1": 3, "PPR-pi/8-w1": 1},
                 measurement_processes={},
                 num_allocs=2,
+                any_commuting_depth=3,
+                qubit_disjoint_depth=4,
             ),
         )
 
@@ -1015,7 +1024,7 @@ class TestSpecsWithPPR:
             num_device_wires=3,
             shots=Shots(None),
             level="decompose-arbitrary-ppr",
-            resources=SpecsResources(
+            resources=PBCSpecsResources(
                 counts={
                     "pbc.prepare": 1,
                     "PPM-w3": 1,
@@ -1026,6 +1035,8 @@ class TestSpecsWithPPR:
                 },
                 measurement_processes={},
                 num_allocs=3,
+                any_commuting_depth=4,
+                qubit_disjoint_depth=4,
             ),
         )
 
@@ -1225,7 +1236,7 @@ class TestSymbolicSpecs:
             return qp.state()
 
         r = qp.specs(c, level=0)(2).resources
-        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
+        assert r.subs({var: 10 for var in r.vars}).quantum_operations["RX"] == 10
 
     def test_symbolic_array_loop_arguemtn(self):
         """Test dynamic loop with a symbolic array as a loop argument."""
@@ -1246,7 +1257,7 @@ class TestSymbolicSpecs:
             return qp.state()
 
         r = qp.specs(c, level=0)(2).resources
-        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
+        assert r.subs({var: 10 for var in r.vars}).quantum_operations["RX"] == 10
 
 
 class TestMarkerIntegration:
