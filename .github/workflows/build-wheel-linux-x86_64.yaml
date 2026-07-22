@@ -39,7 +39,7 @@ on:
         default: 'main'
         type: string
       build_dev_package:
-        description: 'Build and upload the catalyst-dev CPack archive'
+        description: 'Build and upload the catalyst-dev archives'
         required: false
         default: false
         type: boolean
