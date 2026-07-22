@@ -22,8 +22,8 @@ config.name = "Frontend Tests"
 config.test_format = lit.formats.ShTest(True)
 
 # Define the file extensions to treat as test files (with the exception of this file).
-config.suffixes = [".py"]
-config.excludes = ["lit.cfg.py", "utils.py"]
+config.suffixes = [".py", ".mlir"]
+config.excludes = ["lit.cfg.py", "utils.py", "catalyst.autograph.exclusion.py"]
 
 # Define the root path of where to look for tests.
 config.test_source_root = os.path.dirname(__file__)
@@ -69,6 +69,9 @@ if os.environ.get("ENABLE_LIT_COVERAGE", "0") == "1":
 
 config.substitutions.append(("%PYTHON", python_executable))
 
+# allow virtual env for embedded interpreter
+config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", "")
+
 # Define PATH when running frontend tests from an mlir build target.
 try:
     # Access to FileCheck
@@ -85,11 +88,10 @@ try:
     )
     llvm_config.with_environment("CATALYST_LIB_DIR", config.quantum_lib_dir, append_path=True)
 
-    # Define PYTHONPATH to include the dialect python bindings.
-    # From within a build target we have access to cmake variables configured in lit.site.cfg.py.in.
+    catalyst_frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     llvm_config.with_environment(
         "PYTHONPATH",
-        [config.mlir_bindings_dir],
+        [config.mlir_bindings_dir, catalyst_frontend_dir],
         append_path=True,
     )
 except AttributeError:
@@ -115,4 +117,9 @@ except AttributeError:
     llvm_config.with_system_environment("MLIR_LIB_DIR")
     llvm_config.with_system_environment("CATALYST_BIN_DIR")
     llvm_config.with_system_environment("CATALYST_LIB_DIR")
+    llvm_config.with_system_environment("CATALYST_LIBPYTHON")
     llvm_config.with_system_environment("ENZYME_LIB_DIR")
+
+    catalyst_bin_dir = os.getenv("CATALYST_BIN_DIR", "")
+    if os.path.exists(catalyst_bin_dir):
+        llvm_config.add_tool_substitutions(["catalyst"], [catalyst_bin_dir])
