@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <unordered_map>
+
 #include "DGTypes.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -24,77 +26,65 @@ using namespace DecompGraph::Core;
 
 TEST_CASE("Test OperatorNode construction", "[DecompGraph::Core]")
 {
-    const OperatorNode op1{"H", 1, 0, false};
-    const OperatorNode op2{"CNOT", 2, 0, false};
-    const OperatorNode op3{"RX", 1, 1, false};
-    const OperatorNode op4{"RZ", 1, 1, true};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
 
-    REQUIRE(op1.name == "H");
-    REQUIRE(op1.numWires == 1);
-    REQUIRE(op1.numParams == 0);
-    REQUIRE(op1.adjoint == false);
+    REQUIRE(h.id == "Hadamard[][1]{}");
+    REQUIRE(cnot.id == "CNOT[][2]{}");
+    REQUIRE(rx.id == "RX[f64][1]{}");
+    REQUIRE(rz.id == "RZ[f64][1]{}");
 
-    REQUIRE(op2.name == "CNOT");
-    REQUIRE(op2.numWires == 2);
-    REQUIRE(op2.numParams == 0);
-    REQUIRE(op2.adjoint == false);
-
-    REQUIRE(op3.name == "RX");
-    REQUIRE(op3.numWires == 1);
-    REQUIRE(op3.numParams == 1);
-    REQUIRE(op3.adjoint == false);
-
-    REQUIRE(op4.name == "RZ");
-    REQUIRE(op4.numWires == 1);
-    REQUIRE(op4.numParams == 1);
-    REQUIRE(op4.adjoint == true);
+    REQUIRE(h.name == "Hadamard");
+    REQUIRE(cnot.name == "CNOT");
+    REQUIRE(rx.name == "RX");
+    REQUIRE(rz.name == "RZ");
 }
 
 TEST_CASE("Test OperatorNode equality operator", "[DecompGraph::Core]")
 {
-    const OperatorNode op1{"H", 1, 0, false};
-    const OperatorNode op2{"H", 1, 0, false};
-    const OperatorNode op3{"H", 1, 0, true};
-    const OperatorNode op4{"CNOT", 2, 0, false};
+    const OperatorNode h1{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode h2{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
 
-    REQUIRE(op1 == op2);
-    REQUIRE_FALSE(op1 == op3);
-    REQUIRE_FALSE(op1 == op4);
+    REQUIRE(h1 == h2);
+    REQUIRE(h1 != cnot);
 }
 
 TEST_CASE("Test OperatorNodeHash", "[DecompGraph::Core]")
 {
-    const OperatorNode op1{"H", 1, 0, false};
-    const OperatorNode op2{"H", 1, 0, false};
-    const OperatorNode op3{"H", 1, 0, true};
-    const OperatorNode op4{"CNOT", 2, 0, false};
+    const OperatorNode h1{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode h2{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode h3{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
 
     const OperatorNodeHash hashFunc;
-    REQUIRE(hashFunc(op1) == hashFunc(op2));
-    REQUIRE(hashFunc(op1) == hashFunc(op3));
-    REQUIRE(hashFunc(op1) != hashFunc(op4));
+    REQUIRE(hashFunc(h1) == hashFunc(h2));
+    REQUIRE(hashFunc(h1) == hashFunc(h3));
+    REQUIRE(hashFunc(h1) != hashFunc(cnot));
 }
 
 TEST_CASE("Test OperatorNode in unordered_map", "[DecompGraph::Core]")
 {
     std::unordered_map<OperatorNode, double, OperatorNodeHash> opMap;
-    const OperatorNode op1{"H", 1, 0, false};
-    const OperatorNode op2{"CNOT", 2, 0, false};
-    const OperatorNode op3{"RX", 1, 1, false};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
-    opMap[op1] = 1.0;
-    opMap[op2] = 2.0;
+    opMap[h] = 1.0;
+    opMap[cnot] = 2.0;
 
-    REQUIRE(opMap[op1] == 1.0);
-    REQUIRE(opMap[op2] == 2.0);
-    REQUIRE(opMap.find(op3) == opMap.end());
+    REQUIRE(opMap[h] == 1.0);
+    REQUIRE(opMap[cnot] == 2.0);
+    REQUIRE(opMap.find(rx) == opMap.end());
 }
 
 TEST_CASE("Test RuleNode construction", "[DecompGraph::Core]")
 {
-    const auto h = OperatorNode{"H"};
-    const auto rz = OperatorNode{"RZ"};
-    const auto rx = OperatorNode{"RX"};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
 
     const RuleNode h_to_rz_rx_rz{"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}};
     REQUIRE(h_to_rz_rx_rz.name == "h_to_rz_rx_rz");
@@ -108,11 +98,11 @@ TEST_CASE("Test RuleNode construction", "[DecompGraph::Core]")
 
 TEST_CASE("Test WeightedGateset construction and contains", "[DecompGraph::Core]")
 {
-    const OperatorNode h{"H"};
-    const OperatorNode cnot{"CNOT"};
-    const OperatorNode rx{"RX"};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{h, 1.0}, {cnot, 2.0}}};
+    const WeightedGateset gateset{{{h.name, 1.0}, {cnot.name, 2.0}}};
 
     REQUIRE(gateset.contains(h));
     REQUIRE(gateset.contains(cnot));
@@ -124,9 +114,9 @@ TEST_CASE("Test WeightedGateset construction and contains", "[DecompGraph::Core]
 
 TEST_CASE("Test ChosenDecompRule construction", "[DecompGraph::Core]")
 {
-    const OperatorNode h{"H"};
-    const OperatorNode rz{"RZ"};
-    const OperatorNode rx{"RX"};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
 
     const RuleTerm term1{rz, 2};
     const RuleTerm term2{rx, 1};
@@ -145,46 +135,4 @@ TEST_CASE("Test ChosenDecompRule construction", "[DecompGraph::Core]")
     REQUIRE(chosenRule.basisCounts.size() == 2);
     REQUIRE(chosenRule.basisCounts[rz] == 2);
     REQUIRE(chosenRule.basisCounts[rx] == 1);
-}
-
-TEST_CASE("Test graphOpId Support", "[DecompGraph::Core]")
-{
-    // comparing an op without an ID should fallback to legacy match
-    const OperatorNode h{"H"};
-    const OperatorNode hId{"H", -1, -1, false, {}, "H[][1]{}"};
-
-    REQUIRE(h == hId);
-
-    // id + legacy match with non-wildcard params
-    const OperatorNode x{"X", 1, 0};
-    const OperatorNode xId{"X", -1, -1, false, {}, "X[][1]{}"};
-
-    REQUIRE(x == xId);
-
-    // id nodes should fail legacy match if params differ
-    const OperatorNode op1{"op", 1, 1};
-    const OperatorNode op2{"op", 2, 2, false, {}, "op[f64,f64][2]{}"};
-
-    REQUIRE_FALSE(op1 == op2);
-
-    // nodes with same ids should match
-    const OperatorNode pr1{"PauliRot", -1, -1, false, {}, "PauliRot[f64][2]{pauli_word:XX}"};
-    const OperatorNode pr2{"PauliRot", -1, -1, false, {}, "PauliRot[f64][2]{pauli_word:XX}"};
-
-    REQUIRE(pr1 == pr2);
-
-    // nodes with matching ids should ignore other parameters (id is source of truth)
-    const OperatorNode id1{"name1", 1, 1, false, {}, "sameID"};
-    const OperatorNode id2{"name2", 2, 2, true, {}, "sameID"};
-
-    REQUIRE(id1 == id2);
-
-    // Unit test for `OperatorNodeHash`. Check that the hash function prefers ID over name
-    const OperatorNode hash1{"name", -1, -1, false, {}, "id"};
-    const OperatorNode hash2{"name2", 1, 1, true, {}, "id"};
-    const OperatorNode hash3{"name2", 1, 1, true, {}};
-
-    const OperatorNodeHash hashFunc;
-    REQUIRE(hashFunc(hash1) == hashFunc(hash2));
-    REQUIRE(hashFunc(hash2) != hashFunc(hash3));
 }

@@ -13,7 +13,9 @@
 // limitations under the License.
 
 #include <algorithm>
-#include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
@@ -31,11 +33,11 @@ using namespace DecompGraph::Solver;
 
 TEST_CASE("Test DecompositionGraph construction", "[DecompGraph::Solver]")
 {
-    const auto h = OperatorNode{"H", 1, 0, false};
-    const auto rz = OperatorNode{"RZ", 1, 1, false};
-    const auto rx = OperatorNode{"RX", 1, 1, false};
+    const auto h = OperatorNode{"H[][1]{}", "Hadamard"};
+    const auto rz = OperatorNode{"RZ[f64][1]{}", "RZ"};
+    const auto rx = OperatorNode{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{rz, 1.0}, {rx, 2.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}, {rx.name, 2.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -66,9 +68,9 @@ TEST_CASE("Test DecompositionGraph construction", "[DecompGraph::Solver]")
 TEST_CASE("Test DecompositionSolver solve method with incomplete gates in Gateset",
           "[DecompGraph::Solver]")
 {
-    const auto h = OperatorNode{"H", 1, 0, false};
-    const auto h_gateset = OperatorNode{"H"};
-    const WeightedGateset gateset{{{h_gateset, 1.0}}};
+    const auto h = OperatorNode{"H[][1]{}", "Hadamard"};
+    const auto h_gateset = OperatorNode{"H[][1]{}", "Hadamard"};
+    const WeightedGateset gateset{{{h_gateset.name, 1.0}}};
     const std::vector<RuleNode> rules{
         {"h_to_h", h, {{h, 1}}},
     };
@@ -91,10 +93,10 @@ TEST_CASE("Test DecompositionSolver solve method with incomplete gates in Gatese
 
 TEST_CASE("Do not solve for target gates", "[DecompGraph::Solver]")
 {
-    const auto h = OperatorNode{"H", 1, 0, false};
-    const auto rz = OperatorNode{"RZ", 1, 1, false};
+    const auto h = OperatorNode{"H[][1]{}", "Hadamard"};
+    const auto rz = OperatorNode{"RZ[f64][1]{}", "RZ"};
 
-    const WeightedGateset gateset{{{h, 2.0}, {rz, 1.0}}};
+    const WeightedGateset gateset{{{h.name, 2.0}, {rz.name, 1.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz", h, {{rz, 1}}},
@@ -112,11 +114,11 @@ TEST_CASE("Do not solve for target gates", "[DecompGraph::Solver]")
 
 TEST_CASE("Test DecompositionGraph copy and move semantics", "[DecompGraph::Solver]")
 {
-    const auto h = OperatorNode{"H", 1, 0, false};
-    const auto rz = OperatorNode{"RZ", 1, 1, false};
-    const auto rx = OperatorNode{"RX", 1, 1, false};
+    const auto h = OperatorNode{"H[][1]{}", "Hadamard"};
+    const auto rz = OperatorNode{"RZ[f64][1]{}", "RZ"};
+    const auto rx = OperatorNode{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{rz, 1.0}, {rx, 2.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}, {rx.name, 2.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -155,12 +157,12 @@ TEST_CASE("Test DecompositionGraph copy and move semantics", "[DecompGraph::Solv
 
 TEST_CASE("Test DecompositionGraph lookup and counting", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H", 1, 0, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
-    const OperatorNode rx{"RX", 1, 1, false};
-    const OperatorNode ry{"RY", 1, 1, false};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode ry{"RY[f64][1]{}", "RY"};
 
-    const WeightedGateset gateset{{{rz, 1.0}, {ry, 2.0}, {rx, 3.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}, {ry.name, 2.0}, {rx.name, 3.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -179,7 +181,7 @@ TEST_CASE("Test DecompositionGraph lookup and counting", "[DecompGraph::Solver]"
     for (const auto &rule : graph.getAllRulesFor(h)) {
         double totalCost = 0.0;
         for (const auto &input : rule.inputs) {
-            totalCost += graph.getGateset().ops.at(input.op) * input.multiplicity;
+            totalCost += graph.getGateset().ops.at(input.op.name) * input.multiplicity;
         }
         if (rule.name == "h_to_rz_rx_rz") {
             REQUIRE(totalCost == 1.0 * 2 + 3.0 * 1);
@@ -193,15 +195,15 @@ TEST_CASE("Test DecompositionGraph lookup and counting", "[DecompGraph::Solver]"
 TEST_CASE("Test the graph construction with realistic ops and multiple rules from PennyLane",
           "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H", 1, 0, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
-    const OperatorNode rx{"RX", 1, 1, false};
-    const OperatorNode ry{"RY", 1, 1, false};
-    const OperatorNode cnot{"CNOT", 2, 0, false};
-    const OperatorNode swap{"SWAP", 2, 0, false};
-    const OperatorNode customBellOp{"BellOp", 2, 0, false};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode ry{"RY[f64][1]{}", "RY"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode swap{"SWAP[][2]{}", "SWAP"};
+    const OperatorNode customBellOp{"BellOp[][2]{}", "BellOp"};
 
-    const WeightedGateset gateset{{{rz, 1.0}, {rx, 3.0}, {cnot, 5.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}, {rx.name, 3.0}, {cnot.name, 5.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -219,12 +221,12 @@ TEST_CASE("Test the graph construction with realistic ops and multiple rules fro
 
 TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H", 1, 0, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
-    const OperatorNode rx{"RX", 1, 1, false};
-    const OperatorNode ry{"RY", 1, 1, false};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode ry{"RY[f64][1]{}", "RY"};
 
-    const WeightedGateset gateset{{{rz, 1.0}, {ry, 2.0}, {rx, 3.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}, {ry.name, 2.0}, {rx.name, 3.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -258,15 +260,15 @@ TEST_CASE("Test DecompositionSolver with one single operator", "[DecompGraph::So
 
 TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H", 1, 0, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
-    const OperatorNode rx{"RX", 1, 1, false};
-    const OperatorNode ry{"RY", 1, 1, false};
-    const OperatorNode cnot{"CNOT", 2, 0, false};
-    const OperatorNode swap{"SWAP", 2, 0, false};
-    const OperatorNode customBellOp{"BellOp", 2, 0, false};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode ry{"RY[f64][1]{}", "RY"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode swap{"SWAP[][2]{}", "SWAP"};
+    const OperatorNode customBellOp{"BellOp[][2]{}", "BellOp"};
 
-    const WeightedGateset gateset{{{rz, 1.0}, {rx, 3.0}, {cnot, 5.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}, {rx.name, 3.0}, {cnot.name, 5.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -316,10 +318,10 @@ TEST_CASE("Test the graph solver with intermediate ops and multiple rules", "[De
 
 TEST_CASE("Test GraphSolveError for unsolvable operator", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H", 1, 0, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
 
-    const WeightedGateset gateset{{{rz, 1.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}}};
 
     const std::vector<RuleNode> rules{
         {"rz_to_rz", rz, {{rz, 1}}},
@@ -333,7 +335,7 @@ TEST_CASE("Test GraphSolveError for unsolvable operator", "[DecompGraph::Solver]
 
 TEST_CASE("Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H", 1, 0, false};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
 
     const WeightedGateset gateset{};
 
@@ -349,11 +351,11 @@ TEST_CASE("Test GraphSolveError for cyclic decomposition", "[DecompGraph::Solver
 
 TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::Solver]")
 {
-    const OperatorNode x{"X"};
-    const OperatorNode globalPhase{"GlobalPhase"};
-    const OperatorNode rx{"RX"};
+    const OperatorNode x{"X[][1]{}", "PauliX"};
+    const OperatorNode globalPhase{"GlobalPhase[][]{}", "GlobalPhase"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{globalPhase, 1.0}, {rx, 1.0}}};
+    const WeightedGateset gateset{{{globalPhase.name, 1.0}, {rx.name, 1.0}}};
 
     const std::vector<RuleNode> rules{
         {"x_to_globalPhase_rx", x, {{globalPhase, 1}, {rx, 1}}},
@@ -379,14 +381,14 @@ TEST_CASE("Test PauliX -> GlobalPhase(1), RX(1) decomposition", "[DecompGraph::S
 TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
           "[DecompGraph::Solver]")
 {
-    const OperatorNode hadamard{"Hadamard"};
-    const OperatorNode globalPhase{"GlobalPhase"};
-    const OperatorNode rx{"RX"};
-    const OperatorNode rz{"RZ"};
-    const OperatorNode ry{"RY"};
-    const OperatorNode changeOpBasis{"ChangeOpBasis"};
-    const OperatorNode pauliRot{"PauliRot"};
-    const OperatorNode rot{"Rot"};
+    const OperatorNode hadamard{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode globalPhase{"GlobalPhase[][]{}", "GlobalPhase"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode ry{"RY[f64][1]{}", "RY"};
+    const OperatorNode changeOpBasis{"ChangeOpBasis[][2]{}", "ChangeOpBasis"};
+    const OperatorNode pauliRot{"PauliRot[f64][2]{pauli_word:XY}", "PauliRot"};
+    const OperatorNode rot{"Rot[f64,f64,f64][3]{}", "Rot"};
 
     const std::vector<RuleNode> rules{
         {"__builtin__ry_to_rz_cliff", ry, {{changeOpBasis, 1}}},
@@ -398,7 +400,7 @@ TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
         {"__builtin__hadamard_to_rz_ry", hadamard, {{globalPhase, 1}, {ry, 1}, {rz, 1}}},
     };
 
-    const WeightedGateset gateset{{{globalPhase, 1.0}, {rx, 1.0}, {rz, 1.0}}};
+    const WeightedGateset gateset{{{globalPhase.name, 1.0}, {rx.name, 1.0}, {rz.name, 1.0}}};
     const DecompositionGraph graph({hadamard}, gateset, rules);
     DecompositionSolver solver(graph);
     const auto solutions = solver.solve();
@@ -407,7 +409,8 @@ TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
     REQUIRE(h_solution.ruleName == "__builtin__hadamard_to_rz_rx");
     REQUIRE(h_solution.totalCost == 1.0 * 1 + 1.0 * 1 + 1.0 * 2);
 
-    const WeightedGateset gateset2{{{globalPhase, 1.0}, {rx, 1.0}, {rz, 2.0}, {ry, 1.0}}};
+    const WeightedGateset gateset2{
+        {{globalPhase.name, 1.0}, {rx.name, 1.0}, {rz.name, 2.0}, {ry.name, 1.0}}};
     const DecompositionGraph graph2({hadamard}, gateset2, rules);
     DecompositionSolver solver2(graph2);
     const auto solutions2 = solver2.solve();
@@ -417,11 +420,11 @@ TEST_CASE("Test cyclic decomposition with multiple rules for the same operator",
 
 TEST_CASE("Test GraphBuilder with fixed decomposition", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H"};
-    const OperatorNode rz{"RZ"};
-    const OperatorNode rx{"RX"};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{rz, 1.0}, {rx, 3.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}, {rx.name, 3.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -439,11 +442,11 @@ TEST_CASE("Test GraphBuilder with fixed decomposition", "[DecompGraph::Solver]")
 
 TEST_CASE("Test GraphBuilder with alternative decomposition", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H"};
-    const OperatorNode rz{"RZ"};
-    const OperatorNode rx{"RX"};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{rz, 1.0}, {rx, 3.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}, {rx.name, 3.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -459,11 +462,11 @@ TEST_CASE("Test GraphBuilder with alternative decomposition", "[DecompGraph::Sol
 
 TEST_CASE("Test GraphSolver with fixed decomposition", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H"};
-    const OperatorNode rz{"RZ"};
-    const OperatorNode rx{"RX"};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{rz, 3.0}, {rx, 1.0}}};
+    const WeightedGateset gateset{{{rz.name, 3.0}, {rx.name, 1.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -485,11 +488,11 @@ TEST_CASE("Test GraphSolver with fixed decomposition", "[DecompGraph::Solver]")
 
 TEST_CASE("Test GraphSolver with alternative decomposition", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H"};
-    const OperatorNode rz{"RZ"};
-    const OperatorNode rx{"RX"};
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{rz, 1.0}, {rx, 3.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}, {rx.name, 3.0}}};
 
     const std::vector<RuleNode> rules{
         {"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}},
@@ -510,11 +513,11 @@ TEST_CASE("Test GraphSolver with alternative decomposition", "[DecompGraph::Solv
 
 TEST_CASE("Test GraphSolver with MultiRZ decompositions", "[DecompGraph::Solver]")
 {
-    const OperatorNode multiRZ3{"MultiRZ3"};
-    const OperatorNode multiRZ5{"MultiRZ5"};
-    const OperatorNode rz{"RZ"};
+    const OperatorNode multiRZ3{"MultiRZ[f64][3]{}", "MultiRZ"};
+    const OperatorNode multiRZ5{"MultiRZ[f64][5]{}", "MultiRZ"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
 
-    const WeightedGateset gateset{{{rz, 1.0}}};
+    const WeightedGateset gateset{{{rz.name, 1.0}}};
 
     const std::vector<RuleNode> rules{
         {"multiRZ3_to_rz", multiRZ3, {{rz, 3}}},
@@ -537,10 +540,10 @@ TEST_CASE("Test GraphSolver with MultiRZ decompositions", "[DecompGraph::Solver]
 
 TEST_CASE("Test GraphSolver with empty decomposition rules", "[DecompGraph::Solver]")
 {
-    const OperatorNode hadamard{"Hadamard"};
-    const OperatorNode globalPhase{"GlobalPhase"};
+    const OperatorNode hadamard{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode globalPhase{"GlobalPhase[][]{}", "GlobalPhase"};
 
-    const WeightedGateset gateset{{{globalPhase, 1.0}}};
+    const WeightedGateset gateset{{{globalPhase.name, 1.0}}};
 
     const std::vector<RuleNode> rules{
         {"hadamard_to_globalPhase", hadamard, {}},
@@ -557,47 +560,12 @@ TEST_CASE("Test GraphSolver with empty decomposition rules", "[DecompGraph::Solv
     REQUIRE(chosen_rule.totalCost == 0.0);
 }
 
-TEST_CASE("Test GraphSolver with PauliRot specialized by static argument pauli_word",
-          "[DecompGraph::Solver]")
-{
-    // Query: PauliRot[w:1][p:1][pauli_word:X] should match a rule whose output is
-    // PauliRot[w:-1][p:-1][pauli_word:X] (wildcards on wires/params, exact match on pauli_word).
-    const OperatorNode pauliRotQuery{"PauliRot", 1, 1, false, {{"pauli_word", "X"}}};
-    const OperatorNode pauliRotRuleOutput{"PauliRot", -1, -1, false, {{"pauli_word", "X"}}};
-    const OperatorNode hadamard{"Hadamard", 1, 0, false};
-    const OperatorNode multiRZ{"MultiRZ", 1, 1, false};
-
-    const WeightedGateset gateset{{{hadamard, 1.0}, {multiRZ, 1.0}}};
-
-    const std::vector<RuleNode> rules{
-        {"_pauli_rot_decomposition_X", pauliRotRuleOutput, {{hadamard, 2}, {multiRZ, 1}}},
-    };
-
-    const DecompositionGraph graph({pauliRotQuery}, gateset, rules);
-    DecompositionSolver solver(graph);
-    const auto result = solver.solve();
-
-    REQUIRE(result.find(pauliRotQuery) != result.end());
-    const auto &chosen = result.at(pauliRotQuery);
-    REQUIRE_FALSE(chosen.isBasis);
-    REQUIRE(chosen.ruleName == "_pauli_rot_decomposition_X");
-    REQUIRE(chosen.totalCost == 1.0 * 2 + 1.0 * 1);
-    REQUIRE(chosen.basisCounts.at(hadamard) == 2);
-    REQUIRE(chosen.basisCounts.at(multiRZ) == 1);
-
-    const OperatorNode pauliRotQueryY{"PauliRot", 1, 1, false, {{"pauli_word", "Y"}}};
-    REQUIRE_FALSE(pauliRotQuery == pauliRotQueryY);
-    REQUIRE(pauliRotQuery == pauliRotRuleOutput);
-}
-
 TEST_CASE("Test OperatorNode equality with staticNamedArgs", "[DecompGraph::Core]")
 {
-    const OperatorNode pauliRotX{"PauliRot", 1, 1, false, {{"pauli_word", "X"}}};
-    const OperatorNode pauliRotXWildcard{"PauliRot", -1, -1, false, {{"pauli_word", "X"}}};
-    const OperatorNode pauliRotY{"PauliRot", 1, 1, false, {{"pauli_word", "Y"}}};
-    const OperatorNode pauliRotNoArgs{"PauliRot", 1, 1, false};
+    const OperatorNode pauliRotX{"PauliRot[f64][1]{pauli_word:X}", "PauliRot"};
+    const OperatorNode pauliRotX2{"PauliRot[f64][1]{pauli_word:X}", "PauliRot"};
+    const OperatorNode pauliRotY{"PauliRot[f64][1]{pauli_word:Y}", "PauliRot"};
 
-    REQUIRE(pauliRotX == pauliRotXWildcard);
+    REQUIRE(pauliRotX == pauliRotX2);
     REQUIRE_FALSE(pauliRotX == pauliRotY);
-    REQUIRE(pauliRotX == pauliRotNoArgs);
 }

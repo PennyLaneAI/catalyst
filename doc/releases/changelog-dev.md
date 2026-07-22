@@ -173,6 +173,10 @@
 * Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
+* The `catalyst.custom_call` operation now accepts an optional `backend_config` attribute,
+  which allows backend-specific configuration to be attached to custom calls.
+  [(#3037)](https://github.com/PennyLaneAI/catalyst/pull/3037)
+
 * Introduced compile-time python-decompositions, allowing compiler passes to lower decomposition
   rules instantiated with static data (ex. pauli strings). Using this, the `graph-decomposition`
   pass can now decompose `quantum.paulirot` operations using the decomposition rule defined in
@@ -273,6 +277,7 @@
   [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
   [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
   [(#3039)](https://github.com/PennyLaneAI/catalyst/pull/3039)
+  [(#3046)](https://github.com/PennyLaneAI/catalyst/pull/3046)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
