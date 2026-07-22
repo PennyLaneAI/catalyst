@@ -910,11 +910,8 @@ def trace_quantum_operations(
             # which does not follow the same pattern as `qinst_p`.
             # We will revisit this once we have a better solution for
             # supporting general PL operations in Catalyst.
-            params = (
-                op.parameters + [op.hyperparameters["dimension"][0]]
-                if isinstance(op, qp.PCPhase)
-                else op.parameters
-            )
+            params = op.parameters
+            pcphase_dim = op.hyperparameters["dimension"][0] if isinstance(op, qp.PCPhase) else None
 
             qubits2 = qinst_p.bind(
                 *[*qubits, *params, *controlled_qubits, *controlled_values],
@@ -923,6 +920,7 @@ def trace_quantum_operations(
                 params_len=len(params),
                 ctrl_len=len(controlled_qubits),
                 adjoint=adjoint,
+                pcphase_dim=pcphase_dim,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])

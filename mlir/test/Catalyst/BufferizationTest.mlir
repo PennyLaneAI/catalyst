@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --split-input-file \
+// RUN: quantum-opt --split-input-file --verify-diagnostics \
 // RUN:   --pass-pipeline="builtin.module( \
 // RUN:     one-shot-bufferize{unknown-type-conversion=identity-layout-map} \
 // RUN:   )" %s | FileCheck %s
@@ -53,6 +53,15 @@ func.func @dbprint_str() {
 
 // -----
 
+func.func public @symbolic_array_error() attributes {llvm.emit_c_interface} {
+    // expected-error @below {{catalyst::symbolic_array is a placeholder op}}
+    // expected-error @below {{failed to bufferize op}}
+    %0 = catalyst.symbolic_array : tensor<i64>
+    return
+}
+
+// -----
+
 func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
     // CHECK: [[sourceAlloc:%.+]] = bufferization.to_buffer %arg0
     // CHECK: [[destAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
@@ -87,6 +96,17 @@ func.func @custom_call_copy(%arg0: tensor<2x3xf64>) -> tensor<2x2xf64> {
     %0 = catalyst.custom_call fn("lapack_dgesdd") (%extract) : (tensor<2x2xf64>) -> (tensor<2x2xf64>)
 
     return %0 : tensor<2x2xf64>
+}
+
+// -----
+
+// `backend_config` attribute survives bufferization.
+// CHECK-LABEL: func.func @custom_call_backend_config
+// CHECK: catalyst.custom_call fn("lapack_dgesdd") (%{{.*}}, %{{.*}}) {backend_config = {foo = "bar"}, number_original_arg = 1 : i32} :
+// CHECK-SAME: (memref<3x3xf64>, memref<3x3xf64>) -> ()
+func.func @custom_call_backend_config(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
+    %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0) {backend_config = {foo = "bar"}} : (tensor<3x3xf64>) -> (tensor<3x3xf64>)
+    return %0 : tensor<3x3xf64>
 }
 
 // -----

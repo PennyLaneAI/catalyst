@@ -26,6 +26,12 @@ include "mlir/IR/OpBase.td"
 
 include "Catalyst/IR/CatalystDialect.td"
 
+def SymbolicArrayOp : Catalyst_Op<"symbolic_array"> {
+    let summary = "Initialize a dummy array that can be used for resource estimation and dry-runs.";
+    let results = (outs AnyRankedTensor:$result);
+    let assemblyFormat = [{ attr-dict `:` type($result) }];
+}
+
 def ListInitOp : Catalyst_Op<"list_init"> {
     let summary = "Initialize a dynamically resizable arraylist.";
     let results = (outs ArrayListType:$list);
@@ -104,7 +110,8 @@ def CustomCallOp: Catalyst_Op<"custom_call",
   let arguments = (ins
     Variadic<AnyType>:$inputs,
     StrAttr:$call_target_name,
-    OptionalAttr<I32Attr>: $number_original_arg
+    OptionalAttr<I32Attr>: $number_original_arg,
+    OptionalAttr<DictionaryAttr>: $backend_config
   );
   let results = (outs Variadic<AnyType>);
 

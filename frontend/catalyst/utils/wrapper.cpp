@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <csignal>
-
 #include "nanobind/nanobind.h"
+#include "nanobind/stl/string.h"
+#include "nanobind/stl/vector.h"
+
+#include <csignal>
+#include <string>
+#include <vector>
 
 // TODO: Periodically check and increment version.
 // https://endoflife.date/numpy
@@ -230,6 +234,40 @@ nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::ob
     return returns;
 }
 
+template <typename FnPtr> static FnPtr extract_fn_ptr(nb::object fn_obj)
+{
+    auto ctypes = nb::module_::import_("ctypes");
+    return *reinterpret_cast<FnPtr *>(nb::cast<size_t>(ctypes.attr("addressof")(fn_obj)));
+}
+
+void invoke_setup(nb::object setup_fn, std::vector<std::string> argv)
+{
+    using setup_fn_t = void (*)(int, char **);
+    setup_fn_t fn = extract_fn_ptr<setup_fn_t>(setup_fn);
+
+    std::vector<char *> argv_c;
+    argv_c.reserve(argv.size());
+    for (auto &s : argv) {
+        argv_c.push_back(s.data());
+    }
+
+    {
+        nb::gil_scoped_release lock;
+        fn(static_cast<int>(argv.size()), argv_c.data());
+    }
+}
+
+void invoke_teardown(nb::object teardown_fn)
+{
+    using teardown_fn_t = void (*)();
+    teardown_fn_t fn = extract_fn_ptr<teardown_fn_t>(teardown_fn);
+
+    {
+        nb::gil_scoped_release lock;
+        fn();
+    }
+}
+
 NB_MODULE(wrapper, m)
 {
     m.doc() = "wrapper module";
@@ -237,6 +275,12 @@ NB_MODULE(wrapper, m)
     // See https://nanobind.readthedocs.io/en/latest/functions.html#none-arguments
     m.def("wrap", &wrap, "A wrapper function.", nb::arg("func"), nb::arg("py_args"),
           nb::arg("result_desc").none(), nb::arg("transfer"), nb::arg("numpy_arrays"));
+
+    m.def("invoke_setup", &invoke_setup, "Call the JIT'd setup(argc, argv)", nb::arg("setup_fn"),
+          nb::arg("argv"));
+
+    m.def("invoke_teardown", &invoke_teardown, "Call the JIT'd teardown()", nb::arg("teardown_fn"));
+
     int retval = _import_array();
     bool success = retval >= 0;
     if (!success) {
