@@ -316,7 +316,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
     FailureOr<std::string> compileTargetModule(ModuleOp nested)
     {
         MLIRContext *ctx = &getContext();
-        StringRef name = nested.getName().value_or("unnamed");
+        StringRef name = nested.getSymName().value_or("unnamed");
 
         auto targetAttr = nested->getAttrOfType<DictionaryAttr>("catalyst.target");
         if (!targetAttr) {
