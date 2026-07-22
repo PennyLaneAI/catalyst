@@ -14,12 +14,14 @@
 
 #define DEBUG_TYPE "ppr-to-ppm"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "PBC/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -33,13 +35,48 @@ namespace pbc {
 #define GEN_PASS_DEF_PPRTOPPMPASS
 #include "PBC/Transforms/Passes.h.inc"
 
+using namespace catalyst::quantum;
+
+namespace {
+
+/// Move ``quantum.dealloc_qb`` operations to after their last use in each function.
+/// This ensures magic-state qubits remain mapped when ``ppr-to-ppm`` inserts late PPM users.
+void sinkQuantumDeallocs(ModuleOp module)
+{
+    module.walk([&](func::FuncOp func) {
+        SmallVector<DeallocQubitOp> deallocOps;
+        func.walk([&](DeallocQubitOp deallocOp) { deallocOps.push_back(deallocOp); });
+
+        for (DeallocQubitOp deallocOp : deallocOps) {
+            mlir::Value qubit = deallocOp.getQubit();
+            Operation *lastUser = nullptr;
+            func.walk([&](Operation *op) {
+                if (op == deallocOp) {
+                    return;
+                }
+                for (mlir::Value operand : op->getOperands()) {
+                    if (operand == qubit) {
+                        lastUser = op;
+                    }
+                }
+            });
+
+            if (lastUser && lastUser != deallocOp->getPrevNode()) {
+                deallocOp->moveAfter(lastUser);
+            }
+        }
+    });
+}
+
+} // namespace
+
 struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
     using PPRToPPMPassBase::PPRToPPMPassBase;
 
     void runOnOperation() final
     {
         auto ctx = &getContext();
-        auto module = getOperation();
+        auto module = cast<ModuleOp>(getOperation());
 
         RewritePatternSet non_clifford_patterns(ctx);
         populateDecomposeNonCliffordPPRPatterns(non_clifford_patterns, decomposeMethod,
@@ -56,6 +93,8 @@ struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
         if (failed(applyPatternsGreedily(module, std::move(clifford_patterns)))) {
             return signalPassFailure();
         }
+
+        sinkQuantumDeallocs(module);
     }
 };
 

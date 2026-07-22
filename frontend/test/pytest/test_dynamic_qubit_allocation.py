@@ -250,6 +250,33 @@ def test_dynamic_wire_alloc_cond_outside(cond, expected, backend):
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.parametrize("cond, expected", [(True, [0, 1, 0, 0]), (False, [1, 0, 0, 0])])
+def test_dynamic_wire_alloc_cond_outside_non_capture(cond, expected, backend):
+    """
+    Test passing dynamically allocated wires into qp.cond on the legacy pathway.
+    """
+
+    @qjit(capture=False)
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit(c):
+        q = qp.allocate(1)[0]
+        qp.X(q)
+
+        def true_fn():
+            qp.CNOT(wires=[q, 1])
+
+        def false_fn():
+            qp.Identity(0)
+
+        qp.cond(c, true_fn, false_fn)()
+        qp.deallocate(q)
+        return qp.probs(wires=[0, 1])
+
+    observed = circuit(cond)
+
+    assert np.allclose(expected, observed)
+
+
 @pytest.mark.parametrize(
     "num_iter, expected", [(3, [0, 0, 1, 0, 0, 0, 0, 0]), (4, [1, 0, 0, 0, 0, 0, 0, 0])]
 )
@@ -532,6 +559,55 @@ def test_adjoint(backend):
     assert np.allclose(observed, expected)
 
 
+def test_no_capture_zero_state(backend):
+    """Test that zero-state dynamic allocation works without capture enabled."""
+
+    @qjit
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit():
+        with qp.allocate(1) as q:
+            qp.X(q[0])
+            qp.CNOT(wires=[q[0], 0])
+        return qp.probs(wires=[0, 1])
+
+    assert np.allclose([0, 0, 1, 0], circuit())
+
+    @qjit(target="mlir")
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit_mlir():
+        with qp.allocate(1) as q:
+            qp.X(q[0])
+            qp.CNOT(wires=[q[0], 0])
+        return qp.probs(wires=[0, 1])
+
+    mlir_str = circuit_mlir.mlir
+    assert mlir_str.count("qref.dealloc") >= 2
+
+
+def test_no_capture_magic_state(backend):
+    """
+    Test that magic state allocation works without capture enabled.
+    """
+
+    @qjit
+    @qp.qnode(qp.device(backend, wires=2))
+    def baseline():
+        qp.H(1)
+        qp.T(1)
+        qp.CNOT(wires=[1, 0])
+        return qp.probs(wires=[0])
+
+    @qjit
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit():
+        q = qp.allocate(1, state="magic-T")
+        qp.CNOT(wires=[q[0], 0])
+        return qp.probs(wires=[0])
+
+    assert np.allclose(baseline(), circuit())
+
+
+@pytest.mark.parametrize("capture", (True, False))
 @pytest.mark.parametrize(
     ("state", "prep"),
     (
@@ -539,17 +615,17 @@ def test_adjoint(backend):
         ("magic-T-adj", lambda w: (qp.H(w), qp.adjoint(qp.T(w), lazy=False))),
     ),
 )
-def test_magic_state_allocation(backend, state, prep):
+def test_magic_state_allocation(backend, capture, state, prep):
     """Test magic state allocation lowers correctly and produces expected states."""
 
-    @qjit(capture=True)
+    @qjit(capture=capture)
     @qp.qnode(qp.device(backend, wires=2))
     def baseline():
         prep(1)
         qp.CNOT(wires=[1, 0])
         return qp.probs(wires=[0])
 
-    @qjit(capture=True)
+    @qjit(capture=capture)
     @qp.qnode(qp.device(backend, wires=2))
     def circuit():
         q = qp.allocate(1, state=state)
@@ -622,6 +698,38 @@ def test_magic_state_manual_deallocate(backend):
         return qp.probs(wires=[0])
 
     assert np.allclose([1, 0], circuit())
+
+
+@pytest.mark.parametrize("capture", (True, False))
+def test_magic_state_pauli_measure(backend, capture):
+    """Test Pauli product measurement on a fabricated magic wire."""
+
+    @qjit(capture=capture, target="mlir")
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit():
+        qp.CNOT(wires=[0, 1])
+        magic = qp.allocate(1, state="magic-T")
+        qp.pauli_measure("ZZ", wires=[0, magic[0]])
+        return qp.expval(qp.Z(0))
+
+    mlir_str = circuit.mlir
+    assert "pbc.ref.fabricate" in mlir_str
+    assert "pauli" in mlir_str.lower()
+
+
+@pytest.mark.parametrize("capture", (True, False))
+def test_magic_state_mid_measure(backend, capture):
+    """Test mid-circuit measure on device wires after magic state allocation."""
+
+    @qjit(capture=capture, target="mlir")
+    @qp.qnode(qp.device(backend, wires=3))
+    def circuit():
+        magic = qp.allocate(1, state="magic-T")
+        qp.pauli_measure("Z", wires=[magic[0]])
+        qp.measure(2, reset=True)
+        return qp.expval(qp.Z(0))
+
+    circuit()
 
 
 def test_magic_state_mlir_lowering(backend):
