@@ -18,20 +18,20 @@
 include "mlir/IR/OpBase.td"
 include "mlir/IR/DialectBase.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Transport dialect definition.
 //===----------------------------------------------------------------------===//
 
 def Transport_Dialect : Dialect {
-    let summary = "Runtime transport-layer ops that lower to the __catalyst__transport__* CAPI.";
+    let summary = "Typed ops for setting up and driving a transport session.";
     let description = [{
-        A thin, typed MLIR representation of the Catalyst runtime transport CAPI
-        (runtime/include/TransportCAPI.h). One op per controller-side CAPI entry
-        point; `convert-transport-to-llvm` lowers each to an `llvm.call` on the
-        matching `__catalyst__transport__*` symbol. The coprocessor role is an
-        out-of-tree backend loaded by the runtime, so only the controller side is
-        emitted here.
+        The transport dialect models a connection-oriented data-movement session
+        between two endpoints: creating a session, bringing up the connection,
+        exchanging memory handles, establishing a data path, and running rounds
+        of request/reply traffic until teardown.
     }];
 
     let name = "transport";
@@ -41,7 +41,26 @@ def Transport_Dialect : Dialect {
 }
 
 //===----------------------------------------------------------------------===//
-// Transport dialect types.
+// Enums.
+//===----------------------------------------------------------------------===//
+
+def Transport_Role : I32EnumAttr<"Role", "transport session role", [
+        I32EnumAttrCase<"Controller", 0, "controller">,
+        I32EnumAttrCase<"Coprocessor", 1, "coprocessor">
+    ]> {
+    let cppNamespace = "::catalyst::transport";
+}
+
+def Transport_DataPath : I32EnumAttr<"DataPath", "transport data-movement path", [
+        I32EnumAttrCase<"CpuVerbs", 0, "cpu_verbs">,
+        I32EnumAttrCase<"GpuEngine", 1, "gpu_engine">,
+        I32EnumAttrCase<"Other", 2, "other">
+    ]> {
+    let cppNamespace = "::catalyst::transport";
+}
+
+//===----------------------------------------------------------------------===//
+// Types.
 //===----------------------------------------------------------------------===//
 
 class Transport_Type<string name, string typeMnemonic, list<Trait> traits = []>
@@ -49,19 +68,37 @@ class Transport_Type<string name, string typeMnemonic, list<Trait> traits = []>
     let mnemonic = typeMnemonic;
 }
 
+// Opaque session handle, parameterized by role. Lowers to !llvm.ptr; the role is
+// compile-time only and drives op verification + the create factory selection.
 def Transport_SessionType : Transport_Type<"Session", "session"> {
-    let summary = "Opaque transport controller session handle (CatalystTransportSession*).";
+    let summary = "Opaque transport session handle (CatalystTransportSession*), tagged with its role.";
+    let parameters = (ins EnumParameter<Transport_Role>:$role);
+    let assemblyFormat = "`<` $role `>`";
 }
 
-def Transport_PeerType : Transport_Type<"Peer", "peer"> {
-    let summary = "Opaque peer-region descriptor handle (CatalystTransportPeerRef*).";
+def Transport_TokenType : Transport_Type<"Token", "token"> {
+    let summary = "Handle to an in-flight async transport step, awaited with transport.barrier.";
 }
 
+// Role-constrained session-type constraints for role-specific ops.
+def Transport_ControllerSession : Type<
+    CPred<"::llvm::isa<::catalyst::transport::SessionType>($_self) && "
+          "::llvm::cast<::catalyst::transport::SessionType>($_self).getRole() == "
+          "::catalyst::transport::Role::Controller">,
+    "controller transport session">;
+
+def Transport_CoprocessorSession : Type<
+    CPred<"::llvm::isa<::catalyst::transport::SessionType>($_self) && "
+          "::llvm::cast<::catalyst::transport::SessionType>($_self).getRole() == "
+          "::catalyst::transport::Role::Coprocessor">,
+    "coprocessor transport session">;
+
 //===----------------------------------------------------------------------===//
-// Transport operation base.
+// Operation base.
 //===----------------------------------------------------------------------===//
 
+// All transport ops perform side-effecting I/O
 class Transport_Op<string mnemonic, list<Trait> traits = []> :
-    Op<Transport_Dialect, mnemonic, traits>;
+    Op<Transport_Dialect, mnemonic, !listconcat(traits, [MemoryEffects<[MemWrite]>])>;
 
 #endif // TRANSPORT_DIALECT

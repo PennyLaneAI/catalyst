@@ -19,6 +19,7 @@
 #include "mlir/IR/OpDefinition.h"
 
 #include "Transport/IR/TransportOpsDialect.h.inc"
+#include "Transport/IR/TransportEnums.h.inc"
 
 #define GET_TYPEDEF_CLASSES
 #include "Transport/IR/TransportOpsTypes.h.inc"
