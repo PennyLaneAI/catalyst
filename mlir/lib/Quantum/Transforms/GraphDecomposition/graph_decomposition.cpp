@@ -422,7 +422,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // dialect.
         // The interface will provide one unified way of generating operator nodes from operations,
         // with consistent getter methods for all relevant data fields.
-        getOperation().walk([&](quantum::QuantumGate op) {
+        getOperation().walk([&](DecomposableGate op) {
             if (DecompUtils::isInDecompRule(op)) {
                 return;
             }
@@ -430,20 +430,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             node.numWires = op.getNonCtrlQubitOperands().size();
             node.adjoint = op.getAdjointFlag();
 
-            if (auto customOp = llvm::dyn_cast<quantum::CustomOp>(op.getOperation())) {
-                node.name = customOp.getGateName().str();
-            }
-            // Name handling for non-custom ops
-            else {
-                std::string name = op->getName().stripDialect().str();
-                if (name == "gphase") {
-                    name = "GlobalPhase";
-                }
-                else if (name == "paulirot") {
-                    name = cast<DecomposableGate>(op.getOperation()).getGraphOpId();
-                }
-                node.name = name;
-            }
+            node.name = op.getOperatorName();
+            node.id = op.getGraphOpId();
 
             if (auto paramOp =
                     llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
@@ -451,10 +439,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             else {
                 node.numParams = 0;
-            }
-
-            if (auto decompGate = dyn_cast<DecomposableGate>(op.getOperation())) {
-                node.id = decompGate.getGraphOpId();
             }
 
             operators.push_back(node);
