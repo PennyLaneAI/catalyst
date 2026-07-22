@@ -68,3 +68,7 @@ add_subdirectory(QEC)
 if(ENABLE_OQD)
 add_subdirectory(OQDcapi)
 endif()
+
+if(ENABLE_TRANSPORT)
+add_subdirectory(transport)
+endif()
