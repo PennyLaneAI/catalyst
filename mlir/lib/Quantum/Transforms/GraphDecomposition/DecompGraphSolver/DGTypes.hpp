@@ -54,10 +54,11 @@ namespace DecompGraph::Core {
  */
 struct OperatorNode {
     std::string id;
+    std::string name; // name is required for gateset checking
+
     bool adjoint{false};
 
     // optional params, primarily for debug use
-    std::string name{""};
     int numWires{-1};
     int numParams{-1};
     std::unordered_map<std::string, std::string> staticNamedArgs{};
@@ -92,15 +93,16 @@ struct OperatorNodeHash {
  * @brief This represents the weighted target gateset for the graph decomposition problem.
  */
 struct WeightedGateset {
-    // TODO: using ID here mandates that gatesets specify all legal IDs, rather than generic class
-    // like "PauliRot". This should be updated to work on generic names
-    std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;
+    std::unordered_map<std::string, double> ops;
 
-    [[nodiscard]] bool contains(const OperatorNode &op) const { return ops.find(op) != ops.end(); }
+    [[nodiscard]] bool contains(const OperatorNode &op) const
+    {
+        return ops.find(op.name) != ops.end();
+    }
 
     [[nodiscard]] double getCost(const OperatorNode &op) const
     {
-        auto it = ops.find(op);
+        auto it = ops.find(op.name);
         return it != ops.end() ? it->second : std::numeric_limits<double>::infinity();
     }
 };
