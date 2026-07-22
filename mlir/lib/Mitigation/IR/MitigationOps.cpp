@@ -66,3 +66,38 @@ LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 //===----------------------------------------------------------------------===//
 
 MutableOperandRange ZneOp::getArgOperandsMutable() { return getArgsMutable(); }
+
+//===----------------------------------------------------------------------===//
+// RemOp, CallOpInterface
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable RemOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void RemOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+};
+
+Operation::operand_range RemOp::getArgOperands() { return getOperands(); }
+
+//===----------------------------------------------------------------------===//
+// RemOp, SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult RemOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Only check that the callee attribute is set. The mitigation-lowering
+    // pass may rename the referenced function (e.g. with a generated suffix
+    // when the callee lives in a nested module), so the strict symbol
+    // resolution that ZneOp does would reject otherwise-valid IR here.
+    if (!this->getCalleeAttr()) {
+        return this->emitOpError("missing callee attribute");
+    }
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// RemOp, getArgOperandsMutable
+//===----------------------------------------------------------------------===//
+
+MutableOperandRange RemOp::getArgOperandsMutable() { return getArgsMutable(); }
