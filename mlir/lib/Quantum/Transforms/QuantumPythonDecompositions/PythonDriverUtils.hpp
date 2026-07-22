@@ -14,13 +14,13 @@
 
 #pragma once
 
+#include "nanobind/eval.h"
+#include "nanobind/nanobind.h"
+
 #include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <string>
-
-#include "nanobind/eval.h"
-#include "nanobind/nanobind.h"
 
 constexpr const char sitePackagesScript[] = R"(
 import os
