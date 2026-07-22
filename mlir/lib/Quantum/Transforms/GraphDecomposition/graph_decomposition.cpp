@@ -139,24 +139,95 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
         auto solution = solver.solve();
-        LLVM_DEBUG(showSolution(solution));
+        LLVM_DEBUG(showSolution(solution););
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
-        // decompose-lowering to apply the chosen decomposition rules
+        // decompose-lowering to apply the chosen decomposition rules.
+
+        ///////////////////////////
+        // CQRs:
+        //  - Adjoint: A chosen rule for an adjoint operator may re-emit its base decomposition
+        //             wrapped in a `quantum.adjoint` region. Such a region is only reduced to
+        //             op-level modified gates by `adjoint-lowering`. We therefore iterate
+        //             `(decompose-lowering -> adjoint-lowering)` to a fixpoint.
+        // The solver has already chosen every rule up front; this loop only applies them.
         ModuleOp module = getOperation();
-        OpPassManager pm("builtin.module");
 
         DecomposeLoweringPassOptions dlOptions;
         for (auto &[op, chosenRule] : solution) {
             dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
         }
 
-        pm.addPass(qref::createValueSemanticsConversionPass());
-        pm.addPass(createDecomposeLoweringPass(dlOptions));
+        // Convert reference-semantics python decompositions to value semantics once.
+        {
+            OpPassManager valueSemanticsPm("builtin.module");
+            valueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
+            if (failed(runPipeline(valueSemanticsPm, module))) {
+                return signalPassFailure();
+            }
+        }
 
-        if (failed(runPipeline(pm, module))) {
-            return signalPassFailure();
+        auto countOps = [](ModuleOp m) {
+            size_t count = 0;
+            m->walk([&](mlir::Operation *) { count++; });
+            return count;
+        };
+
+        // Fixpoint: apply the chosen rules and distribute any `quantum.adjoint` regions they emit,
+        // until the module stops changing.
+        constexpr unsigned maxIterations = 64;
+        size_t previousOpCount = countOps(module);
+        for (unsigned iter = 0; iter < maxIterations; ++iter) {
+            {
+                OpPassManager decomposePm("builtin.module");
+                decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
+                if (failed(runPipeline(decomposePm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
+            // Distribute a `quantum.ctrl` region lazily.
+            bool hasCtrlRegion = false;
+            module->walk([&](CtrlOp) {
+                hasCtrlRegion = true;
+                return mlir::WalkResult::interrupt();
+            });
+            if (hasCtrlRegion) {
+                OpPassManager ctrlPm("builtin.module");
+                ctrlPm.addPass(createCtrlLoweringPass());
+                if (failed(runPipeline(ctrlPm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
+            bool hasCtrlRegion = true;
+            module->walk[[&](CtrlOp) {
+                hasCtrlRegion = false;
+                return mlir::WalkResult::interrupt();
+            });
+
+            // Distribute a `quantum.adjoint` region lazily.
+            // It uses a greedy rewriter that would otherwise DCE gates in circuits that
+            // never needed adjoint handling.
+            bool hasAdjointRegion = false;
+            module->walk([&](AdjointOp) {
+                hasAdjointRegion = true;
+                return mlir::WalkResult::interrupt();
+            });
+            if (hasAdjointRegion) {
+                OpPassManager adjointPm("builtin.module");
+                adjointPm.addPass(createAdjointLoweringPass());
+                if (failed(runPipeline(adjointPm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
+            size_t currentOpCount = countOps(module);
+            if (currentOpCount == previousOpCount) {
+                break;
+            }
+            previousOpCount = currentOpCount;
         }
     }
 
@@ -418,9 +489,20 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             OperatorNode node;
             node.numWires = op.getNonCtrlQubitOperands().size();
-            node.adjoint = op.getAdjointFlag();
 
-            node.name = op.getOperatorName();
+            // The modifiers are carried in the name, as the result
+            // the solver doesn't need a modifier field
+            std::string name = op.getOperatorName();
+            if (op.getAdjointFlag()) {
+                name = "Adjoint(" + name + ")";
+            }
+            size_t numCtrl = op.getCtrlQubitOperands().size();
+            if (numCtrl == 1) {
+                name = "C(" + name + ")";
+            } else if (numCtrl > 1) {
+                name = std::to_string(numCtrl) + "C(" + name + ")";
+            }
+            node.name = name;
             node.id = op.getGraphOpId();
 
             if (auto paramOp =
@@ -428,10 +510,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 node.numParams = paramOp.getAllParams().size();
             } else {
                 node.numParams = 0;
-            }
-
-            if (auto decompGate = dyn_cast<DecomposableGate>(op.getOperation())) {
-                node.id = decompGate.getGraphOpId();
             }
 
             operators.push_back(node);
@@ -444,16 +522,57 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
+        llvm::StringRef original = raw;
 
-        // Unwrap "Adjoint(GateName)"
+        // Unwrap control following the implementation for Adjoint(Op)
+        llvm::StringRef afterCount = raw;
+        size_t numDigits = 0;
+        while (numDigits < afterCount.size() && afterCount[numDigits] >= '0' &&
+               afterCount[numDigits] <= '9') {
+            numDigits++;
+        }
+        llvm::StringRef ctrlBody = afterCount.drop_front(numDigits);
+        if (ctrlBody.consume_front("C(") && (ctrlBody.contains('{') || ctrlBody.contains('['))) {
+            size_t numCtrl = 1;
+            if (numDigits > 0) {
+                (void)raw.take_front(numDigits).getAsInteger(10, numCtrl);
+            }
+            llvm::StringRef inner = ctrlBody.ends_with(")") ? ctrlBody.drop_back(1) : ctrlBody;
+            OperatorNode innerNode = parseOperator(inner);
+            node.numWires = innerNode.numWires;
+            node.numParams = innerNode.numParams;
+            node.id = original.str();
+            node.name = (numCtrl == 1 ? std::string("C(") : std::to_string(numCtrl) + "C(") +
+                        innerNode.name + ")";
+            return node;
+        }
+
+        // Unwrap "Adjoint(Op)". The modifier is kept in both the id and the (coarser) name, so the
+        // solver never needs a modifier flag: a modified operator's name won't match a base
+        // gate-set entry.
         if (raw.consume_front("Adjoint(")) {
-            node.adjoint = true;
-            auto closeIdx = raw.rfind(')');
-            if (closeIdx == llvm::StringRef::npos) {
-                node.name = raw.trim().str();
+            // New graphOpId form "Adjoint(<base-id>)" (the inner carries '{'/'[' brace groups),
+            // matching defaultGetGraphOpId's wrapping. The whole string is the id; recurse on the
+            // inner base-id to recover name/wires/params.
+            if (raw.contains('{') || raw.contains('[')) {
+                llvm::StringRef inner = raw.ends_with(")") ? raw.drop_back(1) : raw;
+                OperatorNode innerNode = parseOperator(inner);
+                node.name = "Adjoint(" + innerNode.name + ")";
+                node.numWires = innerNode.numWires;
+                node.numParams = innerNode.numParams;
+                node.id = original.str();
                 return node;
             }
-            node.name = raw.take_front(closeIdx).trim().str();
+            // FIXME: Currently, the legacy pipeline form "Adjoint(Name)" optionally followed by
+            // a "(w,p)" suffix (e.g. the "Adjoint(T)(1,0)" keys buildResourceDict emits).
+            // To fix this, Add the following find check to find the first ')' closes the base
+            // name and then a trailing "(w,p)" is parsed by the suffix handler below.
+            auto closeIdx = raw.find(')');
+            if (closeIdx == llvm::StringRef::npos) {
+                node.name = "Adjoint(" + raw.trim().str() + ")";
+                return node;
+            }
+            node.name = "Adjoint(" + raw.take_front(closeIdx).trim().str() + ")";
             raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
         } else if (raw.contains('[') || raw.contains('{')) {
             node.id = raw.str();
