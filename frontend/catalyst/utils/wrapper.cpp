@@ -251,8 +251,10 @@ void invoke_setup(nb::object setup_fn, std::vector<std::string> argv)
         argv_c.push_back(s.data());
     }
 
-    nb::gil_scoped_release lock;
-    fn(static_cast<int>(argv.size()), argv_c.data());
+    {
+        nb::gil_scoped_release lock;
+        fn(static_cast<int>(argv.size()), argv_c.data());
+    }
 }
 
 void invoke_teardown(nb::object teardown_fn)
