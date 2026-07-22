@@ -11,11 +11,17 @@ LLVM_BUILD_DIR ?= $(MK_DIR)/llvm-project/build
 STABLEHLO_BUILD_DIR ?= $(MK_DIR)/stablehlo/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
 RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
+DIST_DIR ?= $(MK_DIR)/dist
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 BUILD_TYPE ?= Release
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 LLVM_TARGETS_TO_BUILD ?= host
+LLVM_INSTALL_STAGING_DIR ?= $(LLVM_BUILD_DIR)/install
+LLVM_DISTRIBUTION_COMPONENTS ?= $\
+	"cmake-exports;llvm-headers;llvm-libraries;$\
+	mlir-cmake-exports;mlir-headers;mlir-libraries;$\
+	FileCheck;llvm-tblgen;llvm-config;mlir-tblgen;not;count"
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF
@@ -81,6 +87,9 @@ llvm:
 		-DLLVM_ENABLE_PROJECTS="$(LLVM_PROJECTS)" \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+		-DLLVM_INSTALL_UTILS=ON \
+		-DLLVM_DISTRIBUTION_COMPONENTS=$(LLVM_DISTRIBUTION_COMPONENTS) \
+		-DCMAKE_INSTALL_PREFIX=$(LLVM_BUILD_DIR)/install \
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
@@ -226,6 +235,23 @@ pack-catalyst-dev: dialects
 
 	@echo "build the catalyst-dev package"
 	cd $(DIALECTS_BUILD_DIR) && cpack
+	mkdir -p $(DIST_DIR)
+	mv $(DIALECTS_BUILD_DIR)/catalyst-dev*.tar.gz $(DIST_DIR)
+
+# Get the LLVM version as, e.g. 22.0.0git-8f264586
+LLVM_VERSION := $(shell $(LLVM_INSTALL_STAGING_DIR)/bin/llvm-config --version)
+LLVM_COMMIT := $(shell grep llvm ../.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8)
+LLVM_VERSION_FULL := $(LLVM_VERSION)-$(LLVM_COMMIT)
+
+.PHONY: pack-mlir-dev
+pack-mlir-dev: llvm
+
+	@echo "build the catalyst-mlir-dev package"
+	cmake --build $(LLVM_BUILD_DIR) --target install-distribution
+	tar -czf catalyst-mlir-dev_$(shell uname -s)_$(shell uname -m)_$(LLVM_VERSION_FULL).tar.gz \
+		-C $(LLVM_INSTALL_STAGING_DIR) bin lib include
+	mkdir -p $(DIST_DIR)
+	mv catalyst-mlir-dev*.tar.gz $(DIST_DIR)
 
 .PHONY: test
 test:
