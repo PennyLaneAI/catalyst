@@ -220,7 +220,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             cost.consume_back(": f64");
             cost = cost.trim();
 
-            bool success = to_float(cost, targetGateSet.ops[OperatorNode{opName.str()}]);
+            bool success = to_float(cost, targetGateSet.ops[opName.str()]);
 
             if (!success) {
                 return failure();
