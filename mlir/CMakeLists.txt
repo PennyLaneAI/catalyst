@@ -316,6 +316,11 @@ install(TARGETS ${CATALYST_INSTALL_TARGETS}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT catalyst-dev
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
+# Install license to share/doc/Catalyst/LICENSE
+install(FILES "${PROJECT_SOURCE_DIR}/../LICENSE"
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}"
+    COMPONENT catalyst-dev)
+
 # Tools (binaries). These are usually not in MLIR_EXPORTS, so install by name.
 # NOTE: We use the catalyst-bin component for tools to exclude from catalyst-dev.
 if(NOT CATALYST_DOCS_ONLY)
