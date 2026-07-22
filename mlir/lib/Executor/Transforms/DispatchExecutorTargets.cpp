@@ -98,7 +98,7 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
                 }
                 StringAttr addrAttr = libCallAddress(call, executorAddress);
                 if (!addrAttr) {
-                    call.emitOpError("executor runtime_call has no executor address");
+                    call.emitOpError("custom_call dispatch has no executor address");
                     return signalPassFailure();
                 }
                 if (openedAddresses.insert(addrAttr.str()).second) {
@@ -136,7 +136,7 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
         for (catalyst::CustomCallOp call : libCalls) {
             StringAttr addressAttr = libCallAddress(call, fallbackAddress);
             if (!addressAttr) {
-                call.emitOpError("executor runtime_call has no executor address");
+                call.emitOpError("custom_call dispatch has no executor address");
                 return failure();
             }
             auto symAttr = StringAttr::get(ctx, call.getCallTargetName());
