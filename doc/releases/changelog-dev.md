@@ -12,6 +12,19 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new runtime transport layer for remote/local executors is introduced.
+  [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
+
+* A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
+  [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
+
+* `quantum.extract` canonicalization now looks through a `quantum.insert` at a distinct
+  static index, rewriting the extract to read from the register feeding the insert and
+  sinking the bypassed insert below the gates acting on the extracted qubits. This removes
+  the false data dependency between wires that act on different qubits of the same register
+  and leaves extracts grouped above the gates and inserts below them.
+  [(#2965)](https://github.com/PennyLaneAI/catalyst/pull/2965)
+
 * Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
   [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
 
@@ -148,8 +161,10 @@
   that have multiple quantum operands, of either quantum register or qubit type.
   [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
 
-* The `--decompose-lowering` pass now supports `quantum.paulirot` operators.
+* The `--decompose-lowering` pass now uses the `DecomposableGate` interface, allowing it to support
+  many new gate operations, including `quantum.paulirot`.
   [(#2893)](https://github.com/PennyLaneAI/catalyst/pull/2893)
+  [(#3040)](https://github.com/PennyLaneAI/catalyst/pull/3040)
 
 * Exclude more packages from AutoGraph conversion, since converting code unintentionally can lead
   to tracing errors.
@@ -161,6 +176,10 @@
 * Dynamic shapes with ``qp.cond`` are now supported with ``qjit(capture=True)``:
   [(#2740)](https://github.com/PennyLaneAI/catalyst/pull/2740)
 
+* The `catalyst.custom_call` operation now accepts an optional `backend_config` attribute,
+  which allows backend-specific configuration to be attached to custom calls.
+  [(#3037)](https://github.com/PennyLaneAI/catalyst/pull/3037)
+
 * Introduced compile-time python-decompositions, allowing compiler passes to lower decomposition
   rules instantiated with static data (ex. pauli strings). Using this, the `graph-decomposition`
   pass can now decompose `quantum.paulirot` operations using the decomposition rule defined in
@@ -171,6 +190,9 @@
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
 <h3>Breaking changes 💔</h3>
+
+* Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
+  [(#2974)](https://github.com/PennyLaneAI/catalyst/pull/2974)
 
 * Catalyst's xDSL dependencies have been updated to `xdsl` 0.63.0 and `xdsl-jax` 0.5.2.
   [(#2840)](https://github.com/PennyLaneAI/catalyst/pull/2840)
@@ -251,8 +273,13 @@
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
 
-* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass. This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph. This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
+* Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
+  This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
+  This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
+  The graph solver now supports the new `graphOpId`s provided by the interface, as well as the legacy pathway with `name`, `numWires` etc.
   [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
+  [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
+  [(#3039)](https://github.com/PennyLaneAI/catalyst/pull/3039)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
@@ -423,6 +450,9 @@
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
   [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
 
+* The documentation for `QJIT.mlir` and `QJIT.mlir_opt` was updated with type hints and docstrings that better reflect the compilation-dependent nature of the properties.
+  [(#2975)](https://github.com/PennyLaneAI/catalyst/pull/2975)
+
 * The [MLIR Plugins](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/plugins.html)
   documentation has been updated to fix a number of typos and formatting issues, and to improve
   overall readability.
@@ -442,6 +472,8 @@ JiaRung Jian,
 Jacob Kitchen,
 Korbinian Kottmann,
 Christina Lee,
+Joseph Lee,
+Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,

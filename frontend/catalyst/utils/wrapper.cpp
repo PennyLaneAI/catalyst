@@ -20,6 +20,8 @@
 #include "nanobind/stl/string.h"
 #include "nanobind/stl/vector.h"
 
+#include <csignal>
+
 // TODO: Periodically check and increment version.
 // https://endoflife.date/numpy
 #define NPY_NO_DEPRECATED_API NPY_1_24_API_VERSION

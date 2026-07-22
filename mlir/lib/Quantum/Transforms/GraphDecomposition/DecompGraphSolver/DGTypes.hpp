@@ -20,7 +20,9 @@
  */
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <string>
 #include <unordered_map>
@@ -58,9 +60,16 @@ struct OperatorNode {
 
     // Optional static arguments for operators that require additional data.
     std::unordered_map<std::string, std::string> staticNamedArgs{};
+    std::string id{""};
 
     bool operator==(const OperatorNode &other) const
     {
+        // id match
+        if (!id.empty() && !other.id.empty() && id == other.id) {
+            return true;
+        }
+        // legacy fallback if either op is missing ID
+
         // For equality, we consider numWires and numParams conditionally equal
         // if they are not set to -1 (which indicates a wildcard that can match any value).
         const bool default_wires =
@@ -98,6 +107,10 @@ struct OperatorNode {
 struct OperatorNodeHash {
     std::size_t operator()(const OperatorNode &node) const
     {
+        // prefer id if available
+        if (!node.id.empty()) {
+            return std::hash<std::string>{}(node.id);
+        }
         return std::hash<std::string>{}(node.name);
     }
 };
@@ -108,7 +121,23 @@ struct OperatorNodeHash {
 struct WeightedGateset {
     std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;
 
-    [[nodiscard]] bool contains(const OperatorNode &op) const { return ops.find(op) != ops.end(); }
+    [[nodiscard]] bool contains(const OperatorNode &op) const
+    {
+        // hash match
+        if (ops.find(op) != ops.end()) {
+            return true;
+        }
+
+        // use op-matching if hashes failed (could be id vs name)
+        for (auto [gatesetOp, cost] : ops) {
+            if (gatesetOp == op) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     [[nodiscard]] double getCost(const OperatorNode &op) const
     {
         auto it = ops.find(op);
@@ -137,7 +166,8 @@ struct RuleTerm {
  * @brief This represents the origin of a decomposition rule.
  *
  * This enum is used to categorize decomposition rules based on their source or type:
- * - Default: The default rule for decomposing an operator as defined in the decomposition graph.
+ * - Default: The default rule for decomposing an operator as defined in the decomposition
+ * graph.
  * - Fixed: A fixed rule that cannot be changed or overridden by the solver.
  * - Alternative: An alternative rule that can be used in place of the default rule.
  */
@@ -154,7 +184,8 @@ enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2 };
  *
  * TODO:
  * - We can add a field for work_wires_required if we want to consider the number of ancillary
- * wires needed for the decomposition, which can be an important factor in resource optimization.
+ * wires needed for the decomposition, which can be an important factor in resource
+ * optimization.
  * - We can also consider adding a field for the decomposition function or a pointer to it,
  * which can be used to actually perform the decomposition after the graph solver selects
  * the rules.
