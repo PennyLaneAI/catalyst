@@ -29,6 +29,7 @@ struct EncodedMemref {
     int64_t rank;
     void *data_aligned;
     int8_t dtype;
+    int64_t *sizes;
 };
 
 #define DEFINE_LAPACK_FUNC(FUNC_NAME, DATA_SIZE, OUT_SIZE, KERNEL)                                 \

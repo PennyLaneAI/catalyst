@@ -59,6 +59,7 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
+from catalyst.utils.runtime_artifacts import collect_runtime_artifacts
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -882,6 +883,8 @@ class QJIT(CatalystCallable):
         mlir_module, ctx = lower_jaxpr_to_mlir(
             self.jaxpr, self.__name__, get_arg_names(self.jaxpr.in_avals, self.original_function)
         )
+
+        collect_runtime_artifacts(mlir_module, self.compile_options)
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)

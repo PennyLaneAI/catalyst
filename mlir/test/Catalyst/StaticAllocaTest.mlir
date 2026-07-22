@@ -41,11 +41,15 @@ module @static_alloca_custom_call {
     // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: llvm.alloca [[one]] x !llvm.array<1 x ptr>
     // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.alloca [[one]] x !llvm.struct<(i64, ptr, i8)>
+    // CHECK: llvm.alloca [[one]] x !llvm.struct<(i64, ptr, i8, ptr)>
+    // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.alloca [[one]] x !llvm.array<2 x i64>
     // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: llvm.alloca [[one]] x !llvm.array<1 x ptr>
     // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.alloca [[one]] x !llvm.struct<(i64, ptr, i8)>
+    // CHECK: llvm.alloca [[one]] x !llvm.struct<(i64, ptr, i8, ptr)>
+    // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.alloca [[one]] x !llvm.array<2 x i64>
     // CHECK: ^bb1:
     cf.br ^bb1
   ^bb1:

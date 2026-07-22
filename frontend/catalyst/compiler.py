@@ -181,6 +181,14 @@ class LinkerDriver:
         if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
             default_flags.append("-lrt_OQD_capi")
 
+        for artifact_path in options.runtime_artifacts:
+            dir_name = os.path.dirname(artifact_path)
+            default_flags += [
+                f"-Wl,-rpath,{dir_name}",
+                f"-L{dir_name}",
+                artifact_path,
+            ]
+
         return default_flags
 
     @staticmethod
@@ -210,9 +218,9 @@ class LinkerDriver:
                 yield compiler
 
     @staticmethod
-    def _attempt_link(compiler, flags, infile, outfile, options):
+    def _attempt_link(compiler, flags, infile, outfile, options, extra_objects=None):
         try:
-            command = [compiler] + flags + [infile, "-o", outfile]
+            command = [compiler] + flags + [infile] + list(extra_objects or []) + ["-o", outfile]
             run_writing_command(command, options)
             return True
         except subprocess.CalledProcessError as e:
@@ -239,7 +247,9 @@ class LinkerDriver:
 
     @staticmethod
     @debug_logger
-    def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):
+    def run(
+        infile, outfile=None, flags=None, fallback_compilers=None, options=None, extra_objects=None
+    ):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
@@ -249,6 +259,8 @@ class LinkerDriver:
             flags (Optional[List[str]]): flags to be passed down to the compiler
             fallback_compilers (Optional[List[str]]): name of executables to be looked for in PATH
             compile_options (Optional[CompileOptions]): generic compilation options.
+            extra_objects (Optional[List[str]]): additional object files to statically link
+                (e.g. locally cross-compiled catalyst.target kernels).
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
@@ -261,7 +273,9 @@ class LinkerDriver:
         if fallback_compilers is None:
             fallback_compilers = LinkerDriver._default_fallback_compilers
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
-            success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
+            success = LinkerDriver._attempt_link(
+                compiler, flags, infile, outfile, options, extra_objects
+            )
             if options.verbose:
                 print("Shared object linking successful", file=options.logfile)
             if success:
@@ -498,7 +512,16 @@ class Compiler:
             out_IR = None
 
         if self.options.link:
-            output = LinkerDriver.run(output_object_name, options=self.options)
+            # Locally cross-compiled catalyst.target kernels are emitted as separate objects; the
+            # driver lists them in `{module}.objects` for the linker to statically include.
+            extra_objects = []
+            objects_manifest = os.path.join(str(workspace), f"{module_name}.objects")
+            if os.path.exists(objects_manifest):
+                with open(objects_manifest, "r", encoding="utf-8") as f:
+                    extra_objects = [line.strip() for line in f if line.strip()]
+            output = LinkerDriver.run(
+                output_object_name, options=self.options, extra_objects=extra_objects
+            )
             output = str(pathlib.Path(output).absolute())
         else:
             output = None
