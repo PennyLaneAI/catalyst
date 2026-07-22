@@ -1381,12 +1381,13 @@ Currently, however, this is not the case for the following functionalities.
     supported mode for these states is to always allocate in the zero state.
 
   - Magic state allocation via ``state="magic-T"`` or ``state="magic-T-adj"`` is
-    supported in Catalyst and lowers to ``pbc.ref.fabricate`` (and ultimately
-    ``pbc.fabricate``) under the hood. These allocations use single-qubit
-    fabricate/deallocate semantics rather than register allocation. Both capture
-    and legacy pathways use the same ``allocate`` / ``deallocate`` jaxpr
+    supported in Catalyst (``qjit(capture=True)``) and lowers to ``pbc.ref.fabricate``
+    (and ultimately ``pbc.fabricate``) under the hood. These allocations use
+    single-qubit fabricate/deallocate semantics rather than register allocation.
+    Capture and legacy pathways share the same ``allocate`` / ``deallocate`` jaxpr
     primitives; the choice between register allocation and fabrication is made
-    during MLIR lowering based on the ``state`` argument.
+    during MLIR lowering based on the ``state`` argument. Legacy tracing support
+    is added in [#3027](https://github.com/PennyLaneAI/catalyst/pull/3027).
 
   - Related to the above point, in PennyLane, dynamic wire allocations do not
     increase the total number of wires used in the circuit. This is because
