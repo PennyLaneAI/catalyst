@@ -489,8 +489,9 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
             Pipeline targetPipeline;
             targetPipeline.setName("CrossCompileTargets");
             std::string dumpIntermediate = options.keepIntermediate ? "true" : "false";
-            targetPipeline.setPasses({"cross-compile-targets{workspace=" + options.workspace.str() +
-                                          " dump-intermediate=" + dumpIntermediate + "}",
+            targetPipeline.setPasses({"cross-compile-targets{workspace=\"" +
+                                          options.workspace.str() +
+                                          "\" dump-intermediate=" + dumpIntermediate + "}",
                                       "dispatch-executor-targets"});
             if (failed(catalyst::utils::Timer<>::timer(
                     catalyst::driver::runPipeline, targetPipeline.getName(),
@@ -511,7 +512,8 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
                     moduleOp->emitError("failed to write object manifest '")
                         << manifestPath << "': " << ec.message();
                     return failure();
-                } else {
+                }
+                else {
                     for (mlir::Attribute pathAttr : objFiles) {
                         if (auto s = mlir::dyn_cast<mlir::StringAttr>(pathAttr)) {
                             manifest << s.getValue() << "\n";
