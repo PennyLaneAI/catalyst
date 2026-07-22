@@ -21,6 +21,7 @@
 // CHECK-LABEL: func.func @setup()
 // CHECK: executor.open("ADDR:PORT")
 // CHECK: executor.send_binary("ADDR:PORT", "/tmp/target_compute.o")
+// Make sure the binary is shipped exactly once even though the host has two launch_kernels
 // CHECK-NOT: executor.send_binary
 // CHECK: return
 
