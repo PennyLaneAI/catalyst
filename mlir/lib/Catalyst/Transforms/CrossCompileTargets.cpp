@@ -196,7 +196,15 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         //  - executor (catalyst.dispatch): leave the module intact for dispatch-executor-targets.
         //  - local: statically link — flatten its host calls and record the object for the linker.
         SmallVector<Attribute> localObjectFiles;
+        // Track seen target names to reject duplicates before compiling
+        llvm::SmallSet<StringRef, 4> seenNames;
         for (auto nested : targetMods) {
+            StringRef name = nested.getSymName().value_or("unnamed");
+            if (!seenNames.insert(name).second) {
+                nested.emitError("duplicate catalyst.target module name '")
+                    << name << "'; each target module must have a unique symbol name";
+                return signalPassFailure();
+            }
             FailureOr<std::string> objPath = compileTargetModule(nested);
             if (failed(objPath)) {
                 return signalPassFailure();
