@@ -27,8 +27,8 @@ using namespace catalyst::transport;
 // Transport dialect definitions.
 //===----------------------------------------------------------------------===//
 
-#include "Transport/IR/TransportOpsDialect.cpp.inc"
 #include "Transport/IR/TransportEnums.cpp.inc"
+#include "Transport/IR/TransportOpsDialect.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // Transport type definitions.
