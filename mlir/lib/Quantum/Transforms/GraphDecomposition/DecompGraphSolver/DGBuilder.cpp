@@ -18,13 +18,23 @@
 
 #include "DGBuilder.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <variant>
+#include <vector>
 
+#include "boost/graph/adjacency_list.hpp"
+#include "boost/graph/detail/adjacency_list.hpp"
+#include "boost/graph/graph_selectors.hpp"
+#include "boost/graph/graph_traits.hpp"
+
+#include "DGTypes.hpp"
 #include "DGUtils.hpp"
-
-#include <boost/graph/adjacency_list.hpp>
 
 using namespace DecompGraph::Core;
 

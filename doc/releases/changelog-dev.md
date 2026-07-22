@@ -277,6 +277,7 @@
   [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
   [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
   [(#3039)](https://github.com/PennyLaneAI/catalyst/pull/3039)
+  [(#3046)](https://github.com/PennyLaneAI/catalyst/pull/3046)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
