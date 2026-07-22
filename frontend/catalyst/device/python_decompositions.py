@@ -28,6 +28,8 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
+from .type_stringify_utils import mlir_stringify_type
+
 _MLIR_DTYPES = {
     "i1": jnp.bool_,
     "i8": jnp.int8,
@@ -87,40 +89,48 @@ class GraphOpID:
     DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp.
     """
 
-    def __init__(self, op: qp.decomposition.CompressedResourceOp | qp.core.Operator2):
-        if isinstance(op, qp.decomposition.CompressedResourceOp):
-            # NOTE: handling this the old-fashioned way, remove once Operator2 migration is complete
-            op_type = op.op_type
-        else:
-            op_type = op
+    def __init__(self, op: qp.core.Operator2, uid=None):
+        assert isinstance(
+            op, qp.core.Operator2
+        ), "Graph-based decomposition expects an Operator2 instance"
+        self.op = op
 
-        if issubclass(op_type, qp.core.operator.Operator):
-            self.name = op_type.__name__
-            self.dynamic_shape = ",".join(["f64"] * op_type.num_params)
-            self.wire_lens = (
-                str(op_type.num_wires) if op_type.num_wires else op.params.get("num_wires", "0")
-            )
-            self.static_data = {}
-            self.extra_data = ""
-        elif isinstance(op_type, qp.core.operator.Operator2):
-            # TODO: use real getters here
-            self.name = op_type.__name__
-            self.dynamic_shape = op_type.getDynamicShape()
-            self.wire_lens = op_type.getWireLens()
-            self.static_data = op_type.getStaticData()
-            self.extra_data = op_type.uid
-        else:
-            raise ValueError(
-                "Only AbstractOperator and CompressedResourceOp types are supported for generating a "
-                f"graph ID, got {op} of type {type(op)}"
-            )
+        self.operator_name = op.name
+        self.dynamic_shape = self.parse_dynamic_shape()
+        self.wire_lens = self.parse_wire_lens()
+        self.static_data = self.parse_static_data()
+        self.extra_data = uid
+
+    def parse_dynamic_shape(self):
+        return list(self.op.dynamic_args.values())
+
+    def parse_wire_lens(self):
+        return list(map(len, self.op.wire_args.values()))
+
+    def parse_static_data(self):
+        return {
+            static_argname: getattr(self.op, static_argname)
+            for static_argname in self.op.compilable_argnames
+        }
+
+    def get_operator_name(self):
+        return self.operator_name
+
+    def get_dynamic_shape_id_format(self):
+        return f"[{','.join(map(mlir_stringify_type, self.dynamic_shape))}]"
+
+    def get_wire_lens_id_format(self):
+        return f"[{','.join(map(str, self.wire_lens))}]"
+
+    def get_static_data_id_format(self):
+        return f"{{{','.join(f'{k}:{v}' for k, v in self.static_data.items())}}}"
 
     def getID(self):
         ID_string = (
-            self.name
-            + ("[" + self.dynamic_shape + "]")
-            + ("[" + self.wire_lens + "]")
-            + ("{" + str(self.static_data) + "}")
+            self.get_operator_name()
+            + self.get_dynamic_shape_id_format()
+            + self.get_wire_lens_id_format()
+            + self.get_static_data_id_format()
         )
         if self.extra_data:
             ID_string += "[" + str(self.extra_data) + "]"
@@ -134,48 +144,31 @@ def collect_resources_for_op(op_name, static_data):
     name_to_resource_ids = {}
     name_to_resources = {}
     for rule in decomp_rules:
-        # TODO: not all PL ops have been migrated to the operator 2 format expected by mlir graph
-        # decomp This means some rules will fail the python callback compilation. When migration is
-        # complete, remove the try-except.
-        try:
-            # The `compute_resources` function's signature is the same as the Operator2 signature
-            # for the original op of the rule
-            resources = rule.compute_resources(**static_data)
-            name_to_resources[rule.name] = resources.gate_counts
-            name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
-            }
-        except:  # pylint: disable=bare-except
-            warnings.warn(
-                f"Encountered rule {rule} that has not been migrated to Operator2 yet, ignoring this rule"
-            )
-            decomp_rules.remove(rule)
+        # The `compute_resources` function's signature is the same as the Operator2 signature
+        # for the original op of the rule
+        resources = rule.compute_resources(**static_data)
+        name_to_resources[rule.name] = resources.gate_counts
+        name_to_resource_ids[rule.name] = {
+            GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
+        }
 
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
-def BFS_decomp_rules(op: qp.core.Operation | qp.core.Operator2, static_data):
+def BFS_decomp_rules(op_name, static_data):
     q = deque()
-    op_name = op.__name__
     q.append((op_name, static_data))
     visited = [(op_name, static_data)]
     while len(q) != 0:
         this = q.popleft()
-        print(f"Visiting {this}")
         resources, _, _ = collect_resources_for_op(*this)
-        print(f"Collected resources {resources}")
         for _rule_name, resource in resources.items():
             for op, _count in resource.items():
-                print(f"   Probing neighbour {op}")
-                if issubclass(op.op_type, qp.ops.ChangeOpBasis):
-                    continue
                 graph_op_id = GraphOpID(op)
-                probe = (graph_op_id.name, graph_op_id.static_data)
+                probe = (graph_op_id.get_operator_name(), graph_op_id.static_data)
                 if not probe in visited:
                     visited.append(probe)
                     q.append(probe)
-                    print(f"      Added {probe}, traversal is {visited}, queue is {q}")
-
     return visited
 
 
@@ -188,8 +181,8 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(op_name, static_data)
 
     def rule_to_subroutine(rule):
-        def decomp_rule(*params, wires):
-            rule._impl(*params, *wires, **static_data)
+        def decomp_rule(*args, **kwargs):
+            rule._impl(*args, **kwargs)
 
         # keep the frontend name for readability, append target op_id for symbol uniqueness
         decomp_rule.__name__ = rule._impl.__name__ + "_" + op_id
@@ -198,53 +191,40 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
 
-    # TODO: not all PL ops have been migrated to the operator 2 format expected by mlir graph decomp
-    # This means some rules will fail the python callback compilation.
-    # When migration is complete, remove the try-except.
-    try:
+    @qp.qjit(
+        target="mlir",
+        capture=True,
+    )
+    @qp.qnode(device=device)
+    def circuit():
+        for subroutine in subroutines:
+            subroutine(*get_dummy_values_for_container(dynamic_shape), wires=wires)
 
-        @qp.qjit(
-            target="mlir",
-            capture=True,
-        )
-        @qp.qnode(device=device)
-        def circuit():
-            for subroutine in subroutines:
-                subroutine(*get_dummy_values_for_container(dynamic_shape), wires=wires)
+    module = circuit.mlir_module
 
-        module = circuit.mlir_module
+    def update_funcop_attributes(op):
+        """Update the decomposition rule attributes if op is a decomposition rule.
 
-        def update_funcop_attributes(op):
-            """Update the decomposition rule attributes if op is a decomposition rule.
+        For use with module.walk
 
-            For use with module.walk
+        This function updates the following attributes:
+            - Adds the `target_gate` attribute.
+            - Adds the `resources` attribute.
+        """
+        if op.name == "func.func":
+            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + op_id)
+            if rule_name in name_to_resource_ids:
+                op.attributes["resources"] = get_mlir_attribute_from_pyval(
+                    {"operations": name_to_resource_ids[rule_name]}
+                )
+                op.attributes["target_gate"] = ir.StringAttr.get(op_id)
 
-            This function updates the following attributes:
-                - Adds the `target_gate` attribute.
-                - Adds the `resources` attribute.
-            """
-            if op.name == "func.func":
-                rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + op_id)
-                if rule_name in name_to_resource_ids:
-                    op.attributes["resources"] = get_mlir_attribute_from_pyval(
-                        {"operations": name_to_resource_ids[rule_name]}
-                    )
-                    op.attributes["target_gate"] = ir.StringAttr.get(op_id)
+        return ir.WalkResult.ADVANCE
 
-            return ir.WalkResult.ADVANCE
+    with module.context:
+        module.operation.walk(update_funcop_attributes)
 
-        with module.context:
-            module.operation.walk(update_funcop_attributes)
-
-        return module
-    except:
-        warnings.warn(
-            f"Python decomposition rule compilation failed for operator "
-            f"'{op_name}' (id: {op_id}); it will be treated as non-decomposable "
-            f"by the graph solver.",
-            UserWarning,
-        )
-        return "builtin.module{}"
+    return module
 
 
 def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:
