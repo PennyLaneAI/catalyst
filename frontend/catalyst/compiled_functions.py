@@ -109,15 +109,11 @@ class SharedObjectManager:
         return function, setup, teardown, mem_transfer
 
     def __enter__(self):
-        params_to_setup = [b"jitted-function"]
-        argc = len(params_to_setup)
-        array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
-        array_of_char_ptrs[:] = params_to_setup
-        self.setup(ctypes.c_int(argc), array_of_char_ptrs)
+        wrapper.invoke_setup(self.setup, ["jitted-function"])
         return self
 
     def __exit__(self, _type, _value, _traceback):
-        self.teardown()
+        wrapper.invoke_teardown(self.teardown)
 
 
 class CompiledFunction:
