@@ -78,7 +78,7 @@ module @jit_ambiguous {
   func.func @main() {
     catalyst.launch_kernel @t1::@c1() : () -> ()
     catalyst.launch_kernel @t2::@c2() : () -> ()
-    // expected-error @below {{ambiguous executor executor}}
+    // expected-error @below {{ambiguous executor}}
     catalyst.custom_call fn("foo") () {backend_config = {dispatch = ""}} : () -> ()
     return
   }

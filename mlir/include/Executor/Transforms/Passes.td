@@ -37,7 +37,7 @@ def ConvertExecutorToLLVMPass : Pass<"convert-executor-to-llvm", "mlir::ModuleOp
 }
 
 def DispatchExecutorTargetsPass : Pass<"dispatch-executor-targets", "mlir::ModuleOp"> {
-    let summary = "Ship cross-compiled catalyst.target modules to a executor executor.";
+    let summary = "Ship cross-compiled `catalyst.target` modules to an executor.";
     let description = [{
         For every `builtin.module` carrying a `catalyst.dispatch` attribute and the
         `catalyst.object_file` path, this pass will perform the following:

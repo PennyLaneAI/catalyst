@@ -33,7 +33,7 @@ namespace executor {
 
 namespace {
 
-// Ships cross-compiled `catalyst.target` modules to a executor executor using the `executor` dialect.
+// Ships cross-compiled `catalyst.target` modules to a executor using the `executor` dialect.
 //
 // This pass should be run after `cross-compile-targets`, which records each module's object file in
 // `catalyst.object_file`. For every nested module carrying a `catalyst.dispatch` attribute this
@@ -93,7 +93,7 @@ struct DispatchExecutorTargetsPass : impl::DispatchExecutorTargetsPassBase<Dispa
             for (catalyst::CustomCallOp call : libCalls) {
                 StringAttr dispatch = executorDispatchOf(call);
                 if ((!dispatch || dispatch.getValue().empty()) && numQnodeExecutors > 1) {
-                    call.emitOpError("ambiguous executor executor");
+                    call.emitOpError("ambiguous executor");
                     return signalPassFailure();
                 }
                 StringAttr addrAttr = libCallAddress(call, executorAddress);
