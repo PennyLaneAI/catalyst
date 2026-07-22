@@ -51,8 +51,6 @@ jobs:
     name: Build on Linux aarch64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-arm64.yaml
-    with:
-      build_dev_package: true
 
   macos-arm:
     name: Build on macOS arm64
