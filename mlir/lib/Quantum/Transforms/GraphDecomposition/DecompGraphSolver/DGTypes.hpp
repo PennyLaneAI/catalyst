@@ -99,7 +99,7 @@ struct WeightedGateset {
         auto it = ops.find(op.name);
         return it != ops.end() ? it->second : std::numeric_limits<double>::infinity();
     }
-};
+}; // namespace DecompGraph::Core
 
 ///////////////////////////
 // Rules and Decompositions
