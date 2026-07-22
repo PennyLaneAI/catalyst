@@ -13,15 +13,15 @@
 // limitations under the License.
 
 // Lower the `transport` dialect to `llvm.call`s on the __catalyst__transport__*
-// CAPI (runtime/include/TransportCAPI.h). Controller-side only.
+// CAPI (runtime/include/TransportCAPI.h).
 
-#include "llvm/ADT/Twine.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/Twine.h"
 
 #include "Transport/IR/TransportOps.h"
 #include "Transport/Transforms/Passes.h"
@@ -37,15 +37,12 @@ namespace transport {
 
 namespace {
 
-// sizeof(CatalystTransportPeerRef) = {u32, u64, u64}; over-allocate for alignment.
-constexpr int64_t kPeerRefBytes = 32;
-
 LLVM::LLVMPointerType ptrTy(MLIRContext *ctx) { return LLVM::LLVMPointerType::get(ctx); }
+IntegerType i32Ty(MLIRContext *ctx) { return IntegerType::get(ctx, 32); }
+IntegerType i64Ty(MLIRContext *ctx) { return IntegerType::get(ctx, 64); }
 
 ModuleOp moduleOf(Operation *op) { return op->getParentOfType<ModuleOp>(); }
 
-// Declare-or-reuse a CAPI function and emit a call to it. A null resultTy means
-// the function returns void.
 Value emitCall(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, StringRef name,
                ArrayRef<Type> paramTys, Type resultTy, ValueRange args)
 {
@@ -56,7 +53,6 @@ Value emitCall(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, 
     return call.getNumResults() ? call.getResult() : Value();
 }
 
-// Materialize a null-terminated global string and return a ptr to its data.
 Value globalStr(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, StringRef prefix,
                 StringRef value)
 {
@@ -75,53 +71,86 @@ Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64
 // Patterns
 //===----------------------------------------------------------------------===//
 
-struct ControllerCreateLowering : public OpConversionPattern<ControllerCreateOp> {
+struct CreateLowering : public OpConversionPattern<CreateOp> {
     using OpConversionPattern::OpConversionPattern;
-    LogicalResult matchAndRewrite(ControllerCreateOp op, OpAdaptor,
+    LogicalResult matchAndRewrite(CreateOp op, OpAdaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
+        auto sessTy = cast<SessionType>(op.getSession().getType());
         Value lib = globalStr(rewriter, op.getLoc(), mod, "transport_backend_", op.getBackendLib());
         Value cfg = globalStr(rewriter, op.getLoc(), mod, "transport_config_", op.getConfig());
-        Value s = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__controller_create",
-                           {ptrTy(ctx), ptrTy(ctx)}, ptrTy(ctx), {lib, cfg});
+        Value role =
+            constInt(rewriter, op.getLoc(), i32Ty(ctx), static_cast<int64_t>(sessTy.getRole()));
+        Value s = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__create",
+                           {ptrTy(ctx), ptrTy(ctx), i32Ty(ctx)}, ptrTy(ctx), {lib, cfg, role});
         rewriter.replaceOp(op, s);
         return success();
     }
 };
 
-struct ConnectLowering : public OpConversionPattern<ConnectOp> {
-    using OpConversionPattern::OpConversionPattern;
-    LogicalResult matchAndRewrite(ConnectOp op, OpAdaptor adaptor,
+template <typename OpT, bool Async> struct ConnectLoweringBase : public OpConversionPattern<OpT> {
+    using OpConversionPattern<OpT>::OpConversionPattern;
+    LogicalResult matchAndRewrite(OpT op, typename OpT::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto *ctx = op.getContext();
-        ModuleOp mod = moduleOf(op);
+        ModuleOp mod = op->template getParentOfType<ModuleOp>();
         Value peer = globalStr(rewriter, op.getLoc(), mod, "transport_peer_", op.getPeer());
-        Value port = constInt(rewriter, op.getLoc(), rewriter.getI16Type(), op.getOobPort());
-        Value r = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__connect",
-                           {ptrTy(ctx), ptrTy(ctx), rewriter.getI16Type()}, rewriter.getI32Type(),
-                           {adaptor.getSession(), peer, port});
-        rewriter.replaceOp(op, r);
+        Value port = constInt(rewriter, op.getLoc(), IntegerType::get(ctx, 16), op.getOobPort());
+        if (Async) {
+            Value r = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__connect_async",
+                               {ptrTy(ctx), ptrTy(ctx), IntegerType::get(ctx, 16)}, i64Ty(ctx),
+                               {adaptor.getSession(), peer, port});
+            rewriter.replaceOp(op, r);
+        }
+        else {
+            emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__connect",
+                     {ptrTy(ctx), ptrTy(ctx), IntegerType::get(ctx, 16)}, i32Ty(ctx),
+                     {adaptor.getSession(), peer, port});
+            rewriter.eraseOp(op);
+        }
         return success();
     }
 };
+using ConnectLowering = ConnectLoweringBase<ConnectOp, false>;
+using ConnectAsyncLowering = ConnectLoweringBase<ConnectAsyncOp, true>;
 
-struct ExchangeKeysLowering : public OpConversionPattern<ExchangeKeysOp> {
-    using OpConversionPattern::OpConversionPattern;
-    LogicalResult matchAndRewrite(ExchangeKeysOp op, OpAdaptor adaptor,
+template <typename OpT, bool Async>
+struct ExchangeKeysLoweringBase : public OpConversionPattern<OpT> {
+    using OpConversionPattern<OpT>::OpConversionPattern;
+    LogicalResult matchAndRewrite(OpT op, typename OpT::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto *ctx = op.getContext();
-        ModuleOp mod = moduleOf(op);
-        Value peerBuf = LLVM::AllocaOp::create(
-            rewriter, op.getLoc(), ptrTy(ctx), rewriter.getI8Type(),
-            constInt(rewriter, op.getLoc(), rewriter.getI64Type(), kPeerRefBytes), /*alignment=*/8);
-        Value r = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__exchange_keys",
-                           {ptrTy(ctx), ptrTy(ctx)}, rewriter.getI32Type(),
-                           {adaptor.getSession(), peerBuf});
-        rewriter.replaceOp(op, {r, peerBuf});
+        ModuleOp mod = op->template getParentOfType<ModuleOp>();
+        if (Async) {
+            Value r =
+                emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__exchange_keys_async",
+                         {ptrTy(ctx)}, i64Ty(ctx), {adaptor.getSession()});
+            rewriter.replaceOp(op, r);
+        }
+        else {
+            emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__exchange_keys",
+                     {ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession()});
+            rewriter.eraseOp(op);
+        }
+        return success();
+    }
+};
+using ExchangeKeysLowering = ExchangeKeysLoweringBase<ExchangeKeysOp, false>;
+using ExchangeKeysAsyncLowering = ExchangeKeysLoweringBase<ExchangeKeysAsyncOp, true>;
+
+struct BarrierLowering : public OpConversionPattern<BarrierOp> {
+    using OpConversionPattern::OpConversionPattern;
+    LogicalResult matchAndRewrite(BarrierOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        auto *ctx = op.getContext();
+        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__barrier",
+                 {i64Ty(ctx)}, i32Ty(ctx), {adaptor.getToken()});
+        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -132,12 +161,23 @@ struct EstablishChannelLowering : public OpConversionPattern<EstablishChannelOp>
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto *ctx = op.getContext();
-        ModuleOp mod = moduleOf(op);
-        Value dp = constInt(rewriter, op.getLoc(), rewriter.getI32Type(), op.getDataPath());
-        Value r = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__establish_channel",
-                           {ptrTy(ctx), rewriter.getI32Type(), ptrTy(ctx)}, rewriter.getI32Type(),
-                           {adaptor.getSession(), dp, adaptor.getPeer()});
-        rewriter.replaceOp(op, r);
+        Value dp =
+            constInt(rewriter, op.getLoc(), i32Ty(ctx), static_cast<int64_t>(op.getDataPath()));
+        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__establish_channel",
+                 {ptrTy(ctx), i32Ty(ctx)}, i32Ty(ctx), {adaptor.getSession(), dp});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+struct SetCoprocessorFnLowering : public OpConversionPattern<SetCoprocessorFnOp> {
+    using OpConversionPattern::OpConversionPattern;
+    LogicalResult matchAndRewrite(SetCoprocessorFnOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__set_coprocessor_fn",
+                 {ptrTy(op.getContext())}, i32Ty(op.getContext()), {adaptor.getSession()});
+        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -148,14 +188,63 @@ struct CommitWorkItemLowering : public OpConversionPattern<CommitWorkItemOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto *ctx = op.getContext();
+        Value idx = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getWorkItemIdx());
+        Value inB = constInt(rewriter, op.getLoc(), i64Ty(ctx), op.getInBytes());
+        Value outB = constInt(rewriter, op.getLoc(), i64Ty(ctx), op.getOutBytes());
+        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__commit_work_item",
+                 {ptrTy(ctx), i32Ty(ctx), i64Ty(ctx), i64Ty(ctx)}, i32Ty(ctx),
+                 {adaptor.getSession(), idx, inB, outB});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+struct KickLowering : public OpConversionPattern<KickOp> {
+    using OpConversionPattern::OpConversionPattern;
+    LogicalResult matchAndRewrite(KickOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
-        Value idx = constInt(rewriter, op.getLoc(), rewriter.getI32Type(), op.getWorkItemIdx());
-        Value inB = constInt(rewriter, op.getLoc(), rewriter.getI64Type(), op.getInBytes());
-        Value outB = constInt(rewriter, op.getLoc(), rewriter.getI64Type(), op.getOutBytes());
-        Value r = emitCall(
-            rewriter, op.getLoc(), mod, "__catalyst__transport__commit_work_item",
-            {ptrTy(ctx), rewriter.getI32Type(), rewriter.getI64Type(), rewriter.getI64Type()},
-            rewriter.getI32Type(), {adaptor.getSession(), idx, inB, outB});
+        Value slot = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__data_slot",
+                              {ptrTy(ctx)}, ptrTy(ctx), {adaptor.getSession()});
+        LLVM::StoreOp::create(rewriter, op.getLoc(), adaptor.getPayload(), slot);
+        Value idx = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getWorkItemIdx());
+        emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__kick",
+                 {ptrTy(ctx), i32Ty(ctx)}, i32Ty(ctx), {adaptor.getSession(), idx});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+struct CollectLowering : public OpConversionPattern<CollectOp> {
+    using OpConversionPattern::OpConversionPattern;
+    LogicalResult matchAndRewrite(CollectOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        auto *ctx = op.getContext();
+        ModuleOp mod = moduleOf(op);
+        Value one = constInt(rewriter, op.getLoc(), i64Ty(ctx), 1);
+        Value buf = LLVM::AllocaOp::create(rewriter, op.getLoc(), ptrTy(ctx), i64Ty(ctx), one,
+                                           /*alignment=*/8);
+        Value bytes = constInt(rewriter, op.getLoc(), i64Ty(ctx), op.getBytes());
+        emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__collect",
+                 {ptrTy(ctx), ptrTy(ctx), i64Ty(ctx)}, i32Ty(ctx),
+                 {adaptor.getSession(), buf, bytes});
+        Value loaded = LLVM::LoadOp::create(rewriter, op.getLoc(), i64Ty(ctx), buf);
+        rewriter.replaceOp(op, loaded);
+        return success();
+    }
+};
+
+struct LastRttLowering : public OpConversionPattern<LastRttNsOp> {
+    using OpConversionPattern::OpConversionPattern;
+    LogicalResult matchAndRewrite(LastRttNsOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Value r = emitCall(rewriter, op.getLoc(), moduleOf(op),
+                           "__catalyst__transport__last_rtt_ns", {ptrTy(op.getContext())},
+                           i64Ty(op.getContext()), {adaptor.getSession()});
         rewriter.replaceOp(op, r);
         return success();
     }
@@ -178,59 +267,6 @@ template <typename OpT> struct VoidSessionLowering : public OpConversionPattern<
     std::string symbol;
 };
 
-struct KickLowering : public OpConversionPattern<KickOp> {
-    using OpConversionPattern::OpConversionPattern;
-    LogicalResult matchAndRewrite(KickOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        auto *ctx = op.getContext();
-        ModuleOp mod = moduleOf(op);
-        // slot = data_slot(s); store payload -> slot; kick(s, idx)
-        Value slot = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__data_slot",
-                              {ptrTy(ctx)}, ptrTy(ctx), {adaptor.getSession()});
-        LLVM::StoreOp::create(rewriter, op.getLoc(), adaptor.getPayload(), slot);
-        Value idx = constInt(rewriter, op.getLoc(), rewriter.getI32Type(), op.getWorkItemIdx());
-        Value r = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__kick",
-                           {ptrTy(ctx), rewriter.getI32Type()}, rewriter.getI32Type(),
-                           {adaptor.getSession(), idx});
-        rewriter.replaceOp(op, r);
-        return success();
-    }
-};
-
-struct CollectLowering : public OpConversionPattern<CollectOp> {
-    using OpConversionPattern::OpConversionPattern;
-    LogicalResult matchAndRewrite(CollectOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        auto *ctx = op.getContext();
-        ModuleOp mod = moduleOf(op);
-        Value one = constInt(rewriter, op.getLoc(), rewriter.getI64Type(), 1);
-        Value buf = LLVM::AllocaOp::create(rewriter, op.getLoc(), ptrTy(ctx), rewriter.getI64Type(),
-                                           one, /*alignment=*/8);
-        Value bytes = constInt(rewriter, op.getLoc(), rewriter.getI64Type(), op.getBytes());
-        emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__collect",
-                 {ptrTy(ctx), ptrTy(ctx), rewriter.getI64Type()}, rewriter.getI32Type(),
-                 {adaptor.getSession(), buf, bytes});
-        Value loaded = LLVM::LoadOp::create(rewriter, op.getLoc(), rewriter.getI64Type(), buf);
-        rewriter.replaceOp(op, loaded);
-        return success();
-    }
-};
-
-struct LastRttLowering : public OpConversionPattern<LastRttNsOp> {
-    using OpConversionPattern::OpConversionPattern;
-    LogicalResult matchAndRewrite(LastRttNsOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        Value r =
-            emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__last_rtt_ns",
-                     {ptrTy(op.getContext())}, rewriter.getI64Type(), {adaptor.getSession()});
-        rewriter.replaceOp(op, r);
-        return success();
-    }
-};
-
 } // namespace
 
 struct ConvertTransportToLLVMPass
@@ -242,12 +278,13 @@ struct ConvertTransportToLLVMPass
         MLIRContext *ctx = &getContext();
         LLVMTypeConverter tc(ctx);
         tc.addConversion([ctx](SessionType) -> Type { return LLVM::LLVMPointerType::get(ctx); });
-        tc.addConversion([ctx](PeerType) -> Type { return LLVM::LLVMPointerType::get(ctx); });
+        tc.addConversion([ctx](TokenType) -> Type { return IntegerType::get(ctx, 64); });
 
         RewritePatternSet patterns(ctx);
-        patterns.add<ControllerCreateLowering, ConnectLowering, ExchangeKeysLowering,
-                     EstablishChannelLowering, CommitWorkItemLowering, KickLowering,
-                     CollectLowering, LastRttLowering>(tc, ctx);
+        patterns.add<CreateLowering, ConnectLowering, ConnectAsyncLowering, ExchangeKeysLowering,
+                     ExchangeKeysAsyncLowering, BarrierLowering, EstablishChannelLowering,
+                     SetCoprocessorFnLowering, CommitWorkItemLowering, KickLowering, CollectLowering,
+                     LastRttLowering>(tc, ctx);
         patterns.add<VoidSessionLowering<StartOp>>(tc, ctx, "__catalyst__transport__start");
         patterns.add<VoidSessionLowering<StopOp>>(tc, ctx, "__catalyst__transport__stop");
         patterns.add<VoidSessionLowering<CloseOp>>(tc, ctx, "__catalyst__transport__close");

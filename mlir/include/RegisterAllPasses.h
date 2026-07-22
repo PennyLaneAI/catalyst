@@ -25,6 +25,7 @@
 #include "QecPhysical/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 #include "RTIO/Transforms/Passes.h"
+#include "Transport/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
 #include "hlo-extensions/Transforms/Passes.h"
 
@@ -44,6 +45,7 @@ inline void registerAllPasses()
     qref::registerQRefPasses();
     quantum::registerQuantumPasses();
     rtio::registerRTIOPasses();
+    transport::registerTransportPasses();
     test::registerTestPasses();
 }
 
