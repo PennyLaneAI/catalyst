@@ -22,6 +22,7 @@ file(GLOB SRC
     qnode_to_async_lowering.cpp
     QnodeToAsyncPatterns.cpp
     RegisterInactiveCallbackPass.cpp
+    RerollLoopsPass.cpp
     ResourceAnalysisPass.cpp
     RegisterDecompRuleResourcePass.cpp
     SplitMultipleTapes.cpp

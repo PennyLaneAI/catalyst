@@ -189,6 +189,15 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
+* IR amplification for circuits whose gate parameters are computed from runtime values
+  (e.g. `qml.TrotterProduct` with runtime Hamiltonian coefficients) is drastically reduced.
+  The new `scalarize-tensor-extracts` pass turns gate-angle dataflow into scalar arithmetic
+  instead of thousands of small tensors that each survive bufferization as an allocation,
+  and the new `reroll-loops` pass reconstructs the loops that tracing unrolled by rewriting
+  repeated op sequences as `scf.for` loops. On a Trotterized QPE workload with runtime
+  coefficients, compile time, peak memory, and final IR size all drop by large factors.
+  [(#3036)](https://github.com/PennyLaneAI/catalyst/pull/3036)
+
 <h3>Breaking changes 💔</h3>
 
 * Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
