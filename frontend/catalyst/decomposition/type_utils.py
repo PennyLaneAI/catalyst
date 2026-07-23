@@ -12,23 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import jax.numpy as jnp
+import numpy as np
 import pennylane as qp
 
-from catalyst.utils.exceptions import CompileError
+_MLIR_DTYPES_TO_PY_DTYPES = {
+    "i1": np.bool_,
+    "i8": np.int8,
+    "i16": np.int16,
+    "i32": np.int32,
+    "i64": np.int64,
+    "f16": np.float16,
+    "f32": np.float32,
+    "f64": np.float64,
+    "complex<f64>": np.complex64,
+    "complex<f128>": np.complex128,
+}
 
-
-def _py_dtype_to_mlir_type_string(python_dtype: type):
-    match python_dtype:
-        case jnp.float64:
-            return "f64"
-        case _:
-            raise CompileError("Unknown data type")
+_PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
 
 
 def _stringify_shaped_type(shape: tuple, dim: int, element_type):
     if dim + 1 == len(shape):
-        inner_content = _py_dtype_to_mlir_type_string(element_type)
+        inner_content = _PY_DTYPES_TO_MLIR_DTYPES[element_type]
     else:
         inner_content = _stringify_shaped_type(shape, dim + 1, element_type)
     length = shape[dim]
@@ -39,6 +44,6 @@ def mlir_stringify_type(dtype: qp.typing.AbstractArray):
     assert isinstance(dtype, qp.typing.AbstractArray)
     element_type = dtype.dtype.type
     if dtype.shape == ():
-        return _py_dtype_to_mlir_type_string(element_type)
+        return _PY_DTYPES_TO_MLIR_DTYPES[element_type]
     else:
         return _stringify_shaped_type(dtype.shape, 0, element_type)
