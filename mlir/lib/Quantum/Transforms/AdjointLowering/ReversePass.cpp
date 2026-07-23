@@ -185,10 +185,13 @@ class AdjointGenerator {
                     remappedValues.map(operand, reversedResult);
                 }
             }
-            else if (isa<QuantumDialect>(op.getDialect())) {
-                op.emitError("Unhandled operation in adjoint region");
-                generationFailed = true;
-                return;
+            else {
+                if (!getQuantumValues(op.getOperands()).empty() ||
+                    !getQuantumValues(op.getResults()).empty()) {
+                    op.emitError("cannot be adjoint-lowered inside a quantum.adjoint region");
+                    generationFailed = true;
+                    return;
+                }
             }
         }
     }

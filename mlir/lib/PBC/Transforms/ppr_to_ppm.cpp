@@ -20,6 +20,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "PBC/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -40,6 +41,20 @@ struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
     {
         auto ctx = &getContext();
         auto module = getOperation();
+
+        // The ppr-to-ppm conversion generates Pauli product measurement
+        // (pbc.ppm) ops, which cannot be reversed by the adjoint-lowering pass.
+        // Reject input inside a quantum.adjoint region up front with a clear
+        // error, rather than failing later with a raw IRMapping assertion.
+        WalkResult adjointCheck = module->walk([&](catalyst::quantum::AdjointOp adjointOp) {
+            adjointOp.emitError() << "ppr-to-ppm cannot be applied to operations inside a "
+                                     "'quantum.adjoint' region, because the resulting Pauli "
+                                     "product measurements cannot be adjoint-lowered";
+            return WalkResult::interrupt();
+        });
+        if (adjointCheck.wasInterrupted()) {
+            return signalPassFailure();
+        }
 
         RewritePatternSet non_clifford_patterns(ctx);
         populateDecomposeNonCliffordPPRPatterns(non_clifford_patterns, decomposeMethod,
