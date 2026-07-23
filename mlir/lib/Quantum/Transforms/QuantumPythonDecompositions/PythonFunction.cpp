@@ -73,7 +73,7 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
 std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
     QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
-        const char *moduleName = "catalyst.device.python_decompositions";
+        const char *moduleName = "catalyst.decomposition.python_decompositions";
         const char *functionName = "python_decomposition_wrapper";
 
         try {
