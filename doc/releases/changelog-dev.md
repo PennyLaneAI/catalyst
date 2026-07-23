@@ -35,11 +35,6 @@
   Instead, rules are removed by the `symbol-dce` pass at the end of the `QuantumCompilationStage`.
   [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
 
-* Catalyst CI and specs tests are updated for PennyLane ``0.46.0.dev62``, aligning with the
-  resource hierarchy from [PennyLane #9841](https://github.com/PennyLaneAI/pennylane/pull/9841)
-  and Operator2 changes from [PennyLane #9846](https://github.com/PennyLaneAI/pennylane/pull/9846).
-  [(#3050)](https://github.com/PennyLaneAI/catalyst/pull/3050)
-
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
   without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
   where applicable, unlocking compilation and execution for these cases. `qp.specs` and the
