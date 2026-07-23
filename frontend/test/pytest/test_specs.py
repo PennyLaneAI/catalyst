@@ -69,6 +69,7 @@ def check_specs_resources_same(
 
     elif isinstance(actual_res, (SpecsResources, PBCSpecsResources)):
         assert isinstance(expected_res, (SpecsResources, PBCSpecsResources))
+        assert type(actual_res) is type(expected_res)
         assert actual_res.quantum_operations == expected_res.quantum_operations
         assert actual_res.measurement_processes == expected_res.measurement_processes
         assert actual_res.num_allocs == expected_res.num_allocs

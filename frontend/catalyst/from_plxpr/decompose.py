@@ -362,8 +362,9 @@ def _should_skip_decomp_rule_capture(op_rep) -> bool:
         return True
 
     # Operator2 resource reps may omit op_type but still encode symbolic ops in the name.
+    # ControlledOp2 uses the ``C(...)`` naming convention rather than ``Controlled(...)``.
     name = op_rep.name
-    return name.startswith(("Adjoint(", "Controlled("))
+    return name.startswith(("Adjoint(", "Controlled(", "C("))
 
 
 # pylint: disable=protected-access
