@@ -487,6 +487,33 @@ class TestAdjointCtrl:
         assert eqn.invars[6].val == True
         assert eqn.invars[7].val == False
 
+    def test_qfunc_ctrl_operator2_preserves_control_context(self):
+        """Test that qfunc controls are forwarded to Operator2 lowering."""
+
+        qp.capture.enable()
+
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit():
+            qp.ctrl(qp.S, control=1, control_values=[False])(0)
+            return qp.state()
+
+        plxpr = jax.make_jaxpr(circuit)()
+        catalyst_xpr = from_plxpr(plxpr)()
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        operator_eqn = next(
+            eqn
+            for eqn in qfunc_xpr.eqns
+            if eqn.primitive == qref_operator_p and eqn.params["op_cls"] is qp.S
+        )
+        qref_get_eqns = [eqn for eqn in qfunc_xpr.eqns if eqn.primitive == qref_get_p]
+
+        assert len(qref_get_eqns) == 2
+        assert operator_eqn.params["n_ctrls"] == 1
+        assert operator_eqn.invars[0] is qref_get_eqns[0].outvars[0]
+        assert operator_eqn.invars[1] is qref_get_eqns[1].outvars[0]
+        assert operator_eqn.invars[2].val is False
+
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_doubly_ctrl(self, as_qfunc):
         """Test doubly controlled op."""
@@ -505,22 +532,6 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
-
-        if as_qfunc:
-            eqn = qfunc_xpr.eqns[3]
-            assert eqn.primitive == qref_operator_p
-            assert eqn.params == {
-                "adjoint": False,
-                "forward_mask": (),
-                "hybrid_lens": (),
-                "hybrid_trees": (),
-                "n_ctrls": 0,
-                "op_cls": qp.S,
-                "wire_lens": (1,),
-            }
-            assert eqn.invars[0] is qfunc_xpr.eqns[2].outvars[0]
-            return
-
         eqn = qfunc_xpr.eqns[5]
         assert eqn.primitive == qref_operator_p
         assert eqn.params == {
@@ -606,22 +617,6 @@ class TestAdjointCtrl:
         assert qfunc_xpr.eqns[3].primitive == qref_get_p
         assert qfunc_xpr.eqns[4].primitive == qref_qinst_p
         assert qfunc_xpr.eqns[5].primitive == qref_get_p
-
-        if as_qfunc:
-            eqn = qfunc_xpr.eqns[6]
-            assert eqn.primitive == qref_operator_p
-            assert eqn.params == {
-                "adjoint": False,
-                "forward_mask": (),
-                "hybrid_lens": (),
-                "hybrid_trees": (),
-                "n_ctrls": 0,
-                "op_cls": qp.T,
-                "wire_lens": (1,),
-            }
-            assert eqn.invars[0] is qfunc_xpr.eqns[5].outvars[0]
-            return
-
         assert qfunc_xpr.eqns[6].primitive == qref_get_p
 
         eqn = qfunc_xpr.eqns[7]
