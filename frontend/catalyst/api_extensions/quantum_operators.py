@@ -418,6 +418,29 @@ class MidCircuitMeasure(HybridOp):
     # pylint: disable=too-many-arguments
     def trace_quantum(self, ctx, device, trace, qrp, postselect_mode=None) -> QRegPromise:
         qubit = qrp.extract(self.wires)[0]
+        if qrp.qref_mode:
+            from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+                qref_measure_p,
+            )
+
+            kwargs = {}
+            if postselect_mode != "hw-like":
+                kwargs["postselect"] = self.postselect
+
+            original_binder = self.binder
+            self.binder = qref_measure_p.bind
+            try:
+                self.bind_overwrite_classical_tracers(
+                    trace,
+                    in_expanded_tracers=[qubit],
+                    out_expanded_tracers=self.out_classical_tracers,
+                    num_quantum_outs=0,
+                    **kwargs,
+                )
+            finally:
+                self.binder = original_binder
+            return qrp
+
         if postselect_mode == "hw-like":
             qubit2 = self.bind_overwrite_classical_tracers(
                 trace,
@@ -460,6 +483,26 @@ class MidCircuitPauliMeasure(HybridOp):
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         qubits = qrp.extract(self.wires)
+        if qrp.qref_mode:
+            from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
+                qref_pauli_measure_p,
+            )
+
+            original_binder = self.binder
+            self.binder = qref_pauli_measure_p.bind
+            try:
+                self.bind_overwrite_classical_tracers(
+                    trace,
+                    in_expanded_tracers=qubits,
+                    out_expanded_tracers=self.out_classical_tracers,
+                    num_quantum_outs=0,
+                    pauli_word=self.pauli_word,
+                    qubits_len=len(qubits),
+                )
+            finally:
+                self.binder = original_binder
+            return qrp
+
         out_qubits = self.bind_overwrite_classical_tracers(
             trace,
             in_expanded_tracers=qubits,
@@ -594,7 +637,7 @@ class HybridAdjoint(HybridOp):
                 partial(body_trace.new_arg, source_info=current_source_info()), [AbstractQreg()]
             )[0]
             qrp_out = trace_quantum_operations(
-                body_tape, device, qreg_in, ctx, body_trace, **kwargs
+                body_tape, device, qreg_in, ctx, body_trace, parent_qrp=qrp, **kwargs
             )
             qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = body_trace.frame.to_jaxpr2(
@@ -608,7 +651,8 @@ class HybridAdjoint(HybridOp):
             args_tree=args_tree,
             jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
         )
-        qrp2 = QRegPromise(op_results[-1])
+        qrp2 = QRegPromise(op_results[-1], num_device_wires=qrp.num_device_wires)
+        qrp2.inherit_dynamic_wire_state(qrp)
         return qrp2
 
     @property
