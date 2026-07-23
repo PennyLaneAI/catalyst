@@ -161,7 +161,7 @@ def collect_resources_for_op(op_name, dummy_dynamic_args, dummy_wires, static_da
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
-def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) -> ModuleOp:
+def compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static_data) -> ModuleOp:
     """
     Return a ModuleOp containing the decomposition rules for an operator instance.
 
@@ -222,6 +222,8 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
     return module
 
 
-def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:
+def compile_decomposition_rules_wrapper(
+    op_name, op_id, dynamic_shape, wire_lens, static_data
+) -> str:
     """Return a string MLIR module containing the decomposition rules for an operator instance."""
-    return str(python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data))
+    return str(compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static_data))

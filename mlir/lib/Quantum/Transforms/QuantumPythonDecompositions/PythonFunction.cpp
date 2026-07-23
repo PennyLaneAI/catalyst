@@ -77,7 +77,7 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
     QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
         const char *moduleName = "catalyst.decomposition.python_decompositions";
-        const char *functionName = "python_decomposition_wrapper";
+        const char *functionName = "compile_decomposition_rules";
 
         try {
             nb::module_ wrapperModule = nb::module_::import_(moduleName);

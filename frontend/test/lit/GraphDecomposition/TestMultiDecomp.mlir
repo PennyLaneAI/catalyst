@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes FIRST
+// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes FIRST
 
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"},graph-decomposition{gate-set=testRZ=1.0,testRY=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes SECOND
+// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=1.0 bytecode-rules="%BYTECODE_PATH"},graph-decomposition{gate-set=testRZ=1.0,testRY=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes SECOND
 
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(2) : !quantum.reg

@@ -24,7 +24,7 @@ from catalyst.decomposition.precompile_decomposition_rules import (
     get_abstract_args,
     precompile_decomp_rules,
 )
-from catalyst.decomposition.python_decompositions import python_decomposition_wrapper
+from catalyst.decomposition.python_decompositions import compile_decomposition_rules_wrapper
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
@@ -33,7 +33,7 @@ class TestGenericUtilities:
 
     def test_paulirot(self):
         """Test that the QPD wrapper correctly returns the IR as a string."""
-        result = python_decomposition_wrapper(
+        result = compile_decomposition_rules_wrapper(
             "PauliRot", "PauliRot[f64][3]{pauli_word:XZZ}", ["i32"], [3], {"pauli_word": "XZZ"}
         )
         assert isinstance(result, str)
@@ -55,7 +55,7 @@ class TestGenericUtilities:
 
             qp.add_decomps(qp.PauliRot, test_decomp)
 
-            result = python_decomposition_wrapper(
+            result = compile_decomposition_rules_wrapper(
                 "PauliRot", "PauliRot[f64][3]{pauli_word:XYX}", ["f64"], [3], {"pauli_word": "XYX"}
             )
 
