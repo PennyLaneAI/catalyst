@@ -73,7 +73,7 @@ class TestGraphDecomposition:
         assert qp.math.allclose([-1], circuit(x, y, z))
 
         expected_resources = {"RY": 1, "RZ": 2}
-        resources = qp.specs(circuit, level="device")(x, y, z)["resources"].gate_types
+        resources = qp.specs(circuit, level="device")(x, y, z)["resources"].quantum_operations
         assert resources == expected_resources
 
     def test_with_precompiled_rule(self):
@@ -93,7 +93,7 @@ class TestGraphDecomposition:
         assert qp.math.allclose([0.9553364891256059], circuit(x, y, z))
 
         expected_resources = {"RY": 1, "RZ": 2}
-        resources = qp.specs(circuit, level="device")(x, y, z)["resources"].gate_types
+        resources = qp.specs(circuit, level="device")(x, y, z)["resources"].quantum_operations
         assert resources == expected_resources
 
     def test_decompose_multi_qubit_gates_precompiled(self):
@@ -112,7 +112,7 @@ class TestGraphDecomposition:
             return qp.expval(qp.Z(0))
 
         expected_resources = {"GlobalPhase": 6, "RX": 6, "RY": 30, "CNOT": 24, "Hadamard": 12}
-        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         assert resources == expected_resources
 
     def test_alt_decomps(self):
@@ -141,7 +141,7 @@ class TestGraphDecomposition:
             return qp.state()
 
         expected_resources = {"CZ": 1, "Hadamard": 3}
-        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         assert resources == expected_resources
 
     def test_fixed_rules(self):
@@ -193,7 +193,7 @@ class TestGraphDecomposition:
             return qp.expval(qp.Z(0))
 
         expected_resources = {"GlobalPhase": 1, "RX": 5, "RZ": 14}
-        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         assert resources == expected_resources
 
     def test_multi_passes(self):
@@ -213,7 +213,7 @@ class TestGraphDecomposition:
             return qp.expval(qp.PauliX(0))
 
         expected_resources = {"RY": 1, "RZ": 2}
-        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         assert resources == expected_resources
 
     def test_multi_graph_decomposition(self):
@@ -259,7 +259,7 @@ class TestGraphDecomposition:
             return qp.state()
 
         expected_resources = {"Rot": 2}
-        resources = qp.specs(circuit, level="device")(1.23, 4.56)["resources"].gate_types
+        resources = qp.specs(circuit, level="device")(1.23, 4.56)["resources"].quantum_operations
         assert resources == expected_resources
 
     @pytest.mark.xfail(
@@ -291,7 +291,7 @@ class TestGraphDecomposition:
             return qp.expval(qp.Z(0))
 
         expected_resources = {"RX": 1, "RY": 2, "CNOT": 4}
-        resources = qp.specs(circuit, level="device")(0.5, 0.3)["resources"].gate_types
+        resources = qp.specs(circuit, level="device")(0.5, 0.3)["resources"].quantum_operations
         assert resources == expected_resources
 
     def test_with_subroutine(self):
@@ -311,7 +311,7 @@ class TestGraphDecomposition:
             f(1.2, (2, 3))
             return qp.expval(qp.Z(0)), qp.expval(qp.Z(2))
 
-        resources = qp.specs(circuit, level="device")().resources.gate_types
+        resources = qp.specs(circuit, level="device")().resources.quantum_operations
         assert resources == {"RX": 2, "CNOT": 4}
 
         r1, r2 = circuit()
@@ -340,7 +340,7 @@ class TestGraphDecomposition:
             return qp.expval(qp.X(0))
 
         expected_resources = {"RX": 2, "RZ": 1}
-        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         assert resources == expected_resources
 
     def test_empty_rule(self):
@@ -366,7 +366,7 @@ class TestGraphDecomposition:
             return qp.expval(qp.Z(0))
 
         expected_resources = {"PauliY": 1}
-        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         assert resources == expected_resources
 
     @pytest.mark.xfail(
@@ -385,7 +385,7 @@ class TestGraphDecomposition:
             return qp.expval(qp.X(0))
 
         expected_resources = {"RX": 2, "RZ": 1}
-        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         assert resources == expected_resources
 
     @pytest.mark.xfail(reason="graph-decomposition does not yet support adjoint or ctrl operations")
@@ -405,7 +405,7 @@ class TestGraphDecomposition:
             return qp.expval(qp.Z(0))
 
         expected_resources = {"GlobalPhase": 24, "CZ": 7, "RX": 25, "RY": 65}
-        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         assert resources == expected_resources
 
     @pytest.mark.xfail(reason="graph-decomposition does not yet support adjoint or ctrl operations")
@@ -424,7 +424,7 @@ class TestGraphDecomposition:
             return qp.expval(qp.Z(0))
 
         expected_resources = {"RX": 1, "RZ": 2, "H": 2, "CZ": 1}
-        resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
         assert resources == expected_resources
 
     @pytest.mark.xfail(reason="graph-decomposition does not yet support work wires")
@@ -557,8 +557,8 @@ class TestPlxPRDecomposition:
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -588,8 +588,8 @@ class TestPlxPRDecomposition:
         expected = np.array([1, 0, 0, 1]) / np.sqrt(2)
         assert qp.math.allclose(qjited_circuit(), expected)
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
-        resources = qp.specs(qjited_circuit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
+        resources = qp.specs(qjited_circuit, level="device")()["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -642,8 +642,8 @@ class TestPlxPRDecomposition:
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -677,8 +677,8 @@ class TestPlxPRDecomposition:
         with_qjit = qp.qjit(circuit, capture=True)
 
         assert qp.math.allclose(without_qjit, with_qjit(x, y))
-        expected_resources = qp.specs(circuit, level="device")(x, y)["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")(x, y)["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")(x, y)["resources"].quantum_operations
+        resources = qp.specs(with_qjit, level="device")(x, y)["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -703,8 +703,10 @@ class TestPlxPRDecomposition:
 
         assert qp.math.allclose(without_qjit, with_qjit(x, y, z))
 
-        expected_resources = qp.specs(circuit, level="device")(x, y, z)["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")(x, y, z)[
+            "resources"
+        ].quantum_operations
+        resources = qp.specs(with_qjit, level="device")(x, y, z)["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -806,8 +808,8 @@ class TestPlxPRDecomposition:
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -833,10 +835,10 @@ class TestPlxPRDecomposition:
         with_qjit = qp.qjit(circuit, capture=True)
 
         result_with_qjit = with_qjit()
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
 
         result_without_qjit = circuit()
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
 
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         assert qp.math.allclose(result_without_qjit, result_with_qjit)
@@ -863,8 +865,8 @@ class TestPlxPRDecomposition:
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -890,9 +892,14 @@ class TestPlxPRDecomposition:
         with_qjit = qp.qjit(circuit, capture=True)
         assert qp.math.allclose(without_qjit, with_qjit())
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
-        assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
+        assert resources == {
+            "Hadamard": 12,
+            "CNOT": 24,
+            "RY": 26,
+            "RX": 4,
+            "GlobalPhase": 4,
+        }
         qp.decomposition.disable_graph()
 
     def test_adjoint(self):
@@ -917,8 +924,8 @@ class TestPlxPRDecomposition:
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -944,8 +951,8 @@ class TestPlxPRDecomposition:
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -965,10 +972,10 @@ class TestPlxPRDecomposition:
 
         with_qjit = qp.qjit(circuit, capture=True)
         result_with_qjit = with_qjit()
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
 
         result_without_qjit = circuit()
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
 
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         assert qp.math.allclose(result_without_qjit, result_with_qjit)
@@ -997,8 +1004,8 @@ class TestPlxPRDecomposition:
 
         assert qp.math.allclose(without_qjit, with_qjit())
 
-        expected_resources = qp.specs(circuit, level="device")()["resources"].gate_types
-        resources = qp.specs(with_qjit, level="device")()["resources"].gate_types
+        expected_resources = qp.specs(circuit, level="device")()["resources"].quantum_operations
+        resources = qp.specs(with_qjit, level="device")()["resources"].quantum_operations
         assert _normalize_gate_types(resources) == _normalize_gate_types(expected_resources)
         qp.decomposition.disable_graph()
 
@@ -1082,7 +1089,7 @@ class TestPlxPRDecomposition:
             f(1.2, (2, 3))
             return qp.expval(qp.Z(0)), qp.expval(qp.Z(2))
 
-        resources = qp.specs(c, level="device")().resources.gate_types
+        resources = qp.specs(c, level="device")().resources.quantum_operations
         assert resources == {"RX": 2, "CNOT": 4}
 
         r1, r2 = c()
@@ -1170,7 +1177,7 @@ class TestPlxPRDecomposition:
             qp.RZ(phi, 0)
             return qp.state()
 
-        resources = qp.specs(f, level="device")(0.123).resources.gate_types
+        resources = qp.specs(f, level="device")(0.123).resources.quantum_operations
         assert resources == {"BasisState": 1, "GlobalPhase": 1}
         qp.decomposition.disable_graph()
 
