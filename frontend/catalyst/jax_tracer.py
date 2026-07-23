@@ -1075,14 +1075,18 @@ def trace_quantum_operations(
     trace = EvaluationContext.get_current_trace()
     from catalyst.from_plxpr.qref_jax_primitives import (  # pylint: disable=import-outside-toplevel
         qref_dealloc_p,
-        qref_dealloc_qb_p,
     )
     from catalyst.jax_primitives import (  # pylint: disable=import-outside-toplevel
         qdealloc_p,
         qdealloc_qb_p,
     )
 
-    defer_dealloc_primitives = {qref_dealloc_p, qref_dealloc_qb_p, qdealloc_p, qdealloc_qb_p}
+    defer_dealloc_primitives = {
+        qref_dealloc_p,
+        qp.allocation.deallocate_prim,
+        qdealloc_p,
+        qdealloc_qb_p,
+    }
     trace.frame.tracing_eqns = sort_eqns(
         trace.frame.tracing_eqns,
         FORCED_ORDER_PRIMITIVES,
