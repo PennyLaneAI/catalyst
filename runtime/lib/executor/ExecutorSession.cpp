@@ -23,6 +23,7 @@
 #include <sys/socket.h>
 #include <vector>
 
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/EPCDynamicLibrarySearchGenerator.h"
@@ -190,7 +191,12 @@ struct ExecutorSession {
     MangleAndInterner Mangle;
     ObjectLinkingLayer ObjectLayer;
 
+    // Shared namespace: the process-symbol generator (QIR runtime, libc) plus library-call objects.
     JITDylib &MainJD;
+    // One JITDylib per shipped kernel object, keyed by its object-file path. Each links against
+    // MainJD for its external deps, but keeps its own entry symbol isolated — so two objects can
+    // export the same `_catalyst_pyface_<entry>` without colliding.
+    StringMap<JITDylib *> KernelJDs;
 
     ExecutorAddr alloc_fn{0};
     ExecutorAddr free_fn{0};
@@ -251,11 +257,23 @@ struct ExecutorSession {
         return std::make_unique<ExecutorSession>(std::move(ES), std::move(*DL));
     }
 
-    Error addObjectFile(std::unique_ptr<MemoryBuffer> Buf)
+    Error addObjectFile(StringRef path, std::unique_ptr<MemoryBuffer> Buf)
     {
-        return ObjectLayer.add(MainJD, std::move(Buf));
+        JITDylib &jd = ES->createBareJITDylib(("kernel:" + path).str());
+        jd.addToLinkOrder(MainJD);
+        KernelJDs[path] = &jd;
+        return ObjectLayer.add(jd, std::move(Buf));
     }
 
+    ExecutorAddr lookupSym(StringRef path, StringRef Name)
+    {
+        auto it = KernelJDs.find(path);
+        JITDylib *jd = (it != KernelJDs.end()) ? it->second : &MainJD;
+        auto Sym = unwrap(ES->lookup({jd}, Mangle(Name.str())), "lookup(" + Name + ")");
+        return Sym.getAddress();
+    }
+
+    // Resolve `Name` in the shared process namespace (library-call symbols).
     ExecutorAddr lookupSym(StringRef Name)
     {
         auto Sym = unwrap(ES->lookup({&MainJD}, Mangle(Name.str())), "lookup(" + Name + ")");
@@ -417,7 +435,7 @@ int load_object_path(ExecutorSession *s, const char *path)
     clear_error();
     try {
         auto buf = unwrap(getFile(path), "getFile(" + Twine(path) + ")");
-        check(s->addObjectFile(std::move(buf)), "addObjectFile");
+        check(s->addObjectFile(path, std::move(buf)), "addObjectFile");
         return 0;
     }
     catch (const std::exception &e) {
@@ -507,10 +525,13 @@ int call_wrapper_raw(ExecutorSession *s, const char *sym, const char *args_buf, 
  * @param name the name of the symbol
  * @return uint64_t the address of the symbol
  */
-uint64_t lookup(ExecutorSession *s, const char *name)
+uint64_t lookup(ExecutorSession *s, const char *name, const char *object)
 {
     clear_error();
     try {
+        if (object && *object) {
+            return s->lookupSym(object, name).getValue();
+        }
         return s->lookupSym(name).getValue();
     }
     catch (const std::exception &e) {

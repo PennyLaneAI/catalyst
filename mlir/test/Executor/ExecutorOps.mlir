@@ -33,10 +33,10 @@ func.func @send_binary() {
 // -----
 
 // CHECK-LABEL: func.func @launch
-// CHECK:         executor.launch("qnode_0", "127.0.0.1:9000") (%{{.*}}) :
+// CHECK:         executor.launch("qnode_0", "127.0.0.1:9000", "/tmp/qnode.o") (%{{.*}}) :
 // CHECK-SAME:    (memref<f64>) -> memref<f64>
 func.func @launch(%arg0: memref<f64>) -> memref<f64> {
-  %0 = executor.launch("qnode_0", "127.0.0.1:9000") (%arg0) : (memref<f64>) -> memref<f64>
+  %0 = executor.launch("qnode_0", "127.0.0.1:9000", "/tmp/qnode.o") (%arg0) : (memref<f64>) -> memref<f64>
   return %0 : memref<f64>
 }
 

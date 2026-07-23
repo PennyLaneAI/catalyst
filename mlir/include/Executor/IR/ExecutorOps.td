@@ -75,13 +75,14 @@ def Executor_LaunchOp : Executor_Op<"launch"> {
     let arguments = (ins
         Variadic<AnyMemRef>:$inputs,
         StrAttr:$address,
-        StrAttr:$kernel_callee
+        StrAttr:$kernel_callee,
+        StrAttr:$object
     );
 
     let results = (outs Variadic<AnyMemRef>:$results);
 
     let assemblyFormat = [{
-        `(` $kernel_callee `,` $address `)` `(` $inputs `)` attr-dict
+        `(` $kernel_callee `,` $address `,` $object `)` `(` $inputs `)` attr-dict
             `:` functional-type($inputs, $results)
     }];
 }
