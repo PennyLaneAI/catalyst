@@ -399,12 +399,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             moduleOp->walk([&](mlir::func::FuncOp func) {
-                if (func.getName().starts_with(opId)) {
+                if (func->hasAttr("target_gate")) {
                     mlir::OwningOpRef<mlir::func::FuncOp> outOp;
                     func->remove();
                     outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
                     mlir::func::FuncOp funcOp = outOp.get();
-                    funcOp->setAttr("target_gate", mlir::StringAttr::get(context, opId));
 
                     // if we fail to add one of the decomps, we still want to try for the rest
                     std::ignore = addRuleNode(funcOp, ruleNodes);
@@ -424,7 +423,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // dialect.
         // The interface will provide one unified way of generating operator nodes from operations,
         // with consistent getter methods for all relevant data fields.
-        getOperation().walk([&](DecomposableGate op) {
+        getOperation().walk([&](quantum::DecomposableGate op) {
             if (DecompUtils::isInDecompRule(op)) {
                 return;
             }
@@ -432,8 +431,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             node.numWires = op.getNonCtrlQubitOperands().size();
             node.adjoint = op.getAdjointFlag();
 
-            node.name = op.getOperatorName();
-            node.id = op.getGraphOpId();
+            node.name = op.getGraphOpId();
 
             if (auto paramOp =
                     llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
