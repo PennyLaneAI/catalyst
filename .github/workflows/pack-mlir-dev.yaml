@@ -1,0 +1,158 @@
+name: Package catalyst-mlir-dev (manual)
+
+# Manual-only: no schedule, no push/PR triggers. Runs solely via the
+# "Run workflow" button in the Actions tab (or `gh workflow run`).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-x86-64:
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ["3.12"]
+        container_img: ["manylinux_2_28_x86_64"]
+
+    name: Pack catalyst-mlir-dev (Linux x86_64)
+    runs-on: ubuntu-24.04
+    container: quay.io/pypa/${{ matrix.container_img }}
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Install dependencies (AlmaLinux)
+      run: |
+        # Reduce wait time for repos not responding
+        cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
+        dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-13
+        # Update env vars valid for all tasks of this job
+        echo '/opt/rh/gcc-toolset-13/root/usr/bin' >> $GITHUB_PATH
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
+        # Add cmake and ninja to the PATH env var
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
+
+    - name: Read pinned LLVM version
+      id: llvm
+      run: echo "version=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/mlir/llvm-project
+        key: llvm-${{ steps.llvm.outputs.version }}-container-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/llvm-build
+        key: ${{ matrix.container_img }}-llvm-${{ steps.llvm.outputs.version }}-${{ matrix.python_version }}-wheel-build
+        fail-on-cache-miss: True
+
+    - name: Build and pack catalyst-mlir-dev
+      run: |
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        make -C mlir pack-mlir-dev
+
+    - name: Locate the archive
+      id: archive
+      run: |
+        path=$(find $GITHUB_WORKSPACE/mlir -name 'catalyst-mlir-dev*.tar.gz' | head -n1)
+        echo "path=$path" >> $GITHUB_OUTPUT
+        echo "name=$(basename "$path")" >> $GITHUB_OUTPUT
+        ls -lh "$path"
+
+    - name: Upload catalyst-mlir-dev archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.archive.outputs.name }}
+        path: ${{ steps.archive.outputs.path }}
+        retention-days: 14
+        if-no-files-found: error
+
+  macos-arm64:
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ["3.12"]
+
+    name: Pack catalyst-mlir-dev (macOS arm64)
+    runs-on: macos-15
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Setup Python version
+      # There are multiple Python versions installed on the GitHub image, 3.12 - 3.14 is already
+      # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
+      # 3.12 - 3.14. Make sure to consistently use the system versions.
+      run: |
+        echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
+
+    # CMake four has dropped compatibility for CMake 3.5, which is the minimum specified by the
+    # LAPACKE reference implementation. TODO: Look into how to upgrade beyond this limit.
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install numpy "nanobind<2.13" pybind11 PyYAML ninja delocate
+        python${{ matrix.python_version }} -m pip install cmake'<4'
+
+    - name: Read pinned LLVM version
+      id: llvm
+      run: echo "version=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/mlir/llvm-project
+        key: llvm-${{ steps.llvm.outputs.version }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/llvm-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ steps.llvm.outputs.version }}-${{ matrix.python_version }}-wheel-build
+        fail-on-cache-miss: True
+
+    - name: Clone LLVM submodule at pinned commit
+      uses: actions/checkout@v4
+      with:
+        repository: llvm/llvm-project
+        ref: ${{ steps.llvm.outputs.version }}
+        path: mlir/llvm-project
+
+    - name: Build and pack catalyst-mlir-dev
+      run: |
+        LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
+        make -C mlir pack-mlir-dev
+
+    - name: Locate the archive
+      id: archive
+      run: |
+        path=$(find $GITHUB_WORKSPACE/mlir -name 'catalyst-mlir-dev*.tar.gz' | head -n1)
+        echo "path=$path" >> $GITHUB_OUTPUT
+        echo "name=$(basename "$path")" >> $GITHUB_OUTPUT
+        ls -lh "$path"
+
+    - name: Upload catalyst-mlir-dev archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.archive.outputs.name }}
+        path: ${{ steps.archive.outputs.path }}
+        retention-days: 14
+        if-no-files-found: error
