@@ -21,7 +21,7 @@ from jax._src.lib.mlir import ir
 from pennylane.operation import Operator, Operator2
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.python_decompositions import GraphOpID, python_decomposition
+from catalyst.decomposition.decomposition_rules import GraphOpID, compile_decomposition_rules
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # TODO: Uncomment dynamic size wires ops once they are supported
@@ -169,7 +169,7 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
                 # we cannot precompile if the rule takes static data
                 continue
 
-            mlir_rules = python_decomposition(
+            mlir_rules = compile_decomposition_rules(
                 op.__name__, GraphOpID(op).getID(), dynamic_data, wire_lens, {}
             )
 

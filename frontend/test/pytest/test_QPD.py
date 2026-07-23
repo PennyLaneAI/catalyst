@@ -17,7 +17,7 @@
 import pennylane as qp
 import pytest
 
-from catalyst.decomposition.python_decompositions import python_decomposition_wrapper
+from catalyst.decomposition.python_decompositions import compile_decomposition_rules_wrapper
 
 
 class TestQPD:
@@ -25,7 +25,7 @@ class TestQPD:
 
     def test_paulirot_wrapper(self):
         """Test that the paulirot QPD wrapper correctly returns the IR as a string."""
-        result = python_decomposition_wrapper(
+        result = compile_decomposition_rules_wrapper(
             "PauliRot", "PauliRot[f64][3]{pauli_word:XZZ}", [0.4], [3], {"pauli_word": "XZZ"}
         )
         assert isinstance(result, str)
@@ -46,7 +46,7 @@ class TestQPD:
 
             qp.add_decomps(qp.PauliRot, test_decomp)
 
-            result = python_decomposition_wrapper(
+            result = compile_decomposition_rules_wrapper(
                 "PauliRot", "PauliRot[f64][3]{pauli_word:XYX}", [float], [3], {"pauli_word": "XYX"}
             )
 
