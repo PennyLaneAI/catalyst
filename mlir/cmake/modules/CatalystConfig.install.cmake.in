@@ -7,14 +7,16 @@ set_and_check(CATALYST_INCLUDE_DIRS "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
 set_and_check(CATALYST_LIBRARY_DIR  "@PACKAGE_CMAKE_INSTALL_LIBDIR@")
 
 # Reconstruct the bundled StableHLO interface target.
-set(_shlo_libs ChloCAPI ChloOps StablehloAssemblyFormat StablehloBase
+if(NOT TARGET ExternalStablehloLib)
+  add_library(ExternalStablehloLib INTERFACE IMPORTED)
+
+  set(_shlo_libs ChloCAPI ChloOps StablehloAssemblyFormat StablehloBase
     StablehloBroadcastUtils StablehloBroadcastLowering StablehloCAPI
     StablehloLinalgTransforms StablehloOps StablehloOptimizationPasses
     StablehloPasses StablehloPassUtils StablehloRegister
     StablehloTypeConversion StablehloTypeInference Version
     VhloCAPI VhloOps VhloTypes)
-if(NOT TARGET ExternalStablehloLib)
-  add_library(ExternalStablehloLib INTERFACE IMPORTED)
+
   foreach(_l IN LISTS _shlo_libs)
     if(NOT TARGET ${_l})
       add_library(${_l} STATIC IMPORTED)
