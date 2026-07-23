@@ -289,6 +289,14 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         {"Snapshot": OperatorProperties(invertible=False, controllable=False, differentiable=False)}
     )
 
+    # Catalyst supports dynamic qubit allocation on qjit-compatible devices. Target device
+    # TOMLs (e.g. lightning) still default this flag to false; expose Catalyst support via
+    # qjit capabilities so verification can check the field rather than bypassing Allocate.
+    # TODO: remove this override once all qjit-compatible backends declare
+    # dynamic_qubit_management=true in their device TOMLs.
+    if target_capabilities.qjit_compatible:
+        qjit_capabilities.dynamic_qubit_management = True
+
     # TODO: Optionally enable runtime-powered quantum gate controlling once they
     #       are supported natively in MLIR.
     # if any(ng.controllable for ng in target_capabilities.operations.values()):
