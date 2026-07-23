@@ -14,6 +14,9 @@
 
 #include "Executor/IR/ExecutorDialect.h"
 
+#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
+
 #include "Executor/IR/ExecutorOps.h"
 
 using namespace mlir;
@@ -27,8 +30,20 @@ using namespace catalyst::executor;
 
 void catalyst::executor::ExecutorDialect::initialize()
 {
+    addTypes<
+#define GET_TYPEDEF_LIST
+#include "Executor/IR/ExecutorOpsTypes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "Executor/IR/ExecutorOps.cpp.inc"
         >();
 }
+
+//===----------------------------------------------------------------------===//
+// Executor type definitions.
+//===----------------------------------------------------------------------===//
+
+#define GET_TYPEDEF_CLASSES
+#include "Executor/IR/ExecutorOpsTypes.cpp.inc"
