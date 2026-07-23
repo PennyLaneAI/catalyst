@@ -53,9 +53,30 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 # --- version string, reused from frontend/catalyst/_version.py ---
-file(READ "${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py" _ver_py)
-string(REGEX MATCH "__version__ = \"([^\"]+)\"" _m "${_ver_py}")
-set(CATALYST_PACKAGE_VERSION "${CMAKE_MATCH_1}" CACHE INTERNAL "Catalyst version")
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+execute_process(
+    COMMAND
+        ${Python3_EXECUTABLE} -c
+            "import sys; \
+            sys.path.append('${PROJECT_SOURCE_DIR}/../frontend/catalyst'); \
+            from _version import __version__; \
+            print(__version__)"
+    OUTPUT_VARIABLE CATALYST_PACKAGE_VERSION
+    ERROR_VARIABLE PARSE_CATALYST_VERSION_ERRORS
+    RESULT_VARIABLE PARSE_CATALYST_VERSION_RETURN_CODE
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+if(NOT PARSE_CATALYST_VERSION_RETURN_CODE EQUAL 0)
+    message(FATAL_ERROR
+        "Failed to read Catalyst package version from file \
+        ${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py: \
+        ${PARSE_CATALYST_VERSION_ERRORS}"
+    )
+endif()
+
+message(STATUS "Found Catalyst package version: ${CATALYST_PACKAGE_VERSION}")
 
 string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" CATALYST_NUMERIC_VERSION "${CATALYST_PACKAGE_VERSION}")
 
