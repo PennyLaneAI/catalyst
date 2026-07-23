@@ -1,0 +1,52 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+namespace catalyst::executor {
+
+// Opaque session handle. Created by open(), released by close().
+struct ExecutorSession;
+
+// Open a TCP session to a `host:port` executor. Returns nullptr on error.
+ExecutorSession *open(const char *remote_addr);
+
+void close(ExecutorSession *s);
+
+// Load an object file into the remote JIT. Returns 0 on success, -1 on error.
+int load_object_path(ExecutorSession *s, const char *path);
+
+// Load an asset file into the remote JIT. Returns 0 on success, -1 on error.
+int load_asset_path(ExecutorSession *s, const char *path);
+
+// Generic ORC wrapper-function call by symbol name. Returns 0 on success, -1 on error.
+int call_wrapper_raw(ExecutorSession *s, const char *sym, const char *args_buf, size_t args_size,
+                     char **out_buf, size_t *out_size);
+
+// Look up a symbol address on the remote. Returns 0 on error.
+uint64_t lookup(ExecutorSession *s, const char *name);
+
+// Invoke a remote kernel. Returns 0 on success, -1 on error.
+int invoke_kernel(ExecutorSession *s, uint64_t entry_addr, size_t num_inputs,
+                  void *const *input_descs, const size_t *input_ranks,
+                  const size_t *input_elem_sizes, size_t num_outputs, void *const *output_descs,
+                  const size_t *output_ranks, const size_t *output_elem_sizes);
+
+// Last error message.
+const char *last_error();
+
+} // namespace catalyst::executor
