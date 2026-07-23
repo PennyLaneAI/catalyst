@@ -2,16 +2,23 @@
 
 <h3>New features since last release</h3>
 
-* ``qp.allocate`` now supports ``state="magic-T"`` and ``state="magic-T-adj"`` with
-  ``qjit(capture=True)``. MLIR lowering selects ``qref.alloc`` or ``pbc.ref.fabricate``
-  based on the ``state`` argument via unified ``allocate`` / ``deallocate`` jaxpr
-  primitives.
-  Requires the corresponding PennyLane release for the new ``AllocateState`` values.
-  [(#3029)](https://github.com/PennyLaneAI/catalyst/pull/3029)
+* You can now dynamically prepare magic T states inside captured Catalyst workflows using
+  ``qp.allocate(state="magic-T")`` and ``qp.allocate(state="magic-T-adj")``, which makes it
+  easier to compile FTQC-style routines that need T-state ancillas on the fly (for example
+  TemporaryAND) with ``qjit(capture=True)``.
 
-* Legacy (``capture=False``) tracing for magic-T dynamic wires, including mid-circuit
-  measurements and control flow, is added in
-  [(#3027)](https://github.com/PennyLaneAI/catalyst/pull/3027).
+  ```python
+  @qjit(capture=True)
+  @qnode(dev)
+  def circuit():
+      qb = qp.allocate(state="magic-T")
+      # ... use qb in your circuit ...
+      qp.deallocate(qb)
+  ```
+
+  Requires a PennyLane release that supports the new ``AllocateState`` values
+  (see [PennyLane #9846](https://github.com/PennyLaneAI/pennylane/pull/9846)).
+  [(#3029)](https://github.com/PennyLaneAI/catalyst/pull/3029)
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
