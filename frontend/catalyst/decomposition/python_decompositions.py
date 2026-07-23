@@ -135,7 +135,7 @@ class GraphOpID:
         return ID_string
 
 
-def collect_resources_for_op(op_name, static_data):
+def collect_resources_for_op(op_name, dummy_dynamic_args, dummy_wires, static_data):
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
 
     # map rules to resource resources, in a more generic format
@@ -144,7 +144,7 @@ def collect_resources_for_op(op_name, static_data):
     for rule in decomp_rules:
         # The `compute_resources` function's signature is the same as the Operator2 signature
         # for the original op of the rule
-        resources = rule.compute_resources(**static_data)
+        resources = rule.compute_resources(*dummy_dynamic_args, *dummy_wires, **static_data)
         name_to_resources[rule.name] = resources.gate_counts
         name_to_resource_ids[rule.name] = {
             GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
@@ -157,9 +157,12 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
     """Python decomposition rule lowering."""
     # TODO update docstring
     device = qp.device("null.qubit", wires=sum(wire_lens))
-    wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
+    dummy_wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
+    dummy_dynamic_args = get_dummy_values_for_container(dynamic_shape)
 
-    _, name_to_resource_ids, decomp_rules = collect_resources_for_op(op_name, static_data)
+    _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
+        op_name, dummy_dynamic_args, dummy_wires, static_data
+    )
 
     def rule_to_subroutine(rule):
         def decomp_rule(*args, **kwargs):
@@ -179,7 +182,7 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            subroutine(*get_dummy_values_for_container(dynamic_shape), wires=wires)
+            subroutine(*dummy_dynamic_args, wires=dummy_wires)
 
     module = circuit.mlir_module
 
