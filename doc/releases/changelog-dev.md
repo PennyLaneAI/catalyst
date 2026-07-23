@@ -15,6 +15,10 @@
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
 
+* Catalyst can now cross-compile target nested modules to standalone object files and
+  either statically link them into the host program or ship them to an executor for dispatch.
+ [(#3033)](https://github.com/PennyLaneAI/catalyst/pull/3033)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
