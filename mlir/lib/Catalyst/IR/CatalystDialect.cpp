@@ -73,6 +73,21 @@ LogicalResult CatalystDialect::verifyOperationAttribute(Operation *op, NamedAttr
 {
     llvm::StringRef name = attribute.getName().strref();
 
+    if (name == EstimatedIterationsAttrName) {
+        if (!isa<scf::ForOp, scf::WhileOp>(op)) {
+            return op->emitError() << "'" << name << "' is only valid on 'scf.for' or 'scf.while'";
+        }
+        auto iters = dyn_cast<IntegerAttr>(attribute.getValue());
+        if (!iters) {
+            return op->emitError() << "'" << name << "' must be an integer attribute";
+        }
+        if (iters.getValue().isNegative()) {
+            return op->emitError() << "'" << name << "' must be non-negative, but got "
+                                   << iters.getValue().getSExtValue();
+        }
+        return success();
+    }
+
     if (name == EstimatedProbabilityAttrName) {
         if (!isa<scf::IfOp>(op)) {
             return op->emitError() << "'" << name << "' is only valid on 'scf.if'";

@@ -334,7 +334,7 @@ func.func @pbc_estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !qua
     %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
         %out = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
         scf.yield %out : !quantum.bit
-    } {estimated_iterations = 10 : i16}
+    } {catalyst.estimated_iterations = 10 : i16}
 
     return %q : !quantum.bit
 }
@@ -365,7 +365,7 @@ func.func @depth_caller(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Dynamic for loop with estimated_iterations: treated as static for the
+// Dynamic for loop with catalyst.estimated_iterations: treated as static for the
 // purposes of counting, so it lifts into "for_loop_1" with the
 // attribute's iteration count as the call multiplier.
 
@@ -384,7 +384,7 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
     %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
         %out = quantum.custom "PauliZ"() %arg1 : !quantum.bit
         scf.yield %out : !quantum.bit
-    } {estimated_iterations = 10 : i16}
+    } {catalyst.estimated_iterations = 10 : i16}
 
     return %q : !quantum.bit
 }

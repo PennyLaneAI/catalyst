@@ -357,7 +357,7 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
     ResourceResult bodyResult;
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
 
-    if (auto estAttr = whileOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
+    if (auto estAttr = whileOp->getAttrOfType<IntegerAttr>(EstimatedIterationsAttrName)) {
         int64_t iters = estAttr.getValue().getSExtValue();
         bodyResult.multiplyByScalar(iters);
     }

@@ -48,6 +48,55 @@ func.func @valid_switch(%sel: index) {
 
 // -----
 
+// A valid loop trip-count hint round-trips unchanged.
+// CHECK-LABEL: @valid_iterations
+func.func @valid_iterations(%arg0: !quantum.bit, %n: index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    // CHECK: catalyst.estimated_iterations = 10 : i16
+    scf.for %i = %c0 to %n step %c1 {
+        scf.yield
+    } {catalyst.estimated_iterations = 10 : i16}
+    return
+}
+
+// -----
+
+func.func @iterations_not_int(%arg0: !quantum.bit, %n: index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    // expected-error @+1 {{'catalyst.estimated_iterations' must be an integer attribute}}
+    scf.for %i = %c0 to %n step %c1 {
+        scf.yield
+    } {catalyst.estimated_iterations = 1.0 : f64}
+    return
+}
+
+// -----
+
+func.func @iterations_negative(%arg0: !quantum.bit, %n: index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    // expected-error @+1 {{'catalyst.estimated_iterations' must be non-negative, but got -1}}
+    scf.for %i = %c0 to %n step %c1 {
+        scf.yield
+    } {catalyst.estimated_iterations = -1 : i64}
+    return
+}
+
+// -----
+
+// `catalyst.estimated_iterations` must be attached to an scf.for or scf.while.
+func.func @iterations_wrong_op(%arg0: !quantum.bit, %cond: i1) {
+    // expected-error @+1 {{'catalyst.estimated_iterations' is only valid on 'scf.for' or 'scf.while'}}
+    scf.if %cond {
+        scf.yield
+    } {catalyst.estimated_iterations = 10 : i64}
+    return
+}
+
+// -----
+
 func.func @prob_not_float(%arg0: !quantum.bit, %cond: i1) {
     // expected-error @+1 {{'catalyst.estimated_probability' must be a float attribute}}
     scf.if %cond {
