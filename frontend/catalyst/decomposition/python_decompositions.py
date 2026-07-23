@@ -19,6 +19,7 @@ This module provides infrastructure for compile-time lowering of decomposition r
 # pylint: disable=protected-access,bare-except
 
 import warnings
+from collections import deque
 
 import jax.numpy as jnp
 import pennylane as qp
@@ -151,6 +152,23 @@ def collect_resources_for_op(op_name, static_data):
         }
 
     return name_to_resources, name_to_resource_ids, decomp_rules
+
+
+def BFS_decomp_rules(op_name, static_data):
+    q = deque()
+    q.append((op_name, static_data))
+    visited = [(op_name, static_data)]
+    while len(q) != 0:
+        this = q.popleft()
+        resources, _, _ = collect_resources_for_op(*this)
+        for _rule_name, resource in resources.items():
+            for op, _count in resource.items():
+                graph_op_id = GraphOpID(op)
+                probe = (graph_op_id.get_operator_name(), graph_op_id.static_data)
+                if not probe in visited:
+                    visited.append(probe)
+                    q.append(probe)
+    return visited
 
 
 def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) -> ModuleOp:
