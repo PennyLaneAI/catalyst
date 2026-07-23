@@ -18,12 +18,14 @@
 
 #include "DGSolver.hpp"
 
-#include <algorithm>
 #include <optional>
+#include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "DGTypes.hpp"
+#include "DGUtils.hpp"
 
 using namespace DecompGraph::Core;
 
