@@ -30,6 +30,7 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -239,7 +240,7 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
     // Add attribute to the for op to indicate the estimated iterations of the loop
     auto estimatedRanges = static_cast<int64_t>(std::ceil(10 * std::log2(1 / epsilon)));
     auto estimatedRangesAttr = rewriter.getI16IntegerAttr(estimatedRanges);
-    forOp->setAttr("estimated_iterations", estimatedRangesAttr);
+    forOp->setAttr(catalyst::EstimatedIterationsAttrName, estimatedRangesAttr);
 
     {
         OpBuilder::InsertionGuard loopGuard(rewriter);
