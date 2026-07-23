@@ -14,10 +14,11 @@
 
 #pragma once
 
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
+//===----------------------------------------------------------------------===//
+// Executor type declarations.
+//===----------------------------------------------------------------------===//
 
-#include "Executor/IR/ExecutorTypes.h"
+#include "mlir/IR/Types.h"
 
-#include "Executor/IR/ExecutorOpsDialect.h.inc"
+#define GET_TYPEDEF_CLASSES
+#include "Executor/IR/ExecutorOpsTypes.h.inc"

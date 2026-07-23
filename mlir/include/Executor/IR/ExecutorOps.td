@@ -18,6 +18,7 @@
 include "mlir/IR/OpBase.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "Executor/IR/ExecutorDialect.td"
+include "Executor/IR/ExecutorTypes.td"
 
 //===----------------------------------------------------------------------===//
 // executor.open
@@ -26,14 +27,17 @@ include "Executor/IR/ExecutorDialect.td"
 def Executor_OpenOp : Executor_Op<"open"> {
     let summary = "Open a session with an executor.";
     let description = [{
-        Establish a connection to the executor reachable at `address`
-        Subsequent executor operations targeting the same `address` reuse this session.
+        Establish a connection to the executor reachable at `address` and return an
+        `!executor.session` handle identifying it. Subsequent executor operations consume the handle
+        to target this session.
     }];
 
     let arguments = (ins StrAttr:$address);
 
+    let results = (outs Executor_SessionType:$session);
+
     let assemblyFormat = [{
-        `(` $address `)` attr-dict
+        `(` $address `)` attr-dict `:` type($session)
     }];
 }
 
@@ -44,19 +48,19 @@ def Executor_OpenOp : Executor_Op<"open"> {
 def Executor_SendBinaryOp : Executor_Op<"send_binary"> {
     let summary = "Ship a compiled kernel object file to the executor.";
     let description = [{
-        Transfer the compiled binary at `binary_path` to the executor at `address`.
+        Transfer the compiled binary at `binary_path` over the `session` to the executor.
         The executor loads the file and exposes all of its symbols.
         `format` selects the wire encoding which is handled by the runtime.
     }];
 
     let arguments = (ins
-        StrAttr:$address,
+        Executor_SessionType:$session,
         StrAttr:$binary_path,
         DefaultValuedAttr<I32Attr, "0">:$format
     );
 
     let assemblyFormat = [{
-        `(` $address `,` $binary_path `)` attr-dict
+        $session `(` $binary_path `)` attr-dict `:` type($session)
     }];
 }
 
@@ -67,22 +71,22 @@ def Executor_SendBinaryOp : Executor_Op<"send_binary"> {
 def Executor_LaunchOp : Executor_Op<"launch"> {
     let summary = "Dispatch a cross-compiled kernel on the executor and receive its results.";
     let description = [{
-        Invoke the kernel previously registered via `executor.send_binary`.
-        The `inputs` operand list mirrors the original host-side `func.call`
-        to the kernel; `results` mirrors the kernel's return values.
+        Invoke, on the given `session`, the kernel previously registered via
+        `executor.send_binary`. The `inputs` operand list mirrors the original host-side
+        `func.call` to the kernel; `results` mirrors the kernel's return values.
     }];
 
     let arguments = (ins
+        Executor_SessionType:$session,
         Variadic<AnyMemRef>:$inputs,
-        StrAttr:$address,
         StrAttr:$kernel_callee
     );
 
     let results = (outs Variadic<AnyMemRef>:$results);
 
     let assemblyFormat = [{
-        `(` $kernel_callee `,` $address `)` `(` $inputs `)` attr-dict
-            `:` functional-type($inputs, $results)
+        $session `(` $kernel_callee `)` `(` $inputs `)` attr-dict
+            `:` type($session) `,` functional-type($inputs, $results)
     }];
 }
 
@@ -93,7 +97,7 @@ def Executor_LaunchOp : Executor_Op<"launch"> {
 def Executor_CallOp : Executor_Op<"call"> {
     let summary = "Invoke a symbol in a previously-loaded shared library.";
     let description = [{
-        Invoke `symbol` in a shared library already loaded on the executor.
+        Invoke `symbol` in a shared library already loaded on the executor `session`.
 
         The operand list packs input buffers followed by output buffers.
         `num_input_args`, when present, marks the boundary: operands `[0, num_input_args)`
@@ -102,8 +106,8 @@ def Executor_CallOp : Executor_Op<"call"> {
     }];
 
     let arguments = (ins
+        Executor_SessionType:$session,
         Variadic<AnyMemRef>:$inputs,
-        StrAttr:$address,
         StrAttr:$symbol,
         OptionalAttr<I32Attr>:$num_input_args
     );
@@ -111,8 +115,8 @@ def Executor_CallOp : Executor_Op<"call"> {
     let results = (outs Variadic<AnyMemRef>:$results);
 
     let assemblyFormat = [{
-        `(` $symbol `,` $address `)` `(` $inputs `)` attr-dict
-            `:` functional-type($inputs, $results)
+        $session `(` $symbol `)` `(` $inputs `)` attr-dict
+            `:` type($session) `,` functional-type($inputs, $results)
     }];
 }
 
@@ -121,16 +125,16 @@ def Executor_CallOp : Executor_Op<"call"> {
 //===----------------------------------------------------------------------===//
 
 def Executor_CloseOp : Executor_Op<"close"> {
-    let summary = "Tear down the session with an executor.";
+    let summary = "Release a session handle with an executor.";
     let description = [{
-        Close the session previously established via `executor.open` for `address`,
-        releasing the connection and any resources loaded on the executor.
+        Release the `session` previously established via `executor.open`, marking the end of its use
+        in the IR.
     }];
 
-    let arguments = (ins StrAttr:$address);
+    let arguments = (ins Executor_SessionType:$session);
 
     let assemblyFormat = [{
-        `(` $address `)` attr-dict
+        $session attr-dict `:` type($session)
     }];
 }
 
