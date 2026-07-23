@@ -18,28 +18,17 @@ This module provides infrastructure for compile-time lowering of decomposition r
 
 # pylint: disable=protected-access,bare-except
 
-import warnings
-
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 
-from catalyst.decomposition.type_stringify_utils import mlir_stringify_type
+from catalyst.decomposition.type_utils import (
+    _MLIR_DTYPES_TO_PY_DTYPES,
+    _PY_DTYPES_TO_MLIR_DTYPES,
+    mlir_stringify_type,
+)
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
-
-_MLIR_DTYPES = {
-    "i1": jnp.bool_,
-    "i8": jnp.int8,
-    "i16": jnp.int16,
-    "i32": jnp.int32,
-    "i64": jnp.int64,
-    "f16": jnp.float16,
-    "f32": jnp.float32,
-    "f64": jnp.float64,
-    "complex<f64>": jnp.complex64,
-    "complex<f128>": jnp.complex128,
-}
 
 
 def get_dummy_values_for_container(container):
@@ -47,9 +36,9 @@ def get_dummy_values_for_container(container):
     dummy_args = []
     for dtype in container:
         if isinstance(dtype, str):
-            if dtype in _MLIR_DTYPES:
+            if dtype in _MLIR_DTYPES_TO_PY_DTYPES:
                 count = 1
-                dtype = _MLIR_DTYPES[dtype]
+                dtype = _MLIR_DTYPES_TO_PY_DTYPES[dtype]
             elif dtype.startswith("tensor"):
                 # tensor<{number}x{type}>
                 dtype = dtype.removeprefix("tensor<")
