@@ -266,7 +266,7 @@ def handle_qnode(
         raise NotImplementedError(
             "A stopping condition is not currently supported with catalyst decomposition."
         )
-    elif self.requires_decompose_lowering:
+    if self.requires_decompose_lowering:
         with warnings.catch_warnings():
             warnings.simplefilter("error", qp.exceptions.DecompositionWarning)
             closed_jaxpr, _ = _collect_and_compile_graph_solutions(

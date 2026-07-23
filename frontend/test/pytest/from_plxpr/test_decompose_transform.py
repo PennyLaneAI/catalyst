@@ -25,7 +25,7 @@ import pennylane as qp
 import pytest
 from jax.core import ShapedArray
 from pennylane.decomposition import controlled_resource_rep
-from pennylane.exceptions import DecompositionError, DecompositionWarning
+from pennylane.exceptions import DecompositionError
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
 from pennylane_lightning.lightning_qubit.lightning_qubit import (
