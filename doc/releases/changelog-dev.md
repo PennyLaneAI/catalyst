@@ -15,6 +15,10 @@
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
 
+* A new `Transport` MLIR dialect is added, providing typed ops for driving a transport session's
+  lifecycle at the IR level.
+  [(#3047)](https://github.com/PennyLaneAI/catalyst/pull/3047)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
