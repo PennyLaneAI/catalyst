@@ -680,6 +680,36 @@ def test_terminal_MP_all_wires(backend):
             return qp.probs()
 
 
+def test_allocate_state_any_unsupported():
+    """Test error when allocating with state=\"any\"."""
+
+    with pytest.raises(
+        CompileError,
+        match='qp.allocate with state="any" is not supported in Catalyst',
+    ):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.allocate(1, state="any")
+            return qp.expval(qp.Z(0))
+
+
+def test_allocate_restored_unsupported():
+    """Test error when allocating with restored=True."""
+
+    with pytest.raises(
+        CompileError,
+        match="qp.allocate with restored=True is not supported in Catalyst",
+    ):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.allocate(1, restored=True)
+            return qp.expval(qp.Z(0))
+
+
 def test_terminal_MP_dynamic_wires(backend):
     """
     Test error message when used with terminal measurements on dynamic wires.

@@ -452,6 +452,8 @@ _special_op_bind_call = {
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.allocate_prim)
 def handle_allocate(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.allocate primitive"""
+    # TODO: remove this wrapper once PLxPRToQuantumJaxprInterpreter can emit Catalyst
+    # jaxpr primitives directly without rebinding PennyLane allocate/deallocate.
 
     assert isinstance(
         num_wires, int
@@ -464,7 +466,13 @@ def handle_allocate(self, *, num_wires, state=None, restored=False):
         if state is not None
         else qp.allocation.AllocateState.ZERO
     )
-    # `restored` is intentionally ignored; see doc/dev/sharp_bits.rst.
+    if state == qp.allocation.AllocateState.ANY:
+        raise CompileError(
+            'qp.allocate with state="any" is not supported in Catalyst. '
+            'Use state="zero" (default), state="magic-T", or state="magic-T-adj".'
+        )
+    if restored:
+        raise CompileError("qp.allocate with restored=True is not supported in Catalyst.")
     return list(
         qp.allocation.allocate_prim.bind(
             num_wires=num_wires,
@@ -477,6 +485,8 @@ def handle_allocate(self, *, num_wires, state=None, restored=False):
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.deallocate_prim)
 def handle_deallocate(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.deallocate primitive"""
+    # TODO: remove this wrapper once PLxPRToQuantumJaxprInterpreter can emit Catalyst
+    # jaxpr primitives directly without rebinding PennyLane allocate/deallocate.
     qp.allocation.deallocate_prim.bind(*wires)
     return []
 

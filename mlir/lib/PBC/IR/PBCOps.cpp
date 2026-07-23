@@ -94,8 +94,9 @@ LogicalResult RefPPMeasurementOp::verify()
 LogicalResult RefFabricateOp::verify()
 {
     auto initState = getInitState();
-    if (initState != LogicalInitKind::magic && initState != LogicalInitKind::magic_conj) {
-        return emitOpError("Only magic states (magic, magic_conj) are supported by ref.fabricate.");
+    if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
+        initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
+        return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
     }
     return success();
 }
