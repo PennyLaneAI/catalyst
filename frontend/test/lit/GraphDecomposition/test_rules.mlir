@@ -13,39 +13,36 @@
 // limitations under the License.
 
 
-func.func @__builtin_h_to_rz_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="Hadamard"} {
+func.func @__builtin_h_to_rz_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard[][1]{}"} {
     %piby2 = arith.constant 1.57 : f64
     %pi = arith.constant 3.14 : f64
     %negpiby2 = arith.constant -3.14 : f64
-    %q1 = quantum.custom "RZ"(%pi) %q0 : !quantum.bit
-    %q2 = quantum.custom "RY"(%piby2) %q1 : !quantum.bit
-    quantum.gphase(%negpiby2)
+    %q1 = quantum.custom "testRZ"(%pi) %q0 : !quantum.bit
+    %q2 = quantum.custom "testRY"(%piby2) %q1 : !quantum.bit
     return %q2 : !quantum.bit
 }
 
-func.func @__builtin_h_to_rz_rx(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="Hadamard"} {
+func.func @__builtin_h_to_rz_rx(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard[][1]{}"} {
     %piby2 = arith.constant 1.57 : f64
     %negpiby2 = arith.constant -3.14 : f64
-    %q1 = quantum.custom "RZ"(%piby2) %q0 : !quantum.bit
-    %q2 = quantum.custom "RX"(%piby2) %q1 : !quantum.bit
-    %q3 = quantum.custom "RZ"(%piby2) %q2 : !quantum.bit
-    quantum.gphase(%negpiby2)
+    %q1 = quantum.custom "testRZ"(%piby2) %q0 : !quantum.bit
+    %q2 = quantum.custom "testRX"(%piby2) %q1 : !quantum.bit
+    %q3 = quantum.custom "testRZ"(%piby2) %q2 : !quantum.bit
     return %q3 : !quantum.bit
 }
 
-func.func @__builtin_x_to_rx(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="PauliX"} {
+func.func @__builtin_x_to_rx(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testPauliX[][1]{}"} {
     %pi = arith.constant 3.14 : f64
     %negpiby2 = arith.constant -3.14 : f64
-    %q1 = quantum.custom "RX"(%pi) %q0 : !quantum.bit
-    quantum.gphase(%negpiby2)
+    %q1 = quantum.custom "testRX"(%pi) %q0 : !quantum.bit
     return %q1 : !quantum.bit
 }
 
-func.func @__builtin_rx_to_rz_ry(%angle : f64, %q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="RX"} {
+func.func @__builtin_rx_to_rz_ry(%angle : f64, %q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testRX[f64][1]{}"} {
     %piby2 = arith.constant 1.57 : f64
     %negpiby2 = arith.constant -3.14 : f64
-    %q1 = quantum.custom "RZ"(%piby2) %q0 : !quantum.bit
-    %q2 = quantum.custom "RY"(%angle) %q1 : !quantum.bit
-    %q3 = quantum.custom "RZ"(%negpiby2) %q2 : !quantum.bit
+    %q1 = quantum.custom "testRZ"(%piby2) %q0 : !quantum.bit
+    %q2 = quantum.custom "testRY"(%angle) %q1 : !quantum.bit
+    %q3 = quantum.custom "testRZ"(%negpiby2) %q2 : !quantum.bit
     return %q3 : !quantum.bit
 }
