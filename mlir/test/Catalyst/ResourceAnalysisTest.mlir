@@ -1128,6 +1128,148 @@ func.func @qref(%arg0: !qref.bit, %arg1: !qref.reg<2>) {
 
 // -----
 
+// scf.if with an `estimated_probability` hint uses the expected (probability-
+// weighted) resource counts instead of the worst case. With p(then) = 0.75 the
+// then-branch has 4 Hadamards and the else-branch has 8, so the expected count
+// is 0.75*4 + 0.25*8 = 5 (the worst case would be 8).
+
+// CHECK-LABEL: "if_estimated_probability"
+// CHECK: "has_branches": true
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 5
+func.func @if_estimated_probability(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
+    %q = scf.if %cond -> !quantum.bit {
+        %t1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        %t2 = quantum.custom "Hadamard"() %t1 : !quantum.bit
+        %t3 = quantum.custom "Hadamard"() %t2 : !quantum.bit
+        %t4 = quantum.custom "Hadamard"() %t3 : !quantum.bit
+        scf.yield %t4 : !quantum.bit
+    } else {
+        %f1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        %f2 = quantum.custom "Hadamard"() %f1 : !quantum.bit
+        %f3 = quantum.custom "Hadamard"() %f2 : !quantum.bit
+        %f4 = quantum.custom "Hadamard"() %f3 : !quantum.bit
+        %f5 = quantum.custom "Hadamard"() %f4 : !quantum.bit
+        %f6 = quantum.custom "Hadamard"() %f5 : !quantum.bit
+        %f7 = quantum.custom "Hadamard"() %f6 : !quantum.bit
+        %f8 = quantum.custom "Hadamard"() %f7 : !quantum.bit
+        scf.yield %f8 : !quantum.bit
+    } {catalyst.estimated_probability = 0.75 : f64}
+    return %q : !quantum.bit
+}
+
+// -----
+
+// scf.if with only a then-branch and `estimated_probability` = 0.5: the (empty)
+// else-branch contributes nothing, so the expected Hadamard count is
+// 0.5 * 3 = 1.5. Fractional expected counts are surfaced as floats in the JSON.
+
+// CHECK-LABEL: "if_estimated_probability_then_only"
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 1.5
+func.func @if_estimated_probability_then_only(%arg0: !quantum.bit, %cond: i1) {
+    scf.if %cond {
+        %t1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        %t2 = quantum.custom "Hadamard"() %t1 : !quantum.bit
+        %t3 = quantum.custom "Hadamard"() %t2 : !quantum.bit
+        scf.yield
+    } {catalyst.estimated_probability = 0.5 : f64}
+    return
+}
+
+// -----
+
+// Qubit allocations are probability-weighted like every other count. Here the
+// then-branch allocates 1 qubit and the (empty) else-branch allocates none,
+// with p(then) = 0.5, so the expected allocation count is 0.5.
+
+// CHECK-LABEL: "if_estimated_probability_qubits"
+// CHECK: "num_alloc_qubits": 0.5
+// CHECK: "num_qubits": 0.5
+func.func @if_estimated_probability_qubits(%cond: i1) {
+    scf.if %cond {
+        %r = quantum.alloc(1) : !quantum.reg
+        %q = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
+        %h = quantum.custom "Hadamard"() %q : !quantum.bit
+        scf.yield
+    } {catalyst.estimated_probability = 0.5 : f64}
+    return
+}
+
+// -----
+
+// A probabilistic conditional inside a loop body: the fractional expected count
+// (0.5 Hadamard per iteration, p(then) = 0.5) must survive lifting into the
+// for_loop_1 body and only be combined with the trip count downstream. The
+// lifted body therefore reports a fractional count, and the parent records
+// function_calls = { for_loop_1: 10 }.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 0.5
+
+// CHECK-LABEL: "prob_if_in_loop": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 10
+func.func @prob_if_in_loop(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c10 = arith.constant 10 : index
+    %c1 = arith.constant 1 : index
+    %q = scf.for %i = %c0 to %c10 step %c1 iter_args(%a = %arg0) -> (!quantum.bit) {
+        scf.if %cond {
+            %h = quantum.custom "Hadamard"() %a : !quantum.bit
+            scf.yield
+        } {catalyst.estimated_probability = 0.5 : f64}
+        scf.yield %a : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
+// scf.index_switch with an `estimated_probabilities` hint (one entry per case,
+// in case order). The default case probability is computed automatically as the
+// remaining mass: 1 - (0.2 + 0.3) = 0.5. With case 0 = 5, case 1 = 10 and
+// default = 2 PauliX gates, the expected count is
+// 0.2*5 + 0.3*10 + 0.5*2 = 5.
+
+// CHECK-LABEL: "switch_estimated_probabilities"
+// CHECK: "has_branches": true
+// CHECK: "operations"
+// CHECK-DAG: "PauliX(1)": 5
+func.func @switch_estimated_probabilities(%arg0: !quantum.bit, %sel: index) -> !quantum.bit {
+    %q = scf.index_switch %sel {catalyst.estimated_probabilities = [0.2 : f64, 0.3 : f64]} -> !quantum.bit
+    case 0 {
+        %c1 = quantum.custom "PauliX"() %arg0 : !quantum.bit
+        %c2 = quantum.custom "PauliX"() %c1 : !quantum.bit
+        %c3 = quantum.custom "PauliX"() %c2 : !quantum.bit
+        %c4 = quantum.custom "PauliX"() %c3 : !quantum.bit
+        %c5 = quantum.custom "PauliX"() %c4 : !quantum.bit
+        scf.yield %c5 : !quantum.bit
+    }
+    case 1 {
+        %d1 = quantum.custom "PauliX"() %arg0 : !quantum.bit
+        %d2 = quantum.custom "PauliX"() %d1 : !quantum.bit
+        %d3 = quantum.custom "PauliX"() %d2 : !quantum.bit
+        %d4 = quantum.custom "PauliX"() %d3 : !quantum.bit
+        %d5 = quantum.custom "PauliX"() %d4 : !quantum.bit
+        %d6 = quantum.custom "PauliX"() %d5 : !quantum.bit
+        %d7 = quantum.custom "PauliX"() %d6 : !quantum.bit
+        %d8 = quantum.custom "PauliX"() %d7 : !quantum.bit
+        %d9 = quantum.custom "PauliX"() %d8 : !quantum.bit
+        %d10 = quantum.custom "PauliX"() %d9 : !quantum.bit
+        scf.yield %d10 : !quantum.bit
+    }
+    default {
+        %e1 = quantum.custom "PauliX"() %arg0 : !quantum.bit
+        %e2 = quantum.custom "PauliX"() %e1 : !quantum.bit
+        scf.yield %e2 : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
 // Resource analysis should include functions inside nested modules.
 
 // CHECK-LABEL: "circuit"
