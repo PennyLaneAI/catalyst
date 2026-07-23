@@ -191,6 +191,8 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Removes the non-graph decomposition fallback when `capture=True` is enabled.
+
 * Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
   [(#2974)](https://github.com/PennyLaneAI/catalyst/pull/2974)
 
