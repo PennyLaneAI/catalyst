@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <dlfcn.h>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -25,6 +26,7 @@
 #include <tuple>
 #include <unordered_set>
 
+#include "DataView.hpp"
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
@@ -81,15 +83,44 @@ class SharedLibraryManager final {
     {
 #ifdef __APPLE__
         auto rtld_flags = RTLD_LAZY;
+        constexpr const char *dl_ext = ".dylib";
 #else
         // Closing the dynamic library of Lightning simulators with dlclose() where OpenMP
         // directives (in Lightning simulators) are in use would raise memory segfaults.
         // Note that we use RTLD_NODELETE as a workaround to fix the issue.
         auto rtld_flags = RTLD_LAZY | RTLD_NODELETE;
+        constexpr const char *dl_ext = ".so";
 #endif
 
-        _handler = dlopen(filename.c_str(), rtld_flags);
-        RT_FAIL_IF(!_handler, dlerror());
+        // Normalize to the platform-native extension up front.
+        std::filesystem::path path(filename);
+        auto name = path.filename().string();
+        if (!name.ends_with(dl_ext)) {
+            auto dot = name.find_last_of('.');
+            if (dot != std::string::npos) {
+                name.resize(dot);
+            }
+            name += dl_ext;
+            path = path.has_parent_path() ? path.parent_path() / name : std::filesystem::path(name);
+        }
+
+        const std::string candidate = path.string();
+        _handler = dlopen(candidate.c_str(), rtld_flags);
+        if (_handler) {
+            return;
+        }
+
+        // dlerror() is destructive: capture before any further use.
+        const char *primary_dlerror = dlerror();
+        std::string primary_error = primary_dlerror ? primary_dlerror : "unknown dlopen error";
+
+        // retry with basename via the loader search path.
+        if (path.has_parent_path()) {
+            _handler = dlopen(name.c_str(), rtld_flags);
+        }
+
+        const std::string err = "dlopen failed to load " + filename + ": " + primary_error;
+        RT_FAIL_IF(!_handler, err.c_str());
     }
 
     ~SharedLibraryManager()
