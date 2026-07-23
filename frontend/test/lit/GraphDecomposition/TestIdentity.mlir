@@ -14,18 +14,18 @@
 
 // Test that decomposition handles circuits that are already decomposed to the given gateset.
 
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=Hadamard=1.0,CNOT=1.0 alt-decomps=Hadamard=false_decomp bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0,testCNOT=1.0 alt-decomps=testHadamard=false_decomp bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(2) : !quantum.reg
     %q0 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     %q1 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
-    // CHECK: Hadamard
-    // CHECK: Hadamard
-    // CHECK: CNOT
-    %q0out = quantum.custom "Hadamard"() %q0 : !quantum.bit
-    %q1out = quantum.custom "Hadamard"() %q1 : !quantum.bit
-    %q:2 = quantum.custom "CNOT"() %q0out, %q1out : !quantum.bit, !quantum.bit
+    // CHECK: testHadamard
+    // CHECK: testHadamard
+    // CHECK: testCNOT
+    %q0out = quantum.custom "testHadamard"() %q0 : !quantum.bit
+    %q1out = quantum.custom "testHadamard"() %q1 : !quantum.bit
+    %q:2 = quantum.custom "testCNOT"() %q0out, %q1out : !quantum.bit, !quantum.bit
     return %q1 : !quantum.bit
 }
 
@@ -36,17 +36,17 @@ module @test_module {
         %0 = quantum.alloc(2) : !quantum.reg
         %q0 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
         %q1 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
-        // CHECK: Hadamard
-        // CHECK: Hadamard
-        // CHECK: CNOT
-        %q0out = quantum.custom "Hadamard"() %q0 : !quantum.bit
-        %q1out = quantum.custom "Hadamard"() %q1 : !quantum.bit
-        %q:2 = quantum.custom "CNOT"() %q0out, %q1out : !quantum.bit, !quantum.bit
+        // CHECK: testHadamard
+        // CHECK: testHadamard
+        // CHECK: testCNOT
+        %q0out = quantum.custom "testHadamard"() %q0 : !quantum.bit
+        %q1out = quantum.custom "testHadamard"() %q1 : !quantum.bit
+        %q:2 = quantum.custom "testCNOT"() %q0out, %q1out : !quantum.bit, !quantum.bit
         return %q1 : !quantum.bit
     }
 
-    func.func private @false_decomp(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="Hadamard"} {
-        %qout = quantum.custom "PauliX"() %q : !quantum.bit
+    func.func private @false_decomp(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard[][1]{}"} {
+        %qout = quantum.custom "testPauliX"() %q : !quantum.bit
         return %qout : !quantum.bit
     }
 }

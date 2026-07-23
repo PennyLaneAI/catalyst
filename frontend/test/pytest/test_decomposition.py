@@ -14,22 +14,31 @@
 
 """Unit tests for the python decompositions module."""
 
+from pathlib import Path
+
 import pennylane as qp
 import pytest
 
+from catalyst.compiler import _quantum_opt
+from catalyst.decomposition.precompile_decomposition_rules import (
+    get_abstract_args,
+    precompile_decomp_rules,
+)
 from catalyst.decomposition.python_decompositions import compile_decomposition_rules_wrapper
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
-class TestQPD:
-    """Test the python wrapper functions used for compile-time decomposition rule lowering."""
+class TestGenericUtilities:
+    """Tests for common decomposition rule lowering utilities."""
 
-    def test_paulirot_wrapper(self):
-        """Test that the paulirot QPD wrapper correctly returns the IR as a string."""
+    def test_paulirot(self):
+        """Test that the QPD wrapper correctly returns the IR as a string."""
         result = compile_decomposition_rules_wrapper(
-            "PauliRot", "PauliRot[f64][3]{pauli_word:XZZ}", [0.4], [3], {"pauli_word": "XZZ"}
+            "PauliRot", "PauliRot[f64][3]{pauli_word:XZZ}", ["i32"], [3], {"pauli_word": "XZZ"}
         )
         assert isinstance(result, str)
-        assert "PauliRot[f64][3]{pauli_word:XZZ}__pauli_rot_decomposition" in result
+        assert "_pauli_rot_decomposition" in result
+        assert 'target_gate = "PauliRot[f64][3]{pauli_word:XZZ}"' in result
         assert "Hadamard" in result
         assert "multirz" in result
 
@@ -37,7 +46,7 @@ class TestQPD:
         """Test that the python decomposition wrapper supports multiple rules."""
         with qp.decomposition.local_decomps():
 
-            def test_resources():
+            def test_resources(pauli_word):  # pylint: disable=unused-argument
                 return {qp.X: 1}
 
             @qp.register_resources(test_resources)
@@ -47,11 +56,26 @@ class TestQPD:
             qp.add_decomps(qp.PauliRot, test_decomp)
 
             result = compile_decomposition_rules_wrapper(
-                "PauliRot", "PauliRot[f64][3]{pauli_word:XYX}", [float], [3], {"pauli_word": "XYX"}
+                "PauliRot", "PauliRot[f64][3]{pauli_word:XYX}", ["f64"], [3], {"pauli_word": "XYX"}
             )
 
-            assert "PauliRot[f64][3]{pauli_word:XYX}_test_decomp" in result
             assert "test_decomp" in result
+            assert "_pauli_rot_decomp" in result
+            assert 'target_gate = "PauliRot[f64][3]{pauli_word:XYX}"' in result
+
+
+class TestPrecompiled:
+    """Tests for precompiled decomposition rules."""
+
+
+class TestTraceTime:
+    """Placeholder for future tests of trace-time decomposition rule lowering."""
+
+
+class TestOnDemand:
+    """
+    Test the python wrapper functions used for on-demand, compile-time decomposition rule lowering.
+    """
 
 
 if __name__ == "__main__":
