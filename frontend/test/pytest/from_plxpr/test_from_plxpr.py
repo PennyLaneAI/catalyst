@@ -26,6 +26,7 @@ from catalyst.from_plxpr import from_plxpr
 from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_get_p,
+    qref_operator_p,
     qref_qinst_p,
 )
 
@@ -437,13 +438,15 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        assert qfunc_xpr.eqns[-5].primitive == qref_qinst_p
+        assert qfunc_xpr.eqns[-5].primitive == qref_operator_p
         assert qfunc_xpr.eqns[-5].params == {
             "adjoint": num_adjoints % 2 == 1,
-            "ctrl_len": 0,
-            "op": "S",
-            "qubits_len": 1,
-            "params_len": 0,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 0,
+            "op_cls": qp.S,
+            "wire_lens": (1,),
         }
 
     @pytest.mark.parametrize("inner_adjoint", (True, False))
@@ -484,6 +487,27 @@ class TestAdjointCtrl:
         assert eqn.invars[6].val == True
         assert eqn.invars[7].val == False
 
+    def test_qfunc_ctrl_operator2_preserves_control_context(self):
+        """Test that qfunc controls are forwarded to Operator2 lowering."""
+
+        qp.capture.enable()
+
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit():
+            qp.ctrl(qp.S, control=1, control_values=[False])(0)
+            return qp.state()
+
+        plxpr = jax.make_jaxpr(circuit)()
+        catalyst_xpr = from_plxpr(plxpr)()
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        eqn = qfunc_xpr.eqns[4]
+        assert eqn.primitive == qref_operator_p
+        assert eqn.params["n_ctrls"] == 1
+        assert eqn.invars[0] is qfunc_xpr.eqns[2].outvars[0]
+        assert eqn.invars[1] is qfunc_xpr.eqns[3].outvars[0]
+        assert eqn.invars[2].val is False
+
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_doubly_ctrl(self, as_qfunc):
         """Test doubly controlled op."""
@@ -503,17 +527,19 @@ class TestAdjointCtrl:
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
         eqn = qfunc_xpr.eqns[5]
-        assert eqn.primitive == qref_qinst_p
+        assert eqn.primitive == qref_operator_p
         assert eqn.params == {
             "adjoint": False,
-            "ctrl_len": 2,
-            "op": "S",
-            "qubits_len": 1,
-            "params_len": 0,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 2,
+            "op_cls": qp.S,
+            "wire_lens": (1,),
         }
 
         for i in range(3):
-            assert eqn.invars[i] == qfunc_xpr.eqns[2 + i].outvars[0]
+            assert eqn.invars[i] is qfunc_xpr.eqns[2 + i].outvars[0]
         assert eqn.invars[3].val == False
         assert eqn.invars[4].val == True
 
@@ -587,14 +613,20 @@ class TestAdjointCtrl:
         assert qfunc_xpr.eqns[5].primitive == qref_get_p
         assert qfunc_xpr.eqns[6].primitive == qref_get_p
 
-        assert qfunc_xpr.eqns[7].primitive == qref_qinst_p
-        assert qfunc_xpr.eqns[7].params == {
+        eqn = qfunc_xpr.eqns[7]
+        assert eqn.primitive == qref_operator_p
+        assert eqn.params == {
             "adjoint": False,
-            "ctrl_len": 1,
-            "op": "T",
-            "params_len": 0,
-            "qubits_len": 1,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 1,
+            "op_cls": qp.T,
+            "wire_lens": (1,),
         }
+        assert eqn.invars[0] is qfunc_xpr.eqns[5].outvars[0]
+        assert eqn.invars[1] is qfunc_xpr.eqns[6].outvars[0]
+        assert eqn.invars[2].val == True
 
     def test_ctrl_around_for_loop(self):
         """Test that ctrl applied to a for loop."""

@@ -596,9 +596,8 @@ class TestCatalystOnlyControlled:
             qp.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3
         )
 
-        assert isinstance(result, type(expected))
         assert result.name == expected.name
-        assert result.base == expected.base
+        assert qp.equal(result.base, expected.base)
         assert result.control_wires == expected.control_wires
         assert result.control_values == expected.control_values
         assert result.work_wires == expected.work_wires
@@ -1424,7 +1423,7 @@ class TestDecomposition:
                 OpWithDecomposition(0.123, wires=[0, 1]),
                 [
                     qp.CH(wires=[2, 0]),
-                    Controlled(qp.S(wires=1), control_wires=2),
+                    qp.ctrl(qp.S(1), 2),
                     qp.CRX(0.123, wires=[2, 0]),
                 ],
             ),
@@ -1441,7 +1440,10 @@ class TestDecomposition:
     def test_decomposition(self, target, decomp):
         """Test that we decompose a normal controlled operation"""
         op = C_ctrl(target, 2)
-        assert op.decomposition() == decomp
+        actual = op.decomposition()
+        assert len(actual) == len(decomp)
+        for actual_op, expected_op in zip(actual, decomp):
+            assert qp.equal(actual_op, expected_op)
 
     def test_non_differentiable_one_qubit_special_unitary(self):
         """Assert that a non-differentiable on qubit special unitary uses the bisect
