@@ -28,6 +28,8 @@
 #include "Test/Transforms/Passes.h"
 #include "hlo-extensions/Transforms/Passes.h"
 
+#include "Transport/Transforms/Passes.h"
+
 namespace catalyst {
 
 inline void registerAllPasses()
@@ -44,6 +46,7 @@ inline void registerAllPasses()
     qref::registerQRefPasses();
     quantum::registerQuantumPasses();
     rtio::registerRTIOPasses();
+    transport::registerTransportPasses();
     test::registerTestPasses();
 }
 
