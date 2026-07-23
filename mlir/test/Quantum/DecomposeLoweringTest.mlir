@@ -598,6 +598,37 @@ module @circuit_with_multirz {
 
 // -----
 
+// CHECK-LABEL: module @circuit_with_operator_op
+module @circuit_with_operator_op {
+  func.func public @test_with_operator(%arg0: f64) -> !quantum.reg attributes {quantum.node} {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: quantum.custom "RZ"
+    // CHECK-NOT: quantum.operator
+    %out_qubits_0 = quantum.operator "DummyOp"(%arg0: f64) qubits(%1)
+      static_data = {metadata = "word"}
+    %2 = quantum.insert %0[ 0], %out_qubits_0 : !quantum.reg, !quantum.bit
+    return %2 : !quantum.reg
+  }
+
+  // CHECK-LABEL: func.func private @_my_dummy_decomp
+  func.func private @_my_dummy_decomp(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes
+      {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "DummyOp[f64][1]{metadata:word}"} {
+    %0 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg0[%extracted] : !quantum.reg -> !quantum.bit
+    %c0 = arith.constant 0 : index
+    %extracted_0 = tensor.extract %arg1[%c0] : tensor<1xf64>
+    %out_qubits = quantum.custom "RZ"(%extracted_0) %2 : !quantum.bit
+    %extracted_1 = tensor.extract %1[] : tensor<i64>
+    %3 = quantum.insert %arg0[%extracted_1], %out_qubits : !quantum.reg, !quantum.bit
+    return %3 : !quantum.reg
+  }
+}
+
+// -----
+
 // CHECK-LABEL: module @qreg_at_not_first_arg
 module @qreg_at_not_first_arg {
   func.func public @test_qreg_at_not_first_arg() attributes {quantum.node} {
@@ -663,7 +694,7 @@ module @test_paulirot {
         // CHECK-DAG: RX
         %reg2 = quantum.insert %inreg[ 0], %out#0 : !quantum.reg, !quantum.bit
         %reg3 = quantum.insert %reg2[ 1], %out#1 : !quantum.reg, !quantum.bit
-        %reg4 = quantum.insert %reg2[ 2], %out#2 : !quantum.reg, !quantum.bit
+        %reg4 = quantum.insert %reg3[ 2], %out#2 : !quantum.reg, !quantum.bit
         quantum.dealloc %reg4 : !quantum.reg
         return
     }

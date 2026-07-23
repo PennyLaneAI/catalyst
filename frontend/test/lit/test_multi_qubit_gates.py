@@ -39,7 +39,7 @@ def circuit(x: float):
     # CHECK: {{%.+}} = quantum.multirz({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     qp.MultiRZ(x, wires=[0, 1, 2, 3, 4])
 
-    # CHECK: {{%.+}} = quantum.pcphase({{%.+}}, {{%.+}}) {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit
+    # CHECK: {{%.+}} = quantum.pcphase({{%.+}}, dim : 0) {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit
     qp.PCPhase(x, dim=0, wires=[0, 1, 2])
 
     return measure(wires=0)

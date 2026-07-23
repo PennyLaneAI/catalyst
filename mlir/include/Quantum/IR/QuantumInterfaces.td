@@ -195,7 +195,7 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "mlir::TypeRange", "getDynamicShape"
         >,
         InterfaceMethod<
-            "Return the number of wires the operation acts on for each wire argument.",
+            "Return the number of wires the operation acts on for each wire argument (excluding control wires).",
             "std::vector<size_t>", "getWireLens"
         >,
         InterfaceMethod<

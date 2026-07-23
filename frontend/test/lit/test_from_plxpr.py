@@ -156,7 +156,7 @@ def test_dynamic_wire():
 
         # CHECK: [[SCALAR:%.+]] = tensor.extract %arg0[] : tensor<i64>
         # CHECK: [[q_w1:%.+]] = qref.get [[QREG]][[[SCALAR]]] : !qref.reg<3>, i64 -> !qref.bit
-        # CHECK: qref.pcphase({{%.+}}, {{%.+}}) [[q_w1]] : !qref.bit
+        # CHECK: qref.pcphase({{%.+}}, dim : 1) [[q_w1]] : !qref.bit
         qp.PCPhase(0.5, wires=w1, dim=1)
 
         return qp.state()
