@@ -36,6 +36,8 @@ def Executor_Dialect : Dialect {
 
     let name = "executor";
     let cppNamespace = "::catalyst::executor";
+
+    let useDefaultTypePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//
