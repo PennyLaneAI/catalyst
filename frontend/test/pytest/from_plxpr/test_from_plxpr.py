@@ -501,18 +501,12 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        operator_eqn = next(
-            eqn
-            for eqn in qfunc_xpr.eqns
-            if eqn.primitive == qref_operator_p and eqn.params["op_cls"] is qp.S
-        )
-        qref_get_eqns = [eqn for eqn in qfunc_xpr.eqns if eqn.primitive == qref_get_p]
-
-        assert len(qref_get_eqns) == 2
-        assert operator_eqn.params["n_ctrls"] == 1
-        assert operator_eqn.invars[0] is qref_get_eqns[0].outvars[0]
-        assert operator_eqn.invars[1] is qref_get_eqns[1].outvars[0]
-        assert operator_eqn.invars[2].val is False
+        eqn = qfunc_xpr.eqns[4]
+        assert eqn.primitive == qref_operator_p
+        assert eqn.params["n_ctrls"] == 1
+        assert eqn.invars[0] is qfunc_xpr.eqns[2].outvars[0]
+        assert eqn.invars[1] is qfunc_xpr.eqns[3].outvars[0]
+        assert eqn.invars[2].val is False
 
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_doubly_ctrl(self, as_qfunc):
