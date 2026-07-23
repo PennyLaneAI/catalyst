@@ -333,6 +333,30 @@ def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
     }];
 }
 
+def ScalarizeTensorExtractsPass : Pass<"scalarize-tensor-extracts"> {
+    let summary = "Sink scalar tensor.extract ops through small-tensor producers.";
+    let description = [{
+        Programs that compute quantum gate parameters from runtime inputs (e.g.
+        Trotterization with runtime Hamiltonian coefficients) produce long chains of
+        small tensor operations whose only consumers are scalar `tensor.extract`
+        operations. Each intermediate tensor survives bufferization as an allocation
+        with copies and each `linalg.generic` is later unrolled into loops, causing
+        severe IR amplification.
+
+        This pass folds `tensor.extract` through elementwise `linalg.generic` (by
+        inlining the scalar payload), `tensor.collapse_shape`, and
+        `tensor.extract_slice`, so the extracted element is computed directly in
+        scalar arithmetic and the intermediate tensors become dead. Payload inlining
+        is limited to small statically-shaped tensors to bound code growth.
+    }];
+
+    let dependentDialects = [
+        "mlir::arith::ArithDialect",
+        "mlir::linalg::LinalgDialect",
+        "mlir::tensor::TensorDialect"
+    ];
+}
+
 def EmptyPass : Pass<"empty"> {
     let summary = "Empty pass that does nothing.";
 

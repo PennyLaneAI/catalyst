@@ -23,6 +23,7 @@ file(GLOB SRC
     QnodeToAsyncPatterns.cpp
     RegisterInactiveCallbackPass.cpp
     ResourceAnalysisPass.cpp
+    ScalarizeTensorExtractsPass.cpp
     RegisterDecompRuleResourcePass.cpp
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp

@@ -45,15 +45,15 @@ def f_with_cond(a, b):
     # CHECK-NOT: linalg.generic
     a2 = a + a
     if a2 > b:
-        # CHECK: arith.subf
+        # CHECK-DAG: arith.subf
         a = a - 2.0
-        # CHECK: arith.mulf
+        # CHECK-DAG: arith.mulf
         b = b * 2.0
         c = a + b
     else:
-        # CHECK: arith.mulf
+        # CHECK-DAG: arith.mulf
         a = a * 2.0
-        # CHECK: arith.subf
+        # CHECK-DAG: arith.subf
         b = b - 2.0
         c = a + b
     return c * 2.0
