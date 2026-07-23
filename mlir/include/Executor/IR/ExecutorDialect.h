@@ -18,6 +18,5 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 
-#include "Executor/IR/ExecutorTypes.h"
-
 #include "Executor/IR/ExecutorOpsDialect.h.inc"
+#include "Executor/IR/ExecutorTypes.h"
