@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This module provides infrastructure for compile-time lowering of decomposition rules via python.
+This module provides infrastructure for lowering decomposition rules via python.
 """
 
 # pylint: disable=protected-access,bare-except
@@ -77,6 +77,7 @@ class GraphOpID:
     """
 
     def __init__(self, op: qp.core.Operator2, uid=None):
+        """Create a new GraphOpId."""
         assert isinstance(
             op, qp.core.Operator2
         ), "Graph-based decomposition expects an Operator2 instance"
@@ -88,31 +89,44 @@ class GraphOpID:
         self.static_data = self.parse_static_data()
         self.extra_data = uid
 
-    def parse_dynamic_shape(self):
+    def parse_dynamic_shape(self) -> list:
+        """Return the dynamic shape as a list of dtypes."""
         return list(self.op.dynamic_args.values())
 
-    def parse_wire_lens(self):
+    def parse_wire_lens(self) -> list[int]:
+        """Return the length of each of the wire args."""
         return list(map(len, self.op.wire_args.values()))
 
-    def parse_static_data(self):
+    def parse_static_data(self) -> dict:
+        """Return a dictionary of names to static data values."""
         return {
             static_argname: getattr(self.op, static_argname)
             for static_argname in self.op.compilable_argnames
         }
 
-    def get_operator_name(self):
+    def get_operator_name(self) -> str:
+        """Return the name of the operator."""
         return self.operator_name
 
-    def get_dynamic_shape_id_format(self):
+    def get_dynamic_shape_id_format(self) -> str:
+        """Return the dynamic shape formatted for GraphOpId."""
         return f"[{','.join(map(mlir_stringify_type, self.dynamic_shape))}]"
 
-    def get_wire_lens_id_format(self):
+    def get_wire_lens_id_format(self) -> str:
+        """Return the wire lengths formatted for GraphOpId."""
         return f"[{','.join(map(str, self.wire_lens))}]"
 
-    def get_static_data_id_format(self):
+    def get_static_data_id_format(self) -> str:
+        """Return the static data formatted for GraphOpId."""
         return f"{{{','.join(f'{k}:{v}' for k, v in self.static_data.items())}}}"
 
-    def getID(self):
+    def getID(self) -> str:
+        """
+        Return the GraphOpId as a string.
+
+        NOTE: do not modify this method without also modifying the corresponding DecomposableGate
+        interface in MLIR.
+        """
         ID_string = (
             self.get_operator_name()
             + self.get_dynamic_shape_id_format()
@@ -125,6 +139,11 @@ class GraphOpID:
 
 
 def collect_resources_for_op(op_name, dummy_dynamic_args, dummy_wires, static_data):
+    """
+    Return resource data for all decomposition rules associated to op_name.
+
+    This includes a dictionary
+    """
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
 
     # map rules to resource resources, in a more generic format
@@ -143,8 +162,11 @@ def collect_resources_for_op(op_name, dummy_dynamic_args, dummy_wires, static_da
 
 
 def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) -> ModuleOp:
-    """Python decomposition rule lowering."""
-    # TODO update docstring
+    """
+    Return a ModuleOp containing the decomposition rules for an operator instance.
+
+    The decomposition rules will be decorated with appropriate resource and target_gate attributes.
+    """
     device = qp.device("null.qubit", wires=sum(wire_lens))
     dummy_wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
     dummy_dynamic_args = get_dummy_values_for_container(dynamic_shape)
@@ -201,5 +223,5 @@ def python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data) 
 
 
 def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:
-    """Generic decomposition wrapper."""
+    """Return a string MLIR module containing the decomposition rules for an operator instance."""
     return str(python_decomposition(op_name, op_id, dynamic_shape, wire_lens, static_data))
