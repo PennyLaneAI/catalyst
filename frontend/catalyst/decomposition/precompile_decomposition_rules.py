@@ -162,7 +162,6 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
     with ir.Context():
         # TODO: update this for Operator2, PL will implement a precompilation registry
         for op in COMPILER_OPS_FOR_DECOMPOSITION:
-            # Operator2 migration is complete
             if not issubclass(op, Operator2):
                 continue
             dynamic_data, wire_lens, static_data = parse_operator_data(op)
