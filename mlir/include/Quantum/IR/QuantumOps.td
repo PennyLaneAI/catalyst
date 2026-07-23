@@ -1154,6 +1154,76 @@ def HamiltonianOp : Observable_Op<"hamiltonian"> {
 
 // -----
 
+def AbstractHamiltonianOp : Quantum_Op<"abs_hamiltonian"> {
+    let summary = "Construct a representation-agnostic Hamiltonian handle.";
+    let description = [{
+        The `quantum.abs_hamiltonian` operation builds an opaque, representation-agnostic handle
+        to a Hamiltonian (`!quantum.abs_hamiltonian`). The numeric data of the Hamiltonian (e.g.
+        Pauli coefficients, or the core/leaf factor tensors of a compressed double-factorized
+        Hamiltonian) flows in as a variadic list of ranked tensor or memref values, while the
+        representation and its static structure ride along as attributes:
+
+        * `kind`      -- the representation discriminator: `"pauli"`, `"lcu"` or `"cdf"`.
+        * `structure` -- representation-specific static metadata (Pauli words, factor ranks, ...).
+
+        Example:
+
+        ```mlir
+        func.func @foo(%coeffs: tensor<2xf64>) {
+            %h = quantum.abs_hamiltonian(%coeffs : tensor<2xf64>)
+                {kind = "pauli", structure = {words = ["XX", "Z"]}} : !quantum.abs_hamiltonian
+            func.return
+        }
+        ```
+    }];
+
+    let arguments = (ins
+        Variadic<AnyTypeOf<[AnyRankedTensor, AnyMemRef]>>:$data,
+        StrAttr:$kind,
+        DefaultValuedAttr<DictionaryAttr, "{}">:$structure
+    );
+
+    let results = (outs
+        AbstractHamiltonianType:$hamiltonian
+    );
+
+    let assemblyFormat = [{
+        `(` $data `:` type($data) `)` attr-dict `:` type(results)
+    }];
+}
+
+def CustomHOp : Quantum_Op<"custom_h"> {
+    let summary = "Apply a custom Hamiltonian-based operation.";
+    let description = [{
+        The `quantum.custom_h` operation consumes a representation-agnostic Hamiltonian handle
+        (`!quantum.abs_hamiltonian`) together with an evolution `time` value and a pair of static
+        integer attributes `n` and `m`. It is the lowering target of the frontend `CustomHOp`
+        operation.
+
+        Example:
+
+        ```mlir
+        func.func @foo(%h: !quantum.abs_hamiltonian, %time: tensor<f64>) {
+            quantum.custom_h %h, %time {n = 50 : i64, m = 1 : i64} : tensor<f64>
+            func.return
+        }
+        ```
+    }];
+
+    let arguments = (ins
+        AbstractHamiltonianType:$hamiltonian,
+        AnyTypeOf<[F64, AnyRankedTensor, AnyMemRef]>:$time,
+        I64Attr:$n,
+        I64Attr:$m
+    );
+
+    let assemblyFormat = [{
+        $hamiltonian `,` $time attr-dict `:` type($time)
+    }];
+}
+
+// -----
+
 class Measurement_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
 
