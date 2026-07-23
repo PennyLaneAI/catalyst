@@ -2,13 +2,13 @@
 
 <h3>New features since last release</h3>
 
-* You can now dynamically prepare magic T states inside captured Catalyst workflows using
-  ``qp.allocate(state="magic-T")`` and ``qp.allocate(state="magic-T-adj")``, which makes it
-  easier to compile FTQC-style routines that need T-state ancillas on the fly (for example
-  TemporaryAND) with ``qjit(capture=True)``.
+* You can now dynamically allocate magic T states (and their conjugates) with Catalyst on
+  both the capture and legacy tracing paths. This lets you build workflows that combine
+  dynamic wire allocation, mid-circuit measurements, and control flow — for example preparing
+  magic-T ancillas, applying a Pauli-product measurement, and branching with ``qp.cond``.
 
   ```python
-  @qjit(capture=True)
+  @qjit  # works with capture=True or capture=False
   @qnode(dev)
   def circuit():
       qb = qp.allocate(state="magic-T")
@@ -19,6 +19,7 @@
   Requires a PennyLane release that supports the new ``AllocateState`` values
   (see [PennyLane #9846](https://github.com/PennyLaneAI/pennylane/pull/9846)).
   [(#3029)](https://github.com/PennyLaneAI/catalyst/pull/3029)
+  [(#3027)](https://github.com/PennyLaneAI/catalyst/pull/3027)
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
