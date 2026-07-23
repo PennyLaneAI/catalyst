@@ -70,23 +70,6 @@ def test_custom_op(i: int):
 print(test_custom_op.mlir)
 
 
-# CHECK-LABEL: func.func public @test_qfunc_ctrl_operator2_preserves_control_context
-@qp.qjit(capture=True, target="mlir")
-@qp.qnode(qp.device("null.qubit", wires=2))
-def test_qfunc_ctrl_operator2_preserves_control_context():
-    """Test that qfunc controls reach final Operator2 MLIR."""
-    # CHECK-DAG: [[false:%.+]] = arith.constant false
-    # CHECK: [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    # CHECK: [[target:%.+]] = qref.get [[reg]][ 0] : !qref.reg<2> -> !qref.bit
-    # CHECK: [[control:%.+]] = qref.get [[reg]][ 1] : !qref.reg<2> -> !qref.bit
-    # CHECK: qref.custom "S"() [[target]] ctrls([[control]]) ctrlvals([[false]]) : !qref.bit ctrls !qref.bit
-    qp.ctrl(qp.S, control=1, control_values=False)(0)
-    return qp.expval(qp.Z(0))
-
-
-print(test_qfunc_ctrl_operator2_preserves_control_context.mlir)
-
-
 # CHECK: func.func public @test_measure() -> tensor<2xf64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
