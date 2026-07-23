@@ -20,7 +20,7 @@ import pennylane as qp
 import pytest
 
 from catalyst.compiler import _quantum_opt
-from catalyst.utils.precompile_decomposition_rules import (
+from catalyst.decomposition.precompile_decomposition_rules import (
     compile_op_decomp_rules,
     get_abstract_args,
     precompile_decomp_rules,

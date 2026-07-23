@@ -17,7 +17,7 @@
 import pennylane as qp
 import pytest
 
-from catalyst.device.python_decompositions import python_decomposition_wrapper
+from catalyst.decomposition.python_decompositions import python_decomposition_wrapper
 
 
 class TestQPD:
