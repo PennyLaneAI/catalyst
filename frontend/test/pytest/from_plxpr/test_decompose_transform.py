@@ -436,7 +436,7 @@ class TestGraphDecomposition:
             def true_func():
                 qp.CNOT(wires)
 
-                with qp.allocate(2, state="any", restored=True) as w:
+                with qp.allocate(2, state="zero") as w:
                     qp.H(w[0])
                     qp.H(w[0])
                     qp.X(w[1])
@@ -444,7 +444,7 @@ class TestGraphDecomposition:
                 return
 
             def false_func():
-                with qp.allocate(1, state="any", restored=False) as w:
+                with qp.allocate(1, state="zero") as w:
                     qp.H(w)
 
                 m = qp.measure(wires[0])
@@ -1050,7 +1050,7 @@ class TestPlxPRDecomposition:
             def true_func():
                 qp.CNOT(wires)
 
-                with qp.allocate(2, state="any", restored=True) as w:
+                with qp.allocate(2, state="zero") as w:
                     qp.H(w[0])
                     qp.H(w[0])
                     qp.X(w[1])
@@ -1059,7 +1059,7 @@ class TestPlxPRDecomposition:
                 return
 
             def false_func():
-                with qp.allocate(1, state="any", restored=False) as w:
+                with qp.allocate(1, state="zero") as w:
                     qp.H(w)
 
                 m = qp.measure(wires[0])
