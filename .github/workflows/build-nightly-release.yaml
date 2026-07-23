@@ -91,28 +91,3 @@ jobs:
         repository-url: https://test.pypi.org/legacy/
         packages-dir: dist
         verbose: true
-
-  collect-dev-package:
-    name: Collect catalyst-dev archives
-    if: ${{ !failure() && !cancelled() }}  # needed in case linux-aarch is skipped
-    needs: [linux-x86, macos-arm, linux-aarch]
-    runs-on: ubuntu-24.04
-
-    steps:
-    - name: Download catalyst-dev archives
-      uses: actions/download-artifact@v4
-      with:
-        pattern: catalyst-dev*
-        merge-multiple: true
-        path: catalyst-dev
-
-    - name: List collected archives
-      run: ls -lh catalyst-dev*
-
-    - name: Upload combined catalyst-dev archives
-      uses: actions/upload-artifact@v4
-      with:
-        name: catalyst-dev-archives
-        path: catalyst-dev/
-        retention-days: 14
-        if-no-files-found: error
