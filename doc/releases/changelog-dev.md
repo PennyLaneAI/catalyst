@@ -6,6 +6,7 @@
   ``qp.allocate(state="magic-T")`` and ``qp.allocate(state="magic-T-adj")``, which makes it
   easier to compile FTQC-style routines that need T-state ancillas on the fly (for example
   TemporaryAND) with ``qjit(capture=True)``.
+  [(#3029)](https://github.com/PennyLaneAI/catalyst/pull/3029)
 
   ```python
   @qjit(capture=True)
@@ -15,10 +16,6 @@
       # ... use qb in your circuit ...
       qp.deallocate(qb)
   ```
-
-  Requires a PennyLane release that supports the new ``AllocateState`` values
-  (see [PennyLane #9846](https://github.com/PennyLaneAI/pennylane/pull/9846)).
-  [(#3029)](https://github.com/PennyLaneAI/catalyst/pull/3029)
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
