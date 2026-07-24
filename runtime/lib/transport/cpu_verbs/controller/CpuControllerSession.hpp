@@ -82,6 +82,7 @@ class CpuControllerSession : public ControllerSession {
         bool oob_listens() const override { return false; }
 
       private:
+        // Sizes from commit_work_item are fixed in CPU controller.
         std::uint64_t in_bytes_ = sizeof(common::Payload::value);
         std::uint64_t out_bytes_ = sizeof(common::Payload::value);
         std::uint64_t next_send_ = 0, next_recv_ = 0;

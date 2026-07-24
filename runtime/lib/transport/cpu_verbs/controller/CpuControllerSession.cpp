@@ -49,6 +49,8 @@ void CpuControllerSession::Impl::stop()
     CpuSessionBase::stop(); // no engine thread runs for the controller; harmless join
 }
 
+// Single work item, fixed-size frame: work_item_idx is ignored; the sizes are
+// just recorded (out_bytes_ caps the reply in collect()).
 void CpuControllerSession::Impl::commit_work_item(std::uint32_t /*work_item_idx*/,
                                                   std::uint64_t in_bytes, std::uint64_t out_bytes)
 {
