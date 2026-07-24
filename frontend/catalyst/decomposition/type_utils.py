@@ -51,24 +51,14 @@ def mlir_stringify_type(dtype: qp.typing.AbstractArray):
 
 
 def get_dummy_values_for_container(container):
-    """Given a container of python types, replace the types with corresponding dummy values."""
-    dummy_args = []
-    for dtype in container:
-        if isinstance(dtype, str):
-            if dtype in _MLIR_DTYPES_TO_PY_DTYPES:
-                count = 1
-                dtype = _MLIR_DTYPES_TO_PY_DTYPES[dtype]
-            elif dtype.startswith("tensor"):
-                # tensor<{number}x{type}>
-                dtype = dtype.removeprefix("tensor<")
-                dtype = dtype.remove_suffice(">")
-                count, dtype = dtype.split("x")
-            else:
-                raise ValueError(f"Unknown dtype {dtype}.")
-        else:
-            count = 1
-            dtype = jnp.dtype(dtype)
-
-        dummy_args.append(jnp.zeros((count,), dtype=dtype))
-
-    return tuple(dummy_args)
+    """
+    Converts a nested list of dtype strings into a matching nested list of jnp.zeros.
+    """
+    if isinstance(container, (list, tuple)):
+        return [get_dummy_values_for_container(item) for item in container]
+    elif isinstance(container, str):
+        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[container])
+    else:
+        raise TypeError(
+            f"Unexpected type in container when creating dummy values: {type(container)}"
+        )
