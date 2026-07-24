@@ -18,6 +18,7 @@ of quantum operations, measurements, and observables to reference semantics JAXP
 
 from enum import Enum
 
+import pennylane as qp
 from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue, ShapedArray
@@ -25,6 +26,7 @@ from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
+    ConstantOp,
     ExtUIOp,
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
@@ -61,13 +63,14 @@ with Patcher(
     ),
 ):
     from mlir_quantum.dialects.mbqc import RefMeasureInBasisOp
-    from mlir_quantum.dialects.pbc import RefPPMeasurementOp
+    from mlir_quantum.dialects.pbc import RefFabricateOp, RefPPMeasurementOp
     from mlir_quantum.dialects.qref import (
         AdjointOp,
         AllocOp,
         ComputationalBasisOp,
         CustomOp,
         DeallocOp,
+        DeallocQubitOp,
         GetOp,
         GlobalPhaseOp,
         HermitianOp,
@@ -223,6 +226,81 @@ def _qref_dealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
 def _qref_get_abstract_eval(qreg, qubit_idx):
     assert isinstance(qreg, QrefQreg), f"Expected QrefQreg, got {qreg}"
     return AbstractQubit()
+
+
+def _pbc_logical_init_attr(ctx, init_state: str):
+    """Create a PBC LogicalInit enum attribute from its string value."""
+    return ir.OpaqueAttr.get("pbc", f"enum {init_state}".encode("utf-8"), ir.NoneType.get(ctx), ctx)
+
+
+_MLIR_MAGIC_STATES = {
+    "magic-T": "magic",
+    "magic-T-adj": "magic_conj",
+}
+
+
+def _normalize_allocate_state(state):
+    if hasattr(state, "value"):
+        state_val = state.value
+    else:
+        state_val = state
+    return _MLIR_MAGIC_STATES.get(state_val, state_val)
+
+
+def _allocate_prim_lowering(jax_ctx: mlir.LoweringRuleContext, *, num_wires, state, restored=False):
+    del restored
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+    state_val = _normalize_allocate_state(state)
+
+    if state_val in ("magic", "magic_conj"):
+        qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
+        init_state_attr = _pbc_logical_init_attr(ctx, state_val)
+        return [
+            RefFabricateOp(qubit=qubit_type, init_state=init_state_attr).results[0]
+            for _ in range(num_wires)
+        ]
+
+    size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), num_wires)
+    qreg_type = ir.OpaqueType.get("qref", f"reg<{num_wires}>", ctx)
+    qreg = AllocOp(qreg_type, nqubits_attr=size_attr).results[0]
+
+    qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
+    i64_type = ir.IntegerType.get_signless(64, ctx)
+    qubits = []
+    for idx in range(num_wires):
+        idx_attr = ir.IntegerAttr.get(i64_type, idx)
+        idx_val = ConstantOp(i64_type, idx_attr).result
+        qubits.append(GetOp(qubit_type, qreg, idx=idx_val).results[0])
+    return qubits
+
+
+def _deallocate_prim_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits):
+    del jax_ctx
+    fabricated_qubits = []
+    qregs = set()
+    for qubit in qubits:
+        defining_op = qubit.owner
+        if defining_op.name == "pbc.ref.fabricate":
+            fabricated_qubits.append(qubit)
+        elif defining_op.name == "qref.get":
+            qregs.add(defining_op.operands[0])
+        else:
+            raise TypeError(
+                f"Manual deallocation is only supported for wires produced by allocate, "
+                f"got {defining_op.name}"
+            )
+
+    if (fabricated_qubits and qregs) or len(qregs) > 1:
+        raise ValueError(
+            "Expected all wires to deallocate to come from the same allocation instruction"
+        )
+
+    for qubit in fabricated_qubits:
+        DeallocQubitOp(qubit)
+    for qreg in qregs:
+        DeallocOp(qreg)
+    return ()
 
 
 def _qref_get_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_idx: ir.Value):
@@ -838,6 +916,8 @@ def _qref_hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value
 
 
 CUSTOM_LOWERING_RULES = (
+    (qp.allocation.allocate_prim, _allocate_prim_lowering),
+    (qp.allocation.deallocate_prim, _deallocate_prim_lowering),
     (qref_operator_p, _qref_operator_p_lowering),
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),

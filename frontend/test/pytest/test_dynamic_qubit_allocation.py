@@ -532,10 +532,35 @@ def test_adjoint(backend):
     assert np.allclose(observed, expected)
 
 
+@pytest.mark.parametrize(
+    ("state", "prep"),
+    (
+        ("magic-T", lambda w: (qp.H(w), qp.T(w))),
+        ("magic-T-adj", lambda w: (qp.H(w), qp.adjoint(qp.T(w), lazy=False))),
+    ),
+)
+def test_magic_state_allocation(backend, state, prep):
+    """Test magic state allocation lowers correctly and produces expected states."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device(backend, wires=2))
+    def baseline():
+        prep(1)
+        qp.CNOT(wires=[1, 0])
+        return qp.probs(wires=[0])
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit():
+        q = qp.allocate(1, state=state)
+        qp.CNOT(wires=[q[0], 0])
+        return qp.probs(wires=[0])
+
+    assert np.allclose(baseline(), circuit())
+
+
 def test_no_capture(backend):
-    """
-    Test error message when used without capture.
-    """
+    """Test error message when allocate is used without program capture."""
     with pytest.raises(
         CompileError,
         match=r".*\.allocate\(\) with qjit is only supported with program capture enabled\.",
@@ -547,6 +572,72 @@ def test_no_capture(backend):
             with qp.allocate(1) as _:
                 pass
             return qp.probs(wires=[0])
+
+
+def test_deallocate_mixed_fabricate_and_register():
+    """Test deallocating fabricate and register wires together is rejected."""
+    with pytest.raises(ValueError, match="same allocation instruction"):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
+        def circuit():
+            q_magic = qp.allocate(1, state="magic-T")
+            q_reg = qp.allocate(1)
+            qp.deallocate([q_magic[0], q_reg[0]])
+            return qp.probs(wires=[0])
+
+
+def test_deallocate_multiple_register_allocations():
+    """Test deallocating wires from separate register allocations is rejected."""
+    with pytest.raises(ValueError, match="same allocation instruction"):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
+        def circuit():
+            q1 = qp.allocate(1)
+            q2 = qp.allocate(1)
+            qp.deallocate([q1[0], q2[0]])
+            return qp.probs(wires=[0])
+
+
+def test_deallocate_non_allocated_wire():
+    """Test deallocating a device wire is rejected at compile time."""
+    with pytest.raises(TypeError, match="Manual deallocation is only supported"):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit():
+            qp.deallocate(0)
+            return qp.probs(wires=[0])
+
+
+def test_magic_state_manual_deallocate(backend):
+    """Test manual deallocation of a magic state wire without entangling gates."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        q = qp.allocate(1, state="magic-T-adj")
+        qp.deallocate(q[0])
+        return qp.probs(wires=[0])
+
+    assert np.allclose([1, 0], circuit())
+
+
+def test_magic_state_mlir_lowering(backend):
+    """Test that magic state allocation lowers to pbc.ref.fabricate."""
+
+    @qjit(target="mlir", capture=True)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        with qp.allocate(1, state="magic-T") as q:
+            qp.X(q[0])
+        return qp.probs(wires=[0])
+
+    mlir_str = circuit.mlir
+    assert "pbc.ref.fabricate" in mlir_str
+    assert "magic" in mlir_str
+    assert "qref.dealloc_qb" in mlir_str
 
 
 def test_use_after_free(backend):
@@ -587,6 +678,36 @@ def test_terminal_MP_all_wires(backend):
             with qp.allocate(1) as _:
                 pass
             return qp.probs()
+
+
+def test_allocate_state_any_unsupported():
+    """Test error when allocating with state=\"any\"."""
+
+    with pytest.raises(
+        CompileError,
+        match='qp.allocate with state="any" is not supported in Catalyst',
+    ):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.allocate(1, state="any")
+            return qp.expval(qp.Z(0))
+
+
+def test_allocate_restored_unsupported():
+    """Test error when allocating with restored=True."""
+
+    with pytest.raises(
+        CompileError,
+        match="qp.allocate with restored=True is not supported in Catalyst",
+    ):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.allocate(1, restored=True)
+            return qp.expval(qp.Z(0))
 
 
 def test_terminal_MP_dynamic_wires(backend):

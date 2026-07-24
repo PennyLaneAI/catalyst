@@ -37,3 +37,32 @@ def RefPPMeasurementOp : PBC_Op<"ref.ppm"> {
 
     let hasVerifier = 1;
 }
+
+def RefFabricateOp : PBC_Op<"ref.fabricate"> {
+    let summary = "Fabricate auxiliary qubits from qubit factories (reference semantics).";
+
+    let description = [{
+        Identical to the pbc.fabricate operation, except in reference semantics.
+        Only magic states (``magic`` and ``magic_conj``) are supported.
+
+        Example:
+        ```mlir
+        %0 = pbc.ref.fabricate magic : !qref.bit
+        %1 = pbc.ref.fabricate magic_conj : !qref.bit
+        ```
+    }];
+
+    let arguments = (ins
+        LogicalInit:$init_state
+    );
+
+    let results = (outs
+        QubitRefType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $init_state attr-dict `:` type($qubit)
+    }];
+
+    let hasVerifier = 1;
+}
