@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
 
@@ -47,3 +48,27 @@ def mlir_stringify_type(dtype: qp.typing.AbstractArray):
         return _PY_DTYPES_TO_MLIR_DTYPES[element_type]
     else:
         return _stringify_shaped_type(dtype.shape, 0, element_type)
+
+
+def get_dummy_values_for_container(container):
+    """Given a container of python types, replace the types with corresponding dummy values."""
+    dummy_args = []
+    for dtype in container:
+        if isinstance(dtype, str):
+            if dtype in _MLIR_DTYPES_TO_PY_DTYPES:
+                count = 1
+                dtype = _MLIR_DTYPES_TO_PY_DTYPES[dtype]
+            elif dtype.startswith("tensor"):
+                # tensor<{number}x{type}>
+                dtype = dtype.removeprefix("tensor<")
+                dtype = dtype.remove_suffice(">")
+                count, dtype = dtype.split("x")
+            else:
+                raise ValueError(f"Unknown dtype {dtype}.")
+        else:
+            count = 1
+            dtype = jnp.dtype(dtype)
+
+        dummy_args.append(jnp.zeros((count,), dtype=dtype))
+
+    return tuple(dummy_args)
