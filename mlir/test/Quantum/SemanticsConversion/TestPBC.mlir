@@ -53,10 +53,10 @@ func.func @test_PPM_op(%angle: f64) -> (i1, i1, i1) attributes {quantum.node} {
 func.func @test_fabricate_magic() attributes {quantum.node} {
     // CHECK: [[magic:%.+]] = pbc.ref.fabricate magic : !qref.bit
     %q = pbc.fabricate magic : !quantum.bit
-    quantum.custom "PauliX"() %q : !quantum.bit
+    %out_qubit = quantum.custom "PauliX"() %q : !quantum.bit
     // CHECK: qref.custom "PauliX"() [[magic]] : !qref.bit
     // CHECK: qref.dealloc_qb [[magic]] : !qref.bit
-    quantum.dealloc_qb %q : !quantum.bit
+    quantum.dealloc_qb %out_qubit : !quantum.bit
     return
 }
 
@@ -66,9 +66,9 @@ func.func @test_fabricate_magic() attributes {quantum.node} {
 func.func @test_fabricate_magic_conj() attributes {quantum.node} {
     // CHECK: [[magic_conj:%.+]] = pbc.ref.fabricate magic_conj : !qref.bit
     %q = pbc.fabricate magic_conj : !quantum.bit
-    quantum.custom "PauliX"() %q : !quantum.bit
+    %out_qubit = quantum.custom "PauliX"() %q : !quantum.bit
     // CHECK: qref.custom "PauliX"() [[magic_conj]] : !qref.bit
     // CHECK: qref.dealloc_qb [[magic_conj]] : !qref.bit
-    quantum.dealloc_qb %q : !quantum.bit
+    quantum.dealloc_qb %out_qubit : !quantum.bit
     return
 }
