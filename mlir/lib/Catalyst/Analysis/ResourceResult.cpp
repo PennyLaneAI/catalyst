@@ -81,7 +81,6 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     }
 
     numAllocQubits = applyMerge(numAllocQubits, other.numAllocQubits, method);
-    numArgQubits = applyMerge(numArgQubits, other.numArgQubits, method);
 
     hasBranches = hasBranches || other.hasBranches;
     hasDynLoop = hasDynLoop || other.hasDynLoop;
@@ -108,8 +107,6 @@ void ResourceResult::multiplyByScalar(double scalar)
     }
 
     numAllocQubits *= scalar;
-    // TODO: does it make sense to scale the arg qubit number?
-    // numArgQubits *= scalar;
 }
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
