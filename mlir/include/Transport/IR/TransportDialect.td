@@ -51,13 +51,6 @@ def Transport_Role : I32EnumAttr<"Role", "transport session role", [
     let cppNamespace = "::catalyst::transport";
 }
 
-def Transport_DataPath : I32EnumAttr<"DataPath", "transport data-movement path", [
-        I32EnumAttrCase<"CpuVerbs", 0, "cpu_verbs">,
-        I32EnumAttrCase<"GpuEngine", 1, "gpu_engine">,
-        I32EnumAttrCase<"Other", 2, "other">
-    ]> {
-    let cppNamespace = "::catalyst::transport";
-}
 
 //===----------------------------------------------------------------------===//
 // Types.
@@ -68,19 +61,19 @@ class Transport_Type<string name, string typeMnemonic, list<Trait> traits = []>
     let mnemonic = typeMnemonic;
 }
 
-// Opaque session handle, parameterized by role. Lowers to !llvm.ptr; the role is
-// compile-time only and drives op verification + the create factory selection.
+// Opaque session handle, parameterized by its role. The role is a compile-time tag
+// that selects which role-specific ops the session may take part in.
 def Transport_SessionType : Transport_Type<"Session", "session"> {
-    let summary = "Opaque transport session handle (CatalystTransportSession*), tagged with its role.";
+    let summary = "An opaque transport session handle, tagged with its role.";
     let parameters = (ins EnumParameter<Transport_Role>:$role);
     let assemblyFormat = "`<` $role `>`";
 }
 
 def Transport_TokenType : Transport_Type<"Token", "token"> {
-    let summary = "Handle to an in-flight async transport step, awaited with transport.barrier.";
+    let summary = "A handle to an in-flight asynchronous step, awaited with transport.barrier.";
 }
 
-// Role-constrained session-type constraints for role-specific ops.
+// Role-constrained session types used by the role-specific ops.
 def Transport_ControllerSession : Type<
     CPred<"::llvm::isa<::catalyst::transport::SessionType>($_self) && "
           "::llvm::cast<::catalyst::transport::SessionType>($_self).getRole() == "

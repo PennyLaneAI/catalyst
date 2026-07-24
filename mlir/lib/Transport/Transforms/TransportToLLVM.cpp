@@ -67,6 +67,20 @@ Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64
     return LLVM::ConstantOp::create(rewriter, loc, ty, rewriter.getIntegerAttr(ty, v));
 }
 
+// From a lowered 1-D memref descriptor (an LLVM struct), extract the aligned data
+// pointer and the buffer's size in bytes (num elements * element byte width).
+std::pair<Value, Value> memrefPtrAndBytes(ConversionPatternRewriter &rewriter, Location loc,
+                                          Value descriptor, MemRefType memTy)
+{
+    Value ptr = LLVM::ExtractValueOp::create(rewriter, loc, descriptor, ArrayRef<int64_t>{1});
+    Value nelem = LLVM::ExtractValueOp::create(rewriter, loc, descriptor, ArrayRef<int64_t>{3, 0});
+    Type elemTy = memTy.getElementType();
+    int64_t elemBytes = isa<IndexType>(elemTy) ? 8 : (elemTy.getIntOrFloatBitWidth() + 7) / 8;
+    Value ebytes = constInt(rewriter, loc, i64Ty(rewriter.getContext()), elemBytes);
+    Value bytes = LLVM::MulOp::create(rewriter, loc, nelem, ebytes);
+    return {ptr, bytes};
+}
+
 //===----------------------------------------------------------------------===//
 // Patterns
 //===----------------------------------------------------------------------===//
@@ -81,10 +95,12 @@ struct CreateLowering : public OpConversionPattern<CreateOp> {
         auto sessTy = cast<SessionType>(op.getSession().getType());
         Value lib = globalStr(rewriter, op.getLoc(), mod, "transport_backend_", op.getBackendLib());
         Value cfg = globalStr(rewriter, op.getLoc(), mod, "transport_config_", op.getConfig());
+        Value key = globalStr(rewriter, op.getLoc(), mod, "transport_key_", op.getKey());
         Value role =
             constInt(rewriter, op.getLoc(), i32Ty(ctx), static_cast<int64_t>(sessTy.getRole()));
         Value s = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__create",
-                           {ptrTy(ctx), ptrTy(ctx), i32Ty(ctx)}, ptrTy(ctx), {lib, cfg, role});
+                           {ptrTy(ctx), ptrTy(ctx), i32Ty(ctx), ptrTy(ctx)}, ptrTy(ctx),
+                           {lib, cfg, role, key});
         rewriter.replaceOp(op, s);
         return success();
     }
@@ -161,10 +177,10 @@ struct EstablishChannelLowering : public OpConversionPattern<EstablishChannelOp>
                                   ConversionPatternRewriter &rewriter) const override
     {
         auto *ctx = op.getContext();
-        Value dp =
-            constInt(rewriter, op.getLoc(), i32Ty(ctx), static_cast<int64_t>(op.getDataPath()));
+        Value dp = globalStr(rewriter, op.getLoc(), moduleOf(op), "transport_data_path_",
+                             op.getDataPath());
         emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__establish_channel",
-                 {ptrTy(ctx), i32Ty(ctx)}, i32Ty(ctx), {adaptor.getSession(), dp});
+                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), dp});
         rewriter.eraseOp(op);
         return success();
     }
@@ -175,8 +191,11 @@ struct SetCoprocessorFnLowering : public OpConversionPattern<SetCoprocessorFnOp>
     LogicalResult matchAndRewrite(SetCoprocessorFnOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__set_coprocessor_fn",
-                 {ptrTy(op.getContext())}, i32Ty(op.getContext()), {adaptor.getSession()});
+        auto *ctx = op.getContext();
+        ModuleOp mod = moduleOf(op);
+        Value sym = globalStr(rewriter, op.getLoc(), mod, "transport_coproc_fn_", op.getSymbol());
+        emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__set_coprocessor_fn",
+                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), sym});
         rewriter.eraseOp(op);
         return success();
     }
@@ -206,9 +225,14 @@ struct KickLowering : public OpConversionPattern<KickOp> {
     {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
+        auto memTy = dyn_cast<MemRefType>(op.getPayload().getType());
+        if (!memTy)
+            return rewriter.notifyMatchFailure(op, "kick payload must be bufferized (memref)");
+        auto [srcPtr, bytes] =
+            memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getPayload(), memTy);
         Value slot = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__data_slot",
                               {ptrTy(ctx)}, ptrTy(ctx), {adaptor.getSession()});
-        LLVM::StoreOp::create(rewriter, op.getLoc(), adaptor.getPayload(), slot);
+        LLVM::MemcpyOp::create(rewriter, op.getLoc(), slot, srcPtr, bytes, /*isVolatile=*/false);
         Value idx = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getWorkItemIdx());
         emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__kick",
                  {ptrTy(ctx), i32Ty(ctx)}, i32Ty(ctx), {adaptor.getSession(), idx});
@@ -224,15 +248,15 @@ struct CollectLowering : public OpConversionPattern<CollectOp> {
     {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
-        Value one = constInt(rewriter, op.getLoc(), i64Ty(ctx), 1);
-        Value buf = LLVM::AllocaOp::create(rewriter, op.getLoc(), ptrTy(ctx), i64Ty(ctx), one,
-                                           /*alignment=*/8);
-        Value bytes = constInt(rewriter, op.getLoc(), i64Ty(ctx), op.getBytes());
+        if (!op.getDest())
+            return rewriter.notifyMatchFailure(op,
+                                               "collect must be bufferized (dest-passing form)");
+        auto memTy = cast<MemRefType>(op.getDest().getType());
+        auto [dstPtr, bytes] = memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getDest(), memTy);
         emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__collect",
                  {ptrTy(ctx), ptrTy(ctx), i64Ty(ctx)}, i32Ty(ctx),
-                 {adaptor.getSession(), buf, bytes});
-        Value loaded = LLVM::LoadOp::create(rewriter, op.getLoc(), i64Ty(ctx), buf);
-        rewriter.replaceOp(op, loaded);
+                 {adaptor.getSession(), dstPtr, bytes});
+        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -267,6 +291,25 @@ template <typename OpT> struct VoidSessionLowering : public OpConversionPattern<
     std::string symbol;
 };
 
+// get_session: look the session up by role from the runtime registry (populated at create).
+struct GetSessionLowering : public OpConversionPattern<GetSessionOp> {
+    using OpConversionPattern::OpConversionPattern;
+    LogicalResult matchAndRewrite(GetSessionOp op, OpAdaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        auto *ctx = op.getContext();
+        ModuleOp mod = moduleOf(op);
+        auto sessTy = cast<SessionType>(op.getSession().getType());
+        Value role =
+            constInt(rewriter, op.getLoc(), i32Ty(ctx), static_cast<int64_t>(sessTy.getRole()));
+        Value key = globalStr(rewriter, op.getLoc(), mod, "transport_key_", op.getKey());
+        Value s = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__get_session",
+                           {i32Ty(ctx), ptrTy(ctx)}, ptrTy(ctx), {role, key});
+        rewriter.replaceOp(op, s);
+        return success();
+    }
+};
+
 } // namespace
 
 struct ConvertTransportToLLVMPass
@@ -284,10 +327,9 @@ struct ConvertTransportToLLVMPass
         patterns.add<CreateLowering, ConnectLowering, ConnectAsyncLowering, ExchangeKeysLowering,
                      ExchangeKeysAsyncLowering, BarrierLowering, EstablishChannelLowering,
                      SetCoprocessorFnLowering, CommitWorkItemLowering, KickLowering,
-                     CollectLowering, LastRttLowering>(tc, ctx);
+                     CollectLowering, LastRttLowering, GetSessionLowering>(tc, ctx);
         patterns.add<VoidSessionLowering<StartOp>>(tc, ctx, "__catalyst__transport__start");
         patterns.add<VoidSessionLowering<StopOp>>(tc, ctx, "__catalyst__transport__stop");
-        patterns.add<VoidSessionLowering<CloseOp>>(tc, ctx, "__catalyst__transport__close");
         patterns.add<VoidSessionLowering<DestroyOp>>(tc, ctx, "__catalyst__transport__destroy");
 
         ConversionTarget target(*ctx);
