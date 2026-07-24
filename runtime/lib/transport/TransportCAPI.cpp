@@ -49,7 +49,7 @@ struct CatalystTransportSession {
     TransportSession *sess = nullptr; // heap-allocated by the backend factory
     MemRegion reply;                  // local region advertised in exchange_keys
     bool reply_ready = false;
-    PeerRef peer;      // peer region learned in exchange_keys
+    PeerRef peer; // peer region learned in exchange_keys
     bool peer_ready = false;
 };
 

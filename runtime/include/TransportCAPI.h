@@ -53,14 +53,15 @@ enum {
 CatalystTransportSession *__catalyst__transport__create(const char *backend_lib, const char *config,
                                                         int32_t role, const char *key);
 
-// Resolve the live session registered at create under (`role`, `key`). 
+// Resolve the live session registered at create under (`role`, `key`).
 // Lets a session brought up in one function be used in another.
 CatalystTransportSession *__catalyst__transport__get_session(int32_t role, const char *key);
 
 // Bring-up. The peer region learned in exchange_keys is kept inside the session, so
 // establish_channel takes no peer handle. The *_async variants run on a worker thread and return a
 // token to await with barrier.
-int __catalyst__transport__connect(CatalystTransportSession *s, const char *peer, uint16_t oob_port);
+int __catalyst__transport__connect(CatalystTransportSession *s, const char *peer,
+                                   uint16_t oob_port);
 int64_t __catalyst__transport__connect_async(CatalystTransportSession *s, const char *peer,
                                              uint16_t oob_port);
 int __catalyst__transport__exchange_keys(CatalystTransportSession *s);
