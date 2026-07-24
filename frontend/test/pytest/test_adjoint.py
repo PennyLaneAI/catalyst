@@ -1088,7 +1088,7 @@ class TestAdjointOperationDiffInfo:
         assert adjoint(op).grad_method == op.grad_method
 
     @pytest.mark.parametrize(
-        "base", (qp.PauliX(0), qp.RX(1.234, wires=0), qp.Rotation(1.234, wires=0))
+        "base", (qp.PauliX(0), qp.RX(1.234, wires=0), qp.Rot(1.234, 0.0, 0.0, wires=0))
     )
     def test_grad_recipe(self, base):
         """Test that the grad_recipe of the Adjoint is the same as the grad_recipe of the base."""
