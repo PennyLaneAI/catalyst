@@ -199,7 +199,7 @@ if(ENABLE_TRANSPORT)
     )
     catch_discover_tests(runner_tests_transport_common)
 
-    # CPU-verbs backend: both roles, in-process loopback (RDMA-backed; SKIP without rxe0).
+    # CPU-verbs backend: both controller and coprocessor (requires RDMA - skip without rxe0).
     add_executable(runner_tests_transport_cpu)
     target_sources(runner_tests_transport_cpu PRIVATE
         Test_TransportCpuVerbs.cpp
