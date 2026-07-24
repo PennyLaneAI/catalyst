@@ -16,20 +16,64 @@
 
 from pathlib import Path
 
+import jax.numpy as jnp
 import pennylane as qp
 import pytest
+from jax.core import ShapedArray
 
 from catalyst.compiler import _quantum_opt
+from catalyst.decomposition.decomposition_rules import (
+    compile_decomposition_rules_wrapper,
+)
 from catalyst.decomposition.precompile_decomposition_rules import (
     get_abstract_args,
     precompile_decomp_rules,
 )
-from catalyst.decomposition.python_decompositions import compile_decomposition_rules_wrapper
+from catalyst.decomposition.type_utils import get_dummy_values_for_container
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
+
+    def test_get_dummy_values_types(self):
+        """Test that get_dummy_values_for_container handles MLIR and Python types correctly."""
+        python_types = [int, float, jnp.dtype("int32"), bool, complex]
+        result = get_dummy_values_for_container(python_types)
+
+        assert result[0].dtype == "int64"
+        assert result[1].dtype == "float64"
+        assert result[2].dtype == "int32"
+        assert result[3].dtype == "bool"
+        assert result[4].dtype == "complex128"
+
+        mlir_types = ["i1", "i32", "f64", "complex<f64>", "complex<f128>"]
+        result = get_dummy_values_for_container(mlir_types)
+
+        assert result[0].dtype == "bool"
+        assert result[1].dtype == "int32"
+        assert result[2].dtype == "float64"
+        assert result[3].dtype == "complex64"
+        assert result[4].dtype == "complex128"
+
+    def test_get_dummy_values_shapes(self):
+        """Test that get_dummy_values_for_container handles MLIR and python shapes correctly."""
+        python_shapes = [bool, [float, float], [int], ShapedArray((4,), "int32")]
+        result = get_dummy_values_for_container(python_shapes)
+        print(result)
+
+        assert result[0].shape == ()
+        assert result[1].shape == (2,)
+        assert result[2].shape == (1,)
+        assert result[3].shape == (4,)
+
+        mlir_types = ["i32", ["f64", "f64"], ["i1", "i1", "i1"]]
+        result = get_dummy_values_for_container(mlir_types)
+        print(result)
+
+        assert result[0].shape == ()
+        assert result[1].shape == (2,)
+        assert result[2].shape == (3,)
 
     def test_paulirot(self):
         """Test that the QPD wrapper correctly returns the IR as a string."""
