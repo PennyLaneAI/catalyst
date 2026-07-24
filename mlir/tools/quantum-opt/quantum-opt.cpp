@@ -44,7 +44,6 @@
 #include "QecLogical/IR/QecLogicalDialect.h"
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "QecPhysical/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RTIO/IR/RTIODialect.h"
@@ -52,6 +51,7 @@
 #include "RegisterAllPasses.h"
 
 #include "Transport/IR/TransportDialect.h"
+#include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
