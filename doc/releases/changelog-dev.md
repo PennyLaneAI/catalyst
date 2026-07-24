@@ -7,9 +7,10 @@
   easier to compile FTQC-style routines that need T-state ancillas on the fly (for example
   TemporaryAND) with ``qjit(capture=True)``.
   [(#3029)](https://github.com/PennyLaneAI/catalyst/pull/3029)
+  [(#3027)](https://github.com/PennyLaneAI/catalyst/pull/3027)
 
   ```python
-  @qjit(capture=True)
+  @qjit  # works with capture=True or capture=False
   @qnode(dev)
   def circuit():
       qb = qp.allocate(state="magic-T")

@@ -1631,7 +1631,7 @@ class ForLoop(HybridOp):
                 partial(inner_trace.new_arg, source_info=current_source_info()), [new_qreg]
             )[0]
             qrp_out = trace_quantum_operations(
-                inner_tape, device, qreg_in, ctx, inner_trace, **kwargs
+                inner_tape, device, qreg_in, ctx, inner_trace, parent_qrp=qrp, **kwargs
             )
             qreg_out = qrp_out.actualize()
 
@@ -1683,8 +1683,10 @@ class ForLoop(HybridOp):
                 apply_reverse_transform=self.apply_reverse_transform,
                 num_implicit_inputs=num_implicit_inputs,
                 preserve_dimensions=not expansion_strategy.input_unshare_variables,
-            )
+            ),
+            num_device_wires=qrp.num_device_wires,
         )
+        qrp2.inherit_dynamic_wire_state(qrp)
         return qrp2
 
 
@@ -1754,7 +1756,7 @@ class WhileLoop(HybridOp):
                 partial(body_trace.new_arg, source_info=current_source_info()), [AbstractQreg()]
             )[0]
             qrp_out = trace_quantum_operations(
-                body_tape, device, qreg_in, ctx, body_trace, **kwargs
+                body_tape, device, qreg_in, ctx, body_trace, parent_qrp=qrp, **kwargs
             )
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(
@@ -1804,8 +1806,10 @@ class WhileLoop(HybridOp):
                 body_nconsts=len(body_consts),
                 num_implicit_inputs=num_implicit_inputs,
                 preserve_dimensions=not expansion_strategy.input_unshare_variables,
-            )
+            ),
+            num_device_wires=qrp.num_device_wires,
         )
+        qrp2.inherit_dynamic_wire_state(qrp)
         return qrp2
 
 
@@ -1888,7 +1892,13 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
                 partial(region.trace.new_arg, source_info=current_source_info()), [new_qreg]
             )[0]
             qreg_out = trace_quantum_operations(
-                region.quantum_tape, device, qreg_in, ctx, region.trace, **kwargs
+                region.quantum_tape,
+                device,
+                qreg_in,
+                ctx,
+                region.trace,
+                parent_qrp=qrp,
+                **kwargs,
             ).actualize()
 
             constants = []
@@ -1928,6 +1938,8 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
             out_expanded_tracers=out_expanded_classical_tracers,
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=num_implicit_outputs[0],
-        )
+        ),
+        num_device_wires=qrp.num_device_wires,
     )
+    qrp2.inherit_dynamic_wire_state(qrp)
     return qrp2

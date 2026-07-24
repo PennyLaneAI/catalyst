@@ -208,9 +208,24 @@ class Box:
         return self.id < other.id
 
 
+def _eqn_invar_counts(eqn: JaxprEqn) -> Set[int]:
+    """Return the set of JAX variable ids used as inputs to an equation."""
+    counts: Set[int] = set()
+    for v in eqn.invars:
+        if hasattr(v, "val") and isinstance(v.val, jax._src.core.Var):
+            actual_var = v.val
+        elif isinstance(v, jax._src.core.Var):
+            actual_var = v
+        else:
+            continue
+        counts.add(actual_var.count)
+    return counts
+
+
 def sort_eqns(
     eqns: List[JaxprEqn | Callable[[], JaxprEqn]],
     forced_order_primitives: Set[JaxprPrimitive],
+    dealloc_after_use_primitives: Set[JaxprPrimitive] | None = None,
 ) -> List[JaxprEqn | Callable[[], JaxprEqn]]:
     """Topologically sort TracingEqns in a unsorted list of equations, based on their
     input/output variables and additional criterias."""
@@ -252,6 +267,17 @@ def sort_eqns(
     for i, q in fixedorder:
         for b in boxes[i + 1 :]:
             b.parents.append(q)  # [3]
+
+    if dealloc_after_use_primitives:
+        for b in boxes:
+            if b.e.primitive not in dealloc_after_use_primitives:
+                continue
+            dealloc_invars = _eqn_invar_counts(b.e)
+            for other in boxes:
+                if other is b:
+                    continue
+                if dealloc_invars & _eqn_invar_counts(other.e):
+                    b.parents.append(other)
 
     sorted_boxes = stable_toposort(boxes)
 
