@@ -261,6 +261,7 @@ def _allocate_prim_lowering(jax_ctx: mlir.LoweringRuleContext, *, num_wires, sta
             for _ in range(num_wires)
         ]
 
+    # PL allocate_prim passes a static num_wires (capture cannot produce a dynamic wire count).
     size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), num_wires)
     qreg_type = ir.OpaqueType.get("qref", f"reg<{num_wires}>", ctx)
     qreg = AllocOp(qreg_type, nqubits_attr=size_attr).results[0]

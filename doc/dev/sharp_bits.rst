@@ -1382,8 +1382,8 @@ Currently, however, this is not the case for the following functionalities.
     initialization (see below).
 
   - Magic state allocation via ``state="magic-T"`` or ``state="magic-T-adj"`` is
-    supported in Catalyst provided program capture is used (``qjit(capture=True)``).
-    PennyLane also supports these allocation modes; the Catalyst-specific behaviour
+    supported in Catalyst, provided program capture is used (``qjit(capture=True)``).
+    PennyLane currently does not support allocating magic states; the Catalyst-specific behaviour
     is that dynamically allocated wires are tracked separately from device wires
     (see below).
 

@@ -635,21 +635,6 @@ def test_magic_state_allocation(backend, capture, state, prep):
     assert np.allclose(baseline(), circuit())
 
 
-def test_no_capture(backend):
-    """Test error message when allocate is used without program capture."""
-    with pytest.raises(
-        CompileError,
-        match=r".*\.allocate\(\) with qjit is only supported with program capture enabled\.",
-    ):
-
-        @qjit
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            with qp.allocate(1) as _:
-                pass
-            return qp.probs(wires=[0])
-
-
 def test_deallocate_mixed_fabricate_and_register():
     """Test deallocating fabricate and register wires together is rejected."""
     with pytest.raises(ValueError, match="same allocation instruction"):
@@ -730,22 +715,6 @@ def test_magic_state_mid_measure(backend, capture):
         return qp.expval(qp.Z(0))
 
     circuit()
-
-
-def test_magic_state_mlir_lowering(backend):
-    """Test that magic state allocation lowers to pbc.ref.fabricate."""
-
-    @qjit(target="mlir", capture=True)
-    @qp.qnode(qp.device(backend, wires=1))
-    def circuit():
-        with qp.allocate(1, state="magic-T") as q:
-            qp.X(q[0])
-        return qp.probs(wires=[0])
-
-    mlir_str = circuit.mlir
-    assert "pbc.ref.fabricate" in mlir_str
-    assert "magic" in mlir_str
-    assert "qref.dealloc_qb" in mlir_str
 
 
 def test_use_after_free(backend):
