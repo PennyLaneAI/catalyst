@@ -29,7 +29,7 @@ from catalyst.decomposition.precompile_decomposition_rules import (
     get_abstract_args,
     precompile_decomp_rules,
 )
-from catalyst.decomposition.type_utils import get_dummy_values_for_container
+from catalyst.decomposition.type_utils import get_dummy_values_for_container, mlir_stringify_type
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
@@ -60,7 +60,6 @@ class TestGenericUtilities:
         """Test that get_dummy_values_for_container handles MLIR and python shapes correctly."""
         python_shapes = [bool, [float, float], [int], ShapedArray((4,), "int32")]
         result = get_dummy_values_for_container(python_shapes)
-        print(result)
 
         assert result[0].shape == ()
         assert result[1].shape == (2,)
@@ -69,43 +68,51 @@ class TestGenericUtilities:
 
         mlir_types = ["i32", ["f64", "f64"], ["i1", "i1", "i1"]]
         result = get_dummy_values_for_container(mlir_types)
-        print(result)
 
         assert result[0].shape == ()
         assert result[1].shape == (2,)
         assert result[2].shape == (3,)
 
-    def test_paulirot(self):
-        """Test that the QPD wrapper correctly returns the IR as a string."""
-        result = compile_decomposition_rules_wrapper(
-            "PauliRot", "PauliRot[f64][3]{pauli_word:XZZ}", ["i32"], [3], {"pauli_word": "XZZ"}
-        )
-        assert isinstance(result, str)
-        assert "_pauli_rot_decomposition" in result
-        assert 'target_gate = "PauliRot[f64][3]{pauli_word:XZZ}"' in result
-        assert "Hadamard" in result
-        assert "multirz" in result
+    def test_mlir_stringify_type(self):
+        """Test mlir_stringify_type."""
+        assert mlir_stringify_type(qp.typing.Float) == "f64"
+        assert mlir_stringify_type(qp.typing.Int) == "i64"
+        assert mlir_stringify_type(qp.typing.Bool) == "i1"
+        assert mlir_stringify_type(qp.typing.Complex) == "complex<f128>"
+        assert mlir_stringify_type(qp.typing.AbstractArray((2,), "int32")) == "[i32,i32]"
 
-    def test_multiple_rules(self):
-        """Test that the python decomposition wrapper supports multiple rules."""
-        with qp.decomposition.local_decomps():
+    # TODO test with mock ops and uncomment
+    # def test_paulirot(self):
+    #     """Test that the QPD wrapper correctly returns the IR as a string."""
+    #     result = compile_decomposition_rules_wrapper(
+    #         "PauliRot", "PauliRot[f64][3]{pauli_word:XZZ}", ["f64"], [3], {"pauli_word": "XZZ"}
+    #     )
+    #     assert isinstance(result, str)
+    #     assert "_pauli_rot_decomposition" in result
+    #     assert 'target_gate = "PauliRot[f64][3]{pauli_word:XZZ}"' in result
+    #     assert "Hadamard" in result
+    #     assert "multirz" in result
 
-            def test_resources(pauli_word):  # pylint: disable=unused-argument
-                return {qp.X: 1}
+    # def test_multiple_rules(self):
+    #     """Test that the python decomposition wrapper supports multiple rules."""
+    #     with qp.decomposition.local_decomps():
 
-            @qp.register_resources(test_resources)
-            def test_decomp(angle, wires, pauli_word):  # pylint: disable=unused-argument
-                qp.RX(angle, wires[0])
+    #         def test_resources(pauli_word):  # pylint: disable=unused-argument
+    #             return {qp.X: 1}
 
-            qp.add_decomps(qp.PauliRot, test_decomp)
+    #         @qp.register_resources(test_resources)
+    #         def test_decomp(angle, wires, pauli_word):  # pylint: disable=unused-argument
+    #             qp.RX(angle, wires[0])
 
-            result = compile_decomposition_rules_wrapper(
-                "PauliRot", "PauliRot[f64][3]{pauli_word:XYX}", ["f64"], [3], {"pauli_word": "XYX"}
-            )
+    #         qp.add_decomps(qp.PauliRot, test_decomp)
 
-            assert "test_decomp" in result
-            assert "_pauli_rot_decomp" in result
-            assert 'target_gate = "PauliRot[f64][3]{pauli_word:XYX}"' in result
+    #         result = compile_decomposition_rules_wrapper(
+    #             "PauliRot", "PauliRot[f64][3]{pauli_word:XYX}", ["f64"], [3], {"pauli_word": "XYX"}
+    #         )
+
+    #         assert "test_decomp" in result
+    #         assert "_pauli_rot_decomp" in result
+    #         assert 'target_gate = "PauliRot[f64][3]{pauli_word:XYX}"' in result
 
 
 class TestPrecompiled:

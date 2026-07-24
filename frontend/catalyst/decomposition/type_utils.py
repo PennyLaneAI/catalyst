@@ -34,7 +34,8 @@ _MLIR_DTYPES_TO_PY_DTYPES = {
 _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
 
 
-def _stringify_shaped_type(shape: tuple, dim: int, element_type):
+def _stringify_shaped_type(shape: tuple, dim: int, element_type) -> str:
+    """Return a string representation of the given shaped data type."""
     if dim + 1 == len(shape):
         inner_content = _PY_DTYPES_TO_MLIR_DTYPES[element_type]
     else:
@@ -45,7 +46,9 @@ def _stringify_shaped_type(shape: tuple, dim: int, element_type):
 
 def mlir_stringify_type(dtype: qp.typing.AbstractArray):
     """Return a string representation of the given data type."""
-    assert isinstance(dtype, qp.typing.AbstractArray)
+    assert isinstance(
+        dtype, qp.typing.AbstractArray
+    ), f"Expected an AbstractArray to stringify, got {dtype}"
     element_type = dtype.dtype.type
     if dtype.shape == ():
         return _PY_DTYPES_TO_MLIR_DTYPES[element_type]
