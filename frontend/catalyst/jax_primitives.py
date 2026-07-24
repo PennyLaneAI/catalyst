@@ -156,6 +156,11 @@ from catalyst.jax_extras import (
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
+from catalyst.resource_hints import (
+    set_estimated_iterations_attr,
+    set_estimated_probabilities_attr,
+    set_estimated_probability_attr,
+)
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
 
@@ -2223,6 +2228,7 @@ def _cond_lowering(
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
     num_implicit_outputs: int,
+    estimated_probability: float | None = None,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
@@ -2285,6 +2291,8 @@ def _cond_lowering(
             return if_op_scf
 
     head_if_op = emit_branches(preds, branch_jaxprs, jax_ctx.module_context.ip.current)
+    if estimated_probability is not None:
+        set_estimated_probability_attr(head_if_op.operation, estimated_probability)
     return head_if_op.results
 
 
@@ -2294,6 +2302,7 @@ def _pl_cond_lowering(
     jaxpr_branches,
     consts_slices,
     args_slice,
+    estimated_probability: float | None = None,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(jaxpr_branches)
@@ -2375,6 +2384,8 @@ def _pl_cond_lowering(
     head_if_op = emit_branches(
         preds, jaxpr_branches, consts_slices, jax_ctx.module_context.ip.current
     )
+    if estimated_probability is not None:
+        set_estimated_probability_attr(head_if_op.operation, estimated_probability)
     return head_if_op.results
 
 
@@ -2404,6 +2415,7 @@ def _switch_lowering(
     *index_and_cases_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
     num_implicit_outputs: int,
+    estimated_probabilities: tuple[float, ...] | None = None,
 ):
     result_types = [mlir.aval_to_ir_types(outvar)[0] for outvar in branch_jaxprs[0].out_avals]
 
@@ -2421,6 +2433,8 @@ def _switch_lowering(
     )
 
     scf_switch_op = IndexSwitchOp(result_types, index, cases, len(branch_jaxprs) - 1)
+    if estimated_probabilities is not None:
+        set_estimated_probabilities_attr(scf_switch_op.operation, estimated_probabilities)
 
     # construct switch branches
     for i in range(len(branch_jaxprs) - 1):
@@ -2505,6 +2519,7 @@ def _while_loop_lowering(
     body_nconsts: int,
     num_implicit_inputs: int,
     preserve_dimensions: bool,
+    estimated_iterations: int | None = None,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_ir_values(iter_args_plus_consts)
@@ -2526,6 +2541,8 @@ def _while_loop_lowering(
     )
 
     while_op_scf = WhileOp(loop_carry_types, loop_args)
+    if estimated_iterations is not None:
+        set_estimated_iterations_attr(while_op_scf.operation, estimated_iterations)
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*loop_carry_types)
@@ -2582,6 +2599,7 @@ def _pl_while_loop_lowering(
     body_slice,
     cond_slice,
     args_slice,
+    estimated_iterations: int | None = None,
 ):
     body_consts = plxpr_invals[slice(*body_slice)]
     cond_consts = plxpr_invals[slice(*cond_slice)]
@@ -2591,6 +2609,8 @@ def _pl_while_loop_lowering(
     args_types = all_args_types[slice(*args_slice)]
 
     while_op_scf = WhileOp(args_types, args)
+    if estimated_iterations is not None:
+        set_estimated_iterations_attr(while_op_scf.operation, estimated_iterations)
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*args_types)
@@ -2688,6 +2708,7 @@ def _for_loop_lowering(
     apply_reverse_transform: bool,
     num_implicit_inputs: int,
     preserve_dimensions,
+    estimated_iterations: int | None = None,
 ):
     body_consts = iter_args_plus_consts[:body_nconsts]
     body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + num_implicit_inputs]
@@ -2734,6 +2755,8 @@ def _for_loop_lowering(
         lower_bound, upper_bound, step = zero, num_iterations, one
 
     for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
+    if estimated_iterations is not None:
+        set_estimated_iterations_attr(for_op_scf.operation, estimated_iterations)
 
     name_stack = jax_ctx.name_stack.extend("for")
     body_block = for_op_scf.body
@@ -2786,6 +2809,7 @@ def _pl_for_loop_lowering(
     consts_slice,
     args_slice,
     abstract_shapes_slice,
+    estimated_iterations: int | None = None,
 ):
     body_consts = plxpr_invals[slice(*consts_slice)]
     abstract_shapes = plxpr_invals[slice(*abstract_shapes_slice)]
@@ -2798,6 +2822,8 @@ def _pl_for_loop_lowering(
     # slicing out index, as passed to block independently
     loop_args = abstract_shapes + args
     for_op_scf = ForOp(start, stop, step, iter_args=loop_args)
+    if estimated_iterations is not None:
+        set_estimated_iterations_attr(for_op_scf.operation, estimated_iterations)
 
     name_stack = jax_ctx.name_stack.extend("for")
     body_block = for_op_scf.body
