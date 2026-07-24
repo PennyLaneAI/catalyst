@@ -4,6 +4,7 @@ file(GLOB SRC
     TransportToLLVM.cpp
     InjectTransportSession.cpp
     BufferizableOpInterfaceImpl.cpp
+    LowerDecodeToTransport.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
