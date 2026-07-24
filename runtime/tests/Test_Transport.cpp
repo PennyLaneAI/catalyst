@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Unit tests for the transport CAPI session registry
+// Unit tests for the transport CAPI session registry and per-call behavior
 
 #include <cstdint>
 
@@ -81,4 +81,60 @@ TEST_CASE("re-create under the same key overwrites", "[transport]")
 TEST_CASE("get_session on an unregistered role/key returns null", "[transport]")
 {
     CHECK(__catalyst__transport__get_session(kController, "never_created") == nullptr);
+}
+
+TEST_CASE("set_coprocessor_fn: an empty symbol binds the built-in echo", "[transport]")
+{
+    auto *s = make(kCoprocessor, "");
+    REQUIRE(s != nullptr);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "") == CATALYST_TRANSPORT_OK);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, nullptr) == CATALYST_TRANSPORT_OK);
+    __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("set_coprocessor_fn: an unresolved symbol is an error", "[transport]")
+{
+    auto *s = make(kCoprocessor, "");
+    REQUIRE(s != nullptr);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "catalyst_no_such_symbol_xyz") ==
+          CATALYST_TRANSPORT_ERR);
+    __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("set_coprocessor_fn on a controller session is an error", "[transport]")
+{
+    auto *s = make(kController, "");
+    REQUIRE(s != nullptr);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "") == CATALYST_TRANSPORT_ERR);
+    __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("null session arguments are rejected without crashing", "[transport]")
+{
+    CHECK(__catalyst__transport__connect(nullptr, "127.0.0.1", 0) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__exchange_keys(nullptr) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__establish_channel(nullptr, "cpu_verbs") == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__set_coprocessor_fn(nullptr, "") == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__commit_work_item(nullptr, 0, 0, 0) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__kick(nullptr, 0) == CATALYST_TRANSPORT_ERR);
+    std::uint8_t buf[4] = {};
+    CHECK(__catalyst__transport__collect(nullptr, buf, sizeof(buf)) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__data_slot(nullptr) == nullptr);
+    CHECK(__catalyst__transport__last_rtt_ns(nullptr) == 0);
+    // The void entry points must simply not crash on null.
+    __catalyst__transport__start(nullptr);
+    __catalyst__transport__stop(nullptr);
+    __catalyst__transport__destroy(nullptr);
+    SUCCEED();
+}
+
+TEST_CASE("commit_work_item rejects a reply larger than the provisioned region", "[transport]")
+{
+    auto *s = make(kController, "");
+    REQUIRE(s != nullptr);
+    // exchange_keys provisions the local reply region (the stub reports a zero-size region).
+    REQUIRE(__catalyst__transport__exchange_keys(s) == CATALYST_TRANSPORT_OK);
+    CHECK(__catalyst__transport__commit_work_item(s, 0, 0, 1) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__commit_work_item(s, 0, 0, 0) == CATALYST_TRANSPORT_OK);
+    __catalyst__transport__destroy(s);
 }
