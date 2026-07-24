@@ -679,19 +679,17 @@ def test_allocate_state_any_unsupported():
             return qp.expval(qp.Z(0))
 
 
-def test_allocate_restored_unsupported():
-    """Test error when allocating with restored=True."""
+def test_allocate_restored_flag_ignored():
+    """Test that restored=True is ignored (PennyLane work-wire metadata only)."""
 
-    with pytest.raises(
-        CompileError,
-        match="qp.allocate with restored=True is not supported in Catalyst",
-    ):
+    @qjit(capture=True)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit():
+        with qp.allocate(1, restored=True) as w:
+            qp.H(w)
+        return qp.expval(qp.Z(0))
 
-        @qjit(capture=True)
-        @qp.qnode(qp.device("null.qubit", wires=1))
-        def circuit():
-            qp.allocate(1, restored=True)
-            return qp.expval(qp.Z(0))
+    assert "qref.alloc" in circuit.mlir
 
 
 def test_terminal_MP_dynamic_wires(backend):

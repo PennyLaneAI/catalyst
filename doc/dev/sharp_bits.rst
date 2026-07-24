@@ -1376,8 +1376,8 @@ Currently, however, this is not the case for the following functionalities.
 - **Dynamic wire allocation behaviour**: The ``qp.allocate()`` function currently
   behaves differently when Catalyst is present or not. In particular:
 
-  - The ``state="any"`` configuration, as well as the ``restored`` keyword, are not
-    supported by Catalyst and will raise a compilation error. Catalyst supports
+  - The ``state="any"`` configuration is not supported by Catalyst and will raise a
+    compilation error. The ``restored`` keyword is ignored. Catalyst supports
     ``state="zero"`` initialization (the default), as well as magic state
     initialization (see below).
 

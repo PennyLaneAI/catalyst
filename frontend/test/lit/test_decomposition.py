@@ -1414,13 +1414,13 @@ def test_decompose_work_wires_control_flow():
         def true_func():
             qp.CNOT(wires)
 
-            with qp.allocate(2, state="any", restored=True) as w:
+            with qp.allocate(2, state="zero") as w:
                 for _ in range(2):
                     qp.H(w[0])
                     qp.X(w[1])
 
         def false_func():
-            with qp.allocate(1, state="any", restored=False) as w:
+            with qp.allocate(1, state="zero") as w:
                 qp.H(w)
 
                 m = qp.measure(wires[0])
@@ -1535,7 +1535,7 @@ def test_num_work_wires():
         def true_func():
             qp.CNOT(wires)
 
-            with qp.allocate(2, state="any", restored=True) as w:
+            with qp.allocate(2, state="zero") as w:
                 qp.H(w[0])
                 qp.H(w[0])
                 qp.X(w[1])
@@ -1544,7 +1544,7 @@ def test_num_work_wires():
             return
 
         def false_func():
-            with qp.allocate(1, state="any", restored=False) as w:
+            with qp.allocate(1, state="zero") as w:
                 qp.H(w)
 
             m = qp.measure(wires[0])

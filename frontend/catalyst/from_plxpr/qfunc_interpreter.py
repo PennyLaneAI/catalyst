@@ -470,8 +470,9 @@ def handle_allocate(self, *, num_wires, state=None, restored=False):
             'qp.allocate with state="any" is not supported in Catalyst. '
             'Use state="zero" (default), state="magic-T", or state="magic-T-adj".'
         )
-    if restored:
-        raise CompileError("qp.allocate with restored=True is not supported in Catalyst.")
+    # Catalyst does not track wire-restore semantics; zero/magic allocations behave the same
+    # regardless of PennyLane's ``restored`` flag (including decomposition work wires).
+    restored = False
     return list(
         qp.allocation.allocate_prim.bind(
             num_wires=num_wires,
