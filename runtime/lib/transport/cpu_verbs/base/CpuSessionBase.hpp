@@ -1,3 +1,17 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 #include <atomic>
 #include <cstdint>
@@ -18,7 +32,7 @@
 #include "Transport.hpp"
 #include "WireProtocol.hpp"
 
-namespace rdma::devices::cpu_libibverbs {
+namespace catalyst::transport::cpu_verbs {
 using namespace catalyst::transport;
 
 // Shared lifecycle for coprocessor and controller roles.
@@ -33,7 +47,7 @@ class CpuSessionBase : public TransportSession {
     void establish_channel(const ChannelDesc &desc, const MemRegion &local,
                            const PeerRef &peer) override;
     void start() override;
-    int collect(void *const *outputs, const std::uint64_t *output_bytes, std::size_t n) override;
+    int collect(void *replies, std::uint64_t bytes) override;
     void stop() override;
 
   protected:
@@ -73,4 +87,4 @@ class CpuSessionBase : public TransportSession {
     std::jthread engine_;
 };
 
-} // namespace rdma::devices::cpu_libibverbs
+} // namespace catalyst::transport::cpu_verbs

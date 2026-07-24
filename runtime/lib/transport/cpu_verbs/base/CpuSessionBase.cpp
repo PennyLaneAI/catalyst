@@ -1,3 +1,17 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "CpuSessionBase.hpp"
 
 #include <algorithm>
@@ -11,9 +25,9 @@
 #include "Handshake.hpp"
 #include "WireProtocol.hpp"
 
-namespace rdma::devices::cpu_libibverbs {
+namespace catalyst::transport::cpu_verbs {
 using namespace catalyst::transport;
-using namespace rdma::devices::common;
+using namespace catalyst::transport::common;
 
 namespace {
 // RDMA device port; rxe0 is single-port -> 1.
@@ -205,7 +219,7 @@ void CpuSessionBase::start()
     engine_ = std::jthread(body);
 }
 
-int CpuSessionBase::collect(void *const *outputs, const std::uint64_t *output_bytes, std::size_t n)
+int CpuSessionBase::collect(void *replies, std::uint64_t bytes)
 {
     while (completed_.load(std::memory_order_acquire) == 0) {
         if (failed_.load(std::memory_order_acquire))
@@ -219,11 +233,10 @@ int CpuSessionBase::collect(void *const *outputs, const std::uint64_t *output_by
     // Stopped before any round completed -> no data (non-exceptional).
     if (completed_.load(std::memory_order_acquire) == 0)
         return -1;
-    if (n > 0 && outputs && outputs[0]) {
+    if (replies) {
         const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
-        const std::size_t nb =
-            output_bytes ? std::min<std::size_t>(output_bytes[0], sizeof(w)) : sizeof(w);
-        std::memcpy(outputs[0], &w, nb);
+        const std::size_t nb = std::min<std::size_t>(bytes, sizeof(w));
+        std::memcpy(replies, &w, nb);
     }
     return 0;
 }
@@ -236,4 +249,4 @@ void CpuSessionBase::stop()
     }
 }
 
-} // namespace rdma::devices::cpu_libibverbs
+} // namespace catalyst::transport::cpu_verbs

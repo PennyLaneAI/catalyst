@@ -1,3 +1,17 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "CpuCoprocessorSession.hpp"
 
 #include <cstring>
@@ -5,8 +19,8 @@
 
 #include "WireProtocol.hpp"
 
-namespace rdma::devices::cpu_libibverbs {
-using namespace rdma::devices::common;
+namespace catalyst::transport::cpu_verbs {
+using namespace catalyst::transport::common;
 
 void CpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx)
 {
@@ -45,4 +59,4 @@ void CpuCoprocessorSession::Impl::run(std::stop_token st)
     reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/true);
 }
 
-} // namespace rdma::devices::cpu_libibverbs
+} // namespace catalyst::transport::cpu_verbs

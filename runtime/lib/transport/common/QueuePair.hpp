@@ -1,3 +1,17 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 #include <cstdint>
 #include <memory>
@@ -8,7 +22,7 @@
 #include "ProtectionDomain.hpp"
 #include "QpState.hpp"
 
-namespace rdma::devices::common {
+namespace catalyst::transport::common {
 class QueuePair {
   public:
     QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,
@@ -35,4 +49,4 @@ class QueuePair {
     ibv_qp *qp_ = nullptr;
     QpState state_ = QpState::RESET;
 };
-} // namespace rdma::devices::common
+} // namespace catalyst::transport::common

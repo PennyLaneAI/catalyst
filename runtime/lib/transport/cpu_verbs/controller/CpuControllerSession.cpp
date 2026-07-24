@@ -1,3 +1,17 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "CpuControllerSession.hpp"
 
 #include <algorithm>
@@ -7,8 +21,8 @@
 
 #include "WireProtocol.hpp"
 
-namespace rdma::devices::cpu_libibverbs {
-using namespace rdma::devices::common;
+namespace catalyst::transport::cpu_verbs {
+using namespace catalyst::transport::common;
 
 namespace {
 std::uint64_t now_ns()
@@ -63,8 +77,7 @@ int CpuControllerSession::Impl::kick(std::uint32_t /*work_item_idx*/)
     return 0;
 }
 
-int CpuControllerSession::Impl::collect(void *const *outputs, const std::uint64_t *output_bytes,
-                                        std::size_t n)
+int CpuControllerSession::Impl::collect(void *replies, std::uint64_t bytes)
 {
     std::stop_token none; // blocking wait for this round's reply
     Payload *r = poll_message_arrival(next_recv_, none);
@@ -72,12 +85,11 @@ int CpuControllerSession::Impl::collect(void *const *outputs, const std::uint64_
         return -1;
     rtt_ns_ = now_ns() - kick_ns_;
     ++next_recv_;
-    if (n > 0 && outputs && outputs[0]) {
-        const std::size_t cap = output_bytes ? output_bytes[0] : out_bytes_;
-        const std::size_t nb = std::min<std::size_t>(cap, sizeof(r->value));
-        std::memcpy(outputs[0], &r->value, nb);
+    if (replies) {
+        const std::size_t nb = std::min<std::size_t>(bytes, sizeof(r->value));
+        std::memcpy(replies, &r->value, nb);
     }
     return 0;
 }
 
-} // namespace rdma::devices::cpu_libibverbs
+} // namespace catalyst::transport::cpu_verbs

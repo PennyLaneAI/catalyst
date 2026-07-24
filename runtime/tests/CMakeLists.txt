@@ -166,3 +166,31 @@ target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
 )
 
 catch_discover_tests(runner_tests_rsdecomp_runtime)
+
+# Transport test suites (RDMA-backed; individual tests SKIP without an rxe0 device)
+if(ENABLE_TRANSPORT)
+    # Device-agnostic common primitives
+    add_executable(runner_tests_transport_common)
+    target_sources(runner_tests_transport_common PRIVATE
+        Test_TransportCommon.cpp
+        Test_TransportWireProtocol.cpp
+    )
+    target_link_libraries(runner_tests_transport_common PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        transport_common
+    )
+    catch_discover_tests(runner_tests_transport_common)
+
+    # CPU-verbs backend (both roles, in-process loopback)
+    add_executable(runner_tests_transport_cpu)
+    target_sources(runner_tests_transport_cpu PRIVATE
+        Test_TransportCpuVerbs.cpp
+    )
+    target_link_libraries(runner_tests_transport_cpu PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        cpu_verbs_impl
+    )
+    catch_discover_tests(runner_tests_transport_cpu)
+endif()

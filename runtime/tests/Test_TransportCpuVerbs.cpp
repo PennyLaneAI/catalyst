@@ -1,3 +1,17 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -12,8 +26,8 @@
 #include "WireProtocol.hpp"
 
 using namespace catalyst::transport;
-using namespace rdma::devices::cpu_libibverbs;
-using namespace rdma::devices::common; // DEMO_SYNDROME, REGION_BYTES
+using namespace catalyst::transport::cpu_verbs;
+using namespace catalyst::transport::common; // DEMO_SYNDROME, REGION_BYTES
 
 static bool have_rxe()
 {
@@ -134,9 +148,7 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
         coproc.establish_channel(desc, m, p);
         coproc.set_coprocessor_fn(nullptr, nullptr); // built-in echo
         coproc.start();
-        void *outs[1] = {&coproc_got};
-        std::uint64_t obytes[1] = {sizeof(coproc_got)};
-        coproc.collect(outs, obytes, 1);
+        coproc.collect(&coproc_got, sizeof(coproc_got));
         coproc.stop();
     });
     CpuControllerSession controller("rxe0", 1);
@@ -158,9 +170,7 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
     std::memcpy(controller.data_slot(), &syndrome, sizeof(syndrome));
     controller.kick(0);
     std::uint64_t controller_got = 0;
-    void *outs[1] = {&controller_got};
-    std::uint64_t obytes[1] = {sizeof(controller_got)};
-    controller.collect(outs, obytes, 1);
+    controller.collect(&controller_got, sizeof(controller_got));
     controller.stop();
     t.join();
 
@@ -192,9 +202,7 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
         coproc.set_coprocessor_fn(invert_fn, nullptr);
         coproc.start();
         std::uint64_t got = 0;
-        void *outs[1] = {&got};
-        std::uint64_t obytes[1] = {sizeof(got)};
-        coproc.collect(outs, obytes, 1);
+        coproc.collect(&got, sizeof(got));
         coproc.stop();
     });
     CpuControllerSession controller("rxe0", 1);
@@ -216,12 +224,10 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
     std::memcpy(controller.data_slot(), &syndrome, sizeof(syndrome));
     controller.kick(0);
     std::uint64_t got = 0;
-    void *outs[1] = {&got};
-    std::uint64_t obytes[1] = {sizeof(got)};
-    controller.collect(outs, obytes, 1);
+    controller.collect(&got, sizeof(got));
     controller.stop();
     t.join();
 
-    REQUIRE(got == ~DEMO_SYNDROME);   // controller received the coprocessor's result
-    REQUIRE(got != DEMO_SYNDROME);    // and it is not a mere echo
+    REQUIRE(got == ~DEMO_SYNDROME); // controller received the coprocessor's result
+    REQUIRE(got != DEMO_SYNDROME);  // and it is not a mere echo
 }

@@ -1,10 +1,24 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 #include <cstddef>
 #include <memory>
 
 #include "CpuSessionBase.hpp"
 
-namespace rdma::devices::cpu_libibverbs {
+namespace catalyst::transport::cpu_verbs {
 
 // Coprocessor role: receives messages, runs the coprocessor function, and
 // returns the result. The function is bound via set_coprocessor_fn; nullptr
@@ -28,10 +42,7 @@ class CpuCoprocessorSession : public CoprocessorSession {
         base_.establish_channel(desc, local, peer);
     }
     void start() override { base_.start(); }
-    int collect(void *const *outputs, const std::uint64_t *output_bytes, std::size_t n) override
-    {
-        return base_.collect(outputs, output_bytes, n);
-    }
+    int collect(void *replies, std::uint64_t bytes) override { return base_.collect(replies, bytes); }
     void stop() override { base_.stop(); }
 
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
@@ -50,4 +61,4 @@ class CpuCoprocessorSession : public CoprocessorSession {
     Impl base_;
 };
 
-} // namespace rdma::devices::cpu_libibverbs
+} // namespace catalyst::transport::cpu_verbs
