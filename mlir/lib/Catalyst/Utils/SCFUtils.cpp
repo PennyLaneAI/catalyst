@@ -76,19 +76,36 @@ int64_t countStaticForOpIterations(scf::ForOp forOp)
     return getNumIterations(l, u, s);
 }
 
-std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp)
+std::optional<double> getEstimatedIterationsAttr(Operation *op)
 {
-    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>(EstimatedIterationsAttrName)) {
-        return estAttr.getValue().getSExtValue();
+    if (auto estAttr = op->getAttrOfType<FloatAttr>(EstimatedIterationsAttrName)) {
+        double value = estAttr.getValueAsDouble();
+        if (value >= 0.0) {
+            return value;
+        }
+        return std::nullopt;
+    }
+    if (auto estAttr = op->getAttrOfType<IntegerAttr>(EstimatedIterationsAttrName)) {
+        if (!estAttr.getValue().isNegative()) {
+            return static_cast<double>(estAttr.getValue().getSExtValue());
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<double> resolveForLoopTripCount(scf::ForOp forOp)
+{
+    if (auto est = getEstimatedIterationsAttr(forOp.getOperation())) {
+        return est;
     }
     if (auto staticTrip = forOp.getStaticTripCount()) {
-        return staticTrip->getSExtValue();
+        return static_cast<double>(staticTrip->getSExtValue());
     }
     auto lb = resolveConstantInt(forOp.getLowerBound());
     auto ub = resolveConstantInt(forOp.getUpperBound());
     auto step = resolveConstantInt(forOp.getStep());
     if (lb && ub && step && *step != 0 && *ub > *lb) {
-        return (*ub - *lb + *step - 1) / *step;
+        return static_cast<double>((*ub - *lb + *step - 1) / *step);
     }
     return std::nullopt;
 }

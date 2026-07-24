@@ -62,13 +62,26 @@ func.func @valid_iterations(%arg0: !quantum.bit, %n: index) {
 
 // -----
 
-func.func @iterations_not_int(%arg0: !quantum.bit, %n: index) {
+// CHECK-LABEL: @valid_iterations_float
+func.func @valid_iterations_float(%arg0: !quantum.bit, %n: index) {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
-    // expected-error @+1 {{'catalyst.estimated_iterations' must be an integer attribute}}
+    // CHECK: catalyst.estimated_iterations = 2.500000e+00
     scf.for %i = %c0 to %n step %c1 {
         scf.yield
-    } {catalyst.estimated_iterations = 1.0 : f64}
+    } {catalyst.estimated_iterations = 2.5 : f64}
+    return
+}
+
+// -----
+
+func.func @iterations_negative_float(%arg0: !quantum.bit, %n: index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    // expected-error @+1 {{'catalyst.estimated_iterations' must be non-negative, but got -1.5}}
+    scf.for %i = %c0 to %n step %c1 {
+        scf.yield
+    } {catalyst.estimated_iterations = -1.5 : f64}
     return
 }
 

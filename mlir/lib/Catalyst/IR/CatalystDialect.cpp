@@ -69,6 +69,27 @@ static LogicalResult verifyProbability(Operation *op, llvm::StringRef attrName, 
     return success();
 }
 
+// Verify a non-negative numeric hint: float or integer attribute.
+static LogicalResult verifyNonNegativeNumber(Operation *op, llvm::StringRef attrName,
+                                             Attribute value)
+{
+    if (auto num = dyn_cast<FloatAttr>(value)) {
+        double v = num.getValueAsDouble();
+        if (v < 0.0) {
+            return op->emitError() << "'" << attrName << "' must be non-negative, but got " << v;
+        }
+        return success();
+    }
+    if (auto num = dyn_cast<IntegerAttr>(value)) {
+        if (num.getValue().isNegative()) {
+            return op->emitError() << "'" << attrName << "' must be non-negative, but got "
+                                   << num.getValue().getSExtValue();
+        }
+        return success();
+    }
+    return op->emitError() << "'" << attrName << "' must be a numeric attribute";
+}
+
 LogicalResult CatalystDialect::verifyOperationAttribute(Operation *op, NamedAttribute attribute)
 {
     llvm::StringRef name = attribute.getName().strref();
@@ -77,15 +98,7 @@ LogicalResult CatalystDialect::verifyOperationAttribute(Operation *op, NamedAttr
         if (!isa<scf::ForOp, scf::WhileOp>(op)) {
             return op->emitError() << "'" << name << "' is only valid on 'scf.for' or 'scf.while'";
         }
-        auto iters = dyn_cast<IntegerAttr>(attribute.getValue());
-        if (!iters) {
-            return op->emitError() << "'" << name << "' must be an integer attribute";
-        }
-        if (iters.getValue().isNegative()) {
-            return op->emitError() << "'" << name << "' must be non-negative, but got "
-                                   << iters.getValue().getSExtValue();
-        }
-        return success();
+        return verifyNonNegativeNumber(op, name, attribute.getValue());
     }
 
     if (name == EstimatedProbabilityAttrName) {

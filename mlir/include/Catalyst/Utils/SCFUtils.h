@@ -40,10 +40,11 @@ int64_t countStaticForloopIterations(Operation *op);
 int64_t countStaticForOpIterations(scf::ForOp forOp);
 
 // Resolve a for loop's static trip count using, in order of preference:
-//   1. a `catalyst.estimated_iterations` integer attribute,
+//   1. a `catalyst.estimated_iterations` numeric attribute,
 //   2. scf::ForOp::getStaticTripCount(), then
 //   3. recursively-resolved constant lower/upper bounds and step.
 // Returns std::nullopt when the trip count cannot be determined statically.
-std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp);
+std::optional<double> getEstimatedIterationsAttr(Operation *op);
+std::optional<double> resolveForLoopTripCount(scf::ForOp forOp);
 
 } // namespace catalyst

@@ -328,7 +328,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
     // Try to resolve a static trip count.
-    std::optional<int64_t> tripCount = resolveForLoopTripCount(forOp);
+    std::optional<double> tripCount = resolveForLoopTripCount(forOp);
 
     if (tripCount.has_value()) {
         // Record the loop body under a new name (for_loop_1, …).
@@ -357,9 +357,8 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
     ResourceResult bodyResult;
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
 
-    if (auto estAttr = whileOp->getAttrOfType<IntegerAttr>(EstimatedIterationsAttrName)) {
-        int64_t iters = estAttr.getValue().getSExtValue();
-        bodyResult.multiplyByScalar(iters);
+    if (auto est = getEstimatedIterationsAttr(whileOp.getOperation())) {
+        bodyResult.multiplyByScalar(*est);
     }
     else {
         result.hasDynLoop = true;

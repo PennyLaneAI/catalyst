@@ -2542,7 +2542,7 @@ def _while_loop_lowering(
     body_nconsts: int,
     num_implicit_inputs: int,
     preserve_dimensions: bool,
-    estimated_iterations: int | None = None,
+    estimated_iterations: int | float | None = None,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_ir_values(iter_args_plus_consts)
@@ -2622,7 +2622,7 @@ def _pl_while_loop_lowering(
     body_slice,
     cond_slice,
     args_slice,
-    estimated_iterations: int | None = None,
+    estimated_iterations: int | float | None = None,
 ):
     body_consts = plxpr_invals[slice(*body_slice)]
     cond_consts = plxpr_invals[slice(*cond_slice)]
@@ -2731,7 +2731,7 @@ def _for_loop_lowering(
     apply_reverse_transform: bool,
     num_implicit_inputs: int,
     preserve_dimensions,
-    estimated_iterations: int | None = None,
+    estimated_iterations: int | float | None = None,
 ):
     body_consts = iter_args_plus_consts[:body_nconsts]
     body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + num_implicit_inputs]
@@ -2832,7 +2832,7 @@ def _pl_for_loop_lowering(
     consts_slice,
     args_slice,
     abstract_shapes_slice,
-    estimated_iterations: int | None = None,
+    estimated_iterations: int | float | None = None,
 ):
     body_consts = plxpr_invals[slice(*consts_slice)]
     abstract_shapes = plxpr_invals[slice(*abstract_shapes_slice)]

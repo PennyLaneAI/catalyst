@@ -75,7 +75,7 @@ FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp swit
 FailureOr<int64_t> PBCLayerContext::forWorstCaseDepth(scf::ForOp forOp)
 {
     // Same trip-count rules as resource counting (`catalyst.estimated_iterations`, static bounds…).
-    std::optional<int64_t> tripCount = resolveForLoopTripCount(forOp);
+    std::optional<double> tripCount = resolveForLoopTripCount(forOp);
 
     if (!tripCount) {
         if (skipDynamic_) {

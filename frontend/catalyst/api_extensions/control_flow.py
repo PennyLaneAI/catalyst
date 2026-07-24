@@ -267,7 +267,7 @@ def for_loop(
     step,
     allow_array_resizing=False,
     *,
-    estimated_iterations: int | None = None,
+    estimated_iterations: int | float | None = None,
 ):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
@@ -444,7 +444,7 @@ def while_loop(
     cond_fn,
     allow_array_resizing: bool = False,
     *,
-    estimated_iterations: int | None = None,
+    estimated_iterations: int | float | None = None,
 ):
     """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
 
