@@ -21,6 +21,11 @@
   `launch`, `call`, and `close`.
   [(#2909)](https://github.com/PennyLaneAI/catalyst/pull/2909)
 
+  - `--convert-executor-to-llvm` pass that lowers each `executor` op to a call into the
+    `__catalyst__executor__*` C-ABI runtime, marshalling string endpoints, memref descriptors, and
+    per-argument metadata.
+  [(#2910)](https://github.com/PennyLaneAI/catalyst/pull/2910)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
