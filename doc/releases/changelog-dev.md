@@ -31,6 +31,10 @@
 * A `BufferizableOpInterface` implementation is added for the `Transport` dialect ops.
   [(#3064)](https://github.com/PennyLaneAI/catalyst/pull/3064)
 
+* A `lower-decode-to-transport` pass is added, which replaces each qecp.decode_esm_css with 
+  a transport kick/collect round over its buffers.
+  [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
