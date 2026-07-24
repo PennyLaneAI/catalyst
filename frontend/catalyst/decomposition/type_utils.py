@@ -65,6 +65,8 @@ def get_dummy_values_for_container(container):
     Ex.
     [[float, float], [int, int, int], [int32, int32, int32, int32]]
     """
+    if isinstance(container, str):
+        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[container])
 
     def handle_item(item):
         if isinstance(item, (list, tuple)):

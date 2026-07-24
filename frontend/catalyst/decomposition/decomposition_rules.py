@@ -18,6 +18,8 @@ This module provides infrastructure for lowering decomposition rules via python.
 
 # pylint: disable=protected-access,bare-except
 
+from functools import partial
+
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
@@ -59,7 +61,6 @@ class GraphOpID:
             op, qp.core.Operator2
         ), "Graph-based decomposition expects an Operator2 instance"
         self.op = op
-
         self.operator_name = op.name
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
@@ -68,11 +69,14 @@ class GraphOpID:
 
     def parse_dynamic_shape(self) -> list:
         """Return the dynamic shape as a list of dtypes."""
-        return list(self.op.dynamic_args.values())
+        return {
+            argname: mlir_stringify_type(argtype)
+            for argname, argtype in self.op.dynamic_args.items()
+        }
 
     def parse_wire_lens(self) -> list[int]:
         """Return the length of each of the wire args."""
-        return list(map(len, self.op.wire_args.values()))
+        return {wire_name: len(wire_arg) for wire_name, wire_arg in self.op.wire_args.items()}
 
     def parse_static_data(self) -> dict:
         """Return a dictionary of names to static data values."""
@@ -87,11 +91,11 @@ class GraphOpID:
 
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
-        return f"[{','.join(map(mlir_stringify_type, self.dynamic_shape))}]"
+        return f"[{','.join(self.dynamic_shape.values())}]"
 
     def get_wire_lens_id_format(self) -> str:
         """Return the wire lengths formatted for GraphOpId."""
-        return f"[{','.join(map(str, self.wire_lens))}]"
+        return f"[{','.join(map(str, self.wire_lens.values()))}]"
 
     def get_static_data_id_format(self) -> str:
         """Return the static data formatted for GraphOpId."""
@@ -115,7 +119,7 @@ class GraphOpID:
         return ID_string
 
 
-def collect_resources_for_op(op_name, dummy_dynamic_args, dummy_wires, static_data):
+def collect_resources_for_op(op_name, kwargs):
     """
     Return resource data for all decomposition rules associated to op_name.
 
@@ -129,7 +133,7 @@ def collect_resources_for_op(op_name, dummy_dynamic_args, dummy_wires, static_da
     for rule in decomp_rules:
         # The `compute_resources` function's signature is the same as the Operator2 signature
         # for the original op of the rule
-        resources = rule.compute_resources(*dummy_dynamic_args, *dummy_wires, **static_data)
+        resources = rule.compute_resources(**kwargs)
         name_to_resources[rule.name] = resources.gate_counts
         name_to_resource_ids[rule.name] = {
             GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
@@ -144,24 +148,33 @@ def compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static
 
     The decomposition rules will be decorated with appropriate resource and target_gate attributes.
     """
-    device = qp.device("null.qubit", wires=sum(wire_lens))
-    dummy_wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
-    dummy_dynamic_args = get_dummy_values_for_container(dynamic_shape)
+    kwargs = {}
+    device = qp.device("null.qubit", wires=sum(wire_lens.values()))
+    for wire_name, wire_len in wire_lens.items():
+        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
+    for arg_name, arg_shape in dynamic_shape.items():
+        kwargs[arg_name] = get_dummy_values_for_container(arg_shape)
+    kwargs.update(static_data)
 
-    _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
-        op_name, dummy_dynamic_args, dummy_wires, static_data
-    )
+    _, name_to_resource_ids, decomp_rules = collect_resources_for_op(op_name, kwargs)
 
+    # The static_data was only needed to query the correct decomp rule
+    # Once we have the correct rules, don't send them into qjit
     def rule_to_subroutine(rule):
         def decomp_rule(*args, **kwargs):
             rule._impl(*args, **kwargs)
 
-        # keep the frontend name for readability, append target op_id for symbol uniqueness
-        decomp_rule.__name__ = rule._impl.__name__ + "_" + op_id
+        decomp_rule_no_static_args = partial(decomp_rule, **static_data)
 
-        return qp.capture.subroutine(decomp_rule)
+        # keep the frontend name for readability, append target op_id for symbol uniqueness
+        decomp_rule_no_static_args.__name__ = rule._impl.__name__ + "_" + op_id
+
+        return qp.capture.subroutine(decomp_rule_no_static_args)
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
+
+    for static_argname in static_data.keys():
+        del kwargs[static_argname]
 
     @qp.qjit(
         target="mlir",
@@ -170,7 +183,7 @@ def compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            subroutine(*dummy_dynamic_args, wires=dummy_wires)
+            subroutine(**kwargs)
 
     module = circuit.mlir_module
 
