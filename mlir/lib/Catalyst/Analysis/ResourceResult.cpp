@@ -110,15 +110,10 @@ void ResourceResult::multiplyByScalar(double scalar)
 }
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
-// (fractional) count values, although generally they are whole numbers. To keep the output
-// clean only print in floating-point format when the value is non-integral.
+// (fractional) count values, but the JSON output always reports the nearest integer.
 static llvm::json::Value countToJson(double count)
 {
-    double rounded = std::nearbyint(count);
-    if (count == rounded && std::abs(count) < 9.007199254740992e15 /* 2^53 */) {
-        return llvm::json::Value(static_cast<int64_t>(rounded));
-    }
-    return llvm::json::Value(count);
+    return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
 }
 
 llvm::json::Object ResourceResult::toJson() const
