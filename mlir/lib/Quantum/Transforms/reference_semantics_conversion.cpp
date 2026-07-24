@@ -407,6 +407,22 @@ void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTrack
     erasureWorklist.push_back(vPPMOp);
 }
 
+void handleFabricate(IRRewriter &builder, pbc::FabricateOp vFabricateOp, QubitValueTracker &tracker,
+                     SmallVector<Operation *> &erasureWorklist)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vFabricateOp);
+    Location loc = vFabricateOp.getLoc();
+
+    for (Value vQubit : vFabricateOp.getOutQubits()) {
+        auto rFabricateOp = pbc::RefFabricateOp::create(
+            builder, loc, qref::QubitType::get(vFabricateOp.getContext()),
+            vFabricateOp.getInitState());
+        tracker.setRQubit(vQubit, rFabricateOp.getQubit());
+    }
+    erasureWorklist.push_back(vFabricateOp);
+}
+
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
                 SmallVector<Operation *> &erasureWorklist)
 {
@@ -814,6 +830,8 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker, erasureWorklist); })
             .Case<pbc::PPMeasurementOp>(
                 [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::FabricateOp>(
+                [&](auto o) { handleFabricate(builder, o, tracker, erasureWorklist); })
             .Case<quantum::AdjointOp>(
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
             .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker, erasureWorklist); })
