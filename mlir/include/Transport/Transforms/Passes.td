@@ -29,4 +29,17 @@ def ConvertTransportToLLVMPass : Pass<"convert-transport-to-llvm", "mlir::Module
     ];
 }
 
+def InjectTransportSessionPass : Pass<"inject-transport-session", "mlir::ModuleOp"> {
+    let summary = "Emit transport session bring-up/teardown from a catalyst.backline attribute.";
+    let description = [{
+        Reads the `catalyst.backline` module attribute and injects the session
+        lifecycle into the host entry function.
+    }];
+
+    let dependentDialects = [
+        "::catalyst::transport::TransportDialect",
+        "mlir::func::FuncDialect"
+    ];
+}
+
 #endif // TRANSPORT_PASSES
