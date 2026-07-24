@@ -2248,11 +2248,7 @@ def _cond_lowering(
     branch_args_plus_consts = preds_and_branch_args_plus_consts[num_preds:]
     flat_args_plus_consts = mlir.flatten_ir_values(branch_args_plus_consts)
 
-    conditional_probs = (
-        unconditional_to_conditional_if_probs(estimated_probabilities)
-        if estimated_probabilities is not None
-        else None
-    )
+    conditional_probs = unconditional_to_conditional_if_probs(estimated_probabilities)
 
     # recursively lower if-else chains to nested IfOps
     def emit_branches(preds, branch_jaxprs, ip, depth=0):
@@ -2327,11 +2323,7 @@ def _pl_cond_lowering(
     preds = invals[:num_preds]
     args = invals[slice(*args_slice)]
 
-    conditional_probs = (
-        unconditional_to_conditional_if_probs(estimated_probabilities)
-        if estimated_probabilities is not None
-        else None
-    )
+    conditional_probs = unconditional_to_conditional_if_probs(estimated_probabilities)
 
     # recursively lower if-else chains to nested IfOps
     def emit_branches(preds, sub_branches, sub_consts_slices, insertion_point, depth=0):
@@ -2456,8 +2448,7 @@ def _switch_lowering(
     )
 
     scf_switch_op = IndexSwitchOp(result_types, index, cases, len(branch_jaxprs) - 1)
-    if estimated_probabilities is not None:
-        set_estimated_probabilities_attr(scf_switch_op.operation, estimated_probabilities)
+    set_estimated_probabilities_attr(scf_switch_op.operation, estimated_probabilities)
 
     # construct switch branches
     for i in range(len(branch_jaxprs) - 1):
@@ -2564,8 +2555,7 @@ def _while_loop_lowering(
     )
 
     while_op_scf = WhileOp(loop_carry_types, loop_args)
-    if estimated_iterations is not None:
-        set_estimated_iterations_attr(while_op_scf.operation, estimated_iterations)
+    set_estimated_iterations_attr(while_op_scf.operation, estimated_iterations)
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*loop_carry_types)
@@ -2632,8 +2622,7 @@ def _pl_while_loop_lowering(
     args_types = all_args_types[slice(*args_slice)]
 
     while_op_scf = WhileOp(args_types, args)
-    if estimated_iterations is not None:
-        set_estimated_iterations_attr(while_op_scf.operation, estimated_iterations)
+    set_estimated_iterations_attr(while_op_scf.operation, estimated_iterations)
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*args_types)
@@ -2778,8 +2767,7 @@ def _for_loop_lowering(
         lower_bound, upper_bound, step = zero, num_iterations, one
 
     for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
-    if estimated_iterations is not None:
-        set_estimated_iterations_attr(for_op_scf.operation, estimated_iterations)
+    set_estimated_iterations_attr(for_op_scf.operation, estimated_iterations)
 
     name_stack = jax_ctx.name_stack.extend("for")
     body_block = for_op_scf.body
@@ -2845,8 +2833,7 @@ def _pl_for_loop_lowering(
     # slicing out index, as passed to block independently
     loop_args = abstract_shapes + args
     for_op_scf = ForOp(start, stop, step, iter_args=loop_args)
-    if estimated_iterations is not None:
-        set_estimated_iterations_attr(for_op_scf.operation, estimated_iterations)
+    set_estimated_iterations_attr(for_op_scf.operation, estimated_iterations)
 
     name_stack = jax_ctx.name_stack.extend("for")
     body_block = for_op_scf.body

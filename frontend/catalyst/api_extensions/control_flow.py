@@ -66,6 +66,7 @@ from catalyst.jax_tracer import (
     trace_quantum_operations,
     unify_convert_result_types,
 )
+from catalyst.resource_hints import normalize_estimated_probabilities_for_cond
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 from catalyst.utils.patching import Patcher
@@ -796,13 +797,6 @@ class CondCallable:
                 """)
         return self._operation
 
-    def _normalized_estimated_probabilities(self):
-        from catalyst.resource_hints import normalize_estimated_probabilities_for_cond
-
-        return normalize_estimated_probabilities_for_cond(
-            self.estimated_probabilities, len(self.preds)
-        )
-
     def else_if(self, pred):
         """
         Block of code to be run if this predicate evaluates to true, skipping all subsequent
@@ -964,9 +958,10 @@ class CondCallable:
         bind_kwargs = {
             "branch_jaxprs": branch_jaxprs,
             "num_implicit_outputs": out_sigs[0].num_implicit_outputs(),
+            "estimated_probabilities": normalize_estimated_probabilities_for_cond(
+                self.estimated_probabilities, len(self.preds)
+            ),
         }
-        if self.estimated_probabilities is not None:
-            bind_kwargs["estimated_probabilities"] = self._normalized_estimated_probabilities()
 
         out_tracers = cond_p.bind(
             *(in_classical_tracers + sum(all_consts, [])),
@@ -1168,9 +1163,8 @@ class ForLoopCallable:
             "apply_reverse_transform": self.apply_reverse_transform,
             "num_implicit_inputs": in_sig.num_implicit_inputs(),
             "preserve_dimensions": not self.expansion_strategy.input_unshare_variables,
+            "estimated_iterations": self.estimated_iterations,
         }
-        if self.estimated_iterations is not None:
-            bind_kwargs["estimated_iterations"] = self.estimated_iterations
 
         out_expanded_tracers = for_p.bind(
             *in_expanded_tracers,
@@ -1409,9 +1403,8 @@ class SwitchCallable:
         bind_kwargs = {
             "branch_jaxprs": branch_jaxprs,
             "num_implicit_outputs": out_sigs[0].num_implicit_outputs(),
+            "estimated_probabilities": tuple(self.estimated_probabilities),
         }
-        if self.estimated_probabilities is not None:
-            bind_kwargs["estimated_probabilities"] = tuple(self.estimated_probabilities)
 
         out_tracers = switch_p.bind(
             *([self.case] + cases + sum(all_consts, [])),
@@ -1636,9 +1629,8 @@ class WhileLoopCallable:
             "body_nconsts": len(out_body_sig.out_consts()),
             "num_implicit_inputs": in_body_sig.num_implicit_inputs(),
             "preserve_dimensions": not self.expansion_strategy.input_unshare_variables,
+            "estimated_iterations": self.estimated_iterations,
         }
-        if self.estimated_iterations is not None:
-            bind_kwargs["estimated_iterations"] = self.estimated_iterations
 
         out_expanded_tracers = while_p.bind(
             *in_expanded_tracers,
@@ -1755,9 +1747,8 @@ class ForLoop(HybridOp):
             "apply_reverse_transform": self.apply_reverse_transform,
             "num_implicit_inputs": num_implicit_inputs,
             "preserve_dimensions": not expansion_strategy.input_unshare_variables,
+            "estimated_iterations": self.estimated_iterations,
         }
-        if self.estimated_iterations is not None:
-            bind_kwargs["estimated_iterations"] = self.estimated_iterations
 
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
@@ -1882,9 +1873,8 @@ class WhileLoop(HybridOp):
             "body_nconsts": len(body_consts),
             "num_implicit_inputs": num_implicit_inputs,
             "preserve_dimensions": not expansion_strategy.input_unshare_variables,
+            "estimated_iterations": self.estimated_iterations,
         }
-        if self.estimated_iterations is not None:
-            bind_kwargs["estimated_iterations"] = self.estimated_iterations
 
         qrp2 = QRegPromise(
             self.bind_overwrite_classical_tracers(
@@ -2012,13 +2002,10 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
     bind_kwargs = {
         "branch_jaxprs": branch_jaxprs,
         "num_implicit_outputs": num_implicit_outputs[0],
-    }
-    if op.estimated_probabilities is not None:
-        from catalyst.resource_hints import normalize_estimated_probabilities_for_cond
-
-        bind_kwargs["estimated_probabilities"] = normalize_estimated_probabilities_for_cond(
+        "estimated_probabilities": normalize_estimated_probabilities_for_cond(
             op.estimated_probabilities, len(op.in_classical_tracers)
-        )
+        ),
+    }
 
     qrp2 = QRegPromise(
         op.bind_overwrite_classical_tracers(
