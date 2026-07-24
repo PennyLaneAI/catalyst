@@ -65,8 +65,7 @@ def backline_pipeline():
 
 
 def serialize_backline(backline) -> dict:
-    """Serialize a ``Backline`` into the ``catalyst.backline`` attribute dict.
-    """
+    """Serialize a ``Backline`` into the ``catalyst.backline`` attribute dict."""
     result = {
         "transport": backline.transport.name,
         "controller": _executor_dict(backline.controller),
