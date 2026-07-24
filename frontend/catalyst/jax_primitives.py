@@ -160,6 +160,7 @@ from catalyst.resource_hints import (
     set_estimated_iterations_attr,
     set_estimated_probabilities_attr,
     set_estimated_probability_attr,
+    unconditional_to_conditional_if_probs,
 )
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
@@ -2228,7 +2229,7 @@ def _cond_lowering(
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
     num_implicit_outputs: int,
-    estimated_probability: float | None = None,
+    estimated_probabilities: tuple[float, ...] | None = None,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
@@ -2236,13 +2237,21 @@ def _cond_lowering(
     branch_args_plus_consts = preds_and_branch_args_plus_consts[num_preds:]
     flat_args_plus_consts = mlir.flatten_ir_values(branch_args_plus_consts)
 
+    conditional_probs = (
+        unconditional_to_conditional_if_probs(estimated_probabilities)
+        if estimated_probabilities is not None
+        else None
+    )
+
     # recursively lower if-else chains to nested IfOps
-    def emit_branches(preds, branch_jaxprs, ip):
+    def emit_branches(preds, branch_jaxprs, ip, depth=0):
         # ip is an MLIR InsertionPoint. This allows recursive calls to emit their Operations inside
         # the 'else' blocks of preceding IfOps.
         with ip:
             pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
             if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
+            if conditional_probs is not None and depth < len(conditional_probs):
+                set_estimated_probability_attr(if_op_scf.operation, conditional_probs[depth])
             true_jaxpr = branch_jaxprs[0]
             if_block = if_op_scf.then_block
 
@@ -2286,13 +2295,11 @@ def _cond_lowering(
                     YieldOp(out)
             else:
                 with ir.InsertionPoint(else_block) as else_ip:
-                    child_if_op = emit_branches(preds[1:], branch_jaxprs[1:], else_ip)
+                    child_if_op = emit_branches(preds[1:], branch_jaxprs[1:], else_ip, depth + 1)
                     YieldOp(child_if_op.results)
             return if_op_scf
 
     head_if_op = emit_branches(preds, branch_jaxprs, jax_ctx.module_context.ip.current)
-    if estimated_probability is not None:
-        set_estimated_probability_attr(head_if_op.operation, estimated_probability)
     return head_if_op.results
 
 
@@ -2302,15 +2309,21 @@ def _pl_cond_lowering(
     jaxpr_branches,
     consts_slices,
     args_slice,
-    estimated_probability: float | None = None,
+    estimated_probabilities: tuple[float, ...] | None = None,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
-    num_preds = len(jaxpr_branches)
+    num_preds = len(jaxpr_branches) - 1
     preds = invals[:num_preds]
     args = invals[slice(*args_slice)]
 
+    conditional_probs = (
+        unconditional_to_conditional_if_probs(estimated_probabilities)
+        if estimated_probabilities is not None
+        else None
+    )
+
     # recursively lower if-else chains to nested IfOps
-    def emit_branches(preds, sub_branches, sub_consts_slices, insertion_point):
+    def emit_branches(preds, sub_branches, sub_consts_slices, insertion_point, depth=0):
         # closure vars are invals, args, jax_ctx
 
         # ip is an MLIR InsertionPoint. This allows recursive calls to emit their Operations inside
@@ -2318,6 +2331,8 @@ def _pl_cond_lowering(
         with insertion_point:
             pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
             if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
+            if conditional_probs is not None and depth < len(conditional_probs):
+                set_estimated_probability_attr(if_op_scf.operation, conditional_probs[depth])
             true_jaxpr = sub_branches[0]
             if_block = if_op_scf.then_block
 
@@ -2376,7 +2391,7 @@ def _pl_cond_lowering(
             else:
                 with ir.InsertionPoint(else_block) as else_ip:
                     child_if_op = emit_branches(
-                        preds[1:], sub_branches[1:], sub_consts_slices[1:], else_ip
+                        preds[1:], sub_branches[1:], sub_consts_slices[1:], else_ip, depth + 1
                     )
                     YieldOp(child_if_op.results)
             return if_op_scf
@@ -2384,8 +2399,6 @@ def _pl_cond_lowering(
     head_if_op = emit_branches(
         preds, jaxpr_branches, consts_slices, jax_ctx.module_context.ip.current
     )
-    if estimated_probability is not None:
-        set_estimated_probability_attr(head_if_op.operation, estimated_probability)
     return head_if_op.results
 
 

@@ -72,7 +72,7 @@ from catalyst.utils.patching import Patcher
 
 
 ## API ##
-def cond(pred: DynamicJaxprTracer, *, estimated_probability: float | None = None):
+def cond(pred: DynamicJaxprTracer, *, estimated_probabilities: float | list[float] | None = None):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
 
     .. note::
@@ -256,7 +256,7 @@ def cond(pred: DynamicJaxprTracer, *, estimated_probability: float | None = None
         raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
-        return CondCallable(pred, true_fn, estimated_probability=estimated_probability)
+        return CondCallable(pred, true_fn, estimated_probabilities=estimated_probabilities)
 
     return _decorator
 
@@ -776,13 +776,13 @@ class CondCallable:
     (Array([0.25, 0.25, 0.25, 0.25], dtype=float64),)
     """
 
-    def __init__(self, pred, true_fn, estimated_probability=None):
+    def __init__(self, pred, true_fn, estimated_probabilities=None):
         self.preds = [self._convert_predicate_to_bool(pred)]
         self.branch_fns = [true_fn]
         self.otherwise_fn = lambda *args, **kwargs: None
         self._operation = None
         self.expansion_strategy = cond_expansion_strategy()
-        self.estimated_probability = estimated_probability
+        self.estimated_probabilities = estimated_probabilities
 
     @property
     def operation(self):
@@ -795,6 +795,13 @@ class CondCallable:
                 and thus has no associated quantum operation.
                 """)
         return self._operation
+
+    def _normalized_estimated_probabilities(self):
+        from catalyst.resource_hints import normalize_estimated_probabilities_for_cond
+
+        return normalize_estimated_probabilities_for_cond(
+            self.estimated_probabilities, len(self.preds)
+        )
 
     def else_if(self, pred):
         """
@@ -926,7 +933,7 @@ class CondCallable:
             out_classical_tracers,
             regions,
             expansion_strategy=self.expansion_strategy,
-            estimated_probability=self.estimated_probability,
+            estimated_probabilities=self.estimated_probabilities,
         )
         return tree_unflatten(out_tree, out_classical_tracers)
 
@@ -958,8 +965,8 @@ class CondCallable:
             "branch_jaxprs": branch_jaxprs,
             "num_implicit_outputs": out_sigs[0].num_implicit_outputs(),
         }
-        if self.estimated_probability is not None:
-            bind_kwargs["estimated_probability"] = self.estimated_probability
+        if self.estimated_probabilities is not None:
+            bind_kwargs["estimated_probabilities"] = self._normalized_estimated_probabilities()
 
         out_tracers = cond_p.bind(
             *(in_classical_tracers + sum(all_consts, [])),
@@ -2006,10 +2013,12 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
         "branch_jaxprs": branch_jaxprs,
         "num_implicit_outputs": num_implicit_outputs[0],
     }
-    if op.estimated_probability is not None:
-        bind_kwargs["estimated_probability"] = op.estimated_probability
     if op.estimated_probabilities is not None:
-        bind_kwargs["estimated_probabilities"] = tuple(op.estimated_probabilities)
+        from catalyst.resource_hints import normalize_estimated_probabilities_for_cond
+
+        bind_kwargs["estimated_probabilities"] = normalize_estimated_probabilities_for_cond(
+            op.estimated_probabilities, len(op.in_classical_tracers)
+        )
 
     qrp2 = QRegPromise(
         op.bind_overwrite_classical_tracers(
