@@ -12,6 +12,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new `catalyst.debug.compile_mlir` function has been added, allowing standalone MLIR files to be
+  compiled through the full Catalyst pipeline and returned as a callable Python object.
+  [(#2832)](https://github.com/PennyLaneAI/catalyst/pull/2832)
+  
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
 
