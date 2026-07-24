@@ -50,7 +50,9 @@ def Executor_SendBinaryOp : Executor_Op<"send_binary"> {
     let description = [{
         Transfer the compiled binary at `binary_path` over the `session` to the executor.
         The executor loads the file and exposes all of its symbols.
-        `format` selects the wire encoding which is handled by the runtime.
+        `format` selects the wire encoding for the transfer, which is handled by the
+        runtime. Defaults to `0` (the raw object file); other values are reserved for
+        future encodings.
     }];
 
     let arguments = (ins
