@@ -61,6 +61,7 @@ class GraphOpID:
             op, qp.core.Operator2
         ), "Graph-based decomposition expects an Operator2 instance"
         self.op = op
+
         self.operator_name = op.name
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()

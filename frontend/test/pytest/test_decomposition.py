@@ -20,6 +20,7 @@ import jax.numpy as jnp
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
+from pennylane.typing import Wire
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.decomposition_rules import (
@@ -55,6 +56,11 @@ class TestGenericUtilities:
         assert result[2].dtype == "float64"
         assert result[3].dtype == "complex64"
         assert result[4].dtype == "complex128"
+
+        string_type = "f64"
+        result = get_dummy_values_for_container(string_type)
+
+        assert result.dtype == "float64"
 
     def test_get_dummy_values_shapes(self):
         """Test that get_dummy_values_for_container handles MLIR and python shapes correctly."""
