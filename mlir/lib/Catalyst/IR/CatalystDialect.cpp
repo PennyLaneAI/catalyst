@@ -16,7 +16,9 @@
 
 #include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
@@ -46,6 +48,88 @@ void CatalystDialect::initialize()
 
     declarePromisedInterfaces<bufferization::BufferizableOpInterface, PrintOp, CustomCallOp,
                               CallbackCallOp, CallbackOp>();
+}
+
+//===----------------------------------------------------------------------===//
+// Catalyst attributes.
+//===----------------------------------------------------------------------===//
+
+// Verify a probability value: must be a float attribute in the range [0, 1].
+static LogicalResult verifyProbability(Operation *op, llvm::StringRef attrName, Attribute value)
+{
+    auto prob = dyn_cast<FloatAttr>(value);
+    if (!prob) {
+        return op->emitError() << "'" << attrName << "' must be a float attribute";
+    }
+    double p = prob.getValueAsDouble();
+    if (p < 0.0 || p > 1.0) {
+        return op->emitError() << "'" << attrName << "' must be a probability in [0, 1], but got "
+                               << p;
+    }
+    return success();
+}
+
+LogicalResult CatalystDialect::verifyOperationAttribute(Operation *op, NamedAttribute attribute)
+{
+    llvm::StringRef name = attribute.getName().strref();
+
+    if (name == EstimatedIterationsAttrName) {
+        if (!isa<scf::ForOp, scf::WhileOp>(op)) {
+            return op->emitError() << "'" << name << "' is only valid on 'scf.for' or 'scf.while'";
+        }
+        auto iters = dyn_cast<IntegerAttr>(attribute.getValue());
+        if (!iters) {
+            return op->emitError() << "'" << name << "' must be an integer attribute";
+        }
+        if (iters.getValue().isNegative()) {
+            return op->emitError() << "'" << name << "' must be non-negative, but got "
+                                   << iters.getValue().getSExtValue();
+        }
+        return success();
+    }
+
+    if (name == EstimatedProbabilityAttrName) {
+        if (!isa<scf::IfOp>(op)) {
+            return op->emitError() << "'" << name << "' is only valid on 'scf.if'";
+        }
+        return verifyProbability(op, name, attribute.getValue());
+    }
+
+    if (name == EstimatedProbabilitiesAttrName) {
+        auto switchOp = dyn_cast<scf::IndexSwitchOp>(op);
+        if (!switchOp) {
+            return op->emitError() << "'" << name << "' is only valid on 'scf.index_switch'";
+        }
+
+        auto probs = dyn_cast<ArrayAttr>(attribute.getValue());
+        if (!probs) {
+            return op->emitError() << "'" << name << "' must be an array attribute";
+        }
+
+        double sum = 0.0;
+        for (Attribute elem : probs) {
+            if (failed(verifyProbability(op, name, elem))) {
+                return failure();
+            }
+            sum += cast<FloatAttr>(elem).getValueAsDouble();
+        }
+
+        // Allow a small tolerance for floating-point accumulation error.
+        if (sum > 1.0 + 1e-10) {
+            return op->emitError()
+                   << "'" << name << "' entries must sum to at most 1, but got " << sum;
+        }
+
+        // There must be exactly one probability per case region.
+        size_t numCases = switchOp.getCaseRegions().size();
+        if (probs.size() != numCases) {
+            return op->emitError() << "'" << name << "' has " << probs.size()
+                                   << " entries but the switch has " << numCases << " case(s)";
+        }
+        return success();
+    }
+
+    return success();
 }
 
 //===----------------------------------------------------------------------===//

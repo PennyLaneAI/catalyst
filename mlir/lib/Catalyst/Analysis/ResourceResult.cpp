@@ -15,6 +15,7 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 #include "llvm/ADT/Hashing.h"
@@ -32,7 +33,7 @@ namespace catalyst {
 using MergeMethod = ResourceResult::MergeMethod;
 
 /// Helper: select merge function based on method enum.
-static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method)
+template <typename T> static T applyMerge(T a, T b, MergeMethod method)
 {
     switch (method) {
     case MergeMethod::Max:
@@ -45,7 +46,7 @@ static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method)
     llvm_unreachable("unknown ResourceResult::MergeMethod");
 }
 
-// Merge a flat StringMap<int64_t> with a single operator[] per key.
+// Merge a flat StringMap with a single operator[] per key.
 template <typename Map> static void mergeStringMap(Map &dst, const Map &src, MergeMethod method)
 {
     for (const auto &entry : src) {
@@ -86,7 +87,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     hasDynLoop = hasDynLoop || other.hasDynLoop;
 }
 
-void ResourceResult::multiplyByScalar(int64_t scalar)
+void ResourceResult::multiplyByScalar(double scalar)
 {
     for (auto &opEntry : operations) {
         for (auto &sizeEntry : opEntry.getValue()) {
@@ -107,7 +108,20 @@ void ResourceResult::multiplyByScalar(int64_t scalar)
     }
 
     numAllocQubits *= scalar;
-    numArgQubits *= scalar;
+    // TODO: does it make sense to scale the arg qubit number?
+    // numArgQubits *= scalar;
+}
+
+// Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
+// (fractional) count values, although generally they are whole numbers. To keep the output
+// clean only print in floating-point format when the value is non-integral.
+static llvm::json::Value countToJson(double count)
+{
+    double rounded = std::nearbyint(count);
+    if (count == rounded && std::abs(count) < 9.007199254740992e15 /* 2^53 */) {
+        return llvm::json::Value(static_cast<int64_t>(rounded));
+    }
+    return llvm::json::Value(count);
 }
 
 llvm::json::Object ResourceResult::toJson() const
@@ -119,28 +133,28 @@ llvm::json::Object ResourceResult::toJson() const
         StringRef opName = opEntry.getKey();
         for (const auto &sizeEntry : opEntry.getValue()) {
             const auto &[nQubits, nParams] = sizeEntry.first;
-            int64_t count = sizeEntry.second;
+            double count = sizeEntry.second;
             std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
-            opsObj[key] = count;
+            opsObj[key] = countToJson(count);
         }
     }
     funcObj["operations"] = std::move(opsObj);
 
     llvm::json::Object measObj;
     for (const auto &entry : measurements) {
-        measObj[entry.getKey()] = entry.getValue();
+        measObj[entry.getKey()] = countToJson(entry.getValue());
     }
     funcObj["measurements"] = std::move(measObj);
 
     llvm::json::Object classObj;
     for (const auto &entry : classicalInstructions) {
-        classObj[entry.getKey()] = entry.getValue();
+        classObj[entry.getKey()] = countToJson(entry.getValue());
     }
     funcObj["classical_instructions"] = std::move(classObj);
 
     llvm::json::Object fcObj;
     for (const auto &entry : functionCalls) {
-        fcObj[entry.getKey()] = entry.getValue();
+        fcObj[entry.getKey()] = countToJson(entry.getValue());
     }
     funcObj["function_calls"] = std::move(fcObj);
 
@@ -150,9 +164,9 @@ llvm::json::Object ResourceResult::toJson() const
     }
     funcObj["var_function_calls"] = std::move(vfcObj);
 
-    funcObj["num_qubits"] = static_cast<int64_t>(numQubits());
-    funcObj["num_alloc_qubits"] = static_cast<int64_t>(numAllocQubits);
-    funcObj["num_arg_qubits"] = static_cast<int64_t>(numArgQubits);
+    funcObj["num_qubits"] = countToJson(numQubits());
+    funcObj["num_alloc_qubits"] = countToJson(numAllocQubits);
+    funcObj["num_arg_qubits"] = numArgQubits;
     funcObj["device_name"] = deviceName;
     funcObj["qnode"] = isQnode;
     funcObj["has_branches"] = hasBranches;
@@ -188,6 +202,7 @@ llvm::json::Object ResourceResult::toJson() const
  */
 DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
 {
+    // TODO: maintain int counts here for now, but this whole function is deprecated
     SmallVector<NamedAttribute> entries;
 
     // operations
@@ -196,7 +211,7 @@ DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
         llvm::StringRef opName = opEntry.getKey();
         for (const auto &sizeEntry : opEntry.getValue()) {
             auto &[nQubits, nParams] = sizeEntry.first;
-            int64_t count = sizeEntry.second;
+            int64_t count = static_cast<int64_t>(std::llround(sizeEntry.second));
             std::string key =
                 (opName + "(" + std::to_string(nQubits) + "," + std::to_string(nParams) + ")")
                     .str();
@@ -210,9 +225,9 @@ DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
     // measurements
     SmallVector<NamedAttribute> measEntries;
     for (const auto &entry : result.measurements) {
-        measEntries.push_back(
-            NamedAttribute(StringAttr::get(ctx, entry.getKey()),
-                           IntegerAttr::get(IntegerType::get(ctx, 64), entry.getValue())));
+        int64_t count = static_cast<int64_t>(std::llround(entry.getValue()));
+        measEntries.push_back(NamedAttribute(StringAttr::get(ctx, entry.getKey()),
+                                             IntegerAttr::get(IntegerType::get(ctx, 64), count)));
     }
     entries.push_back(NamedAttribute(StringAttr::get(ctx, "measurements"),
                                      DictionaryAttr::get(ctx, measEntries)));
@@ -220,13 +235,15 @@ DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
     // scalars
     entries.push_back(
         NamedAttribute(StringAttr::get(ctx, "num_qubits"),
-                       IntegerAttr::get(IntegerType::get(ctx, 64), result.numQubits())));
+                       IntegerAttr::get(IntegerType::get(ctx, 64),
+                                        static_cast<int64_t>(std::llround(result.numQubits())))));
     entries.push_back(
         NamedAttribute(StringAttr::get(ctx, "num_arg_qubits"),
                        IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
-    entries.push_back(
-        NamedAttribute(StringAttr::get(ctx, "num_alloc_qubits"),
-                       IntegerAttr::get(IntegerType::get(ctx, 64), result.numAllocQubits)));
+    entries.push_back(NamedAttribute(
+        StringAttr::get(ctx, "num_alloc_qubits"),
+        IntegerAttr::get(IntegerType::get(ctx, 64),
+                         static_cast<int64_t>(std::llround(result.numAllocQubits)))));
 
     return DictionaryAttr::get(ctx, entries);
 }

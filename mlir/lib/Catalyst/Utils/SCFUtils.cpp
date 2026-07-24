@@ -20,6 +20,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/ConstantResolve.h"
 
 using namespace mlir;
@@ -77,7 +78,7 @@ int64_t countStaticForOpIterations(scf::ForOp forOp)
 
 std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp)
 {
-    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
+    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>(EstimatedIterationsAttrName)) {
         return estAttr.getValue().getSExtValue();
     }
     if (auto staticTrip = forOp.getStaticTripCount()) {

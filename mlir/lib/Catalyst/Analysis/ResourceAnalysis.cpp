@@ -16,6 +16,8 @@
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 #include "llvm/ADT/DenseSet.h"
@@ -29,6 +31,7 @@
 #include "mlir/IR/Operation.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/SCFUtils.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
@@ -354,7 +357,7 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
     ResourceResult bodyResult;
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
 
-    if (auto estAttr = whileOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
+    if (auto estAttr = whileOp->getAttrOfType<IntegerAttr>(EstimatedIterationsAttrName)) {
         int64_t iters = estAttr.getValue().getSExtValue();
         bodyResult.multiplyByScalar(iters);
     }
@@ -372,6 +375,27 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     ResourceResult thenResult;
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint);
 
+    // If a branch probability hint is present, compute the expected (average) resource counts
+    // weighted by the probability, rather than the worst case.
+    // `catalyst.estimated_probability` is the probability that the condition is true.
+    if (auto probAttr = ifOp->getAttrOfType<FloatAttr>(EstimatedProbabilityAttrName)) {
+        double pThen = probAttr.getValueAsDouble();
+        double pElse = 1.0 - pThen;
+
+        ResourceResult elseResult;
+        if (!ifOp.getElseRegion().empty()) {
+            analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
+        }
+
+        thenResult.multiplyByScalar(pThen);
+        elseResult.multiplyByScalar(pElse);
+        thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Sum);
+
+        result.mergeWith(thenResult);
+        return;
+    }
+
+    // No hint: fall back to worst-case (max across branches).
     if (!ifOp.getElseRegion().empty()) {
         ResourceResult elseResult;
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
@@ -385,10 +409,43 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 {
     result.hasBranches = true;
 
+    // If branch probabilities are provided, compute the expected (average) resource counts.
+    // `catalyst.estimated_probabilities` is an array of floats with one entry per case
+    // (excluding the default which is computed automatically).
+    auto caseRegions = switchOp.getCaseRegions();
+    if (auto probsAttr = switchOp->getAttrOfType<ArrayAttr>(EstimatedProbabilitiesAttrName)) {
+        ResourceResult expected;
+        double sumProb = 0.0;
+
+        for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
+            ResourceResult caseResult;
+            analyzeRegion(caseRegion, caseResult, isAdjoint);
+
+            double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
+            sumProb += p;
+
+            caseResult.multiplyByScalar(p);
+            expected.mergeWith(caseResult, ResourceResult::MergeMethod::Sum);
+        }
+
+        // The verifier guarantees the entries sum to at most 1, but a clamp is safer in case
+        // of floating-point error.
+        double pDefault = std::max(0.0, 1.0 - sumProb);
+
+        ResourceResult defaultResult;
+        analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
+        defaultResult.multiplyByScalar(pDefault);
+        expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
+
+        result.mergeWith(expected);
+        return;
+    }
+
+    // No hint: fall back to worst-case (max across all cases).
     ResourceResult maxResult;
     bool first = true;
 
-    for (auto &caseRegion : switchOp.getCaseRegions()) {
+    for (auto &caseRegion : caseRegions) {
         ResourceResult caseResult;
         analyzeRegion(caseRegion, caseResult, isAdjoint);
         if (first) {
@@ -574,7 +631,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
  * @param source The ResourceResult to merge into `dest` (unmodified).
  * @param count A scalar to multiply the `source`'s counts by (defaults to 1).
  */
-static void accumulateScaled(ResourceResult &dest, const ResourceResult &source, int64_t count = 1)
+static void accumulateScaled(ResourceResult &dest, const ResourceResult &source, double count = 1.0)
 {
     for (const auto &opEntry : source.operations) {
         auto &innerDst = dest.operations[opEntry.getKey()];
