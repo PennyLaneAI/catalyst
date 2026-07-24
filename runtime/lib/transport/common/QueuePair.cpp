@@ -118,8 +118,6 @@ void QueuePair::to_rtr(std::uint32_t dest_qpn, std::uint32_t dest_psn,
         .max_dest_rd_atomic = MAX_RD_ATOMIC,
         .min_rnr_timer = MIN_RNR_TIMER,
     };
-    // dgid is a 16-byte union filled from the peer's raw GID after the
-    // aggregate init (it can't be brace-initialized from a runtime array).
     std::memcpy(&a.ah_attr.grh.dgid, dest_gid, 16);
     modify(QpState::RTR, a,
            IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN | IBV_QP_RQ_PSN |
