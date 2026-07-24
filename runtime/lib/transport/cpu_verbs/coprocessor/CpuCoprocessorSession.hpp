@@ -31,9 +31,9 @@ class CpuCoprocessorSession : public CoprocessorSession {
     }
 
     int connect(const ConnectInfo &info) override { return base_.connect(info); }
-    MemRegion alloc_memory(std::size_t size, MemKind kind, std::uint32_t access) override
+    MemRegion alloc_memory(std::size_t size, MemKind kind) override
     {
-        return base_.alloc_memory(size, kind, access);
+        return base_.alloc_memory(size, kind);
     }
     PeerRef exchange_keys(const MemRegion &local) override { return base_.exchange_keys(local); }
     void establish_channel(const ChannelDesc &desc, const MemRegion &local,
@@ -42,7 +42,10 @@ class CpuCoprocessorSession : public CoprocessorSession {
         base_.establish_channel(desc, local, peer);
     }
     void start() override { base_.start(); }
-    int collect(void *replies, std::uint64_t bytes) override { return base_.collect(replies, bytes); }
+    int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override
+    {
+        return base_.collect(replies, replies_bytes, n);
+    }
     void stop() override { base_.stop(); }
 
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;

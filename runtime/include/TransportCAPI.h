@@ -40,46 +40,47 @@ enum {
     CATALYST_TRANSPORT_ERR_STUCK = -4,   // Something got stuck
 };
 
-// DataPath enum (mirrors catalyst::transport::DataPath)
+// Session role (mirrors catalyst::transport::Role in the dialect).
 enum {
-    CATALYST_TRANSPORT_PATH_CPU_VERBS = 0,
-    CATALYST_TRANSPORT_PATH_GPU_ENGINE = 1,
-    CATALYST_TRANSPORT_PATH_OTHER = 2,
+    CATALYST_TRANSPORT_ROLE_CONTROLLER = 0,
+    CATALYST_TRANSPORT_ROLE_COPROCESSOR = 1,
 };
 
-// MemKind enum (mirrors catalyst::transport::MemKind)
-enum {
-    CATALYST_TRANSPORT_MEM_CPU_RAM = 0,
-    CATALYST_TRANSPORT_MEM_GPU_HBM = 1,
-    CATALYST_TRANSPORT_MEM_DDR = 2,
-    CATALYST_TRANSPORT_MEM_OTHER = 3,
-};
+// Create a session from a named backend plugin `.so` (dlopen'd by the runtime). `role` selects
+// which factory symbol is looked up (controller vs coprocessor). `config` is the backend's string.
+// Returns NULL on failure.
+// `key` registers the session under (role, key) for later get_session; empty = not registered.
+CatalystTransportSession *__catalyst__transport__create(const char *backend_lib, const char *config,
+                                                        int32_t role, const char *key);
 
-// Remote peer region descriptor
-typedef struct {
-    uint32_t rkey;
-    uint64_t remote_addr;
-    uint64_t size;
-} CatalystTransportPeerRef;
+// Resolve the live session registered at create under (`role`, `key`).
+// Lets a session brought up in one function be used in another.
+CatalystTransportSession *__catalyst__transport__get_session(int32_t role, const char *key);
 
-// Create a controller session from a named backend plugin `.so` (dlopen'd by the runtime).
-// `config` is the backend's "key=value;..." string. Returns NULL on failure.
-CatalystTransportSession *__catalyst__transport__controller_create(const char *backend_lib,
-                                                                   const char *config);
-
-void __catalyst__transport__close(CatalystTransportSession *s);
+// Bring-up. The peer region learned in exchange_keys is kept inside the session, so
+// establish_channel takes no peer handle. The *_async variants run on a worker thread and return a
+// token to await with barrier.
 int __catalyst__transport__connect(CatalystTransportSession *s, const char *peer,
                                    uint16_t oob_port);
-int __catalyst__transport__exchange_keys(CatalystTransportSession *s,
-                                         CatalystTransportPeerRef *out);
-int __catalyst__transport__establish_channel(CatalystTransportSession *s, int32_t data_path,
-                                             const CatalystTransportPeerRef *peer);
+int64_t __catalyst__transport__connect_async(CatalystTransportSession *s, const char *peer,
+                                             uint16_t oob_port);
+int __catalyst__transport__exchange_keys(CatalystTransportSession *s);
+int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession *s);
+int __catalyst__transport__barrier(int64_t token);
+int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path);
+
+// Coprocessor-only: bind the function run per received message, resolved by runtime symbol name.
+int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol);
+
+// Controller-only: work items + kick.
 int __catalyst__transport__commit_work_item(CatalystTransportSession *s, uint32_t work_item_idx,
                                             uint64_t in_bytes, uint64_t out_bytes);
 void *__catalyst__transport__data_slot(CatalystTransportSession *s);
-void __catalyst__transport__start(CatalystTransportSession *s);
 int __catalyst__transport__kick(CatalystTransportSession *s, uint32_t work_item_idx);
-int __catalyst__transport__collect(CatalystTransportSession *s, void *correction, uint64_t bytes);
+
+// Run / collect / teardown.
+void __catalyst__transport__start(CatalystTransportSession *s);
+int __catalyst__transport__collect(CatalystTransportSession *s, void *reply, uint64_t reply_bytes);
 uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s);
 void __catalyst__transport__stop(CatalystTransportSession *s);
 void __catalyst__transport__destroy(CatalystTransportSession *s);

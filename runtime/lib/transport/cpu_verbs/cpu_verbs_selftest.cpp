@@ -77,11 +77,10 @@ int main(int argc, char **argv)
         .oob_port = port,
     };
     s->connect(ci);
-    MemRegion m = s->alloc_memory(REGION_BYTES, MemKind::CpuRam,
-                                  IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+    MemRegion m = s->alloc_memory(REGION_BYTES, MemKind::CpuRam);
     PeerRef p = s->exchange_keys(m);
     ChannelDesc desc{
-        .data_path = DataPath::CpuVerbs,
+        .data_path = "cpu_verbs",
     };
     s->establish_channel(desc, m, p);
 
@@ -90,11 +89,13 @@ int main(int argc, char **argv)
     // copies the leading 8 bytes of the reply and compares them to DEMO_SYNDROME.
     std::vector<std::uint8_t> corr(std::max<std::size_t>(correction_bytes, sizeof(std::uint64_t)),
                                    0);
+    void *outs[1] = {corr.data()};
+    std::uint64_t obytes[1] = {correction_bytes};
     if (coproc) {
         coproc->set_coprocessor_fn(nullptr, nullptr); // built-in echo
         coproc->start();
         std::this_thread::sleep_for(std::chrono::seconds(3)); // serve ~3 s
-        coproc->collect(corr.data(), correction_bytes);
+        coproc->collect(outs, obytes, 1);
         coproc->stop();
     }
     else {
@@ -105,7 +106,7 @@ int main(int argc, char **argv)
         const std::uint64_t syndrome = DEMO_SYNDROME;
         std::memcpy(controller->data_slot(), &syndrome, sizeof(syndrome));
         controller->kick(0);
-        controller->collect(corr.data(), correction_bytes);
+        controller->collect(outs, obytes, 1);
         controller->stop();
     }
 

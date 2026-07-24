@@ -77,7 +77,8 @@ int CpuControllerSession::Impl::kick(std::uint32_t /*work_item_idx*/)
     return 0;
 }
 
-int CpuControllerSession::Impl::collect(void *replies, std::uint64_t bytes)
+int CpuControllerSession::Impl::collect(void *const *replies, const std::uint64_t *replies_bytes,
+                                        std::size_t n)
 {
     std::stop_token none; // blocking wait for this round's reply
     Payload *r = poll_message_arrival(next_recv_, none);
@@ -85,9 +86,10 @@ int CpuControllerSession::Impl::collect(void *replies, std::uint64_t bytes)
         return -1;
     rtt_ns_ = now_ns() - kick_ns_;
     ++next_recv_;
-    if (replies) {
-        const std::size_t nb = std::min<std::size_t>(bytes, sizeof(r->value));
-        std::memcpy(replies, &r->value, nb);
+    if (n > 0 && replies && replies[0]) {
+        const std::size_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
+        const std::size_t nb = std::min<std::size_t>(cap, sizeof(r->value));
+        std::memcpy(replies[0], &r->value, nb);
     }
     return 0;
 }

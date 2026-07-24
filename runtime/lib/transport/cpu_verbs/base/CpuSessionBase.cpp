@@ -63,7 +63,7 @@ int CpuSessionBase::connect(const ConnectInfo &info)
     return 0;
 }
 
-MemRegion CpuSessionBase::alloc_memory(std::size_t size, MemKind kind, std::uint32_t /*access*/)
+MemRegion CpuSessionBase::alloc_memory(std::size_t size, MemKind kind)
 {
     RDMA_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
@@ -219,7 +219,7 @@ void CpuSessionBase::start()
     engine_ = std::jthread(body);
 }
 
-int CpuSessionBase::collect(void *replies, std::uint64_t bytes)
+int CpuSessionBase::collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n)
 {
     while (completed_.load(std::memory_order_acquire) == 0) {
         if (failed_.load(std::memory_order_acquire))
@@ -233,10 +233,11 @@ int CpuSessionBase::collect(void *replies, std::uint64_t bytes)
     // Stopped before any round completed -> no data (non-exceptional).
     if (completed_.load(std::memory_order_acquire) == 0)
         return -1;
-    if (replies) {
+    if (n > 0 && replies && replies[0]) {
         const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
-        const std::size_t nb = std::min<std::size_t>(bytes, sizeof(w));
-        std::memcpy(replies, &w, nb);
+        const std::size_t nb =
+            replies_bytes ? std::min<std::size_t>(replies_bytes[0], sizeof(w)) : sizeof(w);
+        std::memcpy(replies[0], &w, nb);
     }
     return 0;
 }

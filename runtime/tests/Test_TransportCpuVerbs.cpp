@@ -98,8 +98,7 @@ TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[c
             .oob_port = port,
         };
         coproc.connect(ci);
-        MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam,
-                                          IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+        MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam);
         coproc_rkey = m.rkey;
         PeerRef p = coproc.exchange_keys(m);
         coproc_peer_addr = p.remote_addr;
@@ -111,8 +110,7 @@ TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[c
         .oob_port = port,
     };
     controller.connect(ci);
-    MemRegion mine = controller.alloc_memory(SIZE, MemKind::CpuRam,
-                                             IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+    MemRegion mine = controller.alloc_memory(SIZE, MemKind::CpuRam);
     PeerRef peer = controller.exchange_keys(mine);
     t.join();
 
@@ -139,16 +137,17 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
             .oob_port = port,
         };
         coproc.connect(ci);
-        MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam,
-                                          IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+        MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam);
         PeerRef p = coproc.exchange_keys(m);
         ChannelDesc desc{
-            .data_path = DataPath::CpuVerbs,
+            .data_path = "cpu_verbs",
         };
         coproc.establish_channel(desc, m, p);
         coproc.set_coprocessor_fn(nullptr, nullptr); // built-in echo
         coproc.start();
-        coproc.collect(&coproc_got, sizeof(coproc_got));
+        void *outs[1] = {&coproc_got};
+        std::uint64_t obytes[1] = {sizeof(coproc_got)};
+        coproc.collect(outs, obytes, 1);
         coproc.stop();
     });
     CpuControllerSession controller("rxe0", 1);
@@ -157,11 +156,10 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
         .oob_port = port,
     };
     controller.connect(ci);
-    MemRegion m = controller.alloc_memory(SIZE, MemKind::CpuRam,
-                                          IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+    MemRegion m = controller.alloc_memory(SIZE, MemKind::CpuRam);
     PeerRef p = controller.exchange_keys(m);
     ChannelDesc desc{
-        .data_path = DataPath::CpuVerbs,
+        .data_path = "cpu_verbs",
     };
     controller.establish_channel(desc, m, p);
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
@@ -170,7 +168,9 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
     std::memcpy(controller.data_slot(), &syndrome, sizeof(syndrome));
     controller.kick(0);
     std::uint64_t controller_got = 0;
-    controller.collect(&controller_got, sizeof(controller_got));
+    void *outs[1] = {&controller_got};
+    std::uint64_t obytes[1] = {sizeof(controller_got)};
+    controller.collect(outs, obytes, 1);
     controller.stop();
     t.join();
 
@@ -192,17 +192,18 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
             .oob_port = port,
         };
         coproc.connect(ci);
-        MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam,
-                                          IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+        MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam);
         PeerRef p = coproc.exchange_keys(m);
         ChannelDesc desc{
-            .data_path = DataPath::CpuVerbs,
+            .data_path = "cpu_verbs",
         };
         coproc.establish_channel(desc, m, p);
         coproc.set_coprocessor_fn(invert_fn, nullptr);
         coproc.start();
         std::uint64_t got = 0;
-        coproc.collect(&got, sizeof(got));
+        void *outs[1] = {&got};
+        std::uint64_t obytes[1] = {sizeof(got)};
+        coproc.collect(outs, obytes, 1);
         coproc.stop();
     });
     CpuControllerSession controller("rxe0", 1);
@@ -211,11 +212,10 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
         .oob_port = port,
     };
     controller.connect(ci);
-    MemRegion m = controller.alloc_memory(SIZE, MemKind::CpuRam,
-                                          IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+    MemRegion m = controller.alloc_memory(SIZE, MemKind::CpuRam);
     PeerRef p = controller.exchange_keys(m);
     ChannelDesc desc{
-        .data_path = DataPath::CpuVerbs,
+        .data_path = "cpu_verbs",
     };
     controller.establish_channel(desc, m, p);
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
@@ -224,7 +224,9 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
     std::memcpy(controller.data_slot(), &syndrome, sizeof(syndrome));
     controller.kick(0);
     std::uint64_t got = 0;
-    controller.collect(&got, sizeof(got));
+    void *outs[1] = {&got};
+    std::uint64_t obytes[1] = {sizeof(got)};
+    controller.collect(outs, obytes, 1);
     controller.stop();
     t.join();
 

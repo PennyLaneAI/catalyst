@@ -42,12 +42,12 @@ class CpuSessionBase : public TransportSession {
     ~CpuSessionBase() override { stop(); }
 
     int connect(const ConnectInfo &info) override;
-    MemRegion alloc_memory(std::size_t size, MemKind kind, std::uint32_t access) override;
+    MemRegion alloc_memory(std::size_t size, MemKind kind) override;
     PeerRef exchange_keys(const MemRegion &local) override;
     void establish_channel(const ChannelDesc &desc, const MemRegion &local,
                            const PeerRef &peer) override;
     void start() override;
-    int collect(void *replies, std::uint64_t bytes) override;
+    int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
     void stop() override;
 
   protected:

@@ -30,9 +30,9 @@ class CpuControllerSession : public ControllerSession {
     }
 
     int connect(const ConnectInfo &info) override { return base_.connect(info); }
-    MemRegion alloc_memory(std::size_t size, MemKind kind, std::uint32_t access) override
+    MemRegion alloc_memory(std::size_t size, MemKind kind) override
     {
-        return base_.alloc_memory(size, kind, access);
+        return base_.alloc_memory(size, kind);
     }
     PeerRef exchange_keys(const MemRegion &local) override { return base_.exchange_keys(local); }
     void establish_channel(const ChannelDesc &desc, const MemRegion &local,
@@ -41,7 +41,10 @@ class CpuControllerSession : public ControllerSession {
         base_.establish_channel(desc, local, peer);
     }
     void start() override { base_.start(); }
-    int collect(void *replies, std::uint64_t bytes) override { return base_.collect(replies, bytes); }
+    int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override
+    {
+        return base_.collect(replies, replies_bytes, n);
+    }
     void stop() override { base_.stop(); }
     std::uint64_t last_rtt_ns() const override { return base_.last_rtt_ns(); }
 
@@ -65,7 +68,7 @@ class CpuControllerSession : public ControllerSession {
 
         void start() override;
         void stop() override;
-        int collect(void *replies, std::uint64_t bytes) override;
+        int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
         std::uint64_t last_rtt_ns() const override { return rtt_ns_; }
 
         void commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,

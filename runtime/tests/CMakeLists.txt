@@ -167,9 +167,26 @@ target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
 
 catch_discover_tests(runner_tests_rsdecomp_runtime)
 
-# Transport test suites (RDMA-backed; individual tests SKIP without an rxe0 device)
+# Transport test suites
 if(ENABLE_TRANSPORT)
-    # Device-agnostic common primitives
+    # CAPI + loader, exercised against a stub backend plugin.
+    add_library(stub_transport_backend SHARED stubs/stub_transport_backend.cpp)
+    target_include_directories(stub_transport_backend PRIVATE ${runtime_includes})
+    set_property(TARGET stub_transport_backend PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+    add_executable(runner_tests_transport)
+    target_sources(runner_tests_transport PRIVATE Test_Transport.cpp)
+    target_link_libraries(runner_tests_transport PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        rt_transport
+    )
+    target_compile_definitions(runner_tests_transport PRIVATE
+        STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>")
+    add_dependencies(runner_tests_transport stub_transport_backend)
+    catch_discover_tests(runner_tests_transport)
+
+    # CPU-verbs backend: device-agnostic common primitives (RDMA-backed; SKIP without rxe0).
     add_executable(runner_tests_transport_common)
     target_sources(runner_tests_transport_common PRIVATE
         Test_TransportCommon.cpp
@@ -182,7 +199,7 @@ if(ENABLE_TRANSPORT)
     )
     catch_discover_tests(runner_tests_transport_common)
 
-    # CPU-verbs backend (both roles, in-process loopback)
+    # CPU-verbs backend: both roles, in-process loopback (RDMA-backed; SKIP without rxe0).
     add_executable(runner_tests_transport_cpu)
     target_sources(runner_tests_transport_cpu PRIVATE
         Test_TransportCpuVerbs.cpp
