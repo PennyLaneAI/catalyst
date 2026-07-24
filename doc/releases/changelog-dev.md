@@ -24,6 +24,10 @@
   transport runtime CAPI.
   [(#3048)](https://github.com/PennyLaneAI/catalyst/pull/3048)
 
+* An `inject-transport-session` pass is added, which reads the `catalyst.backline` module
+  attribute and emits the transport session lifecycle into the host entry function.
+  [(#3063)](https://github.com/PennyLaneAI/catalyst/pull/3063)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
