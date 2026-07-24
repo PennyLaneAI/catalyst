@@ -32,8 +32,8 @@
 namespace catalyst {
 
 // Resource-estimation hint on an `scf.for` or `scf.while` with dynamic bounds:
-// the assumed number of loop iterations as a positive integer. Used to compute
-// expected resource counts.
+// the expected number of loop iterations as a positive int or float. Used to
+// compute expected resource counts.
 inline constexpr llvm::StringRef EstimatedIterationsAttrName = "catalyst.estimated_iterations";
 
 // Resource-estimation hint on an `scf.if`: the probability (in [0, 1]) that the

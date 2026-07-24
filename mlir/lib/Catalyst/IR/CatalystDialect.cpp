@@ -77,15 +77,21 @@ LogicalResult CatalystDialect::verifyOperationAttribute(Operation *op, NamedAttr
         if (!isa<scf::ForOp, scf::WhileOp>(op)) {
             return op->emitError() << "'" << name << "' is only valid on 'scf.for' or 'scf.while'";
         }
-        auto iters = dyn_cast<IntegerAttr>(attribute.getValue());
-        if (!iters) {
-            return op->emitError() << "'" << name << "' must be an integer attribute";
+        if (auto intAttr = dyn_cast<IntegerAttr>(attribute.getValue())) {
+            if (intAttr.getValue().isNegative()) {
+                return op->emitError() << "'" << name << "' must be non-negative, but got "
+                                       << intAttr.getValue().getSExtValue();
+            }
+            return success();
         }
-        if (iters.getValue().isNegative()) {
-            return op->emitError() << "'" << name << "' must be non-negative, but got "
-                                   << iters.getValue().getSExtValue();
+        if (auto floatAttr = dyn_cast<FloatAttr>(attribute.getValue())) {
+            if (floatAttr.getValueAsDouble() < 0.0) {
+                return op->emitError() << "'" << name << "' must be non-negative, but got "
+                                       << floatAttr.getValueAsDouble();
+            }
+            return success();
         }
-        return success();
+        return op->emitError() << "'" << name << "' must be an integer or float attribute";
     }
 
     if (name == EstimatedProbabilityAttrName) {

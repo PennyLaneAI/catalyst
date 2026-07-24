@@ -391,6 +391,32 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
 
 // -----
 
+// A fractional catalyst.estimated_iterations on a while loop scales the body's resource
+// counts by the (possibly non-integer) expected iteration count: 2 gates * 2.5 = 5.
+
+// CHECK-LABEL: "estimated_iterations_while_fractional": {
+// CHECK: "operations"
+// CHECK-DAG: "PauliZ(1)": 5
+func.func @estimated_iterations_while_fractional(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %r:2 = scf.while (%i = %c0, %q = %arg0) : (index, !quantum.bit) -> (index, !quantum.bit) {
+        %cond = arith.cmpi slt, %i, %n : index
+        scf.condition(%cond) %i, %q : index, !quantum.bit
+    } do {
+    ^bb0(%i: index, %q: !quantum.bit):
+        %q1 = quantum.custom "PauliZ"() %q : !quantum.bit
+        %q2 = quantum.custom "PauliZ"() %q1 : !quantum.bit
+        %inext = arith.addi %i, %c1 : index
+        scf.yield %inext, %q2 : index, !quantum.bit
+    } attributes {catalyst.estimated_iterations = 2.5 : f64}
+
+    return %r#1 : !quantum.bit
+}
+
+// -----
+
 // Reverse for-loop bounds lowered via subi + ceildivsi (PennyLane for_loop
 // start/stop/step pattern). Trip count = ceildivsi(subi(-1, 9), -1) = 10.
 
@@ -1162,11 +1188,12 @@ func.func @if_estimated_probability(%arg0: !quantum.bit, %cond: i1) -> !quantum.
 
 // scf.if with only a then-branch and `estimated_probability` = 0.5: the (empty)
 // else-branch contributes nothing, so the expected Hadamard count is
-// 0.5 * 3 = 1.5. Fractional expected counts are surfaced as floats in the JSON.
+// 0.5 * 3 = 1.5. Counts are tracked as doubles internally, but the JSON output
+// rounds each count to the nearest integer, so 1.5 is reported as 2.
 
 // CHECK-LABEL: "if_estimated_probability_then_only"
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 1.5
+// CHECK-DAG: "Hadamard(1)": 2
 func.func @if_estimated_probability_then_only(%arg0: !quantum.bit, %cond: i1) {
     scf.if %cond {
         %t1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
@@ -1181,11 +1208,12 @@ func.func @if_estimated_probability_then_only(%arg0: !quantum.bit, %cond: i1) {
 
 // Qubit allocations are probability-weighted like every other count. Here the
 // then-branch allocates 1 qubit and the (empty) else-branch allocates none,
-// with p(then) = 0.5, so the expected allocation count is 0.5.
+// with p(then) = 0.5, so the expected allocation count is 0.5. The JSON output
+// rounds each count to the nearest integer, so 0.5 is reported as 1.
 
 // CHECK-LABEL: "if_estimated_probability_qubits"
-// CHECK: "num_alloc_qubits": 0.5
-// CHECK: "num_qubits": 0.5
+// CHECK: "num_alloc_qubits": 1
+// CHECK: "num_qubits": 1
 func.func @if_estimated_probability_qubits(%cond: i1) {
     scf.if %cond {
         %r = quantum.alloc(1) : !quantum.reg
@@ -1199,14 +1227,15 @@ func.func @if_estimated_probability_qubits(%cond: i1) {
 // -----
 
 // A probabilistic conditional inside a loop body: the fractional expected count
-// (0.5 Hadamard per iteration, p(then) = 0.5) must survive lifting into the
-// for_loop_1 body and only be combined with the trip count downstream. The
-// lifted body therefore reports a fractional count, and the parent records
-// function_calls = { for_loop_1: 10 }.
+// (0.5 Hadamard per iteration, p(then) = 0.5) is carried as a double internally so
+// it survives lifting into the for_loop_1 body and can be combined with the trip
+// count downstream (0.5 * 10 = 5, see the STATS check). The per-function JSON output
+// rounds counts to the nearest integer, so the lifted body reports 1, and the parent
+// records function_calls = { for_loop_1: 10 }.
 
 // CHECK-LABEL: "for_loop_1": {
 // CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 0.5
+// CHECK-DAG: "Hadamard(1)": 1
 
 // CHECK-LABEL: "prob_if_in_loop": {
 // CHECK: "function_calls"
