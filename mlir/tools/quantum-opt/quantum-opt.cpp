@@ -44,6 +44,7 @@
 #include "QecLogical/IR/QecLogicalDialect.h"
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "QecPhysical/Transforms/BufferizableOpInterfaceImpl.h"
+#include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RTIO/IR/RTIODialect.h"
@@ -88,6 +89,7 @@ int main(int argc, char **argv)
     catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::qecp::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::transport::registerBufferizableOpInterfaceExternalModels(registry);
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));
