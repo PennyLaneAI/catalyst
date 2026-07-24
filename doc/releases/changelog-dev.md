@@ -12,6 +12,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
+  through the transport passes.
+  [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
+
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
   [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
