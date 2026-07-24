@@ -430,7 +430,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 
         // The verifier guarantees the entries sum to at most 1, but a clamp is safer in case
         // of floating-point error.
-        double pDefault = std::max(0.0, 1.0 - sumProb);
+        double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
 
         ResourceResult defaultResult;
         analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
