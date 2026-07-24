@@ -28,6 +28,9 @@
   attribute and emits the transport session lifecycle into the host entry function.
   [(#3063)](https://github.com/PennyLaneAI/catalyst/pull/3063)
 
+* A `BufferizableOpInterface` implementation is added for the `Transport` dialect ops.
+  [(#3064)](https://github.com/PennyLaneAI/catalyst/pull/3064)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
