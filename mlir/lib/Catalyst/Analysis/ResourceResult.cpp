@@ -15,10 +15,10 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/JSON.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -110,71 +110,63 @@ void ResourceResult::multiplyByScalar(int64_t scalar)
     numArgQubits *= scalar;
 }
 
-std::string ResourceResult::toJson(int indent) const
+llvm::json::Object ResourceResult::toJson() const
 {
-    // Build JSON object using llvm::json
-    llvm::json::Object root;
+    llvm::json::Object funcObj;
 
-    // Operations: flatten to "OpName(nqubits,nparams)" -> count
     llvm::json::Object opsObj;
     for (const auto &opEntry : operations) {
         StringRef opName = opEntry.getKey();
         for (const auto &sizeEntry : opEntry.getValue()) {
-            auto &[nQubits, nParams] = sizeEntry.first;
+            const auto &[nQubits, nParams] = sizeEntry.first;
             int64_t count = sizeEntry.second;
-            std::string key =
-                (opName + "(" + std::to_string(nQubits) + "," + std::to_string(nParams) + ")")
-                    .str();
+            std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
             opsObj[key] = count;
         }
     }
-    root["operations"] = std::move(opsObj);
+    funcObj["operations"] = std::move(opsObj);
 
-    // Measurements
     llvm::json::Object measObj;
     for (const auto &entry : measurements) {
         measObj[entry.getKey()] = entry.getValue();
     }
-    root["measurements"] = std::move(measObj);
+    funcObj["measurements"] = std::move(measObj);
 
-    // Classical instructions
     llvm::json::Object classObj;
     for (const auto &entry : classicalInstructions) {
         classObj[entry.getKey()] = entry.getValue();
     }
-    root["classical_instructions"] = std::move(classObj);
+    funcObj["classical_instructions"] = std::move(classObj);
 
-    // Function calls
     llvm::json::Object fcObj;
     for (const auto &entry : functionCalls) {
         fcObj[entry.getKey()] = entry.getValue();
     }
-    root["function_calls"] = std::move(fcObj);
+    funcObj["function_calls"] = std::move(fcObj);
 
-    // Variable function calls (dynamic-loop hashes). Emitted as fixed-width
-    // hex strings so that the high-bit portion of the 64-bit hash space
-    // round-trips losslessly through JSON.
     llvm::json::Object vfcObj;
     for (const auto &entry : varFunctionCalls) {
-        vfcObj[entry.getKey()] = formatv("{0:x16}", entry.getValue()).str();
+        vfcObj[entry.getKey()] = llvm::formatv("{0:x16}", entry.getValue()).str();
     }
-    root["var_function_calls"] = std::move(vfcObj);
+    funcObj["var_function_calls"] = std::move(vfcObj);
 
-    root["num_qubits"] = numQubits();
-    root["num_alloc_qubits"] = numAllocQubits;
-    root["num_arg_qubits"] = numArgQubits;
-    root["device_name"] = deviceName;
-    root["has_branches"] = hasBranches;
+    funcObj["num_qubits"] = static_cast<int64_t>(numQubits());
+    funcObj["num_alloc_qubits"] = static_cast<int64_t>(numAllocQubits);
+    funcObj["num_arg_qubits"] = static_cast<int64_t>(numArgQubits);
+    funcObj["device_name"] = deviceName;
+    funcObj["qnode"] = isQnode;
+    funcObj["has_branches"] = hasBranches;
     if (autoQubitManagement.has_value()) {
-        root["auto_qubit_management"] = *autoQubitManagement;
+        funcObj["auto_qubit_management"] = *autoQubitManagement;
     }
+    llvm::json::Object depthObj;
+    if (pbcDepth) {
+        depthObj["any_commuting_depth"] = pbcDepth->first;
+        depthObj["qubit_disjoint_depth"] = pbcDepth->second;
+    }
+    funcObj["depth"] = std::move(depthObj);
 
-    llvm::json::Value jsonValue(std::move(root));
-    std::string result;
-    llvm::raw_string_ostream os(result);
-    os << formatv("{0:2}", jsonValue);
-    os.flush();
-    return result;
+    return funcObj;
 }
 
 /**

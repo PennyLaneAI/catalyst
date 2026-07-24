@@ -28,6 +28,7 @@ from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.primitives import transform_prim
 from pennylane.transforms import decompose as pl_decompose
+from pennylane.transforms.decompose import DecomposeInterpreter
 
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import is_dynamic_wires
@@ -594,8 +595,9 @@ def _apply_compiler_decompose_to_plxpr(
     if stopping_condition:
         kwargs["stopping_condition"] = stopping_condition
 
-    final_jaxpr = qp.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
-
+    interpreter = DecomposeInterpreter(**kwargs)
+    f = partial(interpreter.eval, inner_jaxpr, consts)
+    final_jaxpr = jax.make_jaxpr(f)(*ncargs)
     if graph_enabled:
         qp.decomposition.enable_graph()
 

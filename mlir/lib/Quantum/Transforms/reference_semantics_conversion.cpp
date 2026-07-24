@@ -20,6 +20,7 @@
 
 #include "reference_semantics_conversion.h"
 
+#include <cstdint>
 #include <optional>
 
 #include "llvm/ADT/DenseMap.h"
@@ -366,11 +367,6 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
         auto rGateOp =
             migrateOpToReferenceSemantics<qref::OperatorOp>(builder, vOperatorOp, tracker);
         rGateOp->removeAttr("resultSegmentSizes");
-
-        // Properties are not handled via the generic attribute fields, so we set them separately.
-        rGateOp.setOpName(vOperatorOp.getOpName());
-        rGateOp.setAdjoint(vOperatorOp.getAdjoint());
-        rGateOp.setUID(vOperatorOp.getUID());
     }
     else {
         vGateOp->emitOpError("unknown gate op in quantum dialect");

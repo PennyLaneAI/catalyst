@@ -412,7 +412,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     }];
 
     let arguments = (ins
-        StringProp:$op_name,
+        StrAttr:$op_name,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$forward_args,
 
@@ -429,8 +429,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
 
         // additional functionality provided by quantum.operator, being last allows the builder
         // to use default values in the signature, so that these args are truly optional
-        UnitProp:$adjoint,
-        OptionalProp<I64Prop>:$UID,
+        UnitAttr:$adjoint,
+        OptionalAttr<I64Attr>:$UID,
         DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
@@ -439,8 +439,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             // the ODS operands must be next to each other
-            auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/1);
-            auto [_, lenForwardArgs] = getODSOperandIndexAndLength(/*forward_args=*/2);
+            auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/0);
+            auto [_, lenForwardArgs] = getODSOperandIndexAndLength(/*forward_args=*/1);
             return getOperands().slice(start, lenParams + lenForwardArgs);
         }
     }];
@@ -604,15 +604,11 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
             to be handled in a special way during the lowering due to its C function being variadic
             on the number of qubits.
 
-        .. note::
-            `dim` is currently captured as a float number for compatibility with
-            runtime and device integration.
-
     }];
 
     let arguments = (ins
         F64:$theta,
-        F64:$dim,
+        I64Attr:$dim,
         Variadic<QubitRefType>:$qubits,
         UnitAttr:$adjoint,
         Variadic<QubitRefType>:$ctrl_qubits,
@@ -620,7 +616,7 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
     );
 
     let assemblyFormat = [{
-        `(` $theta `,` $dim `)` $qubits (`adj` $adjoint^)? attr-dict
+        `(` $theta `,` `dim` `:` $dim `)` $qubits (`adj` $adjoint^)? attr-dict
         ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
         `:` type($qubits) (`ctrls` type($ctrl_qubits)^ )?

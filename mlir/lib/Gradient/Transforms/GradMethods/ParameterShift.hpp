@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <utility>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"

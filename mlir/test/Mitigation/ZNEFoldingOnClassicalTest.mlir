@@ -99,8 +99,8 @@ func.func @multipleQnodes(%arg0: tensor<3xf64>) -> f64 {
 // CHECK:      func.call @multipleQnodes.zne
 
 func.func @qjitZne(%arg0: tensor<3xf64>) -> tensor<5xf64> {
-    %numFolds = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
-    %0 = mitigation.zne @multipleQnodes(%arg0) folding (global) numFolds (%numFolds : tensor<5xindex>) : (tensor<3xf64>) -> tensor<5xf64>
+    %numFolds = arith.constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf64>
+    %0 = mitigation.zne @multipleQnodes(%arg0) folding (global) numFolds (%numFolds : tensor<5xf64>) : (tensor<3xf64>) -> tensor<5xf64>
     func.return %0 : tensor<5xf64>
 }
 
@@ -202,11 +202,11 @@ func.func @multipleQnodes(%arg0: tensor<3xf64>, %arg1: f64) -> f64 {
 
 // CHECK:    func.func @qjitZne(%arg0: tensor<3xf64>, %arg1: f64) -> tensor<5xf64> {
 // CHECK:      scf.for
-// CHECK:        func.call @multipleQnodes.zne(%arg0, %arg1, %extracted) : (tensor<3xf64>, f64, index) -> f64
+// CHECK:        func.call @multipleQnodes.zne(%arg0, %arg1, {{%.+}}) : (tensor<3xf64>, f64, index) -> f64
 
 func.func @qjitZne(%arg0: tensor<3xf64>, %arg1: f64) -> tensor<5xf64> {
-    %numFolds = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
-    %0 = mitigation.zne @multipleQnodes(%arg0, %arg1) folding (global) numFolds (%numFolds : tensor<5xindex>) : (tensor<3xf64>, f64) -> tensor<5xf64>
+    %numFolds = arith.constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf64>
+    %0 = mitigation.zne @multipleQnodes(%arg0, %arg1) folding (global) numFolds (%numFolds : tensor<5xf64>) : (tensor<3xf64>, f64) -> tensor<5xf64>
     func.return %0 : tensor<5xf64>
 }
 
@@ -289,7 +289,7 @@ func.func @multipleQnodes(%arg0: tensor<3xf64>, %arg1: f64) -> f64 {
 
 
 func.func @qjitZne(%arg0: tensor<3xf64>, %arg1: f64) -> tensor<5xf64> {
-    %numFolds = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
-    %0 = mitigation.zne @multipleQnodes(%arg0, %arg1) folding (global) numFolds (%numFolds : tensor<5xindex>) : (tensor<3xf64>, f64) -> tensor<5xf64>
+    %numFolds = arith.constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf64>
+    %0 = mitigation.zne @multipleQnodes(%arg0, %arg1) folding (global) numFolds (%numFolds : tensor<5xf64>) : (tensor<3xf64>, f64) -> tensor<5xf64>
     func.return %0 : tensor<5xf64>
 }

@@ -234,13 +234,14 @@ wheel:
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/libQuantumPythonDecompositions.* $(MK_DIR)/frontend/catalyst/lib
 
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
+	mkdir -p $(MK_DIR)/frontend/mlir_quantum
+	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
-	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
 	for file in gradient qref quantum _ods_common catalyst mbqc mitigation pbc _transform; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
-	mkdir -p $(MK_DIR)/frontend/bin
-	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/bin/
+	mkdir -p $(MK_DIR)/frontend/catalyst/bin
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/bin/catalyst $(MK_DIR)/frontend/catalyst/bin/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 
@@ -261,8 +262,8 @@ wheel:
 		    cp $(COPY_FLAGS) $$file $$dest_dir; \
 	    done' sh {} +
 
-	$(PYTHON) -m pip wheel . -w bootstrap_dist --extra-index-url https://test.pypi.org/simple
-	$(PYTHON) -m pip install bootstrap_dist/*.whl
+	$(PYTHON) -m pip wheel --no-deps . -w bootstrap_dist
+	$(PYTHON) -m pip install bootstrap_dist/*.whl --extra-index-url https://test.pypi.org/simple
 
 	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 
@@ -292,7 +293,7 @@ clean:
 	find frontend/catalyst -name "*.so" -not -path "*/third_party/*" -exec rm -v {} +
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
-	rm -rf $(MK_DIR)/frontend/catalyst/include $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/bin
+	rm -rf $(MK_DIR)/frontend/catalyst/include $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
 	rm -rf $(MK_DIR)/frontend/catalyst/resources
 	rm -rf $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlirbc
 	rm -rf $(MK_DIR)/frontend/mlir_quantum
@@ -337,6 +338,7 @@ coverage: coverage-frontend coverage-runtime
 
 lit-coverage:
 	@echo "Running lit tests with coverage"
+	$(DIALECTS_BUILD_DIR)/bin/catalyst --tool=opt --emit-bytecode --register-decomp-rule-resource $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlir > $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlirbc
 	CATALYST_LIBPYTHON=$$($(PYTHON) -c 'from catalyst.utils.runtime_environment import get_libpython_path; print(get_libpython_path())') ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 
 coverage-frontend:

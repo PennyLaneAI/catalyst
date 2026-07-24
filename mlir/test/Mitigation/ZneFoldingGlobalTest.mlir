@@ -86,11 +86,13 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     // CHECK-DAG:    [[c0:%.+]] = index.constant 0
     // CHECK-DAG:    [[c1:%.+]] = index.constant 1
     // CHECK-DAG:    [[c5:%.+]] = index.constant 5
-    // CHECK-DAG:    [[dense5:%.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
+    // CHECK-DAG:    [[dense5:%.+]] = arith.constant dense<[1.000000e+00, 2.000000e+00, 3.000000e+00, 4.000000e+00, 5.000000e+00]> : tensor<5xf64>
     // CHECK-DAG:    [[emptyRes:%.+]] = tensor.empty() : tensor<5xf64>
     // CHECK:        [[results:%.+]] = scf.for [[idx:%.+]] = [[c0]] to [[c5]] step [[c1]] iter_args(%arg2 = [[emptyRes]]) -> (tensor<5xf64>) {
-        // CHECK:    [[scalarFactor:%.+]] = tensor.extract [[dense5]][[[idx]]] : tensor<5xindex>
-        // CHECK:    [[intermediateRes:%.+]] = func.call @simpleCircuit.folded(%arg0, [[scalarFactor]]) : (tensor<3xf64>, index) -> f64
+        // CHECK:    [[scalarFactor:%.+]] = tensor.extract [[dense5]][[[idx]]] : tensor<5xf64>
+        // CHECK:    [[scalarInt:%.+]] = arith.fptosi [[scalarFactor]] : f64 to i64
+        // CHECK:    [[scalarIdx:%.+]] = index.casts [[scalarInt]] : i64 to index
+        // CHECK:    [[intermediateRes:%.+]] = func.call @simpleCircuit.folded(%arg0, [[scalarIdx]]) : (tensor<3xf64>, index) -> f64
         // CHECK:    [[tensorRes:%.+]] = tensor.from_elements [[intermediateRes]] : tensor<1xf64>
             // CHECK:    [[resultsFor:%.+]] = scf.for [[idxJ:%.+]] = [[c0]] to [[c1]] step [[c1]] iter_args(%arg4 = %arg2) -> (tensor<5xf64>) {
                 // CHECK:    [[extracted:%.+]] = tensor.extract [[tensorRes]][%arg3] : tensor<1xf64>
@@ -99,7 +101,7 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
         // CHECK:    scf.yield [[resultsFor]]
     // CHECK:    return [[results]]
 func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> tensor<5xf64> {
-    %numFolds = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
-    %0 = mitigation.zne @simpleCircuit(%arg0) folding (global) numFolds (%numFolds : tensor<5xindex>) : (tensor<3xf64>) -> tensor<5xf64>
+    %numFolds = arith.constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf64>
+    %0 = mitigation.zne @simpleCircuit(%arg0) folding (global) numFolds (%numFolds : tensor<5xf64>) : (tensor<3xf64>) -> tensor<5xf64>
     func.return %0 : tensor<5xf64>
 }

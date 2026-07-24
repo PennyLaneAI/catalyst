@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
