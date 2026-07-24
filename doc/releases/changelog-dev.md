@@ -15,6 +15,12 @@
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
 
+* A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
+  be dispatched to a separate executor process. `executor` dialect models the session lifecycle
+  through an `!executor.session` handle that is threaded from `executor.open` through `send_binary`,
+  `launch`, `call`, and `close`.
+  [(#2909)](https://github.com/PennyLaneAI/catalyst/pull/2909)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
@@ -478,4 +484,5 @@ Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Paul Haochen Wang,
-Jake Zaia.
+Jake Zaia,
+Hongsheng Zheng.
