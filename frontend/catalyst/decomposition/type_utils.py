@@ -12,21 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Type handling utilities for decomposition rule lowering."""
+
 import jax.numpy as jnp
-import numpy as np
 import pennylane as qp
+from jax.core import ShapedArray
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
-    "i1": np.bool_,
-    "i8": np.int8,
-    "i16": np.int16,
-    "i32": np.int32,
-    "i64": np.int64,
-    "f16": np.float16,
-    "f32": np.float32,
-    "f64": np.float64,
-    "complex<f64>": np.complex64,
-    "complex<f128>": np.complex128,
+    "i1": jnp.bool_,
+    "i8": jnp.int8,
+    "i16": jnp.int16,
+    "i32": jnp.int32,
+    "i64": jnp.int64,
+    "f16": jnp.float16,
+    "f32": jnp.float32,
+    "f64": jnp.float64,
+    "complex<f64>": jnp.complex64,
+    "complex<f128>": jnp.complex128,
 }
 
 _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
@@ -42,6 +44,7 @@ def _stringify_shaped_type(shape: tuple, dim: int, element_type):
 
 
 def mlir_stringify_type(dtype: qp.typing.AbstractArray):
+    """Return a string representation of the given data type."""
     assert isinstance(dtype, qp.typing.AbstractArray)
     element_type = dtype.dtype.type
     if dtype.shape == ():
@@ -52,13 +55,27 @@ def mlir_stringify_type(dtype: qp.typing.AbstractArray):
 
 def get_dummy_values_for_container(container):
     """
-    Converts a nested list of dtype strings into a matching nested list of jnp.zeros.
+    Given a container of python or MLIR types, replace the types with corresponding dummy values.
+
+    Each item in the container must be representible as an MLIR tensor with at most one layer of
+    nesting, i.e. cannot be nested and all elements must be of the same type.
+    Ex.
+    [[float, float], [int, int, int], [int32, int32, int32, int32]]
     """
-    if isinstance(container, (list, tuple)):
-        return [get_dummy_values_for_container(item) for item in container]
-    elif isinstance(container, str):
-        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[container])
-    else:
-        raise TypeError(
-            f"Unexpected type in container when creating dummy values: {type(container)}"
-        )
+
+    def handle_item(item):
+        if isinstance(item, (list, tuple)):
+            return jnp.zeros(len(item), dtype=handle_item(item[0]).dtype)
+        if isinstance(item, ShapedArray):
+            return jnp.zeros(item.shape[0], dtype=item.dtype)
+        elif isinstance(item, str):
+            return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[item])
+        elif isinstance(item, (type, jnp.dtype)):
+            try:
+                return jnp.zeros((), jnp.dtype(item))
+            except TypeError:
+                raise TypeError(
+                    f"Unexpected type in container when creating dummy values: {type(item)}"
+                )
+
+    return tuple(handle_item(item) for item in container)
