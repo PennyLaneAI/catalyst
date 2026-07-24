@@ -167,6 +167,40 @@ class GraphOpID:
         return ID_string
 
 
+def get_rule_funcs_from_module(module: ir.Module) -> list[ir.Operation]:
+    funcOps = []
+
+    def find_condition(op):
+        if op.name == "func.func":
+            if "target_gate" in op.attributes:
+                old_attr = op.attributes["sym_name"]
+                op.attributes["sym_name"] = ir.StringAttr.get(
+                    "__builtin_" + old_attr.value.strip('"'), context=old_attr.context
+                )
+                funcOps.append(op.detach_from_parent())
+                return ir.WalkResult.SKIP
+        return ir.WalkResult.ADVANCE
+
+    module.operation.walk(find_condition)
+    return funcOps
+
+
+def get_rules_from_module(module: ir.Module) -> str:
+    """
+    Parse and modify decomposition rules from a ModuleOp.
+
+    Args:
+        module: an MLIR module object containing a FuncOp named `rule_wrapper` to be extracted
+
+    Returns:
+        str: The string representation of any decomposition rules from `module`, pre-pending the
+             `__builtin_` prefix to their names.
+    """
+    funcOps = get_rule_funcs_from_module(module)
+
+    return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
+
+
 def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
     """Return resource data for all decomposition rules associated to op_name."""
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
@@ -296,11 +330,18 @@ def compile_decomposition_rules_wrapper(
     )
 
 
-def fetch_all_reachable_decomposition_rules_from_op(op_name, dynamic_shape, wire_lens, static_data):
+def fetch_all_reachable_decomposition_rules_from_op(
+    op_name, op_id, dynamic_shape, wire_lens, static_data
+):
     q = deque()
     start = (op_name, dynamic_shape, wire_lens, static_data)
     q.append(start)
     visited = [start]
+    rules = [
+        *get_rule_funcs_from_module(
+            compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static_data)
+        )
+    ]
     while len(q) != 0:
         this_name, this_dynamic_shape, this_wire_lens, this_static_data = q.popleft()
         dummy_wires = tuple(jnp.array(range(length), dtype=int) for length in this_wire_lens)
@@ -320,4 +361,11 @@ def fetch_all_reachable_decomposition_rules_from_op(op_name, dynamic_shape, wire
                 if not probe in visited:
                     visited.append(probe)
                     q.append(probe)
-    return visited
+                    rules.extend(
+                        get_rule_funcs_from_module(
+                            compile_decomposition_rules(
+                                probe[0], graph_op_id.getID(), probe[1], probe[2], probe[3]
+                            )
+                        )
+                    )
+    return rules
