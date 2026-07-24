@@ -202,7 +202,6 @@ llvm::json::Object ResourceResult::toJson() const
  */
 DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
 {
-    // TODO: maintain int counts here for now, but this whole function is deprecated
     SmallVector<NamedAttribute> entries;
 
     // operations
