@@ -26,33 +26,10 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from catalyst.decomposition.type_utils import (
     _MLIR_DTYPES_TO_PY_DTYPES,
     _PY_DTYPES_TO_MLIR_DTYPES,
+    get_dummy_values_for_container,
     mlir_stringify_type,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
-
-
-def get_dummy_values_for_container(container):
-    """Given a container of python types, replace the types with corresponding dummy values."""
-    dummy_args = []
-    for dtype in container:
-        if isinstance(dtype, str):
-            if dtype in _MLIR_DTYPES_TO_PY_DTYPES:
-                count = 1
-                dtype = _MLIR_DTYPES_TO_PY_DTYPES[dtype]
-            elif dtype.startswith("tensor"):
-                # tensor<{number}x{type}>
-                dtype = dtype.removeprefix("tensor<")
-                dtype = dtype.remove_suffice(">")
-                count, dtype = dtype.split("x")
-            else:
-                raise ValueError(f"Unknown dtype {dtype}.")
-        else:
-            count = 1
-            dtype = jnp.dtype(dtype)
-
-        dummy_args.append(jnp.zeros((count,), dtype=dtype))
-
-    return tuple(dummy_args)
 
 
 class GraphOpID:
