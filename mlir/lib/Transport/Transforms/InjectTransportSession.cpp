@@ -15,14 +15,14 @@
 // inject-transport-session: read the `catalyst.backline` module attribute and emit the transport
 // session lifecycle into the HOST entry function.
 
+#include <string>
+
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
-
-#include <string>
 
 #include "Transport/IR/TransportOps.h"
 #include "Transport/Transforms/Passes.h"
@@ -61,7 +61,8 @@ struct InjectTransportSessionPass
                 host = fn;
         });
         if (!host) {
-            mod.emitError("inject-transport-session: no host (llvm.emit_c_interface) function found");
+            mod.emitError(
+                "inject-transport-session: no host (llvm.emit_c_interface) function found");
             return signalPassFailure();
         }
 
@@ -109,7 +110,8 @@ struct InjectTransportSessionPass
         b.setInsertionPointToStart(&entry);
         auto i16A = [&](int64_t v) { return b.getIntegerAttr(b.getIntegerType(16), v); };
         auto commit = [&](Value ct) {
-            CommitWorkItemOp::create(b, loc, ct, b.getI32IntegerAttr(i64Of(ctrl, "work_item_idx", 0)),
+            CommitWorkItemOp::create(b, loc, ct,
+                                     b.getI32IntegerAttr(i64Of(ctrl, "work_item_idx", 0)),
                                      b.getI64IntegerAttr(i64Of(ctrl, "in_bytes", 8)),
                                      b.getI64IntegerAttr(i64Of(ctrl, "out_bytes", 8)));
         };
@@ -139,7 +141,8 @@ struct InjectTransportSessionPass
             Value t1 = ConnectAsyncOp::create(b, loc, tokTy, co, strOf(coproc, "peer"),
                                               i16A(i64Of(coproc, "oob_port", 0)))
                            .getToken();
-            ConnectOp::create(b, loc, ct, strOf(coproc, "peer"), i16A(i64Of(coproc, "oob_port", 0)));
+            ConnectOp::create(b, loc, ct, strOf(coproc, "peer"),
+                              i16A(i64Of(coproc, "oob_port", 0)));
             BarrierOp::create(b, loc, t1);
             Value t2 = ExchangeKeysAsyncOp::create(b, loc, tokTy, co).getToken();
             ExchangeKeysOp::create(b, loc, ct);

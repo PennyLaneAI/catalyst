@@ -47,9 +47,10 @@
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "QecPhysical/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 
 #include "RegisterAllPasses.h"
+
+#include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 
 using namespace catalyst;
 using namespace catalyst::driver;

@@ -18,12 +18,12 @@
 //     transport.kick    %s, %syndrome
 //     transport.collect %s, %correction
 
+#include <string>
+
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
-#include "llvm/ADT/SmallVector.h"
-
-#include <string>
 
 #include "Transport/IR/TransportOps.h"
 #include "Transport/Transforms/Passes.h"
@@ -62,7 +62,8 @@ struct LowerDecodeToTransportPass
                 if (auto d = dyn_cast<DictionaryAttr>(arr[i]))
                     if (auto n = d.getAs<StringAttr>("name"); n && !n.getValue().empty())
                         name = n.getValue();
-                peerKeys.push_back(name.empty() ? ("coprocessor." + std::to_string(i)) : name.str());
+                peerKeys.push_back(name.empty() ? ("coprocessor." + std::to_string(i))
+                                                : name.str());
             }
         }
         if (peerKeys.empty()) {

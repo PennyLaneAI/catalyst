@@ -34,7 +34,8 @@ namespace {
 
 struct KickOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<KickOpInterface, KickOp> {
-    bool bufferizesToMemoryRead(Operation *, OpOperand &, const bufferization::AnalysisState &) const
+    bool bufferizesToMemoryRead(Operation *, OpOperand &,
+                                const bufferization::AnalysisState &) const
     {
         return true;
     }
@@ -43,8 +44,8 @@ struct KickOpInterface
     {
         return false;
     }
-    bufferization::AliasingValueList
-    getAliasingValues(Operation *, OpOperand &, const bufferization::AnalysisState &) const
+    bufferization::AliasingValueList getAliasingValues(Operation *, OpOperand &,
+                                                       const bufferization::AnalysisState &) const
     {
         return {};
     }
@@ -69,7 +70,8 @@ struct KickOpInterface
 
 struct CollectOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CollectOpInterface, CollectOp> {
-    bool bufferizesToMemoryRead(Operation *, OpOperand &, const bufferization::AnalysisState &) const
+    bool bufferizesToMemoryRead(Operation *, OpOperand &,
+                                const bufferization::AnalysisState &) const
     {
         return false;
     }
@@ -78,8 +80,8 @@ struct CollectOpInterface
     {
         return false;
     }
-    bufferization::AliasingValueList
-    getAliasingValues(Operation *, OpOperand &, const bufferization::AnalysisState &) const
+    bufferization::AliasingValueList getAliasingValues(Operation *, OpOperand &,
+                                                       const bufferization::AnalysisState &) const
     {
         return {};
     }
