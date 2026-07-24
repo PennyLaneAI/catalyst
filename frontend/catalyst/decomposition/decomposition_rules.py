@@ -18,6 +18,8 @@ This module provides infrastructure for lowering decomposition rules via python.
 
 # pylint: disable=protected-access,bare-except
 
+from collections import deque
+
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
@@ -27,6 +29,7 @@ from catalyst.decomposition.type_utils import (
     _MLIR_DTYPES_TO_PY_DTYPES,
     _PY_DTYPES_TO_MLIR_DTYPES,
     get_dummy_values_for_container,
+    listify_type,
     mlir_stringify_type,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
@@ -84,6 +87,9 @@ class GraphOpID:
     def get_operator_name(self) -> str:
         """Return the name of the operator."""
         return self.operator_name
+
+    def get_dynamic_shape_as_list(self) -> list[str]:
+        return [listify_type(t) for t in self.dynamic_shape]
 
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
@@ -204,3 +210,30 @@ def compile_decomposition_rules_wrapper(
 ) -> str:
     """Return a string MLIR module containing the decomposition rules for an operator instance."""
     return str(compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static_data))
+
+
+def fetch_all_reachable_decomposition_rules_from_op(op_name, dynamic_shape, wire_lens, static_data):
+    q = deque()
+    start = (op_name, dynamic_shape, wire_lens, static_data)
+    q.append(start)
+    visited = [start]
+    while len(q) != 0:
+        this_name, this_dynamic_shape, this_wire_lens, this_static_data = q.popleft()
+        dummy_wires = tuple(jnp.array(range(length), dtype=int) for length in this_wire_lens)
+        dummy_dynamic_args = get_dummy_values_for_container(this_dynamic_shape)
+        resources, _, _ = collect_resources_for_op(
+            this_name, dummy_dynamic_args, dummy_wires, this_static_data
+        )
+        for _rule_name, resource in resources.items():
+            for op, _count in resource.items():
+                graph_op_id = GraphOpID(op)
+                probe = (
+                    graph_op_id.get_operator_name(),
+                    graph_op_id.get_dynamic_shape_as_list(),
+                    graph_op_id.wire_lens,
+                    graph_op_id.static_data,
+                )
+                if not probe in visited:
+                    visited.append(probe)
+                    q.append(probe)
+    return visited

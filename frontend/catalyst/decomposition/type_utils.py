@@ -32,22 +32,35 @@ _MLIR_DTYPES_TO_PY_DTYPES = {
 _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
 
 
-def _stringify_shaped_type(shape: tuple, dim: int, element_type):
+def _process_shaped_type(shape: tuple, dim: int, element_type, formatter):
+    """Recursively processes the shape, applying the formatter at each dimension."""
     if dim + 1 == len(shape):
         inner_content = _PY_DTYPES_TO_MLIR_DTYPES[element_type]
     else:
-        inner_content = _stringify_shaped_type(shape, dim + 1, element_type)
-    length = shape[dim]
-    return f"[{','.join([inner_content] * length)}]"
+        inner_content = _process_shaped_type(shape, dim + 1, element_type, formatter)
+
+    return formatter(inner_content, shape[dim])
+
+
+def _convert_type(dtype: qp.typing.AbstractArray, formatter):
+    """Base function to handle scalar checks before processing the shape."""
+    assert isinstance(dtype, qp.typing.AbstractArray)
+    element_type = dtype.dtype.type
+
+    if dtype.shape == ():
+        return _PY_DTYPES_TO_MLIR_DTYPES[element_type]
+
+    return _process_shaped_type(dtype.shape, 0, element_type, formatter)
 
 
 def mlir_stringify_type(dtype: qp.typing.AbstractArray):
-    assert isinstance(dtype, qp.typing.AbstractArray)
-    element_type = dtype.dtype.type
-    if dtype.shape == ():
-        return _PY_DTYPES_TO_MLIR_DTYPES[element_type]
-    else:
-        return _stringify_shaped_type(dtype.shape, 0, element_type)
+    string_formatter = lambda content, length: f"[{','.join([content] * length)}]"
+    return _convert_type(dtype, string_formatter)
+
+
+def listify_type(dtype: qp.typing.AbstractArray):
+    list_formatter = lambda content, length: [content] * length
+    return _convert_type(dtype, list_formatter)
 
 
 def get_dummy_values_for_container(container):
