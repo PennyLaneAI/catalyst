@@ -38,7 +38,6 @@ from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
-    qref_alloc_p,
     qref_compbasis_p,
     qref_get_p,
     qref_gphase_p,
