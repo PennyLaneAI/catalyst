@@ -69,6 +69,8 @@ func.func @test_ref_fabricate_magic_conj() attributes {quantum.node} {
     // CHECK: [[magic_conj:%.+]] = pbc.fabricate magic_conj : !quantum.bit
     %q = pbc.ref.fabricate magic_conj : !qref.bit
     qref.custom "PauliX"() %q : !qref.bit
+    // CHECK: quantum.custom "PauliX"() [[magic_conj]] : !quantum.bit
+    // CHECK: quantum.dealloc_qb {{.*}} : !quantum.bit
     qref.dealloc_qb %q : !qref.bit
     return
 }
