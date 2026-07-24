@@ -68,7 +68,8 @@ class CpuControllerSession : public ControllerSession {
 
         void start() override;
         void stop() override;
-        int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
+        int collect(void *const *replies, const std::uint64_t *replies_bytes,
+                    std::size_t n) override;
         std::uint64_t last_rtt_ns() const override { return rtt_ns_; }
 
         void commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,

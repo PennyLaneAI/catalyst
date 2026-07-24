@@ -57,6 +57,7 @@ class CpuCoprocessorSession : public CoprocessorSession {
         ~Impl() { stop(); }
         CoprocessorFn coproc_fn_ = nullptr; // nullptr -> built-in echo
         void *coproc_ctx_ = nullptr;
+
       protected:
         void run(std::stop_token st) override;
         bool oob_listens() const override { return true; }

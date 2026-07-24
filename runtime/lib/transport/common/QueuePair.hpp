@@ -16,11 +16,11 @@
 #include <cstdint>
 #include <memory>
 
-#include <infiniband/verbs.h>
-
 #include "CompletionQueue.hpp"
 #include "ProtectionDomain.hpp"
 #include "QpState.hpp"
+
+#include <infiniband/verbs.h>
 
 namespace catalyst::transport::common {
 class QueuePair {

@@ -17,9 +17,9 @@
 #include <cstdint>
 #include <memory>
 
-#include <infiniband/verbs.h>
-
 #include "ProtectionDomain.hpp"
+
+#include <infiniband/verbs.h>
 
 namespace catalyst::transport::common {
 

@@ -18,12 +18,12 @@
 #include <string>
 #include <thread>
 
-#include <catch2/catch_test_macros.hpp>
-#include <infiniband/verbs.h>
-
 #include "CpuControllerSession.hpp"
 #include "CpuCoprocessorSession.hpp"
 #include "WireProtocol.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+#include <infiniband/verbs.h>
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::cpu_verbs;

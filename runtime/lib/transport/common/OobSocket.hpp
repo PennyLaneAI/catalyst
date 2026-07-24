@@ -15,8 +15,9 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
-#include <unistd.h>
 #include <utility>
+
+#include <unistd.h>
 
 namespace catalyst::transport::common {
 

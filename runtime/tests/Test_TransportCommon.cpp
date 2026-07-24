@@ -14,11 +14,11 @@
 
 #include <string>
 
-#include <catch2/catch_test_macros.hpp>
-#include <infiniband/verbs.h>
-
 #include "Context.hpp"
 #include "QpState.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+#include <infiniband/verbs.h>
 
 using namespace catalyst::transport::common;
 

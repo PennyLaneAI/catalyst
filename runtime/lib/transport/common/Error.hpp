@@ -38,7 +38,7 @@ class RdmaError : public std::runtime_error {
         char rdma_full_[512];                                                                      \
         std::snprintf(rdma_full_, sizeof(rdma_full_), "%s:%d: %s (errno=%d: %s)", __FILE__,        \
                       __LINE__, rdma_msg_, errno, std::strerror(errno));                           \
-        ::catalyst::transport::common::rdma_throw(rdma_full_);                                           \
+        ::catalyst::transport::common::rdma_throw(rdma_full_);                                     \
     } while (0)
 
 // Throw RdmaError with file:line + errno when cond is false.

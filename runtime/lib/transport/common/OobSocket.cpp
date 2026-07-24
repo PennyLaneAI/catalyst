@@ -19,13 +19,13 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
-#include <netdb.h>
 #include <thread>
 
+#include "Error.hpp"
+
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-
-#include "Error.hpp"
 
 namespace catalyst::transport::common {
 

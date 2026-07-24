@@ -15,9 +15,9 @@
 #pragma once
 #include <memory>
 
-#include <infiniband/verbs.h>
-
 #include "Context.hpp"
+
+#include <infiniband/verbs.h>
 
 namespace catalyst::transport::common {
 
