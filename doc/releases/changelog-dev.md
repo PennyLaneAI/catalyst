@@ -19,6 +19,10 @@
   lifecycle at the IR level.
   [(#3047)](https://github.com/PennyLaneAI/catalyst/pull/3047)
 
+* A `convert-transport-to-llvm` pass is added, lowering the `Transport` dialect ops to the
+  transport runtime CAPI.
+  [(#3048)](https://github.com/PennyLaneAI/catalyst/pull/3048)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
