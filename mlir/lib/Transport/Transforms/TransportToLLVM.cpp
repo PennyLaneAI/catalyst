@@ -15,13 +15,13 @@
 // Lower the `transport` dialect to `llvm.call`s on the __catalyst__transport__*
 // CAPI (runtime/include/TransportCAPI.h).
 
+#include "llvm/ADT/Twine.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "llvm/ADT/Twine.h"
 
 #include "Transport/IR/TransportOps.h"
 #include "Transport/Transforms/Passes.h"
@@ -67,7 +67,6 @@ Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64
     return LLVM::ConstantOp::create(rewriter, loc, ty, rewriter.getIntegerAttr(ty, v));
 }
 
-
 // From a lowered 1-D memref descriptor (an LLVM struct), extract the aligned data
 // pointer and the buffer's size in bytes (num elements * element byte width).
 std::pair<Value, Value> memrefPtrAndBytes(ConversionPatternRewriter &rewriter, Location loc,
@@ -76,8 +75,7 @@ std::pair<Value, Value> memrefPtrAndBytes(ConversionPatternRewriter &rewriter, L
     Value ptr = LLVM::ExtractValueOp::create(rewriter, loc, descriptor, ArrayRef<int64_t>{1});
     Value nelem = LLVM::ExtractValueOp::create(rewriter, loc, descriptor, ArrayRef<int64_t>{3, 0});
     Type elemTy = memTy.getElementType();
-    int64_t elemBytes =
-        isa<IndexType>(elemTy) ? 8 : (elemTy.getIntOrFloatBitWidth() + 7) / 8;
+    int64_t elemBytes = isa<IndexType>(elemTy) ? 8 : (elemTy.getIntOrFloatBitWidth() + 7) / 8;
     Value ebytes = constInt(rewriter, loc, i64Ty(rewriter.getContext()), elemBytes);
     Value bytes = LLVM::MulOp::create(rewriter, loc, nelem, ebytes);
     return {ptr, bytes};
@@ -251,7 +249,8 @@ struct CollectLowering : public OpConversionPattern<CollectOp> {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         if (!op.getDest())
-            return rewriter.notifyMatchFailure(op, "collect must be bufferized (dest-passing form)");
+            return rewriter.notifyMatchFailure(op,
+                                               "collect must be bufferized (dest-passing form)");
         auto memTy = cast<MemRefType>(op.getDest().getType());
         auto [dstPtr, bytes] = memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getDest(), memTy);
         emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__collect",
@@ -267,9 +266,9 @@ struct LastRttLowering : public OpConversionPattern<LastRttNsOp> {
     LogicalResult matchAndRewrite(LastRttNsOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        Value r = emitCall(rewriter, op.getLoc(), moduleOf(op),
-                           "__catalyst__transport__last_rtt_ns", {ptrTy(op.getContext())},
-                           i64Ty(op.getContext()), {adaptor.getSession()});
+        Value r =
+            emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__last_rtt_ns",
+                     {ptrTy(op.getContext())}, i64Ty(op.getContext()), {adaptor.getSession()});
         rewriter.replaceOp(op, r);
         return success();
     }
@@ -327,8 +326,8 @@ struct ConvertTransportToLLVMPass
         RewritePatternSet patterns(ctx);
         patterns.add<CreateLowering, ConnectLowering, ConnectAsyncLowering, ExchangeKeysLowering,
                      ExchangeKeysAsyncLowering, BarrierLowering, EstablishChannelLowering,
-                     SetCoprocessorFnLowering, CommitWorkItemLowering, KickLowering, CollectLowering,
-                     LastRttLowering, GetSessionLowering>(tc, ctx);
+                     SetCoprocessorFnLowering, CommitWorkItemLowering, KickLowering,
+                     CollectLowering, LastRttLowering, GetSessionLowering>(tc, ctx);
         patterns.add<VoidSessionLowering<StartOp>>(tc, ctx, "__catalyst__transport__start");
         patterns.add<VoidSessionLowering<StopOp>>(tc, ctx, "__catalyst__transport__stop");
         patterns.add<VoidSessionLowering<DestroyOp>>(tc, ctx, "__catalyst__transport__destroy");
