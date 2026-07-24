@@ -56,8 +56,8 @@ func.func @test_ref_fabricate_magic() attributes {quantum.node} {
     // CHECK: [[magic:%.+]] = pbc.fabricate magic : !quantum.bit
     %q = pbc.ref.fabricate magic : !qref.bit
     qref.custom "PauliX"() %q : !qref.bit
-    // CHECK: quantum.custom "PauliX"() [[magic]] : !quantum.bit
-    // CHECK: quantum.dealloc_qb [[magic]] : !quantum.bit
+    // CHECK: [[out:%.+]] = quantum.custom "PauliX"() [[magic]] : !quantum.bit
+    // CHECK: quantum.dealloc_qb [[out]] : !quantum.bit
     qref.dealloc_qb %q : !qref.bit
     return
 }
@@ -69,8 +69,8 @@ func.func @test_ref_fabricate_magic_conj() attributes {quantum.node} {
     // CHECK: [[magic_conj:%.+]] = pbc.fabricate magic_conj : !quantum.bit
     %q = pbc.ref.fabricate magic_conj : !qref.bit
     qref.custom "PauliX"() %q : !qref.bit
-    // CHECK: quantum.custom "PauliX"() [[magic_conj]] : !quantum.bit
-    // CHECK: quantum.dealloc_qb [[magic_conj]] : !quantum.bit
+    // CHECK: [[out:%.+]] = quantum.custom "PauliX"() [[magic_conj]] : !quantum.bit
+    // CHECK: quantum.dealloc_qb [[out]] : !quantum.bit
     qref.dealloc_qb %q : !qref.bit
     return
 }
