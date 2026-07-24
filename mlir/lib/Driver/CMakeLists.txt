@@ -76,6 +76,7 @@ set(LIBS
     ion-transforms
     MLIRRTIO
     rtio-transforms
+    MLIRExecutor
     MLIRCatalystTest
     ${ENZYME_LIB}
     fmt::fmt
