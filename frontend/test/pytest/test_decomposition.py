@@ -20,7 +20,6 @@ import jax.numpy as jnp
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
-from pennylane.typing import Wire
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.decomposition_rules import (
