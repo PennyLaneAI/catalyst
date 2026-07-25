@@ -14,13 +14,23 @@
 
 #define DEBUG_TYPE "ppr-to-ppm"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/Index/IR/IndexDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
+#include "PBC/IR/PBCDialect.h"
+#include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Passes.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -42,33 +52,30 @@ struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
         auto ctx = &getContext();
         auto module = getOperation();
 
-        // The ppr-to-ppm conversion generates Pauli product measurement
-        // (pbc.ppm) ops, which cannot be reversed by the adjoint-lowering pass.
-        // Reject input inside a quantum.adjoint region up front with a clear
-        // error, rather than failing later with a raw IRMapping assertion.
-        WalkResult adjointCheck = module->walk([&](catalyst::quantum::AdjointOp adjointOp) {
-            adjointOp.emitError() << "ppr-to-ppm cannot be applied to operations inside a "
-                                     "'quantum.adjoint' region, because the resulting Pauli "
-                                     "product measurements cannot be adjoint-lowered";
-            return WalkResult::interrupt();
+        OpPassManager pm("builtin.module");
+        pm.addPass(quantum::createAdjointLoweringPass());
+        if (failed(runPipeline(pm, module))) {
+            return signalPassFailure();
+        }
+
+        ConversionTarget target(*ctx);
+        target.addLegalDialect<pbc::PBCDialect>();
+        target.addLegalDialect<mlir::arith::ArithDialect>();
+        target.addLegalDialect<mlir::scf::SCFDialect>();
+        target.addDynamicallyLegalOp<pbc::PPRotationOp>([](pbc::PPRotationOp op) {
+            return !op.hasPiOverFourRotation() && (!op.isNonClifford() || op.getCondition());
         });
-        if (adjointCheck.wasInterrupted()) {
-            return signalPassFailure();
-        }
+        target.addDynamicallyLegalDialect<quantum::QuantumDialect>([](Operation *op) {
+            return isa<quantum::AllocOp, quantum::AllocQubitOp, quantum::DeallocOp,
+                       quantum::DeallocQubitOp, quantum::ExtractOp, quantum::InsertOp,
+                       quantum::GlobalPhaseOp>(op);
+        });
 
-        RewritePatternSet non_clifford_patterns(ctx);
-        populateDecomposeNonCliffordPPRPatterns(non_clifford_patterns, decomposeMethod,
-                                                avoidYMeasure);
+        RewritePatternSet patterns(ctx);
+        populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod, avoidYMeasure);
+        populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure);
 
-        if (failed(applyPatternsGreedily(module, std::move(non_clifford_patterns)))) {
-            return signalPassFailure();
-        }
-
-        // Decompose Clifford PPRs into PPMs
-        RewritePatternSet clifford_patterns(ctx);
-        populateDecomposeCliffordPPRPatterns(clifford_patterns, avoidYMeasure);
-
-        if (failed(applyPatternsGreedily(module, std::move(clifford_patterns)))) {
+        if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
             return signalPassFailure();
         }
     }
