@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 from jax import numpy as jnp
 from pennylane.measurements import Shots
-from pennylane.resource import CircuitSpecs, SpecsResources, SymbolicSpecsResources
+from pennylane.resource import CircuitSpecs, PBCSpecsResources, SpecsResources
 
 import catalyst
 from catalyst import qjit
@@ -54,8 +54,6 @@ def check_specs_resources_same(
     ),
 ) -> None:
     """Helper function to check if 2 resources objects are the same"""
-    assert type(actual_res) == type(expected_res)
-
     if isinstance(actual_res, list):
         assert len(actual_res) == len(expected_res)
 
@@ -69,15 +67,19 @@ def check_specs_resources_same(
             assert k in expected_res
             check_specs_resources_same(actual_res[k], expected_res[k])
 
-    elif isinstance(actual_res, SpecsResources):
-        assert actual_res.gate_types == expected_res.gate_types
-        assert actual_res.gate_sizes == expected_res.gate_sizes
-
-        assert actual_res.measurements == expected_res.measurements
-
+    elif isinstance(actual_res, (SpecsResources, PBCSpecsResources)):
+        assert isinstance(expected_res, (SpecsResources, PBCSpecsResources))
+        assert type(actual_res) is type(expected_res)
+        assert actual_res.quantum_operations == expected_res.quantum_operations
+        assert actual_res.measurement_processes == expected_res.measurement_processes
         assert actual_res.num_allocs == expected_res.num_allocs
         assert actual_res.depth == expected_res.depth
-        assert actual_res.num_gates == expected_res.num_gates
+        assert actual_res.total_quantum_operations == expected_res.total_quantum_operations
+        if isinstance(actual_res, PBCSpecsResources) and isinstance(
+            expected_res, PBCSpecsResources
+        ):
+            assert actual_res.any_commuting_depth == expected_res.any_commuting_depth
+            assert actual_res.qubit_disjoint_depth == expected_res.qubit_disjoint_depth
 
     else:
         raise ValueError("Invalid Type")
@@ -112,9 +114,8 @@ class TestDeviceLevelSpecs:
 
         cat_specs = qp.specs(circuit, level="device")()
 
-        assert cat_specs.resources.num_gates == 1
-        assert cat_specs.resources.gate_types == {"RX": 1}
-        assert cat_specs.resources.gate_sizes == {1: 1}
+        assert cat_specs.resources.total_quantum_operations == 1
+        assert cat_specs.resources.quantum_operations == {"RX": 1}
 
     def test_simple(self):
         """Test a simple case of qp.specs() against PennyLane"""
@@ -160,11 +161,14 @@ class TestDeviceLevelSpecs:
         assert cat_specs["device_name"] == "lightning.qubit"
 
         # Catalyst will handle Adjoint(PauliY) == PauliY
-        assert "CY" in cat_specs["resources"].gate_types
-        cat_specs["resources"].gate_types["C(Adjoint(PauliY))"] = cat_specs["resources"].gate_types[
-            "CY"
-        ]
-        del cat_specs["resources"].gate_types["CY"]
+        cat_ops = cat_specs["resources"].quantum_operations
+        assert "CY" in cat_ops
+        cat_ops["C(Adjoint(PauliY))"] = cat_ops["CY"]
+        del cat_ops["CY"]
+
+        # Catalyst may count doubly-controlled S separately from singly-controlled S
+        if "2C(S)" in cat_ops:
+            cat_ops["C(S)"] = cat_ops.get("C(S)", 0) + cat_ops.pop("2C(S)")
 
         check_specs_same(cat_specs, pl_specs)
 
@@ -184,14 +188,13 @@ class TestDeviceLevelSpecs:
 
         cat_specs = qp.specs(circuit, level="device")()
 
-        assert cat_specs.resources.num_gates == 4
-        assert cat_specs.resources.gate_types == {
+        assert cat_specs.resources.total_quantum_operations == 4
+        assert cat_specs.resources.quantum_operations == {
             "PauliRot-pi/2-w2": 1,
             "PauliRot-identity-w1": 1,
             "PauliRot-Phi-w1": 1,
             "PauliMeasure-w1": 1,
         }
-        assert cat_specs.resources.gate_sizes == {1: 3, 2: 1}
 
     def test_measurements(self):
         """Test that measurements are tracked correctly at device level."""
@@ -236,7 +239,7 @@ class TestDeviceLevelSpecs:
             "state(all wires)": 1,
             "var(Prod(num_terms=3))": 1,
         }
-        assert complex_meas_specs["resources"].measurements == expected_measurements
+        assert complex_meas_specs["resources"].measurement_processes == expected_measurements
 
 
 class TestPassByPassSpecs:
@@ -308,21 +311,18 @@ class TestPassByPassSpecs:
             ),
             resources={
                 "Before MLIR Passes": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "cancel-inverses": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "merge-rotations": SpecsResources(
-                    gate_types={"RX": 1, "RZ": 1},
-                    gate_sizes={1: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 1, "RZ": 1},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
@@ -348,9 +348,8 @@ class TestPassByPassSpecs:
         specs = qp.specs(simple_circuit, level="user")()
         assert specs.level == "merge-rotations"
         assert specs.resources == SpecsResources(
-            gate_types={"RX": 1, "RZ": 1},
-            gate_sizes={1: 2},
-            measurements={"probs(all wires)": 1},
+            counts={"RX": 1, "RZ": 1},
+            measurement_processes={"probs(all wires)": 1},
             num_allocs=2,
         )
 
@@ -365,9 +364,8 @@ class TestPassByPassSpecs:
         specs = qp.specs(simple_circuit, level="user")()
         assert specs.level == "merge-rotations"
         assert specs.resources == SpecsResources(
-            gate_types={"RX": 1, "RZ": 1},
-            gate_sizes={1: 2},
-            measurements={"probs(all wires)": 1},
+            counts={"RX": 1, "RZ": 1},
+            measurement_processes={"probs(all wires)": 1},
             num_allocs=2,
         )
 
@@ -384,9 +382,8 @@ class TestPassByPassSpecs:
         simple_circuit = qjit(simple_circuit)
 
         canceled_res = SpecsResources(
-            gate_types={"RX": 2, "RZ": 2},
-            gate_sizes={1: 4},
-            measurements={"probs(all wires)": 1},
+            counts={"RX": 2, "RZ": 2},
+            measurement_processes={"probs(all wires)": 1},
             num_allocs=2,
         )
 
@@ -408,9 +405,8 @@ class TestPassByPassSpecs:
             ),
             resources={
                 "Before Tape Transforms": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "cancel_inverses": canceled_res,
@@ -460,39 +456,33 @@ class TestPassByPassSpecs:
             ),
             resources={
                 "Before Tape Transforms": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "dummy_transform": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "dummy_transform-2": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "Before MLIR Passes": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "cancel-inverses": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "merge-rotations": SpecsResources(
-                    gate_types={"RX": 1, "RZ": 1},
-                    gate_sizes={1: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 1, "RZ": 1},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
@@ -539,33 +529,28 @@ class TestPassByPassSpecs:
             ),
             resources={
                 "Before Tape Transforms": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "cancel_inverses": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "dummy_transform": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "Before MLIR Passes": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "merge-rotations": SpecsResources(
-                    gate_types={"RX": 1, "RZ": 1},
-                    gate_sizes={1: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 1, "RZ": 1},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
@@ -614,33 +599,28 @@ class TestPassByPassSpecs:
             ),
             resources={
                 "Before Tape Transforms": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "cancel_inverses": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "dummy_transform": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "Before MLIR Passes": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "merge-rotations": SpecsResources(
-                    gate_types={"RX": 1, "RZ": 1},
-                    gate_sizes={1: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 1, "RZ": 1},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
@@ -670,21 +650,18 @@ class TestPassByPassSpecs:
             },
             resources={
                 "Before MLIR Passes": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "cancel-inverses": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "merge-rotations": SpecsResources(
-                    gate_types={"RX": 1, "RZ": 1},
-                    gate_sizes={1: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 1, "RZ": 1},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
@@ -716,15 +693,13 @@ class TestPassByPassSpecs:
             },
             resources={
                 "Before MLIR Passes": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "merge-rotations": SpecsResources(
-                    gate_types={"RX": 1, "RZ": 1},
-                    gate_sizes={1: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 1, "RZ": 1},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
@@ -754,7 +729,7 @@ class TestPassByPassSpecs:
         # Representations are slightly different from plain PL -- wire counts are missing
         info = qp.specs(circ, level=0, compute_depth=False)()
 
-        assert info.resources.measurements == {
+        assert info.resources.measurement_processes == {
             "expval(Hamiltonian(num_terms=2))": 1,
             "expval(Prod(num_terms=2))": 1,
             "sample(1 wires)": 1,
@@ -790,9 +765,8 @@ class TestPassByPassSpecs:
             shots=Shots(None),
             level="Before MLIR Passes",
             resources=SpecsResources(
-                gate_types={"Hadamard": 1, "PauliX": 2, "PauliZ": 1},
-                gate_sizes={1: 4},
-                measurements={"expval(PauliX)": 1},
+                counts={"Hadamard": 1, "PauliX": 2, "PauliZ": 1},
+                measurement_processes={"expval(PauliX)": 1},
                 num_allocs=1,
             ),
         )
@@ -819,9 +793,8 @@ class TestPassByPassSpecs:
             shots=Shots(None),
             level="Before MLIR Passes",
             resources=SpecsResources(
-                gate_types={"Hadamard": 15, "PauliX": 5},
-                gate_sizes={1: 20},
-                measurements={"expval(PauliX)": 1},
+                counts={"Hadamard": 15, "PauliX": 5},
+                measurement_processes={"expval(PauliX)": 1},
                 num_allocs=1,
             ),
         )
@@ -848,21 +821,18 @@ class TestPassByPassSpecs:
             level="split_non_commuting",
             resources=[
                 SpecsResources(
-                    gate_types={"Hadamard": 1, "PauliX": 2},
-                    gate_sizes={1: 3},
-                    measurements={"expval(PauliX)": 1},
+                    counts={"Hadamard": 1, "PauliX": 2},
+                    measurement_processes={"expval(PauliX)": 1},
                     num_allocs=1,
                 ),
                 SpecsResources(
-                    gate_types={"Hadamard": 1, "PauliX": 2},
-                    gate_sizes={1: 3},
-                    measurements={"expval(PauliY)": 1},
+                    counts={"Hadamard": 1, "PauliX": 2},
+                    measurement_processes={"expval(PauliY)": 1},
                     num_allocs=1,
                 ),
                 SpecsResources(
-                    gate_types={"Hadamard": 1, "PauliX": 2},
-                    gate_sizes={1: 3},
-                    measurements={"expval(PauliZ)": 1},
+                    counts={"Hadamard": 1, "PauliX": 2},
+                    measurement_processes={"expval(PauliZ)": 1},
                     num_allocs=1,
                 ),
             ],
@@ -891,41 +861,35 @@ class TestPassByPassSpecs:
             resources={
                 "split-non-commuting": [
                     SpecsResources(
-                        gate_types={"Hadamard": 1, "PauliX": 2},
-                        gate_sizes={1: 3},
-                        measurements={"expval(PauliX)": 1},
+                        counts={"Hadamard": 1, "PauliX": 2},
+                        measurement_processes={"expval(PauliX)": 1},
                         num_allocs=3,
                     ),
                     SpecsResources(
-                        gate_types={"Hadamard": 1, "PauliX": 2},
-                        gate_sizes={1: 3},
-                        measurements={"expval(PauliY)": 1},
+                        counts={"Hadamard": 1, "PauliX": 2},
+                        measurement_processes={"expval(PauliY)": 1},
                         num_allocs=3,
                     ),
                     SpecsResources(
-                        gate_types={"Hadamard": 1, "PauliX": 2},
-                        gate_sizes={1: 3},
-                        measurements={"expval(PauliZ)": 1},
+                        counts={"Hadamard": 1, "PauliX": 2},
+                        measurement_processes={"expval(PauliZ)": 1},
                         num_allocs=3,
                     ),
                 ],
                 "cancel-inverses": [  # The split should remain throughout subsequent passes
                     SpecsResources(
-                        gate_types={"Hadamard": 1},
-                        gate_sizes={1: 1},
-                        measurements={"expval(PauliX)": 1},
+                        counts={"Hadamard": 1},
+                        measurement_processes={"expval(PauliX)": 1},
                         num_allocs=3,
                     ),
                     SpecsResources(
-                        gate_types={"Hadamard": 1},
-                        gate_sizes={1: 1},
-                        measurements={"expval(PauliY)": 1},
+                        counts={"Hadamard": 1},
+                        measurement_processes={"expval(PauliY)": 1},
                         num_allocs=3,
                     ),
                     SpecsResources(
-                        gate_types={"Hadamard": 1},
-                        gate_sizes={1: 1},
-                        measurements={"expval(PauliZ)": 1},
+                        counts={"Hadamard": 1},
+                        measurement_processes={"expval(PauliZ)": 1},
                         num_allocs=3,
                     ),
                 ],
@@ -959,9 +923,8 @@ class TestPassByPassSpecs:
             shots=Shots(None),
             level="Before MLIR Passes",
             resources=SpecsResources(
-                gate_types={"Hadamard": 3, "PauliX": 1},
-                gate_sizes={1: 4},
-                measurements={"probs(all wires)": 1},
+                counts={"Hadamard": 3, "PauliX": 1},
+                measurement_processes={"probs(all wires)": 1},
                 num_allocs=3,
             ),
         )
@@ -993,8 +956,7 @@ class TestPassByPassSpecs:
         for level in [0, 1]:
             resources = qp.specs(c, level=level)().resources
 
-            assert resources.gate_types == {"DummyOp": 2}
-            assert resources.gate_sizes == {4: 1, 5: 1}
+            assert resources.quantum_operations == {"DummyOp": 2}
 
     def test_symbolic_array(self):
         """Test using specs with symbolic_array."""
@@ -1008,10 +970,10 @@ class TestPassByPassSpecs:
             qp.RX(2 * x, 0)
             return qp.probs()
 
-        counts = qp.specs(c, level=0)().resources.gate_counts
+        counts = qp.specs(c, level=0)().resources.quantum_operations
         assert counts == {"RX": 2}
 
-        counts1 = qp.specs(c, level=1)().resources.gate_counts
+        counts1 = qp.specs(c, level=1)().resources.quantum_operations
         assert counts1 == {"RX": 1}
 
         with pytest.raises(catalyst.utils.exceptions.CompileError, match="is a placeholder op"):
@@ -1036,11 +998,12 @@ class TestSpecsWithPPR:
             num_device_wires=2,
             shots=Shots(None),
             level="to-ppr",
-            resources=SpecsResources(
-                gate_types={"GlobalPhase": 2, "PPR-pi/4-w1": 3, "PPR-pi/8-w1": 1},
-                gate_sizes={0: 2, 1: 4},
-                measurements={},
+            resources=PBCSpecsResources(
+                counts={"GlobalPhase": 2, "PPR-pi/4-w1": 3, "PPR-pi/8-w1": 1},
+                measurement_processes={},
                 num_allocs=2,
+                any_commuting_depth=3,
+                qubit_disjoint_depth=4,
             ),
         )
 
@@ -1062,8 +1025,8 @@ class TestSpecsWithPPR:
             num_device_wires=3,
             shots=Shots(None),
             level="decompose-arbitrary-ppr",
-            resources=SpecsResources(
-                gate_types={
+            resources=PBCSpecsResources(
+                counts={
                     "pbc.prepare": 1,
                     "PPM-w3": 1,
                     "PPM-w1": 1,
@@ -1071,9 +1034,10 @@ class TestSpecsWithPPR:
                     "PPR-pi/2-w2": 1,
                     "PPR-Phi-w1": 1,
                 },
-                gate_sizes={0: 1, 1: 3, 2: 1, 3: 1},
-                measurements={},
+                measurement_processes={},
                 num_allocs=3,
+                any_commuting_depth=4,
+                qubit_disjoint_depth=4,
             ),
         )
 
@@ -1100,16 +1064,15 @@ class TestSymbolicSpecs:
         assert s.level == "Before MLIR Passes"
         assert s.device_name == "lightning.qubit"
         res = s.resources
-        assert isinstance(res, SymbolicSpecsResources)
+        assert res.is_symbolic
         assert len(res.vars) == 1
 
         concrete_res = res.subs({var: 5 for var in res.vars})
-        assert isinstance(concrete_res, SpecsResources)
+        assert isinstance(concrete_res, SpecsResources) and not concrete_res.is_symbolic
 
         expected_res = SpecsResources(
-            gate_types={"Hadamard": 1, "PauliX": 6},
-            gate_sizes={1: 7},
-            measurements={"expval(PauliX)": 1},
+            counts={"Hadamard": 1, "PauliX": 6},
+            measurement_processes={"expval(PauliX)": 1},
             num_allocs=1,
         )
         check_specs_resources_same(concrete_res, expected_res)
@@ -1139,16 +1102,15 @@ class TestSymbolicSpecs:
         assert s.device_name == "lightning.qubit"
 
         res = s.resources
-        assert isinstance(res, SymbolicSpecsResources)
+        assert res.is_symbolic
         assert len(res.vars) == 1
 
         concrete_res = res.subs({var: 5 for var in res.vars})
-        assert isinstance(concrete_res, SpecsResources)
+        assert isinstance(concrete_res, SpecsResources) and not concrete_res.is_symbolic
 
         expected_res = SpecsResources(
-            gate_types={"Hadamard": 1, "PauliX": 6, "PauliY": 15, "PauliZ": 25},
-            gate_sizes={1: 47},
-            measurements={"expval(PauliX)": 1},
+            counts={"Hadamard": 1, "PauliX": 6, "PauliY": 15, "PauliZ": 25},
+            measurement_processes={"expval(PauliX)": 1},
             num_allocs=1,
         )
         check_specs_resources_same(concrete_res, expected_res)
@@ -1176,16 +1138,15 @@ class TestSymbolicSpecs:
         assert s.device_name == "lightning.qubit"
 
         res = s.resources
-        assert isinstance(res, SymbolicSpecsResources)
+        assert res.is_symbolic
         assert len(res.vars) == 1
 
         concrete_res = res.subs({var: 5 for var in res.vars})
-        assert isinstance(concrete_res, SpecsResources)
+        assert isinstance(concrete_res, SpecsResources) and not concrete_res.is_symbolic
 
         expected_res = SpecsResources(
-            gate_types={"Hadamard": 1, "PauliX": 16, "PauliZ": 3},
-            gate_sizes={1: 20},
-            measurements={"expval(PauliX)": 1},
+            counts={"Hadamard": 1, "PauliX": 16, "PauliZ": 3},
+            measurement_processes={"expval(PauliX)": 1},
             num_allocs=1,
         )
         check_specs_resources_same(concrete_res, expected_res)
@@ -1207,16 +1168,15 @@ class TestSymbolicSpecs:
         assert s.level == "Before MLIR Passes"
         assert s.device_name == "lightning.qubit"
         res = s.resources
-        assert isinstance(res, SymbolicSpecsResources)
+        assert res.is_symbolic
         assert len(res.vars) == 2
 
         for n in [2, 3]:
             concrete_res = res.subs({var: n for var in res.vars})
-            assert isinstance(concrete_res, SpecsResources)
+            assert isinstance(concrete_res, SpecsResources) and not concrete_res.is_symbolic
             expected_res = SpecsResources(
-                gate_types={"Hadamard": 1 + n * n, "PauliX": n},
-                gate_sizes={1: 1 + n * n + n},
-                measurements={"expval(PauliX)": 1},
+                counts={"Hadamard": 1 + n * n, "PauliX": n},
+                measurement_processes={"expval(PauliX)": 1},
                 num_allocs=1,
             )
             check_specs_resources_same(concrete_res, expected_res)
@@ -1243,7 +1203,7 @@ class TestSymbolicSpecs:
 
         assert isinstance(all_res, dict)
         for res in all_res.values():
-            assert isinstance(res, SymbolicSpecsResources)
+            assert res.is_symbolic
             assert len(res.vars) == 2
 
         for n in [2, 3]:
@@ -1253,9 +1213,8 @@ class TestSymbolicSpecs:
                 check_specs_resources_same(
                     concrete_res,
                     SpecsResources(
-                        gate_types={"Hadamard": n * n + n + 1, "PauliX": n},
-                        gate_sizes={1: n * n + 2 * n + 1},
-                        measurements={"expval(PauliX)": 1},
+                        counts={"Hadamard": n * n + n + 1, "PauliX": n},
+                        measurement_processes={"expval(PauliX)": 1},
                         num_allocs=1,
                     ),
                 )
@@ -1278,7 +1237,7 @@ class TestSymbolicSpecs:
             return qp.state()
 
         r = qp.specs(c, level=0)(2).resources
-        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
+        assert r.subs({var: 10 for var in r.vars}).quantum_operations["RX"] == 10
 
     def test_symbolic_array_loop_arguemtn(self):
         """Test dynamic loop with a symbolic array as a loop argument."""
@@ -1299,7 +1258,7 @@ class TestSymbolicSpecs:
             return qp.state()
 
         r = qp.specs(c, level=0)(2).resources
-        assert r.subs({var: 10 for var in r.vars}).gate_counts["RX"] == 10
+        assert r.subs({var: 10 for var in r.vars}).quantum_operations["RX"] == 10
 
 
 class TestMarkerIntegration:
@@ -1346,21 +1305,18 @@ class TestMarkerIntegration:
             level={0: "before-transforms", 2: "after-tape", 5: "after-mlir"},
             resources={
                 "before-transforms": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "after-tape": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "after-mlir": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
@@ -1404,39 +1360,33 @@ class TestMarkerIntegration:
             ),
             resources={
                 "before-transforms": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "dummy_transform": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "after-tape": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "Before MLIR Passes": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "cancel-inverses": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "after-mlir": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
@@ -1463,15 +1413,13 @@ class TestMarkerIntegration:
             level={0: "m0", 1: "m1, m1-duplicate"},
             resources={
                 "m0": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "m1, m1-duplicate": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
@@ -1504,21 +1452,18 @@ class TestMarkerIntegration:
             level={0: "m0", 1: "m1", 2: "m2"},
             resources={
                 "m0": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
-                    gate_sizes={1: 6, 2: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "m1": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 2, "RZ": 2},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
                 "m2": SpecsResources(
-                    gate_types={"RX": 1, "RZ": 1},
-                    gate_sizes={1: 2},
-                    measurements={"probs(all wires)": 1},
+                    counts={"RX": 1, "RZ": 1},
+                    measurement_processes={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             },
