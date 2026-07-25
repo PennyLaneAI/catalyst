@@ -28,8 +28,8 @@
 #include "Test/Transforms/Passes.h"
 #include "hlo-extensions/Transforms/Passes.h"
 
-#include "Transport/Transforms/Passes.h"
 #include "Executor/Transforms/Passes.h"
+#include "Transport/Transforms/Passes.h"
 
 namespace catalyst {
 
