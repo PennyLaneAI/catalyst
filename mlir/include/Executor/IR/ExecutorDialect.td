@@ -29,7 +29,7 @@ def Executor_Dialect : Dialect {
         interacts with an executor service:
 
         * Opening a session with an executor endpoint
-        * Shipping a cross-compiled kernel object file or assets to that endpoint
+        * Shipping a cross-compiled kernel object file (or other assets) to that endpoint
         * Dispatching a previously-shipped qnode kernel
         * Invoking an arbitrary symbol in a shared library
     }];
