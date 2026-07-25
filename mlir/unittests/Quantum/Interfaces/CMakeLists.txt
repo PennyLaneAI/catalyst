@@ -8,4 +8,5 @@ target_link_libraries(CatalystQuantumInterfaceTests PRIVATE
     ${dialect_libs}
     MLIRQuantum
     MLIRQRef
+    MLIRTestDialect
 )

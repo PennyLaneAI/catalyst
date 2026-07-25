@@ -55,7 +55,7 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
         // quantum gradient function of the parameter-shift pattern.
         scf::IfOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         scf::ForOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
-        catalyst::quantum::InsertOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
+        catalyst::quantum::ExtractOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::DeallocOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::AllocOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
 

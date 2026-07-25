@@ -1,6 +1,5 @@
 recursive-include frontend/catalyst/bin *
 recursive-include frontend/catalyst/lib *
 recursive-include frontend/catalyst/enzyme *
-recursive-include frontend/mlir_quantum *
 recursive-include frontend/catalyst/include/ *.h *.h.inc
 recursive-include frontend/catalyst/resources/ *.mlirbc
