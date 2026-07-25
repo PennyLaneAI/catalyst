@@ -100,6 +100,17 @@ func.func @custom_call_copy(%arg0: tensor<2x3xf64>) -> tensor<2x2xf64> {
 
 // -----
 
+// `backend_config` attribute survives bufferization.
+// CHECK-LABEL: func.func @custom_call_backend_config
+// CHECK: catalyst.custom_call fn("lapack_dgesdd") (%{{.*}}, %{{.*}}) {backend_config = {foo = "bar"}, number_original_arg = 1 : i32} :
+// CHECK-SAME: (memref<3x3xf64>, memref<3x3xf64>) -> ()
+func.func @custom_call_backend_config(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
+    %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0) {backend_config = {foo = "bar"}} : (tensor<3x3xf64>) -> (tensor<3x3xf64>)
+    return %0 : tensor<3x3xf64>
+}
+
+// -----
+
 // CHECK-LABEL: @test0
 module @test0 {
   // CHECK: catalyst.callback @callback_1(memref<f64>, memref<f64>)

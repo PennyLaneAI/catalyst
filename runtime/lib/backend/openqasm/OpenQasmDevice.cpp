@@ -15,6 +15,7 @@
 #include "OpenQasmDevice.hpp"
 
 #include <bitset>
+#include <cstdint>
 
 #include "Exception.hpp"
 

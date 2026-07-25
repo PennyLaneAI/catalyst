@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "pybind11/embed.h"
+
+#include <cstdint>
+
 #include "catch2/catch_test_macros.hpp"
 #include "catch2/matchers/catch_matchers_string.hpp"
-#include "pybind11/embed.h"
 
 #include "OQCDevice.cpp"
 

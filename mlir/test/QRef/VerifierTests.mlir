@@ -121,19 +121,19 @@ func.func @test_multirz_duplicate_qubits(%q0: !qref.bit, %theta: f64) {
 
 // -----
 
-func.func @test_pcphase_control(%q0: !qref.bit, %q1: !qref.bit, %theta: f64, %dim: f64) {
+func.func @test_pcphase_control(%q0: !qref.bit, %q1: !qref.bit, %theta: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling qubits in input (1) and controlling values (2) must be the same}}
-    qref.pcphase(%theta, %dim) %q0 ctrls (%q1) ctrlvals (%true, %true) : !qref.bit ctrls !qref.bit
+    qref.pcphase(%theta, dim : 1) %q0 ctrls (%q1) ctrlvals (%true, %true) : !qref.bit ctrls !qref.bit
     return
 }
 
 // -----
 
-func.func @test_pcphase_duplicate_qubits(%q0: !qref.bit, %theta: f64, %dim: f64) {
+func.func @test_pcphase_duplicate_qubits(%q0: !qref.bit, %theta: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{all qubits on a quantum gate must be distinct (including controls)}}
-    qref.pcphase(%theta, %dim) %q0, %q0 : !qref.bit, !qref.bit
+    qref.pcphase(%theta, dim : 1) %q0, %q0 : !qref.bit, !qref.bit
     return
 }
 

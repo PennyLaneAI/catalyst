@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "dynamic-one-shot"
 
+#include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
 

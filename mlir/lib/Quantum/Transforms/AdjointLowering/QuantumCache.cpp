@@ -14,6 +14,8 @@
 
 #include "QuantumCache.hpp"
 
+#include <cstdint>
+
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "Catalyst/IR/CatalystOps.h"

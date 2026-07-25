@@ -596,9 +596,8 @@ class TestCatalystOnlyControlled:
             qp.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3
         )
 
-        assert isinstance(result, type(expected))
         assert result.name == expected.name
-        assert result.base == expected.base
+        assert qp.equal(result.base, expected.base)
         assert result.control_wires == expected.control_wires
         assert result.control_values == expected.control_values
         assert result.work_wires == expected.work_wires
@@ -763,7 +762,7 @@ class TestControlledProperties:
     """Test the properties of the `catalyst.ctrl` symbolic operator."""
 
     def test_data(self):
-        """Test that the base data can be get and set through HybridCtrl class."""
+        """Test that Controlled data is read-only."""
 
         x = pnp.array(1.234)
 
@@ -772,15 +771,10 @@ class TestControlledProperties:
 
         assert op.data == (x,)
 
-        x_new = (pnp.array(2.3454),)
-        op.data = x_new
-        assert op.data == (x_new,)
-        assert base.data == (x_new,)
-
-        x_new2 = (pnp.array(3.456),)
-        base.data = x_new2
-        assert op.data == (x_new2,)
-        assert op.parameters == [x_new2]
+        with pytest.raises(
+            AttributeError, match="property 'data' of 'ControlledOp' object has no setter"
+        ):
+            setattr(op, "data", (pnp.array(2.3454),))
 
     @pytest.mark.parametrize(
         "val, arr", ((4, [1, 0, 0]), (6, [1, 1, 0]), (1, [0, 0, 1]), (5, [1, 0, 1]))
@@ -985,7 +979,9 @@ class TestControlledMiscMethods:
         assert copied_op.control_values == op.control_values
         assert copied_op.data == (param1,)
 
-        copied_op.data = (6.54,)
+        copied_op = qp.ops.functions.bind_new_parameters(copied_op, (6.54,))
+
+        assert copied_op.data == (6.54,)
         assert op.data == (param1,)
 
     def test_label(self):
@@ -1427,7 +1423,7 @@ class TestDecomposition:
                 OpWithDecomposition(0.123, wires=[0, 1]),
                 [
                     qp.CH(wires=[2, 0]),
-                    Controlled(qp.S(wires=1), control_wires=2),
+                    qp.ctrl(qp.S(1), 2),
                     qp.CRX(0.123, wires=[2, 0]),
                 ],
             ),
@@ -1444,7 +1440,10 @@ class TestDecomposition:
     def test_decomposition(self, target, decomp):
         """Test that we decompose a normal controlled operation"""
         op = C_ctrl(target, 2)
-        assert op.decomposition() == decomp
+        actual = op.decomposition()
+        assert len(actual) == len(decomp)
+        for actual_op, expected_op in zip(actual, decomp):
+            assert qp.equal(actual_op, expected_op)
 
     def test_non_differentiable_one_qubit_special_unitary(self):
         """Assert that a non-differentiable on qubit special unitary uses the bisect

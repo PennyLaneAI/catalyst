@@ -15,6 +15,7 @@
 #include "PBC/Utils/PBCLayer.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"

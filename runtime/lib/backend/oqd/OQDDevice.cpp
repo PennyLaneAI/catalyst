@@ -15,6 +15,7 @@
 #include "OQDDevice.hpp"
 
 #include <algorithm>
+#include <cstdint>
 
 #include "OQDRuntimeCAPI.h"
 

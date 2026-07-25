@@ -19,3 +19,4 @@
 #include "mlir/IR/OpDefinition.h"
 
 #include "Executor/IR/ExecutorOpsDialect.h.inc"
+#include "Executor/IR/ExecutorTypes.h"

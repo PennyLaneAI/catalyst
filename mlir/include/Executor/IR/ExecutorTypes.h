@@ -12,18 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Test that decomposition chooses cheapest decomposition path
+#pragma once
 
-// RUN: quantum-opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0,RY=1.0,RZ=1.0,GlobalPhase=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+//===----------------------------------------------------------------------===//
+// Executor type declarations.
+//===----------------------------------------------------------------------===//
 
+#include "mlir/IR/Types.h"
 
-func.func @circuit() -> !quantum.bit {
-    %0 = quantum.alloc(1) : !quantum.reg
-    %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-    // CHECK-NOT: Hadamard
-    // CHECK-DAG: RZ
-    // CHECK-DAG: RY
-    // CHECK-DAG: gphase
-    %qout = quantum.custom "Hadamard"() %q : !quantum.bit
-    return %qout : !quantum.bit
-}
+#define GET_TYPEDEF_CLASSES
+#include "Executor/IR/ExecutorOpsTypes.h.inc"

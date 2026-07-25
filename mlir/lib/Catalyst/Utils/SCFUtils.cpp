@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cmath> // std::ceil()
+#include <cstdint>
 #include <optional>
 
 #include "mlir/Dialect/SCF/IR/SCF.h"

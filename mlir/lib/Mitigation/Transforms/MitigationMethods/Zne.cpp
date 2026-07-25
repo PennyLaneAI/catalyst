@@ -15,6 +15,7 @@
 #include "Zne.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <deque>
 #include <iostream>
 #include <sstream>

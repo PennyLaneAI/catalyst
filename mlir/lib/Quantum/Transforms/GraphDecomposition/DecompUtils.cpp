@@ -14,6 +14,8 @@
 
 #include "DecompUtils.hpp"
 
+#include <cstdint>
+
 #include "mlir/IR/BuiltinAttributes.h"
 
 using namespace mlir;

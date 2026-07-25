@@ -14,6 +14,8 @@
 
 #include "QecLogical/IR/QecLogicalOps.h"
 
+#include <cstdint>
+
 #include "llvm/Support/Casting.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"

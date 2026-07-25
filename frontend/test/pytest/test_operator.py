@@ -16,7 +16,9 @@ Tests for the new Operator2 class.
 """
 
 # pylint: disable = useless-parent-delegation, missing-function-docstring, missing-class-docstring
+
 import pennylane as qp
+import pytest
 from jax import numpy as jnp
 
 
@@ -90,7 +92,8 @@ class QubitUnitary(qp.core.Operator2):
 
 class PCPhase(qp.core.Operator2):
 
-    dynamic_argnames = ("phi", "dim")
+    dynamic_argnames = ("phi",)
+    compilable_argnames = ("dim",)
 
     def __init__(self, phi, dim, wires):
         super().__init__(phi, dim, wires)
@@ -173,23 +176,33 @@ class TestOperator2Execution:
         assert qp.math.allclose(r1, -1)
         assert qp.math.allclose(r2, -1)
 
-    def test_PCPhase(self):
+    @pytest.mark.parametrize(
+        "dim, expected",
+        [
+            (
+                2,
+                jnp.array(
+                    [jnp.exp(0.5j) / 2, jnp.exp(0.5j) / 2, jnp.exp(-0.5j) / 2, jnp.exp(-0.5j) / 2]
+                ),
+            ),
+            (
+                3,
+                jnp.array(
+                    [jnp.exp(0.5j) / 2, jnp.exp(0.5j) / 2, jnp.exp(0.5j) / 2, jnp.exp(-0.5j) / 2]
+                ),
+            ),
+        ],
+    )
+    def test_PCPhase(self, dim, expected):
         """Test that PCPhase can be executed."""
 
         @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
-        def c(x, dim):
+        def c(x):
             Hadamard(0)
             Hadamard(1)
             PCPhase(x, dim, (0, 1))
             return qp.state()
 
-        state2 = c(0.5, 2)
-        plus = jnp.exp(0.5j) / 2
-        minus = jnp.exp(-0.5j) / 2
-        expected2 = jnp.array([plus, plus, minus, minus])
-        assert qp.math.allclose(state2, expected2)
-
-        state3 = c(0.5, 3)
-        expected3 = jnp.array([plus, plus, plus, minus])
-        assert qp.math.allclose(state3, expected3)
+        state = c(0.5)
+        assert qp.math.allclose(state, expected)

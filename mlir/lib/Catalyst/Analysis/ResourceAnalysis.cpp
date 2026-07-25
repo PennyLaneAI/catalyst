@@ -16,6 +16,8 @@
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 
+#include <cstdint>
+
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"

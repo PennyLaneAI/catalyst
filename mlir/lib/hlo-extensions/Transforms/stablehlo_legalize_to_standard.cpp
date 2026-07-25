@@ -38,6 +38,7 @@ limitations under the License.
 
 // This file implements logic for lowering Stablehlo dialect to Standard dialect.
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <utility>

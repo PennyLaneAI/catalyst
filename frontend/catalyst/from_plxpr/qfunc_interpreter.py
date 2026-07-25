@@ -333,6 +333,10 @@ def handle_operator(
     else:
         control_wire_inputs = control_values = ()
 
+    control_wire_inputs += self.control_wires
+    control_values += self.control_values
+    n_ctrls += len(self.control_wires)
+
     new_wires = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs
     ]
@@ -398,22 +402,20 @@ def _pcphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, h
     # supporting general PL operations in the capture framework.
     # See https://docs.pennylane.ai/en/stable/code/api/pennylane.PCPhase.html
     dim = hyperparameters["dimension"][0]
-    params_len += 1
 
-    ctrl_inputs = invals[qubits_len + 2 :]
-    ctrl_wires = invals[qubits_len + 1 : -len(ctrl_inputs)]
+    # invals are [*wires, theta, *ctrl_wires, *ctrl_vals]
+    ctrl_inputs = invals[qubits_len + 1 :]
 
     return qref_qinst_p.bind(
         *wires,
         angle,
-        dim,
-        *ctrl_wires,
         *ctrl_inputs,
         op=op,
         qubits_len=qubits_len,
         params_len=params_len,
         ctrl_len=ctrl_len,
         adjoint=adjoint,
+        pcphase_dim=dim,
     )
 
 

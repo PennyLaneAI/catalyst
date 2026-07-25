@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "ppm-specs"
 
+#include <cstdint>
 #include <string>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"

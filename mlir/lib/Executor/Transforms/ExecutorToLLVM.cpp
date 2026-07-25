@@ -180,8 +180,9 @@ struct OpenOpLowering : public OpConversionPattern<executor::OpenOp> {
         Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
                                         op.getAddress().str() + '\0', mod);
 
-        LLVM::CallOp::create(rewriter, loc, openFn, ValueRange{addrPtr});
-        rewriter.eraseOp(op);
+        Value session =
+            LLVM::CallOp::create(rewriter, loc, openFn, ValueRange{addrPtr}).getResult();
+        rewriter.replaceOp(op, session);
         return success();
     }
 };
@@ -193,7 +194,7 @@ struct OpenOpLowering : public OpConversionPattern<executor::OpenOp> {
 struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(executor::SendBinaryOp op, OpAdaptor /*adaptor*/,
+    LogicalResult matchAndRewrite(executor::SendBinaryOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
@@ -203,19 +204,18 @@ struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp>
         Type i64Ty = rewriter.getI64Type();
         ModuleOp mod = op->getParentOfType<ModuleOp>();
 
-        Type sendBinSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy, ptrTy, i32Ty});
+        Type sendBinSig = LLVM::LLVMFunctionType::get(i64Ty, {i64Ty, ptrTy, i32Ty});
         LLVM::LLVMFuncOp sendBinFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__executor__send_binary", sendBinSig);
 
         std::string tag = llvm::sys::path::stem(op.getBinaryPath()).str();
-        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
-                                        op.getAddress().str() + '\0', mod);
+        Value session = adaptor.getSession();
         Value pathPtr = getGlobalString(loc, rewriter, "executor_path_" + tag,
                                         op.getBinaryPath().str() + '\0', mod);
         Value formatTag =
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(op.getFormat()));
 
-        LLVM::CallOp::create(rewriter, loc, sendBinFn, ValueRange{addrPtr, pathPtr, formatTag});
+        LLVM::CallOp::create(rewriter, loc, sendBinFn, ValueRange{session, pathPtr, formatTag});
         rewriter.eraseOp(op);
         return success();
     }
@@ -241,7 +241,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
 
         // parameters:
-        // - addr: the address of the executor
+        // - session: the executor session handle
         // - symbol: the symbol to invoke
         // - num_inputs: the number of input arguments
         // - input_descs: the input descriptor array
@@ -251,13 +251,12 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         // - output_descs: the output descriptor array
         // - output_ranks: the output rank array
         Type launchSig = LLVM::LLVMFunctionType::get(
-            voidTy, {ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
+            voidTy, {i64Ty, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
         LLVM::LLVMFuncOp launchFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__executor__launch", launchSig);
 
         std::string callee = op.getKernelCallee().str();
-        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
-                                        op.getAddress().str() + '\0', mod);
+        Value session = adaptor.getSession();
 
         std::string symbolName = "_catalyst_pyface_" + callee;
         Value symbolPtr =
@@ -313,7 +312,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
             rewriter, loc, rewriter.getI64IntegerAttr(outputDescPtrs.size()));
 
         LLVM::CallOp::create(rewriter, loc, launchFn,
-                             ValueRange{addrPtr, symbolPtr, numInputs, inputDescsArr, inputRanksArr,
+                             ValueRange{session, symbolPtr, numInputs, inputDescsArr, inputRanksArr,
                                         inputSizesArr, numOutputs, outputDescsArr, outputRanksArr,
                                         outputSizesArr});
 
@@ -371,14 +370,14 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
 
         // parameters:
-        // - addr: the address of the executor
+        // - session: the executor session handle
         // - symbol: the symbol to invoke
         // - args_buf: the input buffer
         // - args_size: the size of the input buffer
         // - out_buf: the output buffer
         // - out_size: the size of the output buffer
         Type callSig =
-            LLVM::LLVMFunctionType::get(i32Ty, {ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy});
+            LLVM::LLVMFunctionType::get(i32Ty, {i64Ty, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy});
         LLVM::LLVMFuncOp callFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__executor__call_wrapper", callSig);
         Type freeSig = LLVM::LLVMFunctionType::get(voidTy, {ptrTy});
@@ -410,8 +409,7 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
         Type bufTy = LLVM::LLVMArrayType::get(i8Ty, totalInputBytes > 0 ? totalInputBytes : 1);
         std::string sym = op.getSymbol().str();
 
-        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
-                                        op.getAddress().str() + '\0', mod);
+        Value session = adaptor.getSession();
         Value symPtr = getGlobalString(loc, rewriter, "executor_lib_sym_" + sym, sym + '\0', mod);
 
         Value argsBuf = getStaticAlloca(loc, rewriter, bufTy, 1);
@@ -436,7 +434,7 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
 
         LLVM::CallOp::create(
             rewriter, loc, callFn,
-            ValueRange{addrPtr, symPtr, argsBuf, argsSize, outBufSlot, outSizeSlot});
+            ValueRange{session, symPtr, argsBuf, argsSize, outBufSlot, outSizeSlot});
 
         Value outBuf = LLVM::LoadOp::create(rewriter, loc, ptrTy, outBufSlot);
         int64_t outOffset = 0;
@@ -467,23 +465,19 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
 struct CloseOpLowering : public OpConversionPattern<executor::CloseOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(executor::CloseOp op, OpAdaptor /*adaptor*/,
+    LogicalResult matchAndRewrite(executor::CloseOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
-        MLIRContext *ctx = rewriter.getContext();
-        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
         Type i64Ty = rewriter.getI64Type();
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
 
-        Type closeSig = LLVM::LLVMFunctionType::get(i64Ty, {ptrTy});
+        Type closeSig = LLVM::LLVMFunctionType::get(i64Ty, {i64Ty});
         LLVM::LLVMFuncOp closeFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__executor__close", closeSig);
 
-        Value addrPtr = getGlobalString(loc, rewriter, addrGlobalKey(op.getAddress()),
-                                        op.getAddress().str() + '\0', mod);
+        Value session = adaptor.getSession();
 
-        LLVM::CallOp::create(rewriter, loc, closeFn, ValueRange{addrPtr});
+        LLVM::CallOp::create(rewriter, loc, closeFn, ValueRange{session});
         rewriter.eraseOp(op);
         return success();
     }
@@ -502,6 +496,9 @@ struct ConvertExecutorToLLVMPass : impl::ConvertExecutorToLLVMPassBase<ConvertEx
         ModuleOp mod = getOperation();
 
         LLVMTypeConverter typeConverter(ctx);
+        typeConverter.addConversion([](executor::SessionType type) -> Type {
+            return IntegerType::get(type.getContext(), 64);
+        });
 
         RewritePatternSet patterns(ctx);
         patterns.add<OpenOpLowering, SendBinaryOpLowering, LaunchOpLowering, CallOpLowering,

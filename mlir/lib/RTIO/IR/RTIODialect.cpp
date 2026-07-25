@@ -14,6 +14,8 @@
 
 #include "RTIO/IR/RTIODialect.h"
 
+#include <cstdint>
+
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
