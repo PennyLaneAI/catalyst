@@ -28,6 +28,17 @@
   attribute and emits the transport session lifecycle into the host entry function.
   [(#3063)](https://github.com/PennyLaneAI/catalyst/pull/3063)
 
+* A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
+  be dispatched to a separate executor process. `executor` dialect models the session lifecycle
+  through an `!executor.session` handle that is threaded from `executor.open` through `send_binary`,
+  `launch`, `call`, and `close`.
+  [(#2909)](https://github.com/PennyLaneAI/catalyst/pull/2909)
+
+  - `--convert-executor-to-llvm` pass that lowers each `executor` op to a call into the
+    `__catalyst__executor__*` C-ABI runtime, marshalling string endpoints, memref descriptors, and
+    per-argument metadata.
+  [(#2910)](https://github.com/PennyLaneAI/catalyst/pull/2910)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
