@@ -333,6 +333,10 @@ def handle_operator(
     else:
         control_wire_inputs = control_values = ()
 
+    control_wire_inputs += self.control_wires
+    control_values += self.control_values
+    n_ctrls += len(self.control_wires)
+
     new_wires = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs
     ]
