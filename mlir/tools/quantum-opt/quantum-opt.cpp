@@ -50,8 +50,8 @@
 
 #include "RegisterAllPasses.h"
 
-#include "Transport/IR/TransportDialect.h"
 #include "Executor/IR/ExecutorDialect.h"
+#include "Transport/IR/TransportDialect.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
