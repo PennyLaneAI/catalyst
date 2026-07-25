@@ -23,11 +23,11 @@ def ConvertExecutorToLLVMPass : Pass<"convert-executor-to-llvm", "mlir::ModuleOp
         Replaces each `executor.*` op with the corresponding `__catalyst__executor__*`
         runtime entry point:
 
-        * `executor.open`        -> `__catalyst__executor__open(addr)`
-        * `executor.send_binary` -> `__catalyst__executor__send_binary(addr, path, format)`
-        * `executor.launch`      -> `__catalyst__executor__launch(addr, "_catalyst_pyface_<callee>", ...)`
-        * `executor.call`        -> `__catalyst__executor__call_wrapper(addr, sym, ...)` + `__catalyst__executor__free_result`
-        * `executor.close`       -> `__catalyst__executor__close(addr)`
+        * `executor.open`        -> `session = __catalyst__executor__open(addr)`
+        * `executor.send_binary` -> `__catalyst__executor__send_binary(session, path, format)`
+        * `executor.launch`      -> `__catalyst__executor__launch(session, "_catalyst_pyface_<callee>", ...)`
+        * `executor.call`        -> `__catalyst__executor__call_wrapper(session, sym, ...)` + `__catalyst__executor__free_result`
+        * `executor.close`       -> `__catalyst__executor__close(session)`
     }];
 
     let dependentDialects = [
