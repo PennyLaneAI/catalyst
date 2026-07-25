@@ -13,16 +13,16 @@
 // limitations under the License.
 
 /**
-* Plugin entry point for the GPU-verbs coprocessor backend. A loader dlopen's
-* this .so and resolves CatalystTransportCoprocessorFactory.
-* The coprocessor function is bound after construction via
-* set_coprocessor_launcher(): a launch-once function invoked at start() to
-* launch the on-device decode kernel (the kernel itself lives in
-* GpuLaunchers.hip); nullptr selects the built-in echo launcher. This backend
-* supports only the launcher convention; binding a per-message function via
-* set_coprocessor_fn throws (the base class default), so a mis-bind fails at
-* bind time rather than hanging at run time.
-*/
+ * Plugin entry point for the GPU-verbs coprocessor backend. A loader dlopen's
+ * this .so and resolves CatalystTransportCoprocessorFactory.
+ * The coprocessor function is bound after construction via
+ * set_coprocessor_launcher(): a launch-once function invoked at start() to
+ * launch the on-device decode kernel (the kernel itself lives in
+ * GpuLaunchers.hip); nullptr selects the built-in echo launcher. This backend
+ * supports only the launcher convention; binding a per-message function via
+ * set_coprocessor_fn throws (the base class default), so a mis-bind fails at
+ * bind time rather than hanging at run time.
+ */
 
 #include <string>
 
