@@ -30,8 +30,8 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
 
-#include "Transport/IR/TransportDialect.h"
 #include "Executor/IR/ExecutorDialect.h"
+#include "Transport/IR/TransportDialect.h"
 
 int main(int argc, char **argv)
 {

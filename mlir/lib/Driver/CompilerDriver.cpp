@@ -89,8 +89,8 @@
 
 #include "RegisterAllPasses.h"
 
-#include "Transport/IR/TransportDialect.h"
 #include "Executor/IR/ExecutorDialect.h"
+#include "Transport/IR/TransportDialect.h"
 
 using namespace mlir;
 using namespace catalyst;
