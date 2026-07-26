@@ -38,17 +38,14 @@ namespace {
 // This pass runs after `cross-compile-targets`, which records each module's object file in
 // `catalyst.object_file`. For every nested module carrying a `catalyst.dispatch` attribute this
 // pass:
-//   1. Injects `executor.open` into `setup()` (once per unique address) and `executor.send_binary`
-//      into `setup()` (once per module; the object holds every entry).
+//   1. Opens a session (`executor.open`) once per host function and ships the module's object
+//      (`executor.send_binary`) once per function, before its launches.
 //   2. Rewrites every host-side `catalyst.launch_kernel` targeting the module into an
-//      `executor.launch` carrying the executor address, the entry callee, and the object-file path.
+//      `executor.launch` carrying the session value, the entry callee and the object path.
 //   3. Erases the nested module from the host after its `catalyst.launch_kernel`s are rewritten.
 //
 // A `catalyst.custom_call` carrying a `dispatch` entry in its `backend_config` is rewritten into an
-// `executor.call` on the resolved executor address.
-//
-// Session teardown is handled by the runtime, which closes every open session at process exit, so
-// no explicit close op is emitted.
+// `executor.call` reusing the same per-function session.
 struct DispatchExecutorTargetsPass
     : impl::DispatchExecutorTargetsPassBase<DispatchExecutorTargetsPass> {
     using DispatchExecutorTargetsPassBase::DispatchExecutorTargetsPassBase;
@@ -104,9 +101,6 @@ struct DispatchExecutorTargetsPass
                     call.emitOpError("custom_call dispatch has no executor address");
                     return signalPassFailure();
                 }
-                if (openedAddresses.insert(addrAttr.str()).second) {
-                    injectExecutorOpenIntoSetup(host, addrAttr);
-                }
             }
             if (failed(rewriteExecutorLibCalls(libCalls, executorAddress))) {
                 return signalPassFailure();
@@ -132,6 +126,27 @@ struct DispatchExecutorTargetsPass
         return fallbackAddress;
     }
 
+    // Sessions opened per (function, address).
+    llvm::DenseMap<std::pair<Operation *, Attribute>, Value> sessionCache;
+
+    // Return the session handle for `addressAttr` in `user`'s function, opening one at the function
+    // entry on first use and caching it for subsequent sites.
+    Value getOrOpenSession(Operation *user, StringAttr addressAttr)
+    {
+        auto func = user->getParentOfType<func::FuncOp>();
+        std::pair<Operation *, Attribute> key{func.getOperation(), addressAttr};
+        if (Value cached = sessionCache.lookup(key)) {
+            return cached;
+        }
+        Block &entry = func.getBody().front();
+        OpBuilder b(&entry, entry.begin());
+        Value session =
+            executor::OpenOp::create(b, func.getLoc(), SessionType::get(&getContext()), addressAttr)
+                .getSession();
+        sessionCache[key] = session;
+        return session;
+    }
+
     LogicalResult rewriteExecutorLibCalls(ArrayRef<catalyst::CustomCallOp> libCalls,
                                           StringAttr fallbackAddress)
     {
@@ -148,51 +163,39 @@ struct DispatchExecutorTargetsPass
             if (auto n = call.getNumberOriginalArg()) {
                 numInputAttr = b.getI32IntegerAttr(*n);
             }
+            Value session = getOrOpenSession(call, addressAttr);
             auto executorCall = executor::CallOp::create(
-                b, call.getLoc(), call.getResultTypes(), call.getOperands(),
-                /*address=*/addressAttr, /*symbol=*/symAttr,
-                /*num_input_args=*/numInputAttr);
+                b, call.getLoc(), call.getResultTypes(), session, call.getOperands(),
+                /*symbol=*/symAttr, /*num_input_args=*/numInputAttr);
             call.replaceAllUsesWith(executorCall.getResults());
             call.erase();
         }
         return success();
     }
 
-    // Insert `executor.open` before the terminator of `setup`. No-op if setup is absent or
-    // bodyless.
-    void injectExecutorOpenIntoSetup(ModuleOp host, StringAttr addressAttr)
+    // Objects already shipped per (function, object), so `send_binary` is emitted once per host
+    // function even when that function launches the module more than once.
+    llvm::DenseSet<std::pair<Operation *, Attribute>> shippedObjects;
+
+    // Ship `pathAttr` over the session for `addressAttr`, once per (function, object). Emitted
+    // right after the function's `executor.open` so it precedes every launch of the object.
+    void ensureBinaryShipped(Operation *user, StringAttr addressAttr, StringAttr pathAttr)
     {
-        auto setupFn = host.lookupSymbol<func::FuncOp>("setup");
-        if (!setupFn || setupFn.getBody().empty()) {
+        auto func = user->getParentOfType<func::FuncOp>();
+        std::pair<Operation *, Attribute> key{func.getOperation(), pathAttr};
+        if (!shippedObjects.insert(key).second) {
             return;
         }
-        Operation *terminator = setupFn.getBody().front().getTerminator();
-        if (!terminator) {
-            return;
-        }
-        OpBuilder b(terminator);
-        executor::OpenOp::create(b, setupFn.getLoc(), addressAttr);
+        Value session = getOrOpenSession(user, addressAttr);
+        Operation *openOp = session.getDefiningOp();
+        OpBuilder b(openOp);
+        b.setInsertionPointAfter(openOp);
+        executor::SendBinaryOp::create(b, func.getLoc(), session, pathAttr);
     }
 
-    // Insert `executor.send_binary` before the terminator of `setup`. No-op if setup is absent or
-    // bodyless. Always called after `injectExecutorOpenIntoSetup` so the session is opened first.
-    void injectExecutorSendBinaryIntoSetup(ModuleOp host, StringAttr addressAttr,
-                                           StringAttr pathAttr)
-    {
-        auto setupFn = host.lookupSymbol<func::FuncOp>("setup");
-        if (!setupFn || setupFn.getBody().empty()) {
-            return;
-        }
-        Operation *terminator = setupFn.getBody().front().getTerminator();
-        if (!terminator) {
-            return;
-        }
-        OpBuilder b(terminator);
-        executor::SendBinaryOp::create(b, setupFn.getLoc(), addressAttr, pathAttr);
-    }
-
-    // Open a session (once per address), ship the object recorded in
-    // `catalyst.object_file`, and rewrite each host-side launch_kernel into an `executor.launch`.
+    // Rewrite each host-side launch_kernel targeting `nested` into an `executor.launch`, opening a
+    // session and shipping the object recorded in `catalyst.object_file` within the launching
+    // function.
     LogicalResult dispatchTargetModule(ModuleOp host, ModuleOp nested,
                                        llvm::SmallSet<std::string, 4> &openedAddresses,
                                        StringAttr &executorAddress)
@@ -221,15 +224,8 @@ struct DispatchExecutorTargetsPass
         // Remember the executor address so standalone executor lib calls reuse it.
         executorAddress = addressAttr;
 
-        // Inject executor.open (setup) once per unique address.
-        if (!openedAddresses.count(moduleAddress)) {
-            openedAddresses.insert(moduleAddress);
-            injectExecutorOpenIntoSetup(host, addressAttr);
-        }
-
-        // Ship the object once per module: a single `catalyst.object_file` holds every
-        // entry function, and executor.launch resolves individual symbols within it.
-        injectExecutorSendBinaryIntoSetup(host, addressAttr, pathAttr);
+        // Track unique executor addresses (used to detect ambiguous lib-call dispatch).
+        openedAddresses.insert(moduleAddress);
 
         // Rewrite each host-side launch_kernel targeting this module into an executor.launch.
         StringRef moduleName = nested.getSymName().value_or("");
@@ -254,11 +250,14 @@ struct DispatchExecutorTargetsPass
             }
             auto calleeAttr = StringAttr::get(ctx, launchKernel.getCalleeName().getValue());
             OpBuilder b(launchKernel);
-            // `pathAttr` (the object-file path shipped by send_binary) identifies which object the
-            // entry resolves in, so executor.launch is resolved against the right binary.
+            // Open the session and ship the object within this launch's own function, then reuse
+            // the session for the launch. `pathAttr` (the object-file path shipped by send_binary)
+            // identifies which object the entry resolves in.
+            Value session = getOrOpenSession(launchKernel, addressAttr);
+            ensureBinaryShipped(launchKernel, addressAttr, pathAttr);
             auto launch = executor::LaunchOp::create(
-                b, launchKernel.getLoc(), launchKernel.getResultTypes(), launchKernel.getOperands(),
-                addressAttr, calleeAttr, pathAttr);
+                b, launchKernel.getLoc(), launchKernel.getResultTypes(), session,
+                launchKernel.getOperands(), calleeAttr, /*object=*/pathAttr);
             launchKernel.replaceAllUsesWith(launch.getResults());
             launchKernel.erase();
         }
