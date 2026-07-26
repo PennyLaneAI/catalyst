@@ -15,6 +15,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 
 namespace catalyst::transport {
@@ -165,26 +166,71 @@ class ControllerSession : public TransportSession {
 };
 
 /**
- * @brief Opaque function to run on the coprocessor. May include a persistent kernel on the GPU.
+ * @brief Per-message coprocessor function (CPU-style). Invoked once per received
+ * message: decode `in` (`in_len` bytes) into `out` (capacity `out_cap`) and
+ * return the number of bytes written.
  */
 using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *out,
                                       std::size_t out_cap, void *ctx);
 
 /**
+ * @brief Data description for a persistent engine to receive and consume
+ * request messages, then autonomously return processed message to the handoff buffer,
+ * which is then replied by a coprocessor host thread.
+ *
+ * The session owns the buffers and keeps it valid until the engine has stopped
+ * (set `*stop` nonzero, then synchronize) or has processed `total` messages.
+ */
+struct CoprocLaunchDesc {
+    void *ring;               // recv request-slot ring base (device HBM or host RAM)
+    std::uint32_t ring_slots; // slot count of both rings; must be a power of two
+    void *handoff;            // reply-slot ring base (engine -> session, e.g. gpu to cpu)
+    void *stop;               // uint32_t teardown flag the engine polls
+    std::uint64_t total;      // messages to process, or 0 = run until stopped
+    void *stream;             // device queue to launch on (e.g. hipStream_t); null for host
+};
+
+/**
+ * @brief Launch-once coprocessor function (GPU-style). Invoked once at start():
+ * launches a persistent worker on the given datapath. Returns 0 on a successful
+ * launch, nonzero on failure.
+ */
+using CoprocessorLauncherFn = int (*)(const CoprocLaunchDesc *desc, void *ctx);
+
+/**
  * @brief Coprocessor role: receives messages, process, and returns replies.
+ *
+ * A coprocessor function comes in two conventions:
+ * - a host/cpu per-message function vs.
+ * - a device kernel launched once.
+ * Each backend overrides only the setter it supports; the other keeps
+ * the throwing default, so a mis-bind fails loudly at bind time.
  */
 class CoprocessorSession : public TransportSession {
   public:
     /**
-     * @brief Bind the coprocessor function this session runs.
+     * @brief Bind a per-message coprocessor function (CPU-style).
      *
-     * Call before start(). `fn` is a local function pointer; `ctx` is passed
-     * back to `fn` on every invocation and may be null.
-     *
-     * @param fn The coprocessor function to run per received message.
-     * @param ctx Opaque context passed to `fn` on each invocation; may be null.
+     * Call before start(). `fn` is invoked once per received message; `ctx` is
+     * passed back on every invocation and may be null.
      */
-    virtual void set_coprocessor_fn(CoprocessorFn fn, void *ctx) = 0;
+    virtual void set_coprocessor_fn(CoprocessorFn /*fn*/, void * /*ctx*/)
+    {
+        throw std::logic_error(
+            "transport: per-message coprocessor function not supported by this backend");
+    }
+
+    /**
+     * @brief Bind a launch-once coprocessor function (GPU-style).
+     *
+     * Call before start(). `fn` is invoked once (in start()) to launch a
+     * persistent engine on the session's datapath; `ctx` may be null.
+     */
+    virtual void set_coprocessor_launcher(CoprocessorLauncherFn /*fn*/, void * /*ctx*/)
+    {
+        throw std::logic_error(
+            "transport: launch-once coprocessor function not supported by this backend");
+    }
 };
 
 } // namespace catalyst::transport

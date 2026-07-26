@@ -109,12 +109,34 @@ TEST_CASE("set_coprocessor_fn on a controller session is an error", "[transport]
     __catalyst__transport__destroy(s);
 }
 
+TEST_CASE("set_coprocessor_launcher on a per-message-only backend is a clean error", "[transport]")
+{
+    // The stub coprocessor supports only the per-message convention (it overrides
+    // set_coprocessor_fn, not set_coprocessor_launcher), like the CPU backend.
+    // Binding a launcher hits the base class's throwing default; the CAPI guard
+    // must turn that into an error code, not let it escape the extern "C" boundary
+    // (which would terminate). This is the bind-time failure the typed setters buy.
+    auto *s = make(kCoprocessor, "");
+    REQUIRE(s != nullptr);
+    CHECK(__catalyst__transport__set_coprocessor_launcher(s, "") == CATALYST_TRANSPORT_ERR);
+    __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("set_coprocessor_launcher on a controller session is an error", "[transport]")
+{
+    auto *s = make(kController, "");
+    REQUIRE(s != nullptr);
+    CHECK(__catalyst__transport__set_coprocessor_launcher(s, "") == CATALYST_TRANSPORT_ERR);
+    __catalyst__transport__destroy(s);
+}
+
 TEST_CASE("null session arguments are rejected without crashing", "[transport]")
 {
     CHECK(__catalyst__transport__connect(nullptr, "127.0.0.1", 0) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__exchange_keys(nullptr) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__establish_channel(nullptr, "cpu_verbs") == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__set_coprocessor_fn(nullptr, "") == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__set_coprocessor_launcher(nullptr, "") == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__commit_work_item(nullptr, 0, 0, 0) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__kick(nullptr, 0) == CATALYST_TRANSPORT_ERR);
     std::uint8_t buf[4] = {};

@@ -35,6 +35,7 @@ using catalyst::transport::ChannelDesc;
 using catalyst::transport::ConnectInfo;
 using catalyst::transport::ControllerSession;
 using catalyst::transport::CoprocessorFn;
+using catalyst::transport::CoprocessorLauncherFn;
 using catalyst::transport::CoprocessorSession;
 using catalyst::transport::MemKind;
 using catalyst::transport::MemRegion;
@@ -269,6 +270,34 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             }
         }
         co->set_coprocessor_fn(fn, nullptr);
+        return CATALYST_TRANSPORT_OK;
+    });
+}
+
+int __catalyst__transport__set_coprocessor_launcher(CatalystTransportSession *s, const char *symbol)
+{
+    if (!s || !s->sess) {
+        return CATALYST_TRANSPORT_ERR;
+    }
+    return guard([&] {
+        auto *co = dynamic_cast<CoprocessorSession *>(s->sess);
+        if (!co) {
+            std::cerr << "[transport] set_coprocessor_launcher on a non-coprocessor session\n";
+            return CATALYST_TRANSPORT_ERR;
+        }
+        // Empty symbol selects the backend's built-in default launcher (the core
+        // holds no device launcher of its own); a named-but-unresolved symbol is
+        // a hard error.
+        CoprocessorLauncherFn fn = nullptr;
+        if (symbol && *symbol) {
+            fn = reinterpret_cast<CoprocessorLauncherFn>(dlsym(RTLD_DEFAULT, symbol));
+            if (!fn) {
+                std::cerr << "[transport] set_coprocessor_launcher: symbol not found: " << symbol
+                          << "\n";
+                return CATALYST_TRANSPORT_ERR;
+            }
+        }
+        co->set_coprocessor_launcher(fn, nullptr);
         return CATALYST_TRANSPORT_OK;
     });
 }

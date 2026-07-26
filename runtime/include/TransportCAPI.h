@@ -69,8 +69,13 @@ int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession *s);
 int __catalyst__transport__barrier(int64_t token);
 int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path);
 
-// Coprocessor-only: bind the function run per received message, resolved by runtime symbol name.
+// Coprocessor-only: bind the coprocessor function, resolved by runtime symbol name. The two
+// conventions have distinct entrypoints; the compiler emits the one matching the target device.
+// set_coprocessor_fn binds a per-message function (CPU-style); set_coprocessor_launcher binds a
+// launch-once function (GPU-style). Binding one to a backend that supports only the other fails.
 int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol);
+int __catalyst__transport__set_coprocessor_launcher(CatalystTransportSession *s,
+                                                    const char *symbol);
 
 // Controller-only: work items + kick.
 int __catalyst__transport__commit_work_item(CatalystTransportSession *s, uint32_t work_item_idx,

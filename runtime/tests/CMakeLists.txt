@@ -181,8 +181,9 @@ target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
 
 catch_discover_tests(runner_tests_rsdecomp_runtime)
 
-# Transport CAPI test suite
+# Transport test suites
 if(ENABLE_TRANSPORT)
+    # CAPI + loader, exercised against a stub backend plugin.
     add_library(stub_transport_backend SHARED stubs/stub_transport_backend.cpp)
     target_include_directories(stub_transport_backend PRIVATE ${runtime_includes})
     set_property(TARGET stub_transport_backend PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -197,6 +198,45 @@ if(ENABLE_TRANSPORT)
     target_compile_definitions(runner_tests_transport PRIVATE
         STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>")
     add_dependencies(runner_tests_transport stub_transport_backend)
-
     catch_discover_tests(runner_tests_transport)
+
+    # CPU-verbs backend: device-agnostic common primitives (RDMA-backed; SKIP without rxe0).
+    add_executable(runner_tests_transport_common)
+    target_sources(runner_tests_transport_common PRIVATE
+        Test_TransportCommon.cpp
+        Test_TransportWireProtocol.cpp
+    )
+    target_link_libraries(runner_tests_transport_common PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        transport_common
+    )
+    catch_discover_tests(runner_tests_transport_common)
+
+    # CPU-verbs backend: both controller and coprocessor (requires RDMA - skip without rxe0).
+    add_executable(runner_tests_transport_cpu)
+    target_sources(runner_tests_transport_cpu PRIVATE
+        Test_TransportCpuVerbs.cpp
+    )
+    target_link_libraries(runner_tests_transport_cpu PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        cpu_verbs_impl
+    )
+    catch_discover_tests(runner_tests_transport_cpu)
+
+    if(TRANSPORT_HAS_HIP)
+        add_executable(runner_tests_transport_gpu)
+        target_sources(runner_tests_transport_gpu PRIVATE
+            Test_TransportGpu.cpp
+        )
+        # Include dirs and transport_common are inherited from
+        # catalyst_transport_gpu_coprocessor's PUBLIC interface.
+        target_link_libraries(runner_tests_transport_gpu PRIVATE
+            Catch2WithMain
+            catalyst_runtime_testing
+            catalyst_transport_gpu_coprocessor
+        )
+        catch_discover_tests(runner_tests_transport_gpu)
+    endif()
 endif()
