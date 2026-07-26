@@ -33,6 +33,14 @@ def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let dependentDialects = ["LLVM::LLVMDialect"];
 }
 
+def ReferenceSemanticsConversionPass : Pass<"convert-to-reference-semantics"> {
+    let summary = "Convert to reference semantics quantum dialect";
+
+    let dependentDialects = [
+       "catalyst::qref::QRefDialect"
+    ];
+}
+
 def EmitCatalystPyInterfacePass : Pass<"emit-catalyst-py-interface"> {
     let summary = "Emit catalyst python's default interface.";
 
@@ -147,14 +155,26 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"alt-decomps",
             /*Type*/"std::string",
             /*Description*/
-            "Maps an operator to a `|` separated list of alternative decomposition "
-            "rules that will be considered alongside any built-in rules for the operator.">,
+            "Maps an operator to a list of alternative decomposition rules that will be considered"
+            " alongside any built-in rules for the operator.">,
         Option<
             /*C++ name*/"bytecodeRulesFile",
             /*CLI name*/"bytecode-rules",
             /*Type*/"std::string",
-            /*Default*/[{ "./frontend/catalyst/resources/decomposition_rules.mlirbc" }],
-            /*Description*/"A path to a bytecode file of compiled decomposition rules.">
+            /*Default*/[{ "" }],
+            /*Description*/"A path to a bytecode file of compiled decomposition rules.">,
+        Option<
+            /*C++ name*/"libQPDPath",
+            /*CLI name*/"libQPD-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the QuantumPythonDecompositions dynamic library.">,
+        Option<
+            /*C++ name*/"libpythonPath",
+            /*CLI name*/"libpython-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the python shared library.">
     ];
 
     let dependentDialects = [
@@ -169,6 +189,14 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
 
 def DecomposeLoweringPass : Pass<"decompose-lowering"> {
     let summary = "Replace quantum operations with compiled decomposition rules.";
+
+    let options = [
+        ListOption<
+            /*C++ name*/"targetRulesOption",
+            /*CLI name*/"target-rules",
+            /*Type*/"std::string",
+            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">
+    ];
 }
 
 def DisentangleCNOTPass : Pass<"disentangle-cnot"> {

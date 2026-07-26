@@ -92,19 +92,19 @@ class TestDraw:
         [
             (
                 0,
-                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤  State\n"
-                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤  State\n"
-                "2: ──RZ──RZ─────────────────────╰X─╰X─┤  State",
+                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤ ╭State\n"
+                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤ ├State\n"
+                "2: ──RZ──RZ─────────────────────╰X─╰X─┤ ╰State",
             ),
             (
                 1,
-                "0: ──RX──H──H─╭●─╭●──RZ────╭●─╭●─┤  State\n"
-                "1: ──RY───────╰X─╰X──H───H─│──│──┤  State\n"
-                "2: ──RZ────────────────────╰X─╰X─┤  State",
+                "0: ──RX──H──H─╭●─╭●──RZ────╭●─╭●─┤ ╭State\n"
+                "1: ──RY───────╰X─╰X──H───H─│──│──┤ ├State\n"
+                "2: ──RZ────────────────────╰X─╰X─┤ ╰State",
             ),
-            (2, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
-            (None, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
-            (50, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
+            (2, "0: ──RX──RZ─┤ ╭State\n1: ──RY─────┤ ├State\n2: ──RZ─────┤ ╰State"),
+            (None, "0: ──RX──RZ─┤ ╭State\n1: ──RY─────┤ ├State\n2: ──RZ─────┤ ╰State"),
+            (50, "0: ──RX──RZ─┤ ╭State\n1: ──RY─────┤ ├State\n2: ──RZ─────┤ ╰State"),
         ],
     )
     def test_multiple_levels_xdsl(self, transforms_circuit, level, expected):
@@ -123,19 +123,19 @@ class TestDraw:
         [
             (
                 0,
-                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤  State\n"
-                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤  State\n"
-                "2: ──RZ──RZ─────────────────────╰X─╰X─┤  State",
+                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤ ╭State\n"
+                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤ ├State\n"
+                "2: ──RZ──RZ─────────────────────╰X─╰X─┤ ╰State",
             ),
             (
                 1,
-                "0: ──RX──H──H─╭●─╭●──RZ────╭●─╭●─┤  State\n"
-                "1: ──RY───────╰X─╰X──H───H─│──│──┤  State\n"
-                "2: ──RZ────────────────────╰X─╰X─┤  State",
+                "0: ──RX──H──H─╭●─╭●──RZ────╭●─╭●─┤ ╭State\n"
+                "1: ──RY───────╰X─╰X──H───H─│──│──┤ ├State\n"
+                "2: ──RZ────────────────────╰X─╰X─┤ ╰State",
             ),
-            (2, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
-            (None, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
-            (50, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
+            (2, "0: ──RX──RZ─┤ ╭State\n1: ──RY─────┤ ├State\n2: ──RZ─────┤ ╰State"),
+            (None, "0: ──RX──RZ─┤ ╭State\n1: ──RY─────┤ ├State\n2: ──RZ─────┤ ╰State"),
+            (50, "0: ──RX──RZ─┤ ╭State\n1: ──RY─────┤ ├State\n2: ──RZ─────┤ ╰State"),
         ],
     )
     def test_multiple_levels_catalyst(self, transforms_circuit, level, expected):
@@ -154,19 +154,19 @@ class TestDraw:
         [
             (
                 0,
-                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤  State\n"
-                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤  State\n"
-                "2: ──RZ──RZ─────────────────────╰X─╰X─┤  State",
+                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤ ╭State\n"
+                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤ ├State\n"
+                "2: ──RZ──RZ─────────────────────╰X─╰X─┤ ╰State",
             ),
             (
                 1,
-                "0: ──RX──H──H─╭●─╭●──RZ────╭●─╭●─┤  State\n"
-                "1: ──RY───────╰X─╰X──H───H─│──│──┤  State\n"
-                "2: ──RZ────────────────────╰X─╰X─┤  State",
+                "0: ──RX──H──H─╭●─╭●──RZ────╭●─╭●─┤ ╭State\n"
+                "1: ──RY───────╰X─╰X──H───H─│──│──┤ ├State\n"
+                "2: ──RZ────────────────────╰X─╰X─┤ ╰State",
             ),
-            (2, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
-            (None, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
-            (50, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
+            (2, "0: ──RX──RZ─┤ ╭State\n1: ──RY─────┤ ├State\n2: ──RZ─────┤ ╰State"),
+            (None, "0: ──RX──RZ─┤ ╭State\n1: ──RY─────┤ ├State\n2: ──RZ─────┤ ╰State"),
+            (50, "0: ──RX──RZ─┤ ╭State\n1: ──RY─────┤ ├State\n2: ──RZ─────┤ ╰State"),
         ],
     )
     def test_multiple_levels_xdsl_catalyst(self, transforms_circuit, level, expected):
@@ -185,33 +185,33 @@ class TestDraw:
         [
             (
                 0,
-                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤  State\n"
-                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤  State\n"
-                "2: ──RZ──RZ─────────────────────╰X─╰X─┤  State",
+                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤ ╭State\n"
+                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤ ├State\n"
+                "2: ──RZ──RZ─────────────────────╰X─╰X─┤ ╰State",
             ),
             (
                 1,
-                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤  State\n"
-                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤  State\n"
-                "2: ──RZ──RZ─────────────────────╰X─╰X─┤  State",
+                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤ ╭State\n"
+                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤ ├State\n"
+                "2: ──RZ──RZ─────────────────────╰X─╰X─┤ ╰State",
             ),
             (
                 2,
-                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤  State\n"
-                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤  State\n"
-                "2: ──RZ──RZ─────────────────────╰X─╰X─┤  State",
+                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤ ╭State\n"
+                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤ ├State\n"
+                "2: ──RZ──RZ─────────────────────╰X─╰X─┤ ╰State",
             ),
             (
                 None,
-                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤  State\n"
-                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤  State\n"
-                "2: ──RZ──RZ─────────────────────╰X─╰X─┤  State",
+                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤ ╭State\n"
+                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤ ├State\n"
+                "2: ──RZ──RZ─────────────────────╰X─╰X─┤ ╰State",
             ),
             (
                 50,
-                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤  State\n"
-                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤  State\n"
-                "2: ──RZ──RZ─────────────────────╰X─╰X─┤  State",
+                "0: ──RX──RX──H──H─╭●─╭●──RZ──RZ─╭●─╭●─┤ ╭State\n"
+                "1: ──RY──RY───────╰X─╰X──H───H──│──│──┤ ├State\n"
+                "2: ──RZ──RZ─────────────────────╰X─╰X─┤ ╰State",
             ),
         ],
     )
@@ -226,19 +226,19 @@ class TestDraw:
         [
             (
                 lambda: qp.ctrl(qp.RX(0.1, 0), control=(1, 2, 3)),
-                "1: ─╭●──┤  State\n2: ─├●──┤  State\n3: ─├●──┤  State\n0: ─╰RX─┤  State",
+                "1: ─╭●──┤ ╭State\n2: ─├●──┤ ├State\n3: ─├●──┤ ├State\n0: ─╰RX─┤ ╰State",
             ),
             (
                 lambda: qp.ctrl(qp.RX(0.1, 0), control=(1, 2, 3), control_values=(0, 1, 0)),
-                "1: ─╭○──┤  State\n2: ─├●──┤  State\n3: ─├○──┤  State\n0: ─╰RX─┤  State",
+                "1: ─╭○──┤ ╭State\n2: ─├●──┤ ├State\n3: ─├○──┤ ├State\n0: ─╰RX─┤ ╰State",
             ),
             (
-                lambda: qp.adjoint(qp.ctrl(qp.RX(0.1, 0), (1, 2, 3), control_values=(0, 1, 0))),
-                "1: ─╭○───┤  State\n2: ─├●───┤  State\n3: ─├○───┤  State\n0: ─╰RX†─┤  State",
+                lambda: qp.adjoint(qp.ctrl(qp.T(0), (1, 2, 3), control_values=(0, 1, 0))),
+                "1: ─╭○──┤ ╭State\n2: ─├●──┤ ├State\n3: ─├○──┤ ├State\n0: ─╰T†─┤ ╰State",
             ),
             (
-                lambda: qp.ctrl(qp.adjoint(qp.RX(0.1, 0)), (1, 2, 3), control_values=(0, 1, 0)),
-                "1: ─╭○───┤  State\n2: ─├●───┤  State\n3: ─├○───┤  State\n0: ─╰RX†─┤  State",
+                lambda: qp.ctrl(qp.adjoint(qp.T(0)), (1, 2, 3), control_values=(0, 1, 0)),
+                "1: ─╭○──┤ ╭State\n2: ─├●──┤ ├State\n3: ─├○──┤ ├State\n0: ─╰T†─┤ ╰State",
             ),
         ],
     )
@@ -269,7 +269,7 @@ class TestDraw:
 
         assert (
             draw(circuit)()
-            == "0: ─╭●─────┤  State\n1: ─├○─────┤  State\n2: ─├●──RX─┤  State\n3: ─╰X─────┤  State"
+            == "0: ─╭●─────┤ ╭State\n1: ─├○─────┤ ├State\n2: ─├●──RX─┤ ├State\n3: ─╰X─────┤ ╰State"
         )
 
     @pytest.mark.parametrize(
@@ -281,11 +281,11 @@ class TestDraw:
             ),
             (
                 lambda: qp.probs(),
-                "0: ──RX─┤  Probs\n1: ──RY─┤  Probs\n2: ──RZ─┤  Probs",
+                "0: ──RX─┤ ╭Probs\n1: ──RY─┤ ├Probs\n2: ──RZ─┤ ╰Probs",
             ),
             (
                 lambda: qp.sample(),
-                "0: ──RX─┤  Sample\n1: ──RY─┤  Sample\n2: ──RZ─┤  Sample",
+                "0: ──RX─┤ ╭Sample\n1: ──RY─┤ ├Sample\n2: ──RZ─┤ ╰Sample",
             ),
             (
                 lambda: (
@@ -366,9 +366,9 @@ class TestDraw:
             return qp.state()
 
         assert draw(circuit)() == (
-            "0: ──H─╭GlobalPhase─┤  State\n"
-            "1: ──H─├GlobalPhase─┤  State\n"
-            "2: ──H─╰GlobalPhase─┤  State"
+            "0: ──H─╭GlobalPhase─┤ ╭State\n"
+            "1: ──H─├GlobalPhase─┤ ├State\n"
+            "2: ──H─╰GlobalPhase─┤ ╰State"
         )
 
     @pytest.mark.parametrize(
@@ -414,9 +414,9 @@ class TestDraw:
                     ),
                     (qp.QubitUnitary, jax.numpy.array([[0, 1], [1, 0]]), [0]),
                 ],
-                "0: ──U(M0)─╭U(M1)─╭U(M2)─╭U(M1)──U(M0)─┤  State\n"
-                "1: ────────╰U(M1)─├U(M2)─╰U(M1)────────┤  State\n"
-                "2: ───────────────╰U(M2)───────────────┤  State",
+                "0: ──U(M0)─╭U(M1)─╭U(M2)─╭U(M1)──U(M0)─┤ ╭State\n"
+                "1: ────────╰U(M1)─├U(M2)─╰U(M1)────────┤ ├State\n"
+                "2: ───────────────╰U(M2)───────────────┤ ╰State",
             ),
             (
                 [
@@ -430,9 +430,9 @@ class TestDraw:
                     (qp.StatePrep, jax.numpy.array([1, 0, 0, 0]), [0, 1]),
                     (qp.StatePrep, jax.numpy.array([1, 0]), [0]),
                 ],
-                "0: ──|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩──|Ψ⟩─┤  State\n"
-                "1: ──────╰|Ψ⟩─├|Ψ⟩─╰|Ψ⟩──────┤  State\n"
-                "2: ───────────╰|Ψ⟩───────────┤  State",
+                "0: ──|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩──|Ψ⟩─┤ ╭State\n"
+                "1: ──────╰|Ψ⟩─├|Ψ⟩─╰|Ψ⟩──────┤ ├State\n"
+                "2: ───────────╰|Ψ⟩───────────┤ ╰State",
             ),
             (
                 [
@@ -442,9 +442,9 @@ class TestDraw:
                     (qp.MultiRZ, 0.1, [0, 1]),
                     (qp.MultiRZ, 0.1, [0]),
                 ],
-                "0: ──MultiRZ─╭MultiRZ─╭MultiRZ─╭MultiRZ──MultiRZ─┤  State\n"
-                "1: ──────────╰MultiRZ─├MultiRZ─╰MultiRZ──────────┤  State\n"
-                "2: ───────────────────╰MultiRZ───────────────────┤  State",
+                "0: ──MultiRZ─╭MultiRZ─╭MultiRZ─╭MultiRZ──MultiRZ─┤ ╭State\n"
+                "1: ──────────╰MultiRZ─├MultiRZ─╰MultiRZ──────────┤ ├State\n"
+                "2: ───────────────────╰MultiRZ───────────────────┤ ╰State",
             ),
             (
                 [
@@ -454,9 +454,9 @@ class TestDraw:
                     (qp.BasisState, jax.numpy.array([1, 0]), [0, 1]),
                     (qp.BasisState, jax.numpy.array([1]), [0]),
                 ],
-                "0: ──|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩──|Ψ⟩─┤  State\n"
-                "1: ──────╰|Ψ⟩─├|Ψ⟩─╰|Ψ⟩──────┤  State\n"
-                "2: ───────────╰|Ψ⟩───────────┤  State",
+                "0: ──|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩─╭|Ψ⟩──|Ψ⟩─┤ ╭State\n"
+                "1: ──────╰|Ψ⟩─├|Ψ⟩─╰|Ψ⟩──────┤ ├State\n"
+                "2: ───────────╰|Ψ⟩───────────┤ ╰State",
             ),
         ],
     )
@@ -491,8 +491,8 @@ class TestDraw:
             return qp.state()
 
         expected = (
-            "0: ──RX(M0)──RZ(M0)──U(M1)─╭U(M2)─┤  State\n"
-            "1: ────────────────────────╰U(M2)─┤  State"
+            "0: ──RX(M0)──RZ(M0)──U(M1)─╭U(M2)─┤ ╭State\n"
+            "1: ────────────────────────╰U(M2)─┤ ╰State"
         )
         assert draw(circuit)() == expected
 
@@ -671,8 +671,8 @@ class TestDrawGraph:
         @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
             qp.H(0)
-            qp.T(1)
             qp.H(0)
+            qp.T(1)
             qp.RX(0.1, wires=0)
             qp.RX(0.2, wires=0)
             return qp.expval(qp.X(0))
@@ -741,8 +741,8 @@ class TestDrawGraph:
         @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
             qp.H(0)
-            qp.T(1)
             qp.H(0)
+            qp.T(1)
             qp.RX(0.1, wires=0)
             qp.RX(0.2, wires=0)
             return qp.expval(qp.X(0))

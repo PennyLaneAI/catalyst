@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <complex>
+#include <cstdint>
 
 #include "jax_cpu_lapack_kernels/lapack_kernels.hpp"
 

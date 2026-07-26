@@ -14,6 +14,8 @@
 
 #include "PBC/Utils/PauliStringWrapper.h"
 
+#include <cstdint>
+
 #include "stim/mem/simd_word.h"
 #include "stim/stabilizers/flex_pauli_string.h"
 #include "stim/stabilizers/pauli_string.h"

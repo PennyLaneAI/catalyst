@@ -76,6 +76,13 @@ func.func @test_fabricate() {
 
 // -----
 
+func.func @test_fabricate_conj() {
+    %0 = qecl.fabricate [magic_conj] : !qecl.codeblock<1>
+    func.return
+}
+
+// -----
+
 func.func @test_dealloc_cb(%arg0 : !qecl.codeblock<1>) {
     qecl.dealloc_cb %arg0 : !qecl.codeblock<1>
     func.return

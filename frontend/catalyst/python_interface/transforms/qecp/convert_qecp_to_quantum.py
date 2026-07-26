@@ -19,15 +19,14 @@ This module contains the implementation of the xDSL convert-qecp-to-quantum dial
 Known Limitations
 -----------------
 
-  * The hyper-register lowering is experimental can only target programs with more than one logical
-    codeblock, where there is a loop for encoding each logical codeblock. It's sufficient for the
-    GHZ circuit. We might have to come back to this later.
-  * The current hyper-register lowering implementation also does not support any control flow that
-    iterates over hyper registers, except for the encoding loop.
+  * The current hyper-register lowering implementation does not support control-flow operations that
+    iterate over physical hyper-registers, except for the encoding loop after allocating the
+    hyper-register. However, control-flow ops that iterate over other types, like physical
+    codeblocks, are supported.
 """
 
 from dataclasses import dataclass
-from typing import cast
+from typing import NoReturn, cast
 
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, scf
@@ -49,11 +48,13 @@ from catalyst.python_interface.dialects import qecp, quantum
 from catalyst.python_interface.dialects.quantum.attributes import QubitType, QuregType
 from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
+from catalyst.utils.exceptions import CompileError
 
 _QECP_GATENAMES_TO_QUANTUM_OPS = {
     "qecp.hadamard": "Hadamard",
     "qecp.identity": "Identity",
     "qecp.s": "S",
+    "qecp.t": "T",
     "qecp.x": "PauliX",
     "qecp.y": "PauliY",
     "qecp.z": "PauliZ",
@@ -123,7 +124,7 @@ class QecPhysicalQubitTypeConversion(TypeConversionPattern):
         return QubitType()
 
 
-# MARK: Auxiliary qubit Alloc/Dealloc Patterns
+# MARK: Alloc/Dealloc Patterns
 
 
 @dataclass(frozen=True)
@@ -144,6 +145,27 @@ class DeallocAuxQubitConversion(RewritePattern):
     def match_and_rewrite(self, op: qecp.DeallocAuxQubitOp, rewriter: PatternRewriter):
         """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary qubit."""
         rewriter.replace_op(op, quantum.DeallocQubitOp(op.qubit))
+
+
+@dataclass(frozen=True)
+class AllocCodeblockConversion(RewritePattern):
+    """Op conversion pattern from qecp.alloc_cb to quantum.alloc."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.AllocCodeblockOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that allocate an auxiliary codeblock."""
+        assert isinstance(op.codeblock.type, qecp.PhysicalCodeblockType)
+        rewriter.replace_op(op, quantum.AllocOp(op.codeblock.type.n))
+
+
+@dataclass(frozen=True)
+class DeallocCodeblockConversion(RewritePattern):
+    """Op conversion pattern from qecp.dealloc_cb to quantum.dealloc."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: qecp.DeallocCodeblockOp, rewriter: PatternRewriter):
+        """Op conversion rewrite pattern for lowering ops that deallocate an auxiliary codeblock."""
+        rewriter.replace_op(op, quantum.DeallocOp(op.codeblock))
 
 
 # MARK: Data qubit extract and insertion patterns
@@ -284,6 +306,9 @@ class UnrollEncodeLoop(RewritePattern):
                 rewriter.erase_op(op)
 
 
+# MARK: Conversion Pass
+
+
 @dataclass(frozen=True)
 class ConvertQecPhysicalToQuantumPass(ModulePass):
     """
@@ -295,18 +320,20 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
     def _apply_experimental_hyperregister_lowering(self, op: builtin.ModuleOp):
         """Apply a separate pattern rewrite for lowering hyperregister-related qecp ops to quantum
         ops.
+
         NOTE: This is an experimental rewriting for the hyperregister related operations and types.
+
         1. Each codeblock allocated by qecp.alloc is replaced with a quantum.reg allocation.
         2. The encoding loop operation is unrolled.
         3. `qecp.extract_codeblock` operations are removed from the IR by replacing the uses with
-        the corresponding quantum.reg SSA value.
+           the corresponding quantum.reg SSA value.
         4. `qecp.insert_codeblock` operations are replaced with `quantum.dealloc` operation.
+
         NOTE: The current implementation only targets the 3-logical qubit GHZ circuit. The
         implementation is based on the IR structure of the specific circuit.
-        TODO: We might come back to update the logic below to support 1-logical qubit circuits,
-        where there is no ForOp encoding loop in the IR.
         """
-        # Step 1: Unroll encoding loops and ensure the quantum.node op body contains no nested regions.
+        # Step 1: Unroll encoding loops and ensure the quantum.node op body contains no
+        # nested regions.
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [UnrollEncodeLoop()],
@@ -320,33 +347,83 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
                 qecp_alloc_op = None
                 regs = []
                 qecp_ops_to_remove = []
+                dealloced_regs = {}
 
                 for quantum_op in op_.walk():
                     rewriter = PatternRewriter(quantum_op)
+
                     match quantum_op:
                         case qecp.AllocOp():
                             qecp_alloc_op = quantum_op
                             qecp_ops_to_remove.append(quantum_op)
+
                         case func.CallOp() if "encode_zero_" in quantum_op.callee.string_value():
                             regs.append(quantum_op.results[0])
+
                         case qecp.ExtractCodeblockOp():
+                            assert (quantum_op.idx is not None) ^ (quantum_op.idx_attr is not None)
                             qecp_ops_to_remove.append(quantum_op)
-                            idx = resolve_constant_params(quantum_op.idx)
-                            quantum_op.codeblock.replace_all_uses_with(regs[idx])
+                            if quantum_op.idx is not None:
+                                idx = resolve_constant_params(quantum_op.idx)
+                                if not isinstance(idx, int):
+                                    self._emit_non_const_extract_idx_error(quantum_op)
+                            else:
+                                assert quantum_op.idx_attr is not None
+                                idx = quantum_op.idx_attr.value.data
+
+                            if idx not in dealloced_regs:
+                                # This is the first time we extract_block on this index, so replace
+                                # all the uses of the extracted codeblock with the corresponding
+                                # register returned after the encoding step.
+                                quantum_op.codeblock.replace_all_uses_with(regs[idx])
+                            else:
+                                # This handles the case where an extract_block follows an
+                                # insert_block on the same index. In this case, undo the
+                                # deallocation (by removing it from the 'dealloced_regs' dictionary)
+                                # and replace all uses of the extracted codeblock with the register
+                                # that was given as input to the (now undone) quantum.dealloc op.
+                                dealloc_op = dealloced_regs.pop(idx)
+                                quantum_op.codeblock.replace_all_uses_with(dealloc_op.operands[0])
+
                         case qecp.InsertCodeblockOp():
                             qecp_ops_to_remove.append(quantum_op)
-                            idx = resolve_constant_params(quantum_op.idx)
-                            dealloc = quantum.DeallocOp(regs[idx])
-                            rewriter.insert_op(dealloc)
+                            if quantum_op.idx is not None:
+                                idx = resolve_constant_params(quantum_op.idx)
+                            elif quantum_op.idx_attr is not None:
+                                idx = quantum_op.idx_attr.value.data
+
+                            dealloced_regs[idx] = quantum.DeallocOp(quantum_op.codeblock)
                             quantum_op.results[0].replace_all_uses_with(qecp_alloc_op.results[0])
+
                         case qecp.DeallocOp():
                             rewriter.erase_op(quantum_op)
+
+                        case quantum.DeviceReleaseOp():
+                            # Dealloc qregs before device release
+                            for _, dealloced_reg in dealloced_regs.items():
+                                rewriter.insert_op(dealloced_reg)
 
                 for quantum_op in reversed(qecp_ops_to_remove):
                     rewriter = PatternRewriter(quantum_op)
                     rewriter.erase_op(quantum_op)
+
                 # Remove dead code
                 region_dce(op_.body)
+
+    @classmethod
+    def _emit_non_const_extract_idx_error(
+        cls, extract_block_op: qecp.ExtractCodeblockOp
+    ) -> NoReturn:
+        """Emit an op error if the 'idx' value of a qecp.extract_block op is not statically
+        known.
+        """
+        assert isinstance(extract_block_op, qecp.ExtractCodeblockOp)
+        extract_block_op.emit_error(
+            f"'{extract_block_op.name}' operand 'idx' could not be folded or traced back to a "
+            f"constant operation. This index value must be a known statically in order to convert "
+            f"this operation into its equivalent quantum-dialect operations.",
+            CompileError(f"Failed to apply pass '{cls.name}'"),
+        )
 
     # pylint: disable=unused-argument
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
@@ -356,6 +433,10 @@ class ConvertQecPhysicalToQuantumPass(ModulePass):
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
+                    AllocCodeblockConversion(),
+                    DeallocCodeblockConversion(),
+                    # AllocCodeblock conversion must come before Type conversion, because
+                    # it relies on accessing op.codeblock.type.n to get the register size
                     PhysicalCodeblockTypeConversion(recursive=True),
                     QecPhysicalQubitTypeConversion(recursive=True),
                     AllocAuxQubitConversion(),

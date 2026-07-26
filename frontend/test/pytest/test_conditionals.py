@@ -46,16 +46,32 @@ class TestCondToJaxpr:
         """Check the JAXPR of simple conditional function."""
         # pylint: disable=line-too-long
 
-        expected = dedent("""
-            { lambda ; a:i64[]. let
-                b:bool[] = eq a 5:i64[]
-                c:i64[] = cond[
-                  branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
-                                 { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
-                  num_implicit_outputs=0
-                ] b a a
-              in (c,) }
-            """)
+        if capture_mode:
+            # In capture mode, the PL cond primitive is used directly, instead of the catalyst cond
+            expected = dedent("""
+                { lambda ; a:i64[]. let
+                    b:bool[] = eq a 5:i64[]
+                    c:i64[] = cond[
+                    args_slice=(3, None, None)
+                    consts_slices=((1, 2, None), (2, 3, None))
+                    jaxpr_branches=(
+                        { lambda d:i64[]; . let e:i64[] = integer_pow[y=2] d in (e,) }
+                        { lambda f:i64[]; . let g:i64[] = integer_pow[y=3] f in (g,) }
+                    )
+                    ] b a a
+                in (c,) }
+                """)
+        else:
+            expected = dedent("""
+                { lambda ; a:i64[]. let
+                    b:bool[] = eq a 5:i64[]
+                    c:i64[] = cond[
+                    branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
+                                    { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+                    num_implicit_outputs=0
+                    ] b a a
+                in (c,) }
+                """)
 
         @qjit(capture=capture_mode)
         def circuit(n: int):
@@ -224,8 +240,8 @@ class TestCond:
         if capture_mode:
             pytest.xfail("We forgot about this case and will fix it in pl-core.")  # [sc-97385]
 
-        def circuit():
-            @cond(True)
+        def circuit(pred: bool):
+            @cond(pred)
             def cond_fn():
                 return (1, 1)
 
@@ -356,8 +372,8 @@ class TestCond:
             pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
 
         @qjit(capture=capture_mode)
-        def circuit():
-            @cond(True)
+        def circuit(pred):
+            @cond(pred)
             def cond_fn():
                 return 0
 
@@ -369,7 +385,7 @@ class TestCond:
             assert r.dtype is jnp.dtype("int")  # pylint: disable=no-member
             return r
 
-        assert 0 == circuit()
+        assert 0 == circuit(True)
 
     def test_branch_multi_return_type_unification_qjit_2(self, capture_mode):
         """Test that unification happens before the results of the cond primitve is available."""
@@ -495,8 +511,8 @@ class TestCond:
 
         @qjit(capture=capture_mode)
         @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            @cond(True)
+        def circuit(pred):
+            @cond(pred)
             def cond_fn():
                 return 0
 
@@ -508,7 +524,7 @@ class TestCond:
             assert r.dtype is jnp.dtype("int")  # pylint: disable=no-member
             return r
 
-        assert 0 == circuit()
+        assert 0 == circuit(True)
 
     def test_branch_return_mismatch_classical(self, capture_mode):
         """Test that an exception is raised when the true branch returns a different pytree-shape
@@ -1118,6 +1134,75 @@ class TestCondPredicateConversion:
                 TypeError, match="Array with multiple elements is not a valid predicate"
             ):
                 workflow(3)
+
+
+class TestStaticConditionalFolding:
+    """Test the global toggle that folds conditionals with constant predicates."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_toggle(self):
+        saved = catalyst.compile_without_static_conditionals
+        try:
+            yield
+        finally:
+            catalyst.compile_without_static_conditionals = saved
+
+    def test_toggle_default(self):
+        """Static conditionals are folded by default."""
+        assert catalyst.compile_without_static_conditionals is True
+
+    @pytest.mark.parametrize("predicate", [True, False])
+    def test_static_conditional_folded_by_default(self, predicate):
+        """A constant predicate is resolved at trace time, leaving no cond primitive."""
+
+        @qjit(target="mlir")
+        def circuit():
+            @catalyst_cond(predicate)
+            def branch():
+                return 1
+
+            @branch.otherwise
+            def branch():
+                return 2
+
+            return branch()
+
+        assert "cond" not in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
+
+    def test_static_conditional_not_folded_when_disabled(self):
+        """Disabling the toggle keeps the cond primitive even for a constant predicate."""
+        catalyst.compile_without_static_conditionals = False
+
+        @qjit(target="mlir")
+        def circuit():
+            @catalyst_cond(True)
+            def branch():
+                return 1
+
+            @branch.otherwise
+            def branch():
+                return 2
+
+            return branch()
+
+        assert "cond" in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
+
+    def test_dynamic_conditional_not_folded(self):
+        """A predicate depending on a traced argument is never folded."""
+
+        @qjit(target="mlir")
+        def circuit(n: int):
+            @catalyst_cond(n == 5)
+            def branch():
+                return n**2
+
+            @branch.otherwise
+            def branch():
+                return n**3
+
+            return branch()
+
+        assert "cond" in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
 
 
 if __name__ == "__main__":

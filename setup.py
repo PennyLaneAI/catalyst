@@ -128,7 +128,7 @@ requirements = [
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "numpy>2.0.0",
-    "scipy-openblas32>=0.3.26,!=0.3.33",  # symbol and library name
+    "scipy-openblas32>=0.3.26,<0.3.33",  # symbol and library name
     "diastatic-malt==2.15.3",
     "xdsl==0.63.0",
     "xdsl-jax==0.5.2",
@@ -137,17 +137,11 @@ requirements = [
 entry_points = {
     "pennylane.plugins": [
         "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
-        "softwareq.qpp = catalyst.third_party.cuda:SoftwareQQPP",
-        "nvidia.custatevec = catalyst.third_party.cuda:NvidiaCuStateVec",
-        "nvidia.cutensornet = catalyst.third_party.cuda:NvidiaCuTensorNet",
     ],
     "pennylane.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
         "catalyst.ops = catalyst.api_extensions",
         "catalyst.qjit = catalyst:qjit",
-        "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
-        "cuda_quantum.ops = catalyst.api_extensions",
-        "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
     "xdsl.universe": [
         "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
@@ -167,6 +161,9 @@ entry_points = {
     "pennylane.drawer": [
         "draw_graph = catalyst:draw_graph",
     ],
+    "console_scripts": [
+        "catalyst = catalyst_cli_shim:main",
+    ],
 }
 
 classifiers = [
@@ -177,7 +174,6 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -391,25 +387,21 @@ options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x03
 # - `ops`: Path to the compiler operations module.
 # - `qjit`: Path to the JIT compiler decorator provided by the compiler.
 
-# Install the `catalyst` binary into the user's Python environment so it is accessible on the PATH.
-# Does not work with editable installs. Requires the Catalyst mlir module to be built.
-if os.path.exists("frontend/bin/catalyst"):
-    catalyst_cli = ["frontend/bin/catalyst"]
-elif os.path.exists("mlir/build/bin/catalyst"):
-    catalyst_cli = ["mlir/build/bin/catalyst"]
-else:
-    catalyst_cli = []
-
 setup(
     classifiers=classifiers,
     name="pennylane_catalyst",
     version=version,
-    python_requires=">=3.11",
+    python_requires=">=3.12",
     entry_points=entry_points,
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
-        include=["catalyst", "catalyst.*", "mlir_quantum"],
+        include=[
+            "catalyst",
+            "catalyst.*",
+            "mlir_quantum",
+            "mlir_quantum.*",
+        ],
         exclude=[
             "catalyst.third_party.oqc.*",
             "catalyst.third_party.oqd.*",
@@ -417,10 +409,8 @@ setup(
         ],
     ),
     package_dir={"": "frontend"},
+    py_modules=["catalyst_cli_shim"],
     include_package_data=True,
-    data_files=[
-        ("bin", catalyst_cli),
-    ],
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     **description,

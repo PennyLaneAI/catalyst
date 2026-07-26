@@ -363,25 +363,28 @@ func.func @controlled_paulirot(%q0 : !quantum.bit, %q1 : !quantum.bit, %angle : 
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__PCPhase(f64, f64, !llvm.ptr, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__PCPhase(f64, i64, !llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @pcphase
-func.func @pcphase(%q0 : !quantum.bit, %p : f64, %d: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
-
-    // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
-    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, %arg2, [[d]], [[c1]], %arg0)
-    %q1 = quantum.pcphase(%p, %d) %q0 : !quantum.bit
+func.func @pcphase(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
 
     // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
-    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, %arg2, [[d]], [[c2]], %arg0, %arg0)
-    %q2:2 = quantum.pcphase(%p, %d) %q1, %q1 : !quantum.bit, !quantum.bit
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, [[c2]], [[d]], [[c1]], %arg0)
+    %q1 = quantum.pcphase(%p, dim : 2) %q0 : !quantum.bit
 
     // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
     // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
-    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, %arg2, [[d]], [[c3]], %arg0, %arg0, %arg0)
-    %q3:3 = quantum.pcphase(%p, %d) %q2#0, %q2#1, %q2#1 : !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, [[c3]], [[d]], [[c2]], %arg0, %arg0)
+    %q2:2 = quantum.pcphase(%p, dim : 3) %q1, %q1 : !quantum.bit, !quantum.bit
+
+    // CHECK: [[d:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : i64)
+    // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg1, [[c0]], [[d]], [[c3]], %arg0, %arg0, %arg0)
+    %q3:3 = quantum.pcphase(%p, dim : 0) %q2#0, %q2#1, %q2#1 : !quantum.bit, !quantum.bit, !quantum.bit
 
     // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
     // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]

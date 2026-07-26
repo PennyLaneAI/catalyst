@@ -15,6 +15,7 @@ config.host_cxx = "@HOST_CXX@"
 config.llvm_use_sanitizer = "@LLVM_USE_SANITIZER@"
 
 import lit.llvm
+
 lit.llvm.initialize(lit_config, config)
 
 # Let the main config do the real work.

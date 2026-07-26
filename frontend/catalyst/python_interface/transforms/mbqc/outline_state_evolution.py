@@ -207,7 +207,7 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
                         del qubit_to_reg_idx[qb]
                 case quantum.InsertOp():
                     if not terminal_op_in_reg:
-                        if op.idx_attr and qubit_to_reg_idx[op.qubit] is not op.idx_attr:
+                        if op.idx_attr and qubit_to_reg_idx[op.qubit] != op.idx_attr:
                             raise ValueError("op.qubit should be op.idx_attr.")
                         del qubit_to_reg_idx[op.qubit]
                         current_reg = op.out_qreg

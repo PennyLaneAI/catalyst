@@ -32,6 +32,21 @@ include "MBQC/IR/MBQCDialect.td"
 // MBQC dialect operations.
 //===----------------------------------------------------------------------===//
 
+defvar getNumQubitsFromAdjMatrixSize = [{
+    // Get the number of allocated qubits from the densely packed adjacency matrix size for the
+    // graph state prep operations
+    size_t getNumQubitsFromAdjMatrixSize() {
+        mlir::ShapedType adjMatrixType = cast<mlir::ShapedType>(getAdjMatrix().getType());
+        size_t adjMatrixSize = adjMatrixType.getShape()[0];
+        size_t should_be_perfect_square = 1 + 8 * adjMatrixSize;
+        double square_root_candidate = std::sqrt(should_be_perfect_square);
+        assert(std::ceil(square_root_candidate) == std::floor(square_root_candidate) &&
+            "mbqc.graph_state_prep expects tensor size to be a triangular number");
+        size_t numQubits = (1 + (size_t)square_root_candidate) / 2;
+        return numQubits;
+    }
+}];
+
 include "MBQC/IR/MBQCRefOps.td"
 
 def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
@@ -149,6 +164,8 @@ def GraphStatePrepOp : MBQC_Op<"graph_state_prep"> {
     let assemblyFormat = [{
         `(` $adj_matrix `:` type($adj_matrix) `)` `[` `init` $init_op `,` `entangle` $entangle_op `]` attr-dict `:` type(results)
     }];
+
+    let extraClassDeclaration = getNumQubitsFromAdjMatrixSize;
 }
 
 #endif // MBQC_OPS

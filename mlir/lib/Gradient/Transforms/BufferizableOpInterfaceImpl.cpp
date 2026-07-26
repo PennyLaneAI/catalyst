@@ -15,6 +15,7 @@
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 
 #include <algorithm> // std::find
+#include <cstdint>
 #include <vector>
 
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"

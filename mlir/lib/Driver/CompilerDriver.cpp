@@ -80,6 +80,7 @@
 #include "Mitigation/IR/MitigationDialect.h"
 #include "PBC/IR/PBCDialect.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
+#include "QRef/IR/QRefDialect.h"
 #include "QecLogical/IR/QecLogicalDialect.h"
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -87,6 +88,8 @@
 #include "RTIO/IR/RTIODialect.h"
 
 #include "RegisterAllPasses.h"
+
+#include "Executor/IR/ExecutorDialect.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -174,11 +177,13 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 
     // Catalyst
     registry.insert<CatalystDialect>();
+    registry.insert<qref::QRefDialect>();
     registry.insert<quantum::QuantumDialect>();
     registry.insert<pbc::PBCDialect>();
     registry.insert<mbqc::MBQCDialect>();
     registry.insert<ion::IonDialect>();
     registry.insert<rtio::RTIODialect>();
+    registry.insert<executor::ExecutorDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
     registry.insert<pauli_frame::PauliFrameDialect>();
