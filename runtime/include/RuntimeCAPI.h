@@ -33,6 +33,7 @@ void __catalyst__rt__print_state();
 void __catalyst__rt__print_tensor(OpaqueMemRefT *, bool);
 void __catalyst__rt__print_string(char *);
 void __catalyst__rt__assert_bool(bool, char *);
+double __catalyst__rt__random_double();
 int64_t __catalyst__rt__array_get_size_1d(QirArray *);
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t);
 void __catalyst__rt__array_update_element_1d(QirArray *, int64_t, QUBIT *);
@@ -84,7 +85,7 @@ void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__MultiRZ(double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__GlobalPhase(double, const Modifiers *);
-void __catalyst__qis__PCPhase(double, double, const Modifiers *, int64_t, /*qubits*/...);
+void __catalyst__qis__PCPhase(double, int64_t, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PauliRot(const char *, double, const Modifiers *, bool, int64_t,

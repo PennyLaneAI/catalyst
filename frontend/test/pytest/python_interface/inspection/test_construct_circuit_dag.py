@@ -1322,9 +1322,9 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 4  # Device node + ops
 
-        assert nodes["node1"]["label"] == "<name> RX|<wire> [(arg5 % 3)]"
-        assert nodes["node2"]["label"] == "<name> RY|<wire> [(arg5 - 3)]"
-        assert nodes["node3"]["label"] == "<name> RZ|<wire> [(arg5 + 3)]"
+        assert nodes["node1"]["label"] == "<name> RX|<wire> [(arg0 % 3)]"
+        assert nodes["node2"]["label"] == "<name> RY|<wire> [(arg0 - 3)]"
+        assert nodes["node3"]["label"] == "<name> RZ|<wire> [(arg0 + 3)]"
 
     def test_ppm_dynamic(self):
         """Test that PPMs can be captured as nodes."""
@@ -1539,9 +1539,9 @@ class TestCreateDynamicMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + meas
 
-        assert nodes["node1"]["label"] == "<name> probs|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
+        assert nodes["node1"]["label"] == "<name> probs|<wire> [(arg0 % 3), (arg0 - 3), (arg0 + 3)]"
         assert (
-            nodes["node2"]["label"] == "<name> sample|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
+            nodes["node2"]["label"] == "<name> sample|<wire> [(arg0 % 3), (arg0 - 3), (arg0 + 3)]"
         )
 
 
@@ -2842,7 +2842,7 @@ class TestAdjoint:
         @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qp.qnode(dev)
         def my_workflow():
-            qp.adjoint(qp.H(0))
+            qp.adjoint(qp.T(0))
 
         module = my_workflow()
 
@@ -2857,7 +2857,7 @@ class TestAdjoint:
         # cluster1 -> my_workflow
 
         # Because it is an operator instance, no cluster needed
-        assert "Adjoint(Hadamard)" in nodes["node1"]["label"]
+        assert "Adjoint(T)" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
     def test_adjoint_operator_type(self, capture_mode):
@@ -2886,3 +2886,7 @@ class TestAdjoint:
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
         assert "Hadamard" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

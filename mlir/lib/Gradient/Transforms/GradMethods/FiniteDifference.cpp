@@ -15,6 +15,7 @@
 #include "FiniteDifference.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <sstream>
 #include <vector>
 

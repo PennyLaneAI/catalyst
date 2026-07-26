@@ -149,7 +149,7 @@ def test_assembly_format(run_filecheck, pretty_print):
 class TestMeasureInBasisOp:
     """Unit tests for the mbqc.measure_in_basis op."""
 
-    @pytest.mark.parametrize("plane,", ["XY", "YZ", "ZX"])
+    @pytest.mark.parametrize("plane", ["XY", "YZ", "ZX"])
     @pytest.mark.parametrize("postselect", ["", "postselect 0", "postselect 1"])
     def test_measure_in_basis_properties(self, plane, postselect):
         """Test the parsing of the mbqc.measure_in_basis op's properties."""

@@ -5,6 +5,9 @@ on:
     - cron: "0 11 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-config:
     name: CPL rc/rc/rc

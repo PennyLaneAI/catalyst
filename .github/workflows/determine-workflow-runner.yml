@@ -15,6 +15,9 @@ on:
 env:
   LARGE_RUNNER_GROUP_NAME: blacksmith-4vcpu-ubuntu-2404
 
+permissions:
+  contents: read
+
 jobs:
   determine_workflow_runner:
     runs-on: >-

@@ -21,12 +21,10 @@ import pennylane as qp
 import pytest
 
 from catalyst.from_plxpr import from_plxpr
+from catalyst.from_plxpr.qref_jax_primitives import qref_get_p, qref_hermitian_p, qref_namedobs_p
 from catalyst.jax_primitives import (
     expval_p,
     hamiltonian_p,
-    hermitian_p,
-    namedobs_p,
-    qextract_p,
     tensorobs_p,
 )
 
@@ -49,7 +47,7 @@ def test_hermitian():
 
     qfunc = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-    assert qfunc.eqns[4].primitive == hermitian_p
+    assert qfunc.eqns[4].primitive == qref_hermitian_p
     assert qfunc.eqns[4].params == {}
     assert qfunc.eqns[4].invars[0] == qfunc.invars[0]
     assert qfunc.eqns[4].invars[1] == qfunc.eqns[2].outvars[0]
@@ -71,7 +69,7 @@ def test_sprod():
     catalyst_xpr = from_plxpr(jaxpr)()
 
     qfunc = catalyst_xpr.eqns[0].params["call_jaxpr"]
-    assert qfunc.eqns[3].primitive == namedobs_p
+    assert qfunc.eqns[3].primitive == qref_namedobs_p
     assert qfunc.eqns[3].params == {"kind": "PauliZ"}
 
     # 4 is broadcast_in_dim
@@ -98,22 +96,22 @@ def test_prod():
     catalyst_xpr = from_plxpr(jaxpr)()
     qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-    assert qfunc_xpr.eqns[2].primitive == qextract_p
+    assert qfunc_xpr.eqns[2].primitive == qref_get_p
     assert qfunc_xpr.eqns[2].invars[1].val == 0
 
-    assert qfunc_xpr.eqns[3].primitive == namedobs_p
+    assert qfunc_xpr.eqns[3].primitive == qref_namedobs_p
     assert qfunc_xpr.eqns[3].params == {"kind": "PauliX"}
 
-    assert qfunc_xpr.eqns[4].primitive == qextract_p
+    assert qfunc_xpr.eqns[4].primitive == qref_get_p
     assert qfunc_xpr.eqns[4].invars[1].val == 1
 
-    assert qfunc_xpr.eqns[5].primitive == namedobs_p
+    assert qfunc_xpr.eqns[5].primitive == qref_namedobs_p
     assert qfunc_xpr.eqns[5].params == {"kind": "PauliY"}
 
-    assert qfunc_xpr.eqns[6].primitive == qextract_p
+    assert qfunc_xpr.eqns[6].primitive == qref_get_p
     assert qfunc_xpr.eqns[6].invars[1].val == 2
 
-    assert qfunc_xpr.eqns[7].primitive == namedobs_p
+    assert qfunc_xpr.eqns[7].primitive == qref_namedobs_p
     assert qfunc_xpr.eqns[7].params == {"kind": "PauliZ"}
 
     assert qfunc_xpr.eqns[8].primitive == tensorobs_p
@@ -143,22 +141,22 @@ def test_sum(as_linear_combination):
     catalyst_xpr = from_plxpr(jaxpr)()
     qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-    assert qfunc_xpr.eqns[2].primitive == qextract_p
+    assert qfunc_xpr.eqns[2].primitive == qref_get_p
     assert qfunc_xpr.eqns[2].invars[1].val == 0
 
-    assert qfunc_xpr.eqns[3].primitive == namedobs_p
+    assert qfunc_xpr.eqns[3].primitive == qref_namedobs_p
     assert qfunc_xpr.eqns[3].params == {"kind": "PauliX"}
 
-    assert qfunc_xpr.eqns[4].primitive == qextract_p
+    assert qfunc_xpr.eqns[4].primitive == qref_get_p
     assert qfunc_xpr.eqns[4].invars[1].val == 1
 
-    assert qfunc_xpr.eqns[5].primitive == namedobs_p
+    assert qfunc_xpr.eqns[5].primitive == qref_namedobs_p
     assert qfunc_xpr.eqns[5].params == {"kind": "PauliY"}
 
-    assert qfunc_xpr.eqns[6].primitive == qextract_p
+    assert qfunc_xpr.eqns[6].primitive == qref_get_p
     assert qfunc_xpr.eqns[6].invars[1].val == 2
 
-    assert qfunc_xpr.eqns[7].primitive == namedobs_p
+    assert qfunc_xpr.eqns[7].primitive == qref_namedobs_p
     assert qfunc_xpr.eqns[7].params == {"kind": "PauliZ"}
 
     # 8-11 broadcasting and concatenation

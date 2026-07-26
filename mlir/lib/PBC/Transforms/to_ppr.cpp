@@ -42,11 +42,12 @@ struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
 
-        // Convert MeasureOp, CustomOp, and PauliRotOp
+        // Any Quantum "gate-like" operation must be converted
+        target.addDynamicallyLegalDialect<quantum::QuantumDialect>(
+            [](Operation *op) { return !isa<quantum::QuantumOperation>(op); });
         target.addIllegalOp<quantum::MeasureOp>();
-        target.addIllegalOp<quantum::CustomOp>();
 
-        // Conversion target is PBCDialect
+        // Need to declare the ops we generate as explicitly legal
         target.addLegalDialect<pbc::PBCDialect>();
         target.addLegalDialect<mlir::arith::ArithDialect>();
         target.addLegalOp<GlobalPhaseOp>();

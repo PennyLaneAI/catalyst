@@ -21,7 +21,7 @@
 namespace catalyst {
 
 /// Recursively resolve a Value to a numeric constant by walking through
-/// common MLIR op chains (arith.constant, arith.index_cast, arith.addi/subi/muli,
+/// common MLIR op chains (arith.constant, arith.index_cast, arith.addi/subi/muli/ceildivsi,
 /// arith.addf, tensor.extract, tensor.from_elements,
 /// stablehlo.constant/convert/broadcast_in_dim/add/subtract, etc.).
 ///

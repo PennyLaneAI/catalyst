@@ -87,8 +87,16 @@ func.func @test_fabricate_zero() {
 // -----
 
 func.func @test_encode_magic(%arg0 : !qecl.codeblock<1>) {
-    // expected-error@below {{cannot encode a logical codeblock to the magic state}}
+    // expected-error@below {{cannot encode a logical codeblock to a magic state}}
     %0 = qecl.encode [magic] %arg0 : !qecl.codeblock<1>
+    func.return
+}
+
+// -----
+
+func.func @test_encode_magic_conj(%arg0 : !qecl.codeblock<1>) {
+    // expected-error@below {{cannot encode a logical codeblock to a magic state}}
+    %0 = qecl.encode [magic_conj] %arg0 : !qecl.codeblock<1>
     func.return
 }
 

@@ -686,9 +686,6 @@ class SOp(SingleQubitPhysicalGateOp):
 class TOp(SingleQubitPhysicalGateOp):
     """A physical T gate operation."""
 
-    def __init__(self, in_qubit: QecPhysicalQubitSSAValue | Operation):
-        super().__init__(in_qubit)
-
     name = "qecp.t"
 
 

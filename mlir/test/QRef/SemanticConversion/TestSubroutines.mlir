@@ -54,16 +54,13 @@ func.func @main(%arg0: i64, %arg1: f64) -> (!quantum.obs, !quantum.obs) attribut
     // CHECK-SAME:   (f64, !quantum.bit, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit)
     func.call @test_extract_before_call(%r2, %r_dyn, %arg1) : (!qref.reg<2>, !qref.reg<?>, f64) -> ()
     func.call @test_extract_before_call(%r2, %r_dyn, %arg1) : (!qref.reg<2>, !qref.reg<?>, f64) -> ()
-    // CHECK: [[insert_20:%.+]] = quantum.insert [[r2]][ 0], [[second_call]]#0 : !quantum.reg, !quantum.bit
-    // CHECK: [[insert_21:%.+]] = quantum.insert [[insert_20]][ 1], [[second_call]]#1 : !quantum.reg, !quantum.bit
     // CHECK: [[insert_dyn1:%.+]] = quantum.insert [[r_dyn]][ 1], [[second_call]]#2 : !quantum.reg, !quantum.bit
 
-
-    // CHECK: [[q20:%.+]] = quantum.extract [[insert_21]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[obs_q:%.+]] = quantum.compbasis qubits [[q20]] : !quantum.obs
+    // CHECK: [[obs_q:%.+]] = quantum.compbasis qubits [[second_call]]#0 : !quantum.obs
     %q20 = qref.get %r2[0] : !qref.reg<2> -> !qref.bit
     %obs_q = qref.compbasis qubits %q20 : !quantum.obs
-    // CHECK: [[insert_r2:%.+]] = quantum.insert [[insert_21]][ 0], [[q20]] : !quantum.reg, !quantum.bit
+    // CHECK: [[insert_21:%.+]] = quantum.insert [[r2]][ 1], [[second_call]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert_r2:%.+]] = quantum.insert [[insert_21]][ 0], [[second_call]]#0 : !quantum.reg, !quantum.bit
 
     // CHECK: [[obs_r:%.+]] = quantum.compbasis qreg [[insert_dyn1]] : !quantum.obs
     %obs_r = qref.compbasis (qreg %r_dyn : !qref.reg<?>) : !quantum.obs
@@ -463,5 +460,51 @@ func.func @callee(%r: !qref.reg<1>) {
 // expected-error@+1 {{Quantum subroutine call graphs must not have cycles}}
 func.func @caller(%r: !qref.reg<1>) {
     func.call @callee(%r) : (!qref.reg<1>) -> ()
+    return
+}
+
+
+// -----
+
+
+func.func @test_aliasing_qubit_args(%q1: !qref.bit, %q2: !qref.bit, %q3: !qref.bit, %q4: !qref.bit, %q5: !qref.bit) -> () {
+    qref.custom "gate"() %q1, %q2, %q3, %q4, %q5 : !qref.bit, !qref.bit, !qref.bit, !qref.bit, !qref.bit
+    return
+}
+
+func.func @main(%i: i64, %j: i64) -> () attributes {quantum.node} {
+    // COM: canonicalization propagates static left shifts into compile-time constants
+    // COM: 2 is from 1<<1, 4 is from 1<<2
+    // CHECK-DAG: [[one_left_shift_two:%.+]] = arith.constant 4 : i64
+    // CHECK-DAG: [[three:%.+]] = arith.constant 3 : i64
+    // CHECK-DAG: [[one:%.+]] = arith.constant 1 : i64
+    // CHECK-DAG: [[one_left_shift_one:%.+]] = arith.constant 2 : i64
+
+    // CHECK: [[i:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[xor:%.+]] = arith.xori [[i]], [[one_left_shift_one]] : i64
+    // CHECK: [[j:%.+]] = arith.shli [[one]], %arg1 : i64
+    // CHECK: [[xor_:%.+]] = arith.xori [[xor]], [[j]] : i64
+    // CHECK: [[num_ones:%.+]] = math.ctpop [[xor_]] : i64
+    // CHECK: [[cmp:%.+]] = arith.cmpi eq, [[num_ones]], [[three]] : i64
+    // CHECK: "catalyst.assert"([[cmp]]) <{error = "Can only call subroutines with non aliasing qubits"}> : (i1) -> ()
+    %r2 = qref.alloc(2) : !qref.reg<2>
+    %q2_1 = qref.get %r2[1] : !qref.reg<2> -> !qref.bit
+    %q2_i = qref.get %r2[%i] : !qref.reg<2>, i64 -> !qref.bit
+    %q2_j = qref.get %r2[%j] : !qref.reg<2>, i64 -> !qref.bit
+
+    // CHECK: [[i:%.+]] = arith.shli [[one]], %arg0 : i64
+    // CHECK: [[xor:%.+]] = arith.xori [[i]], [[one_left_shift_two]] : i64
+    // CHECK: [[num_ones:%.+]] = math.ctpop [[xor]] : i64
+    // CHECK: [[cmp:%.+]] = arith.cmpi eq, [[num_ones]], [[one_left_shift_one]] : i64
+    // CHECK: "catalyst.assert"([[cmp]]) <{error = "Can only call subroutines with non aliasing qubits"}> : (i1) -> ()
+    %r3 = qref.alloc(3) : !qref.reg<3>
+    %q3_2 = qref.get %r3[2] : !qref.reg<3> -> !qref.bit
+    %q3_i = qref.get %r3[%i] : !qref.reg<3>, i64 -> !qref.bit
+
+    // CHECK: call
+    func.call @test_aliasing_qubit_args(%q2_1, %q2_i, %q2_j, %q3_2, %q3_i) : (!qref.bit, !qref.bit, !qref.bit, !qref.bit, !qref.bit) -> ()
+
+    qref.dealloc %r2 : !qref.reg<2>
+    qref.dealloc %r3 : !qref.reg<3>
     return
 }

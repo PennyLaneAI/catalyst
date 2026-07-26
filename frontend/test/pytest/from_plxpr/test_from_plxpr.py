@@ -19,18 +19,15 @@ import jax
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.capture.primitives import for_loop_prim, while_loop_prim
+from pennylane.capture.primitives import adjoint_transform_prim, for_loop_prim, while_loop_prim
 
 import catalyst
-from catalyst import qjit
 from catalyst.from_plxpr import from_plxpr
-from catalyst.jax_primitives import (
-    adjoint_p,
-    get_call_jaxpr,
-    qalloc_p,
-    qextract_p,
-    qinsert_p,
-    qinst_p,
+from catalyst.from_plxpr.qref_jax_primitives import (
+    qref_alloc_p,
+    qref_get_p,
+    qref_operator_p,
+    qref_qinst_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -52,62 +49,6 @@ def catalyst_execute_jaxpr(jaxpr):
             return jaxpr, None, result_treedef, arg_signature
 
     return JAXPRRunner(fn=lambda: None, compile_options=catalyst.CompileOptions())
-
-
-def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), ignore_order=False):
-    """Compares two call jaxprs and validates that they are essentially equal."""
-    for inv1, inv2 in zip(jaxpr1.invars, jaxpr2.invars):
-        assert inv1.aval == inv2.aval, f"{inv1.aval}, {inv2.aval}"
-    for ov1, ov2 in zip(jaxpr1.outvars, jaxpr2.outvars):
-        assert ov1.aval == ov2.aval
-    assert len(jaxpr1.eqns) == len(jaxpr2.eqns), f"""
-    Number of equations differ: {len(jaxpr1.eqns)} vs {len(jaxpr2.eqns)},
-    {jaxpr1.eqns} vs {jaxpr2.eqns}
-    """
-
-    if not ignore_order:
-        # Assert that equations in both jaxprs are equivalent and in same order
-        for i, (eqn1, eqn2) in enumerate(zip(jaxpr1.eqns, jaxpr2.eqns)):
-            if i not in skip_eqns:
-                compare_eqns(eqn1, eqn2)
-
-    else:
-        # Assert that equations in both jaxprs are equivalent but in any order
-        eqns1 = [eqn for i, eqn in enumerate(jaxpr1.eqns) if i not in skip_eqns]
-        eqns2 = [eqn for i, eqn in enumerate(jaxpr2.eqns) if i not in skip_eqns]
-
-        for eqn1 in eqns1:
-            found_match = False
-            for i, eqn2 in enumerate(eqns2):
-                try:
-                    compare_eqns(eqn1, eqn2)
-                    # Remove the matched equation to prevent double-matching
-                    eqns2.pop(i)
-                    found_match = True
-                    break  # Exit inner loop after finding a match
-                except AssertionError:
-                    pass  # Continue to the next equation in eqns2
-            if not found_match:
-                raise AssertionError(f"No matching equation found for: {eqn1}")
-
-
-def compare_eqns(eqn1, eqn2):
-    """Compare two jaxpr equations."""
-    assert eqn1.primitive == eqn2.primitive
-    if "shots" not in eqn1.params and "shape" not in eqn1.params:
-        assert eqn1.params == eqn2.params
-
-    assert len(eqn1.invars) == len(eqn2.invars)
-    for inv1, inv2 in zip(eqn1.invars, eqn2.invars):
-        assert type(inv1) == type(inv2)  # pylint: disable=unidiomatic-typecheck
-        assert inv1.aval == inv2.aval, f"{eqn1}, {inv1.aval}, {inv2.aval}"
-        if hasattr(inv1, "val"):
-            assert inv1.val == inv2.val, f"{eqn1}, {inv1.val}, {inv2.val}"
-
-    assert len(eqn1.outvars) == len(eqn2.outvars)
-    for ov1, ov2 in zip(eqn1.outvars, eqn2.outvars):
-        assert type(ov1) == type(ov2)  # pylint: disable=unidiomatic-typecheck
-        assert ov1.aval == ov2.aval
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -199,13 +140,6 @@ class TestCatalystCompareJaxpr:
         assert len(catalyst_res) == 1
         assert qp.math.allclose(catalyst_res[0], -1)
 
-        qjit_obj = qjit(circuit)
-        qjit_obj(x)
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
-
     def test_globalphase(self):
         """Test conversion of a global phase."""
 
@@ -223,14 +157,6 @@ class TestCatalystCompareJaxpr:
         qp.capture.disable()
         catalyst_res = catalyst_execute_jaxpr(converted)(phi)
         assert qp.math.allclose(catalyst_res, np.exp(-0.5j) * np.array([1.0, 0.0]))
-
-        qjit_obj = qjit(circuit)
-        qjit_obj(0.5)
-
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_expval(self):
         """Test comparison and execution of the jaxpr for a simple qnode."""
@@ -252,14 +178,6 @@ class TestCatalystCompareJaxpr:
         catalyst_res = catalyst_execute_jaxpr(converted)(0.5)
         assert len(catalyst_res) == 1
         assert qp.math.allclose(catalyst_res[0], jax.numpy.cos(0.5))
-
-        qjit_obj = qjit(circuit)
-        qjit_obj(0.5)
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_probs(self):
         """Test comparison and execution of a jaxpr containing a probability measurement."""
@@ -284,14 +202,6 @@ class TestCatalystCompareJaxpr:
         assert len(catalyst_res) == 1
         expected = np.array([np.cos(0.5 / 2) ** 2, np.sin(0.5 / 2) ** 2])
         assert qp.math.allclose(catalyst_res[0], expected)
-
-        qjit_obj = qjit(circuit)
-        qjit_obj(0.5)
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_state(self):
         """Test that the state can be converted to catalxpr."""
@@ -324,15 +234,6 @@ class TestCatalystCompareJaxpr:
 
         assert qp.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qjit(circuit)
-        qjit_obj(phi)
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-
-        # confused by the weak_types error here
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
-
     def test_variance(self):
         """Test comparison and execution of a jaxpr containing a variance measurement."""
 
@@ -359,14 +260,6 @@ class TestCatalystCompareJaxpr:
         expected = 1 - np.sin(x) ** 2
         assert qp.math.allclose(catalyst_res[0], expected)
 
-        qjit_obj = qjit(circuit)
-        qjit_obj(x)
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
-
     def test_sample(self):
         """Test comparison and execution of a jaxpr returning samples."""
 
@@ -391,48 +284,6 @@ class TestCatalystCompareJaxpr:
         assert len(catalyst_res) == 1
         expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
         assert qp.math.allclose(catalyst_res[0], expected)
-
-        qjit_obj = qjit(circuit)
-        qjit_obj()
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
-
-    @pytest.mark.xfail(reason="from_plxpr does not support dynamic shot transform now")
-    def test_sample_one_shot(self):
-        """Test comparison and execution of a jaxpr returning samples."""
-
-        dev = qp.device("lightning.qubit", wires=2)
-
-        @qp.set_shots(50)
-        @qp.qnode(dev, mcm_method="one-shot")
-        def circuit():
-            qp.X(0)
-            return qp.sample()
-
-        qp.capture.enable()
-        plxpr = jax.make_jaxpr(circuit)()
-
-        converted = from_plxpr(plxpr)()
-        qp.capture.disable()
-
-        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
-        assert converted.eqns[0].params["qnode"] is circuit
-
-        catalyst_res = catalyst_execute_jaxpr(converted)()
-        assert len(catalyst_res) == 1
-        expected = np.transpose(np.vstack([np.ones(50), np.zeros(50)]))
-        assert qp.math.allclose(catalyst_res[0], expected)
-
-        qjit_obj = qjit(circuit)
-        qjit_obj()
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_counts(self):
         """Test comparison and execution of a jaxpr returning counts."""
@@ -460,14 +311,6 @@ class TestCatalystCompareJaxpr:
         assert qp.math.allclose(catalyst_res[0], expected_keys)
         assert qp.math.allclose(catalyst_res[1], expected_values)
 
-        qjit_obj = qjit(circuit)
-        qjit_obj()
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
-
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
-
     def test_basis_state(self):
         """Test comparison and execution of a jaxpr containing BasisState."""
         dev = qp.device("lightning.qubit", wires=2)
@@ -491,15 +334,6 @@ class TestCatalystCompareJaxpr:
         catalyst_res = catalyst_execute_jaxpr(converted)(basis_state)
         assert len(catalyst_res) == 1
         assert qp.math.allclose(catalyst_res[0], expected_state_vector)
-
-        qjit_obj = qjit(circuit)
-        qjit_obj(basis_state)
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-
-        # Ignore ordering of eqns when comparing jaxpr since Catalyst performs sorting
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, ignore_order=True)
 
     def test_state_prep(self):
         """Test comparison and execution of a jaxpr containing StatePrep."""
@@ -525,15 +359,6 @@ class TestCatalystCompareJaxpr:
         catalyst_res = catalyst_execute_jaxpr(converted)(init_state)
         assert len(catalyst_res) == 1
         assert qp.math.allclose(catalyst_res[0], init_state)
-
-        qjit_obj = qjit(circuit)
-        qjit_obj(init_state)
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-
-        # Ignore ordering of eqns when comparing jaxpr since Catalyst performs sorting
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c, ignore_order=True)
 
     def test_multiple_measurements(self):
         """Test that we can convert a circuit with multiple measurement returns."""
@@ -568,14 +393,6 @@ class TestCatalystCompareJaxpr:
         assert qp.math.allclose(catalyst_res[0], expected_expval_x)
         assert qp.math.allclose(catalyst_res[1], expected_expval_y)
         assert qp.math.allclose(catalyst_res[2], expected_probs)
-
-        qjit_obj = qjit(circuit)
-        qjit_obj(x, y, z)
-        catalxpr = qjit_obj.jaxpr
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(catalxpr)
-
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_dynamic_shots(self):
         """Test that shots can be specified on qnode call."""
@@ -621,13 +438,15 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        assert qfunc_xpr.eqns[-6].primitive == qinst_p
-        assert qfunc_xpr.eqns[-6].params == {
+        assert qfunc_xpr.eqns[-5].primitive == qref_operator_p
+        assert qfunc_xpr.eqns[-5].params == {
             "adjoint": num_adjoints % 2 == 1,
-            "ctrl_len": 0,
-            "op": "S",
-            "qubits_len": 1,
-            "params_len": 0,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 0,
+            "op_cls": qp.S,
+            "wire_lens": (1,),
         }
 
     @pytest.mark.parametrize("inner_adjoint", (True, False))
@@ -652,7 +471,7 @@ class TestAdjointCtrl:
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
         eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
-        assert eqn.primitive == qinst_p
+        assert eqn.primitive == qref_qinst_p
         assert eqn.params == {
             "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
             "ctrl_len": 3,
@@ -667,6 +486,27 @@ class TestAdjointCtrl:
         assert eqn.invars[5].val == False
         assert eqn.invars[6].val == True
         assert eqn.invars[7].val == False
+
+    def test_qfunc_ctrl_operator2_preserves_control_context(self):
+        """Test that qfunc controls are forwarded to Operator2 lowering."""
+
+        qp.capture.enable()
+
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit():
+            qp.ctrl(qp.S, control=1, control_values=[False])(0)
+            return qp.state()
+
+        plxpr = jax.make_jaxpr(circuit)()
+        catalyst_xpr = from_plxpr(plxpr)()
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        eqn = qfunc_xpr.eqns[4]
+        assert eqn.primitive == qref_operator_p
+        assert eqn.params["n_ctrls"] == 1
+        assert eqn.invars[0] is qfunc_xpr.eqns[2].outvars[0]
+        assert eqn.invars[1] is qfunc_xpr.eqns[3].outvars[0]
+        assert eqn.invars[2].val is False
 
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_doubly_ctrl(self, as_qfunc):
@@ -687,17 +527,19 @@ class TestAdjointCtrl:
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
         eqn = qfunc_xpr.eqns[5]
-        assert eqn.primitive == qinst_p
+        assert eqn.primitive == qref_operator_p
         assert eqn.params == {
             "adjoint": False,
-            "ctrl_len": 2,
-            "op": "S",
-            "qubits_len": 1,
-            "params_len": 0,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 2,
+            "op_cls": qp.S,
+            "wire_lens": (1,),
         }
 
         for i in range(3):
-            assert eqn.invars[i] == qfunc_xpr.eqns[2 + i].outvars[0]
+            assert eqn.invars[i] is qfunc_xpr.eqns[2 + i].outvars[0]
         assert eqn.invars[3].val == False
         assert eqn.invars[4].val == True
 
@@ -723,22 +565,20 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)(0.5)
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        assert qfunc_xpr.eqns[1].primitive == qalloc_p
-        assert qfunc_xpr.eqns[2].primitive == qextract_p
-        assert qfunc_xpr.eqns[3].primitive == qinst_p
-        assert qfunc_xpr.eqns[4].primitive == qinsert_p
+        assert qfunc_xpr.eqns[1].primitive == qref_alloc_p
+        assert qfunc_xpr.eqns[2].primitive == qref_get_p
+        assert qfunc_xpr.eqns[3].primitive == qref_qinst_p
 
-        eqn = qfunc_xpr.eqns[5]
-        assert eqn.primitive == adjoint_p
-        assert eqn.invars[0] == qfunc_xpr.invars[0]  # x
-        assert eqn.invars[1] == qfunc_xpr.eqns[4].outvars[0]  # the qreg
-        assert eqn.outvars[0] == qfunc_xpr.eqns[6].invars[0]  # also the qreg
-        assert len(eqn.outvars) == 1
+        eqn = qfunc_xpr.eqns[4]
+        assert eqn.primitive == adjoint_transform_prim
+        assert eqn.invars[0] == qfunc_xpr.eqns[1].outvars[0]  # the qreg, as a closure variable
+        assert eqn.invars[1] == qfunc_xpr.invars[0]  # x
+        assert len(eqn.outvars) == 0
 
         target_xpr = eqn.params["jaxpr"]
-        assert target_xpr.eqns[1].primitive == qextract_p
-        assert target_xpr.eqns[2].primitive == qextract_p
-        assert target_xpr.eqns[3].primitive == qinst_p
+        assert target_xpr.eqns[1].primitive == qref_get_p
+        assert target_xpr.eqns[2].primitive == qref_get_p
+        assert target_xpr.eqns[3].primitive == qref_qinst_p
         assert target_xpr.eqns[3].params == {
             "adjoint": False,
             "ctrl_len": 0,
@@ -746,8 +586,6 @@ class TestAdjointCtrl:
             "params_len": 1,
             "qubits_len": 2,
         }
-        assert target_xpr.eqns[4].primitive == qinsert_p
-        assert target_xpr.eqns[5].primitive == qinsert_p
 
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_dynamic_control_wires(self, as_qfunc):
@@ -769,22 +607,26 @@ class TestAdjointCtrl:
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        assert qfunc_xpr.eqns[2].primitive == qextract_p
-        assert qfunc_xpr.eqns[3].primitive == qextract_p
-        assert qfunc_xpr.eqns[4].primitive == qinst_p  # the cnot
-        assert qfunc_xpr.eqns[5].primitive == qinsert_p  # sticking back into reg
-        assert qfunc_xpr.eqns[6].primitive == qinsert_p
-        assert qfunc_xpr.eqns[7].primitive == qextract_p
-        assert qfunc_xpr.eqns[8].primitive == qextract_p
+        assert qfunc_xpr.eqns[2].primitive == qref_get_p
+        assert qfunc_xpr.eqns[3].primitive == qref_get_p
+        assert qfunc_xpr.eqns[4].primitive == qref_qinst_p
+        assert qfunc_xpr.eqns[5].primitive == qref_get_p
+        assert qfunc_xpr.eqns[6].primitive == qref_get_p
 
-        assert qfunc_xpr.eqns[9].primitive == qinst_p
-        assert qfunc_xpr.eqns[9].params == {
+        eqn = qfunc_xpr.eqns[7]
+        assert eqn.primitive == qref_operator_p
+        assert eqn.params == {
             "adjoint": False,
-            "ctrl_len": 1,
-            "op": "T",
-            "params_len": 0,
-            "qubits_len": 1,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 1,
+            "op_cls": qp.T,
+            "wire_lens": (1,),
         }
+        assert eqn.invars[0] is qfunc_xpr.eqns[5].outvars[0]
+        assert eqn.invars[1] is qfunc_xpr.eqns[6].outvars[0]
+        assert eqn.invars[2].val == True
 
     def test_ctrl_around_for_loop(self):
         """Test that ctrl applied to a for loop."""
@@ -807,8 +649,8 @@ class TestAdjointCtrl:
         for_loop_xpr = qfunc_xpr.eqns[2].params["jaxpr_body_fn"]
 
         for i in [0, 1, 2]:
-            assert for_loop_xpr.eqns[i].primitive == qextract_p
-        assert for_loop_xpr.eqns[3].primitive == qinst_p
+            assert for_loop_xpr.eqns[i].primitive == qref_get_p
+        assert for_loop_xpr.eqns[3].primitive == qref_qinst_p
         assert for_loop_xpr.eqns[3].params == {
             "adjoint": False,
             "ctrl_len": 2,
@@ -843,12 +685,10 @@ class TestControlFlow:
 
         eqn = catalyst_jaxpr.eqns[0]
 
-        print(catalyst_jaxpr)
-
         assert eqn.primitive == for_loop_prim
-        assert eqn.params["abstract_shapes_slice"] == (0, 0, 1)
-        assert eqn.params["args_slice"] == (0, 1, 1)
-        assert eqn.params["consts_slice"] == (0, 0, 1)
+        assert eqn.params["abstract_shapes_slice"] == (0, 0, None)
+        assert eqn.params["args_slice"] == (0, None, None)
+        assert eqn.params["consts_slice"] == (0, 0, None)
 
         assert len(eqn.params["jaxpr_body_fn"].eqns) == 3 if reverse else 1
 
@@ -926,14 +766,6 @@ class TestHybridPrograms:
         expected = expval_x1 + expval_y0
 
         assert qp.math.allclose(expected, res[0])
-
-        qjit_obj = qjit(workflow)
-        qjit_obj(0.5)
-
-        call_jaxpr_pl = get_call_jaxpr(converted)
-        call_jaxpr_c = get_call_jaxpr(qjit_obj.jaxpr)
-
-        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
     def test_multiple_qnodes(self):
         """Test that a workflow with multiple qnodes can be converted."""

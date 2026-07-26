@@ -756,9 +756,6 @@ class TestState:
     def test_state_on_0qbits(self, capture_mode):
         """Test state on 0 qubits."""
 
-        if capture_mode:
-            pytest.xfail("capture doesn't currently support 0 wires.")
-
         @qjit(capture=capture_mode)
         @qp.qnode(qp.device("lightning.qubit", wires=0))
         def state_0qbit():
@@ -787,9 +784,6 @@ class TestProbs:
 
     def test_probs_on_0qbits(self, capture_mode):
         """Test probs on 0 qubits."""
-
-        if capture_mode:
-            pytest.xfail("capture doesn't currently support 0 wires.")
 
         @qjit(capture=capture_mode)
         @qp.qnode(qp.device("lightning.qubit", wires=0))

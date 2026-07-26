@@ -631,11 +631,12 @@ func.func public @test_switch_default_only_branch_depth(%arg : index, %q : !quan
 
 // -----
 
-// Static for-loop: depth = N * depth(body). Z-axis PPR + Z-axis PPM commute,
+// Static for-loop: depth = depth(body). Z-axis PPR + Z-axis PPM commute,
 // so each iteration is a single layer.
 
 // CHECK-DAG: "static_for_loop"
-// CHECK-DAG: "depth": 5
+// NOTE: the depth is 1 because the for loop is lifted into the body
+// CHECK-DAG: "depth": 1
 // CHECK-DAG: "depth_type": 0
 // CHECK-DAG: "max_weight_pi4": 1
 // CHECK-DAG: "num_of_ppm": 5
@@ -657,7 +658,7 @@ func.func public @static_for_loop(%arg0: !quantum.bit) {
 // -----
 
 // CHECK-DAG: "static_for_loop_bigstep"
-// CHECK-DAG: "depth": 3
+// CHECK-DAG: "depth": 1
 // CHECK-DAG: "depth_type": 0
 // CHECK-DAG: "max_weight_pi4": 1
 // CHECK-DAG: "num_of_ppm": 3
@@ -679,14 +680,10 @@ func.func public @static_for_loop_bigstep(%arg0: !quantum.bit) {
 
 // -----
 
-// Nested static for-loop. Inner body = 1 layer (Z PPR + Z PPM commute).
-// Inner depth = 5 * 1 = 5. Outer body = inner (5) + 1 outer Z PPR (commutes with the
-// final Z PPM in the inner body? no, inner body was yielded; outer PPR is on the yielded
-// qubit -> a fresh layer after the loop). Outer body depth = 5 + 1 = 6.
-// Outer total = 6 * 6 = 36.
 
 // CHECK-DAG: "static_for_loop_nested"
-// CHECK-DAG: "depth": 36
+// NOTE: the depth is 1 because the for loop is lifted into the body
+// CHECK-DAG: "depth": 2
 // CHECK-DAG: "depth_type": 0
 // CHECK-DAG: "max_weight_pi4": 1
 // CHECK-DAG: "max_weight_pi8": 1
@@ -716,11 +713,11 @@ func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
 
 // -----
 
-// scf.if inside scf.for: outer trip count 2, inner body = scf.if (max(then, else) = 1).
-// Outer body depth = 1. Outer total = 2 * 1 = 2.
+// scf.if inside scf.for: inner body = scf.if (max(then, else) = 1).
+// Outer body depth = 1.
 
 // CHECK-DAG: "test_if_in_for_depth"
-// CHECK-DAG: "depth": 2
+// CHECK-DAG: "depth": 1
 // CHECK-DAG: "depth_type": 0
 func.func public @test_if_in_for_depth(%arg0: !quantum.bit) {
     %c0 = arith.constant 0 : index

@@ -14,7 +14,7 @@ extend-exclude = '''
 '''
 
 [tool.isort]
-py_version=311
+py_version=312
 profile = "black"
 line_length = 100
 skip = [

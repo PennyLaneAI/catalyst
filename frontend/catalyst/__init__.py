@@ -164,6 +164,25 @@ while processing the following with AutoGraph:
     for x in params:
 """
 
+compile_without_static_conditionals = True
+"""bool: Specify whether Catalyst should resolve conditionals on constant predicates
+immediately during program capture. A constant predicate implies the conditional always
+takes the same branch no matter what, making the conditional superfluous. Defaults to `True`.
+
+Set to `False` if you prefer a more faithful representation of the program as written, even if
+it is less optimized. Note that the flag only affects the behaviour during initial capture of
+the program, further compilation may remove those conditionals anyway."""
+
+compile_without_static_loops = False
+"""bool: Specify whether Catalyst should resolve loops on a constant iteration range
+immediately during program capture. A constant iteration range means the `start`, `stop`, and `step`
+of a `for` loop are fixed and will not vary with program behaviour or inputs. Defaults to `False`.
+
+Set to `True` if you prefer a more static form of the program, which can provide additional
+information to the compiler compared to a loop which generates a dynamic iteration index.
+The default is `False` because, even when static, loops are highly useful in compressing the
+size of the captured program, which is good for compile-time performance."""
+
 __all__ = (
     "qjit",
     "QJIT",
@@ -180,6 +199,8 @@ __all__ = (
     "kernel",
     "passes",
     "pipeline",
+    "compile_without_static_conditionals",
+    "compile_without_static_loops",
     *_api_extension_list,
     *_autograph_functions,
 )

@@ -6,17 +6,31 @@
 
 _Lower adjoint regions containing a single quantum operations._
 
-### `-annotate-invalid-gradient-functions`
+### `-cancel-inverses`
 
-_Annotate functions that contain operations invalid for automatic gradient computation._
+_Perform removal of chained operations that are inverses._
+
+### `-combine-global-phases`
+
+_Scope-wise merging of global phase operators (safe)._
 
 ### `-convert-quantum-to-llvm`
 
 _Perform a dialect conversion from Quantum to LLVM (QIR)._
 
+#### Options
+
+```
+-use-array-backed-registers : Use the array-backed-registers conversion pattern for quantum.insert ops.
+```
+
 ### `-cp-global-memref`
 
 _Copy global memrefs before returning from C interface._
+
+### `-decompose-lowering`
+
+_Replace quantum operations with compiled decomposition rules._
 
 ### `-disentangle-cnot`
 
@@ -38,9 +52,37 @@ _Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever 
 -emit-FSM-state-remark : Whether to emit the state analysis result from the simple states propagation FSM onto the gate operations.
 ```
 
+### `-dynamic-one-shot`
+
+_Apply the dynamic one-shot transform._
+
 ### `-emit-catalyst-py-interface`
 
 _Emit catalyst python's default interface._
+
+### `-graph-decomposition`
+
+_Decompose gates using an MLIR-native graph-based framework._
+
+#### Options
+
+```
+-gate-set       : The accepted gates to decompose to.
+-fixed-decomps  : Maps an operator to a decomposition rule that will be applied.
+-alt-decomps    : Maps an operator to a `|` separated list of alternative decomposition rules that will be considered alongside any built-in rules for the operator.
+-bytecode-rules : A path to a bytecode file of compiled decomposition rules.
+```
+
+### `-gridsynth`
+
+_Perform Ross-Selinger/Gridsynth decomposition._
+
+#### Options
+
+```
+-epsilon   : Maximum error tolerance for per-gate discretization.
+-ppr-basis : Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.
+```
 
 ### `-ions-decomposition`
 
@@ -54,10 +96,20 @@ _Perform loop boundary optimization to eliminate the redundancy of operations on
 
 _Perform merging of chained rotation gates about the same axis._
 
-### `-cancel-inverses`
-
-_Perform removal of chained operations that are inverses._
-
 ### `-split-multiple-tapes`
 
 _Given a qnode containing multiple tapes, split each tape into its own function._
+
+### `-split-non-commuting`
+
+_Split quantum functions non-commuting observables into multiple executions._
+
+#### Options
+
+```
+-grouping-strategy : Grouping strategy for observables. "" (default) assigns each observable its own group. "wires" groups observables on non-overlapping wires.
+```
+
+### `-split-to-single-terms`
+
+_Split quantum functions into single-term observables._
