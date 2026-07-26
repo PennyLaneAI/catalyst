@@ -20,14 +20,11 @@
 
 // -----
 
-// When backend_config.dispatch names the executor explicitly, it is rewritten to a executor.call on 
-// that address, and a session is opened once in setup().
-// CHECK-LABEL: func.func @setup()
-// CHECK: executor.open("ADDR:PORT")
-// CHECK: return
+// When backend_config.dispatch names the executor explicitly, it is rewritten to an executor.call
+// on a session opened once at the host function entry.
 // CHECK-LABEL: func.func @main
-// CHECK: executor.call("fpga_trampoline_a_setup", "ADDR:PORT")
-// CHECK-SAME: (memref<256xi8>) -> ()
+// CHECK: %[[S:.*]] = executor.open("ADDR:PORT") : !executor.session
+// CHECK: executor.call %[[S]]("fpga_trampoline_a_setup") (%{{.*}}) {num_input_args = 1 : i32} : !executor.session, (memref<256xi8>) -> ()
 // CHECK-NOT: catalyst.custom_call
 module @jit_bound {
   func.func @setup() {
@@ -41,12 +38,14 @@ module @jit_bound {
 
 // -----
 
-// backend_config.dispatch = "" binds to the program's single executor, which
-// is supplied by the QNode target module's catalyst.dispatch address.
-// CHECK-LABEL: func.func @setup()
-// CHECK: executor.open("ADDR:PORT")
+// backend_config.dispatch = "" binds to the program's single executor, supplied by the QNode target
+// module's catalyst.dispatch address.
 // CHECK-LABEL: func.func @main
-// CHECK: executor.call("fpga_trampoline_a_teardown", "ADDR:PORT")
+// CHECK: %[[S:.*]] = executor.open("ADDR:PORT") : !executor.session
+// CHECK: executor.send_binary %[[S]]("/tmp/target.o") : !executor.session
+// CHECK: executor.launch %[[S]]("compute", "/tmp/target.o") () : !executor.session, () -> ()
+// CHECK: executor.call %[[S]]("fpga_trampoline_a_teardown") () : !executor.session, () -> ()
+// CHECK-NOT: executor.open
 // CHECK-NOT: catalyst.custom_call
 module @jit_inherit {
   func.func @setup() {

@@ -17,24 +17,17 @@
 // This pass consumes the input IR left by cross-compile-targets which carries catalyst.object_file,
 // plus a catalyst.dispatch attributes.
 
-// setup() opens the session once and ships the module's object.
-// CHECK-LABEL: func.func @setup()
-// CHECK: executor.open("ADDR:PORT")
-// CHECK: executor.send_binary("ADDR:PORT", "/tmp/target_compute.o")
-// Make sure the binary is shipped exactly once even though the host has two launch_kernels
-// CHECK-NOT: executor.send_binary
-// CHECK: return
 
-// teardown() is left untouched: the runtime closes sessions at process exit.
-// CHECK-LABEL: func.func @teardown()
-// CHECK-NOT: executor.
-// CHECK: return
-
-// Each host-side launch_kernel is rewritten to its own executor.launch, preserving the call's
-// operand/result types (a typed call exercises the memref-result path).
+// The host entry opens one session, ships the object once, and rewrites each launch_kernel into an
+// executor.launch reusing that session.
 // CHECK-LABEL: func.func public @jit_main
-// CHECK: executor.launch("noop", "ADDR:PORT", "/tmp/target_compute.o") () : () -> ()
-// CHECK: executor.launch("compute", "ADDR:PORT", "/tmp/target_compute.o") (%{{.*}}) : (memref<4xf64>) -> memref<4xf64>
+// CHECK: %[[S:.*]] = executor.open("ADDR:PORT") : !executor.session
+// CHECK: executor.send_binary %[[S]]("/tmp/target_compute.o") : !executor.session
+// CHECK: executor.launch %[[S]]("noop", "/tmp/target_compute.o") () : !executor.session, () -> ()
+// CHECK: executor.launch %[[S]]("compute", "/tmp/target_compute.o") (%{{.*}}) : !executor.session, (memref<4xf64>) -> memref<4xf64>
+// One open and one send_binary for the whole function even though it has two launches.
+// CHECK-NOT: executor.open
+// CHECK-NOT: executor.send_binary
 
 // The launch_kernels and the nested module are gone.
 // CHECK-NOT: catalyst.launch_kernel
