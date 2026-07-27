@@ -216,8 +216,6 @@ if(ENABLE_TRANSPORT)
         target_sources(runner_tests_transport_gpu PRIVATE
             Test_TransportGpu.cpp
         )
-        # Include dirs and transport_common are inherited from
-        # catalyst_transport_gpu_coprocessor's PUBLIC interface.
         target_link_libraries(runner_tests_transport_gpu PRIVATE
             Catch2WithMain
             catalyst_runtime_testing
