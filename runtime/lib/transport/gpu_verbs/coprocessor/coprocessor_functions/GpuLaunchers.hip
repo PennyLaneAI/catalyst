@@ -74,9 +74,8 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
     }
 }
 
-// Enqueue fused<DECODE> on the session-owned stream, wired to the datapath in
-// `desc`. The session keeps ownership of the stream, stop flag, sync() and the
-// host handoff->reply thread; this only launches.
+//  Launch fused<DECODE> on the session-owned stream, wired to the datapath in
+// `desc`.
 template <std::uint64_t (*DECODE)(std::uint64_t)> static int launch(const CoprocLaunchDesc *desc)
 {
     hipLaunchKernelGGL((fused<DECODE>), dim3(1), dim3(1), 0, static_cast<hipStream_t>(desc->stream),
