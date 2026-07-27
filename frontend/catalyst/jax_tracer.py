@@ -509,8 +509,6 @@ class HybridOp(Operator):
         apply_reverse_transform=False,
         expansion_strategy=None,
         debug_info=None,
-        estimated_iterations=None,
-        estimated_probabilities=None,
     ):  # pylint: disable=too-many-arguments
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
@@ -518,8 +516,6 @@ class HybridOp(Operator):
         self.expansion_strategy = expansion_strategy
         self.apply_reverse_transform = apply_reverse_transform
         self.debug_info = debug_info
-        self.estimated_iterations = estimated_iterations
-        self.estimated_probabilities = estimated_probabilities
         super().__init__(wires=Wires(()))
 
     def __repr__(self):

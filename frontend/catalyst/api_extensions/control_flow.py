@@ -1655,6 +1655,19 @@ class Cond(HybridOp):
     binder = cond_p.bind
     has_adjoint = True
 
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+        debug_info=None,
+        estimated_probabilities=None,
+    ):  # pylint: disable=too-many-arguments
+        self.estimated_probabilities = estimated_probabilities
+        super().__init__(in_classical_tracers, out_classical_tracers, regions, apply_reverse_transform, expansion_strategy, debug_info)
+
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
         version of the operation, which is generally supported by Catalyst."""
@@ -1670,6 +1683,19 @@ class ForLoop(HybridOp):
 
     binder = for_p.bind
     has_adjoint = True
+
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+        debug_info=None,
+        estimated_iterations=None,
+    ):  # pylint: disable=too-many-arguments
+        self.estimated_iterations = estimated_iterations
+        super().__init__(in_classical_tracers, out_classical_tracers, regions, apply_reverse_transform, expansion_strategy, debug_info)
 
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
@@ -1768,6 +1794,19 @@ class WhileLoop(HybridOp):
 
     binder = while_p.bind
     has_adjoint = True
+
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+        debug_info=None,
+        estimated_iterations=None,
+    ):  # pylint: disable=too-many-arguments
+        self.estimated_iterations = estimated_iterations
+        super().__init__(in_classical_tracers, out_classical_tracers, regions, apply_reverse_transform, expansion_strategy, debug_info)
 
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
@@ -1992,3 +2031,25 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
         )
     )
     return qrp2
+
+def collect_estimated_probabilities_for_cond(
+    branch_probs: Sequence[float | None],
+) -> tuple[float, ...] | None:
+    """Collect and validate per-branch probability hints for ``cond``."""
+    if all(p is None for p in branch_probs):
+        return None
+    if any(p is None for p in branch_probs):
+        raise ValueError(
+            "'estimated_probability' must be provided for every non-default branch when "
+            "using resource-estimation hints."
+        )
+
+    probs = tuple(float(p) for p in branch_probs)
+    for p in probs:
+        if not 0.0 <= p <= 1.0:
+            raise ValueError(f"'estimated_probability' must be in [0, 1], but got {p}.")
+    if sum(probs) > 1.0 + 1e-10:
+        raise ValueError(
+            f"'estimated_probability' entries must sum to at most 1, but got {sum(probs)}."
+        )
+    return probs
