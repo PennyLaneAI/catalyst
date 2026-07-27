@@ -44,16 +44,12 @@ class PBCDepthExtension : public ResourceExtension {
 };
 
 /// Computes PBC depth for a region into a PBCDepthExtension.
-class PBCDepthAnalysis : public ResourceExtensionAnalysis {
+class PBCDepthAnalysis : public ResourceExtensionAnalysisOf<PBCDepthExtension> {
   public:
     llvm::StringRef name() const override { return "depth"; }
 
-    std::unique_ptr<ResourceExtension> makeEmpty() const override
-    {
-        return std::make_unique<PBCDepthExtension>();
-    }
-
-    void analyze(mlir::Region &region, ResourceExtension &ext, bool isAdjoint) override;
+  protected:
+    void analyze(mlir::Region &region, PBCDepthExtension &ext, bool isAdjoint) override;
 };
 
 // Registers PBCDepthAnalysis into ResourceExtensionRegistry

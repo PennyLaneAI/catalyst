@@ -67,9 +67,8 @@ void PBCDepthExtension::multiplyBy(int64_t factor)
     }
 }
 
-void PBCDepthAnalysis::analyze(Region &region, ResourceExtension &ext, bool isAdjoint)
+void PBCDepthAnalysis::analyze(Region &region, PBCDepthExtension &ext, bool /*isAdjoint*/)
 {
-    auto &depthExt = static_cast<PBCDepthExtension &>(ext);
     Block *block = &region.front();
 
     // Swallow expected errors from dynamic-loop depth computation.
@@ -83,7 +82,7 @@ void PBCDepthAnalysis::analyze(Region &region, ResourceExtension &ext, bool isAd
         });
 
     PBCLayerContext layerContext;
-    depthExt.setDepth(layerContext.computePBCDepth(block));
+    ext.setDepth(layerContext.computePBCDepth(block));
 }
 
 void registerPBCResourceExtensions()
