@@ -13,18 +13,20 @@
 // limitations under the License.
 
 #include "nanobind/nanobind.h"
-#include "nanobind/stl/string.h" // for automatic string conversion
-#include "nanobind/stl/vector.h" // for automatic vector conversion
 
+#include <cstddef>
 #include <exception>
 #include <string>
-#include <vector>
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 
@@ -35,6 +37,33 @@
 namespace nb = nanobind;
 
 namespace {
+
+static nb::dict getPyvalFromDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map)
+{
+    nb::dict dict;
+    for (const auto &entry : map) {
+        std::string typestr;
+        llvm::raw_string_ostream ss(typestr);
+        ss << "[";
+        for (auto [i, type] : llvm::enumerate(entry.getValue())) {
+            if (i > 0) {
+                ss << ",";
+            }
+            type.print(ss);
+        }
+        dict[nb::str(entry.getKey().data())] = ss.str();
+    }
+    return dict;
+}
+
+static nb::dict getPyvalFromWireLens(const llvm::StringMap<size_t> map)
+{
+    nb::dict dict;
+    for (const auto &entry : map) {
+        dict[nb::str(entry.getKey().data())] = entry.getValue();
+    }
+    return dict;
+}
 
 static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange)
 {
@@ -76,6 +105,8 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
 {
     QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
+        nb::print("calling python to handle");
+        std::cerr << op.getGraphOpId();
         const char *moduleName = "catalyst.decomposition.python_decompositions";
         const char *functionName = "compile_decomposition_rules";
 
@@ -83,9 +114,12 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
             nb::module_ wrapperModule = nb::module_::import_(moduleName);
             nb::object wrapperFunction = wrapperModule.attr(functionName);
 
+            nb::print(getPyvalFromDynamicShape(op.getDynamicShape()));
+            nb::print(getPyvalFromWireLens(op.getWireLens()));
+            nb::print(getPyvalFromMlirAttribute(op.getStaticData()));
             nb::object pythonResult =
                 wrapperFunction(op.getOperatorName(), op.getGraphOpId(),
-                                getPyvalFromTypeRange(op.getDynamicShape()), op.getWireLens(),
+                                getPyvalFromDynamicShape(op.getDynamicShape()), op.getWireLens(),
                                 getPyvalFromMlirAttribute(op.getStaticData()));
 
             return nb::borrow<nb::str>(pythonResult).c_str();
