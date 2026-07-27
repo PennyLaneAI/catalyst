@@ -18,6 +18,7 @@
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
@@ -76,27 +77,25 @@ int64_t countStaticForOpIterations(scf::ForOp forOp)
     return getNumIterations(l, u, s);
 }
 
-std::optional<double> getEstimatedIterationsAttr(Operation *op)
+std::optional<double> getEstimatedIterationsHint(Operation *op)
 {
-    if (auto estAttr = op->getAttrOfType<FloatAttr>(EstimatedIterationsAttrName)) {
-        double value = estAttr.getValueAsDouble();
-        if (value >= 0.0) {
-            return value;
-        }
+    Attribute attr = op->getAttr(EstimatedIterationsAttrName);
+    if (!attr) {
         return std::nullopt;
     }
-    if (auto estAttr = op->getAttrOfType<IntegerAttr>(EstimatedIterationsAttrName)) {
-        if (!estAttr.getValue().isNegative()) {
-            return static_cast<double>(estAttr.getValue().getSExtValue());
-        }
+    if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
+        return static_cast<double>(intAttr.getValue().getSExtValue());
+    }
+    if (auto floatAttr = dyn_cast<FloatAttr>(attr)) {
+        return floatAttr.getValueAsDouble();
     }
     return std::nullopt;
 }
 
 std::optional<double> resolveForLoopTripCount(scf::ForOp forOp)
 {
-    if (auto est = getEstimatedIterationsAttr(forOp.getOperation())) {
-        return est;
+    if (auto iters = getEstimatedIterationsHint(forOp)) {
+        return *iters;
     }
     if (auto staticTrip = forOp.getStaticTripCount()) {
         return static_cast<double>(staticTrip->getSExtValue());
