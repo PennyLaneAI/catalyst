@@ -15,7 +15,6 @@
 // Lower the `transport` dialect to `llvm.call`s on the __catalyst__transport__*
 // CAPI (runtime/include/TransportCAPI.h).
 
-#include "llvm/ADT/Twine.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -53,13 +52,43 @@ Value emitCall(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, 
     return call.getNumResults() ? call.getResult() : Value();
 }
 
+std::string globalStrKey(StringRef prefix, StringRef value)
+{
+    std::string key = prefix.str();
+    for (char c : value) {
+        bool ok =
+            (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+        key.push_back(ok ? c : '_');
+    }
+    return key;
+}
+
 Value globalStr(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, StringRef prefix,
                 StringRef value)
 {
-    static int counter = 0;
-    std::string symName = (prefix + Twine(counter++)).str();
-    return LLVM::createGlobalString(loc, rewriter, symName, Twine(value).concat(Twine('\0')).str(),
-                                    LLVM::Linkage::Internal);
+    std::string data = value.str();
+    data.push_back('\0');
+    auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), data.size());
+    StringAttr dataAttr = rewriter.getStringAttr(data);
+
+    // Since the key is lossy, an existing global holding something else is not ours to reuse.
+    std::string base = globalStrKey(prefix, value);
+    std::string symName = base;
+    LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(symName);
+    for (unsigned n = 0; glb && glb.getValueOrNull() != dataAttr; ++n) {
+        symName = base + "." + std::to_string(n);
+        glb = mod.lookupSymbol<LLVM::GlobalOp>(symName);
+    }
+
+    if (!glb) {
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(mod.getBody());
+        glb = LLVM::GlobalOp::create(rewriter, loc, type, /*isConstant=*/true,
+                                     LLVM::Linkage::Internal, symName, dataAttr);
+    }
+    return LLVM::GEPOp::create(rewriter, loc, ptrTy(rewriter.getContext()), type,
+                               LLVM::AddressOfOp::create(rewriter, loc, glb),
+                               ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
 Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64_t v)
