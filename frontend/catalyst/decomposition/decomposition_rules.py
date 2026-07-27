@@ -72,18 +72,20 @@ class GraphOpID:
         """Return the dynamic shape as a list of dtypes."""
         return {
             argname: mlir_stringify_type(argtype)
-            for argname, argtype in self.op.dynamic_args.items()
+            for argname, argtype in sorted(self.op.dynamic_args.items())
         }
 
     def parse_wire_lens(self) -> list[int]:
         """Return the length of each of the wire args."""
-        return {wire_name: len(wire_arg) for wire_name, wire_arg in self.op.wire_args.items()}
+        return {
+            wire_name: len(wire_arg) for wire_name, wire_arg in sorted(self.op.wire_args.items())
+        }
 
     def parse_static_data(self) -> dict:
         """Return a dictionary of names to static data values."""
         return {
             static_argname: getattr(self.op, static_argname)
-            for static_argname in self.op.compilable_argnames
+            for static_argname in sorted(self.op.compilable_argnames)
         }
 
     def get_operator_name(self) -> str:
@@ -92,11 +94,11 @@ class GraphOpID:
 
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
-        return f"[{','.join(self.dynamic_shape.values())}]"
+        return f"{{{','.join(f"{name}:{shape}" for name, shape in self.dynamic_shape.items())}}}"
 
     def get_wire_lens_id_format(self) -> str:
         """Return the wire lengths formatted for GraphOpId."""
-        return f"[{','.join(map(str, self.wire_lens.values()))}]"
+        return f"{{{','.join(f"{name}:{shape}" for name, shape in self.wire_lens.items())}}}"
 
     def get_static_data_id_format(self) -> str:
         """Return the static data formatted for GraphOpId."""

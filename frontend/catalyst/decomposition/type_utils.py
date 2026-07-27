@@ -51,7 +51,7 @@ def mlir_stringify_type(dtype: qp.typing.AbstractArray):
     ), f"Expected an AbstractArray to stringify, got {dtype}"
     element_type = dtype.dtype.type
     if dtype.shape == ():
-        return _PY_DTYPES_TO_MLIR_DTYPES[element_type]
+        return f"[{_PY_DTYPES_TO_MLIR_DTYPES[element_type]}]"
     else:
         return _stringify_shaped_type(dtype.shape, 0, element_type)
 
