@@ -215,6 +215,7 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "name + {map params to list of types} + {map wire args to number of wires} + {static data} + [extra data]\n"
             "```\n"
             "Note that extra data is currently specific to `OperatorOp`s, and should only appear when present."
+            "Each of these maps should be sorted lexicographically by key."
             "In general, this should be computed by the default here and not overridden.",
             "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpId($_op.getOperation()); }]
         >
