@@ -14,11 +14,17 @@
 
 #pragma once
 
+#include <functional>
+#include <memory>
+
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
+#include "Catalyst/Analysis/ResourceExtension.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "PBC/IR/PBCOps.h"
 
@@ -28,9 +34,15 @@ namespace catalyst {
 
 class ResourceAnalysis {
   public:
+    // Callable that constructs a ResourceExtensionAnalysis collector for this run.
+    using ExtensionProvider = std::function<std::unique_ptr<ResourceExtensionAnalysis>()>;
+
     // walk all func::FuncOps within the operation.
-    explicit ResourceAnalysis(ModuleOp moduleOp);
-    explicit ResourceAnalysis(func::FuncOp funcOp);
+    // Default empty providers keeps getAnalysis<> / decomp-rule path extension-free.
+    explicit ResourceAnalysis(ModuleOp moduleOp,
+                              ArrayRef<ExtensionProvider> extensionProviders = {});
+    explicit ResourceAnalysis(func::FuncOp funcOp,
+                              ArrayRef<ExtensionProvider> extensionProviders = {});
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 
@@ -48,12 +60,6 @@ class ResourceAnalysis {
 
     const ResourceResult *getFlattenedResource(llvm::StringRef funcName) const;
 
-    // Maps synthetic loop names to their `scf::ForOp` for depth analysis in the pass.
-    const llvm::StringMap<scf::ForOp> &getSyntheticLoopBodies() const
-    {
-        return syntheticLoopBodies;
-    }
-
   private:
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
@@ -69,7 +75,11 @@ class ResourceAnalysis {
     int64_t forLoopCounter = 0;
     int64_t dynForLoopCounter = 0;
 
-    llvm::StringMap<scf::ForOp> syntheticLoopBodies;
+    // Collect the extension analyses logic
+    llvm::SmallVector<std::unique_ptr<ResourceExtensionAnalysis>> extensionAnalyses;
+
+    // Blank ResourceResult with empty data objects from each collector.
+    ResourceResult makeEmptyResult() const;
 
     // `prefix` + counter; advance counter until the name is free in `funcResults`
     std::string makeUniqueSyntheticName(llvm::StringRef prefix, int64_t &counter);
@@ -84,7 +94,7 @@ class ResourceAnalysis {
     void analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint);
 
     // categorize and count a single operation
-    void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint);
+    void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint) const;
 };
 
 } // namespace catalyst

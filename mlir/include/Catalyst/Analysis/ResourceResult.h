@@ -23,13 +23,15 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
 
+#include "Catalyst/Analysis/ResourceExtension.h"
+
 namespace catalyst {
 
 // ResourceResult holds the resource counts for a single function.
 // It mirrors the Python-side ResourcesResult from specs_collector.py.
 struct ResourceResult {
     // method for merging two ResourceResult values
-    enum class MergeMethod { Sum, Max, Min };
+    using MergeMethod = catalyst::MergeMethod;
 
     // quantum, qref, pbc, mbqc operations are stored
     // as a map from operation name to a map of
@@ -73,9 +75,6 @@ struct ResourceResult {
     // nullopt means no quantum.device in this function.
     std::optional<bool> autoQubitManagement;
 
-    // PBC depths as (any_commuting_depth, qubit_disjoint_depth), or nullopt if unavailable.
-    std::optional<std::pair<int64_t, int64_t>> pbcDepth;
-
     // merge another ResourceResult into this one
     void mergeWith(const ResourceResult &other, MergeMethod method = MergeMethod::Sum);
 
@@ -85,6 +84,14 @@ struct ResourceResult {
 
     // Serialize this function's resources into a JSON object.
     llvm::json::Object toJson() const;
+
+    // It is used to store additional resource information
+    // that is not covered by the core resource result
+    llvm::SmallVector<std::unique_ptr<ResourceExtension>> extensions;
+
+    ResourceResult() = default;
+    ResourceResult(ResourceResult &&) = default;
+    ResourceResult &operator=(ResourceResult &&) = default;
 };
 
 mlir::DictionaryAttr buildResourceDict(mlir::MLIRContext *ctx, const ResourceResult &result);

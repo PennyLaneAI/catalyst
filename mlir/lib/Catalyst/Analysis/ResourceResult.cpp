@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Catalyst/Analysis/ResourceResult.h"
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -23,6 +21,9 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
+
+#include "Catalyst/Analysis/ResourceResult.h"
+#include "Catalyst/Analysis/ResourceExtension.h"
 
 using namespace mlir;
 
@@ -84,6 +85,15 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
 
     hasBranches = hasBranches || other.hasBranches;
     hasDynLoop = hasDynLoop || other.hasDynLoop;
+
+    for (auto &m : extensions) {
+        for (const auto &o : other.extensions) {
+            if (m->name() == o->name()) {
+                m->mergeWith(*o, method);
+                break;
+            }
+        }
+    }
 }
 
 void ResourceResult::multiplyByScalar(double scalar)
@@ -165,12 +175,12 @@ llvm::json::Object ResourceResult::toJson() const
     if (autoQubitManagement.has_value()) {
         funcObj["auto_qubit_management"] = *autoQubitManagement;
     }
-    llvm::json::Object depthObj;
-    if (pbcDepth) {
-        depthObj["any_commuting_depth"] = pbcDepth->first;
-        depthObj["qubit_disjoint_depth"] = pbcDepth->second;
+
+    // Emit registered extensions under their own keys (e.g. "depth").
+    // Stage 4 will nest these under "extended_fields".
+    for (const auto &ext : extensions) {
+        funcObj[ext->name()] = ext->toJson();
     }
-    funcObj["depth"] = std::move(depthObj);
 
     return funcObj;
 }
