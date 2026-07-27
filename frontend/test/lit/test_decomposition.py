@@ -182,20 +182,123 @@ def test_compile_decomposition_rules_wrapper_entry_point():
 
         with qp.decomposition.local_decomps():
             qp.add_decomps(CompilableData, rule)
-            result = compile_decomposition_rules_wrapper(
+            result_a1 = compile_decomposition_rules_wrapper(
                 "CompilableData",
                 "CompilableData{}{wires:1}{a:1,b:2,thing:3}",
                 {},
                 {"wires": 1},
                 {"a": 1, "b": 2, "thing": 3},
             )
-            print(result)
+            print(result_a1)
+
+            result_a10 = compile_decomposition_rules_wrapper(
+                "CompilableData",
+                "CompilableData{}{wires:1}{a:10,b:2,thing:3}",
+                {},
+                {"wires": 1},
+                {"a": 10, "b": 2, "thing": 3},
+            )
+            print(result_a10)
 
     # CHECK: func.func private @"rule_CompilableData{}{wires:1}{a:1,b:2,thing:3}"
     # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64]}{reg:1}{}" = 1 : i64}
     # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:1,b:2,thing:3}"
     # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
+    #
+    # CHECK: func.func private @"rule_CompilableData{}{wires:1}{a:10,b:2,thing:3}"
+    # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64]}{reg:1}{}" = 1 : i64}
+    # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:10,b:2,thing:3}"
+    # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
     test_compilable_data()
+
+    def test_static_data():
+        def rule_resource_fn(label, reg):
+            if label == 1234:
+                return {SingleParam(x=Float, reg=Wire[1]): 1}
+            else:
+                return {SingleParam(x=Float, reg=Wire[1]): 2}
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(label, reg):
+            if label == 1234:
+                SingleParam(x=0.1, reg=reg)
+            else:
+                SingleParam(x=1.1, reg=reg)
+                SingleParam(x=2.2, reg=reg)
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(StaticData, rule)
+            result_1234 = compile_decomposition_rules_wrapper(
+                "StaticData", "StaticData{}{reg:1}{}[1234]", {}, {"reg": 1}, {}, {"label": 1234}
+            )
+            print(result_1234)
+
+            result_4321 = compile_decomposition_rules_wrapper(
+                "StaticData", "StaticData{}{reg:1}{}[4321]", {}, {"reg": 1}, {}, {"label": 4321}
+            )
+            print(result_4321)
+
+    # CHECK: func.func private @"rule_StaticData{}{reg:1}{}[1234]"
+    # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64]}{reg:1}{}" = 1 : i64}
+    # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[1234]"
+    # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
+    #
+    # CHECK: func.func private @"rule_StaticData{}{reg:1}{}[4321]"
+    # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64]}{reg:1}{}" = 2 : i64}
+    # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[4321]"
+    # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
+    # CHECK: stablehlo.constant dense<2.200000e+00> : tensor<f64>
+    test_static_data()
+
+    def test_decompose_to_compilable_data():
+        def rule_resource_fn(reg):
+            return {
+                CompilableData("a", "b", "thing", Wire[1]): 1,
+                CompilableData("aa", "bb", "stuff", Wire[1]): 1,
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            CompilableData(a="a", b="b", thing="thing", wires=reg[0])
+            CompilableData(a="aa", b="bb", thing="stuff", wires=reg[0])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+    # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64,
+    # CHECK-SAME:     "CompilableData{}{wires:1}{a:aa,b:bb,thing:stuff}" = 1 : i64}}
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+    test_decompose_to_compilable_data()
+
+    def test_decompose_to_static_data():
+        def rule_resource_fn(reg):
+            return {
+                StaticData(label="hello", reg=Wire[1]): 1,
+                StaticData(label="world", reg=Wire[1]): 1,
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            StaticData(label="hello", reg=reg[0])
+            StaticData(label="world", reg=reg[1])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            )
+            print(result)
+
+    # COM: TODO CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+    # COM: TODO CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64,
+    # COM: TODO CHECK-SAME:     "CompilableData{}{wires:1}{a:aa,b:bb,thing:stuff}" = 1 : i64}}
+    # COM: TODO CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+    test_decompose_to_static_data()
 
 
 test_compile_decomposition_rules_wrapper_entry_point()

@@ -31,6 +31,7 @@ from catalyst.decomposition.type_utils import (
     get_dummy_values_for_container,
     mlir_stringify_type,
 )
+from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 
@@ -55,7 +56,7 @@ class GraphOpID:
     DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp.
     """
 
-    def __init__(self, op: qp.core.Operator2, uid=None):
+    def __init__(self, op: qp.core.Operator2):
         """Create a new GraphOpId."""
         assert isinstance(
             op, qp.core.Operator2
@@ -66,7 +67,8 @@ class GraphOpID:
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()
-        self.extra_data = uid
+        self.extra_data = self.parse_extra_data()
+        # breakpoint()
 
     def parse_dynamic_shape(self) -> list:
         """Return the dynamic shape as a list of dtypes."""
@@ -86,6 +88,13 @@ class GraphOpID:
         return {
             static_argname: getattr(self.op, static_argname)
             for static_argname in sorted(self.op.compilable_argnames)
+        }
+
+    def parse_extra_data(self) -> dict:
+        """Return a dictionary of names to extra data values."""
+        return {
+            extra_argname: str(extra_arg)
+            for extra_argname, extra_arg in sorted(self.op.static_args.items())
         }
 
     def get_operator_name(self) -> str:
@@ -145,7 +154,9 @@ def collect_resources_for_op(op_name, kwargs):
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
-def compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static_data) -> ModuleOp:
+def compile_decomposition_rules(
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
+) -> ModuleOp:
     """
     Return a ModuleOp containing the decomposition rules for an operator instance.
 
@@ -158,6 +169,8 @@ def compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static
     for arg_name, arg_shape in dynamic_shape.items():
         kwargs[arg_name] = get_dummy_values_for_container(arg_shape)
     kwargs.update(static_data)
+    if extra_data:
+        kwargs.update(extra_data)
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(op_name, kwargs)
 
@@ -168,6 +181,8 @@ def compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static
             rule._impl(*args, **kwargs)
 
         decomp_rule_no_static_args = partial(decomp_rule, **static_data)
+        if extra_data:
+            decomp_rule_no_static_args = partial(decomp_rule_no_static_args, **extra_data)
 
         # keep the frontend name for readability, append target op_id for symbol uniqueness
         decomp_rule_no_static_args.__name__ = rule._impl.__name__ + "_" + op_id
@@ -178,6 +193,9 @@ def compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static
 
     for static_argname in static_data.keys():
         del kwargs[static_argname]
+    if extra_data:
+        for uid_argname in extra_data.keys():
+            del kwargs[uid_argname]
 
     @qp.qjit(
         target="mlir",
@@ -216,7 +234,11 @@ def compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static
 
 
 def compile_decomposition_rules_wrapper(
-    op_name, op_id, dynamic_shape, wire_lens, static_data
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
 ) -> str:
     """Return a string MLIR module containing the decomposition rules for an operator instance."""
-    return str(compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static_data))
+    return str(
+        compile_decomposition_rules(
+            op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
+        )
+    )
