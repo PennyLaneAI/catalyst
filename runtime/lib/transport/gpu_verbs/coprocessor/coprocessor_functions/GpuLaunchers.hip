@@ -26,9 +26,7 @@ namespace catalyst::transport::gpu_verbs {
 using namespace catalyst::transport::common;
 
 // Persistent detect -> decode -> write-handoff kernel, parameterized on the
-// per-shot decode (a __device__ function). Body transcribed verbatim from the
-// former GpuRuntime.hip fused_decode; the only change is gpu_decode(syndrome)
-// -> DECODE(syndrome).
+// per-shot decode (a __device__ function).
 template <std::uint64_t (*DECODE)(std::uint64_t)>
 __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
                       volatile std::uint32_t *stop, std::uint64_t total)
