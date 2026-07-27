@@ -1227,8 +1227,8 @@ func.func public @test_ops_with_ctrl_ref() {
 // CHECK:   "num_arg_qubits": 0
 // CHECK:   "num_qubits": 5
 // CHECK:   "operations"
-// CHECK-DAG: "PrepareState(0)": 2
-// CHECK-DAG: "Fabricate(0)": 1
+// CHECK-DAG: "pbc.prepare(0)": 2
+// CHECK-DAG: "pbc.fabricate(0)": 1
 // CHECK-DAG: "Adjoint(PPR-identity)(1)": 1
 // CHECK-DAG: "PPR-identity(1)": 1
 // CHECK-DAG: "PPR-pi/4(2)": 1

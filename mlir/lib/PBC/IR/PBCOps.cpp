@@ -244,8 +244,8 @@ void LayerOp::print(OpAsmPrinter &p)
 //===----------------------------------------------------------------------===//
 // Implement ResourceQuantumOpInterface methods.
 //===----------------------------------------------------------------------===//
-llvm::StringRef PrepareStateOp::getResourceName() { return "PrepareState"; }
-llvm::StringRef FabricateOp::getResourceName() { return "Fabricate"; }
+llvm::StringRef PrepareStateOp::getResourceName() { return "pbc.prepare"; }
+llvm::StringRef FabricateOp::getResourceName() { return "pbc.fabricate"; }
 llvm::StringRef PPRotationOp::getResourceName()
 {
     switch (std::abs(getRotationKind())) {
