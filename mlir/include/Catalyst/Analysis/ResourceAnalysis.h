@@ -20,6 +20,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
+#include "Catalyst/Analysis/ResourceExtension.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Analysis/ResourceResultExtension.h"
 #include "PBC/IR/PBCOps.h"
