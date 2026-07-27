@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Catalyst/Analysis/ResourceResult.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -22,7 +24,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 
-#include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Analysis/ResourceExtension.h"
 
 using namespace mlir;
