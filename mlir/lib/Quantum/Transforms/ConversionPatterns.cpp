@@ -684,7 +684,7 @@ struct PCPhaseOpPattern : public OpConversionPattern<PCPhaseOp> {
         std::string qirName = "__catalyst__qis__PCPhase";
         Type qirSignature =
             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
-                                        {Float64Type::get(ctx), Float64Type::get(ctx),
+                                        {Float64Type::get(ctx), IntegerType::get(ctx, 64),
                                          modifiersPtr.getType(), IntegerType::get(ctx, 64)},
                                         /*isVarArg=*/true);
 
@@ -694,7 +694,8 @@ struct PCPhaseOpPattern : public OpConversionPattern<PCPhaseOp> {
         int64_t numQubits = op.getOutQubits().size();
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getTheta());
-        args.insert(args.end(), adaptor.getDim());
+        args.insert(args.end(), LLVM::ConstantOp::create(rewriter, loc,
+                                                         rewriter.getI64IntegerAttr(op.getDim())));
         args.insert(args.end(), modifiersPtr);
         args.insert(args.end(),
                     LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));

@@ -228,7 +228,6 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     if op_cls.__name__ in _SPECIAL_LOWERINGS:
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
-
         return _SPECIAL_LOWERINGS[op_cls.__name__](
             *args, ctrl_qubits=ctrl_qubits, ctrl_values=ctrl_values, adjoint=adjoint, **kwargs
         )
@@ -317,10 +316,11 @@ def _multirz_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint):
 
 
 @_register_special_lowering("PCPhase")
-def _pcphase_lowering(theta, dim, *qubits, ctrl_qubits, ctrl_values, adjoint):
+def _pcphase_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint, dim):
+    dim = unflatten(*dim)
     PCPhaseOp(
         theta=extract_scalar(safe_cast_to_f64(theta, "PCPhase"), "PCPhase"),
-        dim=extract_scalar(safe_cast_to_f64(dim, "PCPhase"), "PCPhase"),
+        dim=get_mlir_attribute_from_pyval(dim),
         qubits=qubits,
         ctrl_qubits=ctrl_qubits,
         ctrl_values=ctrl_values,

@@ -33,6 +33,11 @@ namespace DecompGraph::Core {
 
 static inline auto print_op(const OperatorNode &op) -> std::string
 {
+    // id override
+    if (!op.id.empty()) {
+        return "id: " + op.id;
+    }
+
     std::ostringstream oss;
     oss << op.name;
     oss << "[w:" << op.numWires << "]";

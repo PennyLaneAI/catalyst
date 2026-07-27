@@ -373,7 +373,8 @@ def test_ppr_to_ppm_auto_corrected():
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
     specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
-    gate_types = specs_output.resources.gate_types
+    gate_types = specs_output.resources.quantum_operations
+
     assert gate_types["GlobalPhase"] == 4
     assert gate_types["PPR-pi/4-w1"] == 4
     assert gate_types["Adjoint(PPR-pi/4)"] == 2
@@ -401,7 +402,7 @@ def test_ppr_to_ppm_inject_magic_state():
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
     specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
-    gate_types = specs_output.resources.gate_types
+    gate_types = specs_output.resources.quantum_operations
     assert gate_types["Adjoint(PPR-pi/4)"] == 2
     assert gate_types["PPR-pi/4-w1"] == 4
     assert gate_types["PPR-pi/4-w2"] == 1
@@ -429,7 +430,7 @@ def test_ppr_to_ppm_pauli_corrected():
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
     specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
-    gate_types = specs_output.resources.gate_types
+    gate_types = specs_output.resources.quantum_operations
     assert gate_types["PPR-pi/4-w1"] == 4
     assert gate_types["Adjoint(PPR-pi/4)"] == 2
     assert gate_types["PPR-pi/4-w2"] == 1

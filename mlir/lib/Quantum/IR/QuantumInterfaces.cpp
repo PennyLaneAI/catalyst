@@ -14,6 +14,7 @@
 
 #include "Quantum/IR/QuantumInterfaces.h"
 
+#include <cstdint>
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
@@ -70,6 +71,51 @@ void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss)
         .Case<mlir::FloatAttr>([&](mlir::FloatAttr attr) { ss << attr.getValueAsDouble(); })
         .Default([&](mlir::Attribute attr) { attr.print(ss); });
 }
+
+void printShapedType(ArrayRef<int64_t> shape, int64_t dim, Type elementType,
+                     llvm::raw_string_ostream &ss)
+{
+    int64_t length = shape[dim];
+    auto printList = [&](auto printItem) {
+        ss << "[";
+        for (int64_t i = 0; i < length; i++) {
+            printItem();
+            if (i != length - 1) {
+                ss << ",";
+            }
+        }
+        ss << "]";
+    };
+
+    if (static_cast<int64_t>(shape.size()) == dim + 1) {
+        printList([&]() { ss << elementType; });
+    }
+    else {
+        printList([&]() { printShapedType(shape, dim + 1, elementType, ss); });
+    }
+}
+
+void printType(mlir::Type type, llvm::raw_string_ostream &ss)
+{
+    llvm::TypeSwitch<mlir::Type, void>(type)
+        .Case<mlir::ShapedType>([&](mlir::ShapedType shapedType) {
+            printShapedType(shapedType.getShape(), 0, shapedType.getElementType(), ss);
+        })
+        .Default([&](mlir::Type other) { other.print(ss); });
+}
+
+void printTypeRange(mlir::TypeRange typerange, llvm::raw_string_ostream &ss)
+{
+    ss << "[";
+    for (auto [i, type] : llvm::enumerate(typerange)) {
+        if (i > 0) {
+            ss << ",";
+        }
+        printType(type, ss);
+    }
+    ss << "]";
+}
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -87,7 +133,7 @@ std::string defaultGetGraphOpId(Operation *op)
     DecomposableGate gate = cast<DecomposableGate>(op);
 
     ss << gate.getOperatorName();
-    printIterable(gate.getDynamicShape(), ss);
+    printTypeRange(gate.getDynamicShape(), ss);
     printIterable(gate.getWireLens(), ss);
     printAttr(gate.getStaticData(), ss);
     if (gate.getExtraData() != "") {

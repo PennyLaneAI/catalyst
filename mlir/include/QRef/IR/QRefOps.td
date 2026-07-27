@@ -637,15 +637,11 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
             to be handled in a special way during the lowering due to its C function being variadic
             on the number of qubits.
 
-        .. note::
-            `dim` is currently captured as a float number for compatibility with
-            runtime and device integration.
-
     }];
 
     let arguments = (ins
         F64:$theta,
-        F64:$dim,
+        I64Attr:$dim,
         Variadic<QubitRefType>:$qubits,
         UnitAttr:$adjoint,
         Variadic<QubitRefType>:$ctrl_qubits,
@@ -653,7 +649,7 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
     );
 
     let assemblyFormat = [{
-        `(` $theta `,` $dim `)` $qubits (`adj` $adjoint^)? attr-dict
+        `(` $theta `,` `dim` `:` $dim `)` $qubits (`adj` $adjoint^)? attr-dict
         ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
         `:` type($qubits) (`ctrls` type($ctrl_qubits)^ )?
