@@ -89,6 +89,7 @@
 
 #include "RegisterAllPasses.h"
 
+#include "Executor/IR/ExecutorDialect.h"
 #include "Transport/IR/TransportDialect.h"
 
 using namespace mlir;
@@ -184,6 +185,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<ion::IonDialect>();
     registry.insert<rtio::RTIODialect>();
     registry.insert<transport::TransportDialect>();
+    registry.insert<executor::ExecutorDialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
     registry.insert<pauli_frame::PauliFrameDialect>();
