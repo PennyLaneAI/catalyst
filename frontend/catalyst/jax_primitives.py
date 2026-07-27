@@ -133,6 +133,10 @@ with Patcher(
         get_symbolref,
         lower_callable,
         lower_jaxpr,
+        set_estimated_iterations_attr,
+        set_estimated_probabilities_attr,
+        set_estimated_probability_attr,
+        unconditional_to_conditional_if_probs,
     )
 
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
@@ -154,12 +158,6 @@ from catalyst.jax_extras import (
     infer_output_type_jaxpr,
     switch_expansion_strategy,
     while_loop_expansion_strategy,
-)
-from catalyst.resource_hints import (
-    set_estimated_iterations_attr,
-    set_estimated_probabilities_attr,
-    set_estimated_probability_attr,
-    unconditional_to_conditional_if_probs,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp

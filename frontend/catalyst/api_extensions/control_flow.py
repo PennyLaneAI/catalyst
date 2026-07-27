@@ -19,6 +19,7 @@ with control flow, including conditionals, for loops, and while loops.
 
 # pylint: disable=too-many-lines
 
+from collections.abc import Sequence
 from functools import partial
 from typing import Any, Callable, List
 
@@ -66,7 +67,6 @@ from catalyst.jax_tracer import (
     trace_quantum_operations,
     unify_convert_result_types,
 )
-from catalyst.resource_hints import collect_estimated_probabilities_for_cond
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 from catalyst.utils.patching import Patcher

@@ -95,6 +95,45 @@ class TestCondToJaxpr:
         result = circuit.jaxpr
         assert asline(expected) == asline(result)
 
+    @pytest.mark.usefixtures("disable_capture")
+    def test_activated_estimated_probability(self):
+        """Check the JAXPR of a simple conditional function that uses the
+        ``estimated_probability`` resource hint."""
+        # pylint: disable=line-too-long
+
+        expected = dedent("""
+            { lambda ; a:i64[]. let
+                b:bool[] = eq a 5:i64[]
+                c:i64[] = cond[
+                branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
+                                { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+                estimated_probabilities=(0.2,)
+                num_implicit_outputs=0
+                ] b a a
+            in (c,) }
+            """)
+
+        @qjit()
+        def circuit(n: int):
+            @cond(n == 5, estimated_probability=0.2)
+            def cond_fn():
+                return n**2
+
+            @cond_fn.otherwise
+            def cond_fn():
+                return n**3
+
+            out = cond_fn()
+            return out
+
+        def asline(text):
+            return " ".join(
+                map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))
+            ).strip()
+
+        result = circuit.jaxpr
+        assert asline(expected) == asline(result)
+
 
 # pylint: disable=too-many-public-methods,too-many-lines
 class TestCond:
