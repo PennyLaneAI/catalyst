@@ -14,10 +14,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -38,7 +34,6 @@ class ResourceAnalysis {
     using ExtensionProvider = std::function<std::unique_ptr<ResourceExtensionAnalysis>()>;
 
     // walk all func::FuncOps within the operation.
-    // Default empty providers keeps getAnalysis<> / decomp-rule path extension-free.
     explicit ResourceAnalysis(ModuleOp moduleOp,
                               ArrayRef<ExtensionProvider> extensionProviders = {});
     explicit ResourceAnalysis(func::FuncOp funcOp,
