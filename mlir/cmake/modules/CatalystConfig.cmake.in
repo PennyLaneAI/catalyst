@@ -22,3 +22,25 @@ set(CATALYST_INCLUDE_DIRS "@CATALYST_CONFIG_INCLUDE_DIRS@")
 
 # Provide all our library targets to users.
 @CATALYST_CONFIG_INCLUDE_EXPORTS@
+
+# --- rebuild ExternalStablehloLib for build-tree consumers ---
+if(NOT TARGET ExternalStablehloLib)
+  add_library(ExternalStablehloLib INTERFACE IMPORTED)
+
+  set(_shlo_libs ChloCAPI ChloOps StablehloAssemblyFormat StablehloBase
+    StablehloBroadcastUtils StablehloBroadcastLowering StablehloCAPI
+    StablehloLinalgTransforms StablehloOps StablehloOptimizationPasses
+    StablehloPasses StablehloPassUtils StablehloRegister
+    StablehloTypeConversion StablehloTypeInference Version
+    VhloCAPI VhloOps VhloTypes)
+
+  foreach(_l IN LISTS _shlo_libs)
+    if(NOT TARGET ${_l})
+      add_library(${_l} STATIC IMPORTED)
+      set_target_properties(${_l} PROPERTIES
+        IMPORTED_LOCATION "@STABLEHLO_BUILD_DIR@/lib/lib${_l}.a")
+    endif()
+    set_property(TARGET ExternalStablehloLib APPEND
+      PROPERTY INTERFACE_LINK_LIBRARIES ${_l})
+  endforeach()
+endif()
