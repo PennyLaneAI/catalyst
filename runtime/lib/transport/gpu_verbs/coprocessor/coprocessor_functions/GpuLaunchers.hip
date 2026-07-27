@@ -82,10 +82,6 @@ template <std::uint64_t (*DECODE)(std::uint64_t)> static int launch(const Coproc
                        reinterpret_cast<PayloadSlot *>(desc->ring),
                        reinterpret_cast<HandoffSlot *>(desc->handoff),
                        reinterpret_cast<std::uint32_t *>(desc->stop), desc->total);
-    // Launch is fire-and-forget (kernel runs async on the stream), but a bad
-    // launch (e.g. invalid stream/config) surfaces synchronously here via
-    // hipGetLastError(). Report it instead of returning "success" and leaving
-    // the handoff ring unwritten (which would spin run_coprocessor forever).
     hipError_t err = hipGetLastError();
     if (err != hipSuccess) {
         fprintf(stderr, "[gpu_verbs] kernel launch failed: %s\n", hipGetErrorString(err));
