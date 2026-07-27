@@ -23,15 +23,21 @@
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
 
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
-  be dispatched to a separate executor process. `executor` dialect models the session lifecycle
-  through an `!executor.session` handle that is threaded from `executor.open` through `send_binary`,
-  `launch`, `call`, and `close`.
-  [(#2909)](https://github.com/PennyLaneAI/catalyst/pull/2909)
+  be dispatched to a separate executor process.
+
+  - `executor` dialect models the session lifecycle through an `!executor.session` handle that is
+    threaded from `executor.open` through `send_binary`, `launch`, `call`, and `close`.
+    [(#2909)](https://github.com/PennyLaneAI/catalyst/pull/2909)
 
   - `--convert-executor-to-llvm` pass that lowers each `executor` op to a call into the
     `__catalyst__executor__*` C-ABI runtime, marshalling string endpoints, memref descriptors, and
     per-argument metadata.
-  [(#2910)](https://github.com/PennyLaneAI/catalyst/pull/2910)
+    [(#2910)](https://github.com/PennyLaneAI/catalyst/pull/2910)
+
+  - Host-side runtime (`rt_executor`) that backs those symbols. It opens a TCP connection to the
+    executor and uses LLVM's ORC v2 EPC as the wire protocol to ship cross-compiled kernel objects
+    into the remote JIT.
+    [(#2915)](https://github.com/PennyLaneAI/catalyst/pull/2915)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
