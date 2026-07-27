@@ -22,7 +22,7 @@
 
 namespace catalyst {
 
-enum class MergeMethod { Sum, Max, Min }; // hoisted out of the struct
+enum class MergeMethod { Sum, Max, Min };
 
 /// Value object for an optional resource metric. Lives in ResourceResult.
 class ResourceExtension {
@@ -39,10 +39,7 @@ class ResourceExtension {
 class ResourceExtensionAnalysis {
   public:
     virtual ~ResourceExtensionAnalysis() = default;
-    virtual llvm::StringRef name() const = 0; // must be match with ResourceExtension::name()
-
-    /// Mint an empty data object for a new ResourceResult.
-    virtual std::unique_ptr<ResourceExtension> makeEmpty() const = 0;
+    virtual llvm::StringRef name() const = 0; // must be matched to ResourceExtension::name()
 
     /// Per-op hook (e.g. uid_map). Walk through each individual operation.
     virtual void collect(mlir::Operation *op, ResourceExtension &ext, bool isAdjoint) {}
