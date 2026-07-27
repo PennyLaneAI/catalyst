@@ -14,6 +14,8 @@
 
 #include "Catalyst/Utils/ConstantResolve.h"
 
+#include <cstdint>
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinAttributes.h"

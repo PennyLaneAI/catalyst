@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/JSON.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
 
@@ -72,13 +73,17 @@ struct ResourceResult {
     // nullopt means no quantum.device in this function.
     std::optional<bool> autoQubitManagement;
 
+    // PBC depths as (any_commuting_depth, qubit_disjoint_depth), or nullopt if unavailable.
+    std::optional<std::pair<int64_t, int64_t>> pbcDepth;
+
     // merge another ResourceResult into this one
     void mergeWith(const ResourceResult &other, MergeMethod method = MergeMethod::Sum);
 
     // multiply all counts by a scalar
     void multiplyByScalar(int64_t scalar);
 
-    std::string toJson(int indent = 4) const;
+    // Serialize this function's resources into a JSON object.
+    llvm::json::Object toJson() const;
 };
 
 mlir::DictionaryAttr buildResourceDict(mlir::MLIRContext *ctx, const ResourceResult &result);

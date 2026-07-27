@@ -23,18 +23,16 @@ Known Limitations
 The convert-qecl-to-qecp pass has the following known limitations:
 
   * No support for QEC codes where the number of logical qubits per codeblock, k, is greater than 1.
-  * No support for non-CSS codes
-  * Only supports the transversal gates defined in the `QecCode` + T gates
+  * No support for non-CSS codes.
+  * Only supports the transversal gates defined in the `QecCode` + T gates.
   * Only logical Pauli Z observables (computational basis) are supported for lowering `qecl.measure`
     operations.
-  * Support for control flow in the user program is not fully implemented or tested
   * The generated QEC-cycles are not fault-tolerant - they don't account for potential errors in
-    the syndrome qubits/measurements
-  * For terminal measurements, only sampling of MCMs is supported
+    the syndrome qubits/measurements.
   * The encoding procedure to create the logical zero state in a codeblock is not optimized for
-    efficiency
-  * Only thoroughly tested with the Steane code, but should be generalizable to other k=1 CSS
-    stabilizer codes.
+    efficiency.
+  * Only thoroughly tested with the [[7, 1, 3]] Steane code, and to a lesser extent the [[9, 1, 3]]
+    Shor code, but it should be generalizable to other k=1 CSS stabilizer codes.
 """
 
 from collections.abc import Callable, Iterable
@@ -45,8 +43,18 @@ from typing import cast
 import numpy as np
 from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, func, scf, tensor
-from xdsl.dialects.builtin import I1, IndexType, SymbolRefAttr, TensorType, i1, i32, i64
+from xdsl.dialects import arith, builtin, func, linalg, scf, tensor
+from xdsl.dialects.builtin import (
+    I1,
+    ArrayAttr,
+    DenseArrayBase,
+    IndexType,
+    SymbolRefAttr,
+    TensorType,
+    i1,
+    i32,
+    i64,
+)
 from xdsl.ir import Block, BlockArgument, OpResult, Region
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -61,6 +69,7 @@ from xdsl.pattern_rewriter import (
 
 from catalyst.python_interface.dialects import qecl, qecp
 from catalyst.python_interface.pass_api.compiler_transform import compiler_transform
+from catalyst.python_interface.transforms.qecp.qec_code_lib import qecp_gate_op_from_string
 from catalyst.python_interface.transforms.qecp.tanner_graph_lib import (
     parity_check_matrix_to_tanner_csc,
 )
@@ -315,7 +324,6 @@ class MeasureOpConversion(RewritePattern):
         """Rewrite pattern for `qecl.measure` ops."""
 
         k = op.out_codeblock.type.k.value.data
-        n = self.qec_code.n
 
         # The type-converter should already raise a CompileError if the values of k don't agree;
         # assert just in case.
@@ -337,12 +345,12 @@ class MeasureOpConversion(RewritePattern):
             measure_call_op := func.CallOp(
                 callee=SymbolRefAttr(self.measure_subroutine.sym_name),
                 arguments=(op.in_codeblock,),
-                return_types=(builtin.TensorType(i1, shape=(n,)), op.in_codeblock.type),
+                return_types=self.measure_subroutine.function_type.outputs.data,
             ),
             decode_call_op := func.CallOp(
                 callee=SymbolRefAttr(self.physical_meas_decode_subroutine.sym_name),
                 arguments=(measure_call_op.results[0],),
-                return_types=(builtin.TensorType(i1, shape=(k,)),),
+                return_types=self.physical_meas_decode_subroutine.function_type.outputs.data,
             ),
             extract_idx_op := arith.ConstantOp.from_int_and_width(0, IndexType()),
             tensor_extract_op := tensor.ExtractOp(
@@ -514,7 +522,11 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         if uses_measure:
             measure_subroutine = self.create_measure_subroutine()
-            physical_meas_decode_subroutine = self.create_physical_meas_decode_subroutine()
+            mres_tensor_type = measure_subroutine.function_type.outputs.data[0]
+            assert isinstance(mres_tensor_type, TensorType)
+            physical_meas_decode_subroutine = self.create_physical_meas_decode_subroutine(
+                mres_tensor_type
+            )
             module_block.add_op(measure_subroutine)
             module_block.add_op(physical_meas_decode_subroutine)
 
@@ -640,7 +652,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     def create_measure_subroutine(self) -> func.FuncOp:
         """Create the subroutine that performs the transversal measurement of a physical codeblock
-        in the computational basis. All qubits in the codeblock are measured directly.
+        in the computational basis.
+
+        The physical measurement operations are applied on the codeblock qubits as defined in the
+        logical Pauli Z operation of the QEC code. For instance, if the QEC defines the logical
+        Pauli Z operation as "ZIZIZI", codeblock qubits 0, 2, and 3 are measured, and their outcomes
+        are returned as a tensor<3xi1>. For logical Pauli Z operations that contain _physical_ Pauli
+        gates other than Z, the appropriate diagonalizing gates are applied before measuring (i.e.,
+        H for Pauli X measurements and HS† for Pauli Y measurements).
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
@@ -648,67 +667,72 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
         block = Block(arg_types=(codeblock_type,))
 
+        # TODO: This should be fairly easy to adapt to other logical Pauli measurements
+        pauli_z_gate_ops = self.qec_code.transversal_1q_gates.get("z")
+
+        if pauli_z_gate_ops is None or len(pauli_z_gate_ops) == 0:
+            raise CompileError(
+                f"Failed to create transversal-measurement subroutine: the QEC code "
+                f"'{self.qec_code}' does not specify a logical Pauli Z operation"
+            )
+
+        assert len(pauli_z_gate_ops) == self.qec_code.n, (
+            f"Invalid definition of logical Pauli Z operation: QEC code '{self.qec_code.name}' "
+            f"defines a physical codeblock size of n = {self.qec_code.n}, but the Pauli Z "
+            f"operation definition has length {len(pauli_z_gate_ops)}"
+        )
+
+        # Get the indices of the gates in the definition of the logical Pauli Z op that are not
+        # Identity. This gives the indices in the codeblock to be measured.
+        non_identity_idx = [idx for idx, op in enumerate(pauli_z_gate_ops) if op != "I"]
+
         with ImplicitBuilder(block):
-            # Loop over all physical qubits in the codeblock and measure them.
             in_codeblock = cast(BlockArgument[qecp.PhysicalCodeblockType], block.args[0])
-            n = in_codeblock.type.n.value.data
 
-            # Initialize an empty tensor to store the physical measurement results
-            empty_tensor_op = tensor.EmptyOp([], TensorType(i1, shape=(n,)))
+            # Extract qubits at indices in codeblock where the op is not Identity
+            extract_ops = [qecp.ExtractQubitOp(in_codeblock, i) for i in non_identity_idx]
+            qubits = [ext_op.qubit for ext_op in extract_ops]
 
-            # Ops for lower bound, upper bound, and step size.
-            lb_op = arith.ConstantOp.from_int_and_width(0, IndexType())
-            ub_op = arith.ConstantOp.from_int_and_width(n, IndexType())
-            step_op = arith.ConstantOp.from_int_and_width(1, IndexType())
+            # Insert diagonalizing gates
+            for i, cb_idx in enumerate(non_identity_idx):
+                gate_op = pauli_z_gate_ops[cb_idx]
+                match gate_op:
+                    case "Z":
+                        pass
+                    case "X":
+                        hadamard_op = qecp.HadamardOp(qubits[i])
+                        qubits[i] = hadamard_op.out_qubit
+                    case "Y":
+                        s_adj_op = qecp.SOp(qubits[i], adjoint=True)
+                        hadamard_op = qecp.HadamardOp(s_adj_op)
+                        qubits[i] = hadamard_op.out_qubit
+                    case _:  # pragma: no cover
+                        raise CompileError(
+                            f"Gate in logical Pauli Z definition cannot be diagonalized for "
+                            f"measurement: '{gate_op}'. Only gates ('X', 'Y', 'Z') are supported"
+                        )
 
-            for_body = Block(
-                [],
-                arg_types=(builtin.IndexType(), empty_tensor_op.tensor.type, in_codeblock.type),
-            )
+            # Measure and re-insert to codeblock
+            measure_ops = [qecp.MeasureOp(qubit) for qubit in qubits]
+            out_qubits = [op.out_qubit for op in measure_ops]
 
-            for_each_qubit_op = scf.ForOp(
-                lb=lb_op,
-                ub=ub_op,
-                step=step_op,
-                iter_args=(empty_tensor_op.tensor, in_codeblock),
-                body=for_body,
-            )
+            codeblock = in_codeblock
+            for i, out_qubit in zip(non_identity_idx, out_qubits, strict=True):
+                insert_op = qecp.InsertQubitOp(codeblock, i, out_qubit)
+                codeblock = insert_op.out_codeblock
 
-            # Build the body of the for loop. On each iteration, extract the physical qubit at the
-            # iteration index, measure it, and re-insert into the codeblock. Also insert the
-            # measurement result into the tensor. Finally, yield updated tensor of measurement
-            # results and the updated codeblock.
-            with ImplicitBuilder(for_each_qubit_op.body):
-                indvar = cast(BlockArgument[IndexType], for_each_qubit_op.body.block.args[0])
-                mres_tensor = cast(
-                    BlockArgument[TensorType[I1]], for_each_qubit_op.body.block.args[1]
-                )
-                codeblock = cast(
-                    BlockArgument[qecp.PhysicalCodeblockType],
-                    for_each_qubit_op.body.block.args[2],
-                )
+            # Pack measurement results into tensor
+            mres_values = [op.mres for op in measure_ops]
+            mres_tensor_from_elements_op = tensor.FromElementsOp(*mres_values)
 
-                extract_op = qecp.ExtractQubitOp(codeblock=codeblock, idx=indvar)
-                measure_op = qecp.MeasureOp(extract_op.qubit)
-                insert_op = qecp.InsertQubitOp(
-                    in_codeblock=codeblock, idx=indvar, qubit=measure_op.out_qubit
-                )
-
-                tensor_insert_op = tensor.InsertOp(
-                    measure_op.mres, dest=mres_tensor, indices=indvar
-                )
-                scf.YieldOp(tensor_insert_op.result, insert_op.out_codeblock)
-
-            out_mres_tensor = for_each_qubit_op.results[0]
-            out_codeblock = for_each_qubit_op.results[1]
-            func.ReturnOp(out_mres_tensor, out_codeblock)
+            func.ReturnOp(mres_tensor_from_elements_op.result, codeblock)
 
         measure_subroutine = func.FuncOp(
             name=f"measure_transversal_{self.qec_code.name}",
             function_type=(
                 (codeblock_type,),
                 (
-                    builtin.TensorType(i1, shape=(n,)),
+                    mres_tensor_from_elements_op.result.type,
                     codeblock_type,
                 ),
             ),
@@ -720,70 +744,65 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
     # MARK: Meas_decode subroutine
 
-    def create_physical_meas_decode_subroutine(self) -> func.FuncOp:
+    def create_physical_meas_decode_subroutine(self, in_tensor_type: TensorType) -> func.FuncOp:
         """Create the subroutine that performs the physical-measurement decoding of a transversal
         measurement in the computational basis, and returns the corresponding k logical measurement
         outcomes.
 
         The logical measurement outcome is determined by a parity check of the physical measurements
-        corresponding to the indices of the PauliZ operation - i.e. for a code where a transversal
-        Z gate is applied on indices [1, 2, 4], a logical Z measurement is determined by a parity
-        check of physical measurements at indices [1, 2, 4] of the codeblock.
+        corresponding to the indices of the PauliZ operation - i.e. for a code where a transversal Z
+        gate is applied on indices [1, 2, 4], a logical Z measurement is determined by a parity
+        check of physical measurements at indices [1, 2, 4] of the codeblock. Since the transversal-
+        measurement subroutine only returns the measurement results of the non-identity elements of
+        the logical Pauli Z gate, this decoding subroutine simply computes the XOR of all elements
+        in the input tensor of bits.
 
         Note that this method does not insert the subroutine into the module op. Instead it returns
         the built func.FuncOp object that can then be subsequently inserted where desired.
         """
-        in_tensor_type = TensorType(i1, shape=(self.qec_code.n,))
         out_tensor_type = TensorType(i1, shape=(self.qec_code.k,))
         block = Block(arg_types=(in_tensor_type,))
 
-        pauli_z_gate_data = self.qec_code.transversal_1q_gates.get("z")
-
-        err_msg = (
-            f"Failed to create physical-measurement decoding subroutine: the QEC code "
-            f"'{self.qec_code}' does not specify a logical Pauli Z operation"
-        )
-
-        if pauli_z_gate_data is None:
-            raise CompileError(err_msg)
-
-        _, pauli_z_indices = pauli_z_gate_data
-
-        if len(pauli_z_indices) == 0:
-            raise CompileError(err_msg)
+        # TODO: When we support codes with k > 1, we will need to update how we compute the
+        # multiple logical measurement results and how we pack them into the output tensor
 
         with ImplicitBuilder(block):
             in_phys_meas_tensor = cast(BlockArgument[TensorType[I1]], block.args[0])
 
-            phys_meas_values: list[OpResult] = []
-            for idx in pauli_z_indices:
-                extract_idx_op = arith.ConstantOp.from_int_and_width(idx, IndexType())
-                extract_op = tensor.ExtractOp(
-                    in_phys_meas_tensor, indices=extract_idx_op.result, result_type=i1
-                )
-                phys_meas_values.append(extract_op.result)
+            # Build a linalg.reduce op to XOR all elements in the input tensor
+            # of measurement results
 
-            # TODO: When we support codes with k > 1, we will need to update how we compute the
-            # multiple logical measurement results and how we pack them into the output tensor
+            # First create the destination tensor to hold the scalar result
+            c0 = arith.ConstantOp.from_int_and_width(0, i1)
+            empty_tensor_op = tensor.EmptyOp([], TensorType(i1, shape=()))
+            init_tensor = linalg.FillOp((c0.result,), (empty_tensor_op.tensor,))
 
-            if len(phys_meas_values) == 1:
-                result = phys_meas_values[0]
+            # Then build the linalg.reduce op
+            reduce_block = Block(arg_types=(i1, i1))
 
-            else:
-                current_xor = phys_meas_values[0]
-                for i in range(1, len(phys_meas_values)):
-                    current_xor = arith.XOrIOp(current_xor, phys_meas_values[i])
-                    result = current_xor.result
+            with ImplicitBuilder(reduce_block):
+                in_arg = cast(BlockArgument[I1], reduce_block.args[0])
+                out_arg = cast(BlockArgument[I1], reduce_block.args[1])
 
-            out_logi_meas_tensor_op = tensor.EmptyOp([], out_tensor_type)
-            insert_idx_op = arith.ConstantOp.from_int_and_width(0, IndexType())
-            out_logi_meas_tensor_op = tensor.InsertOp(
-                result,
-                dest=out_logi_meas_tensor_op.tensor,
-                indices=insert_idx_op.result,
+                xor_op = arith.XOrIOp(in_arg, out_arg)
+                linalg.YieldOp(xor_op.result)
+
+            reduce_op = linalg.ReduceOp(
+                input=in_phys_meas_tensor,
+                init=init_tensor.results[0],
+                dimensions=DenseArrayBase.from_list(i64, [0]),
+                region=Region(reduce_block),
             )
 
-            func.ReturnOp(out_logi_meas_tensor_op.result)
+            expand_op = tensor.ExpandShapeOp(
+                reduce_op.result[0],
+                dynamic_output_shape=[],
+                reassociation=ArrayAttr([]),
+                static_output_shape=DenseArrayBase.from_list(i64, [1]),
+                result_type=out_tensor_type,
+            )
+
+            func.ReturnOp(expand_op.result)
 
         physical_meas_decode_subroutine = func.FuncOp(
             name=f"decode_physical_measurements_{self.qec_code.name}",
@@ -856,7 +875,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
         Args:
             used_init_states (set[str]): the init_states used in the circuit being compiled.
-                The function will create only the subroutines relevant to the current circuit.
+                The function will create only the subroutines relevant to the current circuit. If
+                an empty set is given, the function returns an empty dictionary.
 
         The encoding process follows the third option for magic state encoding described in
         https://arxiv.org/pdf/1303.4291 (Sec. II), with the modification that when using it to
@@ -873,9 +893,12 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         Note that this method does not insert the subroutine into the module op. Instead it
         returns the built func.FuncOp object that can then be subsequently inserted where desired.
         """
+        if not used_init_states:
+            return {}
+
         unitary_encoding_info = self.qec_code.unitary_encoding
 
-        required_keys = {"state_prep_index", "hadamard_indices", "cnot_indices"}
+        required_keys = {"state_prep_index", "ops"}
         if not required_keys.issubset(unitary_encoding_info):  # pragma: no cover
             raise CompileError(
                 f"QEC code '{self.qec_code.name}' does not define a unitary encoding "
@@ -917,19 +940,12 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 magic_state_qubits[state_prep_index] = next_op.results[0]
 
                 # Perform unitary encoding circuit for the code
-                hadamards = unitary_encoding_info["hadamard_indices"]
-                cnot_pairs = unitary_encoding_info["cnot_indices"]
-
-                for idx in hadamards:
-                    h = qecp.HadamardOp(magic_state_qubits[idx])
-                    magic_state_qubits[idx] = h.results[0]
-
-                for ctrl_idx, trgt_idx in cnot_pairs:
-                    cnot_op = qecp.CnotOp(
-                        magic_state_qubits[ctrl_idx], magic_state_qubits[trgt_idx]
+                for op, wire_idxs in unitary_encoding_info["ops"]:
+                    op_out = qecp_gate_op_from_string(op)(
+                        *[magic_state_qubits[idx] for idx in wire_idxs]
                     )
-                    magic_state_qubits[ctrl_idx] = cnot_op.results[0]
-                    magic_state_qubits[trgt_idx] = cnot_op.results[1]
+                    for i, idx in enumerate(wire_idxs):
+                        magic_state_qubits[idx] = op_out.results[i]
 
                 # insert data qubits back into the codeblock
                 encoded_codeblock = codeblock
@@ -963,7 +979,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 The function will create only the subroutines relevant to the current circuit.
 
         The subroutines are built based on the gate and codeblock indices defined in the specified
-        ``QecCode``. For example, a code that specifies ``{"x": (qecp.PauliXOp, [2, 3])}`` as a
+        ``QecCode``. For example, a code that specifies ``{"x": ("I", "I", "X", "X", "I")}`` as a
         transversal gate will lower ``qecl.x`` to ``qecp.x`` at indices 2 and 3. The `qecp.identity`
         operator is applied at all other indices in the codeblock.
 
@@ -974,19 +990,23 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         single_qubit_gates = self.qec_code.transversal_1q_gates
         if "identity" not in single_qubit_gates:
             # for identity, no need to add any non-Identity gates
-            single_qubit_gates["identity"] = (None, [])
+            single_qubit_gates["identity"] = ("I",) * self.qec_code.n
 
         codeblock_type = qecp.PhysicalCodeblockType(self.qec_code.k, self.qec_code.n)
         input_types = (codeblock_type,)
         output_types = (codeblock_type,)
 
-        for gate_name, gate_info in single_qubit_gates.items():
+        for gate_name, gate_ops in single_qubit_gates.items():
 
             if gate_name not in circuit_gate_ops:
                 # skip this one if it's not included in the circuit ops
                 continue
 
-            gate_op, gate_indices = gate_info
+            assert len(gate_ops) == self.qec_code.n, (
+                f"Invalid definition of transversal gate '{gate_name}': QEC code "
+                f"'{self.qec_code.name}' defines a physical codeblock size of "
+                f"n = {self.qec_code.n}, but gate definition has length {len(gate_ops)}"
+            )
 
             block = Block(arg_types=input_types)
 
@@ -998,8 +1018,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 qubits = [ext_op.results[0] for ext_op in extract_ops]
 
                 transversal_gate = [
-                    gate_op(qb) if idx in gate_indices else qecp.IdentityOp(qb)
-                    for idx, qb in enumerate(qubits)
+                    qecp_gate_op_from_string(gate_op)(qb)
+                    for gate_op, qb in zip(gate_ops, qubits, strict=True)
                 ]
 
                 qubits_out = [op.results[0] for op in transversal_gate]
@@ -1069,7 +1089,8 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
 
                 # apply the gate to each pair of qubits
                 transversal_gate = [
-                    gate_op(ctrl_qb, trgt_qb) for ctrl_qb, trgt_qb in zip(ctrl_qubits, trgt_qubits)
+                    qecp_gate_op_from_string(gate_op)(ctrl_qb, trgt_qb)
+                    for ctrl_qb, trgt_qb in zip(ctrl_qubits, trgt_qubits)
                 ]
 
                 ctrl_qbs_out = [op.results[0] for op in transversal_gate]
@@ -1267,7 +1288,14 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
         block.
         """
         # Allocate auxiliary qubits for ESM checks
-        aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
+        match check_type:
+            case CheckType.X:
+                aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.x_tanner)
+            case CheckType.Z:
+                aux_allocate_ops = (qecp.AllocAuxQubitOp() for row in self.qec_code.z_tanner)
+            case _:  # pragma: no cover
+                assert False, f"Unknown CheckType: '{check_type}'"
+
         aux_qubits = [
             cast(OpResult[qecp.QecPhysicalQubitType], op.results[0]) for op in aux_allocate_ops
         ]
@@ -1359,7 +1387,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                         corr_qubit_op = qecp.PauliZOp(in_qubit=err_qubit)
                     case CheckType.Z:
                         corr_qubit_op = qecp.PauliXOp(in_qubit=err_qubit)
-                    case _:
+                    case _:  # pragma: no cover
                         assert False, f"Unknown CheckType: '{check_type}'"
 
                 insert_err_qubit_op = qecp.InsertQubitOp(

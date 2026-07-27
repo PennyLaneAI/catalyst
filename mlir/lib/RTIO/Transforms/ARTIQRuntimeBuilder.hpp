@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"

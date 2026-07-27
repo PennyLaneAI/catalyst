@@ -14,6 +14,8 @@
 
 #include "QRef/IR/QRefDialect.h"
 
+#include <cstdint>
+
 #include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser

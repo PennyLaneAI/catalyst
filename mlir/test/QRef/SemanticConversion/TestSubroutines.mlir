@@ -54,16 +54,13 @@ func.func @main(%arg0: i64, %arg1: f64) -> (!quantum.obs, !quantum.obs) attribut
     // CHECK-SAME:   (f64, !quantum.bit, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit)
     func.call @test_extract_before_call(%r2, %r_dyn, %arg1) : (!qref.reg<2>, !qref.reg<?>, f64) -> ()
     func.call @test_extract_before_call(%r2, %r_dyn, %arg1) : (!qref.reg<2>, !qref.reg<?>, f64) -> ()
-    // CHECK: [[insert_20:%.+]] = quantum.insert [[r2]][ 0], [[second_call]]#0 : !quantum.reg, !quantum.bit
-    // CHECK: [[insert_21:%.+]] = quantum.insert [[insert_20]][ 1], [[second_call]]#1 : !quantum.reg, !quantum.bit
     // CHECK: [[insert_dyn1:%.+]] = quantum.insert [[r_dyn]][ 1], [[second_call]]#2 : !quantum.reg, !quantum.bit
 
-
-    // CHECK: [[q20:%.+]] = quantum.extract [[insert_21]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[obs_q:%.+]] = quantum.compbasis qubits [[q20]] : !quantum.obs
+    // CHECK: [[obs_q:%.+]] = quantum.compbasis qubits [[second_call]]#0 : !quantum.obs
     %q20 = qref.get %r2[0] : !qref.reg<2> -> !qref.bit
     %obs_q = qref.compbasis qubits %q20 : !quantum.obs
-    // CHECK: [[insert_r2:%.+]] = quantum.insert [[insert_21]][ 0], [[q20]] : !quantum.reg, !quantum.bit
+    // CHECK: [[insert_21:%.+]] = quantum.insert [[r2]][ 1], [[second_call]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert_r2:%.+]] = quantum.insert [[insert_21]][ 0], [[second_call]]#0 : !quantum.reg, !quantum.bit
 
     // CHECK: [[obs_r:%.+]] = quantum.compbasis qreg [[insert_dyn1]] : !quantum.obs
     %obs_r = qref.compbasis (qreg %r_dyn : !qref.reg<?>) : !quantum.obs

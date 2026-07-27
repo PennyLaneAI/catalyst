@@ -1157,11 +1157,6 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
         int32_t nQreg = rOperatorOp.getQreg() ? 1 : 0;
         vGateOp->setAttr("resultSegmentSizes",
                          builder.getDenseI32ArrayAttr({nTargets, nCtrls, nQreg}));
-
-        // Properties are not handled via the generic attribute fields, so we set them separately.
-        vGateOp.setOpName(rOperatorOp.getOpName());
-        vGateOp.setAdjoint(rOperatorOp.getAdjoint());
-        vGateOp.setUID(rOperatorOp.getUID());
     }
     else {
         rGateOp->emitOpError("unknown gate op in qref dialect");

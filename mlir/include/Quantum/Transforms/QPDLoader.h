@@ -17,12 +17,13 @@
 #include <string>
 #include <vector>
 
+#include "Quantum/IR/QuantumInterfaces.h"
+
 namespace catalyst::quantum {
 
-using LowerPauliRotFn = std::string (*)(double theta, std::string pauliWord,
-                                        std::vector<int> wires);
+using PythonRuleLoweringFn = std::string (*)(DecomposableGate op);
 
-extern LowerPauliRotFn pythonLowerPauliRot;
+extern PythonRuleLoweringFn pythonRuleLowering;
 
 bool loadQPD(std::string libQPDPath, std::string libpythonPath);
 

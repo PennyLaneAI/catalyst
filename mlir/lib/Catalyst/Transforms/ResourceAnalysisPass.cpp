@@ -14,14 +14,17 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
+#include <cstdint>
 #include <fstream>
 #include <string>
 
 #include "llvm/Support/JSON.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "PBC/Utils/PBCLayer.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -74,7 +77,9 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         std::string jsonStr = "";
 
         if (outputJson) {
-            jsonStr = buildJsonString(results);
+            llvm::StringMap<ResourceResult> resultsWithDepth = results;
+            populatePBCDepths(resultsWithDepth, analysis);
+            jsonStr = buildJsonString(resultsWithDepth);
 
             if (outputFname.empty()) {
                 printJsonOutput(jsonStr);
@@ -88,6 +93,40 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     }
 
   private:
+    /// Populate PBC worst-case depth on each function and lifted loop body entry.
+    void populatePBCDepths(llvm::StringMap<ResourceResult> &results,
+                           const ResourceAnalysis &analysis)
+    {
+        // Swallow expected errors
+        // Errors arise when attempting to compute depth of dynamic loops.
+        ScopedDiagnosticHandler depthDiagHandler(
+            getOperation()->getContext(), [](Diagnostic &diag) {
+                if (diag.getSeverity() == DiagnosticSeverity::Error &&
+                    diag.str().find("worst-case depth") != std::string::npos) {
+                    return success();
+                }
+                return failure();
+            });
+
+        // Handle static loop bodies.
+        getOperation()->walk([&](func::FuncOp funcOp) {
+            if (funcOp.isDeclaration()) {
+                return;
+            }
+
+            pbc::PBCLayerContext layerContext;
+            results[funcOp.getName()].pbcDepth =
+                layerContext.computePBCDepth(&funcOp.getBody().front());
+        });
+
+        // Handle dynamic loop bodies.
+        for (const auto &entry : analysis.getSyntheticLoopBodies()) {
+            scf::ForOp forOp = entry.getValue();
+            pbc::PBCLayerContext layerContext;
+            results[entry.getKey()].pbcDepth = layerContext.computePBCDepth(forOp.getBody());
+        }
+    }
+
     /// Sum a ResourceResult's content into the pass's
     /// Statistic counters. Caller is responsible for choosing whether to
     /// pass a per-function or flattened result.
@@ -112,61 +151,6 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         }
     }
 
-    /// Serialize a single ResourceResult into a JSON object.
-    static llvm::json::Object resultToJson(const ResourceResult &result)
-    {
-        llvm::json::Object funcObj;
-
-        llvm::json::Object opsObj;
-        for (const auto &opEntry : result.operations) {
-            StringRef opName = opEntry.getKey();
-            for (const auto &sizeEntry : opEntry.getValue()) {
-                const auto &[nQubits, nParams] = sizeEntry.first;
-                int64_t count = sizeEntry.second;
-                std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
-                opsObj[key] = count;
-            }
-        }
-        funcObj["operations"] = std::move(opsObj);
-
-        llvm::json::Object measObj;
-        for (const auto &entry : result.measurements) {
-            measObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["measurements"] = std::move(measObj);
-
-        llvm::json::Object classObj;
-        for (const auto &entry : result.classicalInstructions) {
-            classObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["classical_instructions"] = std::move(classObj);
-
-        llvm::json::Object fcObj;
-        for (const auto &entry : result.functionCalls) {
-            fcObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["function_calls"] = std::move(fcObj);
-
-        // Store hashes as hex strings so JSON readers don't break high bits
-        llvm::json::Object vfcObj;
-        for (const auto &entry : result.varFunctionCalls) {
-            vfcObj[entry.getKey()] = formatv("{0:x16}", entry.getValue()).str();
-        }
-        funcObj["var_function_calls"] = std::move(vfcObj);
-
-        funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
-        funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
-        funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
-        funcObj["device_name"] = result.deviceName;
-        funcObj["qnode"] = result.isQnode;
-        funcObj["has_branches"] = result.hasBranches;
-        if (result.autoQubitManagement.has_value()) {
-            funcObj["auto_qubit_management"] = *result.autoQubitManagement;
-        }
-
-        return funcObj;
-    }
-
     /// Serialize all per-function ResourceResults into a JSON string.
     /// qnode functions are inserted first so that the PennyLane reader
     /// (which uses the first entry) picks the correct function.
@@ -176,12 +160,12 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
         for (const auto &funcEntry : results) {
             if (funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                root[funcEntry.getKey()] = funcEntry.getValue().toJson();
             }
         }
         for (const auto &funcEntry : results) {
             if (!funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                root[funcEntry.getKey()] = funcEntry.getValue().toJson();
             }
         }
 
