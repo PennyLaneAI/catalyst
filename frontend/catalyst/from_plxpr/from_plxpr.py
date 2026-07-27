@@ -304,6 +304,7 @@ def handle_qnode(
         # implementation. The current Python implementation cannot be mixed
         # with other transforms in between.
         gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
+        gateset = list(sorted(gateset))  # consistent ordering for testing
         setattr(qnode, "decompose_gatesets", [gateset])
     pipelines = (("main", tuple(self._pass_pipeline)),)
     if not self._skip_preprocess:

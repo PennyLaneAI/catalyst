@@ -533,7 +533,7 @@ def test_decompose_gateset_without_graph():
     @qp.qjit(target="mlir", capture=True)
     @partial(qp.transforms.decompose, gate_set={"RX", "RZ"})
     @qp.qnode(qp.device("lightning.qubit", wires=1))
-    # CHECK-LABEL: @circuit_8() -> tensor<f64> attributes {decompose_gatesets = {{\[}}["RZ", "RX"]], diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, quantum.node}
+    # CHECK-LABEL: @circuit_8() -> tensor<f64> attributes {decompose_gatesets = {{\[}}["RX", "RZ"]], diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, quantum.node}
     def circuit_8():
         return qp.expval(qp.Z(0))
 
