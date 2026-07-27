@@ -2251,13 +2251,14 @@ def _cond_lowering(
     conditional_probs = unconditional_to_conditional_if_probs(estimated_probabilities)
 
     # recursively lower if-else chains to nested IfOps
-    def emit_branches(preds, branch_jaxprs, ip, depth=0):
+    def emit_branches(preds, branch_jaxprs, ip):
         # ip is an MLIR InsertionPoint. This allows recursive calls to emit their Operations inside
         # the 'else' blocks of preceding IfOps.
         with ip:
             pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
             if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
-            if conditional_probs is not None and depth < len(conditional_probs):
+            if conditional_probs is not None:
+                depth = num_preds - len(preds)
                 set_estimated_probability_attr(if_op_scf.operation, conditional_probs[depth])
             true_jaxpr = branch_jaxprs[0]
             if_block = if_op_scf.then_block
@@ -2302,7 +2303,7 @@ def _cond_lowering(
                     YieldOp(out)
             else:
                 with ir.InsertionPoint(else_block) as else_ip:
-                    child_if_op = emit_branches(preds[1:], branch_jaxprs[1:], else_ip, depth + 1)
+                    child_if_op = emit_branches(preds[1:], branch_jaxprs[1:], else_ip)
                     YieldOp(child_if_op.results)
             return if_op_scf
 
@@ -2326,7 +2327,7 @@ def _pl_cond_lowering(
     conditional_probs = unconditional_to_conditional_if_probs(estimated_probabilities)
 
     # recursively lower if-else chains to nested IfOps
-    def emit_branches(preds, sub_branches, sub_consts_slices, insertion_point, depth=0):
+    def emit_branches(preds, sub_branches, sub_consts_slices, insertion_point):
         # closure vars are invals, args, jax_ctx
 
         # ip is an MLIR InsertionPoint. This allows recursive calls to emit their Operations inside
@@ -2334,7 +2335,8 @@ def _pl_cond_lowering(
         with insertion_point:
             pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
             if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
-            if conditional_probs is not None and depth < len(conditional_probs):
+            if conditional_probs is not None:
+                depth = num_preds - len(preds)
                 set_estimated_probability_attr(if_op_scf.operation, conditional_probs[depth])
             true_jaxpr = sub_branches[0]
             if_block = if_op_scf.then_block
@@ -2393,7 +2395,7 @@ def _pl_cond_lowering(
             else:
                 with ir.InsertionPoint(else_block) as else_ip:
                     child_if_op = emit_branches(
-                        preds[1:], sub_branches[1:], sub_consts_slices[1:], else_ip, depth + 1
+                        preds[1:], sub_branches[1:], sub_consts_slices[1:], else_ip
                     )
                     YieldOp(child_if_op.results)
             return if_op_scf
