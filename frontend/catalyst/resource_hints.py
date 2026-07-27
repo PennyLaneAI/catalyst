@@ -83,7 +83,9 @@ def normalize_estimated_probabilities_for_cond(
     return probs
 
 
-def unconditional_to_conditional_if_probs(probs: Sequence[float] | None) -> tuple[float, ...] | None:
+def unconditional_to_conditional_if_probs(
+    probs: Sequence[float] | None,
+) -> tuple[float, ...] | None:
     """Convert unconditional branch probabilities to per-``scf.if`` conditional probabilities.
 
     ``qp.cond`` with ``elif`` branches lowers to nested ``scf.if`` ops.
