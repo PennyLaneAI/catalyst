@@ -15,6 +15,7 @@
 #pragma once
 
 #include <memory>
+#include <type_traits>
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
@@ -35,17 +36,53 @@ class ResourceExtension {
     virtual void multiplyBy(int64_t factor) {}
 };
 
+template <typename Ext> class ResourceExtensionAnalysisOf;
+
 /// Owned by ResourceAnalysis for the duration of a run; writes into per-result data.
+/// Do not inherit directly, use ResourceExtensionAnalysisOf<Ext>.
 class ResourceExtensionAnalysis {
+    template <typename Ext> friend class ResourceExtensionAnalysisOf;
+
+    ResourceExtensionAnalysis() = default;
+
   public:
     virtual ~ResourceExtensionAnalysis() = default;
+    ResourceExtensionAnalysis(const ResourceExtensionAnalysis &) = delete;
+    ResourceExtensionAnalysis &operator=(const ResourceExtensionAnalysis &) = delete;
+
     virtual llvm::StringRef name() const = 0; // must be matched to ResourceExtension::name()
 
-    /// Per-op hook (e.g. uid_map). Walk through each individual operation.
+    /// Mint an empty data object for a new ResourceResult.
+    virtual std::unique_ptr<ResourceExtension> makeEmpty() const = 0;
+
+    /// Walk through each individual operation.
     virtual void collect(mlir::Operation *op, ResourceExtension &ext, bool isAdjoint) {}
 
-    /// Whole-region hook (e.g. depth). Walk through the whole region.
+    /// Walk through the each region.
     virtual void analyze(mlir::Region &region, ResourceExtension &ext, bool isAdjoint) {}
+};
+
+/// Subclasses override the typed collect / analyze overloads.
+template <typename Ext> class ResourceExtensionAnalysisOf : public ResourceExtensionAnalysis {
+  public:
+    static_assert(std::is_base_of_v<ResourceExtension, Ext>,
+                  "Ext must derive from ResourceExtension");
+
+    std::unique_ptr<ResourceExtension> makeEmpty() const final { return std::make_unique<Ext>(); }
+
+    void collect(mlir::Operation *op, ResourceExtension &ext, bool isAdjoint) final
+    {
+        collect(op, static_cast<Ext &>(ext), isAdjoint);
+    }
+
+    void analyze(mlir::Region &region, ResourceExtension &ext, bool isAdjoint) final
+    {
+        analyze(region, static_cast<Ext &>(ext), isAdjoint);
+    }
+
+  protected:
+    virtual void collect(mlir::Operation * /*op*/, Ext & /*ext*/, bool /*isAdjoint*/) {}
+    virtual void analyze(mlir::Region & /*region*/, Ext & /*ext*/, bool /*isAdjoint*/) {}
 };
 
 } // namespace catalyst
