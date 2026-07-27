@@ -19,7 +19,7 @@
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-    // RY-NOT: test Y
+    // RY-NOT: testY
     // RY: testRY
 
     // XZ-NOT: testY
