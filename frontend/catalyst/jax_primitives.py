@@ -155,15 +155,15 @@ from catalyst.jax_extras import (
     switch_expansion_strategy,
     while_loop_expansion_strategy,
 )
-from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
-from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
-from catalyst.utils.types import convert_shaped_arrays_to_tensors
 from catalyst.resource_hints import (
     set_estimated_iterations_attr,
     set_estimated_probabilities_attr,
     set_estimated_probability_attr,
     unconditional_to_conditional_if_probs,
 )
+from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
+from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
 
