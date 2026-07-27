@@ -116,7 +116,13 @@
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
-* The `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
+* The `resource-analysis` pass now supports pluggable resource metrics through a
+  `ResourceExtension`/`ResourceExtensionAnalysis` interface and a self-registering global
+  registry. Dialects and plugins can contribute additional per-function resource data
+  (such as PBC circuit depth) without modifying the core analysis.
+  [(#3070)](https://github.com/PennyLaneAI/catalyst/pull/3070)
+
+* `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
   duplicate serialization logic and keeping its output consistent.
   [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
 
