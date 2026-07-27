@@ -1396,7 +1396,7 @@ class SwitchCallable:
             *([self.case] + cases + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
-            estimated_probabilities=tuple(self.estimated_probabilities),
+            estimated_probabilities=self.estimated_probabilities,
         )
 
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
