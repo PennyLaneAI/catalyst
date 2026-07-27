@@ -242,7 +242,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
         double pThen = probAttr.getValueAsDouble();
         double pElse = 1.0 - pThen;
 
-        ResourceResult elseResult;
+        ResourceResult elseResult = makeEmptyResult();
         if (!ifOp.getElseRegion().empty()) {
             analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
         }
@@ -274,11 +274,11 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     // (excluding the default which is computed automatically).
     auto caseRegions = switchOp.getCaseRegions();
     if (auto probsAttr = switchOp->getAttrOfType<ArrayAttr>(EstimatedProbabilitiesAttrName)) {
-        ResourceResult expected;
+        ResourceResult expected = makeEmptyResult();
         double sumProb = 0.0;
 
         for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
-            ResourceResult caseResult;
+            ResourceResult caseResult = makeEmptyResult();
             analyzeRegion(caseRegion, caseResult, isAdjoint);
 
             double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
@@ -292,7 +292,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         // of floating-point error.
         double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
 
-        ResourceResult defaultResult;
+        ResourceResult defaultResult = makeEmptyResult();
         analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
         defaultResult.multiplyByScalar(pDefault);
         expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
@@ -302,11 +302,11 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // No hint: fall back to worst-case (max across all cases).
-    ResourceResult maxResult;
+    ResourceResult maxResult = makeEmptyResult();
     bool first = true;
 
     for (auto &caseRegion : caseRegions) {
-        ResourceResult caseResult;
+        ResourceResult caseResult = makeEmptyResult();
         analyzeRegion(caseRegion, caseResult, isAdjoint);
         if (first) {
             maxResult = std::move(caseResult);
