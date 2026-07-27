@@ -69,27 +69,6 @@ static LogicalResult verifyProbability(Operation *op, llvm::StringRef attrName, 
     return success();
 }
 
-// Verify a non-negative numeric hint: float or integer attribute.
-static LogicalResult verifyNonNegativeNumber(Operation *op, llvm::StringRef attrName,
-                                             Attribute value)
-{
-    if (auto num = dyn_cast<FloatAttr>(value)) {
-        double v = num.getValueAsDouble();
-        if (v < 0.0) {
-            return op->emitError() << "'" << attrName << "' must be non-negative, but got " << v;
-        }
-        return success();
-    }
-    if (auto num = dyn_cast<IntegerAttr>(value)) {
-        if (num.getValue().isNegative()) {
-            return op->emitError() << "'" << attrName << "' must be non-negative, but got "
-                                   << num.getValue().getSExtValue();
-        }
-        return success();
-    }
-    return op->emitError() << "'" << attrName << "' must be a numeric attribute";
-}
-
 LogicalResult CatalystDialect::verifyOperationAttribute(Operation *op, NamedAttribute attribute)
 {
     llvm::StringRef name = attribute.getName().strref();
@@ -98,7 +77,21 @@ LogicalResult CatalystDialect::verifyOperationAttribute(Operation *op, NamedAttr
         if (!isa<scf::ForOp, scf::WhileOp>(op)) {
             return op->emitError() << "'" << name << "' is only valid on 'scf.for' or 'scf.while'";
         }
-        return verifyNonNegativeNumber(op, name, attribute.getValue());
+        if (auto intAttr = dyn_cast<IntegerAttr>(attribute.getValue())) {
+            if (intAttr.getValue().isNegative()) {
+                return op->emitError() << "'" << name << "' must be non-negative, but got "
+                                       << intAttr.getValue().getSExtValue();
+            }
+            return success();
+        }
+        if (auto floatAttr = dyn_cast<FloatAttr>(attribute.getValue())) {
+            if (floatAttr.getValueAsDouble() < 0.0) {
+                return op->emitError() << "'" << name << "' must be non-negative, but got "
+                                       << floatAttr.getValueAsDouble();
+            }
+            return success();
+        }
+        return op->emitError() << "'" << name << "' must be an integer or float attribute";
     }
 
     if (name == EstimatedProbabilityAttrName) {

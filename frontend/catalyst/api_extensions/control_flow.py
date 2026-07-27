@@ -955,17 +955,13 @@ class CondCallable:
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
         # Output types from all the branches are unified by now, we use the first branch for
         # the resulting tracers.
-        bind_kwargs = {
-            "branch_jaxprs": branch_jaxprs,
-            "num_implicit_outputs": out_sigs[0].num_implicit_outputs(),
-            "estimated_probabilities": normalize_estimated_probabilities_for_cond(
-                self.estimated_probabilities, len(self.preds)
-            ),
-        }
-
         out_tracers = cond_p.bind(
             *(in_classical_tracers + sum(all_consts, [])),
-            **bind_kwargs,
+            branch_jaxprs=branch_jaxprs,
+            num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
+            estimated_probabilities=normalize_estimated_probabilities_for_cond(
+                self.estimated_probabilities, len(self.preds)
+            ),
         )
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
 
@@ -1157,18 +1153,14 @@ class ForLoopCallable:
             )[0],
         ]
 
-        bind_kwargs = {
-            "body_jaxpr": out_sig.out_jaxpr(),
-            "body_nconsts": len(out_sig.out_consts()),
-            "apply_reverse_transform": self.apply_reverse_transform,
-            "num_implicit_inputs": in_sig.num_implicit_inputs(),
-            "preserve_dimensions": not self.expansion_strategy.input_unshare_variables,
-            "estimated_iterations": self.estimated_iterations,
-        }
-
         out_expanded_tracers = for_p.bind(
             *in_expanded_tracers,
-            **bind_kwargs,
+            body_jaxpr=out_sig.out_jaxpr(),
+            body_nconsts=len(out_sig.out_consts()),
+            apply_reverse_transform=self.apply_reverse_transform,
+            num_implicit_inputs=in_sig.num_implicit_inputs(),
+            preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
+            estimated_iterations=self.estimated_iterations,
         )
 
         return tree_unflatten(
@@ -1400,15 +1392,11 @@ class SwitchCallable:
         # after this, all branches have the same signatures
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
-        bind_kwargs = {
-            "branch_jaxprs": branch_jaxprs,
-            "num_implicit_outputs": out_sigs[0].num_implicit_outputs(),
-            "estimated_probabilities": tuple(self.estimated_probabilities),
-        }
-
         out_tracers = switch_p.bind(
             *([self.case] + cases + sum(all_consts, [])),
-            **bind_kwargs,
+            branch_jaxprs=branch_jaxprs,
+            num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
+            estimated_probabilities=tuple(self.estimated_probabilities),
         )
 
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
@@ -1622,19 +1610,15 @@ class WhileLoopCallable:
             *in_body_sig.in_expanded_args,
         ]
 
-        bind_kwargs = {
-            "cond_jaxpr": out_cond_sig.out_jaxpr(),
-            "body_jaxpr": out_body_sig.out_jaxpr(),
-            "cond_nconsts": len(out_cond_sig.out_consts()),
-            "body_nconsts": len(out_body_sig.out_consts()),
-            "num_implicit_inputs": in_body_sig.num_implicit_inputs(),
-            "preserve_dimensions": not self.expansion_strategy.input_unshare_variables,
-            "estimated_iterations": self.estimated_iterations,
-        }
-
         out_expanded_tracers = while_p.bind(
             *in_expanded_tracers,
-            **bind_kwargs,
+            cond_jaxpr=out_cond_sig.out_jaxpr(),
+            body_jaxpr=out_body_sig.out_jaxpr(),
+            cond_nconsts=len(out_cond_sig.out_consts()),
+            body_nconsts=len(out_body_sig.out_consts()),
+            num_implicit_inputs=in_body_sig.num_implicit_inputs(),
+            preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
+            estimated_iterations=self.estimated_iterations,
         )
         return tree_unflatten(
             out_body_sig.out_tree(), collapse(out_body_sig.out_type(), out_expanded_tracers)
@@ -1741,21 +1725,17 @@ class ForLoop(HybridOp):
             num_implicit_inputs=num_implicit_inputs,
         )
 
-        bind_kwargs = {
-            "body_jaxpr": ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
-            "body_nconsts": len(consts),
-            "apply_reverse_transform": self.apply_reverse_transform,
-            "num_implicit_inputs": num_implicit_inputs,
-            "preserve_dimensions": not expansion_strategy.input_unshare_variables,
-            "estimated_iterations": self.estimated_iterations,
-        }
-
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
-                **bind_kwargs,
+                body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
+                body_nconsts=len(consts),
+                apply_reverse_transform=self.apply_reverse_transform,
+                num_implicit_inputs=num_implicit_inputs,
+                preserve_dimensions=not expansion_strategy.input_unshare_variables,
+                estimated_iterations=self.estimated_iterations,
             )
         )
         return qrp2
@@ -1866,22 +1846,18 @@ class WhileLoop(HybridOp):
             expansion_strategy=expansion_strategy,
         )[0]
 
-        bind_kwargs = {
-            "cond_jaxpr": ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
-            "body_jaxpr": ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
-            "cond_nconsts": len(cond_consts),
-            "body_nconsts": len(body_consts),
-            "num_implicit_inputs": num_implicit_inputs,
-            "preserve_dimensions": not expansion_strategy.input_unshare_variables,
-            "estimated_iterations": self.estimated_iterations,
-        }
-
         qrp2 = QRegPromise(
             self.bind_overwrite_classical_tracers(
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
-                **bind_kwargs,
+                cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
+                body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
+                cond_nconsts=len(cond_consts),
+                body_nconsts=len(body_consts),
+                num_implicit_inputs=num_implicit_inputs,
+                preserve_dimensions=not expansion_strategy.input_unshare_variables,
+                estimated_iterations=self.estimated_iterations,
             )
         )
         return qrp2
@@ -1999,20 +1975,16 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
         op.out_classical_tracers,
         expansion_strategy=op.expansion_strategy,
     )[0]
-    bind_kwargs = {
-        "branch_jaxprs": branch_jaxprs,
-        "num_implicit_outputs": num_implicit_outputs[0],
-        "estimated_probabilities": normalize_estimated_probabilities_for_cond(
-            op.estimated_probabilities, len(op.in_classical_tracers)
-        ),
-    }
-
     qrp2 = QRegPromise(
         op.bind_overwrite_classical_tracers(
             trace,
             in_expanded_tracers=in_expanded_classical_tracers,
             out_expanded_tracers=out_expanded_classical_tracers,
-            **bind_kwargs,
+            branch_jaxprs=branch_jaxprs,
+            num_implicit_outputs=num_implicit_outputs[0],
+            estimated_probabilities=normalize_estimated_probabilities_for_cond(
+                op.estimated_probabilities, len(op.in_classical_tracers)
+            ),
         )
     )
     return qrp2
