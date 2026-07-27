@@ -12,8 +12,26 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
+  resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
+  operations in question can be annotated with either a `catalyst.estimated_probability` or
+  `catalyst.estimated_probabilities` attribute, respectively, to indicate the expected probability
+  distribution over the branches. The counted resources are then scaled proportionally and summed.
+  [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
+
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
+
+* A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
+  be dispatched to a separate executor process. `executor` dialect models the session lifecycle
+  through an `!executor.session` handle that is threaded from `executor.open` through `send_binary`,
+  `launch`, `call`, and `close`.
+  [(#2909)](https://github.com/PennyLaneAI/catalyst/pull/2909)
+
+  - `--convert-executor-to-llvm` pass that lowers each `executor` op to a call into the
+    `__catalyst__executor__*` C-ABI runtime, marshalling string endpoints, memref descriptors, and
+    per-argument metadata.
+  [(#2910)](https://github.com/PennyLaneAI/catalyst/pull/2910)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
@@ -64,6 +82,12 @@
 * `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
   duplicate serialization logic and keeping its output consistent.
   [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
+
+* The `ResourceAnalysis` pass now counts quantum, measurement, and allocation
+  ops through dialect-agnostic MLIR OpInterfaces instead of hard-coded check.
+  New dialects can opt in by implementing these interfaces without changing
+  the analysis.
+  [(#3025)](https://github.com/PennyLaneAI/catalyst/pull/3025)
 
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
@@ -481,4 +505,5 @@ Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Paul Haochen Wang,
-Jake Zaia.
+Jake Zaia,
+Hongsheng Zheng.

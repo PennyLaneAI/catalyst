@@ -1343,3 +1343,84 @@ std::string OperatorOp::getExtraData()
 {
     return getUID().has_value() ? std::to_string(getUID().value()) : "";
 }
+// Implement ResourceQuantumOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+llvm::StringRef CustomOp::getResourceName() { return getGateName(); }
+llvm::StringRef SetStateOp::getResourceName() { return "SetState"; }
+llvm::StringRef SetBasisStateOp::getResourceName() { return "SetBasisState"; }
+llvm::StringRef PauliRotOp::getResourceName() { return "PauliRot"; }
+llvm::StringRef GlobalPhaseOp::getResourceName() { return "GlobalPhase"; }
+llvm::StringRef MultiRZOp::getResourceName() { return "MultiRZ"; }
+llvm::StringRef PCPhaseOp::getResourceName() { return "PCPhase"; }
+llvm::StringRef QubitUnitaryOp::getResourceName() { return "QubitUnitary"; }
+llvm::StringRef OperatorOp::getResourceName() { return getOpName(); }
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceMeasurementOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+static llvm::StringRef getObservableName(MLIRContext *ctx, llvm::StringRef baseName,
+                                         Operation *obsOp)
+{
+    std::string obs;
+    if (!obsOp) {
+        obs = "all wires";
+    }
+    else {
+        obs = llvm::TypeSwitch<Operation *, std::string>(obsOp)
+                  .Case<catalyst::quantum::ComputationalBasisOp,
+                        catalyst::qref::ComputationalBasisOp>([](auto cbOp) {
+                      unsigned n = cbOp.getQubits().size();
+                      return n == 0 ? std::string("all wires") : std::to_string(n) + " wires";
+                  })
+                  .Case<catalyst::quantum::NamedObsOp, catalyst::qref::NamedObsOp>(
+                      [](auto op) { return stringifyNamedObservable(op.getType()).str(); })
+                  .Case<catalyst::quantum::TensorOp>([](auto op) {
+                      return "Prod(num_terms=" + std::to_string(op.getTerms().size()) + ")";
+                  })
+                  .Case<catalyst::quantum::HamiltonianOp>([](auto op) {
+                      return "Hamiltonian(num_terms=" + std::to_string(op.getTerms().size()) + ")";
+                  })
+                  .Default([](Operation *) { return std::string("all wires"); });
+    }
+
+    return StringAttr::get(ctx, (baseName + "(" + obs + ")").str()).getValue();
+}
+
+llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
+uint64_t MeasureOp::getResourceNumQubits() { return 1; }
+uint64_t MeasureOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasureOp::getResourceNumParams() { return 0; }
+
+llvm::StringRef SampleOp::getResourceMeasurementName()
+{
+    return getObservableName(getContext(), "sample", getObs().getDefiningOp());
+}
+llvm::StringRef CountsOp::getResourceMeasurementName()
+{
+    return getObservableName(getContext(), "counts", getObs().getDefiningOp());
+}
+llvm::StringRef ExpvalOp::getResourceMeasurementName()
+{
+    return getObservableName(getContext(), "expval", getObs().getDefiningOp());
+}
+llvm::StringRef VarianceOp::getResourceMeasurementName()
+{
+    return getObservableName(getContext(), "var", getObs().getDefiningOp());
+}
+llvm::StringRef ProbsOp::getResourceMeasurementName()
+{
+    return getObservableName(getContext(), "probs", getObs().getDefiningOp());
+}
+llvm::StringRef StateOp::getResourceMeasurementName()
+{
+    return getObservableName(getContext(), "state", getObs().getDefiningOp());
+}
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceAllocQubitOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+uint64_t AllocOp::getResourceNumAllocQubits() { return getNqubitsAttr().value_or(0); }
+uint64_t AllocQubitOp::getResourceNumAllocQubits() { return 1; }
