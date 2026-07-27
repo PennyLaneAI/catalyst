@@ -53,32 +53,25 @@ def set_estimated_probabilities_attr(op, values: Sequence[float]) -> None:
     op.attributes[ESTIMATED_PROBABILITIES_ATTR] = ir.ArrayAttr.get(attrs)
 
 
-def normalize_estimated_probabilities_for_cond(
-    value: float | Sequence[float] | None, num_branches: int
+def collect_estimated_probabilities_for_cond(
+    branch_probs: Sequence[float | None],
 ) -> tuple[float, ...] | None:
-    """Normalize and validate probability hints for ``cond``."""
-    if value is None:
+    """Collect and validate per-branch probability hints for ``cond``."""
+    if all(p is None for p in branch_probs):
         return None
-    if isinstance(value, (int, float)):
-        probs = (float(value),)
-    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        probs = tuple(float(v) for v in value)
-    else:
-        raise TypeError(
-            "'estimated_probabilities' must be a float or sequence of floats in [0, 1]."
+    if any(p is None for p in branch_probs):
+        raise ValueError(
+            "'estimated_probability' must be provided for every non-default branch when "
+            "using resource-estimation hints."
         )
 
+    probs = tuple(float(p) for p in branch_probs)
     for p in probs:
         if not 0.0 <= p <= 1.0:
-            raise ValueError(f"'estimated_probabilities' must be in [0, 1], but got {p}.")
+            raise ValueError(f"'estimated_probability' must be in [0, 1], but got {p}.")
     if sum(probs) > 1.0 + 1e-10:
         raise ValueError(
-            f"'estimated_probabilities' entries must sum to at most 1, but got {sum(probs)}."
-        )
-    if len(probs) != num_branches:
-        raise ValueError(
-            f"'estimated_probabilities' must have one entry per non-default branch, but got "
-            f"{len(probs)} probabilities for {num_branches} branch(es)."
+            f"'estimated_probability' entries must sum to at most 1, but got {sum(probs)}."
         )
     return probs
 

@@ -66,14 +66,14 @@ from catalyst.jax_tracer import (
     trace_quantum_operations,
     unify_convert_result_types,
 )
-from catalyst.resource_hints import normalize_estimated_probabilities_for_cond
+from catalyst.resource_hints import collect_estimated_probabilities_for_cond
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 from catalyst.utils.patching import Patcher
 
 
 ## API ##
-def cond(pred: DynamicJaxprTracer, *, estimated_probabilities: float | list[float] | None = None):
+def cond(pred: DynamicJaxprTracer, *, estimated_probability: float | None = None):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
 
     .. note::
@@ -257,7 +257,7 @@ def cond(pred: DynamicJaxprTracer, *, estimated_probabilities: float | list[floa
         raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
-        return CondCallable(pred, true_fn, estimated_probabilities=estimated_probabilities)
+        return CondCallable(pred, true_fn, estimated_probability=estimated_probability)
 
     return _decorator
 
@@ -777,13 +777,13 @@ class CondCallable:
     (Array([0.25, 0.25, 0.25, 0.25], dtype=float64),)
     """
 
-    def __init__(self, pred, true_fn, estimated_probabilities=None):
+    def __init__(self, pred, true_fn, estimated_probability=None):
         self.preds = [self._convert_predicate_to_bool(pred)]
         self.branch_fns = [true_fn]
         self.otherwise_fn = lambda *args, **kwargs: None
         self._operation = None
         self.expansion_strategy = cond_expansion_strategy()
-        self.estimated_probabilities = estimated_probabilities
+        self.branch_probabilities = [estimated_probability]
 
     @property
     def operation(self):
@@ -797,13 +797,16 @@ class CondCallable:
                 """)
         return self._operation
 
-    def else_if(self, pred):
+    def else_if(self, pred, *, estimated_probability=None):
         """
         Block of code to be run if this predicate evaluates to true, skipping all subsequent
         conditional blocks.
 
         Args:
             pred (bool): The predicate that will determine if this branch is executed.
+            estimated_probability (float): Optional hint for resource estimation giving the
+                expected probability of this branch. Must be provided for every non-default
+                branch when using resource-estimation hints.
 
         Returns:
             A callable decorator that wraps this 'else if' branch of the conditional and returns
@@ -813,6 +816,7 @@ class CondCallable:
         def decorator(branch_fn):
             self.preds.append(self._convert_predicate_to_bool(pred))
             self.branch_fns.append(branch_fn)
+            self.branch_probabilities.append(estimated_probability)
             return self
 
         return decorator
@@ -927,7 +931,9 @@ class CondCallable:
             out_classical_tracers,
             regions,
             expansion_strategy=self.expansion_strategy,
-            estimated_probabilities=self.estimated_probabilities,
+            estimated_probabilities=collect_estimated_probabilities_for_cond(
+                self.branch_probabilities
+            ),
         )
         return tree_unflatten(out_tree, out_classical_tracers)
 
@@ -959,8 +965,8 @@ class CondCallable:
             *(in_classical_tracers + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
-            estimated_probabilities=normalize_estimated_probabilities_for_cond(
-                self.estimated_probabilities, len(self.preds)
+            estimated_probabilities=collect_estimated_probabilities_for_cond(
+                self.branch_probabilities
             ),
         )
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
@@ -1982,9 +1988,7 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
             out_expanded_tracers=out_expanded_classical_tracers,
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=num_implicit_outputs[0],
-            estimated_probabilities=normalize_estimated_probabilities_for_cond(
-                op.estimated_probabilities, len(op.in_classical_tracers)
-            ),
+            estimated_probabilities=op.estimated_probabilities,
         )
     )
     return qrp2
