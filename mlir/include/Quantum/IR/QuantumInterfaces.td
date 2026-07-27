@@ -16,8 +16,9 @@
 #define QUANTUM_INTERFACES
 
 include "mlir/IR/OpBase.td"
+include "Catalyst/Analysis/ResourceInterfaces.td"
 
-def QuantumOperation : OpInterface<"QuantumOperation"> {
+def QuantumOperation : OpInterface<"QuantumOperation", [ResourceQuantumOpInterface]> {
     let description = [{
         This interface provides a generic way to interact with instructions that are
         considered quantum logic gates. These are characterized by operating on zero

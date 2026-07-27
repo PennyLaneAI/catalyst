@@ -23,7 +23,7 @@
 extern "C" {
 #endif
 
-// Executor Runtime API. This is expected to be called by the host program to establish a executor
+// Executor Runtime API. This is expected to be called by the host program to establish an executor
 // session. Including open a session, send the binary to the executor, launch the kernel on the
 // executor and close the session.
 int64_t __catalyst__executor__open(const char *addr);
