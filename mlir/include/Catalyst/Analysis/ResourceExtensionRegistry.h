@@ -29,8 +29,8 @@
 namespace catalyst {
 
 /// Global registry of ResourceExtensionAnalysis providers.
-/// Dialects / plugins self-register
-// (e.g. pbc::registerPBCResourceExtensions, or REGISTER_RESOURCE_EXTENSION in a shared library).
+/// Dialects / plugins self-register via the ResourceExtensionRegistry::add method,
+/// or the REGISTER_RESOURCE_EXTENSION macro.
 class ResourceExtensionRegistry {
   public:
     using ExtensionProvider = std::function<std::unique_ptr<ResourceExtensionAnalysis>()>;
