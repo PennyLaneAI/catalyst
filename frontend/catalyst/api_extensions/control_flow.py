@@ -2131,5 +2131,3 @@ def collect_estimated_probabilities(
             f"'estimated_probability' entries must sum to at most 1, but got {sum(probs)}."
         )
     return probs
-
-def validate_estimated_iterations(value: int | float | None) -> int | float:

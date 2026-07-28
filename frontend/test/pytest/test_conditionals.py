@@ -115,7 +115,7 @@ class TestCondToJaxpr:
 
         @qjit()
         def circuit(n: int):
-            @cond(n == 5, estimated_probability=0.2)
+            @catalyst_cond(n == 5, estimated_probability=0.2)
             def cond_fn():
                 return n**2
 
@@ -158,7 +158,7 @@ class TestCondToJaxpr:
 
         @qjit()
         def circuit(n: int):
-            @cond(n == 5, estimated_probability=0.2)
+            @catalyst_cond(n == 5, estimated_probability=0.2)
             def cond_fn():
                 return n**2
 
