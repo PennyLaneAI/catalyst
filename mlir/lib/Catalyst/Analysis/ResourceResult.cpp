@@ -118,6 +118,10 @@ void ResourceResult::multiplyByScalar(double scalar)
     }
 
     numAllocQubits *= scalar;
+
+    for (auto &m : extensions) {
+        m->multiplyBy(scalar);
+    }
 }
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
