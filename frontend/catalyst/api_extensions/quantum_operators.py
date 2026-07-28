@@ -664,12 +664,11 @@ class CtrlCallable:
     def __call__(self, *args, **kwargs):
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
-            return create_controlled_op(
+            return qp.ctrl(
                 base_op,
-                self.control_wires,
-                self.control_values,
-                self.work_wires,
-                work_wire_type=self.work_wire_type,
+                control=self.control_wires,
+                control_values=self.control_values,
+                work_wires=self.work_wires,
             )
 
         tracing_artifacts = self.trace_body(args, kwargs)
