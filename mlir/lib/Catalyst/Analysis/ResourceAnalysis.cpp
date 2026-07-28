@@ -16,6 +16,8 @@
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 #include "llvm/ADT/DenseSet.h"
@@ -29,6 +31,7 @@
 #include "mlir/IR/Operation.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/SCFUtils.h"
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
@@ -66,165 +69,6 @@ static bool isCustomDialectOp(Operation *op)
     }
     return isa<quantum::QuantumDialect, pbc::PBCDialect, mbqc::MBQCDialect, qref::QRefDialect>(
         dialect);
-}
-
-//===----------------------------------------------------------------------===//
-// Operation categorization helpers
-//===----------------------------------------------------------------------===//
-
-/// Get the name to use for a quantum gate op.
-static std::string getGateOpName(Operation *op, bool isAdjoint)
-{
-    std::string name =
-        llvm::TypeSwitch<Operation *, std::string>(op)
-            .Case<quantum::CustomOp, qref::CustomOp>(
-                [](auto customOp) { return customOp.getGateName().str(); })
-            .Case<quantum::OperatorOp, qref::OperatorOp>(
-                [](auto operatorOp) { return operatorOp.getOpName().str(); })
-            .Case<quantum::PauliRotOp, qref::PauliRotOp>([](auto) { return "PauliRot"; })
-            .Case<quantum::GlobalPhaseOp, qref::GlobalPhaseOp>([](auto) { return "GlobalPhase"; })
-            .Case<quantum::MultiRZOp, qref::MultiRZOp>([](auto) { return "MultiRZ"; })
-            .Case<quantum::PCPhaseOp, qref::PCPhaseOp>([](auto) { return "PCPhase"; })
-            .Case<quantum::QubitUnitaryOp, qref::QubitUnitaryOp>(
-                [](auto) { return "QubitUnitary"; })
-            .Case<quantum::SetStateOp, qref::SetStateOp>([](auto) { return "SetState"; })
-            .Case<quantum::SetBasisStateOp, qref::SetBasisStateOp>(
-                [](auto) { return "SetBasisState"; })
-            .Default([](Operation *o) { return o->getName().getStringRef().str(); });
-
-    // Combine region-level adjoint (from quantum.adjoint) with
-    // op-level adjoint flag (from the adj attribute on the gate).
-    if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
-        isAdjoint ^= gate.getAdjointFlag();
-    }
-
-    if (auto gate = dyn_cast<qref::QuantumGate>(op)) {
-        isAdjoint ^= gate.getAdjointFlag();
-    }
-
-    if (isAdjoint) {
-        name = "Adjoint(" + name + ")";
-    }
-    return name;
-}
-
-/// Get the number of qubits for a gate operation.
-static int getGateQubitCount(Operation *op)
-{
-    if (auto qOp = dyn_cast<quantum::QuantumOperation>(op)) {
-        return static_cast<int>(qOp.getQubitOperands().size());
-    }
-    if (auto qOp = dyn_cast<qref::QuantumOperation>(op)) {
-        return static_cast<int>(qOp.getQubitOperands().size());
-    }
-    return 0;
-}
-
-/// Get the number of parameters for a gate operation.
-static int getGateParamCount(Operation *op)
-{
-    if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
-        return static_cast<int>(gate.getAllParams().size());
-    }
-    if (auto gate = dyn_cast<qref::ParametrizedGate>(op)) {
-        return static_cast<int>(gate.getAllParams().size());
-    }
-    return 0;
-}
-
-/// Get the name for a PBC operation.
-static std::string getPBCOpName(Operation *op)
-{
-    return llvm::TypeSwitch<Operation *, std::string>(op)
-        .Case<pbc::PPRotationOp>([](auto pprOp) -> std::string {
-            int8_t rk = pprOp.getRotationKind();
-            if (rk == 0) {
-                return "PPR-identity";
-            }
-            return "PPR-pi/" + std::to_string(std::abs(rk));
-        })
-        .Case<pbc::PPRotationArbitraryOp>([](auto) -> std::string { return "PPR-Phi"; })
-        .Case<pbc::PPMeasurementOp, pbc::RefPPMeasurementOp, pbc::SelectPPMeasurementOp>(
-            [](auto) -> std::string { return "PPM"; })
-        .Default([](Operation *o) { return o->getName().getStringRef().str(); });
-}
-
-/// Get the qubit count for a PBC operation.
-static int getPBCQubitCount(Operation *op)
-{
-    // if the operation is one of these operations, it will return the number of qubits in the input
-    return llvm::TypeSwitch<Operation *, int>(op)
-        .Case<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
-              pbc::SelectPPMeasurementOp>(
-            [](auto typedOp) { return static_cast<int>(typedOp.getInQubits().size()); })
-        .Default(0);
-}
-
-/// Resolve the observable name from its defining operation.
-/// Mirrors the Python `xdsl_to_qml_measurement_name` in xdsl_conversion.py.
-static std::string getObservableName(Operation *obsOp)
-{
-    if (!obsOp) {
-        return "all wires";
-    }
-
-    return llvm::TypeSwitch<Operation *, std::string>(obsOp)
-        .Case<quantum::ComputationalBasisOp, qref::ComputationalBasisOp>([](auto cbOp) {
-            unsigned n = cbOp.getQubits().size();
-            return n == 0 ? std::string("all wires") : std::to_string(n) + " wires";
-        })
-        .Case<quantum::NamedObsOp, qref::NamedObsOp>(
-            [](auto op) { return stringifyNamedObservable(op.getType()).str(); })
-        .Case<quantum::TensorOp>(
-            [](auto op) { return "Prod(num_terms=" + std::to_string(op.getTerms().size()) + ")"; })
-        .Case<quantum::HamiltonianOp>([](auto op) {
-            return "Hamiltonian(num_terms=" + std::to_string(op.getTerms().size()) + ")";
-        })
-        .Default([](Operation *) { return std::string("all wires"); });
-}
-
-/// Get the full measurement name including observable info.
-/// e.g. "MidCircuitMeasure", "expval(PauliZ)", "sample(all wires)", "probs(2 wires)".
-static std::string getMeasurementName(Operation *op)
-{
-    if (isa<quantum::MeasureOp, qref::MeasureOp>(op)) {
-        return "MidCircuitMeasure";
-    }
-
-    std::string baseName =
-        llvm::TypeSwitch<Operation *, std::string>(op)
-            .Case<quantum::SampleOp>([](auto) { return "sample"; })
-            .Case<quantum::CountsOp>([](auto) { return "counts"; })
-            .Case<quantum::ExpvalOp>([](auto) { return "expval"; })
-            .Case<quantum::VarianceOp>([](auto) { return "var"; })
-            .Case<quantum::ProbsOp>([](auto) { return "probs"; })
-            .Case<quantum::StateOp>([](auto) { return "state"; })
-            .Default([](Operation *o) { return o->getName().getStringRef().str(); });
-
-    if (auto measProc = dyn_cast<quantum::MeasurementProcess>(op)) {
-        return baseName + "(" + getObservableName(measProc.getObs().getDefiningOp()) + ")";
-    }
-
-    return baseName;
-}
-
-/**
- * @brief Collect a single MBQC operation into the ResourceResult.
- *
- * This categorizes the operation into gates, measurements, classical instructions,
- * or function calls, and updates the corresponding counts in the ResourceResult.
- *
- * @param op The MBQC operation to collect.
- * @param result The ResourceResult to update with the operation's resource usage.
- * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
- */
-void collectMBQCOperation(Operation *op, ResourceResult &result, bool isAdjoint)
-{
-    std::string name = op->getName().getStringRef().str();
-    result.operations[name][{0, 0}] += 1;
-
-    llvm::TypeSwitch<Operation *, void>(op).Case<mbqc::GraphStatePrepOp, mbqc::RefGraphStatePrepOp>(
-        [&](auto graphOp) { result.numAllocQubits += graphOp.getNumQubitsFromAdjMatrixSize(); });
 }
 
 //===----------------------------------------------------------------------===//
@@ -325,7 +169,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
     // Try to resolve a static trip count.
-    std::optional<int64_t> tripCount = resolveForLoopTripCount(forOp);
+    std::optional<double> tripCount = resolveForLoopTripCount(forOp);
 
     if (tripCount.has_value()) {
         // Record the loop body under a new name (for_loop_1, …).
@@ -354,9 +198,8 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
     ResourceResult bodyResult;
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
 
-    if (auto estAttr = whileOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
-        int64_t iters = estAttr.getValue().getSExtValue();
-        bodyResult.multiplyByScalar(iters);
+    if (auto iters = getEstimatedIterationsHint(whileOp)) {
+        bodyResult.multiplyByScalar(*iters);
     }
     else {
         result.hasDynLoop = true;
@@ -372,6 +215,27 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     ResourceResult thenResult;
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint);
 
+    // If a branch probability hint is present, compute the expected (average) resource counts
+    // weighted by the probability, rather than the worst case.
+    // `catalyst.estimated_probability` is the probability that the condition is true.
+    if (auto probAttr = ifOp->getAttrOfType<FloatAttr>(EstimatedProbabilityAttrName)) {
+        double pThen = probAttr.getValueAsDouble();
+        double pElse = 1.0 - pThen;
+
+        ResourceResult elseResult;
+        if (!ifOp.getElseRegion().empty()) {
+            analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
+        }
+
+        thenResult.multiplyByScalar(pThen);
+        elseResult.multiplyByScalar(pElse);
+        thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Sum);
+
+        result.mergeWith(thenResult);
+        return;
+    }
+
+    // No hint: fall back to worst-case (max across branches).
     if (!ifOp.getElseRegion().empty()) {
         ResourceResult elseResult;
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
@@ -385,10 +249,43 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 {
     result.hasBranches = true;
 
+    // If branch probabilities are provided, compute the expected (average) resource counts.
+    // `catalyst.estimated_probabilities` is an array of floats with one entry per case
+    // (excluding the default which is computed automatically).
+    auto caseRegions = switchOp.getCaseRegions();
+    if (auto probsAttr = switchOp->getAttrOfType<ArrayAttr>(EstimatedProbabilitiesAttrName)) {
+        ResourceResult expected;
+        double sumProb = 0.0;
+
+        for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
+            ResourceResult caseResult;
+            analyzeRegion(caseRegion, caseResult, isAdjoint);
+
+            double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
+            sumProb += p;
+
+            caseResult.multiplyByScalar(p);
+            expected.mergeWith(caseResult, ResourceResult::MergeMethod::Sum);
+        }
+
+        // The verifier guarantees the entries sum to at most 1, but a clamp is safer in case
+        // of floating-point error.
+        double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
+
+        ResourceResult defaultResult;
+        analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
+        defaultResult.multiplyByScalar(pDefault);
+        expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
+
+        result.mergeWith(expected);
+        return;
+    }
+
+    // No hint: fall back to worst-case (max across all cases).
     ResourceResult maxResult;
     bool first = true;
 
-    for (auto &caseRegion : switchOp.getCaseRegions()) {
+    for (auto &caseRegion : caseRegions) {
         ResourceResult caseResult;
         analyzeRegion(caseRegion, caseResult, isAdjoint);
         if (first) {
@@ -473,40 +370,9 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  */
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
 {
-    // Quantum gates
-    if (isa<quantum::CustomOp, qref::CustomOp, quantum::OperatorOp, qref::OperatorOp,
-            quantum::PauliRotOp, qref::PauliRotOp, quantum::GlobalPhaseOp, qref::GlobalPhaseOp,
-            quantum::MultiRZOp, qref::MultiRZOp, quantum::PCPhaseOp, qref::PCPhaseOp,
-            quantum::QubitUnitaryOp, qref::QubitUnitaryOp, quantum::SetStateOp, qref::SetStateOp,
-            quantum::SetBasisStateOp, qref::SetBasisStateOp>(op)) {
-        std::string name = getGateOpName(op, isAdjoint);
-        int nQubits = getGateQubitCount(op);
-        int nParams = getGateParamCount(op);
-        result.operations[name][{nQubits, nParams}] += 1;
-        return;
-    }
 
-    // Measurements
-    if (isa<quantum::MeasureOp, qref::MeasureOp, quantum::SampleOp, quantum::CountsOp,
-            quantum::ExpvalOp, quantum::VarianceOp, quantum::ProbsOp, quantum::StateOp>(op)) {
-        result.measurements[getMeasurementName(op)] += 1;
-        return;
-    }
-
-    // PBC operations
-    if (isa<pbc::PPRotationOp, pbc::RefPPMeasurementOp, pbc::PPRotationArbitraryOp,
-            pbc::PPMeasurementOp, pbc::SelectPPMeasurementOp, pbc::PrepareStateOp,
-            pbc::FabricateOp>(op)) {
-        std::string name = getPBCOpName(op);
-        int nQubits = getPBCQubitCount(op);
-        result.operations[name][{nQubits, 0}] += 1;
-        return;
-    }
-
-    // MBQC operations
-    if (isa<mbqc::MeasureInBasisOp, mbqc::RefMeasureInBasisOp, mbqc::GraphStatePrepOp,
-            mbqc::RefGraphStatePrepOp>(op)) {
-        collectMBQCOperation(op, result, isAdjoint);
+    // Skipped ops
+    if (isSkippedOp(op)) {
         return;
     }
 
@@ -517,23 +383,41 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         return;
     }
 
-    // Metadata: qubit allocations
-    if (auto allocOp = dyn_cast<quantum::AllocOp>(op)) {
-        uint64_t nqubits = allocOp.getNqubitsAttr().value_or(0);
-        result.numAllocQubits += nqubits;
+    // Quantum operations
+    if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
+        std::string name = inst.getResourceName().str();
+        if (isAdjoint ^ inst.getResourceAdjointFlag()) {
+            name = "Adjoint(" + name + ")";
+        }
+        uint64_t nCtrlQubits = inst.getResourceNumCtrlQubits();
+
+        if (nCtrlQubits == 1) {
+            name = "C(" + name + ")";
+        }
+        else if (nCtrlQubits > 1) {
+            name = std::to_string(nCtrlQubits) + "C(" + name + ")";
+        }
+
+        uint64_t nParams = inst.getResourceNumParams();
+        uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;
+        result.operations[name][{nQubits, nParams}] += 1;
+
+        // Ops may also allocate (e.g. mbqc.graph_state_prep, pbc.prepare, pbc.fabricate).
+        if (auto alloc = dyn_cast<ResourceAllocQubitOpInterface>(op)) {
+            result.numAllocQubits += alloc.getResourceNumAllocQubits();
+        }
         return;
     }
 
-    // Metadata: qubit allocations
-    if (auto allocOp = dyn_cast<qref::AllocOp>(op)) {
-        uint64_t nqubits = allocOp.getNqubitsAttr().value_or(0);
-        result.numAllocQubits += nqubits;
+    // Measurements
+    if (auto inst = dyn_cast<ResourceMeasurementOpInterface>(op)) {
+        result.measurements[inst.getResourceMeasurementName()] += 1;
         return;
     }
 
-    // Metadata: qubit allocation
-    if (isa<quantum::AllocQubitOp, qref::AllocQubitOp>(op)) {
-        result.numAllocQubits += 1;
+    // Qubit allocations
+    if (auto inst = dyn_cast<ResourceAllocQubitOpInterface>(op)) {
+        result.numAllocQubits += inst.getResourceNumAllocQubits();
         return;
     }
 
@@ -547,11 +431,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
                                  << "'. Recursive calls are not flattened, so resource counts may "
                                     "be incomplete.";
         }
-        return;
-    }
-
-    // Skipped ops
-    if (isSkippedOp(op)) {
         return;
     }
 
@@ -574,7 +453,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
  * @param source The ResourceResult to merge into `dest` (unmodified).
  * @param count A scalar to multiply the `source`'s counts by (defaults to 1).
  */
-static void accumulateScaled(ResourceResult &dest, const ResourceResult &source, int64_t count = 1)
+static void accumulateScaled(ResourceResult &dest, const ResourceResult &source, double count = 1.0)
 {
     for (const auto &opEntry : source.operations) {
         auto &innerDst = dest.operations[opEntry.getKey()];
