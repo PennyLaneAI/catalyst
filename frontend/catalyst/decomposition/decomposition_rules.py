@@ -68,7 +68,6 @@ class GraphOpID:
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()
         self.extra_data = self.parse_extra_data()
-        # breakpoint()
 
     def parse_dynamic_shape(self) -> list:
         """Return the dynamic shape as a list of dtypes."""
@@ -92,10 +91,20 @@ class GraphOpID:
 
     def parse_extra_data(self) -> dict:
         """Return a dictionary of names to extra data values."""
-        return {
-            extra_argname: str(extra_arg)
-            for extra_argname, extra_arg in sorted(self.op.static_args.items())
-        }
+        if self.op.static_args or self.op.hybrid_args:
+            uid = generate_uid(
+                *tuple(self.op.dynamic_args.values()),
+                op_cls=type(self.op),
+                wire_lens=tuple(self.wire_lens.values()),
+                hybrid_lens=(),
+                hybrid_trees=(),
+                adjoint=False,
+                n_ctrls=0,
+                static_args=self.op.static_args,
+            )
+            return uid
+        else:
+            return {}
 
     def get_operator_name(self) -> str:
         """Return the name of the operator."""
