@@ -28,9 +28,9 @@
 
 namespace catalyst {
 
-/// Global registry of ResourceExtensionAnalysis providers.
-/// Dialects / plugins self-register via the ResourceExtensionRegistry::add method,
-/// or the REGISTER_RESOURCE_EXTENSION macro.
+// Global registry of ResourceExtensionAnalysis providers.
+// Dialects / plugins self-register via the ResourceExtensionRegistry::add method,
+// or the REGISTER_RESOURCE_EXTENSION macro.
 class ResourceExtensionRegistry {
   public:
     using ExtensionProvider = std::function<std::unique_ptr<ResourceExtensionAnalysis>()>;
@@ -54,7 +54,7 @@ class ResourceExtensionRegistry {
     llvm::SmallVector<std::string> names;
 };
 
-/// Self-register a ResourceExtensionAnalysis factory.
+// Self-register a ResourceExtensionAnalysis factory.
 // Example:
 // REGISTER_RESOURCE_EXTENSION(std::make_unique<ABCAnalysis>());
 #define RES_EXT_CONCAT_(a, b) a##b
