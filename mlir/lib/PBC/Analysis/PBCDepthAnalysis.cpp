@@ -87,11 +87,10 @@ void PBCDepthAnalysis::analyze(Region &region, PBCDepthExtension &ext, bool /*is
 
 void registerPBCResourceExtensions()
 {
-    static const bool once = [] {
+    [[maybe_unused]] static const bool once = [] {
         ResourceExtensionRegistry::get().add([] { return std::make_unique<PBCDepthAnalysis>(); });
         return true;
     }();
-    (void)once;
 }
 
 } // namespace pbc
