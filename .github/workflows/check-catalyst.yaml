@@ -526,6 +526,13 @@ jobs:
         python3 -m pip install oqc-qcaas-client
         # Install graphviz for testing the mlir-op-graph integration
         sudo apt-get install -y graphviz
+
+    - name: Install PennyLane from source
+      run: |
+        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
+
+    - name: Install Catalyst Frontend
+      run: |
         make frontend
 
     - name: Verify Graphviz installation
@@ -606,6 +613,13 @@ jobs:
         sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
+
+    - name: Install PennyLane from source
+      run: |
+        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
+
+    - name: Install Catalyst Frontend
+      run: |
         make frontend
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
@@ -670,6 +684,13 @@ jobs:
         sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
+
+    - name: Install PennyLane from source
+      run: |
+        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
+
+    - name: Install Catalyst Frontend
+      run: |
         make frontend
 
   runtime-device-tests:
