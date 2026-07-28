@@ -121,7 +121,17 @@ void ResourceResult::multiplyBy(double scalar) {
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
 // (fractional) count values, but the JSON output always reports the nearest integer.
-static llvm::json::Value countToJson(double count) {
+//
+// JSON Schema (per function, keyed by name at the root):
+//   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
+//   num_qubits: { alloc, arg, total }
+//   classical_instructions: { "dialect.op": count, ... }
+//   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
+//   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
+//   measurement_processes: { "meas_type": count, ... }
+//   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth, qubit_disjoint_depth }
+static llvm::json::Value countToJson(double count)
+{
     return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
 }
 
