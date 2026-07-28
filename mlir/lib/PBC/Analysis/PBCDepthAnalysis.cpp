@@ -32,7 +32,9 @@ llvm::json::Value PBCDepthExtension::toJson() const {
         depthObj["qubit_disjoint_depth"] = depth->second;
         return depthObj;
     }
-    return nullptr;
+    else {
+        return nullptr;
+    }
 }
 
 void PBCDepthExtension::mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) {
