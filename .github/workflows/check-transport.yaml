@@ -112,11 +112,29 @@ jobs:
           # Build only drivers/infiniband/sw/rxe against the running kernel's
           # build tree; the RXE driver is self-contained and rarely carries
           # distro patches, so upstream source usually compiles cleanly.
+          #
+          # The RXE Makefile has `obj-$(CONFIG_RDMA_RXE) += rdma_rxe.o`. When
+          # kbuild reads the running kernel's .config out-of-tree and the
+          # Azure kernel has CONFIG_RDMA_RXE unset (which is exactly why the
+          # extras package doesn't ship the .ko), that resolves to nothing
+          # and no module is built - MODPOST silently runs against zero
+          # objects. Force `obj-m` so the build produces rdma_rxe.ko
+          # regardless of the running kernel's config.
+          sed -i 's|obj-\$(CONFIG_RDMA_RXE)|obj-m|' \
+            "$SRC/drivers/infiniband/sw/rxe/Makefile"
+          echo "--- patched rxe Makefile ---"
+          cat "$SRC/drivers/infiniband/sw/rxe/Makefile"
+          echo "----------------------------"
+
           make -C "/lib/modules/$KVER/build" \
             M="$SRC/drivers/infiniband/sw/rxe" modules
 
           KO="$SRC/drivers/infiniband/sw/rxe/rdma_rxe.ko"
-          [ -f "$KO" ] || { echo "::error::rdma_rxe.ko not produced by build"; exit 1; }
+          if [ ! -f "$KO" ]; then
+            echo "::error::rdma_rxe.ko not produced by build"
+            ls -la "$SRC/drivers/infiniband/sw/rxe/"
+            exit 1
+          fi
 
           sudo install -D -m 644 "$KO" \
             "/lib/modules/$KVER/kernel/drivers/infiniband/sw/rxe/rdma_rxe.ko"
