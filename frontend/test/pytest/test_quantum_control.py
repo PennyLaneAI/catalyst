@@ -1235,7 +1235,7 @@ def ControlledPhaseShift(phi):
 
 
 special_non_par_op_decomps = [
-    (qp.PauliY, [], [0], [1], qp.CY, [qp.CRY(pnp.pi, wires=[1, 0]), qp.S(1)]),
+    (qp.PauliY, [], [0], [1], qp.CY, [qp.CY(wires=[1, 0])]),
     (qp.PauliZ, [], [1], [0], qp.CZ, [qp.ControlledPhaseShift(pnp.pi, wires=[0, 1])]),
     (
         qp.Hadamard,
