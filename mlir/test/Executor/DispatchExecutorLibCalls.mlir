@@ -24,14 +24,14 @@
 // on a session opened once at the host function entry.
 // CHECK-LABEL: func.func @main
 // CHECK: %[[S:.*]] = executor.open("ADDR:PORT") : !executor.session
-// CHECK: executor.call %[[S]]("fpga_trampoline_a_setup") (%{{.*}}) {num_input_args = 1 : i32} : !executor.session, (memref<256xi8>) -> ()
+// CHECK: executor.call %[[S]]("foo") (%{{.*}}) {num_input_args = 1 : i32} : !executor.session, (memref<256xi8>) -> ()
 // CHECK-NOT: catalyst.custom_call
 module @jit_bound {
   func.func @setup() {
     return
   }
   func.func @main(%arg0: memref<256xi8>) {
-    catalyst.custom_call fn("fpga_trampoline_a_setup") (%arg0) {backend_config = {dispatch = "ADDR:PORT"}, number_original_arg = 1 : i32} : (memref<256xi8>) -> ()
+    catalyst.custom_call fn("foo") (%arg0) {backend_config = {dispatch = "ADDR:PORT"}, number_original_arg = 1 : i32} : (memref<256xi8>) -> ()
     return
   }
 }
@@ -44,7 +44,7 @@ module @jit_bound {
 // CHECK: %[[S:.*]] = executor.open("ADDR:PORT") : !executor.session
 // CHECK: executor.send_binary %[[S]]("/tmp/target.o") : !executor.session
 // CHECK: executor.launch %[[S]]("compute", "/tmp/target.o") () : !executor.session, () -> ()
-// CHECK: executor.call %[[S]]("fpga_trampoline_a_teardown") () : !executor.session, () -> ()
+// CHECK: executor.call %[[S]]("foo") () : !executor.session, () -> ()
 // CHECK-NOT: executor.open
 // CHECK-NOT: catalyst.custom_call
 module @jit_inherit {
@@ -56,7 +56,7 @@ module @jit_inherit {
   }
   func.func @main() {
     catalyst.launch_kernel @target::@compute() : () -> ()
-    catalyst.custom_call fn("fpga_trampoline_a_teardown") () {backend_config = {dispatch = ""}} : () -> ()
+    catalyst.custom_call fn("foo") () {backend_config = {dispatch = ""}} : () -> ()
     return
   }
   module @target attributes {catalyst.object_file = "/tmp/target.o", catalyst.dispatch = {address = "ADDR:PORT"}} {
