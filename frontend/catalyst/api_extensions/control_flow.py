@@ -99,6 +99,8 @@ def cond(pred: DynamicJaxprTracer, *, estimated_probability: float | None = None
 
     Args:
         pred (bool): the first predicate with which to control the branch to execute
+        estimated_probability (float | None): resource hint for the estimated probability with
+            which the predicate will trigger.
 
     Returns:
         A callable decorator that wraps the first 'if' branch of the conditional.
@@ -317,6 +319,8 @@ def for_loop(
             to modify dimension sizes within the for loop, however outer-scope
             dynamically-shaped arrays will no longer be captured, and arrays of the same shape
             cannot be used in binary operations.
+        estimated_iterations (int | float | None): resource hint for the estimated trip-count of
+            the loop. This may be a ``float`` to allow for averaging or other statistical estimates.
 
     Returns:
         Callable[[int, ...], ...]: A wrapper around the loop body function.
@@ -484,6 +488,8 @@ def while_loop(
             to modify dimension sizes within the loop, however outer-scope
             dynamically-shaped arrays will no longer be captured, and arrays of the same shape
             cannot be used in binary operations.
+        estimated_iterations (int | float | None): resource hint for the estimated trip-count of
+            the loop. This may be a ``float`` to allow for averaging or other statistical estimates.
 
     Returns:
         Callable: A wrapper around the while-loop function.
@@ -931,7 +937,7 @@ class CondCallable:
             out_classical_tracers,
             regions,
             expansion_strategy=self.expansion_strategy,
-            estimated_probabilities=collect_estimated_probabilities_for_cond(
+            estimated_probabilities=collect_estimated_probabilities(
                 self.branch_probabilities
             ),
         )
@@ -1052,6 +1058,12 @@ class ForLoopCallable:
         self._operation = None
         self.expansion_strategy = for_loop_expansion_strategy(experimental_preserve_dimensions)
         self.apply_reverse_transform = isinstance(self.step, int) and self.step < 0
+
+        if estimated_iterations is not None and estimated_iterations < 0:
+            raise ValueError(
+                "`estimated_iterations` must be a non-negative int or float. "
+                f"Got {estimated_iterations} of type {type(estimated_iterations).__name__}."
+            )
         self.estimated_iterations = estimated_iterations
 
     @property
@@ -1501,6 +1513,11 @@ class WhileLoopCallable:
         self.body_fn = body_fn
         self._operation = None
         self.expansion_strategy = while_loop_expansion_strategy(experimental_preserve_dimensions)
+        if estimated_iterations is not None and estimated_iterations < 0:
+            raise ValueError(
+                "`estimated_iterations` must be a non-negative int or float. "
+                f"Got {estimated_iterations} of type {type(estimated_iterations).__name__}."
+            )
         self.estimated_iterations = estimated_iterations
 
     @property
@@ -2114,3 +2131,5 @@ def collect_estimated_probabilities(
             f"'estimated_probability' entries must sum to at most 1, but got {sum(probs)}."
         )
     return probs
+
+def validate_estimated_iterations(value: int | float | None) -> int | float:
