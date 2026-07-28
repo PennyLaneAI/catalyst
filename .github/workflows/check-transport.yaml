@@ -69,11 +69,8 @@ jobs:
 
       - name: Ensure rdma_rxe.ko is available for the running kernel
         run: |
-          # The Azure kernel used by GitHub-hosted runners frequently does not
-          # ship a matching linux-modules-extra-<abi> package in Ubuntu apt.
-          # Try that first; if the module isn't present after installing, build
-          # it out-of-tree from the upstream stable branch that matches the
-          # running kernel's major.minor version.
+          # Try linux-modules-extra first; if the .ko isn't there, build
+          # rdma_rxe out-of-tree from the matching upstream stable branch.
           set -euo pipefail
 
           KVER=$(uname -r)
@@ -109,22 +106,9 @@ jobs:
             https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git \
             "$SRC"
 
-          # Build only drivers/infiniband/sw/rxe against the running kernel's
-          # build tree; the RXE driver is self-contained and rarely carries
-          # distro patches, so upstream source usually compiles cleanly.
-          #
-          # The RXE Makefile has `obj-$(CONFIG_RDMA_RXE) += rdma_rxe.o`. When
-          # kbuild reads the running kernel's .config out-of-tree and the
-          # Azure kernel has CONFIG_RDMA_RXE unset (which is exactly why the
-          # extras package doesn't ship the .ko), that resolves to nothing
-          # and no module is built - MODPOST silently runs against zero
-          # objects. Force `obj-m` so the build produces rdma_rxe.ko
-          # regardless of the running kernel's config.
+          # Force obj-m; Azure kernel has CONFIG_RDMA_RXE unset.
           sed -i 's|obj-\$(CONFIG_RDMA_RXE)|obj-m|' \
             "$SRC/drivers/infiniband/sw/rxe/Makefile"
-          echo "--- patched rxe Makefile ---"
-          cat "$SRC/drivers/infiniband/sw/rxe/Makefile"
-          echo "----------------------------"
 
           make -C "/lib/modules/$KVER/build" \
             M="$SRC/drivers/infiniband/sw/rxe" modules
@@ -149,11 +133,7 @@ jobs:
 
       - name: Configure Soft-RoCE (rxe0 on loopback)
         run: |
-          # rdma_rxe provides a software RoCE device. Attach it to `lo` so the
-          # runtime's cpu_verbs backend has an ibverbs device named `rxe0` to
-          # open. The Catch2 tests SKIP when this device is absent, and
-          # run_loopback.sh requires it - both scenarios happen inside
-          # make test-transport.
+          # Attach rdma_rxe to `lo` so the tests find an ibverbs device named rxe0.
           sudo modprobe rdma_rxe
           sudo rdma link add rxe0 type rxe netdev lo
           rdma link show
