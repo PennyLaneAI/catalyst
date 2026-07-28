@@ -1,12 +1,5 @@
 name: Check Transport Backends
 
-# Builds the runtime with ENABLE_TRANSPORT=ON and exercises the transport
-# backends (CAPI + loader against a stub backend, common RDMA primitives, and
-# the cpu_verbs controller/coprocessor sessions) plus the two-process loopback
-# smoke test. There is no physical RDMA NIC on GitHub-hosted runners, so we
-# rely on Soft-RoCE (rdma_rxe kernel module) attached to the loopback
-# interface. The test binaries key on device name "rxe0".
-
 on:
   pull_request:
     types:
