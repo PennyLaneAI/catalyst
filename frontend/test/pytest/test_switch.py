@@ -13,7 +13,9 @@
 # limitations under the License.
 
 from math import pi
+import re
 from re import escape
+from textwrap import dedent
 
 import jax.numpy as jnp
 import numpy as np
@@ -32,6 +34,84 @@ QUANTUM_OPERATION_MESSAGE = escape(
     " context, and thus has no associated quantum operation."
 )
 
+class TestSwitchToJaxpr:
+    """Run tests on the generated JAXPR of switch."""
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_switch_to_jaxpr(self):
+        """Check the JAXPR of a standard switch function."""
+        # pylint: disable=line-too-long
+
+        expected = dedent("""
+        { lambda ; a:i64[]. let
+            b:i64[] = switch[
+              branch_jaxprs=[{ lambda ; a:i64[]. let  in (0:i64[],) }, { lambda ; a:i64[]. let b:i64[] = neg a in (b,) }]
+              estimated_probabilities=None
+              num_implicit_outputs=0
+            ] a 0:i64[] a
+          in (b,) }
+            """)
+
+        @qjit()
+        def circuit(i: int):
+            @switch(i)
+            def my_switch():
+                return -i
+
+            @my_switch.branch(0)
+            def my_branch():
+                return 0
+
+            return my_switch()
+
+        def asline(text):
+            return " ".join(
+                map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))
+            ).strip()
+
+        result = circuit.jaxpr
+        assert asline(expected) == asline(result)
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_with_estimated_probabilities_to_jaxpr(self):
+        """Check the JAXPR of a standard switch function with estimated probabilities."""
+        # pylint: disable=line-too-long
+
+        expected = dedent("""
+        { lambda ; a:i64[]. let
+            b:i64[] = switch[
+              branch_jaxprs=[{ lambda ; a:i64[]. let  in (0:i64[],) },
+                                { lambda ; a:i64[]. let  in (3:i64[],) },
+                                { lambda ; a:i64[]. let b:i64[] = neg a in (b,) }]
+              estimated_probabilities=(0.3, 0.5)
+              num_implicit_outputs=0
+            ] a 0:i64[] 3:i64[] a
+          in (b,) }
+            """)
+
+        @qjit()
+        def circuit(i: int):
+            @switch(i)
+            def my_switch():
+                return -i
+
+            @my_switch.branch(0, estimated_probability=0.3)
+            def my_branch():
+                return 0
+
+            @my_switch.branch(3, estimated_probability=0.5)
+            def my_branch():
+                return 3
+
+            return my_switch()
+
+        def asline(text):
+            return " ".join(
+                map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))
+            ).strip()
+
+        result = circuit.jaxpr
+        assert asline(expected) == asline(result)
 
 class TestInterpreted:
     """Test that Catalyst switches can be used with the python interpreter."""

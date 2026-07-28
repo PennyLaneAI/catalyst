@@ -593,7 +593,7 @@ def while_loop(
     return _decorator
 
 
-def switch(index_var: int, *, estimated_probabilities: list[float] | None = None):
+def switch(index_var: int):
     """
     A :func:`~.qjit` compatible decorator for index-switches in PennyLane/Catalyst.
 
@@ -719,7 +719,7 @@ def switch(index_var: int, *, estimated_probabilities: list[float] | None = None
         raise PlxprCaptureCFCompatibilityError("switch")
 
     def _decorator(branch):
-        return SwitchCallable(index_var, branch, estimated_probabilities=estimated_probabilities)
+        return SwitchCallable(index_var, branch)
 
     return _decorator
 
@@ -965,7 +965,7 @@ class CondCallable:
             *(in_classical_tracers + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
-            estimated_probabilities=collect_estimated_probabilities_for_cond(
+            estimated_probabilities=collect_estimated_probabilities(
                 self.branch_probabilities
             ),
         )
@@ -1241,17 +1241,27 @@ class SwitchCallable:
         default_branch: Callable,
         cases: list = None,
         branches: list = None,
-        estimated_probabilities: list[float] | None = None,
+        estimated_probabilities: list = None,
     ):
         if default_branch == None:
             raise ValueError("Switch requires a default branch.")
 
+        # Default case and branch
         self.case = case
-        self.case_to_branch = dict(zip(cases, branches)) if cases and branches else {}
         self.default_branch = default_branch
+
+        # Additional cases and branches
+        if cases and branches:
+            self.case_to_branch = dict(zip(cases, branches))
+            if estimated_probabilities  is None:
+                estimated_probabilities = [None] * len(cases)
+            self.case_to_prob = dict(zip(cases, estimated_probabilities, strict=True))
+        else:
+            self.case_to_branch = {}
+            self.case_to_prob = {}
+
         self._operation = None
         self.expansion_strategy = switch_expansion_strategy()
-        self.estimated_probabilities = estimated_probabilities
 
     @property
     def operation(self):
@@ -1265,12 +1275,14 @@ class SwitchCallable:
             )
         return self._operation
 
-    def branch(self, case: int):
+    def branch(self, case: int, *, estimated_probability: float | None = None):
         """
         Branch to be run if the switch's case is equivalent to the case provided here.
 
         Args:
             case (int): the case index of this branch.
+            estimated_probability (float | None): resource hint for the estimated probability
+                with which this branch will be triggered.
 
         Returns:
             A callable decorator that wraps this case of the switch.
@@ -1278,6 +1290,7 @@ class SwitchCallable:
 
         def decorator(branch: Callable):
             self.case_to_branch[case] = branch
+            self.case_to_prob[case] = estimated_probability
             return self
 
         return decorator
@@ -1289,6 +1302,8 @@ class SwitchCallable:
             else ([], [])
         )
         branches.append(self.default_branch)
+        # Extract estimated probabilities in the ordering of the cases
+        estimated_probabilities = collect_estimated_probabilities([self.case_to_prob[case] for case in cases])
 
         outer_trace = EvaluationContext.get_current_trace()
         in_classical_tracers = [self.case] + cases
@@ -1358,7 +1373,7 @@ class SwitchCallable:
             out_classical_tracers,
             regions,
             expansion_strategy=self.expansion_strategy,
-            estimated_probabilities=self.estimated_probabilities,
+            estimated_probabilities=estimated_probabilities,
         )
         return tree_unflatten(out_tree, out_classical_tracers)
 
@@ -1370,6 +1385,8 @@ class SwitchCallable:
             else ([], [])
         )
         branches.append(self.default_branch)
+        # Extract estimated probabilities in the ordering of the cases
+        estimated_probabilities = collect_estimated_probabilities([self.case_to_prob[case] for case in cases])
 
         # wraps trace to allow simple unzipping
         def _trace(branch_fn: Callable):
@@ -1402,7 +1419,7 @@ class SwitchCallable:
             *([self.case] + cases + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
-            estimated_probabilities=self.estimated_probabilities,
+            estimated_probabilities=estimated_probabilities,
         )
 
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
@@ -1779,6 +1796,19 @@ class Switch(HybridOp):
     binder = switch_p.bind
     has_adjoint = True
 
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+        debug_info=None,
+        estimated_probabilities=None,
+    ):  # pylint: disable=too-many-arguments
+        self.estimated_probabilities = estimated_probabilities
+        super().__init__(in_classical_tracers, out_classical_tracers, regions, apply_reverse_transform, expansion_strategy, debug_info)
+
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
         version of the operation, which is generally supported by Catalyst."""
@@ -2032,16 +2062,16 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
     )
     return qrp2
 
-def collect_estimated_probabilities_for_cond(
+def collect_estimated_probabilities(
     branch_probs: Sequence[float | None],
 ) -> tuple[float, ...] | None:
-    """Collect and validate per-branch probability hints for ``cond``."""
+    """Collect and validate per-branch probability hints for ``cond`` and ``switch``."""
     if all(p is None for p in branch_probs):
         return None
     if any(p is None for p in branch_probs):
         raise ValueError(
             "'estimated_probability' must be provided for every non-default branch when "
-            "using resource-estimation hints."
+            "it is provided for any non-default branch."
         )
 
     probs = tuple(float(p) for p in branch_probs)

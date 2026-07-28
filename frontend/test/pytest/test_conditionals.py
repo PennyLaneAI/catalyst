@@ -96,7 +96,7 @@ class TestCondToJaxpr:
         assert asline(expected) == asline(result)
 
     @pytest.mark.usefixtures("disable_capture")
-    def test_activated_estimated_probability(self):
+    def test_single_estimated_probability(self):
         """Check the JAXPR of a simple conditional function that uses the
         ``estimated_probability`` resource hint."""
         # pylint: disable=line-too-long
@@ -133,6 +133,58 @@ class TestCondToJaxpr:
 
         result = circuit.jaxpr
         assert asline(expected) == asline(result)
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_estimated_probability_with_else_ifs(self):
+        """Check the JAXPR of a conditional function with else_ifs that uses the
+        ``estimated_probability`` resource hint."""
+        # pylint: disable=line-too-long
+
+        expected = dedent("""
+            { lambda ; a:i64[]. let
+                b:bool[] = eq a 5:i64[]
+                c:bool[] = lt a 8:i64[]
+                d:bool[] = gt a 3:i64[]
+                e:i64[] = cond[
+                branch_jaxprs=[{ lambda ; a:i64[] b:i64[] c:i64[] d:i64[]. let e:i64[] = integer_pow[y=2] a in (e,) },
+                                { lambda ; a:i64[] b:i64[] c:i64[] d:i64[]. let e:i64[] = integer_pow[y=4] b in (e,) },
+                                { lambda ; a:i64[] b:i64[] c:i64[] d:i64[]. let e:i64[] = integer_pow[y=5] c in (e,) },
+                                { lambda ; a:i64[] b:i64[] c:i64[] d:i64[]. let e:i64[] = integer_pow[y=3] d in (e,) }]
+                estimated_probabilities=(0.2, 0.6, 0.1)
+                num_implicit_outputs=0
+                ] b c d a a a a
+            in (e,) }
+            """)
+
+        @qjit()
+        def circuit(n: int):
+            @cond(n == 5, estimated_probability=0.2)
+            def cond_fn():
+                return n**2
+
+            @cond_fn.else_if(n < 8, estimated_probability=0.6)
+            def cond_fn():
+                return n**4
+
+            @cond_fn.else_if(n > 3, estimated_probability=0.1)
+            def cond_fn():
+                return n**5
+
+            @cond_fn.otherwise
+            def cond_fn():
+                return n**3
+
+            out = cond_fn()
+            return out
+
+        def asline(text):
+            return " ".join(
+                map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))
+            ).strip()
+
+        result = circuit.jaxpr
+        assert asline(expected) == asline(result)
+
 
 
 # pylint: disable=too-many-public-methods,too-many-lines
