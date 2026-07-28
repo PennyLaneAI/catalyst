@@ -26,7 +26,7 @@
 namespace catalyst {
 namespace pbc {
 
-/// PBC depth data stored in ResourceResult::extensions.
+// PBC depth data stored in ResourceResult::extensions.
 class PBCDepthExtension : public ResourceExtension {
   public:
     llvm::StringRef name() const override { return "depth"; }
@@ -43,7 +43,7 @@ class PBCDepthExtension : public ResourceExtension {
     std::optional<std::pair<int64_t, int64_t>> depth;
 };
 
-/// Computes PBC depth for a region into a PBCDepthExtension.
+// Computes PBC depth for a region into a PBCDepthExtension.
 class PBCDepthAnalysis : public ResourceExtensionAnalysisOf<PBCDepthExtension> {
   public:
     llvm::StringRef name() const override { return "depth"; }

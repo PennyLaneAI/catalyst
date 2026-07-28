@@ -25,7 +25,7 @@ namespace catalyst {
 
 enum class MergeMethod { Sum, Max, Min };
 
-/// Value object for an optional resource metric. Lives in ResourceResult.
+// Value object for an optional resource metric. Lives in ResourceResult.
 class ResourceExtension {
   public:
     virtual ~ResourceExtension() = default;
@@ -38,8 +38,8 @@ class ResourceExtension {
 
 template <typename Ext> class ResourceExtensionAnalysisOf;
 
-/// Owned by ResourceAnalysis for the duration of a run; writes into per-result data.
-/// Do not inherit directly, use ResourceExtensionAnalysisOf<Ext>.
+// Owned by ResourceAnalysis for the duration of a run; writes into per-result data.
+// Do not inherit directly, use ResourceExtensionAnalysisOf<Ext>.
 class ResourceExtensionAnalysis {
     template <typename Ext> friend class ResourceExtensionAnalysisOf;
 
@@ -52,17 +52,17 @@ class ResourceExtensionAnalysis {
 
     virtual llvm::StringRef name() const = 0; // must be matched to ResourceExtension::name()
 
-    /// Mint an empty data object for a new ResourceResult.
+    // Mint an empty data object for a new ResourceResult.
     virtual std::unique_ptr<ResourceExtension> makeEmpty() const = 0;
 
-    /// Walk through each individual operation.
+    // Walk through each individual operation.
     virtual void collect(mlir::Operation *op, ResourceExtension &ext, bool isAdjoint) {}
 
-    /// Walk through the each region.
+    // Walk through the each region.
     virtual void analyze(mlir::Region &region, ResourceExtension &ext, bool isAdjoint) {}
 };
 
-/// Subclasses override the typed collect / analyze overloads.
+// Subclasses override the typed collect / analyze overloads.
 template <typename Ext> class ResourceExtensionAnalysisOf : public ResourceExtensionAnalysis {
   public:
     static_assert(std::is_base_of_v<ResourceExtension, Ext>,
