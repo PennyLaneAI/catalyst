@@ -420,6 +420,7 @@ def transform_named_sequence_lowering(pipeline, sym_name):
 
     return uses_xdsl_passes
 
+
 def set_estimated_iterations_attr(op, value: int | float) -> None:
     """Attach a trip-count hint to an ``scf.for`` or ``scf.while`` op."""
     if value is None:
@@ -449,8 +450,6 @@ def set_estimated_probabilities_attr(op, values: Sequence[float]) -> None:
     f64_type = ir.F64Type.get(ctx)
     attrs = [ir.FloatAttr.get(f64_type, value) for value in values]
     op.attributes["catalyst.estimated_probabilities"] = ir.ArrayAttr.get(attrs)
-
-
 
 
 def unconditional_to_conditional_if_probs(

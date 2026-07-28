@@ -965,9 +965,7 @@ class CondCallable:
             *(in_classical_tracers + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
-            estimated_probabilities=collect_estimated_probabilities(
-                self.branch_probabilities
-            ),
+            estimated_probabilities=collect_estimated_probabilities(self.branch_probabilities),
         )
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
 
@@ -1253,7 +1251,7 @@ class SwitchCallable:
         # Additional cases and branches
         if cases and branches:
             self.case_to_branch = dict(zip(cases, branches))
-            if estimated_probabilities  is None:
+            if estimated_probabilities is None:
                 estimated_probabilities = [None] * len(cases)
             self.case_to_prob = dict(zip(cases, estimated_probabilities, strict=True))
         else:
@@ -1303,7 +1301,9 @@ class SwitchCallable:
         )
         branches.append(self.default_branch)
         # Extract estimated probabilities in the ordering of the cases
-        estimated_probabilities = collect_estimated_probabilities([self.case_to_prob[case] for case in cases])
+        estimated_probabilities = collect_estimated_probabilities(
+            [self.case_to_prob[case] for case in cases]
+        )
 
         outer_trace = EvaluationContext.get_current_trace()
         in_classical_tracers = [self.case] + cases
@@ -1386,7 +1386,9 @@ class SwitchCallable:
         )
         branches.append(self.default_branch)
         # Extract estimated probabilities in the ordering of the cases
-        estimated_probabilities = collect_estimated_probabilities([self.case_to_prob[case] for case in cases])
+        estimated_probabilities = collect_estimated_probabilities(
+            [self.case_to_prob[case] for case in cases]
+        )
 
         # wraps trace to allow simple unzipping
         def _trace(branch_fn: Callable):
@@ -1683,7 +1685,14 @@ class Cond(HybridOp):
         estimated_probabilities=None,
     ):  # pylint: disable=too-many-arguments
         self.estimated_probabilities = estimated_probabilities
-        super().__init__(in_classical_tracers, out_classical_tracers, regions, apply_reverse_transform, expansion_strategy, debug_info)
+        super().__init__(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            apply_reverse_transform,
+            expansion_strategy,
+            debug_info,
+        )
 
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
@@ -1712,7 +1721,14 @@ class ForLoop(HybridOp):
         estimated_iterations=None,
     ):  # pylint: disable=too-many-arguments
         self.estimated_iterations = estimated_iterations
-        super().__init__(in_classical_tracers, out_classical_tracers, regions, apply_reverse_transform, expansion_strategy, debug_info)
+        super().__init__(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            apply_reverse_transform,
+            expansion_strategy,
+            debug_info,
+        )
 
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
@@ -1807,7 +1823,14 @@ class Switch(HybridOp):
         estimated_probabilities=None,
     ):  # pylint: disable=too-many-arguments
         self.estimated_probabilities = estimated_probabilities
-        super().__init__(in_classical_tracers, out_classical_tracers, regions, apply_reverse_transform, expansion_strategy, debug_info)
+        super().__init__(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            apply_reverse_transform,
+            expansion_strategy,
+            debug_info,
+        )
 
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
@@ -1836,7 +1859,14 @@ class WhileLoop(HybridOp):
         estimated_iterations=None,
     ):  # pylint: disable=too-many-arguments
         self.estimated_iterations = estimated_iterations
-        super().__init__(in_classical_tracers, out_classical_tracers, regions, apply_reverse_transform, expansion_strategy, debug_info)
+        super().__init__(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            apply_reverse_transform,
+            expansion_strategy,
+            debug_info,
+        )
 
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
@@ -2061,6 +2091,7 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
         )
     )
     return qrp2
+
 
 def collect_estimated_probabilities(
     branch_probs: Sequence[float | None],
