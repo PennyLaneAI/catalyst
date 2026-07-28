@@ -17,6 +17,7 @@ ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
+ENABLE_TRANSPORT ?= OFF
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
@@ -150,12 +151,12 @@ dialect-docs:
 	$(MAKE) -C mlir dialect-docs
 
 runtime:
-	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
+	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD) ENABLE_TRANSPORT=$(ENABLE_TRANSPORT)
 
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
+.PHONY: test test-runtime test-runtime-transport test-frontend lit pytest test-demos test-oqc test-toml-spec
 test: test-runtime test-frontend test-demos
 
 test-toml-spec:
@@ -163,6 +164,9 @@ test-toml-spec:
 
 test-runtime:
 	$(MAKE) -C runtime test
+
+test-runtime-transport:
+	$(MAKE) -C runtime test-transport
 
 test-mlir:
 	$(MAKE) -C mlir test

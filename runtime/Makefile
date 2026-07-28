@@ -58,6 +58,12 @@ ifeq ($(ENABLE_TRANSPORT), ON)
 	BUILD_TARGETS += rt_transport
 endif
 
+TRANSPORT_TEST_TARGETS := \
+	runner_tests_transport \
+	runner_tests_transport_common \
+	runner_tests_transport_cpu \
+	cpu_verbs_selftest
+
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -117,6 +123,22 @@ ifeq ($(ENABLE_OQD), ON)
 	# Test the OQD devices C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
+
+.PHONY: test-transport
+test-transport: ENABLE_TRANSPORT=ON
+test-transport: CODE_COVERAGE=OFF
+test-transport: BUILD_TYPE?=RelWithDebInfo
+test-transport: configure
+	cmake --build $(RT_BUILD_DIR) --target $(TRANSPORT_TEST_TARGETS) -j$(NPROC)
+	@echo "Catalyst transport CAPI/loader test suite (stub backend)"
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_transport
+	@echo "Catalyst transport common primitives (SKIPs without rxe0)"
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_transport_common
+	@echo "Catalyst transport cpu_verbs backend (SKIPs without rxe0)"
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_transport_cpu
+	@echo "Catalyst transport cpu_verbs two-process loopback (requires rxe0)"
+	BIN=$(RT_BUILD_DIR)/lib/transport/cpu_verbs/cpu_verbs_selftest \
+	    $(MK_DIR)/lib/transport/cpu_verbs/run_loopback.sh
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov

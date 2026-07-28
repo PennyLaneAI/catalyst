@@ -1,0 +1,137 @@
+name: Check Transport Backends
+
+# Builds the runtime with ENABLE_TRANSPORT=ON and exercises the transport
+# backends (CAPI + loader against a stub backend, common RDMA primitives, and
+# the cpu_verbs controller/coprocessor sessions) plus the two-process loopback
+# smoke test. There is no physical RDMA NIC on GitHub-hosted runners, so we
+# rely on Soft-RoCE (rdma_rxe kernel module) attached to the loopback
+# interface. The test binaries key on device name "rxe0".
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    paths:
+      - 'runtime/lib/transport/**'
+      - 'runtime/tests/Test_Transport*.cpp'
+      - 'runtime/tests/stubs/stub_transport_backend*'
+      - 'runtime/tests/CMakeLists.txt'
+      - 'runtime/CMakeLists.txt'
+      - 'runtime/lib/CMakeLists.txt'
+      - 'runtime/Makefile'
+      - 'Makefile'
+      - '.github/workflows/check-transport.yaml'
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  determine_runner:
+    if: github.event.pull_request.draft == false
+    name: Determine runner type to use
+    uses: ./.github/workflows/determine-workflow-runner.yml
+    with:
+      default_runner: ubuntu-24.04
+
+  constants:
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+    needs: [determine_runner]
+    with:
+      multiple_compilers: false
+      runs_on: ${{ needs.determine_runner.outputs.runner_group }}
+
+  transport-tests:
+    name: Transport Backend Tests (Soft-RoCE)
+    needs: [constants, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+
+    steps:
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
+
+      - name: Install build and RDMA dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build clang make \
+            libibverbs-dev libibverbs1 ibverbs-providers ibverbs-utils \
+            rdma-core iproute2 \
+            "linux-modules-extra-$(uname -r)"
+          python3 -m pip install "nanobind<2.13" pybind11
+
+      - name: Configure Soft-RoCE (rxe0 on loopback)
+        run: |
+          # rdma_rxe is a mainline Linux kernel module that provides a
+          # software RoCE device. Attach it to `lo` so the runtime's cpu_verbs
+          # backend has an ibverbs device named `rxe0` to open. The Catch2
+          # tests SKIP when this device is absent, and run_loopback.sh
+          # requires it - both scenarios happen inside make test-transport.
+          sudo modprobe rdma_rxe
+          sudo rdma link add rxe0 type rxe netdev lo
+          rdma link show
+          ibv_devices
+          ibv_devinfo -d rxe0
+          # Fail fast if rxe0 didn't come up - otherwise Catch2 tests would
+          # silently SKIP and the loopback would be the only thing exercising it.
+          ibv_devices | awk '{print $1}' | grep -q '^rxe0$'
+
+      - name: Get Cached LLVM Source
+        id: cache-llvm-source
+        uses: actions/cache/restore@v4
+        with:
+          path: mlir/llvm-project
+          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone LLVM Submodule
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          ref: ${{ needs.constants.outputs.llvm_version }}
+          path: mlir/llvm-project
+
+      - name: Build Catalyst-Runtime with ENABLE_TRANSPORT=ON
+        run: |
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which clang) \
+          CXX_COMPILER=$(which clang++) \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          ENABLE_ASAN=OFF \
+          ENABLE_TRANSPORT=ON \
+          make runtime
+
+      - name: Run transport test suite (Catch2 + loopback)
+        run: |
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which clang) \
+          CXX_COMPILER=$(which clang++) \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          make test-runtime-transport
+
+      - name: Upload loopback logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transport-loopback-logs
+          path: |
+            /tmp/cvl_coproc.log
+            /tmp/cvl_ctrl.log
+          if-no-files-found: ignore
+          retention-days: 7
