@@ -17,6 +17,7 @@
 #include "mlir/IR/Diagnostics.h"
 
 #include "Catalyst/Analysis/ResourceExtensionRegistry.h"
+#include "Catalyst/Analysis/ResourceResult.h"
 #include "PBC/Utils/PBCLayer.h"
 
 using namespace mlir;

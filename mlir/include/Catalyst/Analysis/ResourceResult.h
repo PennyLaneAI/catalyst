@@ -27,6 +27,8 @@
 
 namespace catalyst {
 
+enum class MergeMethod { Sum, Max, Min };
+
 // ResourceResult holds the resource counts for a single function.
 // It mirrors the Python-side ResourcesResult from specs_collector.py.
 struct ResourceResult {

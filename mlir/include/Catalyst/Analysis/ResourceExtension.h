@@ -23,7 +23,8 @@
 
 namespace catalyst {
 
-enum class MergeMethod { Sum, Max, Min };
+// Define in ResourceResult.h.
+enum class MergeMethod;
 
 // Value object for an optional resource metric. Lives in ResourceResult.
 class ResourceExtension {
