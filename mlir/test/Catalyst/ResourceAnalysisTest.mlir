@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt -resource-analysis=output-json --split-input-file -verify-diagnostics %s -o /dev/null | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(resource-analysis{output-json=true})" --split-input-file %s -o /dev/null | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(resource-analysis)" --split-input-file %s -o /dev/null 2>&1 | FileCheck %s --check-prefix=WARN
+
 
 // Basic gate counting
 
