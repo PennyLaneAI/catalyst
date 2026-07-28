@@ -33,6 +33,9 @@ void __catalyst__executor__launch(int64_t session, const char *entry_symbol, con
                                   const size_t *input_ranks, const size_t *input_elem_sizes,
                                   size_t num_outputs, void *const *output_descs,
                                   const size_t *output_ranks, const size_t *output_elem_sizes);
+int64_t __catalyst__executor__launch_async(int64_t session, const char *entry_symbol,
+                                           const char *object);
+void __catalyst__executor__await(int64_t token);
 int32_t __catalyst__executor__call_wrapper(int64_t session, const char *symbol,
                                            const char *args_buf, size_t args_size, void **out_buf,
                                            size_t *out_size);

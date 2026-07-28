@@ -20,6 +20,8 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include "Exception.hpp"
 #include "ExecutorCAPI.h"
@@ -34,14 +36,17 @@ struct ExecutorEntry {
     std::set<std::string> loaded_paths; // Paths of the binaries already loaded into the session.
     std::mutex mu;                      // Guards this entry's `session` and `loaded_paths`.
 
-    ~ExecutorEntry()
-    {
-        if (session) {
-            catalyst::executor::close(session);
-            session = nullptr;
-        }
-    }
+    ~ExecutorEntry();
 };
+
+struct AsyncWorker {
+    int64_t session;
+    std::thread thread;
+};
+
+std::mutex g_async_mu;
+std::map<int64_t, AsyncWorker> g_async_workers;
+int64_t g_next_token = 1;
 
 // Guards both session maps and `g_next_handle`.
 std::mutex g_map_mu;
@@ -54,6 +59,39 @@ std::map<int64_t, std::shared_ptr<ExecutorEntry>> g_sessions_by_handle;
 // Monotonic handle allocator. 0 is reserved for the invalid handle.
 int64_t g_next_handle = 1;
 
+std::thread take_async_worker(int64_t token)
+{
+    std::lock_guard<std::mutex> lk(g_async_mu);
+    auto it = g_async_workers.find(token);
+    if (it == g_async_workers.end()) {
+        return {};
+    }
+    std::thread worker = std::move(it->second.thread);
+    g_async_workers.erase(it);
+    return worker;
+}
+
+void join_session_workers(int64_t session_handle)
+{
+    std::vector<std::thread> workers;
+    {
+        std::lock_guard<std::mutex> lk(g_async_mu);
+        for (auto it = g_async_workers.begin(); it != g_async_workers.end();) {
+            if (it->second.session != session_handle) {
+                ++it;
+                continue;
+            }
+            workers.push_back(std::move(it->second.thread));
+            it = g_async_workers.erase(it);
+        }
+    }
+    for (auto &w : workers) {
+        if (w.joinable()) {
+            w.join();
+        }
+    }
+}
+
 // DEBUG logs
 bool remote_verbose()
 {
@@ -62,6 +100,15 @@ bool remote_verbose()
         return e && *e && *e != '0';
     }();
     return v;
+}
+
+ExecutorEntry::~ExecutorEntry()
+{
+    join_session_workers(handle);
+    if (session) {
+        catalyst::executor::close(session);
+        session = nullptr;
+    }
 }
 
 // Resolve a session handle to its entry.
@@ -252,6 +299,7 @@ int64_t __catalyst__executor__close(int64_t session)
     if (!entry) {
         return 0;
     }
+    join_session_workers(session);
     std::string addr = entry->address;
     {
         // Close under the entry lock only; do not hold g_map_mu here (see lock ordering above).
@@ -306,6 +354,60 @@ void __catalyst__executor__launch(int64_t session, const char *entry_symbol, con
                                           input_ranks, input_elem_sizes, num_outputs, output_descs,
                                           output_ranks, output_elem_sizes) != 0) {
         RT_FAIL(catalyst::executor::last_error());
+    }
+}
+
+int64_t __catalyst__executor__launch_async(int64_t session, const char *entry_symbol,
+                                           const char *object)
+{
+    auto entry = find_entry_by_handle(session);
+    if (!entry) {
+        RT_FAIL("Can't find opened session");
+    }
+    ExecutorEntry *raw = entry.get();
+    std::string sym = entry_symbol ? entry_symbol : "";
+    std::string obj = object ? object : "";
+    bool verbose = remote_verbose();
+
+    auto work = [raw, sym, obj, verbose, session]() {
+        std::lock_guard<std::mutex> lock(raw->mu);
+        if (verbose) {
+            std::fprintf(stderr, "[remote] launch_async(session=%lld, symbol=%s, object=%s)\n",
+                         static_cast<long long>(session), sym.c_str(),
+                         obj.empty() ? "<none>" : obj.c_str());
+        }
+        if (!raw->session) {
+            std::fprintf(stderr, "[remote] launch_async: session closed before worker ran\n");
+            return;
+        }
+        const char *obj_arg = obj.empty() ? nullptr : obj.c_str();
+        uint64_t entry_addr = catalyst::executor::lookup(raw->session, sym.c_str(), obj_arg);
+        if (!entry_addr) {
+            std::fprintf(stderr, "[remote] launch_async lookup failed: %s\n",
+                         catalyst::executor::last_error());
+            return;
+        }
+        if (catalyst::executor::invoke_kernel(raw->session, entry_addr, 0, nullptr, nullptr,
+                                              nullptr, 0, nullptr, nullptr, nullptr) != 0) {
+            std::fprintf(stderr, "[remote] launch_async invoke failed: %s\n",
+                         catalyst::executor::last_error());
+        }
+    };
+
+    std::lock_guard<std::mutex> reg(g_async_mu);
+    int64_t token = g_next_token++;
+    g_async_workers.emplace(token, AsyncWorker{session, std::thread(std::move(work))});
+    return token;
+}
+
+void __catalyst__executor__await(int64_t token)
+{
+    if (remote_verbose()) {
+        std::fprintf(stderr, "[remote] await(token=%lld)\n", static_cast<long long>(token));
+    }
+    std::thread worker = take_async_worker(token);
+    if (worker.joinable()) {
+        worker.join();
     }
 }
 

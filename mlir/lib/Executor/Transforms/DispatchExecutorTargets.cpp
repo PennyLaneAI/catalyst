@@ -76,6 +76,13 @@ struct DispatchExecutorTargetsPass
             return;
         }
 
+        backlineBringupMode = false;
+        host.walk([&](func::FuncOp fn) {
+            if (fn->hasAttr("catalyst.backline_bringup")) {
+                backlineBringupMode = true;
+            }
+        });
+
         // Modules sharing an executor get a single executor.open.
         llvm::SmallSet<std::string, 4> openedAddresses;
         StringAttr executorAddress;
@@ -106,6 +113,40 @@ struct DispatchExecutorTargetsPass
                 return signalPassFailure();
             }
         }
+
+        // A function that issued async launches must wait for them before it returns,
+        // so the launched entry is fully established before any later work runs.
+        //
+        // TODO: replace this with a `catalyst.launch_kernel_async` op (+ `catalyst.await`) so
+        // inject-transport-session places the await itself and this pass lowers 1:1, deleting the
+        // block below.
+        WalkResult joined = host.walk([&](func::FuncOp fn) {
+            SmallVector<Value> tokens;
+            fn.walk([&](executor::LaunchAsyncOp launch) { tokens.push_back(launch.getToken()); });
+            if (tokens.empty()) {
+                return WalkResult::advance();
+            }
+            Block *entry = &fn.getBody().front();
+            bool inEntryBlock = true;
+            for (Value token : tokens) {
+                if (token.getDefiningOp()->getBlock() != entry) {
+                    inEntryBlock = false;
+                    break;
+                }
+            }
+            if (!inEntryBlock) {
+                fn.emitOpError("async launch must be in the function's entry block");
+                return WalkResult::interrupt();
+            }
+            OpBuilder b(entry->getTerminator());
+            for (Value token : tokens) {
+                executor::AwaitOp::create(b, fn.getLoc(), token);
+            }
+            return WalkResult::advance();
+        });
+        if (joined.wasInterrupted()) {
+            return signalPassFailure();
+        }
     }
 
     static StringAttr executorDispatchOf(catalyst::CustomCallOp call)
@@ -125,6 +166,8 @@ struct DispatchExecutorTargetsPass
         }
         return fallbackAddress;
     }
+
+    bool backlineBringupMode = false;
 
     // Sessions opened per (function, address).
     llvm::DenseMap<std::pair<Operation *, Attribute>, Value> sessionCache;
@@ -254,7 +297,22 @@ struct DispatchExecutorTargetsPass
             // the session for the launch. `pathAttr` (the object-file path shipped by send_binary)
             // identifies which object the entry resolves in.
             Value session = getOrOpenSession(launchKernel, addressAttr);
-            ensureBinaryShipped(launchKernel, addressAttr, pathAttr);
+            bool isBringup =
+                launchKernel->getParentOfType<func::FuncOp>()->hasAttr("catalyst.backline_bringup");
+            if (!backlineBringupMode || isBringup) {
+                ensureBinaryShipped(launchKernel, addressAttr, pathAttr);
+            }
+            if (launchKernel->hasAttr("catalyst.nonblocking")) {
+                if (launchKernel->getNumOperands() != 0 || launchKernel->getNumResults() != 0) {
+                    launchKernel.emitOpError("nonblocking dispatch requires a '()->()' callee");
+                    return failure();
+                }
+                executor::LaunchAsyncOp::create(b, launchKernel.getLoc(),
+                                                executor::TokenType::get(ctx), session, calleeAttr,
+                                                /*object=*/pathAttr);
+                launchKernel.erase();
+                continue;
+            }
             auto launch = executor::LaunchOp::create(
                 b, launchKernel.getLoc(), launchKernel.getResultTypes(), session,
                 launchKernel.getOperands(), calleeAttr, /*object=*/pathAttr);
