@@ -27,8 +27,6 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
-    _MLIR_DTYPES_TO_PY_DTYPES,
-    _PY_DTYPES_TO_MLIR_DTYPES,
     get_dummy_values_for_container,
     mlir_stringify_type,
     post_process_concretize_leaves,
@@ -40,20 +38,24 @@ from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 class GraphOpID:
     """
-    Return the graph operator id for the operator2 instance `op`.
+    A parser object to compute the graph operator id for the operator2 instance `op`.
 
-    The FuncOp decomposition rules in the returned string satisfy the following requirements:
-        - Are named `{rule name}_{op graph ID}`.
-        - Are MLIR representations of the PennyLane decomposition rules associated with the
-          specified operator.
-        - Are instantiated with the static data provided, and all other data remains dynamic.
-        - Are self-contained, and do not contain any device initialization, setup/teardown etc.
-        - Are compatible with the `decompose-lowering` and `graph-decomposition` passes, meaning
-          the following:
-            - Their `target_gate` attribute is set to the provided graph operator ID
-            - They have a resources attribute containing an operations attribute which maps graph
-              operator IDs to counts of their occurrences in the rule.
-            - Their arguments are mappable to the operator they decompose via `decompose-lowering`.
+    The format of the computed graph op ID string is as follows:
+        op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
+
+    For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
+    argument named `angle`, one wire argument named `cwires`, one static data argument
+    `label="hello"`, and UID 10 would be parsed to the following graph op ID:
+        HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
+
+    The defining trait of a graph op ID is that it has unique correspondence to decomposition rules.
+    In other words, different graph op IDs have different sets of decomposition rules.
+
+    For example,
+        PauliRot{angle:[f64]}{wires:1}{pauli_word:X}[]
+    and
+        PauliRot{angle:[f64]}{wires:2}{pauli_word:XX}[]
+    will have different decomposition rules.
 
     Note that this function should not be updated without updating the corresponding method on the
     DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp.
@@ -72,15 +74,15 @@ class GraphOpID:
         self.static_data = self.parse_static_data()
         self.extra_data = self.parse_extra_data()
 
-    def parse_dynamic_shape(self) -> list:
-        """Return the dynamic shape as a list of dtypes."""
+    def parse_dynamic_shape(self) -> dict:
+        """Return the dynamic shape as a dictionary of dtypes from the dynamic arg names."""
         return {
             argname: mlir_stringify_type(argtype)
             for argname, argtype in sorted(self.op.dynamic_args.items())
         }
 
-    def parse_wire_lens(self) -> list[int]:
-        """Return the length of each of the wire args."""
+    def parse_wire_lens(self) -> dict:
+        """Return the length of each of the wire args as a dictionary from the wire arg names."""
         wire_lens = {}
         for wire_name, wire_arg in sorted(self.op.wire_args.items()):
             if wire_name not in self.op.hybrid_argnames:
@@ -95,7 +97,7 @@ class GraphOpID:
         }
 
     def parse_extra_data(self) -> dict:
-        """Return a dictionary of names to extra data values."""
+        """Return the UID computed from this Operator2 instance."""
         if self.op.static_args or self.op.hybrid_args:
             hybrid_lens = []
             hybrid_trees = []
@@ -106,7 +108,7 @@ class GraphOpID:
                 hybrid_lens.append(len(leaves))
                 hybrid_trees.append(tree)
                 hybrid_args.extend(leaves)
-            uid = generate_uid(
+            return generate_uid(
                 *tuple(self.op.dynamic_args.values()),  # dynamic args
                 *(None,)
                 * sum(
@@ -121,7 +123,6 @@ class GraphOpID:
                 n_ctrls=0,
                 static_args=self.op.static_args,
             )
-            return uid
         else:
             return {}
 
@@ -162,8 +163,6 @@ class GraphOpID:
 def collect_resources_for_op(op_name, kwargs):
     """
     Return resource data for all decomposition rules associated to op_name.
-
-    This includes a dictionary
     """
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
 
@@ -191,22 +190,23 @@ def compile_decomposition_rules(
     The decomposition rules will be decorated with appropriate resource and target_gate attributes.
     """
     kwargs = {}
+    extra_data = extra_data or {}
+
     device = qp.device("null.qubit", wires=sum(wire_lens.values()))
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
         kwargs[arg_name] = get_dummy_values_for_container(arg_shape)
-    kwargs.update(static_data)
-    if extra_data:
-        kwargs.update(extra_data)
 
-    _, name_to_resource_ids, decomp_rules = collect_resources_for_op(op_name, kwargs)
+    _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
+        op_name, kwargs | static_data | extra_data
+    )
 
-    # The static_data was only needed to query the correct decomp rule
+    # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit
     def rule_to_subroutine(rule):
-        def decomp_rule(*args, **kwargs):
-            rule._impl(*args, **kwargs)
+        def decomp_rule(*_args, **_kwargs):
+            rule._impl(*_args, **_kwargs)
 
         decomp_rule_no_static_args = partial(decomp_rule, **static_data)
         if extra_data:
@@ -218,12 +218,6 @@ def compile_decomposition_rules(
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
-
-    for static_argname in static_data.keys():
-        del kwargs[static_argname]
-    if extra_data:
-        for uid_argname in extra_data.keys():
-            del kwargs[uid_argname]
 
     @qp.qjit(
         target="mlir",
