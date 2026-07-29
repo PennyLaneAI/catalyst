@@ -13,11 +13,11 @@ name: "CodeQL Advanced"
 
 on:
   push:
-    branches: [ "main", "v*.*.*-docs", "v*.*.*-rc0" ]
+    branches: [ "main", "doc/*", "v*.*.*-rc" ]
   pull_request:
-    branches: [ "main", "v*.*.*-docs", "v*.*.*-rc0" ]
+    branches: [ "main", "doc/*", "v*.*.*-rc" ]
   schedule:
-    - cron: '26 6 * * 4'
+    - cron: '18 13 * * 2'
 
 jobs:
   analyze:
@@ -82,13 +82,6 @@ jobs:
 
         # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         # queries: security-extended,security-and-quality
-
-    # If the analyze step fails for one of the languages you are analyzing with
-    # "We were unable to automatically build your code", modify the matrix above
-    # to set the build mode to "manual" for that language. Then modify this step
-    # to build your code.
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
