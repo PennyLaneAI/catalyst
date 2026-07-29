@@ -132,15 +132,15 @@ class GraphOpID:
 
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
-        return f"{{{','.join(f"{name}:{shape}" for name, shape in self.dynamic_shape.items())}}}"
+        return "{" + ",".join(f"{name}:{shape}" for name, shape in self.dynamic_shape.items()) + "}"
 
     def get_wire_lens_id_format(self) -> str:
         """Return the wire lengths formatted for GraphOpId."""
-        return f"{{{','.join(f"{name}:{shape}" for name, shape in self.wire_lens.items())}}}"
+        return "{" + ",".join(f"{name}:{shape}" for name, shape in self.wire_lens.items()) + "}"
 
     def get_static_data_id_format(self) -> str:
         """Return the static data formatted for GraphOpId."""
-        return f"{{{','.join(f'{k}:{v}' for k, v in self.static_data.items())}}}"
+        return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
 
     def getID(self) -> str:
         """
