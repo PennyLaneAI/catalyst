@@ -132,7 +132,8 @@ void ResourceResult::multiplyBy(double scalar) {
 //   measurement_processes: { "meas_type": count, ... }
 //   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
 //   qubit_disjoint_depth }
-static llvm::json::Value countToJson(double count) {
+static llvm::json::Value countToJson(double count)
+{
     return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
 }
 
