@@ -56,7 +56,7 @@ func.func @pbc_operations() attributes {target_gate="pbc"} {
 
 // Rule with measure
 
-// CHECK: resources = {measurements = {MidCircuitMeasure = 1 : i64},
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 1 : i64, num_arg_qubits = 0 : i64, num_qubits = 1 : i64, operations = {"Hadamard(1,0)" = 1 : i64, "MidCircuitMeasure(1,0)" = 1 : i64}}, target_gate = "gate"
 func.func @rule_mcm() attributes {target_gate="gate"} {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -153,7 +153,7 @@ func.func @rule_with_nested_loop(%arg0: !quantum.bit) -> !quantum.bit attributes
 // -----
 
 // Rules with parametric ops
-// CHECK:  operations = {"Adjoint(Rot)(4,3)" = 1 : i64, "Rot(4,3)" = 1 : i64}}
+// CHECK:  operations = {"2C(Adjoint(Rot))(4,3)" = 1 : i64, "2C(Rot)(4,3)" = 1 : i64}}
 func.func @rule_with_parametric_ops(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate="gate"} {
     %cst_0 = arith.constant 0.1 : f64
     %cst_1 = arith.constant 0.2 : f64
