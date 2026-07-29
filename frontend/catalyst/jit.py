@@ -893,12 +893,13 @@ class QJIT(CatalystCallable):
         device = getattr(self.user_function, "device", None)
         backline = getattr(device, "backline", None)
         if backline is not None:
-            from catalyst.backline import serialize_backline
-            from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+            from jax.interpreters.mlir import ir
+
+            from catalyst.backline import backline_attr_text
 
             with mlir_module.context:
-                mlir_module.operation.attributes["catalyst.backline"] = (
-                    get_mlir_attribute_from_pyval(serialize_backline(backline))
+                mlir_module.operation.attributes["catalyst.backline"] = ir.Attribute.parse(
+                    backline_attr_text(backline)
                 )
 
         return mlir_module
