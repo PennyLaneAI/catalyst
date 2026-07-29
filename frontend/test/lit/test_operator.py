@@ -36,6 +36,7 @@ from operator2_dummy_gates import (
     QubitUnitary,
     SingleParam,
     SingleParamCustomOp,
+    SingleParamNoCustomOpBadOrder,
     StaticData,
 )
 
@@ -224,6 +225,30 @@ def c_single_param_custom(x: float):
 print(c_single_param_custom.mlir)
 
 
+@qp.qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("null.qubit", wires=3))
+def c_single_param_no_custom_bad_order(x: float):
+    # CHECK-LABEL: func.func public @c_single_param_no_custom_bad_order
+
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.operator "SingleParamNoCustomOpBadOrder"({{%.+}}) qubits([[q0]])
+    # CHECK:    static_data = {}
+    # CHECK:    param_map = {x = [0]} qubit_map = {wires = [0]}
+    SingleParamNoCustomOpBadOrder(x=x, wires=0)
+
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 2]
+    # CHECK: qref.operator "SingleParamNoCustomOpBadOrder"({{%.+}}) qubits([[q1]], [[q2]])
+    # CHECK:  static_data = {}
+    # CHECK:  param_map = {x = [0]} qubit_map = {wires = [0, 1]}
+    SingleParamNoCustomOpBadOrder((1, 2), 0.5)
+
+    return qp.state()
+
+
+print(c_single_param_no_custom_bad_order.mlir)
+
+
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def c_compilable():
@@ -298,7 +323,7 @@ def c_multi_param_custom():
 
     # pylint: disable=line-too-long
     # CHECK: qref.custom "MultiParamsCustom"({{%.+}}, {{%.+}}, {{%.+}}) [[q0]] : !qref.bit
-    MultiParamsCustom(0, 0.5, c=0.7, b=2.4)
+    MultiParamsCustom(0.5, c=0.7, b=2.4, wires=0)
     return qp.state()
 
 
