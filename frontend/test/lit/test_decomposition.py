@@ -27,6 +27,7 @@ from operator2_dummy_gates import (
     NoParamsCustomOp,
     SingleParam,
     StaticData,
+    StaticDataMultiReg,
 )
 from pennylane.typing import Float, Wire
 
@@ -296,13 +297,143 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             print(result)
 
     # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
-    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:.+]]]" = 1
-    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:.+]]]" = 2
+    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:[-0-9]+]]]" = 1
+    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:[-0-9]+]]]" = 2
     # CHECK-DAG:   target_gate = "NoParams{}{reg:2}{}"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
     test_decompose_to_static_data()
+
+    def test_decompose_to_hybrid_wires():
+        def rule_resource_fn(reg):
+            return {
+                HybridWires(cwires=[Wire[1]]): 2,
+                HybridWires(cwires=[Wire[1], [Wire[1], Wire[1]]]): 1,
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            HybridWires(cwires=[qp.wires.Wires(0)])
+            HybridWires(cwires=[qp.wires.Wires(1)])
+            HybridWires(
+                cwires=[qp.wires.Wires(reg[0]), [qp.wires.Wires(reg[1]), qp.wires.Wires(reg[2])]]
+            )
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
+    # CHECK-DAG: "HybridWires{}{}{}[[[uid_1:[-0-9]+]]]" = 1
+    # CHECK-DAG: "HybridWires{}{}{}[[[uid_2:[-0-9]+]]]" = 2
+    # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
+    test_decompose_to_hybrid_wires()
+
+    def test_decompose_to_hybrid_op():
+        def rule_resource_fn(reg):
+            return {
+                HybridOpArg(
+                    angle=Float,
+                    op=StaticDataMultiReg(label="hello", reg=Wire[1], reg2=Wire[2], theta=Float),
+                    cwires=Wire[1],
+                    n_iters=100,
+                ): 2,
+                HybridOpArg(
+                    angle=Float,
+                    op=StaticDataMultiReg(label="hello", reg=Wire[1], reg2=Wire[2], theta=Float),
+                    cwires=Wire[1],
+                    n_iters=101,
+                ): 1,
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            HybridOpArg(
+                angle=0.1,
+                op=StaticDataMultiReg("hello", reg=[42], reg2=[11, 12], theta=0.4),
+                cwires=37,
+                n_iters=100,
+            )
+            HybridOpArg(
+                angle=0.2,
+                op=StaticDataMultiReg("hello", reg=[1], reg2=[2, 3], theta=0.2),
+                cwires=4,
+                n_iters=100,
+            )
+            HybridOpArg(
+                angle=0.3,
+                op=StaticDataMultiReg("hello", reg=[42], reg2=[11, 12], theta=0.4),
+                cwires=37,
+                n_iters=101,
+            )
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
+    # CHECK-DAG: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_1:[-0-9]+]]]" = 1
+    # CHECK-DAG: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_2:[-0-9]+]]]" = 2
+    # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
+    test_decompose_to_hybrid_op()
+
+    def test_decompose_to_hybrid_op_nested():
+        def rule_resource_fn(reg):
+            return {
+                HybridOpArg(
+                    angle=Float,
+                    op=HybridOpArg(
+                        angle=Float,
+                        op=StaticDataMultiReg(
+                            label="hello", reg=Wire[1], reg2=Wire[2], theta=Float
+                        ),
+                        cwires=Wire[3],
+                        n_iters=200,
+                    ),
+                    cwires=Wire[1],
+                    n_iters=100,
+                ): 1,
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            HybridOpArg(
+                angle=0.1,
+                op=HybridOpArg(
+                    angle=0.2,
+                    op=StaticDataMultiReg("hello", reg=[42], reg2=[11, 12], theta=0.4),
+                    cwires=[100, 200, 300],
+                    n_iters=200,
+                ),
+                cwires=37,
+                n_iters=100,
+            )
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
+    # CHECK-DAG: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_1:[-0-9]+]]]" = 1
+    # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
+    test_decompose_to_hybrid_op_nested()
 
 
 test_compile_decomposition_rules_wrapper_entry_point()

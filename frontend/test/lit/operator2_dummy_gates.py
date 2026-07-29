@@ -134,6 +134,16 @@ class StaticData(qp.core.Operator2):
         super().__init__(label=label, reg=reg)
 
 
+class StaticDataMultiReg(qp.core.Operator2):
+
+    static_argnames = ("label",)
+    wire_argnames = ("reg", "reg2")
+    dynamic_argnames = ("theta",)
+
+    def __init__(self, label, reg, reg2, theta):
+        super().__init__(label=label, reg=reg, reg2=reg2, theta=theta)
+
+
 class HybridWires(qp.core.Operator2):
 
     hybrid_argnames = ("cwires",)

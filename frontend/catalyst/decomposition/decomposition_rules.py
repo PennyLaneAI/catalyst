@@ -24,12 +24,15 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jaxlib.mlir.dialects.builtin import ModuleOp
+from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
     _MLIR_DTYPES_TO_PY_DTYPES,
     _PY_DTYPES_TO_MLIR_DTYPES,
     get_dummy_values_for_container,
     mlir_stringify_type,
+    post_process_concretize_leaves,
+    replace_abstract_wires_with_concrete_wires,
 )
 from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
@@ -78,9 +81,11 @@ class GraphOpID:
 
     def parse_wire_lens(self) -> list[int]:
         """Return the length of each of the wire args."""
-        return {
-            wire_name: len(wire_arg) for wire_name, wire_arg in sorted(self.op.wire_args.items())
-        }
+        wire_lens = {}
+        for wire_name, wire_arg in sorted(self.op.wire_args.items()):
+            if wire_name not in self.op.hybrid_argnames:
+                wire_lens[wire_name] = len(wire_arg)
+        return wire_lens
 
     def parse_static_data(self) -> dict:
         """Return a dictionary of names to static data values."""
@@ -92,12 +97,26 @@ class GraphOpID:
     def parse_extra_data(self) -> dict:
         """Return a dictionary of names to extra data values."""
         if self.op.static_args or self.op.hybrid_args:
+            hybrid_lens = []
+            hybrid_trees = []
+            hybrid_args = []
+            for _, hybrid_argval in self.op.hybrid_args.items():
+                leaves, tree = flatten(replace_abstract_wires_with_concrete_wires(hybrid_argval))
+                leaves = post_process_concretize_leaves(leaves)
+                hybrid_lens.append(len(leaves))
+                hybrid_trees.append(tree)
+                hybrid_args.extend(leaves)
             uid = generate_uid(
-                *tuple(self.op.dynamic_args.values()),
+                *tuple(self.op.dynamic_args.values()),  # dynamic args
+                *(None,)
+                * sum(
+                    self.wire_lens.values()
+                ),  # non hybrid wires, unused during uid generation, so just give empty values
+                *hybrid_args,
                 op_cls=type(self.op),
                 wire_lens=tuple(self.wire_lens.values()),
-                hybrid_lens=(),
-                hybrid_trees=(),
+                hybrid_lens=tuple(hybrid_lens),
+                hybrid_trees=tuple(hybrid_trees),
                 adjoint=False,
                 n_ctrls=0,
                 static_args=self.op.static_args,
