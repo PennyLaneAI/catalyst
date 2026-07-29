@@ -105,8 +105,6 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
 {
     QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
-        nb::print("calling python to handle");
-        std::cerr << op.getGraphOpId();
         const char *moduleName = "catalyst.decomposition.python_decompositions";
         const char *functionName = "compile_decomposition_rules";
 
@@ -114,9 +112,6 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
             nb::module_ wrapperModule = nb::module_::import_(moduleName);
             nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-            nb::print(getPyvalFromDynamicShape(op.getDynamicShape()));
-            nb::print(getPyvalFromWireLens(op.getWireLens()));
-            nb::print(getPyvalFromMlirAttribute(op.getStaticData()));
             nb::object pythonResult =
                 wrapperFunction(op.getOperatorName(), op.getGraphOpId(),
                                 getPyvalFromDynamicShape(op.getDynamicShape()), op.getWireLens(),
