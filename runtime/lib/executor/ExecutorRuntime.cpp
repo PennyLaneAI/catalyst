@@ -140,9 +140,6 @@ extern "C" {
 /**
  * @brief Open (or reuse) an executor session for `addr`.
  *
- * Idempotent per address: a second open of a live address returns the existing handle rather than
- * reconnecting. A failed connection drops the entry so a later open retries from scratch.
- *
  * @param addr The executor endpoint to connect to. Must be non-empty.
  * @return int64_t A non-zero session handle for use with the other executor CAPI calls.
  */
@@ -199,9 +196,6 @@ int64_t __catalyst__executor__open(const char *addr)
 
 /**
  * @brief Load a binary (object or asset) into the session, once per path.
- *
- * Paths already loaded into the session are skipped, so repeated sends of the same object are
- * no-ops. A failed load is not recorded as loaded, so it can be retried.
  *
  * @param session The i64 handle of the session, from __catalyst__executor__open.
  * @param path The filesystem path of the binary to load. Empty is a no-op.
@@ -322,8 +316,6 @@ void __catalyst__executor__free_result(void *buf) { std::free(buf); }
 /**
  * @brief Close a session: join its outstanding async workers, close the connection, and forget it.
  *
- * Idempotent: closing an unknown or already-closed handle is a no-op.
- *
  * @param session The i64 handle of the session to close.
  * @return int64_t 0.
  */
@@ -359,9 +351,7 @@ int64_t __catalyst__executor__close(int64_t session)
 
 /**
  * @brief Synchronously invoke an entry symbol on the executor, marshalling memref arguments.
- *
- * The entry is resolved within the JITDylib of `object`, so identically-named entries from
- * different shipped objects do not collide. Blocks until the remote invocation completes.
+ * Blocks until the remote invocation completes.
  *
  * @param session The i64 handle of the session.
  * @param entry_symbol The name of the entry function to invoke.
@@ -411,10 +401,6 @@ void __catalyst__executor__launch(int64_t session, const char *entry_symbol, con
 
 /**
  * @brief Invoke a no-argument entry symbol on a background thread and return a token to await.
- *
- * The invocation runs on a worker thread registered under the returned token. Failures are captured
- * and re-raised by the matching __catalyst__executor__await rather than thrown on the worker. The
- * worker must be awaited (or joined via close) before the session is destroyed.
  *
  * @param session The i64 handle of the session.
  * @param entry_symbol The name of the entry function to invoke.
@@ -471,10 +457,6 @@ int64_t __catalyst__executor__launch_async(int64_t session, const char *entry_sy
 
 /**
  * @brief Wait for the async worker identified by `token` and re-raise any failure it recorded.
- *
- * Joins the worker thread, then re-raises (RT_FAIL) on the main thread any error the worker
- * captured. An unknown or already-consumed token is a non-fatal no-op (it may have been reaped by a
- * prior close); such cases are logged only under CATALYST_REMOTE_VERBOSE.
  *
  * @param token The token returned by __catalyst__executor__launch_async.
  */
