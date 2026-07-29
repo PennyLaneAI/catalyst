@@ -165,12 +165,12 @@ Value emitDFTStage(OpBuilder &builder, Location loc, Value input, int64_t axis, 
             Value accRe = complex::ReOp::create(b, bodyLoc, realType, acc);
             Value accIm = complex::ImOp::create(b, bodyLoc, realType, acc);
             // (xRe + i*xIm) * (tRe + i*tIm)
-            Value prodRe = arith::SubFOp::create(
-                b, bodyLoc, arith::MulFOp::create(b, bodyLoc, xRe, twiddleRe),
-                arith::MulFOp::create(b, bodyLoc, xIm, twiddleIm));
-            Value prodIm = arith::AddFOp::create(
-                b, bodyLoc, arith::MulFOp::create(b, bodyLoc, xRe, twiddleIm),
-                arith::MulFOp::create(b, bodyLoc, xIm, twiddleRe));
+            Value prodRe =
+                arith::SubFOp::create(b, bodyLoc, arith::MulFOp::create(b, bodyLoc, xRe, twiddleRe),
+                                      arith::MulFOp::create(b, bodyLoc, xIm, twiddleIm));
+            Value prodIm =
+                arith::AddFOp::create(b, bodyLoc, arith::MulFOp::create(b, bodyLoc, xRe, twiddleIm),
+                                      arith::MulFOp::create(b, bodyLoc, xIm, twiddleRe));
             Value newRe = arith::AddFOp::create(b, bodyLoc, accRe, prodRe);
             Value newIm = arith::AddFOp::create(b, bodyLoc, accIm, prodIm);
             Value result = complex::CreateOp::create(b, bodyLoc, outElemType, newRe, newIm);
@@ -192,9 +192,9 @@ Value emitDFTStage(OpBuilder &builder, Location loc, Value input, int64_t axis, 
             Value xRe = complex::ReOp::create(b, bodyLoc, realType, x);
             Value xIm = complex::ImOp::create(b, bodyLoc, realType, x);
             // Re(x * e^{i*theta}) with the 1/L scale already in the twiddle.
-            Value base = arith::SubFOp::create(
-                b, bodyLoc, arith::MulFOp::create(b, bodyLoc, xRe, twiddleRe),
-                arith::MulFOp::create(b, bodyLoc, xIm, twiddleIm));
+            Value base =
+                arith::SubFOp::create(b, bodyLoc, arith::MulFOp::create(b, bodyLoc, xRe, twiddleRe),
+                                      arith::MulFOp::create(b, bodyLoc, xIm, twiddleIm));
             // Hermitian symmetry weight. Interior bins stand in for their
             // conjugate mirror as well and count twice. The DC bin at j = 0
             // and for even L the Nyquist bin at j = L/2 are self conjugate
@@ -202,8 +202,7 @@ Value emitDFTStage(OpBuilder &builder, Location loc, Value input, int64_t axis, 
             Value one = createFloatConst(b, bodyLoc, realType, 1.0);
             Value two = createFloatConst(b, bodyLoc, realType, 2.0);
             Value zeroIdx = arith::ConstantIndexOp::create(b, bodyLoc, 0);
-            Value isDC =
-                arith::CmpIOp::create(b, bodyLoc, arith::CmpIPredicate::eq, j, zeroIdx);
+            Value isDC = arith::CmpIOp::create(b, bodyLoc, arith::CmpIPredicate::eq, j, zeroIdx);
             Value weight = arith::SelectOp::create(b, bodyLoc, isDC, one, two);
             if (modulus % 2 == 0) {
                 Value nyquistIdx = arith::ConstantIndexOp::create(b, bodyLoc, numBins - 1);
@@ -274,8 +273,8 @@ struct FftOpRewritePattern : public OpRewritePattern<stablehlo::FftOp> {
         case stablehlo::FftType::FFT:
         case stablehlo::FftType::IFFT: {
             Type complexElemType = operandType.getElementType();
-            StageKind kind = fftType == stablehlo::FftType::FFT ? StageKind::C2CForward
-                                                                : StageKind::C2CInverse;
+            StageKind kind =
+                fftType == stablehlo::FftType::FFT ? StageKind::C2CForward : StageKind::C2CInverse;
             for (int64_t i = 0; i < numAxes; ++i) {
                 int64_t axis = rank - numAxes + i;
                 current = emitDFTStage(rewriter, loc, current, axis, fftLength[i], fftLength[i],
@@ -287,8 +286,8 @@ struct FftOpRewritePattern : public OpRewritePattern<stablehlo::FftOp> {
             Type complexElemType = resultType.getElementType();
             // Real to complex along the last axis first which produces the
             // halved axis and then forward transforms along the other axes.
-            current = emitDFTStage(rewriter, loc, current, rank - 1, lastLength,
-                                   lastLength / 2 + 1, StageKind::R2C, complexElemType);
+            current = emitDFTStage(rewriter, loc, current, rank - 1, lastLength, lastLength / 2 + 1,
+                                   StageKind::R2C, complexElemType);
             for (int64_t i = 0; i < numAxes - 1; ++i) {
                 int64_t axis = rank - numAxes + i;
                 current = emitDFTStage(rewriter, loc, current, axis, fftLength[i], fftLength[i],
