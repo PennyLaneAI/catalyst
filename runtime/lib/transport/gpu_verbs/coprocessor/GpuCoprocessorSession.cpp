@@ -128,8 +128,8 @@ void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const Mem
     local_ = local;
     peer_ = peer;
     handoff_ = gpu_.alloc_handoff(K_RING_SLOTS);
-    reply_buf_ =
-        common::MemoryRegion::alloc_host(pd_, sizeof(Payload), 64, common::MemAccess::LOCAL_WRITE);
+    reply_buf_ = common::MemoryRegion::alloc_host(pd_, sizeof(Payload), alignof(PayloadSlot),
+                                                  common::MemAccess::LOCAL_WRITE);
 }
 
 void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx)

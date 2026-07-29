@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Cross-device loopback over a real RDMA port: a gpu_verbs coprocessor
-# running the echo decoder in the background, and a cpu_verbs
+# Cross-device loopback test over a real RDMA port. A gpu_verbs coprocessor
+# runs the echo decoder in the background, and a cpu_verbs
 # controller in the foreground that sends one syndrome and collects the reply.
 # Both observe DEMO_SYNDROME and exit 0, then the script prints "INTEROP: PASS".
 #
