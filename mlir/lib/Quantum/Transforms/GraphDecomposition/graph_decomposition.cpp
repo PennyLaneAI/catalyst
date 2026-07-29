@@ -399,11 +399,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             moduleOp->walk([&](mlir::func::FuncOp func) {
-                if (func->hasAttr("target_gate")) {
+                if (func.getName().starts_with(opId)) {
                     mlir::OwningOpRef<mlir::func::FuncOp> outOp;
                     func->remove();
                     outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
                     mlir::func::FuncOp funcOp = outOp.get();
+                    funcOp->setAttr("target_gate", mlir::StringAttr::get(context, opId));
 
                     // if we fail to add one of the decomps, we still want to try for the rest
                     std::ignore = addRuleNode(funcOp, ruleNodes);
@@ -416,17 +417,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
-    void getOperators(std::vector<OperatorNode> &operators){
+    void getOperators(std::vector<OperatorNode> &operators)
+    {
         // TODO: replace this with DecomposableGate interface. We will drop support for any other op
         // types once the interface has been implemented for the core operations in the quantum
         // dialect.
         // The interface will provide one unified way of generating operator nodes from operations,
         // with consistent getter methods for all relevant data fields.
-<<<<<<< HEAD
         getOperation().walk([&](DecomposableGate op) {
-=======
-        getOperation().walk([&](quantum::DecomposableGate op) {
->>>>>>> origin/generic-decomp-rule-lowering
             if (DecompUtils::isInDecompRule(op)) {
                 return;
             }
@@ -434,12 +432,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             node.numWires = op.getNonCtrlQubitOperands().size();
             node.adjoint = op.getAdjointFlag();
 
-<<<<<<< HEAD
             node.name = op.getOperatorName();
             node.id = op.getGraphOpId();
-=======
-            node.name = op.getGraphOpId();
->>>>>>> origin/generic-decomp-rule-lowering
 
             if (auto paramOp =
                     llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
@@ -451,153 +445,152 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             operators.push_back(node);
         });
-}
+    }
 
-/**
- * @brief Helper to parse a gate name into an OperatorNode.
- * Handles patterns like "Adjoint(GateName)" and "GateName(metadata)".
- */
-OperatorNode
-parseOperator(llvm::StringRef raw)
-{
-    OperatorNode node;
+    /**
+     * @brief Helper to parse a gate name into an OperatorNode.
+     * Handles patterns like "Adjoint(GateName)" and "GateName(metadata)".
+     */
+    OperatorNode parseOperator(llvm::StringRef raw)
+    {
+        OperatorNode node;
 
-    // Unwrap "Adjoint(GateName)"
-    if (raw.consume_front("Adjoint(")) {
-        node.adjoint = true;
-        auto closeIdx = raw.rfind(')');
-        if (closeIdx == llvm::StringRef::npos) {
-            node.name = raw.trim().str();
-            return node;
+        // Unwrap "Adjoint(GateName)"
+        if (raw.consume_front("Adjoint(")) {
+            node.adjoint = true;
+            auto closeIdx = raw.rfind(')');
+            if (closeIdx == llvm::StringRef::npos) {
+                node.name = raw.trim().str();
+                return node;
+            }
+            node.name = raw.take_front(closeIdx).trim().str();
+            raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
         }
-        node.name = raw.take_front(closeIdx).trim().str();
-        raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
-    }
-    else if (raw.contains('[') || raw.contains('{')) {
-        node.id = raw.str();
-        node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
-    }
-    else {
-        auto openIdx = raw.find('(');
-        if (openIdx == llvm::StringRef::npos) {
-            node.name = raw.trim().str();
-            return node;
+        else if (raw.contains('[') || raw.contains('{')) {
+            node.id = raw.str();
+            node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
         }
-        node.name = raw.take_front(openIdx).trim().str();
-        raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
-    }
-
-    // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
-    if (raw.consume_front("(") && raw.consume_back(")")) {
-        llvm::StringRef wStr, pStr;
-        std::tie(wStr, pStr) = raw.split(',');
-        int w = -1, p = -1;
-        if (!wStr.getAsInteger(10, w)) {
-            node.numWires = w;
-        }
-        if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
-            node.numParams = p;
-        }
-        // If pStr is empty we were given the legacy "(w)" format; leave
-        // numParams at the wildcard default so old bytecode keeps working.
-    }
-
-    return node;
-}
-
-/**
- * @brief Create RuleNodes for each rule available to be used in graph decomposition.
- */
-LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
-                           llvm::StringSet<> &userRuleNames)
-{
-    // Load pre-compiled rules (ignore failure, we can try to solve without)
-    std::ignore = loadBuiltInDecompositionRules(filename, rules);
-
-    // Lower and load compile-time rules
-    if (failed(loadPythonDecomps(rules))) {
-        return failure();
-    }
-
-    // Load user-rules
-    if (failed(loadUserDecompositionRules(userRuleNames, rules))) {
-        return failure();
-    }
-    return success();
-}
-
-/**
- * @brief Convert the parsed fixed-decomposition mapping (op name → rule name)
- * into the Core::FixedDecomps type expected by the DecompositionGraph.
- *
- * For each entry, looks up the corresponding RuleNode in setOfRules by name.
- * Rules not found in setOfRules are skipped with a diagnostic.
- *
- * @param opToFixedDecompName  Parsed mapping from operator name to fixed-rule name.
- * @param setOfRules           The full list of available decomposition rules.
- * @return Core::FixedDecomps  Mapping from OperatorNode to its fixed RuleNode.
- */
-FixedDecomps buildFixedDecomps(const llvm::StringMap<std::string> &opToFixedDecompName,
-                               const llvm::StringMap<const RuleNode *> &rulesByName)
-{
-    FixedDecomps fixedDecomps;
-    fixedDecomps.reserve(opToFixedDecompName.size());
-
-    for (const auto &[opName, ruleName] : opToFixedDecompName) {
-        auto it = rulesByName.find(ruleName);
-        if (it == rulesByName.end()) {
-            continue;
+        else {
+            auto openIdx = raw.find('(');
+            if (openIdx == llvm::StringRef::npos) {
+                node.name = raw.trim().str();
+                return node;
+            }
+            node.name = raw.take_front(openIdx).trim().str();
+            raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
         }
 
-        OperatorNode opNode;
-        opNode.name = opName.str();
-        fixedDecomps.emplace(std::move(opNode), *(it->second));
+        // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
+        if (raw.consume_front("(") && raw.consume_back(")")) {
+            llvm::StringRef wStr, pStr;
+            std::tie(wStr, pStr) = raw.split(',');
+            int w = -1, p = -1;
+            if (!wStr.getAsInteger(10, w)) {
+                node.numWires = w;
+            }
+            if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
+                node.numParams = p;
+            }
+            // If pStr is empty we were given the legacy "(w)" format; leave
+            // numParams at the wildcard default so old bytecode keeps working.
+        }
+
+        return node;
     }
-    return fixedDecomps;
-}
 
-/**
- * @brief Convert the parsed alternative-decomposition mapping
- * (op name → list of rule names) into the Core::AltDecomps type
- * expected by the DecompositionGraph.
- *
- * For each entry, looks up the corresponding RuleNodes in setOfRules by name.
- * Individual rules not found are skipped with a diagnostic.
- *
- * @param opToAltDecompNames  Parsed mapping from operator name to alternative-rule
- * names.
- * @param setOfRules          The full list of available decomposition rules.
- * @return Core::AltDecomps   Mapping from OperatorNode to its alternative RuleNodes.
- */
-AltDecomps
-buildAltDecomps(const llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                const llvm::StringMap<const RuleNode *> &rulesByName)
-{
-    AltDecomps altDecomps;
-    altDecomps.reserve(opToAltDecompNames.size());
+    /**
+     * @brief Create RuleNodes for each rule available to be used in graph decomposition.
+     */
+    LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
+                               llvm::StringSet<> &userRuleNames)
+    {
+        // Load pre-compiled rules (ignore failure, we can try to solve without)
+        std::ignore = loadBuiltInDecompositionRules(filename, rules);
 
-    for (const auto &[opName, ruleNames] : opToAltDecompNames) {
-        OperatorNode opNode;
-        opNode.name = opName.str();
+        // Lower and load compile-time rules
+        if (failed(loadPythonDecomps(rules))) {
+            return failure();
+        }
 
-        std::vector<RuleNode> altRules;
-        altRules.reserve(ruleNames.size());
+        // Load user-rules
+        if (failed(loadUserDecompositionRules(userRuleNames, rules))) {
+            return failure();
+        }
+        return success();
+    }
 
-        for (const auto &ruleName : ruleNames) {
+    /**
+     * @brief Convert the parsed fixed-decomposition mapping (op name → rule name)
+     * into the Core::FixedDecomps type expected by the DecompositionGraph.
+     *
+     * For each entry, looks up the corresponding RuleNode in setOfRules by name.
+     * Rules not found in setOfRules are skipped with a diagnostic.
+     *
+     * @param opToFixedDecompName  Parsed mapping from operator name to fixed-rule name.
+     * @param setOfRules           The full list of available decomposition rules.
+     * @return Core::FixedDecomps  Mapping from OperatorNode to its fixed RuleNode.
+     */
+    FixedDecomps buildFixedDecomps(const llvm::StringMap<std::string> &opToFixedDecompName,
+                                   const llvm::StringMap<const RuleNode *> &rulesByName)
+    {
+        FixedDecomps fixedDecomps;
+        fixedDecomps.reserve(opToFixedDecompName.size());
+
+        for (const auto &[opName, ruleName] : opToFixedDecompName) {
             auto it = rulesByName.find(ruleName);
             if (it == rulesByName.end()) {
                 continue;
             }
-            altRules.push_back(*(it->second));
-        }
 
-        if (!altRules.empty()) {
-            altDecomps.emplace(std::move(opNode), std::move(altRules));
+            OperatorNode opNode;
+            opNode.name = opName.str();
+            fixedDecomps.emplace(std::move(opNode), *(it->second));
         }
+        return fixedDecomps;
     }
-    return altDecomps;
-}
-}; // namespace quantum
 
-} // namespace catalyst
+    /**
+     * @brief Convert the parsed alternative-decomposition mapping
+     * (op name → list of rule names) into the Core::AltDecomps type
+     * expected by the DecompositionGraph.
+     *
+     * For each entry, looks up the corresponding RuleNodes in setOfRules by name.
+     * Individual rules not found are skipped with a diagnostic.
+     *
+     * @param opToAltDecompNames  Parsed mapping from operator name to alternative-rule
+     * names.
+     * @param setOfRules          The full list of available decomposition rules.
+     * @return Core::AltDecomps   Mapping from OperatorNode to its alternative RuleNodes.
+     */
+    AltDecomps
+    buildAltDecomps(const llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
+                    const llvm::StringMap<const RuleNode *> &rulesByName)
+    {
+        AltDecomps altDecomps;
+        altDecomps.reserve(opToAltDecompNames.size());
+
+        for (const auto &[opName, ruleNames] : opToAltDecompNames) {
+            OperatorNode opNode;
+            opNode.name = opName.str();
+
+            std::vector<RuleNode> altRules;
+            altRules.reserve(ruleNames.size());
+
+            for (const auto &ruleName : ruleNames) {
+                auto it = rulesByName.find(ruleName);
+                if (it == rulesByName.end()) {
+                    continue;
+                }
+                altRules.push_back(*(it->second));
+            }
+
+            if (!altRules.empty()) {
+                altDecomps.emplace(std::move(opNode), std::move(altRules));
+            }
+        }
+        return altDecomps;
+    }
+};
+
+} // namespace quantum
 } // namespace catalyst
