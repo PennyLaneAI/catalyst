@@ -143,3 +143,33 @@ def test_backline_qnode_capture_path():
         assert 'transport = "net"' in ir
     finally:
         qp.capture.disable()
+
+
+def test_remote_controller_module_tagged_with_role():
+    """A remote controller's module carries catalyst.backline_role.
+
+    The transport passes locate it by role rather than by matching the triple/address that
+    catalyst.target and catalyst.dispatch copy from the node.
+    """
+    qp.capture.enable()
+    try:
+        ctrl = qp.Controller(
+            qp.device("null.qubit", wires=2),
+            name="ctrl",
+            addr="127.0.0.1",
+            port="18590",
+            remote=True,
+            triple="aarch64-unknown-linux-gnu",
+            init_args={"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"},
+        )
+        dev = qp.backline(ctrl, transport="net")
+
+        @qjit(target="mlir", capture=True)
+        @qp.qnode(dev)
+        def circuit():
+            qp.Hadamard(0)
+            return qp.probs()
+
+        assert 'catalyst.backline_role = "controller"' in circuit.mlir
+    finally:
+        qp.capture.disable()
