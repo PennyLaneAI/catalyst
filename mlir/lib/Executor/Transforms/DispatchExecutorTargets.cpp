@@ -56,7 +56,7 @@ struct DispatchExecutorTargetsPass
 
         SmallVector<ModuleOp> targetMods;
         for (auto mod : host.getBody()->getOps<ModuleOp>()) {
-            if (mod->hasAttr("catalst.dispatch")) {
+            if (mod->hasAttr("catalyst.dispatch")) {
                 targetMods.push_back(mod);
             }
         }
