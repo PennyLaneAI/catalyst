@@ -1,18 +1,11 @@
 #!/usr/bin/env bash
 #
-# Cross-device interop loopback: gpu_verbs coprocessor (this device's GPU, over
-# RDMA/GPUDirect) + cpu_verbs controller (already-migrated CPU transport),
-# talking over one real mlx5 port via the shared common/WireProtocol framing:
-#   - gpu coprocessor: background; listens on the OOB port, runs the built-in
-#     on-device echo kernel against a GpuHbm memory region
-#   - cpu controller:  foreground; connects, sends one syndrome, collects the
-#     reply
-# Both sides agree on data_path="cpu_verbs", so the echo bounces the syndrome
-# back and both roles observe DEMO_SYNDROME and exit 0; the script prints
-# "INTEROP: PASS".
+# Cross-device loopback over a real RDMA port: a gpu_verbs coprocessor
+# running the echo decoder in the background, and a cpu_verbs
+# controller in the foreground that sends one syndrome and collects the reply.
+# Both observe DEMO_SYNDROME and exit 0, then the script prints "INTEROP: PASS".
 #
-# Requires a working RDMA NIC with GPUDirect RDMA support (dma-buf MR) on the
-# chosen device, e.g. mlx5_1 / gid 3 (RoCEv2/IPv4).
+# Requires a NIC with GPUDirect RDMA (dma-buf MR) support.
 # Env overrides: DEV (mlx5_1), GID (3), PORT (18560).
 set -u
 DEV=${DEV:-mlx5_1}; GID=${GID:-3}; PORT=${PORT:-18560}

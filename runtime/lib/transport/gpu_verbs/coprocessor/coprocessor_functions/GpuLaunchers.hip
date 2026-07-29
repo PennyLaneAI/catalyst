@@ -30,14 +30,31 @@ using namespace catalyst::transport::common;
 // multiple of the interval.
 constexpr std::uint32_t STOP_POLL_INTERVAL = 1024;
 
-// Persistent detect -> decode -> write-handoff kernel, parameterized on the
-// per-shot decode (a __device__ function).
+/**
+ * @brief Persistent kernel templated on a device decoder: polls the HBM ring
+ * buffer, executes the inline decoder, and writes corrections to the host
+ * handoff buffer.
+ *
+ * Launched once with a single thread and runs until `total` shots
+ * are done or the host raises `*stop`.
+ *
+ * @tparam DECODE Per-shot __device__ decode, syndrome and return correction.
+ * @param ring Request ring in local HBM, K_RING_SLOTS slots, written by the
+ *             peer's RDMA_WRITEs. Slot `cursor % K_RING_SLOTS` carries shot
+ *             `cursor`, published via its `seq_num` trailer.
+ * @param handoff Host-mapped reply ring, same slot count; this kernel writes
+ *                {correction, seq} and the CPU reads it.
+ * @param stop Host-mapped teardown flag; nonzero means exit. Sampled only every
+ *             STOP_POLL_INTERVAL spins (host-coherent read over PCIe).
+ * @param total Number of shots to process, or 0 to run until stopped.
+ */
 template <std::uint64_t (*DECODE)(std::uint64_t)>
 __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
                       volatile std::uint32_t *stop, std::uint64_t total)
 {
-    if (threadIdx.x != 0 || blockIdx.x != 0)
+    if (threadIdx.x != 0 || blockIdx.x != 0) {
         return;
+    }
     for (std::uint64_t cursor = 0; total == 0 || cursor < total; ++cursor) {
         const std::uint32_t expect = static_cast<std::uint32_t>(cursor + 1);
         const std::size_t index = cursor & (K_RING_SLOTS - 1);

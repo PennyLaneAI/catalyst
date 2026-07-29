@@ -31,15 +31,9 @@ struct alignas(16) HandoffSlot {
     std::uint32_t pad;
 };
 
-// PRECONDITION: if the persistent kernel was launched with total == 0, the
-// caller must set *stop_dev to non-zero and call sync() before destroying this
-// object. The
-// destructor frees memory unconditionally without stopping the kernel;
-// destroying while the fused kernel is still running is undefined behavior.
 class GpuRuntime {
   public:
-    GpuRuntime(); // hipSetDevice(0) + stream; throws std::runtime_error on
-                  // failure
+    GpuRuntime();
     ~GpuRuntime();
     GpuRuntime(const GpuRuntime &) = delete;
     GpuRuntime &operator=(const GpuRuntime &) = delete;
@@ -53,13 +47,13 @@ class GpuRuntime {
     HbmRing alloc_hbm_ring(std::size_t bytes);
 
     struct Handoff {
-        HandoffSlot *host = nullptr;
-        HandoffSlot *dev = nullptr;
-        std::uint32_t *stop_host = nullptr;
-        std::uint32_t *stop_dev = nullptr;
-        std::size_t slots = 0;
+        HandoffSlot *host = nullptr;        // CPU-side view of the ring
+        HandoffSlot *dev = nullptr;         // device-side view of the same pages
+        std::uint32_t *stop_host = nullptr; // CPU-side teardown flag
+        std::uint32_t *stop_dev = nullptr;  // device-side view of the same flag
+        std::size_t num_slots = 0;          // number of slots in the ring
     };
-    Handoff alloc_handoff(std::size_t slots);
+    Handoff alloc_handoff(std::size_t num_slots);
 
     void sync(); // hipStreamSynchronize
 

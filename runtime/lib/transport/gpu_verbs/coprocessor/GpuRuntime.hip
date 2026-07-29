@@ -12,31 +12,50 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
+#include "Error.hpp"
 #include "GpuRuntime.hpp"
 
 #include <hip/hip_runtime.h>
 
+/**
+ * @brief Macro that throws `std::runtime_error` if a HIP call does not return
+ * hipSuccess, tagged with the source location of the call.
+ */
+#define HIP_CHECK(expression, what)                                                                \
+    ::catalyst::transport::gpu_verbs::_hip_check((expression), (what), __FILE__, __LINE__, __func__)
+
 namespace catalyst::transport::gpu_verbs {
-namespace {
-void hip_check(hipError_t e, const char *what)
+
+/**
+ * @brief Throws a `std::runtime_error` describing a failed HIP call.
+ *
+ * @note This is not supposed to be called directly; use HIP_CHECK.
+ */
+inline void _hip_check(hipError_t err, const char *what, const char *file_name, std::size_t line,
+                       const char *function_name)
 {
-    if (e != hipSuccess)
-        throw std::runtime_error(std::string("GpuRuntime: ") + what + ": " + hipGetErrorString(e));
+    if (err == hipSuccess) {
+        return;
+    }
+    std::stringstream sstream;
+    sstream << "[" << file_name << ":" << line << "][Function:" << function_name
+            << "] GpuRuntime: " << what << ": " << hipGetErrorString(err);
+    throw std::runtime_error(sstream.str());
 }
-} // namespace
 
 GpuRuntime::GpuRuntime()
 {
     int dc = 0;
-    hip_check(hipGetDeviceCount(&dc), "hipGetDeviceCount");
-    if (dc <= 0)
-        throw std::runtime_error("GpuRuntime: no HIP device");
-    hip_check(hipSetDevice(0), "hipSetDevice(0)");
+    HIP_CHECK(hipGetDeviceCount(&dc), "hipGetDeviceCount");
+    RDMA_CHECK(dc > 0, "GpuRuntime: no HIP device");
+    HIP_CHECK(hipSetDevice(0), "hipSetDevice(0)");
     hipStream_t s = nullptr;
-    hip_check(hipStreamCreate(&s), "hipStreamCreate");
+    HIP_CHECK(hipStreamCreate(&s), "hipStreamCreate");
     stream_ = s;
 }
 
@@ -54,45 +73,42 @@ GpuRuntime::~GpuRuntime()
 
 GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes)
 {
-    HbmRing r{.size =
-                  bytes}; // Allocate exactly `bytes` (caller passes a page-aligned REGION_BYTES).
+    // Allocate exactly `bytes` (caller passes a page-aligned REGION_BYTES).
+    HbmRing r{.size = bytes};
 #if defined(__HIP_PLATFORM_AMD__)
     // NOTE: fine grained coherence is an AMD specific notion and does not have
     // a CUDA equivalent, therefore, use standard `hipMalloc` in that case
-    hip_check(hipExtMallocWithFlags(&r.ptr, r.size, hipDeviceMallocFinegrained),
+    HIP_CHECK(hipExtMallocWithFlags(&r.ptr, r.size, hipDeviceMallocFinegrained),
               "hipExtMallocWithFlags(finegrained)");
 #elif defined(__HIP_PLATFORM_NVIDIA__)
-    hip_check(hipMalloc(&r.ptr, r.size), "hipMalloc");
+    HIP_CHECK(hipMalloc(&r.ptr, r.size), "hipMalloc");
 #else
 #error "Unsupported HIP platform"
 #endif
-    hip_check(hipMemset(r.ptr, 0, r.size), "hipMemset(ring)");
-    hip_check(hipMemGetHandleForAddressRange(&r.dmabuf_fd, reinterpret_cast<hipDeviceptr_t>(r.ptr),
+    HIP_CHECK(hipMemset(r.ptr, 0, r.size), "hipMemset(ring)");
+    HIP_CHECK(hipMemGetHandleForAddressRange(&r.dmabuf_fd, reinterpret_cast<hipDeviceptr_t>(r.ptr),
                                              r.size, hipMemRangeHandleTypeDmaBufFd, 0),
               "hipMemGetHandleForAddressRange(DmaBufFd)");
     hbm_ptr_ = r.ptr;
     return r;
 }
 
-GpuRuntime::Handoff GpuRuntime::alloc_handoff(std::size_t slots)
+GpuRuntime::Handoff GpuRuntime::alloc_handoff(std::size_t num_slots)
 {
     Handoff h;
-    h.slots = slots;
-    hip_check(hipHostMalloc((void **)&h.host, slots * sizeof(HandoffSlot),
+    h.num_slots = num_slots;
+    HIP_CHECK(hipHostMalloc((void **)&h.host, num_slots * sizeof(HandoffSlot),
                             hipHostMallocMapped | hipHostMallocCoherent),
               "hipHostMalloc(handoff)");
-    for (std::size_t i = 0; i < slots; ++i) {
-        h.host[i].correction = 0;
-        h.host[i].seq = 0;
-        h.host[i].pad = 0;
-    }
-    hip_check(hipHostGetDevicePointer((void **)&h.dev, h.host, 0),
+    // Zero every slot so a stale seq can never look like a published reply.
+    std::fill_n(h.host, num_slots, HandoffSlot{});
+    HIP_CHECK(hipHostGetDevicePointer((void **)&h.dev, h.host, 0),
               "hipHostGetDevicePointer(handoff)");
-    hip_check(hipHostMalloc((void **)&h.stop_host, sizeof(std::uint32_t),
+    HIP_CHECK(hipHostMalloc((void **)&h.stop_host, sizeof(std::uint32_t),
                             hipHostMallocMapped | hipHostMallocCoherent),
               "hipHostMalloc(stop)");
     *h.stop_host = 0;
-    hip_check(hipHostGetDevicePointer((void **)&h.stop_dev, h.stop_host, 0),
+    HIP_CHECK(hipHostGetDevicePointer((void **)&h.stop_dev, h.stop_host, 0),
               "hipHostGetDevicePointer(stop)");
     handoff_host_ = h.host;
     stop_host_ = h.stop_host;
@@ -102,7 +118,7 @@ GpuRuntime::Handoff GpuRuntime::alloc_handoff(std::size_t slots)
 void GpuRuntime::sync()
 {
     if (stream_)
-        hip_check(hipStreamSynchronize(static_cast<hipStream_t>(stream_)), "hipStreamSynchronize");
+        HIP_CHECK(hipStreamSynchronize(static_cast<hipStream_t>(stream_)), "hipStreamSynchronize");
 }
 
 } // namespace catalyst::transport::gpu_verbs

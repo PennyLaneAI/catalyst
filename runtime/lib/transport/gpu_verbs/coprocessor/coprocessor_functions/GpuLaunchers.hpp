@@ -20,7 +20,7 @@ namespace catalyst::transport::gpu_verbs {
 // CoprocessorLauncherFn launchers: each enqueues the persistent detect ->
 // decode -> write-handoff kernel (one per decoder) on the session's stream.
 // `desc` is the datapath to wire the kernel to; `ctx` is unused. Return 0 if
-// the launch succeeded, nonzero if it failed. 
+// the launch succeeded, nonzero if it failed.
 extern "C" int catalyst_gpu_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);
 extern "C" int catalyst_gpu_steane_launcher(const CoprocLaunchDesc *desc, void *ctx);
 
