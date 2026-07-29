@@ -13,11 +13,13 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     MLIRTransport
+    MLIRQecPhysical
 )
 
 set(DEPENDS
     MLIRTransportPassIncGen
     MLIRTransportEnumsIncGen
+    MLIRQecPhysicalOpsIncGen
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
