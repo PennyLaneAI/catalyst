@@ -19,7 +19,7 @@
 
 // expected-error @below {{coprocessor requires a 'peer'}}
 module attributes {catalyst.backline = #transport.backline<transport = "net", controller = #transport.node<backend_lib = "x">,
-  coprocessors = [#transport.node<backend_lib = "y", symbol = "decode">]>} {
+  coprocessors = [#transport.node<backend_lib = "y", symbol = "foo">]>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
 }
