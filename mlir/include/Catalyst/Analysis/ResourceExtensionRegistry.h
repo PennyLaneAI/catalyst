@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include <cassert>
 #include <functional>
 #include <memory>
 #include <string>
@@ -23,6 +22,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/WithColor.h"
 
 #include "Catalyst/Analysis/ResourceExtension.h"
 
@@ -39,9 +39,13 @@ class ResourceExtensionRegistry {
 
     void add(ExtensionProvider extensionProvider)
     {
-        llvm::StringRef name = extensionProvider()->name();
-        assert(!llvm::is_contained(names, name) && "ResourceExtension name already registered");
-        names.push_back(name.str());
+        std::string name = extensionProvider()->name().str();
+        if (llvm::is_contained(names, name)) {
+            llvm::WithColor::warning()
+                << "ResourceExtension '" << name << "' is already registered; ignoring duplicate\n";
+            return;
+        }
+        names.push_back(std::move(name));
         extensionProviders.push_back(std::move(extensionProvider));
     }
 
