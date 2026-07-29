@@ -27,6 +27,7 @@ import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.primitives import transform_prim
+from pennylane.decomposition.utils import to_name
 from pennylane.transforms import decompose as pl_decompose
 
 from catalyst.device import extract_backend_info
@@ -557,10 +558,4 @@ def _get_operator_name(op):
     Note: Controlled and Adjoint ops aren't supported in `gate_set`
     by PennyLane's DecompositionGraph; unit tests were added in PennyLane.
     """
-    if isinstance(op, str):
-        return op
-
-    # Return NoNameOp if the operator has no _primitive.name attribute.
-    # This is to avoid errors when we capture the program
-    # as we deal with such ops later in the decomposition graph.
-    return getattr(op._primitive, "name", "NoNameOp")
+    return to_name(op)
