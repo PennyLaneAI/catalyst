@@ -71,4 +71,7 @@ endif()
 
 if(ENABLE_TRANSPORT)
 add_subdirectory(transport)
+
+if(ENABLE_EXECUTOR)
+add_subdirectory(executor)
 endif()

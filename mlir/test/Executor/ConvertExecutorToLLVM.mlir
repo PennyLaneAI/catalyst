@@ -43,11 +43,12 @@ func.func @send_binary() {
 // -----
 
 // CHECK-DAG: llvm.mlir.global internal constant @executor_sym_qnode_0("_catalyst_pyface_qnode_0\00")
+// CHECK-DAG: llvm.mlir.global internal constant @executor_obj_qnode_0("/tmp/qnode_0.o\00")
 // CHECK-DAG: llvm.mlir.global internal constant @executor_in_ranks_qnode_0(dense<0> : tensor<1xi64>)
 // CHECK-DAG: llvm.mlir.global internal constant @executor_in_sizes_qnode_0(dense<8> : tensor<1xi64>)
 // CHECK-DAG: llvm.mlir.global internal constant @executor_out_ranks_qnode_0(dense<0> : tensor<1xi64>)
 // CHECK-DAG: llvm.mlir.global internal constant @executor_out_sizes_qnode_0(dense<8> : tensor<1xi64>)
-// CHECK-DAG: llvm.func @__catalyst__executor__launch(i64, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK-DAG: llvm.func @__catalyst__executor__launch(i64, !llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, !llvm.ptr)
 // CHECK-LABEL: func.func @launch
 func.func @launch(%arg0: memref<f64>) -> memref<f64> {
   // Four stack slots: the input/output descriptors, and the two pointer arrays handed to the
@@ -67,15 +68,15 @@ func.func @launch(%arg0: memref<f64>) -> memref<f64> {
   // CHECK: llvm.insertvalue %{{.*}}, %{{.*}}[0] : !llvm.array<1 x ptr>
   // CHECK: llvm.store %{{.*}}, %{{.*}} : !llvm.array<1 x ptr>, !llvm.ptr
 
-  // A single dispatch call threading the session handle plus the nine marshalled operands
-  // CHECK: llvm.call @__catalyst__executor__launch(%[[S]], %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}) : (i64, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
+  // A single dispatch call threading the session handle and object plus the nine marshalled operands
+  // CHECK: llvm.call @__catalyst__executor__launch(%[[S]], %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}) : (i64, !llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
   // Result read back from the output descriptor slot.
   // CHECK: llvm.load %{{.*}} : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
 
   // Launch marshals via stores only
   // CHECK-NOT: llvm.intr.memcpy
   %s = executor.open("127.0.0.1:9000") : !executor.session
-  %0 = executor.launch %s("qnode_0") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
+  %0 = executor.launch %s("qnode_0", "/tmp/qnode_0.o") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
   return %0 : memref<f64>
 }
 
