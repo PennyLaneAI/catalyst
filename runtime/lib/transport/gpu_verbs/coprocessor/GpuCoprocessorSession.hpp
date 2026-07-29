@@ -37,8 +37,13 @@ using namespace catalyst::transport;
 
 class GpuCoprocessorSession : public CoprocessorSession {
   public:
-    explicit GpuCoprocessorSession(std::string dev = "mlx5_1", int gid_idx = 3);
+    explicit GpuCoprocessorSession(std::string dev, int gid_idx);
     ~GpuCoprocessorSession() override { stop(); }
+
+    GpuCoprocessorSession(const GpuCoprocessorSession &) = delete;
+    GpuCoprocessorSession &operator=(const GpuCoprocessorSession &) = delete;
+    GpuCoprocessorSession(GpuCoprocessorSession &&) = delete;
+    GpuCoprocessorSession &operator=(GpuCoprocessorSession &&) = delete;
 
     int connect(const ConnectInfo &info) override;
     MemRegion alloc_memory(std::size_t size, MemKind kind) override;

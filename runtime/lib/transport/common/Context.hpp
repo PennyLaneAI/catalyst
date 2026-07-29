@@ -29,7 +29,7 @@ namespace catalyst::transport::common {
 class Context {
   public:
     /**
-     * @brief Opens an RDMA device by its system name (e.g., "mlx5_0").
+     * @brief Opens an RDMA device by its system name.
      */
     explicit Context(const std::string &dev_name); // open by name
 

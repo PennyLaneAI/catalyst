@@ -13,8 +13,13 @@
 // limitations under the License.
 
 #pragma once
+#include <atomic>
 #include <cstddef>
+#include <cstdint>
+#include <exception>
 #include <memory>
+#include <stop_token>
+#include <thread>
 
 #include "CpuSessionBase.hpp"
 
@@ -25,10 +30,7 @@ namespace catalyst::transport::cpu_verbs {
 // selects the built-in echo (passthrough self-test).
 class CpuCoprocessorSession : public CoprocessorSession {
   public:
-    explicit CpuCoprocessorSession(std::string dev = "rxe0", int gid_idx = 1)
-        : base_(std::move(dev), gid_idx)
-    {
-    }
+    explicit CpuCoprocessorSession(std::string dev, int gid_idx) : base_(std::move(dev), gid_idx) {}
 
     int connect(const ConnectInfo &info) override { return base_.connect(info); }
     MemRegion alloc_memory(std::size_t size, MemKind kind) override
@@ -54,13 +56,30 @@ class CpuCoprocessorSession : public CoprocessorSession {
     class Impl : public CpuSessionBase {
       public:
         using CpuSessionBase::CpuSessionBase;
-        ~Impl() { stop(); }
+        ~Impl() override { stop(); }
+
+        void start() override;
+        int collect(void *const *replies, const std::uint64_t *replies_bytes,
+                    std::size_t n) override;
+        void stop() override;
+
         CoprocessorFn coproc_fn_ = nullptr; // nullptr -> built-in echo
         void *coproc_ctx_ = nullptr;
 
       protected:
-        void run(std::stop_token st) override;
         bool oob_listens() const override { return true; }
+
+      private:
+        // The engine loop; runs on engine_.
+        void run(std::stop_token st);
+
+        // failed_ (release) publishes error_; collect() acquire-loads it and
+        // rethrows.
+        std::atomic<bool> failed_{false};
+        std::exception_ptr error_;
+        std::atomic<std::uint64_t> completed_{0};
+        std::atomic<std::uint64_t> last_word_{0};
+        std::jthread engine_;
     };
     Impl base_;
 };

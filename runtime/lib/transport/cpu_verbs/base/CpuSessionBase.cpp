@@ -38,6 +38,8 @@ constexpr int REAP_BATCH = 16;
 constexpr int INLINE_MAX = 256;
 constexpr int SQ_DEPTH = 4096;
 constexpr int CQ_DEPTH = 4096;
+// Page alignment for registered host buffers.
+constexpr std::size_t PAGE_ALIGN = 4096;
 } // namespace
 
 CpuSessionBase::CpuSessionBase(std::string dev, int gid_idx)
@@ -67,7 +69,7 @@ MemRegion CpuSessionBase::alloc_memory(std::size_t size, MemKind kind)
 {
     RDMA_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
-        pd_, size, 4096, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE));
+        pd_, size, PAGE_ALIGN, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE));
     const MemoryRegion &mr = caller_memory_regions_.back();
     return MemRegion{
         .addr = mr.addr(),
@@ -122,8 +124,8 @@ void CpuSessionBase::establish_channel(const ChannelDesc &desc, const MemRegion 
     desc_ = desc;
     local_ = local;
     peer_ = peer;
-    send_buf_ =
-        common::MemoryRegion::alloc_host(pd_, sizeof(Payload), 64, common::MemAccess::LOCAL_WRITE);
+    send_buf_ = common::MemoryRegion::alloc_host(pd_, sizeof(Payload), alignof(PayloadSlot),
+                                                 common::MemAccess::LOCAL_WRITE);
 }
 
 void CpuSessionBase::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled)
@@ -162,10 +164,12 @@ void CpuSessionBase::reap(ibv_cq *cq, int &outstanding, bool drain)
     do {
         int n = ibv_poll_cq(cq, static_cast<int>(wc.size()), wc.data());
         if (n == 0) {
-            if (!drain)
+            if (!drain) {
                 return;
-            if (++empty >= DRAIN_MAX_EMPTY)
+            }
+            if (++empty >= DRAIN_MAX_EMPTY) {
                 return;
+            }
             continue;
         }
         empty = 0;
@@ -189,65 +193,12 @@ Payload *CpuSessionBase::poll_message_arrival(std::uint64_t cursor, std::stop_to
     std::atomic_ref<std::uint32_t> seq_ref(slot->seq_num);
     const auto expected = static_cast<std::uint32_t>(cursor + 1);
     while (seq_ref.load(std::memory_order_acquire) != expected) {
-        if (st.stop_requested())
+        if (st.stop_requested()) {
             return nullptr;
+        }
         std::this_thread::yield();
     }
     return slot;
-}
-
-void CpuSessionBase::start()
-{
-    stop();
-    failed_.store(false, std::memory_order_relaxed);
-    error_ = nullptr;
-    completed_.store(0, std::memory_order_relaxed);
-    last_word_.store(0, std::memory_order_relaxed);
-    // jthread injects the stop_token. A data-path RDMA_CHECK throws RdmaError;
-    // it must not escape the thread function (that would std::terminate).
-    // Capture it into error_ and publish via failed_ (release) so collect()
-    // can rethrow the real exception.
-    auto body = [this](std::stop_token st) {
-        try {
-            run(st);
-        }
-        catch (...) {
-            error_ = std::current_exception();
-            failed_.store(true, std::memory_order_release);
-        }
-    };
-    engine_ = std::jthread(body);
-}
-
-int CpuSessionBase::collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n)
-{
-    while (completed_.load(std::memory_order_acquire) == 0) {
-        if (failed_.load(std::memory_order_acquire))
-            std::rethrow_exception(error_); // surface the engine's real error
-        if (!engine_.joinable() || engine_.get_stop_token().stop_requested())
-            break;
-        std::this_thread::yield();
-    }
-    if (failed_.load(std::memory_order_acquire))
-        std::rethrow_exception(error_);
-    // Stopped before any round completed -> no data (non-exceptional).
-    if (completed_.load(std::memory_order_acquire) == 0)
-        return -1;
-    if (n > 0 && replies && replies[0]) {
-        const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
-        const std::size_t nb =
-            replies_bytes ? std::min<std::size_t>(replies_bytes[0], sizeof(w)) : sizeof(w);
-        std::memcpy(replies[0], &w, nb);
-    }
-    return 0;
-}
-
-void CpuSessionBase::stop()
-{
-    if (engine_.joinable()) {
-        engine_.request_stop();
-        engine_.join();
-    }
 }
 
 } // namespace catalyst::transport::cpu_verbs

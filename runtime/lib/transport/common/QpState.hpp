@@ -13,11 +13,13 @@
 // limitations under the License.
 
 #pragma once
+#include <cstdint>
+
 #include "Error.hpp"
 
 namespace catalyst::transport::common {
 
-enum class QpState { RESET, INIT, RTR, RTS, ERROR };
+enum class QpState : std::uint8_t { RESET, INIT, RTR, RTS, ERROR };
 
 inline const char *to_string(QpState s)
 {
@@ -39,8 +41,9 @@ inline const char *to_string(QpState s)
 // Checks whether a given transition is valid.
 constexpr bool is_valid_transition(QpState from, QpState to)
 {
-    if (to == QpState::ERROR || to == QpState::RESET)
+    if (to == QpState::ERROR || to == QpState::RESET) {
         return true;
+    }
     switch (from) {
     case QpState::RESET:
         return to == QpState::INIT;

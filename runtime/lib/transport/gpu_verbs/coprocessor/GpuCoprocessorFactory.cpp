@@ -26,14 +26,14 @@
 
 #include <string>
 
-#include "GpuBackendConfig.hpp"
+#include "BackendConfig.hpp"
 #include "GpuCoprocessorSession.hpp"
 #include "TransportBackend.h"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string &config)
 {
-    const auto cfg = catalyst::transport::gpu_verbs::parse_gpu_config(config);
+    const auto cfg = catalyst::transport::common::parse_backend_config(config, "gpu_verbs");
     return new catalyst::transport::gpu_verbs::GpuCoprocessorSession(cfg.dev, cfg.gid);
 }
 } // namespace

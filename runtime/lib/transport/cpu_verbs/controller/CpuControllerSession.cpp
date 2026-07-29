@@ -44,9 +44,9 @@ void CpuControllerSession::Impl::start()
 
 void CpuControllerSession::Impl::stop()
 {
-    if (fwd_cq_)
+    if (fwd_cq_) {
         reap(fwd_cq_->get(), signaled_outstanding_, /*drain=*/true);
-    CpuSessionBase::stop(); // no engine thread runs for the controller; harmless join
+    }
 }
 
 // Single work item, fixed-size frame: work_item_idx is ignored; the sizes are
@@ -83,8 +83,9 @@ int CpuControllerSession::Impl::collect(void *const *replies, const std::uint64_
 {
     std::stop_token none; // blocking wait for this round's reply
     Payload *r = poll_message_arrival(next_recv_, none);
-    if (!r)
+    if (!r) {
         return -1;
+    }
     rtt_ns_ = now_ns() - kick_ns_;
     ++next_recv_;
     if (n > 0 && replies && replies[0]) {

@@ -13,14 +13,11 @@
 // limitations under the License.
 
 #pragma once
-#include <atomic>
 #include <cstdint>
-#include <exception>
 #include <memory>
 #include <optional>
 #include <stop_token>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "CompletionQueue.hpp"
@@ -35,24 +32,26 @@
 namespace catalyst::transport::cpu_verbs {
 using namespace catalyst::transport;
 
-// Shared lifecycle for coprocessor and controller roles.
+/**
+ * @brief Connection bring-up and data-path primitives shared by both roles.
+ */
 class CpuSessionBase : public TransportSession {
   public:
-    explicit CpuSessionBase(std::string dev = "rxe0", int gid_idx = 1);
-    ~CpuSessionBase() override { stop(); }
+    explicit CpuSessionBase(std::string dev, int gid_idx);
+    ~CpuSessionBase() override = default;
+
+    CpuSessionBase(const CpuSessionBase &) = delete;
+    CpuSessionBase &operator=(const CpuSessionBase &) = delete;
+    CpuSessionBase(CpuSessionBase &&) = delete;
+    CpuSessionBase &operator=(CpuSessionBase &&) = delete;
 
     int connect(const ConnectInfo &info) override;
     MemRegion alloc_memory(std::size_t size, MemKind kind) override;
     PeerRef exchange_keys(const MemRegion &local) override;
     void establish_channel(const ChannelDesc &desc, const MemRegion &local,
                            const PeerRef &peer) override;
-    void start() override;
-    int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
-    void stop() override;
 
   protected:
-    // The role-specific engine loop (runs on engine_).
-    virtual void run(std::stop_token st) = 0;
     // True for the coprocessor (listens/sends first on the OOB socket).
     virtual bool oob_listens() const = 0;
 
@@ -78,13 +77,6 @@ class CpuSessionBase : public TransportSession {
     MemRegion local_{};
     PeerRef peer_{};
     ChannelDesc desc_{};
-    // failed_ (release) publishes error_; collect() acquire-loads it and
-    // rethrows.
-    std::atomic<bool> failed_{false};
-    std::exception_ptr error_;
-    std::atomic<std::uint64_t> completed_{0};
-    std::atomic<std::uint64_t> last_word_{0};
-    std::jthread engine_;
 };
 
 } // namespace catalyst::transport::cpu_verbs

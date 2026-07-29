@@ -24,10 +24,7 @@ namespace catalyst::transport::cpu_verbs {
 // then collect()s the reply. No internal engine thread.
 class CpuControllerSession : public ControllerSession {
   public:
-    explicit CpuControllerSession(std::string dev = "rxe0", int gid_idx = 1)
-        : base_(std::move(dev), gid_idx)
-    {
-    }
+    explicit CpuControllerSession(std::string dev, int gid_idx) : base_(std::move(dev), gid_idx) {}
 
     int connect(const ConnectInfo &info) override { return base_.connect(info); }
     MemRegion alloc_memory(std::size_t size, MemKind kind) override
@@ -58,13 +55,10 @@ class CpuControllerSession : public ControllerSession {
     void *data_slot() override { return base_.data_slot(); }
 
   private:
-    // Caller-driven controller over the shared session primitives. run() is unused
-    // (no engine thread); start()/stop()/collect() are overridden for the
-    // synchronous kick model.
     class Impl : public CpuSessionBase {
       public:
         using CpuSessionBase::CpuSessionBase;
-        ~Impl() { stop(); }
+        ~Impl() override { stop(); }
 
         void start() override;
         void stop() override;
@@ -78,7 +72,6 @@ class CpuControllerSession : public ControllerSession {
         void *data_slot();
 
       protected:
-        void run(std::stop_token) override {} // unused: controller is caller-driven
         bool oob_listens() const override { return false; }
 
       private:

@@ -43,8 +43,9 @@ Context::Context(const std::string &dev_name)
 }
 Context::~Context()
 {
-    if (ctx_)
+    if (ctx_) {
         ibv_close_device(ctx_);
+    }
 }
 ibv_context *Context::get() const { return ctx_; }
 ibv_port_attr Context::port_attr(std::uint8_t port) const

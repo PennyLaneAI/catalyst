@@ -29,10 +29,11 @@ class FdGuard {
     ~FdGuard() { reset(); }
 
     FdGuard(FdGuard &&other) noexcept : fd_(other.release()) {}
-    FdGuard &operator=(FdGuard &&o) noexcept
+    FdGuard &operator=(FdGuard &&other) noexcept
     {
-        if (this != &o)
-            reset(o.release());
+        if (this != &other) {
+            reset(other.release());
+        }
         return *this;
     }
     FdGuard(const FdGuard &) = delete;
@@ -48,8 +49,9 @@ class FdGuard {
      */
     void reset(int new_fd = -1) noexcept
     {
-        if (fd_ >= 0)
+        if (fd_ >= 0) {
             ::close(fd_);
+        }
         fd_ = new_fd;
     }
 
@@ -63,9 +65,10 @@ class FdGuard {
     int fd_ = -1;
 };
 
-// OOB TCP handshake helpers.
-FdGuard tcp_listen_accept(std::uint16_t port);
-FdGuard tcp_connect(const char *host, std::uint16_t port);
+// OOB TCP handshake helpers. The coprocessor
+// listens and accepts, the controller connects to it.
+FdGuard tcp_listen_accept(std::uint16_t port);             // coprocessor side
+FdGuard tcp_connect(const char *host, std::uint16_t port); // controller side
 
 // Blocking exact-length IO over an OOB socket.
 void send_exact(int fd, const void *buf, std::size_t n);

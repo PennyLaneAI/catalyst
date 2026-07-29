@@ -34,14 +34,18 @@ int main(int argc, char **argv)
     std::uint16_t port = 18560;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
-        if (k == "--dev")
+        if (k == "--dev") {
             dev = v;
-        else if (k == "--gid")
+        }
+        else if (k == "--gid") {
             gid = std::atoi(v.c_str());
-        else if (k == "--peer")
+        }
+        else if (k == "--peer") {
             peer = v;
-        else if (k == "--port")
+        }
+        else if (k == "--port") {
             port = static_cast<std::uint16_t>(std::atoi(v.c_str()));
+        }
     }
     GpuCoprocessorSession s(dev, gid);
     ConnectInfo ci{

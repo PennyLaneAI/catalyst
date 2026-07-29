@@ -20,14 +20,14 @@
 
 #include <string>
 
-#include "CpuBackendConfig.hpp"
+#include "BackendConfig.hpp"
 #include "CpuCoprocessorSession.hpp"
 #include "TransportBackend.h"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string &config)
 {
-    const auto cfg = catalyst::transport::cpu_verbs::parse_cpu_config(config);
+    const auto cfg = catalyst::transport::common::parse_backend_config(config, "cpu_verbs");
     return new catalyst::transport::cpu_verbs::CpuCoprocessorSession(cfg.dev, cfg.gid);
 }
 } // namespace

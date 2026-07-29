@@ -175,6 +175,10 @@ class LinkerDriver:
             "-lrt_rsdecomp",
             "-lrt_decoder",
         ]
+        
+        rt_transport_so = "librt_transport" + file_extension
+        if os.path.isfile(os.path.join(rt_lib_path, rt_transport_so)):
+            default_flags.append("-lrt_transport")
 
         # If OQD runtime capi is built, link to it as well
         # TODO: This is not ideal and should be replaced when the compiler is device aware

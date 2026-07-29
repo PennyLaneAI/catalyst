@@ -39,8 +39,16 @@ constexpr std::uint8_t PORT = 1;
 constexpr int REAP_BATCH = 16;
 // QP inline capacity for inline sends (>= sizeof(Payload), 16 B).
 constexpr int INLINE_MAX = 256;
+// Backward path: everything this coprocessor sends goes out on bwd_qp_, so it
+// carries the full send/completion depth.
 constexpr int SQ_DEPTH = 4096;
 constexpr int CQ_DEPTH = 4096;
+// Forward path: the peer RDMA-writes into our ring, so fwd_qp_ is only driven to
+// RTS and never posted to (see connect()/exchange_keys()). Minimal capacity, and
+// no inline budget at all.
+constexpr int FWD_SQ_DEPTH = 16;
+constexpr int FWD_CQ_DEPTH = 256;
+constexpr int FWD_INLINE_MAX = 0;
 } // namespace
 
 GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx)
@@ -52,9 +60,9 @@ int GpuCoprocessorSession::connect(const ConnectInfo &info)
 {
     ctx_ = std::make_shared<Context>(dev_name_);
     pd_ = std::make_shared<ProtectionDomain>(ctx_);
-    fwd_cq_ = std::make_shared<CompletionQueue>(ctx_, 256);
+    fwd_cq_ = std::make_shared<CompletionQueue>(ctx_, FWD_CQ_DEPTH);
     bwd_cq_ = std::make_shared<CompletionQueue>(ctx_, CQ_DEPTH);
-    fwd_qp_ = std::make_shared<QueuePair>(pd_, fwd_cq_, fwd_cq_, 16);
+    fwd_qp_ = std::make_shared<QueuePair>(pd_, fwd_cq_, fwd_cq_, FWD_SQ_DEPTH, FWD_INLINE_MAX);
     bwd_qp_ = std::make_shared<QueuePair>(pd_, bwd_cq_, bwd_cq_, SQ_DEPTH, INLINE_MAX);
     fwd_qp_->to_init(PORT);
     bwd_qp_->to_init(PORT);
@@ -172,10 +180,12 @@ void GpuCoprocessorSession::reap_bwd(int &outstanding, bool drain)
     do {
         int n = ibv_poll_cq(bwd_cq_->get(), static_cast<int>(wc.size()), wc.data());
         if (n == 0) {
-            if (!drain)
+            if (!drain) {
                 return;
-            if (++empty >= DRAIN_MAX_EMPTY)
+            }
+            if (++empty >= DRAIN_MAX_EMPTY) {
                 return;
+            }
             continue;
         }
         empty = 0;
@@ -225,8 +235,9 @@ void GpuCoprocessorSession::start()
     error_ = nullptr;
     completed_.store(0, std::memory_order_relaxed);
     last_word_.store(0, std::memory_order_relaxed);
-    if (handoff_.stop_host)
+    if (handoff_.stop_host) {
         *handoff_.stop_host = 0;
+    }
     // Launch the persistent kernel once via the bound launcher (nullptr selects
     // the built-in echo launcher). The kernel runs until the stop flag is set
     // (total = 0); the session keeps owning the stream/stop/sync + reply thread.
@@ -260,16 +271,20 @@ int GpuCoprocessorSession::collect(void *const *outputs, const std::uint64_t *ou
                                    std::size_t n)
 {
     while (completed_.load(std::memory_order_acquire) == 0) {
-        if (failed_.load(std::memory_order_acquire))
+        if (failed_.load(std::memory_order_acquire)) {
             std::rethrow_exception(error_);
-        if (!engine_.joinable() || engine_.get_stop_token().stop_requested())
+        }
+        if (!engine_.joinable() || engine_.get_stop_token().stop_requested()) {
             break;
+        }
         std::this_thread::yield();
     }
-    if (failed_.load(std::memory_order_acquire))
+    if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_);
-    if (completed_.load(std::memory_order_acquire) == 0)
+    }
+    if (completed_.load(std::memory_order_acquire) == 0) {
         return -1;
+    }
     if (n > 0 && outputs && outputs[0]) {
         const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
         const std::size_t nb =
@@ -281,8 +296,9 @@ int GpuCoprocessorSession::collect(void *const *outputs, const std::uint64_t *ou
 
 void GpuCoprocessorSession::stop()
 {
-    if (handoff_.stop_host)
+    if (handoff_.stop_host) {
         *handoff_.stop_host = 1; // let the fused kernel exit its loop
+    }
     if (engine_.joinable()) {
         engine_.request_stop();
         engine_.join();
