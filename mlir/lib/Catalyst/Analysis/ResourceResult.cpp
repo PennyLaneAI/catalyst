@@ -129,7 +129,8 @@ void ResourceResult::multiplyBy(double scalar) {
 //   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
 //   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
 //   measurement_processes: { "meas_type": count, ... }
-//   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth, qubit_disjoint_depth }
+//   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
+//   qubit_disjoint_depth }
 static llvm::json::Value countToJson(double count)
 {
     return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
