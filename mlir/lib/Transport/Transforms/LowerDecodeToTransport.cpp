@@ -20,11 +20,13 @@
 
 #include <string>
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
 
+#include "QecPhysical/IR/QecPhysicalOps.h"
 #include "Transport/IR/TransportOps.h"
 #include "Transport/Transforms/Passes.h"
 
@@ -48,31 +50,20 @@ struct LowerDecodeToTransportPass
     void runOnOperation() override
     {
         ModuleOp mod = getOperation();
-        auto backline = mod->getAttrOfType<DictionaryAttr>(kBacklineAttr);
+        auto backline = mod->getAttrOfType<BacklineAttr>(kBacklineAttr);
         if (!backline)
+            return;
+
+        SmallVector<std::string> peerKeys;
+        for (auto [i, coproc] : llvm::enumerate(backline.getCoprocessors()))
+            peerKeys.push_back(coproc.keyOr("coprocessor." + std::to_string(i)).str());
+        // The controller is not an offload target, so with no coprocessors declared,
+        // there is nowhere to send the decode, and it stays local.
+        if (peerKeys.empty())
             return;
 
         MLIRContext *ctx = &getContext();
         auto ctrlTy = SessionType::get(ctx, Role::Controller);
-
-        SmallVector<std::string> peerKeys;
-        if (auto arr = backline.getAs<ArrayAttr>("coprocessors")) {
-            for (size_t i = 0; i < arr.size(); ++i) {
-                StringRef name;
-                if (auto d = dyn_cast<DictionaryAttr>(arr[i]))
-                    if (auto n = d.getAs<StringAttr>("name"); n && !n.getValue().empty())
-                        name = n.getValue();
-                peerKeys.push_back(name.empty() ? ("coprocessor." + std::to_string(i))
-                                                : name.str());
-            }
-        }
-        if (peerKeys.empty()) {
-            StringRef name;
-            if (auto c = backline.getAs<DictionaryAttr>("controller"))
-                if (auto n = c.getAs<StringAttr>("name"); n && !n.getValue().empty())
-                    name = n.getValue();
-            peerKeys.push_back(name.empty() ? "controller" : name.str());
-        }
 
         auto emitRound = [&](Operation *anchor, Value syndrome, Value correction, StringRef key) {
             OpBuilder b(anchor);
@@ -83,20 +74,15 @@ struct LowerDecodeToTransportPass
             anchor->erase();
         };
 
-        SmallVector<Operation *> anchors;
-        mod.walk([&](Operation *op) {
-            if (op->getName().getStringRef() == "qecp.decode_esm_css" && op->getNumResults() == 0 &&
-                op->getNumOperands() == 3)
+        SmallVector<qecp::DecodeEsmCssOp> anchors;
+        mod.walk([&](qecp::DecodeEsmCssOp op) {
+            if (op.isBufferized() && op.getErrIdxIn())
                 anchors.push_back(op);
         });
+        // Distribute the decoding tasks across the coprocessors in a round-robin fashion.
         for (size_t k = 0; k < anchors.size(); ++k) {
-            Operation *anchor = anchors[k];
-            std::string key;
-            if (auto tag = anchor->getAttrOfType<StringAttr>("transport.peer"))
-                key = tag.getValue().str();
-            else
-                key = peerKeys[k % peerKeys.size()];
-            emitRound(anchor, anchor->getOperand(0), anchor->getOperand(2), key);
+            qecp::DecodeEsmCssOp anchor = anchors[k];
+            emitRound(anchor, anchor.getEsm(), anchor.getErrIdxIn(), peerKeys[k % peerKeys.size()]);
         }
     }
 };
