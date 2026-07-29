@@ -154,6 +154,41 @@ class TestCompilerOptions:
         assert "--save-ir-after-each=pass" in flags
 
 
+class TestDefaultFlags:
+    """Unit tests for optional libraries discovered in LinkerDriver.get_default_flags."""
+
+    @staticmethod
+    def _lib_name(stem):
+        """Build the platform-specific shared library file name for a library stem."""
+        ext = ".so" if platform.system() == "Linux" else ".dylib"
+        return stem + ext
+
+    def _patch_isfile(self, monkeypatch, overrides):
+        """Patch isfile to force given library file names present/absent."""
+        real_isfile = os.path.isfile
+        overrides = {os.path.basename(name): value for name, value in overrides.items()}
+
+        def fake_isfile(p):
+            name = os.path.basename(p)
+            if name in overrides:
+                return overrides[name]
+            return real_isfile(p)
+
+        monkeypatch.setattr("catalyst.compiler.os.path.isfile", fake_isfile)
+
+    def test_rt_executor_linked_when_present(self, monkeypatch):
+        """-lrt_executor is added when librt_executor exists in the runtime lib dir."""
+        self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_executor"): True})
+        flags = LinkerDriver.get_default_flags(CompileOptions())
+        assert "-lrt_executor" in flags
+
+    def test_rt_executor_not_linked_when_absent(self, monkeypatch):
+        """-lrt_executor is omitted when librt_executor is missing."""
+        self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_executor"): False})
+        flags = LinkerDriver.get_default_flags(CompileOptions())
+        assert "-lrt_executor" not in flags
+
+
 class TestCompilerWarnings:
     """Test compiler's warning messages."""
 
