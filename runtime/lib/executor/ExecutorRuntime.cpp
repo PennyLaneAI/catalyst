@@ -42,6 +42,7 @@ struct ExecutorEntry {
 struct AsyncWorker {
     int64_t session;
     std::thread thread;
+    std::shared_ptr<std::string> error;
 };
 
 std::mutex g_async_mu;
@@ -59,14 +60,14 @@ std::map<int64_t, std::shared_ptr<ExecutorEntry>> g_sessions_by_handle;
 // Monotonic handle allocator. 0 is reserved for the invalid handle.
 int64_t g_next_handle = 1;
 
-std::thread take_async_worker(int64_t token)
+AsyncWorker take_async_worker(int64_t token)
 {
     std::lock_guard<std::mutex> lk(g_async_mu);
     auto it = g_async_workers.find(token);
     if (it == g_async_workers.end()) {
         return {};
     }
-    std::thread worker = std::move(it->second.thread);
+    AsyncWorker worker = std::move(it->second);
     g_async_workers.erase(it);
     return worker;
 }
@@ -136,6 +137,15 @@ std::shared_ptr<ExecutorEntry> find_entry_by_handle(int64_t session)
 
 extern "C" {
 
+/**
+ * @brief Open (or reuse) an executor session for `addr`.
+ *
+ * Idempotent per address: a second open of a live address returns the existing handle rather than
+ * reconnecting. A failed connection drops the entry so a later open retries from scratch.
+ *
+ * @param addr The executor endpoint to connect to. Must be non-empty.
+ * @return int64_t A non-zero session handle for use with the other executor CAPI calls.
+ */
 int64_t __catalyst__executor__open(const char *addr)
 {
     if (!addr || !*addr) {
@@ -187,6 +197,17 @@ int64_t __catalyst__executor__open(const char *addr)
     RT_FAIL(err_msg.c_str());
 }
 
+/**
+ * @brief Load a binary (object or asset) into the session, once per path.
+ *
+ * Paths already loaded into the session are skipped, so repeated sends of the same object are
+ * no-ops. A failed load is not recorded as loaded, so it can be retried.
+ *
+ * @param session The i64 handle of the session, from __catalyst__executor__open.
+ * @param path The filesystem path of the binary to load. Empty is a no-op.
+ * @param format The binary format tag: 0 for an object file, 1 for an asset.
+ * @return int64_t 0 on success.
+ */
 int64_t __catalyst__executor__send_binary(int64_t session, const char *path, uint32_t format)
 {
     auto entry = find_entry_by_handle(session);
@@ -291,8 +312,21 @@ int32_t __catalyst__executor__call_wrapper(int64_t session, const char *symbol,
     return 0;
 }
 
+/**
+ * @brief Free a result buffer returned by __catalyst__executor__call_wrapper.
+ *
+ * @param buf The buffer to free. May be null.
+ */
 void __catalyst__executor__free_result(void *buf) { std::free(buf); }
 
+/**
+ * @brief Close a session: join its outstanding async workers, close the connection, and forget it.
+ *
+ * Idempotent: closing an unknown or already-closed handle is a no-op.
+ *
+ * @param session The i64 handle of the session to close.
+ * @return int64_t 0.
+ */
 int64_t __catalyst__executor__close(int64_t session)
 {
     auto entry = find_entry_by_handle(session);
@@ -323,6 +357,24 @@ int64_t __catalyst__executor__close(int64_t session)
     return 0;
 }
 
+/**
+ * @brief Synchronously invoke an entry symbol on the executor, marshalling memref arguments.
+ *
+ * The entry is resolved within the JITDylib of `object`, so identically-named entries from
+ * different shipped objects do not collide. Blocks until the remote invocation completes.
+ *
+ * @param session The i64 handle of the session.
+ * @param entry_symbol The name of the entry function to invoke.
+ * @param object The object path whose JITDylib scopes the symbol lookup; null for the global scope.
+ * @param num_inputs The number of input memref descriptors.
+ * @param input_descs The input memref descriptors.
+ * @param input_ranks The rank of each input memref.
+ * @param input_elem_sizes The element size (bytes) of each input memref.
+ * @param num_outputs The number of output memref descriptors.
+ * @param output_descs The output memref descriptors.
+ * @param output_ranks The rank of each output memref.
+ * @param output_elem_sizes The element size (bytes) of each output memref.
+ */
 void __catalyst__executor__launch(int64_t session, const char *entry_symbol, const char *object,
                                   size_t num_inputs, void *const *input_descs,
                                   const size_t *input_ranks, const size_t *input_elem_sizes,
@@ -357,6 +409,19 @@ void __catalyst__executor__launch(int64_t session, const char *entry_symbol, con
     }
 }
 
+/**
+ * @brief Invoke a no-argument entry symbol on a background thread and return a token to await.
+ *
+ * The invocation runs on a worker thread registered under the returned token. Failures are captured
+ * and re-raised by the matching __catalyst__executor__await rather than thrown on the worker. The
+ * worker must be awaited (or joined via close) before the session is destroyed.
+ *
+ * @param session The i64 handle of the session.
+ * @param entry_symbol The name of the entry function to invoke.
+ * @param object The object path whose JITDylib scopes the symbol lookup; null/empty for global.
+ * @return int64_t A token identifying the async worker, to be passed to
+ * __catalyst__executor__await.
+ */
 int64_t __catalyst__executor__launch_async(int64_t session, const char *entry_symbol,
                                            const char *object)
 {
@@ -368,8 +433,11 @@ int64_t __catalyst__executor__launch_async(int64_t session, const char *entry_sy
     std::string sym = entry_symbol ? entry_symbol : "";
     std::string obj = object ? object : "";
     bool verbose = remote_verbose();
+    auto error = std::make_shared<std::string>();
 
-    auto work = [raw, sym, obj, verbose, session]() {
+    // Failures are recorded and not thrown so they can be re-raised on the main thread by the 
+    //matching `await`
+    auto work = [raw, sym, obj, verbose, session, error]() {
         std::lock_guard<std::mutex> lock(raw->mu);
         if (verbose) {
             std::fprintf(stderr, "[remote] launch_async(session=%lld, symbol=%s, object=%s)\n",
@@ -377,37 +445,55 @@ int64_t __catalyst__executor__launch_async(int64_t session, const char *entry_sy
                          obj.empty() ? "<none>" : obj.c_str());
         }
         if (!raw->session) {
-            std::fprintf(stderr, "[remote] launch_async: session closed before worker ran\n");
+            *error = "launch_async(session=" + std::to_string(session) +
+                     "): session closed before worker ran";
             return;
         }
         const char *obj_arg = obj.empty() ? nullptr : obj.c_str();
         uint64_t entry_addr = catalyst::executor::lookup(raw->session, sym.c_str(), obj_arg);
         if (!entry_addr) {
-            std::fprintf(stderr, "[remote] launch_async lookup failed: %s\n",
-                         catalyst::executor::last_error());
+            *error =
+                "launch_async lookup of '" + sym + "' failed: " + catalyst::executor::last_error();
             return;
         }
         if (catalyst::executor::invoke_kernel(raw->session, entry_addr, 0, nullptr, nullptr,
                                               nullptr, 0, nullptr, nullptr, nullptr) != 0) {
-            std::fprintf(stderr, "[remote] launch_async invoke failed: %s\n",
-                         catalyst::executor::last_error());
+            *error =
+                "launch_async invoke of '" + sym + "' failed: " + catalyst::executor::last_error();
         }
     };
 
     std::lock_guard<std::mutex> reg(g_async_mu);
     int64_t token = g_next_token++;
-    g_async_workers.emplace(token, AsyncWorker{session, std::thread(std::move(work))});
+    g_async_workers.emplace(token, AsyncWorker{session, std::thread(std::move(work)), error});
     return token;
 }
 
+/**
+ * @brief Wait for the async worker identified by `token` and re-raise any failure it recorded.
+ *
+ * Joins the worker thread, then re-raises (RT_FAIL) on the main thread any error the worker
+ * captured. An unknown or already-consumed token is a non-fatal no-op (it may have been reaped by a
+ * prior close); such cases are logged only under CATALYST_REMOTE_VERBOSE.
+ *
+ * @param token The token returned by __catalyst__executor__launch_async.
+ */
 void __catalyst__executor__await(int64_t token)
 {
     if (remote_verbose()) {
         std::fprintf(stderr, "[remote] await(token=%lld)\n", static_cast<long long>(token));
     }
-    std::thread worker = take_async_worker(token);
-    if (worker.joinable()) {
-        worker.join();
+    AsyncWorker worker = take_async_worker(token);
+    if (!worker.thread.joinable()) {
+        if (remote_verbose()) {
+            std::fprintf(stderr, "[remote] await: unknown or already-awaited token %lld\n",
+                         static_cast<long long>(token));
+        }
+        return;
+    }
+    worker.thread.join();
+    if (worker.error && !worker.error->empty()) {
+        RT_FAIL(worker.error->c_str());
     }
 }
 
