@@ -63,9 +63,10 @@ class FdGuard {
     int fd_ = -1;
 };
 
-// OOB TCP handshake helpers.
-FdGuard tcp_listen_accept(std::uint16_t port);
-FdGuard tcp_connect(const char *host, std::uint16_t port);
+// OOB TCP handshake helpers. The coprocessor
+// listens and accepts, the controller connects to it.
+FdGuard tcp_listen_accept(std::uint16_t port); // coprocessor side
+FdGuard tcp_connect(const char *host, std::uint16_t port); // controller side
 
 // Blocking exact-length IO over an OOB socket.
 void send_exact(int fd, const void *buf, std::size_t n);

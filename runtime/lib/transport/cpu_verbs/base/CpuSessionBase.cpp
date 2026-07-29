@@ -38,6 +38,8 @@ constexpr int REAP_BATCH = 16;
 constexpr int INLINE_MAX = 256;
 constexpr int SQ_DEPTH = 4096;
 constexpr int CQ_DEPTH = 4096;
+// Page alignment for registered host buffers.
+constexpr std::size_t PAGE_ALIGN = 4096;
 } // namespace
 
 CpuSessionBase::CpuSessionBase(std::string dev, int gid_idx)
@@ -67,7 +69,7 @@ MemRegion CpuSessionBase::alloc_memory(std::size_t size, MemKind kind)
 {
     RDMA_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
-        pd_, size, 4096, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE));
+        pd_, size, PAGE_ALIGN, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE));
     const MemoryRegion &mr = caller_memory_regions_.back();
     return MemRegion{
         .addr = mr.addr(),
@@ -123,7 +125,7 @@ void CpuSessionBase::establish_channel(const ChannelDesc &desc, const MemRegion 
     local_ = local;
     peer_ = peer;
     send_buf_ =
-        common::MemoryRegion::alloc_host(pd_, sizeof(Payload), 64, common::MemAccess::LOCAL_WRITE);
+        common::MemoryRegion::alloc_host(pd_, sizeof(Payload), alignof(PayloadSlot), common::MemAccess::LOCAL_WRITE);
 }
 
 void CpuSessionBase::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled)

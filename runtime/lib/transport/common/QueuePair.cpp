@@ -31,6 +31,9 @@ constexpr std::uint8_t QP_TIMEOUT = 14;    // ACK timeout code
 constexpr std::uint8_t RETRY_CNT = 7;      // transport retry count
 constexpr std::uint8_t RNR_RETRY = 7;      // RNR retry count (7 = infinite)
 constexpr std::uint8_t MAX_RD_ATOMIC = 1;  // outstanding RDMA read/atomic ops
+constexpr std::uint8_t MAX_RECV_WR = 4;
+constexpr std::uint8_t MAX_SGE = 1;
+
 } // namespace
 
 QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,
@@ -43,9 +46,9 @@ QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<Compl
         .cap =
             {
                 .max_send_wr = static_cast<std::uint32_t>(max_send_wr),
-                .max_recv_wr = 4,
-                .max_send_sge = 1,
-                .max_recv_sge = 1,
+                .max_recv_wr = MAX_RECV_WR,
+                .max_send_sge = MAX_SGE,
+                .max_recv_sge = MAX_SGE,
                 .max_inline_data = static_cast<std::uint32_t>(max_inline),
             },
         .qp_type = IBV_QPT_RC,
