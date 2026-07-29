@@ -17,14 +17,14 @@
 
 #include <string>
 
-#include "CpuBackendConfig.hpp"
+#include "BackendConfig.hpp"
 #include "CpuControllerSession.hpp"
 #include "TransportBackend.h"
 
 namespace {
 catalyst::transport::ControllerSession *make_cpu_controller(const std::string &config)
 {
-    const auto cfg = catalyst::transport::cpu_verbs::parse_cpu_config(config);
+    const auto cfg = catalyst::transport::common::parse_backend_config(config, "cpu_verbs");
     return new catalyst::transport::cpu_verbs::CpuControllerSession(cfg.dev, cfg.gid);
 }
 } // namespace

@@ -14,6 +14,7 @@
 
 #include <string>
 
+#include "BackendConfig.hpp"
 #include "Context.hpp"
 #include "QpState.hpp"
 
@@ -36,6 +37,43 @@ static bool have_rxe()
         ibv_free_device_list(devs);
     }
     return found;
+}
+
+TEST_CASE("parse_backend_config requires an explicit dev and gid", "[common]")
+{
+    SECTION("both keys present, order-independent")
+    {
+        const BackendConfig a = parse_backend_config("dev=rxe0;gid=1", "cpu_verbs");
+        CHECK(a.dev == "rxe0");
+        CHECK(a.gid == 1);
+        const BackendConfig b = parse_backend_config("gid=3;dev=mlx5_1", "gpu_verbs");
+        CHECK(b.dev == "mlx5_1");
+        CHECK(b.gid == 3);
+        // 0 is a valid GID index, not a "missing" sentinel.
+        CHECK(parse_backend_config("dev=rxe0;gid=0", "cpu_verbs").gid == 0);
+    }
+    SECTION("unknown keys are ignored, required ones still enforced")
+    {
+        const BackendConfig c = parse_backend_config("foo=bar;dev=rxe0;gid=2", "cpu_verbs");
+        CHECK(c.dev == "rxe0");
+        CHECK(c.gid == 2);
+    }
+    SECTION("a missing key is rejected rather than defaulted")
+    {
+        CHECK_THROWS_AS(parse_backend_config("", "cpu_verbs"), RdmaError);
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0", "cpu_verbs"), RdmaError);
+        CHECK_THROWS_AS(parse_backend_config("gid=1", "cpu_verbs"), RdmaError);
+        CHECK_THROWS_AS(parse_backend_config("junk", "cpu_verbs"), RdmaError);
+    }
+    SECTION("an empty or malformed value is rejected")
+    {
+        CHECK_THROWS_AS(parse_backend_config("dev=;gid=1", "cpu_verbs"), RdmaError);
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=", "cpu_verbs"), RdmaError);
+        // std::atoi would have silently turned each of these into gid 0.
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=abc", "cpu_verbs"), RdmaError);
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=1x", "cpu_verbs"), RdmaError);
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=-1", "cpu_verbs"), RdmaError);
+    }
 }
 
 TEST_CASE("QpState transitions gate the RC bring-up edges", "[common]")

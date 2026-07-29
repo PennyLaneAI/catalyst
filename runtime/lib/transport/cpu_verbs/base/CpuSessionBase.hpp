@@ -41,6 +41,11 @@ class CpuSessionBase : public TransportSession {
     explicit CpuSessionBase(std::string dev, int gid_idx);
     ~CpuSessionBase() override { stop(); }
 
+    CpuSessionBase(const CpuSessionBase &) = delete;
+    CpuSessionBase &operator=(const CpuSessionBase &) = delete;
+    CpuSessionBase(CpuSessionBase &&) = delete;
+    CpuSessionBase &operator=(CpuSessionBase &&) = delete;
+
     int connect(const ConnectInfo &info) override;
     MemRegion alloc_memory(std::size_t size, MemKind kind) override;
     PeerRef exchange_keys(const MemRegion &local) override;

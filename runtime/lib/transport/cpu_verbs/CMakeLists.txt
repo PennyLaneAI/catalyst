@@ -8,7 +8,6 @@ add_library(cpu_verbs_impl STATIC
     coprocessor/CpuCoprocessorSession.cpp
 )
 target_include_directories(cpu_verbs_impl PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}              # CpuBackendConfig.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/base
     ${CMAKE_CURRENT_SOURCE_DIR}/controller
     ${CMAKE_CURRENT_SOURCE_DIR}/coprocessor

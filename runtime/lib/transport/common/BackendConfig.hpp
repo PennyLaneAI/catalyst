@@ -22,19 +22,32 @@
 
 #include "Error.hpp"
 
-namespace catalyst::transport::cpu_verbs {
+namespace catalyst::transport::common {
 
-// Construction parameters parsed from a backend factory `config` string
-// ("key=value;..."). Connection parameters (peer/oob_port) are not here — they
-// arrive later via connect(). Both keys are required, e.g.
-// "dev=rxe0;gid=1".
-struct CpuConfig {
-    std::string dev;
-    int gid;
+// Construction parameters shared by the verbs-based backends, parsed from a
+// backend factory `config` string ("key=value;..."). Connection parameters
+// (peer/oob_port) are not here — they arrive later via connect(). Both keys are
+// required and have no defaults, e.g. "dev=rxe0;gid=1".
+struct BackendConfig {
+    std::string dev; // RDMA device name, e.g. "rxe0" or "mlx5_1"
+    int gid;         // GID index on that device's port
 };
 
-inline CpuConfig parse_cpu_config(const std::string &config)
+/**
+ * @brief Parse the `dev` and `gid` keys out of a backend `config` string.
+ *
+ * Unknown keys are ignored, so a backend may carry extra keys of its own and
+ * parse them separately. Both recognised keys are mandatory: an absent, empty
+ * or malformed value throws rather than falling back to a built-in device.
+ *
+ * @param config The factory config string, e.g. "dev=rxe0;gid=1".
+ * @param backend Backend name used in error messages, e.g. "cpu_verbs".
+ * @return The parsed device name and GID index.
+ */
+inline BackendConfig parse_backend_config(const std::string &config, const char *backend)
 {
+    // Parsed into locals so a rejected config never yields a partially built
+    // BackendConfig.
     std::string dev;
     int gid = 0;
     bool have_dev = false, have_gid = false;
@@ -46,15 +59,17 @@ inline CpuConfig parse_cpu_config(const std::string &config)
             const std::string_view key = tok.substr(0, eq);
             const std::string_view val = tok.substr(eq + 1);
             if (key == "dev") {
-                RDMA_CHECK(!val.empty(), "cpu_verbs config: 'dev' must not be empty");
+                RDMA_CHECK(!val.empty(), "%s config: 'dev' must not be empty", backend);
                 dev = std::string(val);
                 have_dev = true;
             }
             else if (key == "gid") {
+                // from_chars, not atoi: atoi maps a malformed value to 0, which
+                // would silently reinstate a default gid.
                 const char *last = val.data() + val.size();
                 const auto res = std::from_chars(val.data(), last, gid);
                 RDMA_CHECK(res.ec == std::errc{} && res.ptr == last && gid >= 0,
-                           "cpu_verbs config: 'gid' must be a non-negative integer, got '%.*s'",
+                           "%s config: 'gid' must be a non-negative integer, got '%.*s'", backend,
                            static_cast<int>(val.size()), val.data());
                 have_gid = true;
             }
@@ -65,10 +80,9 @@ inline CpuConfig parse_cpu_config(const std::string &config)
         pos = sep + 1;
     }
     RDMA_CHECK(have_dev && have_gid,
-               "cpu_verbs config requires both 'dev' and 'gid' (e.g. \"dev=rxe0;gid=1\"), got "
-               "\"%s\"",
-               config.c_str());
-    return CpuConfig{std::move(dev), gid};
+               "%s config requires both 'dev' and 'gid' (e.g. \"dev=rxe0;gid=1\"), got \"%s\"",
+               backend, config.c_str());
+    return BackendConfig{std::move(dev), gid};
 }
 
-} // namespace catalyst::transport::cpu_verbs
+} // namespace catalyst::transport::common

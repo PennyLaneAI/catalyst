@@ -18,7 +18,6 @@
 #include <string>
 #include <thread>
 
-#include "CpuBackendConfig.hpp"
 #include "CpuControllerSession.hpp"
 #include "CpuCoprocessorSession.hpp"
 #include "WireProtocol.hpp"
@@ -57,42 +56,6 @@ static std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std:
     const std::size_t n = std::min(out_cap, sizeof(v));
     std::memcpy(out, &v, n);
     return n;
-}
-
-TEST_CASE("parse_cpu_config requires an explicit dev and gid", "[cpu_libibverbs]")
-{
-    SECTION("both keys present, order-independent")
-    {
-        const CpuConfig a = parse_cpu_config("dev=rxe0;gid=1");
-        CHECK(a.dev == "rxe0");
-        CHECK(a.gid == 1);
-        const CpuConfig b = parse_cpu_config("gid=3;dev=mlx5_1");
-        CHECK(b.dev == "mlx5_1");
-        CHECK(b.gid == 3);
-        CHECK(parse_cpu_config("dev=rxe0;gid=0").gid == 0); // 0 is a valid GID index
-    }
-    SECTION("unknown keys are ignored, required ones still enforced")
-    {
-        const CpuConfig c = parse_cpu_config("foo=bar;dev=rxe0;gid=2");
-        CHECK(c.dev == "rxe0");
-        CHECK(c.gid == 2);
-    }
-    SECTION("a missing key is rejected rather than defaulted")
-    {
-        CHECK_THROWS_AS(parse_cpu_config(""), RdmaError);
-        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0"), RdmaError);
-        CHECK_THROWS_AS(parse_cpu_config("gid=1"), RdmaError);
-        CHECK_THROWS_AS(parse_cpu_config("junk"), RdmaError);
-    }
-    SECTION("an empty or malformed value is rejected")
-    {
-        CHECK_THROWS_AS(parse_cpu_config("dev=;gid=1"), RdmaError);
-        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0;gid="), RdmaError);
-        // std::atoi would have silently turned each of these into gid 0.
-        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0;gid=abc"), RdmaError);
-        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0;gid=1x"), RdmaError);
-        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0;gid=-1"), RdmaError);
-    }
 }
 
 TEST_CASE("controller and coprocessor connect: both reach INIT and open the "
