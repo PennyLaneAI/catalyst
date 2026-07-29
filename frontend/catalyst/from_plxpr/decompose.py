@@ -162,8 +162,8 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         """
 
         self._operations.add(op)
-        data, struct = jax.tree_util.tree_flatten(op)
-        return jax.tree_util.tree_unflatten(struct, data)
+        # PennyLane's base interpreter rebinds reconstructed Operator2 instances into the trace.
+        return super().interpret_operation(op)
 
     def cleanup(self):
         """Cleanup after interpretation."""
