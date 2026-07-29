@@ -30,6 +30,9 @@
 namespace catalyst::transport::common {
 
 namespace {
+constexpr int CONNECT_ATTEMPTS = 200;
+constexpr auto CONNECT_RETRY_DELAY = std::chrono::milliseconds(50);
+
 void set_tcp_nodelay(int fd)
 {
     int one = 1;
@@ -72,17 +75,16 @@ FdGuard tcp_connect(const char *host, std::uint16_t port)
     RDMA_CHECK(rc == 0, "getaddrinfo(%s:%s): %s", host, port_str, gai_strerror(rc));
     std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> res_guard(res, freeaddrinfo);
 
-    for (int attempt = 0; attempt < 200; ++attempt) {
+    for (int attempt = 0; attempt < CONNECT_ATTEMPTS; ++attempt) {
         FdGuard s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
         RDMA_CHECK(s.valid(), "socket");
         if (connect(s.get(), res->ai_addr, res->ai_addrlen) == 0) {
             set_tcp_nodelay(s.get());
             return s;
         }
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(50ms);
+        std::this_thread::sleep_for(CONNECT_RETRY_DELAY);
     }
-    RDMA_FAIL("tcp_connect(%s:%u) failed after 200 attempts", host, port);
+    RDMA_FAIL("tcp_connect(%s:%u) failed after %d attempts", host, port, CONNECT_ATTEMPTS);
 }
 
 void send_exact(int fd, const void *buf, std::size_t n)

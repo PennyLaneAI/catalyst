@@ -31,9 +31,8 @@ constexpr std::uint8_t QP_TIMEOUT = 14;    // ACK timeout code
 constexpr std::uint8_t RETRY_CNT = 7;      // transport retry count
 constexpr std::uint8_t RNR_RETRY = 7;      // RNR retry count (7 = infinite)
 constexpr std::uint8_t MAX_RD_ATOMIC = 1;  // outstanding RDMA read/atomic ops
-constexpr std::uint8_t MAX_RECV_WR = 4;
-constexpr std::uint8_t MAX_SGE = 1;
-
+constexpr std::uint32_t MAX_RECV_WR = 4;
+constexpr std::uint32_t MAX_SGE = 1; // single-SGE descriptors on both queues
 } // namespace
 
 QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,
