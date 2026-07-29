@@ -259,6 +259,10 @@ struct ExecutorSession {
 
     Error addObjectFile(StringRef path, std::unique_ptr<MemoryBuffer> Buf)
     {
+        if (KernelJDs.count(path)) {
+            return make_error<StringError>("object already loaded: " + path,
+                                           inconvertibleErrorCode());
+        }
         JITDylib &jd = ES->createBareJITDylib(("kernel:" + path).str());
         jd.addToLinkOrder(MainJD);
         KernelJDs[path] = &jd;

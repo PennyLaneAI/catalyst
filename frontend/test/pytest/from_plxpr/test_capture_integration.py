@@ -1130,38 +1130,8 @@ class TestCapture:
             == captured_rotations_inverses_result
         )
 
-    def test_transform_decompose_workflow(self, backend):
-        """Test the integration for a circuit with a 'decompose' transform."""
-
-        # Capture enabled
-
-        @qjit(capture=True)
-        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
-        @qp.qnode(qp.device(backend, wires=2))
-        def captured_circuit(x: float, y: float, z: float):
-            qp.Rot(x, y, z, 0)
-            return qp.expval(qp.PauliZ(0))
-
-        capture_result = captured_circuit(1.5, 2.5, 3.5)
-        assert is_rot_decomposed(captured_circuit.mlir)
-
-        # Capture disabled
-
-        @qjit
-        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
-        @qp.qnode(qp.device(backend, wires=2))
-        def circuit(x: float, y: float, z: float):
-            qp.Rot(x, y, z, 0)
-            return qp.expval(qp.PauliZ(0))
-
-        assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
-
     def test_transform_graph_decompose_workflow(self, backend):
         """Test the integration for a circuit with a 'decompose' graph transform."""
-
-        # Capture enabled
-
-        qp.decomposition.enable_graph()
 
         @qjit(capture=True)
         @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
@@ -1177,8 +1147,6 @@ class TestCapture:
             return qp.expval(qp.PauliZ(0))
 
         capture_result = captured_circuit(1.5, 2.5, 3.5)
-
-        qp.decomposition.disable_graph()
 
         # Capture disabled
         @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])

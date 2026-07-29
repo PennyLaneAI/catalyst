@@ -12,12 +12,23 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
+  resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
+  operations in question can be annotated with either a `catalyst.estimated_probability` or
+  `catalyst.estimated_probabilities` attribute, respectively, to indicate the expected probability
+  distribution over the branches. The counted resources are then scaled proportionally and summed.
+  [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
+
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
 
 * Catalyst can now cross-compile target nested modules to standalone object files and
   either statically link them into the host program or ship them to an executor for dispatch.
  [(#3033)](https://github.com/PennyLaneAI/catalyst/pull/3033)
+
+* A new `Transport` MLIR dialect is added, providing typed ops for driving a transport session's
+  lifecycle at the IR level.
+  [(#3047)](https://github.com/PennyLaneAI/catalyst/pull/3047)
 
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
@@ -35,6 +46,7 @@
     executor and uses LLVM's ORC v2 EPC as the wire protocol to ship cross-compiled kernel objects
     into the remote JIT.
     [(#2915)](https://github.com/PennyLaneAI/catalyst/pull/2915)
+    [(#3030)](https://github.com/PennyLaneAI/catalyst/pull/3030)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
@@ -85,6 +97,12 @@
 * `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
   duplicate serialization logic and keeping its output consistent.
   [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
+
+* The `ResourceAnalysis` pass now counts quantum, measurement, and allocation
+  ops through dialect-agnostic MLIR OpInterfaces instead of hard-coded check.
+  New dialects can opt in by implementing these interfaces without changing
+  the analysis.
+  [(#3025)](https://github.com/PennyLaneAI/catalyst/pull/3025)
 
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
@@ -211,6 +229,9 @@
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
 <h3>Breaking changes 💔</h3>
+
+* Removes the non-graph decomposition fallback when `capture=True` is enabled.
+  [(#3058)](https://github.com/PennyLaneAI/catalyst/pull/3058/)
 
 * Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
   [(#2974)](https://github.com/PennyLaneAI/catalyst/pull/2974)
