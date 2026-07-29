@@ -38,8 +38,8 @@ func.func @send_binary() {
 func.func @launch(%arg0: memref<f64>) -> memref<f64> {
   // CHECK: %[[S:.*]] = executor.open("127.0.0.1:9000") : !executor.session
   %s = executor.open("127.0.0.1:9000") : !executor.session
-  // CHECK: executor.launch %[[S]]("qnode_0") (%{{.*}}) : !executor.session, (memref<f64>) -> memref<f64>
-  %0 = executor.launch %s("qnode_0") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
+  // CHECK: executor.launch %[[S]]("qnode_0", "/tmp/qnode.o") (%{{.*}}) : !executor.session, (memref<f64>) -> memref<f64>
+  %0 = executor.launch %s("qnode_0", "/tmp/qnode.o") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
   return %0 : memref<f64>
 }
 
@@ -75,8 +75,8 @@ func.func @session_lifecycle(%arg0: memref<f64>) -> memref<f64> {
   // CHECK: %[[S:.*]] = executor.open("127.0.0.1:9000") : !executor.session
   %s = executor.open("127.0.0.1:9000") : !executor.session
   executor.send_binary %s("/tmp/qnode_0.o") : !executor.session
-  %0 = executor.launch %s("qnode_0") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
-  %1 = executor.launch %s("qnode_0") (%0) : !executor.session, (memref<f64>) -> memref<f64>
+  %0 = executor.launch %s("qnode_0", "/tmp/qnode_0.o") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
+  %1 = executor.launch %s("qnode_0", "/tmp/qnode_0.o") (%0) : !executor.session, (memref<f64>) -> memref<f64>
   executor.close %s : !executor.session
   return %1 : memref<f64>
 }

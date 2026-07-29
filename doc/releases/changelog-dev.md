@@ -42,6 +42,7 @@
     executor and uses LLVM's ORC v2 EPC as the wire protocol to ship cross-compiled kernel objects
     into the remote JIT.
     [(#2915)](https://github.com/PennyLaneAI/catalyst/pull/2915)
+    [(#3030)](https://github.com/PennyLaneAI/catalyst/pull/3030)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)

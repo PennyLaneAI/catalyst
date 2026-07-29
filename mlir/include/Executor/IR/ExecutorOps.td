@@ -81,13 +81,14 @@ def Executor_LaunchOp : Executor_Op<"launch"> {
     let arguments = (ins
         Executor_SessionType:$session,
         Variadic<AnyMemRef>:$inputs,
-        StrAttr:$kernel_callee
+        StrAttr:$kernel_callee,
+        StrAttr:$object
     );
 
     let results = (outs Variadic<AnyMemRef>:$results);
 
     let assemblyFormat = [{
-        $session `(` $kernel_callee `)` `(` $inputs `)` attr-dict
+        $session `(` $kernel_callee `,` $object `)` `(` $inputs `)` attr-dict
             `:` type($session) `,` functional-type($inputs, $results)
     }];
 }
