@@ -18,7 +18,6 @@
 import pennylane as qp
 from operator2_dummy_gates import (
     CompilableData,
-    HybridNoOpArg,
     HybridOpArg,
     HybridWires,
     MultiParams,

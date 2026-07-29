@@ -105,9 +105,6 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
     and builds a decomposition graph to find efficient decomposition pathways
     to a target gate set.
 
-    This interpreter should be used with `qp.decomposition.enable_graph()`
-    to enable graph-based decomposition.
-
     Note that this doesn't actually decompose the operations during interpretation.
     It only captures the operations and builds the decomposition graph.
     The actual decomposition is done later in the MLIR decomposition pass.
@@ -133,12 +130,6 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         alt_decomps=None,
         num_work_wires=0,
     ):
-
-        if not qp.decomposition.enabled_graph():  # pragma: no cover
-            raise TypeError(
-                "The DecompRuleInterpreter can only be used when"
-                "graph-based decomposition is enabled."
-            )
 
         self._gate_set = gate_set
         self._fixed_decomps = fixed_decomps
@@ -195,7 +186,8 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         # and compile them to Catalyst JAXPR decomposition rules
         for op, rule in self._decomp_graph_solution.items():
             # Get number of wires if exists
-            op_num_wires = op.op.params.get("num_wires", None)
+            op_params = getattr(op.op, "params", {}) or {}
+            op_num_wires = op_params.get("num_wires", None)
             if (
                 o := next(
                     (
@@ -222,7 +214,7 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                 # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                 # dictionary to get the number of wires.
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
-                pauli_word = op.op.params.get("pauli_word", None)
+                pauli_word = op_params.get("pauli_word", None)
                 requires_copy = num_wires == -1
 
                 if op.op.name in ("PauliRot", "PauliMeasure"):
@@ -237,24 +229,14 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                     requires_copy=requires_copy,
                     pauli_word=pauli_word,
                 )
-            elif not (
-                (op_type := getattr(op.op, "op_type", None)) is not None
-                and issubclass(
-                    op_type,
-                    (
-                        qp.ops.Adjoint,
-                        qp.ops.Controlled,
-                        qp.ops.ChangeOpBasis,
-                        qp.ops.Prod,
-                        qp.TemporaryAND,
-                    ),
-                )
-            ):
+            elif _should_skip_decomp_rule_capture(op.op):
                 # Note that the graph-decomposition returns abstracted rules
                 # for Adjoint and Controlled operations, so we skip them here.
                 # These abstracted rules cannot be captured and lowered.
                 # We use MLIR AdjointOp and ControlledOp primitives
                 # to deal with decomposition of symbolic operations at PLxPR.
+                continue
+            else:
                 raise ValueError(f"Could not capture {op.op} without the number of wires.")
 
 
@@ -353,6 +335,27 @@ def _create_decomposition_rule(
     # Note that we shouldn't pass args as kwargs to decomposition_rule
     # JAX doesn't like it and it may fail to preserve the order of args.
     return decomposition_rule(func_cp, pauli_word=pauli_word)(*args)
+
+
+def _should_skip_decomp_rule_capture(op_rep) -> bool:
+    """Return True if a decomposition-graph op should not be captured as a JAX rule."""
+    op_type = getattr(op_rep, "op_type", None)
+    if op_type is not None and issubclass(
+        op_type,
+        (
+            qp.ops.Adjoint,
+            qp.ops.Controlled,
+            qp.ops.ChangeOpBasis,
+            qp.ops.Prod,
+            qp.TemporaryAND,
+        ),
+    ):
+        return True
+
+    # Operator2 resource reps may omit op_type but still encode symbolic ops in the name.
+    # ControlledOp2 uses the ``C(...)`` naming convention rather than ``Controlled(...)``.
+    name = op_rep.name
+    return name.startswith(("Adjoint(", "Controlled(", "C("))
 
 
 # pylint: disable=protected-access

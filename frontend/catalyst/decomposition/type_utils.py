@@ -15,7 +15,6 @@
 """Type handling utilities for decomposition rule lowering."""
 
 import copy
-import dataclasses
 
 import jax.numpy as jnp
 import pennylane as qp

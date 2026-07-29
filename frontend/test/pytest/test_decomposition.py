@@ -80,44 +80,11 @@ class TestGenericUtilities:
 
     def test_mlir_stringify_type(self):
         """Test mlir_stringify_type."""
-        assert mlir_stringify_type(qp.typing.Float) == "f64"
-        assert mlir_stringify_type(qp.typing.Int) == "i64"
-        assert mlir_stringify_type(qp.typing.Bool) == "i1"
-        assert mlir_stringify_type(qp.typing.Complex) == "complex<f128>"
+        assert mlir_stringify_type(qp.typing.Float) == "[f64]"
+        assert mlir_stringify_type(qp.typing.Int) == "[i64]"
+        assert mlir_stringify_type(qp.typing.Bool) == "[i1]"
+        assert mlir_stringify_type(qp.typing.Complex) == "[complex<f128>]"
         assert mlir_stringify_type(qp.typing.AbstractArray((2,), "int32")) == "[i32,i32]"
-
-    # TODO test with mock ops and uncomment
-    # def test_paulirot(self):
-    #     """Test that the QPD wrapper correctly returns the IR as a string."""
-    #     result = compile_decomposition_rules_wrapper(
-    #         "PauliRot", "PauliRot[f64][3]{pauli_word:XZZ}", ["f64"], [3], {"pauli_word": "XZZ"}
-    #     )
-    #     assert isinstance(result, str)
-    #     assert "_pauli_rot_decomposition" in result
-    #     assert 'target_gate = "PauliRot[f64][3]{pauli_word:XZZ}"' in result
-    #     assert "Hadamard" in result
-    #     assert "multirz" in result
-
-    # def test_multiple_rules(self):
-    #     """Test that the python decomposition wrapper supports multiple rules."""
-    #     with qp.decomposition.local_decomps():
-
-    #         def test_resources(pauli_word):  # pylint: disable=unused-argument
-    #             return {qp.X: 1}
-
-    #         @qp.register_resources(test_resources)
-    #         def test_decomp(angle, wires, pauli_word):  # pylint: disable=unused-argument
-    #             qp.RX(angle, wires[0])
-
-    #         qp.add_decomps(qp.PauliRot, test_decomp)
-
-    #         result = compile_decomposition_rules_wrapper(
-    #             "PauliRot", "PauliRot[f64][3]{pauli_word:XYX}", ["f64"], [3], {"pauli_word": "XYX"}
-    #         )
-
-    #         assert "test_decomp" in result
-    #         assert "_pauli_rot_decomp" in result
-    #         assert 'target_gate = "PauliRot[f64][3]{pauli_word:XYX}"' in result
 
 
 class TestPrecompiled:

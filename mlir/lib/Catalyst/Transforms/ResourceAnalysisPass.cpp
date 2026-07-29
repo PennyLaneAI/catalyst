@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <string>
@@ -132,23 +133,35 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     /// pass a per-function or flattened result.
     void accumulateStats(const ResourceResult &r)
     {
+        double gates = 0.0;
         for (const auto &opEntry : r.operations) {
             for (const auto &sizeEntry : opEntry.getValue()) {
-                totalGates += sizeEntry.second;
+                gates += sizeEntry.second;
             }
         }
+        totalGates += static_cast<int64_t>(std::llround(gates));
+
+        double measurements = 0.0;
         for (const auto &measEntry : r.measurements) {
-            totalMeasurements += measEntry.getValue();
+            measurements += measEntry.getValue();
         }
+        totalMeasurements += static_cast<int64_t>(std::llround(measurements));
+
+        double classicalOps = 0.0;
         for (const auto &classEntry : r.classicalInstructions) {
-            totalClassicalOps += classEntry.getValue();
+            classicalOps += classEntry.getValue();
         }
-        totalAllocQubits += r.numAllocQubits;
-        totalArgQubits += r.numArgQubits;
-        totalQubits += r.numQubits();
+        totalClassicalOps += static_cast<int64_t>(std::llround(classicalOps));
+
+        double functionCalls = 0.0;
         for (const auto &fcEntry : r.functionCalls) {
-            totalFunctionCalls += fcEntry.getValue();
+            functionCalls += fcEntry.getValue();
         }
+        totalFunctionCalls += static_cast<int64_t>(std::llround(functionCalls));
+
+        totalAllocQubits += static_cast<int64_t>(std::llround(r.numAllocQubits));
+        totalArgQubits += r.numArgQubits;
+        totalQubits += static_cast<int64_t>(std::llround(r.numQubits()));
     }
 
     /// Serialize all per-function ResourceResults into a JSON string.
