@@ -305,8 +305,17 @@ def _catalyst(*args, stdin=None, text=True):
     catalyst *args
     """
     cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
+
+    if sys.stderr.isatty():
+        cmd.insert(1, "--color")
+
     try:
         result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=text)
+
+        if result.stderr:
+            stderr = result.stderr.decode() if isinstance(result.stderr, bytes) else result.stderr
+            print(stderr, end="", file=sys.stderr)
+
         return result.stdout
     except subprocess.CalledProcessError as e:
         raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
