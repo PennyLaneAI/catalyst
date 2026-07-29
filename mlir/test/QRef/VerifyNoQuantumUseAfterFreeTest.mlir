@@ -84,3 +84,15 @@ func.func @test_no_errors() {
     qref.dealloc %r : !qref.reg<3>
     return
 }
+
+// -----
+
+func.func @test_use_after_free_ref_fabricate() {
+    %q = pbc.ref.fabricate magic : !qref.bit
+    qref.custom "PauliX"() %q : !qref.bit
+    qref.dealloc_qb %q : !qref.bit
+
+    // expected-error@+1 {{Detected use of a qubit after deallocation}}
+    qref.custom "PauliX"() %q : !qref.bit
+    return
+}

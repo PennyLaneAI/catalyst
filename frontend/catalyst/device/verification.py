@@ -19,6 +19,7 @@ with the compiler and device.
 
 from typing import Any, Callable, List, Sequence
 
+import pennylane as qp
 from pennylane import transform
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.measurements import (
@@ -201,6 +202,14 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # we can't use isinstance(op, Controlled).
         if type(op) in (Controlled, ControlledOp) or isinstance(op, (Adjoint)):
             pass
+        elif isinstance(op, (qp.allocation.Allocate, qp.allocation.Deallocate)):
+            # TODO: validate unsupported allocate state/restored combinations here
+            # once they are exposed on tape ops during verification.
+            if not qjit_device.capabilities.dynamic_qubit_management:
+                raise CompileError(
+                    f"Dynamic qubit allocation is not supported on "
+                    f"'{qjit_device.original_device.name}' device"
+                )
         elif not op.name in supported_ops:
             raise CompileError(
                 f"{op.name} is not supported on '{qjit_device.original_device.name}' device"

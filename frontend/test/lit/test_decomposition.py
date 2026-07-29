@@ -1221,13 +1221,13 @@ def test_decompose_work_wires_control_flow():
         def true_func():
             qp.CNOT(wires)
 
-            with qp.allocate(2, state="any", restored=True) as w:
+            with qp.allocate(2, state="zero") as w:
                 for _ in range(2):
                     qp.H(w[0])
                     qp.X(w[1])
 
         def false_func():
-            with qp.allocate(1, state="any", restored=False) as w:
+            with qp.allocate(1, state="zero") as w:
                 qp.H(w)
 
                 m = qp.measure(wires[0])
@@ -1336,7 +1336,7 @@ def test_num_work_wires():
         def true_func():
             qp.CNOT(wires)
 
-            with qp.allocate(2, state="any", restored=True) as w:
+            with qp.allocate(2, state="zero") as w:
                 qp.H(w[0])
                 qp.H(w[0])
                 qp.X(w[1])
@@ -1345,7 +1345,7 @@ def test_num_work_wires():
             return
 
         def false_func():
-            with qp.allocate(1, state="any", restored=False) as w:
+            with qp.allocate(1, state="zero") as w:
                 qp.H(w)
 
             m = qp.measure(wires[0])
@@ -1657,3 +1657,34 @@ def test_paulirot_python_decomposition():
 
 
 test_paulirot_python_decomposition()
+
+
+def test_decompose_with_magic_state_allocation():
+    """Test decomposition rules can allocate magic states as work wires."""
+
+    qp.decomposition.enable_graph()
+
+    @qp.register_resources({qp.CNOT: 1})
+    def magic_decomp(wire):
+        with qp.allocate(1, state="magic-T") as work:
+            qp.CNOT(wires=[work[0], wire])
+
+    @qjit(capture=True, target="mlir")
+    @partial(
+        qp.transforms.decompose,
+        gate_set={"CNOT"},
+        fixed_decomps={qp.X: magic_decomp},
+    )
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    def circuit():
+        qp.X(0)
+        return qp.probs(wires=[0])
+
+    # CHECK: pbc.ref.fabricate magic
+    # CHECK: qref.custom "CNOT"
+    print(circuit.mlir)
+
+    qp.decomposition.disable_graph()
+
+
+test_decompose_with_magic_state_allocation()
