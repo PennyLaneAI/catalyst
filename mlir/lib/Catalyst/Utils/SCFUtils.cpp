@@ -18,8 +18,10 @@
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/ConstantResolve.h"
 
 using namespace mlir;
@@ -75,19 +77,34 @@ int64_t countStaticForOpIterations(scf::ForOp forOp)
     return getNumIterations(l, u, s);
 }
 
-std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp)
+std::optional<double> getEstimatedIterationsHint(Operation *op)
 {
-    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
-        return estAttr.getValue().getSExtValue();
+    Attribute attr = op->getAttr(EstimatedIterationsAttrName);
+    if (!attr) {
+        return std::nullopt;
+    }
+    if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
+        return static_cast<double>(intAttr.getValue().getSExtValue());
+    }
+    if (auto floatAttr = dyn_cast<FloatAttr>(attr)) {
+        return floatAttr.getValueAsDouble();
+    }
+    return std::nullopt;
+}
+
+std::optional<double> resolveForLoopTripCount(scf::ForOp forOp)
+{
+    if (auto iters = getEstimatedIterationsHint(forOp)) {
+        return *iters;
     }
     if (auto staticTrip = forOp.getStaticTripCount()) {
-        return staticTrip->getSExtValue();
+        return static_cast<double>(staticTrip->getSExtValue());
     }
     auto lb = resolveConstantInt(forOp.getLowerBound());
     auto ub = resolveConstantInt(forOp.getUpperBound());
     auto step = resolveConstantInt(forOp.getStep());
     if (lb && ub && step && *step != 0 && *ub > *lb) {
-        return (*ub - *lb + *step - 1) / *step;
+        return static_cast<double>((*ub - *lb + *step - 1) / *step);
     }
     return std::nullopt;
 }
