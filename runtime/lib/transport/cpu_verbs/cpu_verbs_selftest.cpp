@@ -41,20 +41,27 @@ int main(int argc, char **argv)
     std::uint32_t correction_bytes = sizeof(std::uint64_t);
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
-        if (k == "--role")
+        if (k == "--role") {
             role = v;
-        else if (k == "--dev")
+        }
+        else if (k == "--dev") {
             dev = v;
-        else if (k == "--gid")
+        }
+        else if (k == "--gid") {
             gid = std::atoi(v.c_str());
-        else if (k == "--peer")
+        }
+        else if (k == "--peer") {
             peer = v;
-        else if (k == "--port")
+        }
+        else if (k == "--port") {
             port = static_cast<std::uint16_t>(std::atoi(v.c_str()));
-        else if (k == "--syndrome-bytes")
+        }
+        else if (k == "--syndrome-bytes") {
             syndrome_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
-        else if (k == "--correction-bytes")
+        }
+        else if (k == "--correction-bytes") {
             correction_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
+        }
     }
     const bool is_coprocessor = (role == "coprocessor");
 

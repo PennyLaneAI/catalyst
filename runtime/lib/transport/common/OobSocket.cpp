@@ -92,8 +92,9 @@ void send_exact(int fd, const void *buf, std::size_t n)
     while (done < n) {
         ssize_t r = ::send(fd, p + done, n - done, 0);
         if (r < 0) {
-            if (errno == EINTR)
+            if (errno == EINTR) {
                 continue; // interrupted by signal; retry
+            }
             RDMA_FAIL("send: %s", std::strerror(errno));
         }
         done += static_cast<std::size_t>(r);
@@ -107,8 +108,9 @@ void recv_exact(int fd, void *buf, std::size_t n)
     while (done < n) {
         ssize_t r = ::recv(fd, p + done, n - done, 0);
         if (r < 0) {
-            if (errno == EINTR)
+            if (errno == EINTR) {
                 continue; // interrupted by signal; retry
+            }
             RDMA_FAIL("recv: %s", std::strerror(errno));
         }
         RDMA_CHECK(r > 0, "recv: peer closed connection (%zu/%zu bytes)", done, n);

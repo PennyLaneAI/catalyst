@@ -45,10 +45,12 @@ void CpuCoprocessorSession::Impl::run(std::stop_token st)
         completed_.fetch_add(1, std::memory_order_release);
         Payload *send = send_payload();
         send->value = 0; // deterministic high bytes when the result is shorter
-        if (coproc_fn_)
+        if (coproc_fn_) {
             coproc_fn_(&r->value, sizeof(r->value), &send->value, sizeof(send->value), coproc_ctx_);
-        else
+        }
+        else {
             send->value = r->value; // built-in echo
+        }
         const bool sig = (c % SIGNAL_EVERY == 0);
         post_write(bwd_qp_->get(), c, /*inline_data=*/true, sig);
         if (sig) {

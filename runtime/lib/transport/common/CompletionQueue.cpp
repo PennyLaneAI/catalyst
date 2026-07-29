@@ -26,8 +26,9 @@ CompletionQueue::CompletionQueue(std::shared_ptr<Context> ctx, int depth) : ctx_
 }
 CompletionQueue::~CompletionQueue()
 {
-    if (cq_)
+    if (cq_) {
         ibv_destroy_cq(cq_);
+    }
 }
 ibv_cq *CompletionQueue::get() const { return cq_; }
 } // namespace catalyst::transport::common

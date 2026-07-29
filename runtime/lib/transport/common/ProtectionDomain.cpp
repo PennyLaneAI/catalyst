@@ -26,8 +26,9 @@ ProtectionDomain::ProtectionDomain(std::shared_ptr<Context> ctx) : ctx_(std::mov
 }
 ProtectionDomain::~ProtectionDomain()
 {
-    if (pd_)
+    if (pd_) {
         ibv_dealloc_pd(pd_);
+    }
 }
 ibv_pd *ProtectionDomain::get() const { return pd_; }
 } // namespace catalyst::transport::common

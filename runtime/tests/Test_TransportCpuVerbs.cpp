@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 
+#include "CpuBackendConfig.hpp"
 #include "CpuControllerSession.hpp"
 #include "CpuCoprocessorSession.hpp"
 #include "WireProtocol.hpp"
@@ -34,11 +35,14 @@ static bool have_rxe()
     int n = 0;
     ibv_device **devs = ibv_get_device_list(&n);
     bool found = false;
-    for (int i = 0; i < n; ++i)
-        if (std::string(ibv_get_device_name(devs[i])) == "rxe0")
+    for (int i = 0; i < n; ++i) {
+        if (std::string(ibv_get_device_name(devs[i])) == "rxe0") {
             found = true;
-    if (devs)
+        }
+    }
+    if (devs) {
         ibv_free_device_list(devs);
+    }
     return found;
 }
 
@@ -55,12 +59,49 @@ static std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std:
     return n;
 }
 
+TEST_CASE("parse_cpu_config requires an explicit dev and gid", "[cpu_libibverbs]")
+{
+    SECTION("both keys present, order-independent")
+    {
+        const CpuConfig a = parse_cpu_config("dev=rxe0;gid=1");
+        CHECK(a.dev == "rxe0");
+        CHECK(a.gid == 1);
+        const CpuConfig b = parse_cpu_config("gid=3;dev=mlx5_1");
+        CHECK(b.dev == "mlx5_1");
+        CHECK(b.gid == 3);
+        CHECK(parse_cpu_config("dev=rxe0;gid=0").gid == 0); // 0 is a valid GID index
+    }
+    SECTION("unknown keys are ignored, required ones still enforced")
+    {
+        const CpuConfig c = parse_cpu_config("foo=bar;dev=rxe0;gid=2");
+        CHECK(c.dev == "rxe0");
+        CHECK(c.gid == 2);
+    }
+    SECTION("a missing key is rejected rather than defaulted")
+    {
+        CHECK_THROWS_AS(parse_cpu_config(""), RdmaError);
+        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0"), RdmaError);
+        CHECK_THROWS_AS(parse_cpu_config("gid=1"), RdmaError);
+        CHECK_THROWS_AS(parse_cpu_config("junk"), RdmaError);
+    }
+    SECTION("an empty or malformed value is rejected")
+    {
+        CHECK_THROWS_AS(parse_cpu_config("dev=;gid=1"), RdmaError);
+        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0;gid="), RdmaError);
+        // std::atoi would have silently turned each of these into gid 0.
+        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0;gid=abc"), RdmaError);
+        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0;gid=1x"), RdmaError);
+        CHECK_THROWS_AS(parse_cpu_config("dev=rxe0;gid=-1"), RdmaError);
+    }
+}
+
 TEST_CASE("controller and coprocessor connect: both reach INIT and open the "
           "OOB channel",
           "[cpu_libibverbs]")
 {
-    if (!have_rxe())
+    if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
+    }
     const std::uint16_t port = 18590;
     int coproc_rc = -99;
     std::thread t([&] {
@@ -84,8 +125,9 @@ TEST_CASE("controller and coprocessor connect: both reach INIT and open the "
 
 TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[cpu_libibverbs]")
 {
-    if (!have_rxe())
+    if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
+    }
     const std::uint16_t port = 18591;
     const std::size_t SIZE = REGION_BYTES;
     std::uint32_t coproc_rkey = 0;
@@ -125,8 +167,9 @@ TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[c
 
 TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply", "[cpu_libibverbs]")
 {
-    if (!have_rxe())
+    if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
+    }
     const std::uint16_t port = 18593;
     const std::size_t SIZE = REGION_BYTES;
     std::uint64_t coproc_got = 0;
@@ -181,8 +224,9 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
 TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor",
           "[cpu_libibverbs]")
 {
-    if (!have_rxe())
+    if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
+    }
     const std::uint16_t port = 18595;
     const std::size_t SIZE = REGION_BYTES;
     std::thread t([&] {

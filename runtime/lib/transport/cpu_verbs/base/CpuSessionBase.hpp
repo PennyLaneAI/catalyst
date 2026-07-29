@@ -38,7 +38,7 @@ using namespace catalyst::transport;
 // Shared lifecycle for coprocessor and controller roles.
 class CpuSessionBase : public TransportSession {
   public:
-    explicit CpuSessionBase(std::string dev = "rxe0", int gid_idx = 1);
+    explicit CpuSessionBase(std::string dev, int gid_idx);
     ~CpuSessionBase() override { stop(); }
 
     int connect(const ConnectInfo &info) override;

@@ -41,8 +41,9 @@ inline const char *to_string(QpState s)
 // Checks whether a given transition is valid.
 constexpr bool is_valid_transition(QpState from, QpState to)
 {
-    if (to == QpState::ERROR || to == QpState::RESET)
+    if (to == QpState::ERROR || to == QpState::RESET) {
         return true;
+    }
     switch (from) {
     case QpState::RESET:
         return to == QpState::INIT;

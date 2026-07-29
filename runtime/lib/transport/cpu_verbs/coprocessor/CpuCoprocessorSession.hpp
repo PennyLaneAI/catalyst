@@ -25,10 +25,7 @@ namespace catalyst::transport::cpu_verbs {
 // selects the built-in echo (passthrough self-test).
 class CpuCoprocessorSession : public CoprocessorSession {
   public:
-    explicit CpuCoprocessorSession(std::string dev = "rxe0", int gid_idx = 1)
-        : base_(std::move(dev), gid_idx)
-    {
-    }
+    explicit CpuCoprocessorSession(std::string dev, int gid_idx) : base_(std::move(dev), gid_idx) {}
 
     int connect(const ConnectInfo &info) override { return base_.connect(info); }
     MemRegion alloc_memory(std::size_t size, MemKind kind) override

@@ -27,11 +27,14 @@ static bool have_rxe()
     int n = 0;
     ibv_device **devs = ibv_get_device_list(&n);
     bool found = false;
-    for (int i = 0; i < n; ++i)
-        if (std::string(ibv_get_device_name(devs[i])) == "rxe0")
+    for (int i = 0; i < n; ++i) {
+        if (std::string(ibv_get_device_name(devs[i])) == "rxe0") {
             found = true;
-    if (devs)
+        }
+    }
+    if (devs) {
         ibv_free_device_list(devs);
+    }
     return found;
 }
 
@@ -48,8 +51,9 @@ TEST_CASE("QpState transitions gate the RC bring-up edges", "[common]")
 
 TEST_CASE("Context opens rxe0 with an active port", "[common]")
 {
-    if (!have_rxe())
+    if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
+    }
     Context ctx("rxe0");
     REQUIRE(ctx.get() != nullptr);
     ibv_port_attr pa = ctx.port_attr(1);

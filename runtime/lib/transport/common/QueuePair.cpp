@@ -60,8 +60,9 @@ QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<Compl
 
 QueuePair::~QueuePair()
 {
-    if (qp_)
+    if (qp_) {
         ibv_destroy_qp(qp_);
+    }
 }
 
 ibv_qp *QueuePair::get() const { return qp_; }

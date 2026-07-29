@@ -124,8 +124,8 @@ void CpuSessionBase::establish_channel(const ChannelDesc &desc, const MemRegion 
     desc_ = desc;
     local_ = local;
     peer_ = peer;
-    send_buf_ =
-        common::MemoryRegion::alloc_host(pd_, sizeof(Payload), alignof(PayloadSlot), common::MemAccess::LOCAL_WRITE);
+    send_buf_ = common::MemoryRegion::alloc_host(pd_, sizeof(Payload), alignof(PayloadSlot),
+                                                 common::MemAccess::LOCAL_WRITE);
 }
 
 void CpuSessionBase::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled)
@@ -164,10 +164,12 @@ void CpuSessionBase::reap(ibv_cq *cq, int &outstanding, bool drain)
     do {
         int n = ibv_poll_cq(cq, static_cast<int>(wc.size()), wc.data());
         if (n == 0) {
-            if (!drain)
+            if (!drain) {
                 return;
-            if (++empty >= DRAIN_MAX_EMPTY)
+            }
+            if (++empty >= DRAIN_MAX_EMPTY) {
                 return;
+            }
             continue;
         }
         empty = 0;
@@ -191,8 +193,9 @@ Payload *CpuSessionBase::poll_message_arrival(std::uint64_t cursor, std::stop_to
     std::atomic_ref<std::uint32_t> seq_ref(slot->seq_num);
     const auto expected = static_cast<std::uint32_t>(cursor + 1);
     while (seq_ref.load(std::memory_order_acquire) != expected) {
-        if (st.stop_requested())
+        if (st.stop_requested()) {
             return nullptr;
+        }
         std::this_thread::yield();
     }
     return slot;
@@ -224,17 +227,21 @@ void CpuSessionBase::start()
 int CpuSessionBase::collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n)
 {
     while (completed_.load(std::memory_order_acquire) == 0) {
-        if (failed_.load(std::memory_order_acquire))
+        if (failed_.load(std::memory_order_acquire)) {
             std::rethrow_exception(error_); // surface the engine's real error
-        if (!engine_.joinable() || engine_.get_stop_token().stop_requested())
+        }
+        if (!engine_.joinable() || engine_.get_stop_token().stop_requested()) {
             break;
+        }
         std::this_thread::yield();
     }
-    if (failed_.load(std::memory_order_acquire))
+    if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_);
+    }
     // Stopped before any round completed -> no data (non-exceptional).
-    if (completed_.load(std::memory_order_acquire) == 0)
+    if (completed_.load(std::memory_order_acquire) == 0) {
         return -1;
+    }
     if (n > 0 && replies && replies[0]) {
         const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
         const std::size_t nb =
