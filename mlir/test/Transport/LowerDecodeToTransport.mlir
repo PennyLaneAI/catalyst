@@ -21,10 +21,9 @@
 // CHECK:         %[[S:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
 // CHECK:         transport.kick %[[S]], %{{.*}} {work_item_idx = 0 : i32} : !transport.session<controller>, memref<?xi1>
 // CHECK:         transport.collect %[[S]], %{{.*}} : !transport.session<controller>, memref<?xindex>
-module attributes {catalyst.backline = {
-  controller = {backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18590 : i16},
-  coprocessors = [{backend_lib = "x", config = "c", name = "cop0"}]
-}} {
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18590 : i16>,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @qec_circuit(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<?xi1>, %erridx: memref<?xindex>) {
     qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<?xindex>) : memref<?xi1>
     return
@@ -38,10 +37,9 @@ module attributes {catalyst.backline = {
 
 // CHECK-LABEL: func.func @controller_only
 // CHECK:         qecp.decode_esm_css
-// CHECK-NOT:     transport.
-module attributes {catalyst.backline = {
-  controller = {backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18590 : i16}
-}} {
+// CHECK-NOT:     {{[^#]}}transport.
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18590 : i16>>} {
   func.func @controller_only(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<?xi1>, %erridx: memref<?xindex>) {
     qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<?xindex>) : memref<?xi1>
     return
@@ -54,7 +52,7 @@ module attributes {catalyst.backline = {
 
 // CHECK-LABEL: func.func @plain
 // CHECK:         qecp.decode_esm_css
-// CHECK-NOT:     transport.
+// CHECK-NOT:     {{[^#]}}transport.
 module {
   func.func @plain(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<?xi1>, %erridx: memref<?xindex>) {
     qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<?xindex>) : memref<?xi1>
@@ -69,11 +67,10 @@ module {
 
 // CHECK-LABEL: func.func @not_bufferized
 // CHECK:         qecp.decode_esm_css
-// CHECK-NOT:     transport.
-module attributes {catalyst.backline = {
-  controller = {backend_lib = "x", config = "c"},
-  coprocessors = [{backend_lib = "x", config = "c", name = "cop0"}]
-}} {
+// CHECK-NOT:     {{[^#]}}transport.
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c">,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @not_bufferized(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: tensor<2xi1>) -> tensor<1xindex> {
     %erridx = qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm : tensor<2xi1> -> tensor<1xindex>
     return %erridx : tensor<1xindex>
@@ -87,13 +84,10 @@ module attributes {catalyst.backline = {
 // CHECK-LABEL: func.func @qec_circuit
 // CHECK:         transport.get_session {key = "cop0"} : !transport.session<controller>
 // CHECK:         transport.get_session {key = "cop1"} : !transport.session<controller>
-module attributes {catalyst.backline = {
-  controller = {backend_lib = "x", config = "c"},
-  coprocessors = [
-    {backend_lib = "x", config = "c", name = "cop0"},
-    {backend_lib = "x", config = "c", name = "cop1"}
-  ]
-}} {
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c">,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">,
+                  #transport.node<backend_lib = "x", config = "c", name = "cop1", peer = "10.0.0.2", symbol = "decode">]>} {
   func.func @qec_circuit(%tanner: !qecp.tanner_graph<8, 6, i32>,
                          %e0: memref<?xi1>, %i0: memref<?xindex>,
                          %e1: memref<?xi1>, %i1: memref<?xindex>) {

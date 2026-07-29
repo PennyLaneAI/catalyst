@@ -50,22 +50,14 @@ struct LowerDecodeToTransportPass
     void runOnOperation() override
     {
         ModuleOp mod = getOperation();
-        auto backline = mod->getAttrOfType<DictionaryAttr>(kBacklineAttr);
+        auto backline = mod->getAttrOfType<BacklineAttr>(kBacklineAttr);
         if (!backline)
             return;
 
         SmallVector<std::string> peerKeys;
-        if (auto arr = backline.getAs<ArrayAttr>("coprocessors")) {
-            for (auto [i, a] : llvm::enumerate(arr)) {
-                StringRef name;
-                if (auto d = dyn_cast<DictionaryAttr>(a))
-                    if (auto n = d.getAs<StringAttr>("name"); n && !n.getValue().empty())
-                        name = n.getValue();
-                peerKeys.push_back(name.empty() ? ("coprocessor." + std::to_string(i))
-                                                : name.str());
-            }
-        }
-        // The controller is not an offload target, so with no coprocessors declared, 
+        for (auto [i, coproc] : llvm::enumerate(backline.getCoprocessors()))
+            peerKeys.push_back(coproc.keyOr("coprocessor." + std::to_string(i)).str());
+        // The controller is not an offload target, so with no coprocessors declared,
         // there is nowhere to send the decode, and it stays local.
         if (peerKeys.empty())
             return;
