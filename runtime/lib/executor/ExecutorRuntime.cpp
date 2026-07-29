@@ -421,8 +421,8 @@ int64_t __catalyst__executor__launch_async(int64_t session, const char *entry_sy
     bool verbose = remote_verbose();
     auto error = std::make_shared<std::string>();
 
-    // Failures are recorded and not thrown so they can be re-raised on the main thread by the 
-    //matching `await`
+    // Failures are recorded and not thrown so they can be re-raised on the main thread by the
+    // matching `await`
     auto work = [raw, sym, obj, verbose, session, error]() {
         std::lock_guard<std::mutex> lock(raw->mu);
         if (verbose) {
