@@ -77,8 +77,9 @@ MemoryRegion MemoryRegion::alloc_host(std::shared_ptr<ProtectionDomain> pd, std:
 
 MemoryRegion::~MemoryRegion()
 {
-    if (mr_)
+    if (mr_) {
         ibv_dereg_mr(mr_);
+    }
 }
 
 MemoryRegion::MemoryRegion(MemoryRegion &&other) noexcept

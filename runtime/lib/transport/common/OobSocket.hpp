@@ -29,10 +29,10 @@ class FdGuard {
     ~FdGuard() { reset(); }
 
     FdGuard(FdGuard &&other) noexcept : fd_(other.release()) {}
-    FdGuard &operator=(FdGuard &&o) noexcept
+    FdGuard &operator=(FdGuard &&other) noexcept
     {
-        if (this != &o)
-            reset(o.release());
+        if (this != &other)
+            reset(other.release());
         return *this;
     }
     FdGuard(const FdGuard &) = delete;

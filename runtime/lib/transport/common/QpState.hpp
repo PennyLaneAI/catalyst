@@ -17,7 +17,7 @@
 
 namespace catalyst::transport::common {
 
-enum class QpState { RESET, INIT, RTR, RTS, ERROR };
+enum class QpState : std::uint8_t { RESET, INIT, RTR, RTS, ERROR };
 
 inline const char *to_string(QpState s)
 {
