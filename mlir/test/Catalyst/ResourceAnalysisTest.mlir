@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(resource-analysis{output-json=true})" --split-input-file %s -o /dev/null | FileCheck %s
-// RUN: quantum-opt --pass-pipeline="builtin.module(resource-analysis)" --split-input-file %s -o /dev/null 2>&1 | FileCheck %s --check-prefix=WARN
-
+// RUN: quantum-opt -resource-analysis=output-json --split-input-file -verify-diagnostics %s -o /dev/null | FileCheck %s
 
 // Basic gate counting
 
@@ -1128,11 +1126,11 @@ func.func private @my_helper(%arg0: !quantum.bit) -> !quantum.bit {
 // Recursive calls are skipped when flattening resources, so the pass should
 // warn that resource counts may be incomplete.
 
-// WARN: ResourceAnalysis encountered recursive call to 'recursive'. Recursive calls are not flattened, so resource counts may be incomplete.
-// func.func @recursive(%arg0: !quantum.bit) -> !quantum.bit {
-//     %out = func.call @recursive(%arg0) : (!quantum.bit) -> !quantum.bit
-//     return %out : !quantum.bit
-// }
+func.func @recursive(%arg0: !quantum.bit) -> !quantum.bit {
+    // expected-warning@below {{ResourceAnalysis encountered recursive call to 'recursive'. Recursive calls are not flattened, so resource counts may be incomplete.}}
+    %out = func.call @recursive(%arg0) : (!quantum.bit) -> !quantum.bit
+    return %out : !quantum.bit
+}
 
 // -----
 
