@@ -14,6 +14,7 @@
 
 #include "CpuCoprocessorSession.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <thread>
 
@@ -26,6 +27,65 @@ void CpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx)
 {
     base_.coproc_fn_ = fn;
     base_.coproc_ctx_ = ctx;
+}
+
+void CpuCoprocessorSession::Impl::start()
+{
+    stop();
+    failed_.store(false, std::memory_order_relaxed);
+    error_ = nullptr;
+    completed_.store(0, std::memory_order_relaxed);
+    last_word_.store(0, std::memory_order_relaxed);
+    // jthread injects the stop_token. A data-path RDMA_CHECK throws RdmaError;
+    // it must not escape the thread function (that would std::terminate).
+    // Capture it into error_ and publish via failed_ (release) so collect()
+    // can rethrow the real exception.
+    auto body = [this](std::stop_token st) {
+        try {
+            run(st);
+        }
+        catch (...) {
+            error_ = std::current_exception();
+            failed_.store(true, std::memory_order_release);
+        }
+    };
+    engine_ = std::jthread(body);
+}
+
+int CpuCoprocessorSession::Impl::collect(void *const *replies, const std::uint64_t *replies_bytes,
+                                         std::size_t n)
+{
+    while (completed_.load(std::memory_order_acquire) == 0) {
+        if (failed_.load(std::memory_order_acquire)) {
+            std::rethrow_exception(error_); // surface the engine's real error
+        }
+        if (!engine_.joinable() || engine_.get_stop_token().stop_requested()) {
+            break;
+        }
+        std::this_thread::yield();
+    }
+    if (failed_.load(std::memory_order_acquire)) {
+        std::rethrow_exception(error_);
+    }
+    // Stopped before any round completed -> no data (non-exceptional).
+    if (completed_.load(std::memory_order_acquire) == 0) {
+        return -1;
+    }
+    if (n > 0 && replies && replies[0]) {
+        const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
+        const std::size_t nb =
+            replies_bytes ? std::min<std::size_t>(replies_bytes[0], sizeof(w)) : sizeof(w);
+        std::memcpy(replies[0], &w, nb);
+    }
+    return 0;
+}
+
+void CpuCoprocessorSession::Impl::stop()
+{
+    if (engine_.joinable()) {
+        engine_.request_stop();
+        engine_.join();
+    }
 }
 
 // Coprocessor: wait for a message, run the coprocessor function into the send

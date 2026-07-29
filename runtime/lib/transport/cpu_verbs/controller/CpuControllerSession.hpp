@@ -55,13 +55,10 @@ class CpuControllerSession : public ControllerSession {
     void *data_slot() override { return base_.data_slot(); }
 
   private:
-    // Caller-driven controller over the shared session primitives. run() is unused
-    // (no engine thread); start()/stop()/collect() are overridden for the
-    // synchronous kick model.
     class Impl : public CpuSessionBase {
       public:
         using CpuSessionBase::CpuSessionBase;
-        ~Impl() { stop(); }
+        ~Impl() override { stop(); }
 
         void start() override;
         void stop() override;
@@ -75,7 +72,6 @@ class CpuControllerSession : public ControllerSession {
         void *data_slot();
 
       protected:
-        void run(std::stop_token) override {} // unused: controller is caller-driven
         bool oob_listens() const override { return false; }
 
       private:

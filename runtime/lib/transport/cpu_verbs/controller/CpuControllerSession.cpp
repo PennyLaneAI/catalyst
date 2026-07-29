@@ -47,7 +47,6 @@ void CpuControllerSession::Impl::stop()
     if (fwd_cq_) {
         reap(fwd_cq_->get(), signaled_outstanding_, /*drain=*/true);
     }
-    CpuSessionBase::stop(); // no engine thread runs for the controller; harmless join
 }
 
 // Single work item, fixed-size frame: work_item_idx is ignored; the sizes are
