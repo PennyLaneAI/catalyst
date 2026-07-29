@@ -14,12 +14,15 @@
 // limitations under the License.
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "gtest/gtest.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Format.h" // for gtest printing on failure
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
@@ -34,6 +37,7 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Support/LLVM.h"
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
@@ -473,4 +477,47 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     ASSERT_EQ(op.getStaticData(), mlir::DictionaryAttr::get(&context, {}));
 
     ASSERT_EQ(op.getGraphOpId(), "testOperatorUID[i1,f64,i64][1,2]{}[248]");
+}
+
+TEST(DecomposableGateInterfaceTests, OperatorOpNestedArgs)
+{
+    std::string moduleStr = R"mlir(
+func.func @testfunc(%arg: tensor<3xi64>, %arg2: tensor<2xf64>) {
+
+  %reg = quantum.alloc(4) : !quantum.reg
+  %q0 = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
+
+  %0 = quantum.operator "testNestedArgs"(%arg : tensor<3xi64>, %arg2: tensor<2xf64>)
+    qubits(%q0)
+  return
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::func::FuncDialect, mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate op;
+    module->walk([&](OperatorOp walkOp) { op = walkOp; });
+
+    ASSERT_EQ(op.getOperatorName(), "testNestedArgs");
+
+    // This is needed to keep the backing array from being deleted
+    mlir::Type int64 = mlir::IntegerType::get(&context, 64);
+    llvm::SmallVector<mlir::Type, 1> backing(
+        {mlir::RankedTensorType::get(ArrayRef<int64_t>({3}), int64),
+         mlir::RankedTensorType::get(ArrayRef<int64_t>({2}), mlir::Float64Type::get(&context))});
+    mlir::TypeRange expectedDynamicShape(backing);
+    mlir::TypeRange actual(op.getDynamicShape());
+    ASSERT_EQ(llvm::SmallVector<mlir::Type>(actual),
+              llvm::SmallVector<mlir::Type>(expectedDynamicShape));
+
+    ASSERT_EQ(op.getWireLens(), std::vector<size_t>({1}));
+
+    ASSERT_EQ(op.getStaticData(), mlir::DictionaryAttr::get(&context, {}));
+
+    ASSERT_EQ(op.getGraphOpId(), "testNestedArgs[[i64,i64,i64],[f64,f64]][1]{}");
 }
