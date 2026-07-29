@@ -14,6 +14,8 @@
 
 """Type handling utilities for decomposition rule lowering."""
 
+import copy
+
 import jax.numpy as jnp
 import pennylane as qp
 from jax.core import ShapedArray
@@ -51,7 +53,7 @@ def mlir_stringify_type(dtype: qp.typing.AbstractArray):
     ), f"Expected an AbstractArray to stringify, got {dtype}"
     element_type = dtype.dtype.type
     if dtype.shape == ():
-        return _PY_DTYPES_TO_MLIR_DTYPES[element_type]
+        return f"[{_PY_DTYPES_TO_MLIR_DTYPES[element_type]}]"
     else:
         return _stringify_shaped_type(dtype.shape, 0, element_type)
 
@@ -65,6 +67,8 @@ def get_dummy_values_for_container(container):
     Ex.
     [[float, float], [int, int, int], [int32, int32, int32, int32]]
     """
+    if isinstance(container, str):
+        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[container])
 
     def handle_item(item):
         if isinstance(item, (list, tuple)):
@@ -82,3 +86,58 @@ def get_dummy_values_for_container(container):
                 )
 
     return tuple(handle_item(item) for item in container)
+
+
+def replace_abstract_wires_with_concrete_wires(node):
+    if isinstance(node, qp.core.Operator2):
+        return _replace_op_abstract_wires_with_concrete_wires(node)
+
+    if isinstance(node, list):
+        return [replace_abstract_wires_with_concrete_wires(item) for item in node]
+    elif isinstance(node, dict):
+        return {k: replace_abstract_wires_with_concrete_wires(v) for k, v in node.items()}
+    elif isinstance(node, tuple):
+        return tuple(replace_abstract_wires_with_concrete_wires(item) for item in node)
+    else:
+        if isinstance(node, qp.typing.AbstractWires):
+            return qp.wires.Wires(range(node.num_wires))
+        else:
+            return node
+
+
+def _replace_op_abstract_wires_with_concrete_wires(op2):
+    """
+    Given an Operator2 instance, return a copy of the same instance but with all fields whose value
+    is an `AbstractWires` replaced with concrete `Wires`.
+    """
+    new_op = copy.deepcopy(op2)
+    for wire_arg in new_op.wire_argnames:
+        if isinstance(new_op.arguments[wire_arg], qp.typing.AbstractWires):
+            num_wires = new_op.arguments[wire_arg].num_wires
+            new_op.arguments[wire_arg] = qp.wires.Wires(range(-1, -num_wires - 1, -1))
+    for hybrid_arg in new_op.hybrid_argnames:
+        if isinstance(new_op.arguments[hybrid_arg], qp.core.Operator2):
+            new_op.arguments[hybrid_arg] = _replace_op_abstract_wires_with_concrete_wires(
+                new_op.arguments[hybrid_arg]
+            )
+
+    return new_op
+
+
+def post_process_concretize_leaves(leaves):
+    """
+    Given a list of pytree leaf values, change all `AbstractArray`s to `ShapedArray`s of the same
+    shape and dtype, and change all negative integers to `AbstractQubit()`s.
+    """
+    out_leaves = []
+    for leaf in leaves:
+        if isinstance(leaf, int) and leaf < 0:
+            out_leaves.append(qp.wires.AbstractQubit())
+        elif isinstance(leaf, qp.typing.AbstractArray):
+            out_leaves.append(
+                ShapedArray(shape=leaf.shape, dtype=leaf.dtype, weak_type=leaf._weak_type)
+            )
+        else:
+            out_leaves.append(leaf)
+
+    return out_leaves
