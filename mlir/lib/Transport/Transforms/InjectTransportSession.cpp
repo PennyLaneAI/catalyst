@@ -25,6 +25,7 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+
 #include "Transport/IR/TransportOps.h"
 #include "Transport/Transforms/Passes.h"
 
@@ -115,8 +116,9 @@ struct InjectTransportSessionPass
         auto launchVoid = [&](OpBuilder &lb, StringAttr modName, StringAttr fnName,
                               bool nonblocking = false) {
             auto callee = SymbolRefAttr::get(modName, {FlatSymbolRefAttr::get(ctx, fnName)});
-            auto lk = catalyst::LaunchKernelOp::create(lb, loc, TypeRange{}, callee, ValueRange{},
-                                                      /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
+            auto lk =
+                catalyst::LaunchKernelOp::create(lb, loc, TypeRange{}, callee, ValueRange{},
+                                                 /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
             // Serve waits for a connect a later op makes, so it must not block here.
             if (nonblocking)
                 lk->setAttr("catalyst.nonblocking", UnitAttr::get(ctx));
@@ -127,8 +129,7 @@ struct InjectTransportSessionPass
         b.setInsertionPoint(setupFn.getBody().front().getTerminator());
         auto i16A = [&](int64_t v) { return b.getIntegerAttr(b.getIntegerType(16), v); };
         auto commit = [&](Value ct) {
-            CommitWorkItemOp::create(b, loc, ct,
-                                     b.getI32IntegerAttr(ctrl.workItemIdx()),
+            CommitWorkItemOp::create(b, loc, ct, b.getI32IntegerAttr(ctrl.workItemIdx()),
                                      b.getI64IntegerAttr(ctrl.inBytes()),
                                      b.getI64IntegerAttr(ctrl.outBytes()));
         };
@@ -160,8 +161,7 @@ struct InjectTransportSessionPass
         if (coprocs.empty()) {
             // Controller-only
             StringAttr key = ctrl.keyOr("controller");
-            Value ct = CreateOp::create(b, loc, ctrlTy, ctrl.getBackendLib(),
-                                        ctrl.getConfig(), key)
+            Value ct = CreateOp::create(b, loc, ctrlTy, ctrl.getBackendLib(), ctrl.getConfig(), key)
                            .getSession();
             ConnectOp::create(b, loc, ct, ctrl.getPeer(), i16A(ctrl.oobPort()));
             ExchangeKeysOp::create(b, loc, ct);
@@ -189,16 +189,16 @@ struct InjectTransportSessionPass
                 coprocMod->setAttr(kRoleAttr, mmb.getStringAttr(kCoprocessorRole));
                 if (auto addr = coproc.getAddress(); !addr.getValue().empty()) {
                     coprocMod->setAttr("catalyst.dispatch",
-                                       mmb.getDictionaryAttr({NamedAttribute(
-                                           mmb.getStringAttr("address"), addr)}));
+                                       mmb.getDictionaryAttr(
+                                           {NamedAttribute(mmb.getStringAttr("address"), addr)}));
                 }
 
                 func::FuncOp serveFn = makeVoidFunc("coproc_serve" + sfx, coprocMod);
                 OpBuilder cb(ctx);
                 cb.setInsertionPoint(serveFn.getBody().front().getTerminator());
-                Value co = CreateOp::create(cb, loc, coTy, coproc.getBackendLib(),
-                                            coproc.getConfig(), key)
-                               .getSession();
+                Value co =
+                    CreateOp::create(cb, loc, coTy, coproc.getBackendLib(), coproc.getConfig(), key)
+                        .getSession();
                 Value tok = ConnectAsyncOp::create(cb, loc, tokTy, co, coproc.getPeer(),
                                                    i16A(coproc.oobPort()))
                                 .getToken();
@@ -231,9 +231,9 @@ struct InjectTransportSessionPass
                     launchVoid(htb, coprocModNameAttr, stopFn.getSymNameAttr());
                 }
 
-                Value ctr = CreateOp::create(b, loc, ctrlTy, ctrl.getBackendLib(),
-                                             ctrl.getConfig(), key)
-                                .getSession();
+                Value ctr =
+                    CreateOp::create(b, loc, ctrlTy, ctrl.getBackendLib(), ctrl.getConfig(), key)
+                        .getSession();
                 ConnectOp::create(b, loc, ctr, coproc.getPeer(), i16A(coproc.oobPort()));
                 ExchangeKeysOp::create(b, loc, ctr);
                 EstablishChannelOp::create(b, loc, ctr, ctrl.dataPathOr("cpu_verbs"));
@@ -246,9 +246,9 @@ struct InjectTransportSessionPass
             if (remoteController) {
                 // The controller's ops go to its target module; the coprocessor listens here, and
                 // the rest of its bring-up follows the launch that dials it.
-                Value ctr = CreateOp::create(b, loc, ctrlTy, ctrl.getBackendLib(),
-                                             ctrl.getConfig(), key)
-                                .getSession();
+                Value ctr =
+                    CreateOp::create(b, loc, ctrlTy, ctrl.getBackendLib(), ctrl.getConfig(), key)
+                        .getSession();
                 ConnectOp::create(b, loc, ctr, coproc.getPeer(), i16A(coproc.oobPort()));
                 ExchangeKeysOp::create(b, loc, ctr);
                 EstablishChannelOp::create(b, loc, ctr, ctrl.dataPathOr("cpu_verbs"));
@@ -257,9 +257,9 @@ struct InjectTransportSessionPass
                 keyed.push_back({ctrlTy, key, teardownFn});
 
                 OpBuilder hb(hostSetup.getBody().front().getTerminator());
-                Value lco = CreateOp::create(hb, loc, coTy, coproc.getBackendLib(),
-                                             coproc.getConfig(), key)
-                                .getSession();
+                Value lco =
+                    CreateOp::create(hb, loc, coTy, coproc.getBackendLib(), coproc.getConfig(), key)
+                        .getSession();
                 Value ltok = ConnectAsyncOp::create(hb, loc, tokTy, lco, coproc.getPeer(),
                                                     i16A(coproc.oobPort()))
                                  .getToken();
@@ -269,17 +269,15 @@ struct InjectTransportSessionPass
                 continue;
             }
 
-            Value ct = CreateOp::create(b, loc, ctrlTy, ctrl.getBackendLib(),
-                                        ctrl.getConfig(), key)
+            Value ct = CreateOp::create(b, loc, ctrlTy, ctrl.getBackendLib(), ctrl.getConfig(), key)
                            .getSession();
-            Value co = CreateOp::create(b, loc, coTy, coproc.getBackendLib(),
-                                        coproc.getConfig(), key)
-                           .getSession();
-            Value t1 = ConnectAsyncOp::create(b, loc, tokTy, co, coproc.getPeer(),
-                                              i16A(coproc.oobPort()))
-                           .getToken();
-            ConnectOp::create(b, loc, ct, coproc.getPeer(),
-                              i16A(coproc.oobPort()));
+            Value co =
+                CreateOp::create(b, loc, coTy, coproc.getBackendLib(), coproc.getConfig(), key)
+                    .getSession();
+            Value t1 =
+                ConnectAsyncOp::create(b, loc, tokTy, co, coproc.getPeer(), i16A(coproc.oobPort()))
+                    .getToken();
+            ConnectOp::create(b, loc, ct, coproc.getPeer(), i16A(coproc.oobPort()));
             BarrierOp::create(b, loc, t1);
             Value t2 = ExchangeKeysAsyncOp::create(b, loc, tokTy, co).getToken();
             ExchangeKeysOp::create(b, loc, ct);
