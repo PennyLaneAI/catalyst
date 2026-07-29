@@ -190,4 +190,6 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
 
 
 if __name__ == "__main__":  # pragma: no cover
-    precompile_decomp_rules()
+    # TODO: re-enable once Operator2 migration is complete for pre-compilable ops
+    # precompile_decomp_rules()
+    pass
