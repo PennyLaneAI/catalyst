@@ -947,20 +947,18 @@ class TestControlledMiscMethods:
         op = C_ctrl(target, control_wires, control_values=control_values, work_wires=work_wires)
 
         data, metadata = op._flatten()
-        assert data[0] is target
-        assert len(data) == 1
+        dynamic_data, wire_data, hybrid_data = data
+        assert dynamic_data == [list(control_values)]
+        assert wire_data == [control_wires, work_wires]
+        assert hybrid_data == [target]
 
-        assert len(metadata) == 4
-        assert metadata[0] == control_wires
-        assert metadata[1] == control_values
-        assert metadata[2] == work_wires
-        assert metadata[3] == work_wire_type
+        assert metadata == (work_wire_type,)
 
         assert hash(metadata)
 
         new_op = type(op)._unflatten(*op._flatten())
         assert qp.equal(op, new_op)
-        assert new_op._name == "C(S)"  # make sure initialization was called
+        assert new_op.name == "C(S)"  # make sure initialization was called
 
     def test_copy(self):
         """Test that a copy of a controlled oeprator can have its parameters updated
