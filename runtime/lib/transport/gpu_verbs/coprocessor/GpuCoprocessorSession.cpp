@@ -37,15 +37,13 @@ namespace {
 constexpr std::uint8_t PORT = 1;
 // Max CQEs taken per non-blocking batch reap.
 constexpr int REAP_BATCH = 16;
-// QP inline capacity for inline sends (>= sizeof(Payload), 16 B).
-constexpr int INLINE_MAX = 256;
-// Backward path: everything this coprocessor sends goes out on bwd_qp_, so it
-// carries the full send/completion depth.
 constexpr int SQ_DEPTH = 4096;
 constexpr int CQ_DEPTH = 4096;
-// Forward path: the peer RDMA-writes into our ring, so fwd_qp_ is only driven to
-// RTS and never posted to (see connect()/exchange_keys()). Minimal capacity, and
-// no inline budget at all.
+// QP inline capacity for inline sends (>= sizeof(Payload), 16 B).
+constexpr int INLINE_MAX = 256;
+
+// fwd qp is for one-sided RDMA_WRITE from controller to coprocessor,
+// so the CQ/SQ depth does not matter here for the coprocessor session.
 constexpr int FWD_SQ_DEPTH = 16;
 constexpr int FWD_CQ_DEPTH = 256;
 constexpr int FWD_INLINE_MAX = 0;

@@ -25,6 +25,11 @@
 namespace catalyst::transport::gpu_verbs {
 using namespace catalyst::transport::common;
 
+// How often the spin loop samples the teardown flag. Must be a power of two: the
+// loop tests `(spins & (STOP_POLL_INTERVAL - 1)) == 0`, i.e. spins that are a
+// multiple of the interval.
+constexpr std::uint32_t STOP_POLL_INTERVAL = 1024;
+
 // Persistent detect -> decode -> write-handoff kernel, parameterized on the
 // per-shot decode (a __device__ function).
 template <std::uint64_t (*DECODE)(std::uint64_t)>
@@ -37,12 +42,13 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
         const std::uint32_t expect = static_cast<std::uint32_t>(cursor + 1);
         const std::size_t index = cursor & (K_RING_SLOTS - 1);
         volatile std::uint32_t *sptr = &ring[index].p.seq_num;
-        // Poll the request ring on local HBM; only check the stop
-        // flag (host-coherent read over PCIe) ~every 1024 spins so it stays
-        // off the request-detection hot path. Stop is a teardown flag.
+        // Poll the request ring on local HBM. The stop flag is a host-coherent
+        // read over PCIe, so sample it only every STOP_POLL_INTERVAL spins to
+        // keep it off the request-detection hot path. Stop is a teardown flag.
         for (std::uint32_t spins = 0; *sptr != expect; ++spins) {
-            if ((spins & 0x3ffu) == 0u && stop && *stop != 0)
+            if ((spins & (STOP_POLL_INTERVAL - 1)) == 0u && stop && *stop != 0) {
                 return;
+            }
         }
         __threadfence_system(); // seq observed -> ensure value read isn't hoisted/stale
         const std::uint64_t syndrome = ring[index].p.value;
