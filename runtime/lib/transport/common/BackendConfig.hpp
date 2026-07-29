@@ -29,7 +29,7 @@ namespace catalyst::transport::common {
 // (peer/oob_port) are not here — they arrive later via connect(). Both keys are
 // required and have no defaults, e.g. "dev=rxe0;gid=1".
 struct BackendConfig {
-    std::string dev; // RDMA device name, e.g. "rxe0" or "mlx5_1"
+    std::string dev; // RDMA device name
     int gid;         // GID index on that device's port
 };
 
