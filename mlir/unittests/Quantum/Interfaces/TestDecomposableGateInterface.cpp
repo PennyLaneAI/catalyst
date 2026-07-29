@@ -74,6 +74,9 @@ module {
         {"0", {Float64Type::get(&context)}}};
     ASSERT_EQ(customOp.getDynamicShape(), expectedDynamicShape);
 
+    llvm::StringMap<size_t> expectedWires = {{"wires", 2}};
+    ASSERT_EQ(customOp.getWireLens(), expectedWires);
+
     ASSERT_EQ(customOp.getStaticData().size(), 0);
 
     ASSERT_EQ(customOp.getGraphOpId(), "RX{0:[f64]}{wires:2}{}");
