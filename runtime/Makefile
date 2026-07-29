@@ -14,6 +14,7 @@ BUILD_TYPE ?= RelWithDebInfo
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
 ENABLE_TRANSPORT ?= OFF
+ENABLE_EXECUTOR ?= OFF
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 LLVM_DIR ?= $(MK_DIR)/../mlir/llvm-project/
@@ -58,6 +59,10 @@ ifeq ($(ENABLE_TRANSPORT), ON)
 	BUILD_TARGETS += rt_transport
 endif
 
+ifeq ($(ENABLE_EXECUTOR), ON)
+	BUILD_TARGETS += rt_executor
+endif
+
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -84,6 +89,7 @@ configure:
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_OQD=$(ENABLE_OQD) \
 		-DENABLE_TRANSPORT=$(ENABLE_TRANSPORT) \
+		-DENABLE_EXECUTOR=$(ENABLE_EXECUTOR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
