@@ -43,7 +43,6 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/IR/CatalystOps.h"
 #include "Driver/DefaultPipelines/DefaultPipelines.h"
-#include "Executor/IR/ExecutorDialect.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
@@ -55,6 +54,8 @@
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
+
+#include "Executor/IR/ExecutorDialect.h"
 
 using namespace mlir;
 
