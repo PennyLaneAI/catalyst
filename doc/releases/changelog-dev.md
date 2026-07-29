@@ -246,10 +246,6 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fixed a bug where `catalyst.grad` failed to compile functions with complex valued intermediate
-  results. The TBAA lowering used for gradient modules now accepts loads and stores of complex
-  element types and leaves them untagged instead of rejecting them.
-
 * Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
   the top-level module. Functions inside nested modules, such as kernels called through
   `catalyst.launch_kernel`, are now included in the output.
@@ -303,6 +299,11 @@
 
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
+
+* Fixed a bug where `catalyst.grad` failed to compile functions with complex valued intermediate
+  results. The TBAA lowering used for gradient modules now accepts loads and stores of complex
+  element types and leaves them untagged instead of rejecting them.
+  [(#3077)](https://github.com/PennyLaneAI/catalyst/pull/3077)
 
 <h3>Internal changes ⚙️</h3>
 
