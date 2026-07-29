@@ -50,6 +50,26 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
     ];
 }
 
+def FFTLoweringPass : Pass<"fft-lowering"> {
+    let summary = "Lower fft op from Stable HLO to linalg generics computing the DFT.";
+    let description = [{
+        Upstream StableHLO provides no legalization of the fft op to linalg
+        since XLA lowers it to a runtime library call instead. This pass lowers
+        all four transform types FFT, IFFT, RFFT and IRFFT to chains of batched
+        1D discrete Fourier transform stages. Each stage is a linalg.generic
+        reduction with twiddle factors computed at runtime.
+    }];
+
+    let dependentDialects = [
+        "mlir::arith::ArithDialect",
+        "mlir::complex::ComplexDialect",
+        "mlir::linalg::LinalgDialect",
+        "mlir::math::MathDialect",
+        "mlir::tensor::TensorDialect",
+        "stablehlo::StablehloDialect"
+    ];
+}
+
 def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
     let summary = "Lower custom calls op from Stable HLO to CallOp.";
 

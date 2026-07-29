@@ -2,6 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* `jax.numpy.fft` functions (`fft`, `ifft`, `rfft`, `irfft` and their 2D/ND variants) can now be
+  compiled with `@qjit`. Upstream StableHLO provides no legalization for `stablehlo.fft`, so a new
+  `fft-lowering` pass lowers it to `linalg.generic` reductions computing the discrete Fourier
+  transform with one batched 1D stage per transform axis. All four transform types are supported
+  for any transform length.
+  [(#2521)](https://github.com/PennyLaneAI/catalyst/issues/2521)
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``

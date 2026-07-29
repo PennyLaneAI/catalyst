@@ -21,6 +21,8 @@
 namespace catalyst {
 namespace hlo_extensions {
 
+void populateFFTPatterns(mlir::RewritePatternSet &);
+
 void populateScatterPatterns(mlir::RewritePatternSet &);
 
 void populateHloCustomCallPatterns(mlir::RewritePatternSet &);

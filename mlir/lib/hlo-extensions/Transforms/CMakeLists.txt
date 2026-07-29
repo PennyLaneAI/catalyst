@@ -1,6 +1,8 @@
 set(LIBRARY_NAME catalyst-stablehlo-transforms)
 
 file(GLOB SRC
+    fft_lowering.cpp
+    FFTPatterns.cpp
     hlo_custom_call_lowering.cpp
     HloCustomCallPatterns.cpp
     scatter_lowering.cpp
