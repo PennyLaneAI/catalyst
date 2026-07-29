@@ -231,14 +231,8 @@ class TestFFTIndirectCall:
 
 class TestFFTGradient:
     """The emitted linalg loops are transparent to Enzyme and the DFT is a
-    linear map so reverse mode differentiation through an FFT is exact once
-    complex intermediates are supported by the gradient pipeline."""
+    linear map so reverse mode differentiation through an FFT is exact."""
 
-    @pytest.mark.xfail(
-        reason="catalyst.grad through complex intermediates fails to lower "
-        "memref.load of complex element types independently of FFT",
-        strict=True,
-    )
     def test_grad_through_fft(self):
         """d/dx sum(|fft(x)|^2) == 2*n*x by Parseval's theorem."""
         from catalyst import grad

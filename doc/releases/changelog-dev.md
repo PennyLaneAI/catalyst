@@ -6,8 +6,7 @@
   compiled with `@qjit`. Upstream StableHLO provides no legalization for `stablehlo.fft`, so a new
   `fft-lowering` pass lowers it to `linalg.generic` reductions computing the discrete Fourier
   transform with one batched 1D stage per transform axis. All four transform types are supported
-  for any transform length.
-  [(#2521)](https://github.com/PennyLaneAI/catalyst/issues/2521)
+  for any transform length and the generated code is differentiable with `catalyst.grad`.
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
@@ -247,6 +246,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed a bug where `catalyst.grad` failed to compile functions with complex valued intermediate
+  results. The TBAA lowering used for gradient modules now accepts loads and stores of complex
+  element types and leaves them untagged instead of rejecting them.
 
 * Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
   the top-level module. Functions inside nested modules, such as kernels called through
