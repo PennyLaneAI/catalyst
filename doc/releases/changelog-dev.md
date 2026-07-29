@@ -177,6 +177,13 @@
   the analysis.
   [(#3025)](https://github.com/PennyLaneAI/catalyst/pull/3025)
 
+* The `resource-analysis` pass JSON output has been standardized into a nested schema.
+  Gate counts are grouped by wire count under `quantum_operations`, function metadata
+  lives under `metadata`, qubit counts under `num_qubits`, static and dynamic calls
+  under `function_calls.static` / `function_calls.dynamic`, measurement processes under
+  `measurement_processes`, and pluggable metrics under `extended_fields`.
+  [(#3076)](https://github.com/PennyLaneAI/catalyst/pull/3076)
+
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
   [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
