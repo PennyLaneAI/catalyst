@@ -60,6 +60,11 @@
     into the remote JIT.
     [(#2915)](https://github.com/PennyLaneAI/catalyst/pull/2915)
 
+  - Added `executor.launch_async` and `executor.await` ops, paired by a new `!executor.token` type
+    to the executor dialect along with the necessary lowerings. This allows one to start a async 
+    kernel on a background host thread and join it later.
+    [(#3073)](https://github.com/PennyLaneAI/catalyst/pull/3073)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
