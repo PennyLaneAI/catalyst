@@ -76,6 +76,7 @@ set(LIBS
     ion-transforms
     MLIRRTIO
     rtio-transforms
+    MLIRTransport
     MLIRExecutor
     executor-transforms
     MLIRCatalystTest

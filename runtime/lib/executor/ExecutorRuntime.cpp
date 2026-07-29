@@ -275,11 +275,11 @@ int64_t __catalyst__executor__close(int64_t session)
     return 0;
 }
 
-void __catalyst__executor__launch(int64_t session, const char *entry_symbol, size_t num_inputs,
-                                  void *const *input_descs, const size_t *input_ranks,
-                                  const size_t *input_elem_sizes, size_t num_outputs,
-                                  void *const *output_descs, const size_t *output_ranks,
-                                  const size_t *output_elem_sizes)
+void __catalyst__executor__launch(int64_t session, const char *entry_symbol, const char *object,
+                                  size_t num_inputs, void *const *input_descs,
+                                  const size_t *input_ranks, const size_t *input_elem_sizes,
+                                  size_t num_outputs, void *const *output_descs,
+                                  const size_t *output_ranks, const size_t *output_elem_sizes)
 {
     auto entry = find_entry_by_handle(session);
     if (!entry) {
@@ -288,13 +288,17 @@ void __catalyst__executor__launch(int64_t session, const char *entry_symbol, siz
 
     std::lock_guard<std::mutex> lock(entry->mu);
     if (remote_verbose()) {
-        std::fprintf(stderr, "[remote] launch(session=%lld, symbol=%s, n_in=%zu, n_out=%zu)\n",
-                     static_cast<long long>(session), entry_symbol, num_inputs, num_outputs);
+        std::fprintf(stderr,
+                     "[remote] launch(session=%lld, symbol=%s, object=%s, n_in=%zu, n_out=%zu)\n",
+                     static_cast<long long>(session), entry_symbol, object ? object : "<none>",
+                     num_inputs, num_outputs);
     }
     if (!entry->session) {
         RT_FAIL("Session is closed");
     }
-    uint64_t entry_addr = catalyst::executor::lookup(entry->session, entry_symbol);
+    // Resolve the entry within the JITDylib of its own object, so same-named entries shipped from
+    // different kernel objects don't collide in one symbol namespace.
+    uint64_t entry_addr = catalyst::executor::lookup(entry->session, entry_symbol, object);
     if (!entry_addr) {
         RT_FAIL(catalyst::executor::last_error());
     }

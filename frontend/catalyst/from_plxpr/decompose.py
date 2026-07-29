@@ -105,9 +105,6 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
     and builds a decomposition graph to find efficient decomposition pathways
     to a target gate set.
 
-    This interpreter should be used with `qp.decomposition.enable_graph()`
-    to enable graph-based decomposition.
-
     Note that this doesn't actually decompose the operations during interpretation.
     It only captures the operations and builds the decomposition graph.
     The actual decomposition is done later in the MLIR decomposition pass.
@@ -133,12 +130,6 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         alt_decomps=None,
         num_work_wires=0,
     ):
-
-        if not qp.decomposition.enabled_graph():  # pragma: no cover
-            raise TypeError(
-                "The DecompRuleInterpreter can only be used when"
-                "graph-based decomposition is enabled."
-            )
 
         self._gate_set = gate_set
         self._fixed_decomps = fixed_decomps

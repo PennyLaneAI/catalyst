@@ -22,6 +22,10 @@
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
 
+* A new `Transport` MLIR dialect is added, providing typed ops for driving a transport session's
+  lifecycle at the IR level.
+  [(#3047)](https://github.com/PennyLaneAI/catalyst/pull/3047)
+
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
 
@@ -39,6 +43,7 @@
     into the remote JIT.
     [(#2915)](https://github.com/PennyLaneAI/catalyst/pull/2915)
     [(#3031)](https://github.com/PennyLaneAI/catalyst/pull/3031)
+    [(#3030)](https://github.com/PennyLaneAI/catalyst/pull/3030)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
@@ -221,6 +226,9 @@
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
 <h3>Breaking changes 💔</h3>
+
+* Removes the non-graph decomposition fallback when `capture=True` is enabled.
+  [(#3058)](https://github.com/PennyLaneAI/catalyst/pull/3058/)
 
 * Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
   [(#2974)](https://github.com/PennyLaneAI/catalyst/pull/2974)
