@@ -16,6 +16,7 @@
 # pylint: disable = missing-function-docstring, line-too-long
 
 import pennylane as qp
+from jax import numpy as jnp
 from operator2_dummy_gates import (
     CompilableData,
     HybridOpArg,
@@ -143,6 +144,26 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
     # CHECK-SAME:   target_gate = "MultiParams{a:[f64],b:[i32,f64],c:{{\[\[}}i32],[f64{{\]\]}}}{reg:2}{}"
     test_multi_params()
+
+    def test_decompose_to_tensor_params():
+        def rule_resource_fn(reg):
+            return {SingleParam(x=Float[2], reg=Wire[3]): 1}
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            SingleParam(x=jnp.array([0.2, 0.3]), reg=reg)
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
+    # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64,f64]}{reg:3}{}" = 1 : i64}
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
+    test_decompose_to_tensor_params()
 
     def test_multi_wires():
         def rule_resource_fn(reg1, reg2):
