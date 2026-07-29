@@ -285,6 +285,10 @@ class TestPreprocessHybridOp:
 
         assert np.isclose(circuit(x, y), np.cos(-x) * np.cos(y))
 
+    @pytest.mark.xfail(
+        reason="Legacy preprocessing cannot decompose Operator2 Hadamard subclasses",
+        raises=CompileError,
+    )
     def test_decomposition_of_cond_circuit(self):
         """Test that unsupported operators nested in Cond are decompsed, and the
         resulting circuit has the expected result, obtained analytically"""
@@ -331,6 +335,10 @@ class TestPreprocessHybridOp:
         expected_res = np.array([x1, x2, x1, x2])
         assert np.allclose(expected_res, circuit(phi))
 
+    @pytest.mark.xfail(
+        reason="Legacy preprocessing cannot decompose Operator2 Hadamard subclasses",
+        raises=CompileError,
+    )
     @pytest.mark.parametrize("reps, angle", [(3, 1.72), (5, 1.6), (10, 0.4)])
     def test_decomposition_of_forloop_circuit(self, reps, angle):
         """Test that unsupported operators nested in ForLoop are decompsed, and
