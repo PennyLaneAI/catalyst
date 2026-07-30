@@ -250,8 +250,8 @@ int __catalyst__transport__establish_channel(CatalystTransportSession *s, const 
     });
 }
 
-int __catalyst__transport__set_coprocessor(CatalystTransportSession *s, const char *symbol,
-                                           int32_t convention)
+int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol,
+                                              int32_t convention)
 {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
@@ -259,14 +259,14 @@ int __catalyst__transport__set_coprocessor(CatalystTransportSession *s, const ch
     return guard([&] {
         auto *co = dynamic_cast<CoprocessorSession *>(s->sess);
         if (!co) {
-            std::cerr << "[transport] set_coprocessor on a non-coprocessor session\n";
+            std::cerr << "[transport] set_coprocessor_fn on a non-coprocessor session\n";
             return CATALYST_TRANSPORT_ERR;
         }
         void *raw = nullptr;
         if (symbol && *symbol) {
             raw = dlsym(RTLD_DEFAULT, symbol);
             if (!raw) {
-                std::cerr << "[transport] set_coprocessor: symbol not found: " << symbol << "\n";
+                std::cerr << "[transport] set_coprocessor_fn: symbol not found: " << symbol << "\n";
                 return CATALYST_TRANSPORT_ERR;
             }
         }
@@ -281,7 +281,7 @@ int __catalyst__transport__set_coprocessor(CatalystTransportSession *s, const ch
             co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(raw), nullptr);
             return CATALYST_TRANSPORT_OK;
         }
-        std::cerr << "[transport] set_coprocessor: unknown convention " << convention << "\n";
+        std::cerr << "[transport] set_coprocessor_fn: unknown convention " << convention << "\n";
         return CATALYST_TRANSPORT_ERR;
     });
 }
