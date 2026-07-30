@@ -362,8 +362,9 @@ void __catalyst__transport__destroy(CatalystTransportSession *s)
     if (!s) {
         return;
     }
-    for (auto it = g_registry.begin(); it != g_registry.end();)
+    for (auto it = g_registry.begin(); it != g_registry.end();) {
         it = (it->second == s) ? g_registry.erase(it) : std::next(it);
+    }
     delete s->sess; // owned by the backend factory
     s->backend.reset();
     delete s;
