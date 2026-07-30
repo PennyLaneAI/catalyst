@@ -46,15 +46,17 @@ using namespace catalyst::transport;
 
 StringAttr NodeAttr::keyOr(llvm::StringRef fallback) const
 {
-    if (StringAttr n = getName(); n && !n.getValue().empty())
+    if (StringAttr n = getName(); n && !n.getValue().empty()) {
         return n;
+    }
     return StringAttr::get(getContext(), fallback);
 }
 
 StringAttr NodeAttr::dataPathOr(llvm::StringRef dflt) const
 {
-    if (StringAttr p = getDataPath(); p && !p.getValue().empty())
+    if (StringAttr p = getDataPath(); p && !p.getValue().empty()) {
         return p;
+    }
     return StringAttr::get(getContext(), dflt);
 }
 
@@ -78,15 +80,19 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                                    StringAttr transport, NodeAttr controller,
                                    llvm::ArrayRef<NodeAttr> coprocessors)
 {
-    if (!controller)
+    if (!controller) {
         return emitError() << "backline requires a controller";
+    }
     for (NodeAttr c : coprocessors) {
-        if (!c)
+        if (!c) {
             return emitError() << "null coprocessor";
-        if (!c.getPeer() || c.getPeer().getValue().empty())
+        }
+        if (!c.getPeer() || c.getPeer().getValue().empty()) {
             return emitError() << "coprocessor requires a 'peer'";
-        if (!c.getSymbol() || c.getSymbol().getValue().empty())
+        }
+        if (!c.getSymbol() || c.getSymbol().getValue().empty()) {
             return emitError() << "coprocessor requires a 'symbol'";
+        }
     }
     return success();
 }

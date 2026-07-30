@@ -255,8 +255,9 @@ struct KickLowering : public OpConversionPattern<KickOp> {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         auto memTy = dyn_cast<MemRefType>(op.getPayload().getType());
-        if (!memTy)
+        if (!memTy) {
             return rewriter.notifyMatchFailure(op, "kick payload must be bufferized (memref)");
+        }
         auto [srcPtr, bytes] =
             memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getPayload(), memTy);
         Value slot = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__data_slot",
@@ -277,9 +278,10 @@ struct CollectLowering : public OpConversionPattern<CollectOp> {
     {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
-        if (!op.getDest())
+        if (!op.getDest()) {
             return rewriter.notifyMatchFailure(op,
                                                "collect must be bufferized (dest-passing form)");
+        }
         auto memTy = cast<MemRefType>(op.getDest().getType());
         auto [dstPtr, bytes] = memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getDest(), memTy);
         emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__collect",
@@ -365,8 +367,9 @@ struct ConvertTransportToLLVMPass
         target.addLegalDialect<LLVM::LLVMDialect>();
         target.addIllegalDialect<TransportDialect>();
 
-        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns))))
+        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
+        }
     }
 };
 
