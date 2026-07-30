@@ -108,17 +108,15 @@ def format_for_id(d):
     return "{" + ",".join(k + ":" + handle_item(v) for k, v in d.items()) + "}"
 
 
-def get_dummy_values_for_container(container):
+def get_dummy_values_for_container(dictionary):
     """
-    Given a container of python or MLIR types, replace the types with corresponding dummy values.
+    Given a dictionary of python or MLIR types, replace the types with corresponding dummy values.
 
-    Each item in the container must be representible as an MLIR tensor with at most one layer of
+    Each item in the dictionary must be representable as an MLIR tensor with at most one layer of
     nesting, i.e. cannot be nested and all elements must be of the same type.
     Ex.
     [[float, float], [int, int, int], [int32, int32, int32, int32]]
     """
-    if isinstance(container, str):
-        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[container])
 
     def handle_item(item):
         if isinstance(item, (list, tuple)):
@@ -135,7 +133,8 @@ def get_dummy_values_for_container(container):
                     f"Unexpected type in container when creating dummy values: {type(item)}"
                 )
 
-    return tuple(handle_item(item) for item in container)
+    # return tuple(handle_item(item) for item in container)
+    return {k: handle_item(v) for k, v in dictionary.items()}
 
 
 def replace_abstract_wires_with_concrete_wires(node):

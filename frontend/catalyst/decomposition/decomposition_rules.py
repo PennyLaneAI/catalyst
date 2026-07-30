@@ -224,9 +224,7 @@ def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
     kwargs = {}
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
-    for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_container(arg_shape)
-    return kwargs
+    return kwargs | get_dummy_values_for_container(dynamic_shape)
 
 
 def compile_decomposition_rules(
