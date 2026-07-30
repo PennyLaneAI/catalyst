@@ -29,8 +29,9 @@ extern "C" int catalyst_gpu_echo_launcher(const CoprocLaunchDesc *desc, void *ct
 
 int main(int argc, char **argv)
 {
-    std::string dev = "mlx5_1", peer = "0.0.0.0";
-    int gid = 3;
+    // --dev and --gid are required
+    std::string dev, peer = "0.0.0.0";
+    int gid = -1;
     int gpu_device = 0;
     std::uint16_t port = 18560;
     for (int i = 1; i + 1 < argc; i += 2) {
@@ -50,6 +51,14 @@ int main(int argc, char **argv)
         else if (k == "--port") {
             port = static_cast<std::uint16_t>(std::atoi(v.c_str()));
         }
+    }
+    if (dev.empty() || gid < 0) {
+        std::fprintf(stderr,
+                     "usage: %s --dev <rdma_device> --gid <gid_index>"
+                     " [--gpu <index>] [--peer <ip>] [--port <n>]\n"
+                     "  --dev and --gid are required; the device needs dma-buf MR support\n",
+                     argv[0]);
+        return 2;
     }
     GpuCoprocessorSession s(dev, gid, gpu_device);
     ConnectInfo ci{
