@@ -26,14 +26,10 @@ import sys
 import threading
 import time
 
-from ._util import (
-    _log,
-    _logcmd,
-    _PDEATHSIG,
-    _PORT_RE,
-    _READY_RE,
-    _SSH_PW_RE,
-    _SUDO_FAIL_RE,
+from .utils import (
+    Log,
+    Patterns,
+    pdeathsig,
     PortInUse,
 )
 from .ssh import _build_remote_cmd, _ssh_base
@@ -84,8 +80,11 @@ class _ExecutorProcess:
 
     # --- shared lifecycle -------------------------------------------------------------------------
     def _say(self, msg: str, level: int = 1) -> None:
+        """Log a launcher-side narrative line (executor stdout is streamed separately). Prefixed
+        with ``<name>:`` so multiple executors stay distinguishable, and teed to the log file so
+        the file is self-contained."""
         line = msg if self.name == "executor" else f"{self.name}: {msg}"
-        _log(line, level)
+        Log.say(line, level)
         # Tee the launcher's own narrative (launch cmd, readiness, teardown) into the log file too,
         # so the file is self-contained rather than only the executor's stdout/stderr.
         if self._log_fh is not None:
@@ -94,6 +93,8 @@ class _ExecutorProcess:
                 self._log_fh.flush()
 
     def _open_log(self) -> None:
+        """Open the per-launch log file (if any) in append mode and write the subclass header.
+        Failing to open the log is non-fatal — the launch continues without teeing."""
         if not self.log_path:
             return
         try:
@@ -118,9 +119,9 @@ class _ExecutorProcess:
                 with contextlib.suppress(Exception):
                     self._log_fh.write(line + "\n")
                     self._log_fh.flush()
-            if _PORT_RE.search(line):
+            if Patterns.PORT.search(line):
                 self._port_conflict.set()
-            if _READY_RE.search(line):
+            if Patterns.READY.search(line):
                 self._ready.set()
             self._scan_line(line)
 
@@ -158,6 +159,8 @@ class _ExecutorProcess:
         )
 
     def _shutdown(self) -> None:
+        """Close the log file and terminate the subprocess; escalate to SIGKILL if it doesn't
+        exit within 10s. Idempotent."""
         fh, self._log_fh = self._log_fh, None  # stop the pump teeing, then close
         if fh is not None:
             with contextlib.suppress(Exception):
@@ -172,6 +175,8 @@ class _ExecutorProcess:
                     self.proc.kill()
 
     def stop(self) -> None:
+        """Terminate the executor and run any subclass-specific teardown (e.g. the remote pkill
+        backstop). Idempotent."""
         self._shutdown()
         self._teardown_extra()
 
@@ -202,6 +207,9 @@ class _LocalProcess(_ExecutorProcess):
         self._env = dict(env or {})
 
     def _spawn(self) -> None:
+        """Start ``catalyst-executor`` as a local subprocess bound to ``127.0.0.1:<port>``, with
+        each ``plugins`` entry passed as ``--plugin=<path>``. ``env`` extends the parent
+        environment. ``PR_SET_PDEATHSIG`` ensures the child dies with the parent."""
         exe = os.path.expanduser(os.path.expandvars(self._executor_bin))
         argv = [exe, f"--bind=127.0.0.1:{self._bind_port}"]
         argv += [f"--plugin={os.path.expanduser(os.path.expandvars(p))}" for p in self._plugins]
@@ -209,7 +217,7 @@ class _LocalProcess(_ExecutorProcess):
         for key, value in self._env.items():
             proc_env[key] = os.path.expandvars(value)
         self._say(f"starting local executor on {self.addr}")
-        _logcmd(argv)
+        Log.cmd(argv)
         self.proc = subprocess.Popen(
             argv,
             stdout=subprocess.PIPE,
@@ -217,7 +225,7 @@ class _LocalProcess(_ExecutorProcess):
             text=True,
             bufsize=1,
             env=proc_env,
-            preexec_fn=_PDEATHSIG,
+            preexec_fn=pdeathsig,
         )
 
 
@@ -267,6 +275,8 @@ class _RemoteProcess(_ExecutorProcess):
         self._ready_reached = False  # gates the teardown pkill (don't kill others' ports)
 
     def _log_header(self) -> str:
+        """Header block written once at the top of a fresh log file, recording host, port,
+        workspace, timestamp, and plugins so appended runs are separable."""
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         return (
             f"\n# ==== {self.name} @ {self.host}:{self._bind_port} | ws={self.workspace} | "
@@ -274,22 +284,36 @@ class _RemoteProcess(_ExecutorProcess):
         )
 
     def _scan_line(self, line: str) -> None:
-        if _SSH_PW_RE.search(line):  # ssh login prompt — key auth isn't set up
+        """Watch executor output for SSH password / sudo-failure prompts and flag them so
+        :meth:`_check_failure` can bail with a helpful message rather than hanging on stdin."""
+        if Patterns.SSH_PW.search(line):  # ssh login prompt — key auth isn't set up
             self._auth_kind = "ssh"
             self._auth_prompt.set()
-        elif _SUDO_FAIL_RE.search(line):  # sudo rejected the password we fed
+        elif Patterns.SUDO_FAIL.search(line):  # sudo rejected the password we fed
             self._auth_kind = "sudo"
             self._auth_prompt.set()
 
     def _check_failure(self) -> None:
+        """Abort the launch with a helpful message if :meth:`_scan_line` saw an auth prompt we
+        can't satisfy (missing SSH key, or wrong/absent sudo password)."""
         if self._auth_prompt.is_set():
             self._shutdown()
             raise SystemExit(self._auth_help())
 
     def _on_ready(self) -> None:
+        """Record that the remote executor actually bound its port. Gates the teardown
+        ``pkill`` so a port collision (where the process there is someone else's) never wrongly
+        kills it."""
         self._ready_reached = True
 
     def _spawn(self) -> None:
+        """Open the SSH port-forward and start ``catalyst-executor`` on the remote host.
+
+        Builds the remote shell command via :func:`_build_remote_cmd` (cd + env + exec, wrapped
+        in ``sudo`` when requested) and the local ``ssh -L <local>:localhost:<remote>`` tunnel.
+        With ``sudo_password``, pipes the password into ``sudo -S`` on stdin (no PTY);
+        NOPASSWD mode uses ``-tt`` so closing SSH SIGHUPs the executor. Sets ``self.proc`` to
+        the started ``subprocess.Popen``."""
         use_pw = self.sudo_password is not None
         remote_cmd = _build_remote_cmd(
             self.workspace,
@@ -318,7 +342,7 @@ class _RemoteProcess(_ExecutorProcess):
             f"(tunnel {self.addr} -> remote:{self._bind_port})"
         )
         self._say(f"remote: {remote_cmd}", level=2)
-        _logcmd(ssh)
+        Log.cmd(ssh)
         self.proc = subprocess.Popen(
             ssh,
             stdin=(subprocess.PIPE if use_pw else subprocess.DEVNULL),
@@ -326,7 +350,7 @@ class _RemoteProcess(_ExecutorProcess):
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            preexec_fn=_PDEATHSIG,
+            preexec_fn=pdeathsig,
         )
         if use_pw:  # feed the sudo password straight into `sudo -S` on stdin
             assert self.proc.stdin is not None and self.sudo_password is not None
@@ -335,6 +359,8 @@ class _RemoteProcess(_ExecutorProcess):
                 self.proc.stdin.flush()
 
     def _auth_help(self) -> str:
+        """A human-readable hint for the user to fix the detected auth failure — install an SSH
+        key, or supply/verify the sudo password. Called by :meth:`_check_failure`."""
         if self._auth_kind == "ssh":
             return (
                 "SSH wants a password — install your key once (only adds your key, does not\n"
@@ -348,6 +374,9 @@ class _RemoteProcess(_ExecutorProcess):
         )
 
     def _teardown_extra(self) -> None:
+        """Backstop ``pkill`` for OUR executor on the remote host, in case closing the SSH
+        connection didn't SIGHUP it. Skipped when we never bound the port (the process there
+        would be someone else's, and a port-scoped ``pkill`` must not wrongly kill it)."""
         # Backstop kill of OUR executor (closing the -tt ssh already SIGHUPs it). Only when we
         # actually bound this port — on a port collision the process there is someone else's, and a
         # port-scoped pkill would wrongly kill it.
@@ -397,5 +426,6 @@ class _RemoteProcess(_ExecutorProcess):
             )
 
     def stop(self) -> None:
+        """Stop the remote executor and close the SSH tunnel. Idempotent."""
         self._say("stopping executor + closing tunnel")
         super().stop()

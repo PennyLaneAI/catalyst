@@ -95,7 +95,13 @@ def attach_executor(device, executor):
     ``target(...)`` device; the attached executor supplies the dispatch ``address`` and ``triple``
     (see :func:`get_target`/:func:`get_dispatch`). Explicit ``target(...)`` tags still win.
 
-    Returns the same device, for chaining.
+    Args:
+        device: A PennyLane device with a backline placement whose controller is ``remote``.
+        executor: A launched :class:`catalyst.Executor` (or any object exposing ``.address`` and
+            optionally ``.triple``) that supplies the controller's dispatch coordinates.
+
+    Returns:
+        The same device, tagged with the executor for chaining.
     """
     setattr(device, _BACKLINE_EXECUTOR_ATTR, executor)
     return device
@@ -146,6 +152,14 @@ def get_target(device) -> Optional[Target]:
     An explicit :func:`target` tag wins. Otherwise, if the device carries a backline placement whose
     controller is ``remote``, the controller QNode is cross-compiled like a target device, with the
     triple from an attached :class:`catalyst.Executor` (or the controller's ``triple`` field).
+
+    Args:
+        device: A PennyLane device that may carry a :func:`target` tag or a backline placement.
+
+    Returns:
+        Target: The cross-compilation target for ``device`` if one is set (explicitly or via a
+            ``remote`` backline controller).
+        None: If ``device`` is neither a target nor a remote backline controller.
     """
     explicit = getattr(device, _TARGET_ATTR, None)
     if explicit is not None:
@@ -161,6 +175,13 @@ def get_backline_role(device) -> Optional[str]:
 
     Tagging the role lets the transport passes find a module by which node it belongs to, rather than
     matching on the triple/address copied into ``catalyst.target``/``catalyst.dispatch``.
+
+    Args:
+        device: A PennyLane device that may carry a backline placement.
+
+    Returns:
+        str: ``"controller"`` if ``device`` is the controller of a remote backline placement.
+        None: If ``device`` has no backline role.
     """
     ctrl = _backline_controller(device)
     if ctrl is not None and getattr(ctrl, "remote", False):
@@ -173,6 +194,15 @@ def get_dispatch(device) -> Optional[RemoteDispatch]:
 
     An explicit :func:`target` ``address=`` wins. Otherwise a ``remote`` backline controller is
     dispatched to the address of its attached :class:`catalyst.Executor` (or its ``addr:port``).
+
+    Args:
+        device: A PennyLane device that may carry a :func:`target` dispatch tag or a remote
+            backline controller.
+
+    Returns:
+        RemoteDispatch: The dispatch spec (executor address) for ``device`` if remote execution
+            applies.
+        None: If ``device`` is not dispatched to a remote executor.
     """
     explicit = getattr(device, _DISPATCH_ATTR, None)
     if explicit is not None:
