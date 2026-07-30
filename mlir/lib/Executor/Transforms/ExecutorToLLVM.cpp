@@ -332,6 +332,40 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// executor.launch_async  ->  __catalyst__executor__launch_async(session, sym, object) -> token
+//===----------------------------------------------------------------------===//
+
+struct LaunchAsyncOpLowering : public OpConversionPattern<executor::LaunchAsyncOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(executor::LaunchAsyncOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        Type i64Ty = rewriter.getI64Type();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        std::string callee = op.getKernelCallee().str();
+        std::string symbolName = "_catalyst_pyface_" + callee;
+        Value symbolPtr =
+            getGlobalString(loc, rewriter, "executor_sym_" + callee, symbolName + '\0', mod);
+        Value objectPtr = getGlobalString(loc, rewriter, "executor_obj_" + callee,
+                                          op.getObject().str() + '\0', mod);
+
+        Type asyncSig = LLVM::LLVMFunctionType::get(i64Ty, {i64Ty, ptrTy, ptrTy});
+        LLVM::LLVMFuncOp asyncFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__executor__launch_async", asyncSig);
+
+        auto call = LLVM::CallOp::create(rewriter, loc, asyncFn,
+                                         ValueRange{adaptor.getSession(), symbolPtr, objectPtr});
+        rewriter.replaceOp(op, call.getResult());
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
 // executor.call  ->  __catalyst__executor__call_wrapper(addr, sym,
 //                                                   args_buf, args_size,
 //                                                   &out_buf, &out_size)
@@ -488,6 +522,30 @@ struct CloseOpLowering : public OpConversionPattern<executor::CloseOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// executor.await  ->  __catalyst__executor__await(token)
+//===----------------------------------------------------------------------===//
+
+struct AwaitOpLowering : public OpConversionPattern<executor::AwaitOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(executor::AwaitOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        Type i64Ty = rewriter.getI64Type();
+        Type voidTy = LLVM::LLVMVoidType::get(rewriter.getContext());
+
+        Type awaitSig = LLVM::LLVMFunctionType::get(voidTy, {i64Ty});
+        LLVM::LLVMFuncOp awaitFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__executor__await", awaitSig);
+
+        LLVM::CallOp::create(rewriter, loc, awaitFn, ValueRange{adaptor.getToken()});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
 
@@ -503,10 +561,13 @@ struct ConvertExecutorToLLVMPass : impl::ConvertExecutorToLLVMPassBase<ConvertEx
         typeConverter.addConversion([](executor::SessionType type) -> Type {
             return IntegerType::get(type.getContext(), 64);
         });
+        typeConverter.addConversion([](executor::TokenType type) -> Type {
+            return IntegerType::get(type.getContext(), 64);
+        });
 
         RewritePatternSet patterns(ctx);
-        patterns.add<OpenOpLowering, SendBinaryOpLowering, LaunchOpLowering, CallOpLowering,
-                     CloseOpLowering>(typeConverter, ctx);
+        patterns.add<OpenOpLowering, SendBinaryOpLowering, LaunchOpLowering, LaunchAsyncOpLowering,
+                     CallOpLowering, CloseOpLowering, AwaitOpLowering>(typeConverter, ctx);
 
         LLVMConversionTarget target(*ctx);
         target.addLegalOp<ModuleOp>();
