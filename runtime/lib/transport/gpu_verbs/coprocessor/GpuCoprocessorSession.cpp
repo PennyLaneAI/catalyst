@@ -143,7 +143,7 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
 bool GpuCoprocessorSession::post_inline(std::uint64_t cursor)
 {
     auto *reply = reinterpret_cast<Payload *>(reply_buf_->addr());
-    reply->value = last_word_.load(std::memory_order_relaxed); // the correction
+    reply->value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
     reply->seq_num = static_cast<std::uint32_t>(cursor + 1);
     reply->pad = 0;
     ibv_sge sge{
@@ -162,7 +162,8 @@ bool GpuCoprocessorSession::post_inline(std::uint64_t cursor)
         peer_.remote_addr + (cursor & (K_RING_SLOTS - 1)) * sizeof(PayloadSlot);
     wr.wr.rdma.rkey = peer_.rkey;
     ibv_send_wr *bad = nullptr;
-    RDMA_CHECK(ibv_post_send(bwd_qp_->get(), &wr, &bad) == 0, "ibv_post_send");
+    const int rc = ibv_post_send(bwd_qp_->get(), &wr, &bad);
+    RDMA_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));
     return signaled;
 }
 
@@ -284,10 +285,11 @@ int GpuCoprocessorSession::collect(void *const *outputs, const std::uint64_t *ou
         return -1;
     }
     if (n > 0 && outputs && outputs[0]) {
-        const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
-        const std::size_t nb =
-            output_bytes ? std::min<std::size_t>(output_bytes[0], sizeof(w)) : sizeof(w);
-        std::memcpy(outputs[0], &w, nb);
+        const std::int64_t w = last_word_.load(std::memory_order_relaxed);
+        const std::size_t cap = output_bytes ? output_bytes[0] : sizeof(w);
+        RDMA_CHECK(cap <= sizeof(w), "output capacity (%zu) exceeds the %zu B payload", cap,
+                   sizeof(w));
+        std::memcpy(outputs[0], &w, cap);
     }
     return 0;
 }

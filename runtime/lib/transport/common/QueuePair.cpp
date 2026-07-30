@@ -54,7 +54,7 @@ QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<Compl
         .sq_sig_all = 0,
     };
     qp_ = ibv_create_qp(pd_->get(), &a);
-    RDMA_CHECK(qp_, "ibv_create_qp");
+    RDMA_CHECK_ERRNO(qp_, "ibv_create_qp");
 }
 
 QueuePair::~QueuePair()
@@ -81,11 +81,7 @@ void QueuePair::check_transition(QpState to) const
 void QueuePair::modify(QpState to, ibv_qp_attr &attr, int mask, const char *what)
 {
     check_transition(to);
-    // ibv_modify_qp returns the error code directly; errno is unreliable for
-    // it.
-    int rc = ibv_modify_qp(qp_, &attr, mask);
-    // ibv_modify_qp returns an errno-style code directly (errno itself is
-    // unreliable for it), so translate rc, not errno, to a readable message.
+    const int rc = ibv_modify_qp(qp_, &attr, mask);
     RDMA_CHECK(rc == 0, "%s rc=%d (%s)", what, rc, std::strerror(rc));
     state_ = to; // advance only after a successful modify
 }

@@ -49,7 +49,8 @@ template <class Fn> void for_each_config_kv(std::string_view config, Fn fn)
 {
     while (!config.empty()) {
         const std::size_t sep = config.find(';');
-        const std::string_view tok = config.substr(0, sep);
+        const std::string_view tok =
+            config.substr(0, sep == std::string_view::npos ? config.size() : sep);
         if (const std::size_t eq = tok.find('='); eq != std::string_view::npos) {
             fn(tok.substr(0, eq), tok.substr(eq + 1));
         }

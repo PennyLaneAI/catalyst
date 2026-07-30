@@ -43,7 +43,7 @@ void set_tcp_nodelay(int fd)
 FdGuard tcp_listen_accept(std::uint16_t port)
 {
     FdGuard listener(socket(AF_INET, SOCK_STREAM, 0));
-    RDMA_CHECK(listener.valid(), "socket");
+    RDMA_CHECK_ERRNO(listener.valid(), "socket");
     int one = 1;
     setsockopt(listener.get(), SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
     sockaddr_in sa{
@@ -51,11 +51,11 @@ FdGuard tcp_listen_accept(std::uint16_t port)
         .sin_port = htons(port),
         .sin_addr = {.s_addr = INADDR_ANY},
     };
-    RDMA_CHECK(bind(listener.get(), reinterpret_cast<sockaddr *>(&sa), sizeof(sa)) == 0, "bind(%u)",
-               port);
-    RDMA_CHECK(listen(listener.get(), 1) == 0, "listen");
+    RDMA_CHECK_ERRNO(bind(listener.get(), reinterpret_cast<sockaddr *>(&sa), sizeof(sa)) == 0,
+                     "bind(%u)", port);
+    RDMA_CHECK_ERRNO(listen(listener.get(), 1) == 0, "listen");
     FdGuard client(accept(listener.get(), nullptr, nullptr));
-    RDMA_CHECK(client.valid(), "accept");
+    RDMA_CHECK_ERRNO(client.valid(), "accept");
     set_tcp_nodelay(client.get());
     return client; // listener closed by its FdGuard on return
 }
@@ -77,7 +77,7 @@ FdGuard tcp_connect(const char *host, std::uint16_t port)
 
     for (int attempt = 0; attempt < CONNECT_ATTEMPTS; ++attempt) {
         FdGuard s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
-        RDMA_CHECK(s.valid(), "socket");
+        RDMA_CHECK_ERRNO(s.valid(), "socket");
         if (connect(s.get(), res->ai_addr, res->ai_addrlen) == 0) {
             set_tcp_nodelay(s.get());
             return s;

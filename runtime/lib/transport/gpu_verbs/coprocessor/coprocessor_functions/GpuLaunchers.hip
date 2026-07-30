@@ -40,7 +40,7 @@ constexpr std::uint32_t STOP_POLL_INTERVAL = 1024;
  * Launched once with a single thread and runs until `total` shots
  * are done or the host raises `*stop`.
  *
- * @tparam DECODE Per-shot __device__ decode, syndrome and return correction.
+ * @tparam DECODE Per-shot __device__ decode: syndrome word in, error qubit index out.
  * @param ring Request ring in local HBM, K_RING_SLOTS slots, written by the
  *             peer's RDMA_WRITEs. Slot `cursor % K_RING_SLOTS` carries shot
  *             `cursor`, published via its `seq_num` trailer.
@@ -50,7 +50,7 @@ constexpr std::uint32_t STOP_POLL_INTERVAL = 1024;
  *             STOP_POLL_INTERVAL spins (host-coherent read over PCIe).
  * @param total Number of shots to process, or 0 to run until stopped.
  */
-template <std::uint64_t (*DECODE)(std::uint64_t)>
+template <std::int64_t (*DECODE)(std::uint64_t)>
 __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
                       volatile std::uint32_t *stop, std::uint64_t total)
 {
@@ -101,7 +101,7 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
 
 // Launch fused<DECODE> on the session-owned stream, wired to the datapath in
 // `desc`.
-template <std::uint64_t (*DECODE)(std::uint64_t)> static void launch(const CoprocLaunchDesc *desc)
+template <std::int64_t (*DECODE)(std::uint64_t)> static void launch(const CoprocLaunchDesc *desc)
 {
     hipLaunchKernelGGL((fused<DECODE>), dim3(1), dim3(1), 0, static_cast<hipStream_t>(desc->stream),
                        reinterpret_cast<PayloadSlot *>(desc->ring),
@@ -111,7 +111,7 @@ template <std::uint64_t (*DECODE)(std::uint64_t)> static void launch(const Copro
 }
 
 // Make sure we don't throw exception across C ABI.
-template <std::uint64_t (*DECODE)(std::uint64_t)>
+template <std::int64_t (*DECODE)(std::uint64_t)>
 static int launch_noexcept(const CoprocLaunchDesc *desc) noexcept
 {
     try {

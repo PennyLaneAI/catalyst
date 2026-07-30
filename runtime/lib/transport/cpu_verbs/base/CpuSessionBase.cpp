@@ -121,8 +121,8 @@ template <class Role>
 void CpuSessionBase<Role>::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                              const PeerRef &peer)
 {
-    RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu", local.size,
-               REGION_BYTES);
+    RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
+               static_cast<std::size_t>(local.size), REGION_BYTES);
     desc_ = desc;
     local_ = local;
     peer_ = peer;
@@ -153,7 +153,8 @@ void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inl
         peer_.remote_addr + (cursor & (K_RING_SLOTS - 1)) * sizeof(PayloadSlot);
     wr.wr.rdma.rkey = peer_.rkey;
     ibv_send_wr *bad = nullptr;
-    RDMA_CHECK(ibv_post_send(qp, &wr, &bad) == 0, "ibv_post_send");
+    const int rc = ibv_post_send(qp, &wr, &bad);
+    RDMA_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));
 }
 
 // Non-blocking batch reap of `cq`: take whatever completions are ready (up to

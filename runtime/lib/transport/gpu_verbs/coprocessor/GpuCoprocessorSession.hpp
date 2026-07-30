@@ -102,7 +102,7 @@ class GpuCoprocessorSession : public CoprocessorSession {
     std::atomic<bool> failed_{false};
     std::exception_ptr error_;
     std::atomic<std::uint64_t> completed_{0};
-    std::atomic<std::uint64_t> last_word_{0};
+    std::atomic<std::int64_t> last_word_{0};
     std::jthread engine_;
 };
 

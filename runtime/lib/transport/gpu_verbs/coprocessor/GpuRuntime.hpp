@@ -26,7 +26,7 @@ namespace catalyst::transport::gpu_verbs {
 // past 16 B the kernel falls back to the write-correction / fence / release-seq
 // / fence trailer protocol instead.
 struct alignas(16) HandoffSlot {
-    std::uint64_t correction;
+    std::int64_t correction; // error qubit index the decoder produced; -1 for no error
     std::uint32_t seq;
     std::uint32_t pad;
 };

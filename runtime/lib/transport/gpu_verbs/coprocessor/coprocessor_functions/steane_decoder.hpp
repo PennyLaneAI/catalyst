@@ -16,12 +16,33 @@
 #include <cstdint>
 namespace catalyst::transport::gpu_verbs {
 
-__device__ inline std::uint64_t steane_decode(std::uint64_t syndrome)
+constexpr int STEANE_CHECKS = 3;
+
+/**
+ * @brief Syndrome to error qubit index for the [[7,1,3]] Steane code; -1 is no
+ * error.
+ *
+ * Indexed by the 3 checks packed with check 0 as the most significant bit.
+ * For compatibility with existing Steane decoder.
+ */
+__device__ constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1 << STEANE_CHECKS] = {-1, 6, 4, 5,
+                                                                                  0,  3, 1, 2};
+
+/**
+ * @brief Decode one Steane syndrome to an error qubit index.
+ *
+ * @param syndrome Ring word holding one byte per check, byte `i` carrying check
+ *                 `i` in its low bit (a `memref<?xi1>` lowers to one byte per
+ *                 element, so the checks arrive unpacked).
+ * @return The error qubit index, or -1 for no error.
+ */
+__device__ inline std::int64_t steane_decode(std::uint64_t syndrome)
 {
-    // One 3-bit check (X or Z) per call; the nonzero index selects the single
-    // corrected qubit (0 => no error).
-    const std::uint32_t check = syndrome & 0x7u;
-    return static_cast<std::uint64_t>(check ? (1u << (check - 1)) : 0u);
+    std::uint32_t packed = 0;
+    for (int i = 0; i < STEANE_CHECKS; ++i) {
+        packed = (packed << 1U) | static_cast<std::uint32_t>((syndrome >> (8 * i)) & 1U);
+    }
+    return STEANE_SYNDROME_TO_QUBIT[packed];
 }
 
 } // namespace catalyst::transport::gpu_verbs
