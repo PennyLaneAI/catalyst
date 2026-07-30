@@ -13,9 +13,11 @@
 // limitations under the License.
 
 #include <cstdio>
+#include <exception>
 
 #include "GpuLaunchers.hpp" // CoprocLaunchDesc (via Transport.hpp)
 #include "GpuRuntime.hpp"   // HandoffSlot
+#include "HipCheck.hpp"     // HIP_CHECK
 #include "WireProtocol.hpp"
 
 #include "coprocessor_functions/echo_decoder.hpp"
@@ -97,30 +99,43 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
     }
 }
 
-//  Launch fused<DECODE> on the session-owned stream, wired to the datapath in
+// Launch fused<DECODE> on the session-owned stream, wired to the datapath in
 // `desc`.
-template <std::uint64_t (*DECODE)(std::uint64_t)> static int launch(const CoprocLaunchDesc *desc)
+template <std::uint64_t (*DECODE)(std::uint64_t)> static void launch(const CoprocLaunchDesc *desc)
 {
     hipLaunchKernelGGL((fused<DECODE>), dim3(1), dim3(1), 0, static_cast<hipStream_t>(desc->stream),
                        reinterpret_cast<PayloadSlot *>(desc->ring),
                        reinterpret_cast<HandoffSlot *>(desc->handoff),
                        reinterpret_cast<std::uint32_t *>(desc->stop), desc->total);
-    hipError_t err = hipGetLastError();
-    if (err != hipSuccess) {
-        fprintf(stderr, "[gpu_verbs] kernel launch failed: %s\n", hipGetErrorString(err));
+    HIP_CHECK(hipGetLastError(), "kernel launch");
+}
+
+// Make sure we don't throw exception across C ABI.
+template <std::uint64_t (*DECODE)(std::uint64_t)>
+static int launch_noexcept(const CoprocLaunchDesc *desc) noexcept
+{
+    try {
+        launch<DECODE>(desc);
+        return 0;
+    }
+    catch (const std::exception &e) {
+        std::fprintf(stderr, "[gpu_verbs] %s\n", e.what());
         return 1;
     }
-    return 0;
+    catch (...) {
+        std::fprintf(stderr, "[gpu_verbs] kernel launch failed: unknown error\n");
+        return 1;
+    }
 }
 
 extern "C" int catalyst_gpu_echo_launcher(const CoprocLaunchDesc *desc, void *)
 {
-    return launch<echo_decode>(desc);
+    return launch_noexcept<echo_decode>(desc);
 }
 
 extern "C" int catalyst_gpu_steane_launcher(const CoprocLaunchDesc *desc, void *)
 {
-    return launch<steane_decode>(desc);
+    return launch_noexcept<steane_decode>(desc);
 }
 
 int default_echo_launcher(const CoprocLaunchDesc *desc, void *ctx)

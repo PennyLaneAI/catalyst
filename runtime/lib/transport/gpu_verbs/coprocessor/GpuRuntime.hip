@@ -13,40 +13,15 @@
 // limitations under the License.
 
 #include <algorithm>
-#include <sstream>
 #include <stdexcept>
-#include <string>
 
 #include "Error.hpp"
 #include "GpuRuntime.hpp"
+#include "HipCheck.hpp"
 
 #include <hip/hip_runtime.h>
 
-/**
- * @brief Macro that throws `std::runtime_error` if a HIP call does not return
- * hipSuccess, tagged with the source location of the call.
- */
-#define HIP_CHECK(expression, what)                                                                \
-    ::catalyst::transport::gpu_verbs::_hip_check((expression), (what), __FILE__, __LINE__, __func__)
-
 namespace catalyst::transport::gpu_verbs {
-
-/**
- * @brief Throws a `std::runtime_error` describing a failed HIP call.
- *
- * @note This is not supposed to be called directly; use HIP_CHECK.
- */
-inline void _hip_check(hipError_t err, const char *what, const char *file_name, std::size_t line,
-                       const char *function_name)
-{
-    if (err == hipSuccess) {
-        return;
-    }
-    std::stringstream sstream;
-    sstream << "[" << file_name << ":" << line << "][Function:" << function_name
-            << "] GpuRuntime: " << what << ": " << hipGetErrorString(err);
-    throw std::runtime_error(sstream.str());
-}
 
 GpuRuntime::GpuRuntime()
 {
