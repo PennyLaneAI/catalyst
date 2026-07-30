@@ -177,7 +177,7 @@ def get_rule_funcs_from_module(module: ir.Module) -> list[ir.Operation]:
                 op.attributes["sym_name"] = ir.StringAttr.get(
                     "__builtin_" + old_attr.value.strip('"'), context=old_attr.context
                 )
-                funcOps.append(op)
+                funcOps.append(op.detach_from_parent())
                 return ir.WalkResult.SKIP
         return ir.WalkResult.ADVANCE
 
@@ -314,9 +314,9 @@ def compile_decomposition_rules_wrapper(
 def fetch_all_reachable_decomposition_rules_from_op(
     op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
 ):
-    q = deque()
+    queue = deque()
     start = (op_name, dynamic_shape, wire_lens, static_data, extra_data)
-    q.append(start)
+    queue.append(start)
     visited = [start]
     rules = [
         *get_rule_funcs_from_module(
@@ -326,9 +326,9 @@ def fetch_all_reachable_decomposition_rules_from_op(
         )
     ]
 
-    while len(q) != 0:
+    while len(queue) != 0:
         this_name, this_dynamic_shape, this_wire_lens, this_static_data, this_extra_data = (
-            q.popleft()
+            queue.popleft()
         )
         this_extra_data = this_extra_data or {}
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
@@ -340,18 +340,25 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 graph_op_id = GraphOpID(op)
                 probe = (
                     graph_op_id.get_operator_name(),
-                    graph_op_id.get_dynamic_shape(),
+                    {
+                        name: mlir_stringify_type(shape)
+                        for name, shape in graph_op_id.get_dynamic_shape().items()
+                    },
                     graph_op_id.wire_lens,
                     graph_op_id.static_data,
+                    graph_op_id.extra_data,
                 )
                 if not probe in visited:
                     visited.append(probe)
-                    q.append(probe)
-                    rules.extend(
-                        get_rule_funcs_from_module(
-                            compile_decomposition_rules(
-                                probe[0], graph_op_id.getID(), probe[1], probe[2], probe[3]
-                            )
-                        )
+                    queue.append(probe)
+
+                    module = compile_decomposition_rules(
+                        probe[0],
+                        graph_op_id.getID(),
+                        probe[1],
+                        probe[2],
+                        probe[3],
+                        probe[4],
                     )
+                    rules.extend(get_rule_funcs_from_module(module))
     return rules
