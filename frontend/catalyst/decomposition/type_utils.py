@@ -14,6 +14,8 @@
 
 """Type handling utilities for decomposition rule lowering."""
 
+import copy
+
 import jax.numpy as jnp
 import pennylane as qp
 from jax.core import ShapedArray
@@ -34,37 +36,26 @@ _MLIR_DTYPES_TO_PY_DTYPES = {
 _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
 
 
-def _process_shaped_type(shape: tuple, dim: int, element_type, formatter):
-    """Recursively processes the shape, applying the formatter at each dimension."""
+def _stringify_shaped_type(shape: tuple, dim: int, element_type) -> str:
+    """Return a string representation of the given shaped data type."""
     if dim + 1 == len(shape):
         inner_content = _PY_DTYPES_TO_MLIR_DTYPES[element_type]
     else:
-        inner_content = _process_shaped_type(shape, dim + 1, element_type, formatter)
-
-    return formatter(inner_content, shape[dim])
-
-
-def _convert_type(dtype: qp.typing.AbstractArray, formatter):
-    """Base function to handle scalar checks before processing the shape."""
-    assert isinstance(dtype, qp.typing.AbstractArray)
-    element_type = dtype.dtype.type
-
-    if dtype.shape == ():
-        return _PY_DTYPES_TO_MLIR_DTYPES[element_type]
-
-    return _process_shaped_type(dtype.shape, 0, element_type, formatter)
+        inner_content = _stringify_shaped_type(shape, dim + 1, element_type)
+    length = shape[dim]
+    return f"[{','.join([inner_content] * length)}]"
 
 
 def mlir_stringify_type(dtype: qp.typing.AbstractArray):
     """Return a string representation of the given data type."""
-    string_formatter = lambda content, length: f"[{','.join([content] * length)}]"
-    return _convert_type(dtype, string_formatter)
-
-
-def listify_type(dtype: qp.typing.AbstractArray):
-    """Return a list representation of the given data type."""
-    list_formatter = lambda content, length: [content] * length
-    return _convert_type(dtype, list_formatter)
+    assert isinstance(
+        dtype, qp.typing.AbstractArray
+    ), f"Expected an AbstractArray to stringify, got {dtype}"
+    element_type = dtype.dtype.type
+    if dtype.shape == ():
+        return f"[{_PY_DTYPES_TO_MLIR_DTYPES[element_type]}]"
+    else:
+        return _stringify_shaped_type(dtype.shape, 0, element_type)
 
 
 def get_dummy_values_for_container(container):
@@ -76,6 +67,8 @@ def get_dummy_values_for_container(container):
     Ex.
     [[float, float], [int, int, int], [int32, int32, int32, int32]]
     """
+    if isinstance(container, str):
+        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[container])
 
     def handle_item(item):
         if isinstance(item, (list, tuple)):
@@ -93,3 +86,58 @@ def get_dummy_values_for_container(container):
                 )
 
     return tuple(handle_item(item) for item in container)
+
+
+def replace_abstract_wires_with_concrete_wires(node):
+    if isinstance(node, qp.core.Operator2):
+        return _replace_op_abstract_wires_with_concrete_wires(node)
+
+    if isinstance(node, list):
+        return [replace_abstract_wires_with_concrete_wires(item) for item in node]
+    elif isinstance(node, dict):
+        return {k: replace_abstract_wires_with_concrete_wires(v) for k, v in node.items()}
+    elif isinstance(node, tuple):
+        return tuple(replace_abstract_wires_with_concrete_wires(item) for item in node)
+    else:
+        if isinstance(node, qp.typing.AbstractWires):
+            return qp.wires.Wires(range(node.num_wires))
+        else:
+            return node
+
+
+def _replace_op_abstract_wires_with_concrete_wires(op2):
+    """
+    Given an Operator2 instance, return a copy of the same instance but with all fields whose value
+    is an `AbstractWires` replaced with concrete `Wires`.
+    """
+    new_op = copy.deepcopy(op2)
+    for wire_arg in new_op.wire_argnames:
+        if isinstance(new_op.arguments[wire_arg], qp.typing.AbstractWires):
+            num_wires = new_op.arguments[wire_arg].num_wires
+            new_op.arguments[wire_arg] = qp.wires.Wires(range(-1, -num_wires - 1, -1))
+    for hybrid_arg in new_op.hybrid_argnames:
+        if isinstance(new_op.arguments[hybrid_arg], qp.core.Operator2):
+            new_op.arguments[hybrid_arg] = _replace_op_abstract_wires_with_concrete_wires(
+                new_op.arguments[hybrid_arg]
+            )
+
+    return new_op
+
+
+def post_process_concretize_leaves(leaves):
+    """
+    Given a list of pytree leaf values, change all `AbstractArray`s to `ShapedArray`s of the same
+    shape and dtype, and change all negative integers to `AbstractQubit()`s.
+    """
+    out_leaves = []
+    for leaf in leaves:
+        if isinstance(leaf, int) and leaf < 0:
+            out_leaves.append(qp.wires.AbstractQubit())
+        elif isinstance(leaf, qp.typing.AbstractArray):
+            out_leaves.append(
+                ShapedArray(shape=leaf.shape, dtype=leaf.dtype, weak_type=leaf._weak_type)
+            )
+        else:
+            out_leaves.append(leaf)
+
+    return out_leaves
