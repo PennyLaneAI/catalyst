@@ -15,27 +15,16 @@ jobs:
     name: Changelog Reminder
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@master
+    - name: Changelog Reminder
+      uses: peterjgrainger/action-changelog-reminder@v1.3.0
       with:
-        fetch-depth: 2
-    - name: Check changelog entry
-      shell: bash
-      run: |
-        if git rev-parse --verify HEAD^2 > /dev/null 2>&1; then
-          CHANGED_FILES=$(git diff --name-only HEAD^1 HEAD^2)
-        else
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
-        fi
-
-        if grep -Fxq "doc/releases/changelog-dev.md" <<< "${CHANGED_FILES}"; then
-          echo "Changelog entry found."
-        else
-          echo "::warning::Hello. You may have forgotten to update the changelog in doc/releases/changelog-dev.md."
-          {
-            echo "Hello. You may have forgotten to update the changelog!"
-            echo "Please edit \`doc/releases/changelog-dev.md\` on your branch with:"
-            echo "- A one-to-two sentence description of the change. You may include a small working example for new features."
-            echo "- A link back to this PR."
-            echo "- Your name (or GitHub username) in the contributors section."
-          } >> "${GITHUB_STEP_SUMMARY}"
-        fi
+        changelog_regex: 'doc/releases/changelog-dev.md'
+        customPrMessage: |
+          Hello. You may have forgotten to update the changelog!
+          Please edit [`doc/releases/changelog-dev.md`](/PennyLaneAI/catalyst/blob/main/doc/releases/changelog-dev.md) on your branch with:
+          * A one-to-two sentence description of the change. You may include a small working example for new features.
+          * A link back to this PR.
+          * Your name (or GitHub username) in the contributors section.
+      env:
+        GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
