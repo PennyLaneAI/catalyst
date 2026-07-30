@@ -79,10 +79,7 @@ class GraphOpID:
 
     def parse_dynamic_shape(self) -> dict:
         """Return the dynamic shape as a dictionary of dtypes from the dynamic arg names."""
-        return {
-            argname: mlir_stringify_type(argtype)
-            for argname, argtype in sorted(self.op.dynamic_args.items())
-        }
+        return {argname: argtype for argname, argtype in sorted(self.op.dynamic_args.items())}
 
     def parse_wire_lens(self) -> dict:
         """Return the length of each of the wire args as a dictionary from the wire arg names."""
