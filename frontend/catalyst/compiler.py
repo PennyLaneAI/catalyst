@@ -298,7 +298,7 @@ def _get_catalyst_cli_cmd(*args, stdin=None):
     return cmd
 
 
-def _catalyst(*args, stdin=None, text=True):
+def _catalyst(*args, stdin=None, text=True, stderr_return=False):
     """Raw interface to catalyst
 
     echo ${stdin} | catalyst *args -
@@ -312,7 +312,8 @@ def _catalyst(*args, stdin=None, text=True):
     try:
         result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=text)
 
-        if result.stderr:
+        # Capture the diagnostic output from the compiler
+        if stderr_return and result.stderr:
             stderr = result.stderr.decode() if isinstance(result.stderr, bytes) else result.stderr
             print(stderr, end="", file=sys.stderr)
 
@@ -321,13 +322,13 @@ def _catalyst(*args, stdin=None, text=True):
         raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
 
-def _quantum_opt(*args, stdin=None, text=True):
+def _quantum_opt(*args, stdin=None, text=True, stderr_return=False):
     """Raw interface to quantum-opt
 
     echo ${stdin} | catalyst --tool=opt *args -
     catalyst --tool=opt *args
     """
-    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text)
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text, stderr_return=stderr_return)
 
 
 def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
@@ -409,6 +410,7 @@ def to_mlir_opt(
     options: Optional[CompileOptions] = None,
     using_python_compiler=False,
     workspace=None,
+    stderr_return=True,
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     # Check if we need to use the Python interface for xDSL passes
@@ -422,12 +424,12 @@ def to_mlir_opt(
 
     # These are the options that may affect compilation
     if not options:
-        return _quantum_opt(*args, stdin=stdin)
+        return _quantum_opt(*args, stdin=stdin, stderr_return=stderr_return)
 
     opts = _options_to_cli_flags(options)
     if workspace is not None:
         opts += [("--workspace", str(workspace))]
-    return _quantum_opt(*opts, *args, stdin=stdin)
+    return _quantum_opt(*opts, *args, stdin=stdin, stderr_return=stderr_return)
 
 
 class Compiler:
