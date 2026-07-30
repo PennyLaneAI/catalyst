@@ -22,6 +22,10 @@
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
 
+* Catalyst can now cross-compile target nested modules to standalone object files and
+  either statically link them into the host program or ship them to an executor for dispatch.
+ [(#3033)](https://github.com/PennyLaneAI/catalyst/pull/3033)
+
 * A new `Transport` MLIR dialect is added, providing typed ops for driving a transport session's
   lifecycle at the IR level.
   [(#3047)](https://github.com/PennyLaneAI/catalyst/pull/3047)
