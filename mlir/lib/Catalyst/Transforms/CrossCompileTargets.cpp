@@ -55,6 +55,8 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
 
+#include "Executor/IR/ExecutorDialect.h"
+
 using namespace mlir;
 
 namespace catalyst {
@@ -78,16 +80,9 @@ void exposeEntryViaCInterface(func::FuncOp fn)
 // LLVM-dialect lowering, reusing the same stage definitions as the host pipeline.
 std::vector<std::string> defaultLoweringPassList()
 {
-    auto buf = driver::getBufferizationStage();
+    auto passes = driver::getBufferizationStage();
     auto llvmPasses = driver::getLLVMDialectLoweringStage();
-    std::vector<std::string> passes;
-    passes.reserve(buf.size() + llvmPasses.size());
-    passes.insert(passes.end(), buf.begin(), buf.end());
-    for (const auto &passName : llvmPasses) {
-        if (passName != "convert-executor-to-llvm") {
-            passes.push_back(passName);
-        }
-    }
+    passes.insert(passes.end(), llvmPasses.begin(), llvmPasses.end());
     return passes;
 }
 
@@ -161,7 +156,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
                         catalyst::mitigation::MitigationDialect,
                         catalyst::pauli_frame::PauliFrameDialect, catalyst::ion::IonDialect,
                         catalyst::rtio::RTIODialect, catalyst::qecl::QecLogicalDialect,
-                        catalyst::qecp::QecPhysicalDialect>();
+                        catalyst::qecp::QecPhysicalDialect, catalyst::executor::ExecutorDialect>();
     }
 
     void runOnOperation() final
@@ -169,11 +164,9 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         ModuleOp host = getOperation();
 
         SmallVector<ModuleOp> targetMods;
-        for (auto &op : host.getBody()->getOperations()) {
-            if (auto mod = dyn_cast<ModuleOp>(&op)) {
-                if (mod->hasAttr("catalyst.target")) {
-                    targetMods.push_back(mod);
-                }
+        for (auto mod : host.getBody()->getOps<ModuleOp>()) {
+            if (mod->hasAttr("catalyst.target")) {
+                targetMods.push_back(mod);
             }
         }
 

@@ -334,7 +334,7 @@ func.func @pbc_estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !qua
     %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
         %out = pbc.ppr ["Z"](4) %arg1 : !quantum.bit
         scf.yield %out : !quantum.bit
-    } {estimated_iterations = 10 : i16}
+    } {catalyst.estimated_iterations = 10 : i16}
 
     return %q : !quantum.bit
 }
@@ -365,7 +365,7 @@ func.func @depth_caller(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Dynamic for loop with estimated_iterations: treated as static for the
+// Dynamic for loop with catalyst.estimated_iterations: treated as static for the
 // purposes of counting, so it lifts into "for_loop_1" with the
 // attribute's iteration count as the call multiplier.
 
@@ -384,9 +384,35 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
     %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
         %out = quantum.custom "PauliZ"() %arg1 : !quantum.bit
         scf.yield %out : !quantum.bit
-    } {estimated_iterations = 10 : i16}
+    } {catalyst.estimated_iterations = 10 : i16}
 
     return %q : !quantum.bit
+}
+
+// -----
+
+// A fractional catalyst.estimated_iterations on a while loop scales the body's resource
+// counts by the (possibly non-integer) expected iteration count: 2 gates * 2.5 = 5.
+
+// CHECK-LABEL: "estimated_iterations_while_fractional": {
+// CHECK: "operations"
+// CHECK-DAG: "PauliZ(1)": 5
+func.func @estimated_iterations_while_fractional(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %r:2 = scf.while (%i = %c0, %q = %arg0) : (index, !quantum.bit) -> (index, !quantum.bit) {
+        %cond = arith.cmpi slt, %i, %n : index
+        scf.condition(%cond) %i, %q : index, !quantum.bit
+    } do {
+    ^bb0(%i: index, %q: !quantum.bit):
+        %q1 = quantum.custom "PauliZ"() %q : !quantum.bit
+        %q2 = quantum.custom "PauliZ"() %q1 : !quantum.bit
+        %inext = arith.addi %i, %c1 : index
+        scf.yield %inext, %q2 : index, !quantum.bit
+    } attributes {catalyst.estimated_iterations = 2.5 : f64}
+
+    return %r#1 : !quantum.bit
 }
 
 // -----
@@ -676,11 +702,11 @@ func.func private @for_loop_1(%arg0: !quantum.bit) -> !quantum.bit {
 // the parent.
 
 // CHECK-LABEL: "for_loop_1": {
-// CHECK: "measurements"
-// CHECK-DAG: "MidCircuitMeasure": 1
+// CHECK: "measurements": {}
 // CHECK: "num_alloc_qubits": 1
 // CHECK: "operations"
 // CHECK-DAG: "Hadamard(1)": 1
+// CHECK-DAG: "MidCircuitMeasure(1)": 1
 
 // CHECK-LABEL: "loop_with_measurement_and_alloc": {
 // CHECK: "function_calls"
@@ -708,11 +734,13 @@ func.func @loop_with_measurement_and_alloc() {
 // Measurements at the top level (not inside a loop)
 
 // CHECK-LABEL: "measurement_ops"
-// CHECK: "measurements"
-// CHECK-DAG: "MidCircuitMeasure": 1
+// CHECK: "measurements": {}
 // CHECK: "num_alloc_qubits": 1
 // CHECK: "num_arg_qubits": 0
 // CHECK: "num_qubits": 1
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 1
+// CHECK-DAG: "MidCircuitMeasure(1)": 1
 func.func @measurement_ops() {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -959,8 +987,8 @@ func.func @mixed_alloc_and_arg_qubits(%q0: !quantum.bit) -> !quantum.bit attribu
 // STATS: 2 total-alloc-qubits
 // STATS: 0 total-arg-qubits
 // STATS: 1 total-classical-ops
-// STATS: 1 total-gates
-// STATS: 1 total-measurements
+// STATS: 2 total-gates
+// STATS: 0 total-measurements
 // STATS: 2 total-qubits
 func.func @stats_test() {
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -1084,8 +1112,7 @@ func.func @auto_qm_flag_unset() {
 
 // CHECK-LABEL: "qref"
 
-// CHECK: "measurements"
-// CHECK-DAG: "MidCircuitMeasure": 1
+// CHECK: "measurements": {}
 
 // CHECK:   "num_alloc_qubits": 6
 // CHECK:   "num_arg_qubits": 3
@@ -1096,7 +1123,8 @@ func.func @auto_qm_flag_unset() {
 // CHECK-DAG: "CNOT(2)": 1
 // CHECK-DAG: "Adjoint(T)(1)": 1
 // CHECK-DAG: "S(1)": 1
-// CHECK-PPM: "PPM(0)": 1,
+// CHECK-DAG: "MidCircuitMeasure(1)": 1
+// CHECK-DAG: "PPM(0)": 1,
 // CHECK-DAG: "mbqc.ref.graph_state_prep(0)": 1,
 // CHECK-DAG: "mbqc.ref.measure_in_basis(0)": 1
 
@@ -1128,6 +1156,151 @@ func.func @qref(%arg0: !qref.bit, %arg1: !qref.reg<2>) {
 
 // -----
 
+// scf.if with an `estimated_probability` hint uses the expected (probability-
+// weighted) resource counts instead of the worst case. With p(then) = 0.75 the
+// then-branch has 4 Hadamards and the else-branch has 8, so the expected count
+// is 0.75*4 + 0.25*8 = 5 (the worst case would be 8).
+
+// CHECK-LABEL: "if_estimated_probability"
+// CHECK: "has_branches": true
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 5
+func.func @if_estimated_probability(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
+    %q = scf.if %cond -> !quantum.bit {
+        %t1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        %t2 = quantum.custom "Hadamard"() %t1 : !quantum.bit
+        %t3 = quantum.custom "Hadamard"() %t2 : !quantum.bit
+        %t4 = quantum.custom "Hadamard"() %t3 : !quantum.bit
+        scf.yield %t4 : !quantum.bit
+    } else {
+        %f1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        %f2 = quantum.custom "Hadamard"() %f1 : !quantum.bit
+        %f3 = quantum.custom "Hadamard"() %f2 : !quantum.bit
+        %f4 = quantum.custom "Hadamard"() %f3 : !quantum.bit
+        %f5 = quantum.custom "Hadamard"() %f4 : !quantum.bit
+        %f6 = quantum.custom "Hadamard"() %f5 : !quantum.bit
+        %f7 = quantum.custom "Hadamard"() %f6 : !quantum.bit
+        %f8 = quantum.custom "Hadamard"() %f7 : !quantum.bit
+        scf.yield %f8 : !quantum.bit
+    } {catalyst.estimated_probability = 0.75 : f64}
+    return %q : !quantum.bit
+}
+
+// -----
+
+// scf.if with only a then-branch and `estimated_probability` = 0.5: the (empty)
+// else-branch contributes nothing, so the expected Hadamard count is
+// 0.5 * 3 = 1.5. Counts are tracked as doubles internally, but the JSON output
+// rounds each count to the nearest integer, so 1.5 is reported as 2.
+
+// CHECK-LABEL: "if_estimated_probability_then_only"
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 2
+func.func @if_estimated_probability_then_only(%arg0: !quantum.bit, %cond: i1) {
+    scf.if %cond {
+        %t1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        %t2 = quantum.custom "Hadamard"() %t1 : !quantum.bit
+        %t3 = quantum.custom "Hadamard"() %t2 : !quantum.bit
+        scf.yield
+    } {catalyst.estimated_probability = 0.5 : f64}
+    return
+}
+
+// -----
+
+// Qubit allocations are probability-weighted like every other count. Here the
+// then-branch allocates 1 qubit and the (empty) else-branch allocates none,
+// with p(then) = 0.5, so the expected allocation count is 0.5. The JSON output
+// rounds each count to the nearest integer, so 0.5 is reported as 1.
+
+// CHECK-LABEL: "if_estimated_probability_qubits"
+// CHECK: "num_alloc_qubits": 1
+// CHECK: "num_qubits": 1
+func.func @if_estimated_probability_qubits(%cond: i1) {
+    scf.if %cond {
+        %r = quantum.alloc(1) : !quantum.reg
+        %q = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
+        %h = quantum.custom "Hadamard"() %q : !quantum.bit
+        scf.yield
+    } {catalyst.estimated_probability = 0.5 : f64}
+    return
+}
+
+// -----
+
+// A probabilistic conditional inside a loop body: the fractional expected count
+// (0.5 Hadamard per iteration, p(then) = 0.5) is carried as a double internally so
+// it survives lifting into the for_loop_1 body and can be combined with the trip
+// count downstream (0.5 * 10 = 5, see the STATS check). The per-function JSON output
+// rounds counts to the nearest integer, so the lifted body reports 1, and the parent
+// records function_calls = { for_loop_1: 10 }.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 1
+
+// CHECK-LABEL: "prob_if_in_loop": {
+// CHECK: "function_calls"
+// CHECK: "for_loop_1": 10
+func.func @prob_if_in_loop(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c10 = arith.constant 10 : index
+    %c1 = arith.constant 1 : index
+    %q = scf.for %i = %c0 to %c10 step %c1 iter_args(%a = %arg0) -> (!quantum.bit) {
+        scf.if %cond {
+            %h = quantum.custom "Hadamard"() %a : !quantum.bit
+            scf.yield
+        } {catalyst.estimated_probability = 0.5 : f64}
+        scf.yield %a : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
+// scf.index_switch with an `estimated_probabilities` hint (one entry per case,
+// in case order). The default case probability is computed automatically as the
+// remaining mass: 1 - (0.2 + 0.3) = 0.5. With case 0 = 5, case 1 = 10 and
+// default = 2 PauliX gates, the expected count is
+// 0.2*5 + 0.3*10 + 0.5*2 = 5.
+
+// CHECK-LABEL: "switch_estimated_probabilities"
+// CHECK: "has_branches": true
+// CHECK: "operations"
+// CHECK-DAG: "PauliX(1)": 5
+func.func @switch_estimated_probabilities(%arg0: !quantum.bit, %sel: index) -> !quantum.bit {
+    %q = scf.index_switch %sel {catalyst.estimated_probabilities = [0.2 : f64, 0.3 : f64]} -> !quantum.bit
+    case 0 {
+        %c1 = quantum.custom "PauliX"() %arg0 : !quantum.bit
+        %c2 = quantum.custom "PauliX"() %c1 : !quantum.bit
+        %c3 = quantum.custom "PauliX"() %c2 : !quantum.bit
+        %c4 = quantum.custom "PauliX"() %c3 : !quantum.bit
+        %c5 = quantum.custom "PauliX"() %c4 : !quantum.bit
+        scf.yield %c5 : !quantum.bit
+    }
+    case 1 {
+        %d1 = quantum.custom "PauliX"() %arg0 : !quantum.bit
+        %d2 = quantum.custom "PauliX"() %d1 : !quantum.bit
+        %d3 = quantum.custom "PauliX"() %d2 : !quantum.bit
+        %d4 = quantum.custom "PauliX"() %d3 : !quantum.bit
+        %d5 = quantum.custom "PauliX"() %d4 : !quantum.bit
+        %d6 = quantum.custom "PauliX"() %d5 : !quantum.bit
+        %d7 = quantum.custom "PauliX"() %d6 : !quantum.bit
+        %d8 = quantum.custom "PauliX"() %d7 : !quantum.bit
+        %d9 = quantum.custom "PauliX"() %d8 : !quantum.bit
+        %d10 = quantum.custom "PauliX"() %d9 : !quantum.bit
+        scf.yield %d10 : !quantum.bit
+    }
+    default {
+        %e1 = quantum.custom "PauliX"() %arg0 : !quantum.bit
+        %e2 = quantum.custom "PauliX"() %e1 : !quantum.bit
+        scf.yield %e2 : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
 // Resource analysis should include functions inside nested modules.
 
 // CHECK-LABEL: "circuit"
@@ -1153,4 +1326,135 @@ module @nested_resource_module {
       return
     }
   }
+}
+
+// -----
+
+// Test operations with control qubits.
+
+// CHECK-LABEL: "test_ops_with_ctrl"
+// CHECK-DAG: "Adjoint(T)(1)": 1
+// CHECK-DAG: "CY(2)": 1
+// CHECK-DAG: "PauliX(1)": 1
+// CHECK-DAG: "C(Adjoint(S))(2)": 1
+// CHECK-DAG: "2C(S)(3)": 1
+
+func.func public @test_ops_with_ctrl() -> tensor<8xf64> {
+    %false = arith.constant false
+    %true = arith.constant true
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
+    %out_qubits_0 = quantum.custom "T"() %out_qubits adj : !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_qubits_1, %out_ctrl_qubits = quantum.custom "S"() %out_qubits_0 adj ctrls(%2) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %out_qubits_2, %out_ctrl_qubits_3:2 = quantum.custom "S"() %out_qubits_1 ctrls(%out_ctrl_qubits, %3) ctrlvals(%true, %false) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+    %out_qubits_4:2 = quantum.custom "CY"() %out_ctrl_qubits_3#1, %out_qubits_2 : !quantum.bit, !quantum.bit
+    %4 = quantum.insert %0[ 0], %out_qubits_4#1 : !quantum.reg, !quantum.bit
+    %5 = quantum.insert %4[ 1], %out_ctrl_qubits_3#0 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 2], %out_qubits_4#0 : !quantum.reg, !quantum.bit
+    %7 = quantum.compbasis qreg %6 : !quantum.obs
+    %8 = quantum.probs %7 : tensor<8xf64>
+    quantum.dealloc %6 : !quantum.reg
+    quantum.device_release
+    return %8 : tensor<8xf64>
+}
+
+// -----
+
+// Test operations with control qubits in reference semantics.
+
+// CHECK-LABEL: "test_ops_with_ctrl_ref"
+// CHECK-DAG: "Adjoint(T)(1)": 1
+// CHECK-DAG: "CY(2)": 1
+// CHECK-DAG: "PauliX(1)": 1
+// CHECK-DAG: "C(S)(2)": 1
+// CHECK-DAG: "2C(S)(3)": 1
+
+func.func public @test_ops_with_ctrl_ref() {
+    %false = arith.constant false
+    %true = arith.constant true
+    %0 = qref.alloc( 3) : !qref.reg<3>
+    %1 = qref.get %0[ 0] : !qref.reg<3> -> !qref.bit
+    qref.custom "PauliX"() %1 : !qref.bit
+    qref.custom "T"() %1 adj : !qref.bit
+    %2 = qref.get %0[ 1] : !qref.reg<3> -> !qref.bit
+    qref.custom "S"() %1 ctrls(%2) ctrlvals(%true) : !qref.bit ctrls !qref.bit
+    %3 = qref.get %0[ 2] : !qref.reg<3> -> !qref.bit
+    qref.custom "S"() %1 ctrls(%2, %3) ctrlvals(%true, %false) : !qref.bit ctrls !qref.bit, !qref.bit
+    qref.custom "CY"() %3, %1 : !qref.bit, !qref.bit
+    qref.dealloc %0 : !qref.reg<3>
+    return
+}
+
+// -----
+
+// Test PBC prepare/fabricate allocations and multi-qubit PPR/PPM counts.
+
+// CHECK-LABEL: "pbc_prepare_fabricate"
+// CHECK:   "num_alloc_qubits": 5
+// CHECK:   "num_arg_qubits": 0
+// CHECK:   "num_qubits": 5
+// CHECK:   "operations"
+// CHECK-DAG: "pbc.prepare(0)": 2
+// CHECK-DAG: "pbc.fabricate(0)": 1
+// CHECK-DAG: "Adjoint(PPR-identity)(1)": 1
+// CHECK-DAG: "PPR-identity(1)": 1
+// CHECK-DAG: "PPR-pi/4(2)": 1
+// CHECK-DAG: "PPR-pi/8(3)": 1
+// CHECK-DAG: "Adjoint(PPM)(2)": 1
+// CHECK-DAG: "PPM(2)": 1
+
+func.func @pbc_prepare_fabricate() {
+    %q0, %q1 = pbc.prepare plus : !quantum.bit, !quantum.bit
+    %q2 = pbc.prepare zero : !quantum.bit
+    %m0, %m1 = pbc.fabricate magic : !quantum.bit, !quantum.bit
+    %r0:2 = pbc.ppr ["X", "Z"](4) %q0, %q1 : !quantum.bit, !quantum.bit
+    %r1:3 = pbc.ppr ["X", "Y", "Z"](8) %r0#0, %r0#1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+    %r2 = pbc.ppr ["X"](1) %r1#0 : !quantum.bit
+    %r3 = pbc.ppr ["X"](-1) %r2 : !quantum.bit
+    %mres, %out0, %out1 = pbc.ppm ["X", "Z"] %m0, %m1 : i1, !quantum.bit, !quantum.bit
+    %mres2, %out2, %out3 = pbc.ppm ["X", "Z"](-) %out0, %out1 : i1, !quantum.bit, !quantum.bit
+    return
+}
+
+
+// -----
+
+// Test OperatorOp: name, params, adjoint, and control qubits.
+
+// CHECK-LABEL: "operator2"
+// CHECK-DAG: "MyOpA(2)": 1
+// CHECK-DAG: "C(MyOpB)(2)": 1
+// CHECK-DAG: "2C(MyOpC)(3)": 1
+// CHECK-DAG: "Adjoint(MyOpD)(1)": 1
+
+func.func @operator2() {
+    %false = arith.constant false
+    %true = arith.constant true
+    %theta = arith.constant 0.5 : f64
+    %phi = arith.constant 0.25 : f64
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %q0 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %q1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %q2 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+
+    %o0, %o1 = quantum.operator "MyOpA"(%theta : f64) qubits(%q0, %q1)
+
+    %o2, %oc0 = quantum.operator "MyOpB"(%theta : f64) qubits(%o0)
+      ctrls(%o1) ctrl_vals(%true)
+
+    %o3, %oc1, %oc2 = quantum.operator "MyOpC"(%theta : f64, %phi : f64) qubits(%o2)
+      ctrls(%oc0, %q2) ctrl_vals(%true, %false)
+
+    %o4 = quantum.operator "MyOpD"(%theta : f64) adj qubits(%o3)
+      static_data = {pauli_string = "XYZ"}
+
+    %r0 = quantum.insert %0[ 0], %o4 : !quantum.reg, !quantum.bit
+    %r1 = quantum.insert %r0[ 1], %oc1 : !quantum.reg, !quantum.bit
+    %r2 = quantum.insert %r1[ 2], %oc2 : !quantum.reg, !quantum.bit
+    quantum.dealloc %r2 : !quantum.reg
+    return
 }
