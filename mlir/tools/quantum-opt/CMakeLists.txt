@@ -34,6 +34,7 @@ set(LIBS
     MLIRRTIO
     rtio-transforms
     MLIRTransport
+    transport-transforms
     MLIRExecutor
     executor-transforms
     MLIRQecLogical
