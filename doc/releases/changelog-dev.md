@@ -50,6 +50,11 @@
     executor and uses LLVM's ORC v2 EPC as the wire protocol to ship cross-compiled kernel objects
     into the remote JIT.
     [(#2915)](https://github.com/PennyLaneAI/catalyst/pull/2915)
+
+  - Added `executor.launch_async` and `executor.await` ops, paired by a new `!executor.token` type
+    to the executor dialect along with the necessary lowerings. This allows one to start an async 
+    kernel on a background host thread and join it later.
+    [(#3073)](https://github.com/PennyLaneAI/catalyst/pull/3073)
     [(#3031)](https://github.com/PennyLaneAI/catalyst/pull/3031)
     [(#3030)](https://github.com/PennyLaneAI/catalyst/pull/3030)
 
