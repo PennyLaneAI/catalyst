@@ -103,7 +103,7 @@ void SymbolicCircuit::applyGateRZ(size_t qubitIndex, GateID gateId)
     Parity &parity = stateTrans.getExprMutable(qubitIndex);
 
     bool affineVal = parity.getAffineValue();
-    PhaseBucket contributor = PhaseBucket(gateId, affineVal);
+    GateBundle contributor = GateBundle(gateId, affineVal);
 
     parity.clearAffineValue();
     phasePoly.insertContributor(parity, contributor);

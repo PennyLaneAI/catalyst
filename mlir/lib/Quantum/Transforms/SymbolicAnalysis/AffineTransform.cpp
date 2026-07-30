@@ -12,92 +12,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "AffineTransform.h"
+#include "AffineTransform.hpp"
 
 /*
-    Constructors:
+    Print:
 */
-TransformLayout::TransformLayout(size_t n)
+std::string AffineTransform::toString() const
 {
-    inVars.reserve(n);
-    std::iota(inVars.begin(), inVars.end(), 0); 
-}
-/*
-    Operators:
-*/
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AffineTransform &trans)
-{
-    os << trans.mat;
-    return os;
-}
+    std::string res = "";
 
-std::string AffineTransform::algebraicView() const
-{
-    return mat.algebraicView(getQubitNum());
+    for (size_t i = 0; i < matrix.getNumRows(); ++i) {
+        std::string pre = matrix.getRowAt(i).toStringWithOrder(schema.preVars);
+        std::string aux = matrix.getRowAt(i).toStringWithOrder(schema.auxVars);
+        bool affVal = matrix.getRowAt(i).getBitAtLoc(schema.affVal);
+
+        res += (pre + aux + std::to_string(affVal)) + "\n";
+    }
+    return res;
 }
 
 /*
     Methods:
 */
-void AffineTransform::extendQubitsTo(size_t newQubitNum)
-{
-    size_t curQubitNum = getQubitNum();
-    size_t auxVarNum = getAuxVarNum();
-
-    mat.extendRowsTo(newQubitNum, auxVarNum);
-    
-    layout.inVars.reserve(newQubitNum);
-    for (size_t i = curQubitNum + 1; i <= newQubitNum; i++) {
-        layout.inVars.push_back(i + auxVarNum);
-    }
+void AffineTransform::extendQubitsBy(size_t addQubitNum)
+{    
+    IdxView newVars = schema.allocPreVars(addQubitNum);
+    matrix.extendRowsFor(newVars, schema.maxBlock());
 }
 
-void AffineTransform::initQubit(size_t qubitIndex, bool basisState)
+void AffineTransform::prepareQubit(size_t wire, bool basisState)
 {
-    mat.resetRow(qubitIndex);
+    matrix.resetRow(wire, schema.affVal.block);
     if (basisState == 1) {
-        mat.flipAffineValueAtRow(qubitIndex);
+        matrix.getRowMutableAt(wire).setBitAtLoc(schema.affVal);
     }
-}
-
-void AffineTransform::applyGateX(size_t qubitIndex) 
-{
-    mat.flipAffineValueAtRow(qubitIndex);
-}
-
-void AffineTransform::applyGateCNOT(size_t controlIndex, size_t targetIndex)
-{
-    mat.addRowToRow(controlIndex, targetIndex);
-}
-
-void AffineTransform::applyGateSWAP(size_t qubitIndex1, size_t qubitIndex2)
-{
-    mat.swapRows(qubitIndex1, qubitIndex2);
-}
-
-void AffineTransform::applyGateH(size_t qubitIndex)
-{   
-    size_t lastInd = getQubitNum() + getAuxVarNum() + 1;
-    mat.setRow(qubitIndex, Parity::eVec(lastInd, lastInd));
-    layout.auxVars.push_back(lastInd);
 }
 
 // uninterpreted gates.
-void AffineTransform::applyGateU(llvm::ArrayRef<size_t> qubitIndices)
+void AffineTransform::applyGateU(llvm::ArrayRef<size_t> wires)
 {
-    llvm::outs() << "U on qubits ";
-    for (size_t index : qubitIndices) {
-        llvm::outs() << index << ", ";
-    }
-    llvm::outs() << ":\n";
-    
-    size_t n = qubitIndices.size();
-    size_t lastInd = getQubitNum() + getAuxVarNum();
+    const size_t n = wires.size();
+    IdxView auxVarLocs = schema.allocAuxVars(n);
 
-    layout.auxVars.reserve(getAuxVarNum() + n);
-    for (size_t i = 0; i < n; i++) {
-        mat.setRow(qubitIndices[i],
-                          Parity::eVec(lastInd + n, lastInd + i + 1));
-        layout.auxVars.push_back(lastInd + i + 1);
+    for (size_t i = 0; i < n; ++i) {
+        matrix.setRowToBasis(wires[i], auxVarLocs[i]);
     }
-} // make sure nothing leads to segment fault and index out of bounds.
+}

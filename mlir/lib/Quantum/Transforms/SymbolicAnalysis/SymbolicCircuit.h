@@ -25,16 +25,16 @@
 
 struct SymbolicCircuit {
     // std::vector<bool> isAux;
-    PhasePolynomial phasePoly;
+    PhaseAbstraction phasePoly;
     AffineTransform stateTrans; // row i corresponds to qubit i, but col i doesn't!
 
     // Constructors
     SymbolicCircuit() = default;
     SymbolicCircuit(size_t qubitNum)
-        : phasePoly(PhasePolynomial()), stateTrans(AffineTransform(qubitNum))
+        : phasePoly(PhaseAbstraction()), stateTrans(AffineTransform(qubitNum))
     {
     }
-    SymbolicCircuit(PhasePolynomial phasePoly, AffineTransform stateTrans)
+    SymbolicCircuit(PhaseAbstraction phasePoly, AffineTransform stateTrans)
         : phasePoly(std::move(phasePoly)), stateTrans(std::move(stateTrans))
     {
     }

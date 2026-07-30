@@ -1,4 +1,5 @@
 import pennylane as qp
+from catalyst import cond
 
 
 @qp.qjit(keep_intermediate=2, capture=False)
@@ -59,3 +60,7 @@ circuit_base()
 circuit_ex424()
 # circuit_ex425()
 circuit_ex426()
+
+# gates you support
+# gates you don't support
+# control flow

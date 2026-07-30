@@ -35,20 +35,17 @@ file(GLOB SRC
     reference_semantics_conversion.cpp
     split_non_commuting.cpp
     split_to_single_terms.cpp
-    phase_folding.cpp
-    SymbolicAnalysis/PhaseBucket.h
-    SymbolicAnalysis/PhaseBucket.cpp
-    SymbolicAnalysis/Parity.h
+    SymbolicAnalysis/Gate.hpp
+    SymbolicAnalysis/GateBundle.cpp
     SymbolicAnalysis/Parity.cpp
-    SymbolicAnalysis/BinaryMatrix.h
     SymbolicAnalysis/BinaryMatrix.cpp
-    SymbolicAnalysis/PhasePolynomial.h
-    SymbolicAnalysis/PhasePolynomial.cpp
-    SymbolicAnalysis/AffineTransform.h
+    SymbolicAnalysis/AffineSchema.cpp
     SymbolicAnalysis/AffineTransform.cpp
-    SymbolicAnalysis/SymbolicCircuit.h
-    SymbolicAnalysis/SymbolicCircuit.cpp
-    SymbolicAnalysis/Gate.h
+    SymbolicAnalysis/AffineRelation.cpp
+    SymbolicAnalysis/PhaseAbstraction.cpp
+    SymbolicAnalysis/ProgramAbstraction.cpp
+    SymbolicAnalysis/RegionSummary.cpp
+    phase_folding.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

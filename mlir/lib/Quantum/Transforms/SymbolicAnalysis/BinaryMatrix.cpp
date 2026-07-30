@@ -12,114 +12,89 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "BinaryMatrix.h"
+#include "BinaryMatrix.hpp"
 
 /*
-    Constructors:
+    Static Factories:
 */
-BinaryMatrix::BinaryMatrix(size_t n)
+BinaryMatrix BinaryMatrix::Identity(size_t numRows, std::optional<size_t> numBlocks)
 {
-    exprRows.reserve(n);
-    for (size_t i = 0; i < n; i++) {
-        exprRows.push_back(Parity::eVec(n, i + 1));
-    }
-}
+    size_t blocks = numBlocks.value_or(BitLocation::requiredBlockNum(numRows));
+    BinaryMatrix mat(numRows);
+    BitLocation loc(0, 0);
 
-BinaryMatrix BinaryMatrix::identity(size_t n) { return BinaryMatrix(n); }
+    for (size_t i = 0; i < numRows; ++i) {
+        Parity& curRow = mat.allocRow();
+        curRow.mkBasis(++loc, blocks);
+    }
+    return mat;
+}
 
 /*
     Operators:
 */
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BinaryMatrix &mat)
 {
-    for (auto it = mat.exprRows.begin(); it != mat.exprRows.end(); it++) {
+    for (auto it = mat.rows.begin(); it != mat.rows.end(); ++it) {
         os << *it << '\n';
     }
     return os;
 }
 
-std::string BinaryMatrix::algebraicView(size_t qubitNum) const
-{
-    std::string res = "";
-    for (size_t i = 0; i < exprRows.size(); i++) {
-        res +=
-            ("x'" + std::to_string(i + 1) + " = " + exprRows[i].algebraicView(qubitNum) + '\n');
-    }
-    return res;
-}
-
-/*
-    Getters and Setters:
-*/
-void BinaryMatrix::setRow(size_t row, const Parity &parity) { getRowMutable(row) = parity; }
-
-void BinaryMatrix::resetRow(size_t row) { getRowMutable(row).reset(); }
-
-void BinaryMatrix::flipAffineValueAtRow(size_t row) { getRowMutable(row).flipAffineValue(); }
-
 /*
     Methods:
 */
-void BinaryMatrix::extendRowsTo(size_t newRowNum, size_t auxVarNum)
+void BinaryMatrix::extendRowsFor(IdxView newVars, size_t maxBlock)
 {
-    if (newRowNum > getRowNum()) {
-        exprRows.reserve(newRowNum);
-        for (size_t i = getRowNum() + 1; i <= newRowNum; i++) {
-            exprRows.push_back(Parity::eVec(newRowNum + auxVarNum, i + auxVarNum));
-        }
-    } // it might be more efficient to resize to newRowNum, and then just turn the eVec bits on for
-      // the new rows.
-}
-
-void BinaryMatrix::swapRows(size_t row1, size_t row2)
-{
-    std::swap(getRowMutable(row1), getRowMutable(row2));
-}
-
-void BinaryMatrix::addParityToRow(size_t row, const Parity &parity)
-{
-    getRowMutable(row) += parity;
-}
-
-void BinaryMatrix::addRowToRow(size_t sourceRow, size_t targetRow)
-{ // E_i,j
-    getRowMutable(targetRow) += getRow(sourceRow);
-}
-
-void BinaryMatrix::toEchelonForm(std::vector<int>& colOrd)
-{
-    for (size_t i = 0, j = 0; i < getRowNum() && j < colOrd.size(); j++) {
-        if (setPivotRow(i, colOrd[j])) {
-            rowReduceWithPivot(i, colOrd[j]);
-            i++;
-        }        
+    rows.reserve(getNumRows() + newVars.size());
+    for (size_t i = 0; i < newVars.size(); ++i) {
+        Parity &newRow = allocRow();
+        newRow.mkBasis(newVars[i], maxBlock);
+        rows.push_back(Parity::eVec(maxBlock, newVars[i]));
     }
 }
 
-void BinaryMatrix::toReducedEchelonForm(std::vector<int>& colOrd)
+bool BinaryMatrix::establishPivotAt(size_t pvtRow, BitLocation pvtCol)
 {
-    // toEchelonForm(colOrd);
-}
-
-bool BinaryMatrix::setPivotRow(size_t pivotRow, size_t pivotCol)
-{
-    if (getRow(pivotRow).getBitAt(pivotCol)) {
+    if (getRowAt(pvtRow).getBitAtLoc(pvtCol)) {
         return true;
     }
-    for (size_t i = pivotRow + 1; i < getRowNum(); i++) {
-        if (getRow(i).getBitAt(pivotCol)) {
-            swapRows(pivotRow, i);
+
+    const size_t rowNum = getNumRows();
+    for (size_t i = pvtRow + 1; i < rowNum; ++i) {
+        if (getRowAt(i).getBitAtLoc(pvtCol)) {
+            swapRows(pvtRow, i);
             return true;
         }
     }
     return false;
 }
 
-void BinaryMatrix::rowReduceWithPivot(size_t pivotRow, size_t pivotCol)
+void BinaryMatrix::forwardElimWrtPivot(size_t pvtRow, BitLocation pvtCol)
 {
-    for (size_t i = pivotRow + 1; i < getRowNum(); i++) {
-        if (getRow(i).getBitAt(pivotCol)) {
-            addRowToRow(pivotRow, i);
-        }
+    const size_t rowNum = getNumRows();
+    for (size_t i = pvtRow + 1; i < rowNum; ++i) {
+        rowReduceWrtPivot(i, pvtRow, pvtCol);
     }
+}
+
+void BinaryMatrix::backwardElimWrtPivot(size_t pvtRow, BitLocation pvtCol)
+{
+    for (int i = pvtRow - 1; i >= 0; --i) {
+        rowReduceWrtPivot(i, pvtRow, pvtCol);
+    }
+}
+
+void BinaryMatrix::rowReduceWrtPivot(size_t row, size_t pvtRow, BitLocation pvtCol)
+{
+    if (getRowAt(row).getBitAtLoc(pvtCol)) {
+        addRowToRow(pvtRow, row);
+    }
+}
+
+size_t BinaryMatrix::firstTrivialRow() const
+{
+    return findFirstRowIf([](const Parity& row) { 
+        return row.isTrivial(); 
+    });
 }
