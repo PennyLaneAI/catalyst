@@ -15,6 +15,7 @@
 // Lower the `transport` dialect to `llvm.call`s on the __catalyst__transport__*
 // CAPI (runtime/include/TransportCAPI.h).
 
+#include "llvm/ADT/StringExtras.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -56,8 +57,7 @@ std::string globalStrKey(StringRef prefix, StringRef value)
 {
     std::string key = prefix.str();
     for (char c : value) {
-        bool ok =
-            (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+        bool ok = llvm::isAlnum(c) || c == '_';
         key.push_back(ok ? c : '_');
     }
     return key;
