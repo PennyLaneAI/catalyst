@@ -102,13 +102,22 @@ def Transport_CommitWorkItemOp : Transport_Op<"commit_work_item"> {
 }
 
 def Transport_SetCoprocessorFnOp : Transport_Op<"set_coprocessor_fn"> {
-    let summary = "Bind the function run per received message (coprocessor).";
+    let summary = "Bind the function the coprocessor runs (coprocessor).";
     let description = [{
-        Binds the function the coprocessor applies to each received message before
-        replying. `symbol` is the name the coprocessor resolves and invokes.
+        Binds the function the coprocessor applies to received messages before
+        replying. `symbol` is the name the coprocessor resolves and invokes; an
+        empty symbol selects a default.
+
+        `convention` says which calling convention `symbol` follows:
+
+        * `0` (default) - per-message: a host function invoked once per received
+          message.
+        * `1` - launch-once: invoked once at start to launch a persistent engine
+          that consumes messages itself (e.g. a device kernel).
     }];
     let arguments = (ins Transport_CoprocessorSession:$session,
-                         DefaultValuedStrAttr<StrAttr, "">:$symbol);
+                         DefaultValuedStrAttr<StrAttr, "">:$symbol,
+                         DefaultValuedOptionalAttr<I32Attr, "0">:$convention);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
 

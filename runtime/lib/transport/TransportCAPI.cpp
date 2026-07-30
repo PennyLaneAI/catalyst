@@ -34,6 +34,7 @@
 using catalyst::transport::ChannelDesc;
 using catalyst::transport::ConnectInfo;
 using catalyst::transport::ControllerSession;
+using catalyst::transport::CoprocConvention;
 using catalyst::transport::CoprocessorFn;
 using catalyst::transport::CoprocessorLauncherFn;
 using catalyst::transport::CoprocessorSession;
@@ -249,7 +250,8 @@ int __catalyst__transport__establish_channel(CatalystTransportSession *s, const 
     });
 }
 
-int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol)
+int __catalyst__transport__set_coprocessor(CatalystTransportSession *s, const char *symbol,
+                                           int32_t convention)
 {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
@@ -257,48 +259,30 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
     return guard([&] {
         auto *co = dynamic_cast<CoprocessorSession *>(s->sess);
         if (!co) {
-            std::cerr << "[transport] set_coprocessor_fn on a non-coprocessor session\n";
+            std::cerr << "[transport] set_coprocessor on a non-coprocessor session\n";
             return CATALYST_TRANSPORT_ERR;
         }
-        // Empty symbol selects the built-in echo; a named-but-unresolved symbol is a hard error
-        CoprocessorFn fn = &echo_fn;
+        void *raw = nullptr;
         if (symbol && *symbol) {
-            fn = reinterpret_cast<CoprocessorFn>(dlsym(RTLD_DEFAULT, symbol));
-            if (!fn) {
-                std::cerr << "[transport] set_coprocessor_fn: symbol not found: " << symbol << "\n";
+            raw = dlsym(RTLD_DEFAULT, symbol);
+            if (!raw) {
+                std::cerr << "[transport] set_coprocessor: symbol not found: " << symbol << "\n";
                 return CATALYST_TRANSPORT_ERR;
             }
         }
-        co->set_coprocessor_fn(fn, nullptr);
-        return CATALYST_TRANSPORT_OK;
-    });
-}
-
-int __catalyst__transport__set_coprocessor_launcher(CatalystTransportSession *s, const char *symbol)
-{
-    if (!s || !s->sess) {
+        switch (static_cast<CoprocConvention>(convention)) {
+        case CoprocConvention::PerMessage:
+            // No symbol -> the core's built-in echo.
+            co->set_coprocessor_fn(raw ? reinterpret_cast<CoprocessorFn>(raw) : &echo_fn, nullptr);
+            return CATALYST_TRANSPORT_OK;
+        case CoprocConvention::LaunchOnce:
+            // No symbol -> null, letting the backend pick its own default
+            // launcher; the core holds no device launcher of its own.
+            co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(raw), nullptr);
+            return CATALYST_TRANSPORT_OK;
+        }
+        std::cerr << "[transport] set_coprocessor: unknown convention " << convention << "\n";
         return CATALYST_TRANSPORT_ERR;
-    }
-    return guard([&] {
-        auto *co = dynamic_cast<CoprocessorSession *>(s->sess);
-        if (!co) {
-            std::cerr << "[transport] set_coprocessor_launcher on a non-coprocessor session\n";
-            return CATALYST_TRANSPORT_ERR;
-        }
-        // Empty symbol selects the backend's built-in default launcher (the core
-        // holds no device launcher of its own); a named-but-unresolved symbol is
-        // a hard error.
-        CoprocessorLauncherFn fn = nullptr;
-        if (symbol && *symbol) {
-            fn = reinterpret_cast<CoprocessorLauncherFn>(dlsym(RTLD_DEFAULT, symbol));
-            if (!fn) {
-                std::cerr << "[transport] set_coprocessor_launcher: symbol not found: " << symbol
-                          << "\n";
-                return CATALYST_TRANSPORT_ERR;
-            }
-        }
-        co->set_coprocessor_launcher(fn, nullptr);
-        return CATALYST_TRANSPORT_OK;
     });
 }
 

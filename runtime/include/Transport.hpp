@@ -73,7 +73,7 @@ struct ChannelDesc {
  *   2. alloc_memory      - register the region (needs the connected context)
  *   3. exchange_keys     - swap region handles over the out-of-band channel
  *   4. establish_channel - program the channel from the local + peer regions
- *   5. (coprocessor) set_coprocessor_fn before start()
+ *   5. (coprocessor) bind a coprocessor function before start()
  *   6. start / collect / stop
  */
 class TransportSession {
@@ -196,6 +196,14 @@ struct CoprocLaunchDesc {
  * launch, nonzero on failure.
  */
 using CoprocessorLauncherFn = int (*)(const CoprocLaunchDesc *desc, void *ctx);
+
+/**
+ * @brief Which calling convention a bound coprocessor function follows.
+ */
+enum class CoprocConvention : std::int32_t {
+    PerMessage = 0, // CoprocessorFn: host, invoked once per received message
+    LaunchOnce = 1, // CoprocessorLauncherFn: launches a persistent engine
+};
 
 /**
  * @brief Coprocessor role: receives messages, process, and returns replies.

@@ -65,8 +65,12 @@ func.func @coprocessor() {
   %t = transport.connect_async %c {peer = "127.0.0.1", oob_port = 18560 : i16} : !transport.session<coprocessor> -> !transport.token
   // CHECK: llvm.call @__catalyst__transport__barrier
   transport.barrier %t : !transport.token
-  // CHECK: llvm.call @__catalyst__transport__set_coprocessor_fn(%[[C]], {{.*}}) : (!llvm.ptr, !llvm.ptr) -> i32
+  // An omitted convention lowers to 0 (per-message).
+  // CHECK: llvm.call @__catalyst__transport__set_coprocessor(%[[C]], {{.*}}) : (!llvm.ptr, !llvm.ptr, i32) -> i32
   transport.set_coprocessor_fn %c {symbol = "foo"} : !transport.session<coprocessor>
+  // An explicit launch-once convention lowers to 1.
+  // CHECK: llvm.call @__catalyst__transport__set_coprocessor(%[[C]], {{.*}}) : (!llvm.ptr, !llvm.ptr, i32) -> i32
+  transport.set_coprocessor_fn %c {symbol = "bar", convention = 1 : i32} : !transport.session<coprocessor>
   // CHECK: llvm.call @__catalyst__transport__destroy(%[[C]])
   transport.destroy %c : !transport.session<coprocessor>
   return
