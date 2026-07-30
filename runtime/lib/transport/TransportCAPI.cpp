@@ -229,7 +229,17 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
         }
         auto *raw = h.release();
         if (key && *key) {
-            g_registry[registry_key(role, key)] = raw; // resolved later via get_session
+            const std::string rk = registry_key(role, key);
+            auto it = g_registry.find(rk);
+            if (it != g_registry.end() && it->second != raw) {
+                // Registry is a soft lookup only; the prior session is still owned by its
+                // create() return value and must be destroy()'d by the caller.
+                std::cerr << "[transport] create: overwriting registry entry for role " << role
+                          << " key '" << key
+                          << "' without destroying the previous session; caller must still "
+                             "destroy the old handle\n";
+            }
+            g_registry[rk] = raw; // resolved later via get_session
         }
         return raw;
     }
