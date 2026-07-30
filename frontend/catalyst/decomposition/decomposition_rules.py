@@ -21,7 +21,6 @@ This module provides infrastructure for lowering decomposition rules via python.
 from collections import deque
 from functools import partial
 
-import jax
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
@@ -30,7 +29,7 @@ from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
-    format_for_id,
+    format_dynamic_params_for_id,
     get_dummy_values_for_container,
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
@@ -135,7 +134,7 @@ class GraphOpID:
 
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
-        return format_for_id(convert_types_to_mlir_strings(self.dynamic_shape))
+        return format_dynamic_params_for_id(convert_types_to_mlir_strings(self.dynamic_shape))
 
     def get_wire_lens_id_format(self) -> str:
         """Return the wire lengths formatted for GraphOpId."""
