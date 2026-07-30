@@ -23,12 +23,14 @@
 
 namespace catalyst::transport::gpu_verbs {
 
-GpuRuntime::GpuRuntime()
+GpuRuntime::GpuRuntime(int device)
 {
     int dc = 0;
     HIP_CHECK(hipGetDeviceCount(&dc), "hipGetDeviceCount");
     RDMA_CHECK(dc > 0, "GpuRuntime: no HIP device");
-    HIP_CHECK(hipSetDevice(0), "hipSetDevice(0)");
+    RDMA_CHECK(device >= 0 && device < dc, "GpuRuntime: HIP device %d out of range (%d present)",
+               device, dc);
+    HIP_CHECK(hipSetDevice(device), "hipSetDevice");
     hipStream_t s = nullptr;
     HIP_CHECK(hipStreamCreate(&s), "hipStreamCreate");
     stream_ = s;

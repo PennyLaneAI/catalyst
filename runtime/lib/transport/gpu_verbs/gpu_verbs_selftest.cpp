@@ -31,6 +31,7 @@ int main(int argc, char **argv)
 {
     std::string dev = "mlx5_1", peer = "0.0.0.0";
     int gid = 3;
+    int gpu_device = 0;
     std::uint16_t port = 18560;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
@@ -40,6 +41,9 @@ int main(int argc, char **argv)
         else if (k == "--gid") {
             gid = std::atoi(v.c_str());
         }
+        else if (k == "--gpu") {
+            gpu_device = std::atoi(v.c_str());
+        }
         else if (k == "--peer") {
             peer = v;
         }
@@ -47,7 +51,7 @@ int main(int argc, char **argv)
             port = static_cast<std::uint16_t>(std::atoi(v.c_str()));
         }
     }
-    GpuCoprocessorSession s(dev, gid);
+    GpuCoprocessorSession s(dev, gid, gpu_device);
     ConnectInfo ci{
         .peer = peer,
         .oob_port = port,

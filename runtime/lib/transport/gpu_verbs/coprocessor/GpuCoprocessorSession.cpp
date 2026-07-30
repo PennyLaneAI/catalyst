@@ -49,8 +49,8 @@ constexpr int FWD_CQ_DEPTH = 256;
 constexpr int FWD_INLINE_MAX = 0;
 } // namespace
 
-GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx)
-    : dev_name_(std::move(dev)), gid_idx_(gid_idx)
+GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device)
+    : dev_name_(std::move(dev)), gid_idx_(gid_idx), gpu_(gpu_device)
 {
 }
 

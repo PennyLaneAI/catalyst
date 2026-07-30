@@ -33,7 +33,7 @@ struct alignas(16) HandoffSlot {
 
 class GpuRuntime {
   public:
-    GpuRuntime();
+    explicit GpuRuntime(int device);
     ~GpuRuntime();
     GpuRuntime(const GpuRuntime &) = delete;
     GpuRuntime &operator=(const GpuRuntime &) = delete;

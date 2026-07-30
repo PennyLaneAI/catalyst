@@ -37,7 +37,7 @@ using namespace catalyst::transport;
 
 class GpuCoprocessorSession : public CoprocessorSession {
   public:
-    explicit GpuCoprocessorSession(std::string dev, int gid_idx);
+    GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device);
     ~GpuCoprocessorSession() override { stop(); }
 
     GpuCoprocessorSession(const GpuCoprocessorSession &) = delete;
