@@ -111,35 +111,56 @@ class Log:
         return cls._level
 
     @classmethod
-    def say(cls, msg: str, level: int = 1) -> None:
-        """Print ``msg`` to stderr tagged ``[remote-exec]`` when verbosity is at least ``level``."""
+    def info(cls, msg: str, level: int = 1) -> None:
+        """Print ``msg`` to stderr tagged ``[remote-exec]`` when verbosity is at least ``level``.
+
+        ``level`` defaults to 1 (the main narrative — phases, ready/stop). Pass ``level=2`` for
+        verbose-only detail (full commands, per-step timings)."""
         if level <= cls._level:
             print(f"[remote-exec] {msg}", file=sys.stderr, flush=True)
 
     @classmethod
     def cmd(cls, argv: list[str]) -> None:
         """Echo a command we're about to run (verbosity >= 2)."""
-        cls.say("$ " + " ".join(shlex.quote(c) for c in argv), level=2)
+        cls.info("$ " + " ".join(shlex.quote(c) for c in argv), level=2)
 
 
 class Paths:
     """Default paths — workspace, executor binary, per-launch log file — resolved from the current
     environment (installed wheel vs source build, login user, host, timestamp)."""
 
+    # Workspace-name prefix — used both to build a fresh default workspace and (by
+    # `_RemoteProcess.teardown_workspace`) to gate the `rm -rf` cleanup, so a user-pinned dir
+    # (without this prefix) can never be wiped.
+    WORKSPACE_PREFIX = "catalyst-exec-"
+
+    # The catalyst-executor binary name — single source of truth for the filename we look for in
+    # the runtime lib dir, embed in log filenames, and refer to as `./{EXECUTOR_BIN}` when the
+    # binary sits in a scp'd workspace.
+    EXECUTOR_BIN = "catalyst-executor"
+
+    # Filesystem-safe but clearly separated (no bare run-together digits): 2026-06-30_04-48-15.
+    _TS_FMT = "%Y-%m-%d_%H-%M-%S"
+
     @staticmethod
     def _timestamp() -> str:
-        """Filesystem-safe timestamp (``YYYY-MM-DD_HH-MM-SS``) used to tag workspace names and log
-        files so runs don't overwrite each other."""
-        # Filesystem-safe but clearly separated (no bare run-together digits): 2026-06-30_04-48-15
-        return time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
+        """Filesystem-safe timestamp used to tag workspace names and log files so runs don't
+        overwrite each other."""
+        return time.strftime(Paths._TS_FMT, time.localtime())
+
+    @staticmethod
+    def _random_suffix() -> str:
+        """A random 12-bit hex tag (3 chars, 4096 possibilities) so two launches within the same
+        second don't collide on the workspace name."""
+        return f"{random.randint(0, 0xfff):03x}"
 
     @staticmethod
     def default_workspace() -> str:
         """Per-run remote dir so concurrent launches on a shared account don't clobber each other.
-        The ``catalyst-exec-`` prefix also gates the ``rm -rf`` cleanup (safety)."""
+        The :attr:`WORKSPACE_PREFIX` also gates the ``rm -rf`` cleanup (safety)."""
         return (
-            f"~/catalyst-exec-{getpass.getuser()}-{Paths._timestamp()}-"
-            f"{random.randint(0, 0xfff):03x}"
+            f"~/{Paths.WORKSPACE_PREFIX}{getpass.getuser()}-"
+            f"{Paths._timestamp()}-{Paths._random_suffix()}"
         )
 
     @staticmethod
@@ -149,10 +170,10 @@ class Paths:
         In an installed wheel it sits in the packaged lib dir; in a source build it is under the
         runtime build's ``remote/`` subdir. Falls back to the name on ``PATH``."""
         rt_lib = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-        for candidate in (rt_lib / "catalyst-executor", rt_lib / "remote" / "catalyst-executor"):
+        for candidate in (rt_lib / Paths.EXECUTOR_BIN, rt_lib / "remote" / Paths.EXECUTOR_BIN):
             if candidate.exists():
                 return str(candidate)
-        return "catalyst-executor"
+        return Paths.EXECUTOR_BIN
 
     @staticmethod
     def resolve_log(
@@ -166,7 +187,7 @@ class Paths:
         if explicit:
             return explicit
         tag = "" if name == "executor" else f"-{name}"
-        return f"catalyst-executor{tag}-{host}-{Paths._timestamp()}.log"
+        return f"{Paths.EXECUTOR_BIN}{tag}-{host}-{Paths._timestamp()}.log"
 
 
 def random_port() -> int:

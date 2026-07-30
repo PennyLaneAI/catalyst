@@ -62,7 +62,7 @@ from .utils import (
     triple_from_uname,
 )
 from .process import _ExecutorProcess, _LocalProcess, _RemoteProcess
-from .ssh import _copy_bundle, _remove_remote_dir, _resolve_sudo_password, _ssh_base
+from .ssh import Auth, copy_bundle, remove_remote_dir, SSH
 
 __all__ = ["Executor"]
 
@@ -222,7 +222,7 @@ class Executor:
             return triple_from_uname(platform.system(), platform.machine())
         if self.host:
             user = self._user or getpass.getuser()
-            cmd = _ssh_base(
+            cmd = SSH.base(
                 user, self.host.strip(), ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
             ) + ["uname -sm"]
             try:
@@ -280,7 +280,7 @@ class Executor:
             user, host, workspace = self._remote_target()
             ws_pinned = self._workspace is not None  # a pinned dir is left in place on teardown
             sudo_pw = (
-                _resolve_sudo_password(user, host, self._sudo_password) if self._sudo else None
+                Auth.resolve_sudo(user, host, self._sudo_password) if self._sudo else None
             )
             if self._copy and self._bundle:
                 bundle = Path(self._bundle)
@@ -288,7 +288,7 @@ class Executor:
                     self._build(
                         self.triple, bundle
                     )  # idempotent recipe (see build=); may cross-build
-                _copy_bundle(bundle, user, host, workspace)
+                copy_bundle(bundle, user, host, workspace)
 
             def make(port: int) -> _ExecutorProcess:
                 return _RemoteProcess(
@@ -304,7 +304,7 @@ class Executor:
                     # copied bundle -> run it from the workspace (./); sudo's secure_path would miss a
                     # bare name. Bare only when attaching to a remote that has it on PATH.
                     executor_bin=self._executor_bin
-                    or ("./catalyst-executor" if self._copy else "catalyst-executor"),
+                    or (f"./{Paths.EXECUTOR_BIN}" if self._copy else Paths.EXECUTOR_BIN),
                     cleanup_ws=(not ws_pinned),
                     ready_timeout=self._ready_timeout,
                     name=self.name,
@@ -363,7 +363,7 @@ class Executor:
         bundle = Path(self._bundle)
         if self._build is not None:
             self._build(self.triple, bundle)  # idempotent recipe (see build=); may cross-build
-        _copy_bundle(bundle, user, host, workspace)
+        copy_bundle(bundle, user, host, workspace)
         self._copy = False  # bundle is deployed; launch() on this instance won't re-copy
         return self
 
@@ -386,7 +386,7 @@ class Executor:
         Log.set_level(self._verbose)
         user, host, workspace = self._remote_target()
         try:
-            _remove_remote_dir(user, host, workspace)
+            remove_remote_dir(user, host, workspace)
         except RuntimeError:
             if force:
                 raise

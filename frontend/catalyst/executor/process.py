@@ -28,11 +28,12 @@ import time
 
 from .utils import (
     Log,
+    Paths,
     Patterns,
     pdeathsig,
     PortInUse,
 )
-from .ssh import _build_remote_cmd, _ssh_base
+from .ssh import Remote, SSH
 
 
 class _ExecutorProcess:
@@ -84,7 +85,7 @@ class _ExecutorProcess:
         with ``<name>:`` so multiple executors stay distinguishable, and teed to the log file so
         the file is self-contained."""
         line = msg if self.name == "executor" else f"{self.name}: {msg}"
-        Log.say(line, level)
+        Log.info(line, level)
         # Tee the launcher's own narrative (launch cmd, readiness, teardown) into the log file too,
         # so the file is self-contained rather than only the executor's stdout/stderr.
         if self._log_fh is not None:
@@ -211,8 +212,11 @@ class _LocalProcess(_ExecutorProcess):
         each ``plugins`` entry passed as ``--plugin=<path>``. ``env`` extends the parent
         environment. ``PR_SET_PDEATHSIG`` ensures the child dies with the parent."""
         exe = os.path.expanduser(os.path.expandvars(self._executor_bin))
-        argv = [exe, f"--bind=127.0.0.1:{self._bind_port}"]
-        argv += [f"--plugin={os.path.expanduser(os.path.expandvars(p))}" for p in self._plugins]
+        argv = [exe, f"{Remote.BIND_FLAG}127.0.0.1:{self._bind_port}"]
+        argv += [
+            f"{Remote.PLUGIN_FLAG}{os.path.expanduser(os.path.expandvars(p))}"
+            for p in self._plugins
+        ]
         proc_env = dict(os.environ)
         for key, value in self._env.items():
             proc_env[key] = os.path.expandvars(value)
@@ -246,7 +250,7 @@ class _RemoteProcess(_ExecutorProcess):
         env: dict[str, str] | None = None,
         sudo: bool = True,
         sudo_password: str | None = None,
-        executor_bin: str = "./catalyst-executor",
+        executor_bin: str = f"./{Paths.EXECUTOR_BIN}",
         cleanup_ws: bool = False,
         ready_timeout: float = 60.0,
         name: str = "executor",
@@ -309,13 +313,13 @@ class _RemoteProcess(_ExecutorProcess):
     def _spawn(self) -> None:
         """Open the SSH port-forward and start ``catalyst-executor`` on the remote host.
 
-        Builds the remote shell command via :func:`_build_remote_cmd` (cd + env + exec, wrapped
+        Builds the remote shell command via :meth:`Remote.launcher` (cd + env + exec, wrapped
         in ``sudo`` when requested) and the local ``ssh -L <local>:localhost:<remote>`` tunnel.
         With ``sudo_password``, pipes the password into ``sudo -S`` on stdin (no PTY);
         NOPASSWD mode uses ``-tt`` so closing SSH SIGHUPs the executor. Sets ``self.proc`` to
         the started ``subprocess.Popen``."""
         use_pw = self.sudo_password is not None
-        remote_cmd = _build_remote_cmd(
+        remote_cmd = Remote.launcher(
             self.workspace,
             self._bind_port,
             self._plugins,
@@ -336,7 +340,7 @@ class _RemoteProcess(_ExecutorProcess):
         ]
         if not use_pw:
             opts = ["-tt"] + opts
-        ssh = _ssh_base(self.user, self.host, opts, multiplex=False) + [remote_cmd]
+        ssh = SSH.base(self.user, self.host, opts, multiplex=False) + [remote_cmd]
         self._say(
             f"starting executor on {self.host}:{self._bind_port} "
             f"(tunnel {self.addr} -> remote:{self._bind_port})"
@@ -382,18 +386,18 @@ class _RemoteProcess(_ExecutorProcess):
         # port-scoped pkill would wrongly kill it.
         if not self._ready_reached:
             return
-        pat = f"catalyst-executor.*--bind=0.0.0.0:{self._bind_port}"
+        pat = f"{Paths.EXECUTOR_BIN}.*{Remote.BIND_FLAG}0.0.0.0:{self._bind_port}"
         with contextlib.suppress(Exception):
             if not self.sudo:
                 subprocess.call(
-                    _ssh_base(self.user, self.host) + [f"pkill -f {shlex.quote(pat)}"],
+                    SSH.base(self.user, self.host) + [f"pkill -f {shlex.quote(pat)}"],
                     timeout=15,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
             elif self.sudo_password is not None:
                 subprocess.run(
-                    _ssh_base(self.user, self.host)
+                    SSH.base(self.user, self.host)
                     + [f"sudo -S -p '' pkill -f {shlex.quote(pat)}"],
                     input=self.sudo_password + "\n",
                     text=True,
@@ -403,7 +407,7 @@ class _RemoteProcess(_ExecutorProcess):
                 )
             else:
                 subprocess.call(
-                    _ssh_base(self.user, self.host) + [f"sudo -n pkill -f {shlex.quote(pat)}"],
+                    SSH.base(self.user, self.host) + [f"sudo -n pkill -f {shlex.quote(pat)}"],
                     timeout=15,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
@@ -414,12 +418,12 @@ class _RemoteProcess(_ExecutorProcess):
         can never wipe a user-pinned dir; a no-op for a pinned workspace."""
         if not self.cleanup_ws:
             return
-        if not self.workspace.rsplit("/", 1)[-1].startswith("catalyst-exec-"):
+        if not self.workspace.rsplit("/", 1)[-1].startswith(Paths.WORKSPACE_PREFIX):
             return
         self._say(f"removing remote workspace {self.workspace}", level=2)
         with contextlib.suppress(Exception):
             subprocess.call(
-                _ssh_base(self.user, self.host) + [f"rm -rf {self.workspace}"],
+                SSH.base(self.user, self.host) + [f"rm -rf {self.workspace}"],
                 timeout=15,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
