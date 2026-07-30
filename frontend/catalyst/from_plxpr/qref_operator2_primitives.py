@@ -23,14 +23,16 @@ from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.pytrees import unflatten
 
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
-
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
 # Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
 # yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
 # once JAX updates to a compatible MLIR version
 # pylint: disable=ungrouped-imports
+from catalyst.decomposition.decomposition_rules import (
+    fetch_all_reachable_decomposition_rules_from_op,
+)
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
     extract_scalar,
@@ -301,6 +303,20 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
         param_map=param_map,
         static_data=static_data,
         qubit_map=qubit_map,
+    )
+
+    # Collect decomp rules
+    # op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
+    repack_wire_argnames = []
+    for wire_argname in op_cls.wire_argnames:
+        if wire_argname not in op_cls.hybrid_argnames:
+            repack_wire_argnames.append(wire_argname)
+    decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+        op_name=op_cls.__name__,
+        op_id="Bob{phi:[f64],thetas:[f64,f64]}{wires:1,other_wires:2}{bob_word:blah}",
+        dynamic_shape={"phi": ["f64"], "thetas": ["f64", "f64"]},
+        wire_lens={a: b for a, b in zip(repack_wire_argnames, wire_lens, strict=True)},
+        static_data=repack_static_data,
     )
 
     return []
