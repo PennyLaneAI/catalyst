@@ -33,11 +33,14 @@ TEST_CASE("create registers a session resolvable by (role, key)", "[transport]")
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "reg_ctrl") == s);
     // Unknown key and mismatched role both miss.
-    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "reg_absent") == nullptr);
-    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "reg_ctrl") == nullptr);
+    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "reg_absent") ==
+          nullptr);
+    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "reg_ctrl") ==
+          nullptr);
     __catalyst__transport__destroy(s);
     // destroy unregisters.
-    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "reg_ctrl") == nullptr);
+    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "reg_ctrl") ==
+          nullptr);
 }
 
 TEST_CASE("role disambiguates the same key", "[transport]")
@@ -71,12 +74,14 @@ TEST_CASE("re-create under the same key overwrites", "[transport]")
     // s1 was already overwritten, so s2 remains resolvable until its own destroy.
     CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "ovr_key") == s2);
     __catalyst__transport__destroy(s2);
-    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "ovr_key") == nullptr);
+    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "ovr_key") ==
+          nullptr);
 }
 
 TEST_CASE("get_session on an unregistered role/key returns null", "[transport]")
 {
-    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "never_created") == nullptr);
+    CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "never_created") ==
+          nullptr);
 }
 
 TEST_CASE("set_coprocessor_fn: an empty symbol binds the built-in echo", "[transport]")
