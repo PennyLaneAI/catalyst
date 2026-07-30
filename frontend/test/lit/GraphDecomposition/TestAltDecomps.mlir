@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRY=1.0,testX=3.0,testZ=3.0 alt-decomps=PauliY=[y_to_ry,y_to_x_z] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes RY
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRY=1.0,testX=3.0,testZ=3.0 alt-decomps=testY=[y_to_ry,y_to_x_z] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes RY
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRY=3.0,testX=1.0,testZ=1.0 alt-decomps=PauliY=[y_to_ry,y_to_x_z] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes XZ
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRY=3.0,testX=1.0,testZ=1.0 alt-decomps=testY=[y_to_ry,y_to_x_z] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes XZ
 
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-    // RY-NOT: test 
+    // RY-NOT: testY
     // RY: testRY
 
-    // XZ-NOT: test
+    // XZ-NOT: testY
     // XZ: testX
     // XZ: testZ
     %qout = quantum.custom "testY"() %q : !quantum.bit
@@ -33,7 +33,7 @@ func.func @circuit() -> !quantum.bit {
 }
 
 // CHECK-LABEL: y_to_ry
-func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY[][1]{}", resources = { operations = {"testRY[f64][1]{}"=1}}} {
+func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY{}{wires:1}{}", resources = { operations = {"testRY{0:[f64]}{wires:1}{}"=1}}} {
     %pi = arith.constant 3.14 : f64
     %negpiby2 = arith.constant -1.57 : f64
     %q1 = quantum.custom "testRY"(%pi) %q0 : !quantum.bit
@@ -41,7 +41,7 @@ func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="
 }
 
 // CHECK-LABEL: y_to_x_z
-func.func @y_to_x_z(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY[][1]{}", resources = { operations = {"testX[][1]{}"=1, "testZ[][1]{}"=1}}} {
+func.func @y_to_x_z(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY{}{wires:1}{}", resources = { operations = {"testX{}{wires:1}{}"=1, "testZ{}{wires:1}{}"=1}}} {
     %q1 = quantum.custom "testX"() %q0 : !quantum.bit
     %q2 = quantum.custom "testZ"() %q1 : !quantum.bit
     return %q2 : !quantum.bit
