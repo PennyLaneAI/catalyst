@@ -21,6 +21,7 @@ This module provides infrastructure for lowering decomposition rules via python.
 from collections import deque
 from functools import partial
 
+import jax
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
@@ -28,8 +29,9 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
+    convert_types_to_mlir_strings,
+    format_for_id,
     get_dummy_values_for_container,
-    mlir_stringify_type,
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
 )
@@ -77,7 +79,15 @@ class GraphOpID:
 
     def parse_dynamic_shape(self) -> dict:
         """Return the dynamic shape as a dictionary of dtypes from the dynamic arg names."""
-        return {argname: argtype for argname, argtype in sorted(self.op.dynamic_args.items())}
+        # breakpoint()
+        return {
+            argname: (
+                argtype
+                if isinstance(argtype, (jax.core.ShapedArray, qp.typing.AbstractArray))
+                else [argtype]
+            )
+            for argname, argtype in sorted(self.op.dynamic_args.items())
+        }
 
     def parse_wire_lens(self) -> dict:
         """Return the length of each of the wire args as a dictionary from the wire arg names."""
@@ -133,13 +143,7 @@ class GraphOpID:
 
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
-        return (
-            "{"
-            + ",".join(
-                f"{name}:{mlir_stringify_type(shape)}" for name, shape in self.dynamic_shape.items()
-            )
-            + "}"
-        )
+        return format_for_id(convert_types_to_mlir_strings(self.dynamic_shape))
 
     def get_wire_lens_id_format(self) -> str:
         """Return the wire lengths formatted for GraphOpId."""
@@ -360,10 +364,11 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 graph_op_id = GraphOpID(op)
                 probe = (
                     graph_op_id.get_operator_name(),
-                    {
-                        name: mlir_stringify_type(shape)
-                        for name, shape in graph_op_id.get_dynamic_shape().items()
-                    },
+                    # {
+                    #     name: convert_types_to_mlir_strings(shape)
+                    #     for name, shape in graph_op_id.get_dynamic_shape().items()
+                    # },
+                    convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
                     graph_op_id.wire_lens,
                     graph_op_id.static_data,
                     graph_op_id.extra_data,

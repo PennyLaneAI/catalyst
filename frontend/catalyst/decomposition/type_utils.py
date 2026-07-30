@@ -36,26 +36,74 @@ _MLIR_DTYPES_TO_PY_DTYPES = {
 _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
 
 
-def _stringify_shaped_type(shape: tuple, dim: int, element_type) -> str:
-    """Return a string representation of the given shaped data type."""
-    if dim + 1 == len(shape):
-        inner_content = _PY_DTYPES_TO_MLIR_DTYPES[element_type]
-    else:
-        inner_content = _stringify_shaped_type(shape, dim + 1, element_type)
-    length = shape[dim]
-    return f"[{','.join([inner_content] * length)}]"
+# def _stringify_shaped_type(shape: tuple, dim: int, element_type) -> str:
+#     """Return a string representation of the given shaped data type."""
+#     if dim + 1 == len(shape):
+#         inner_content = _PY_DTYPES_TO_MLIR_DTYPES[element_type]
+#     else:
+#         inner_content = _stringify_shaped_type(shape, dim + 1, element_type)
+#     length = shape[dim]
+#     return f"[{','.join([inner_content] * length)}]"
 
 
-def mlir_stringify_type(dtype: qp.typing.AbstractArray):
-    """Return a string representation of the given data type."""
-    assert isinstance(
-        dtype, qp.typing.AbstractArray
-    ), f"Expected an AbstractArray to stringify, got {dtype}"
-    element_type = dtype.dtype.type
-    if dtype.shape == ():
-        return f"[{_PY_DTYPES_TO_MLIR_DTYPES[element_type]}]"
-    else:
-        return _stringify_shaped_type(dtype.shape, 0, element_type)
+# def mlir_stringify_type(dtype: qp.typing.AbstractArray):
+#     """Return a string representation of the given data type."""
+#     assert isinstance(
+#         dtype, qp.typing.AbstractArray
+#     ), f"Expected an AbstractArray to stringify, got {dtype}"
+#     element_type = dtype.dtype.type
+#     if dtype.shape == ():
+#         return f"[{_PY_DTYPES_TO_MLIR_DTYPES[element_type]}]"
+#     else:
+#         return _stringify_shaped_type(dtype.shape, 0, element_type)
+
+
+def convert_shaped_type_to_mlir_string(shaped_type, current_dim=0):
+    """Convert a shape of arbitrary dimension to a string with MLIR type strings for values."""
+    if current_dim == shaped_type.ndim:
+        return _PY_DTYPES_TO_MLIR_DTYPES[shaped_type.dtype.type]
+
+    return [convert_shaped_type_to_mlir_string(shaped_type, current_dim + 1)] * shaped_type.shape[
+        current_dim
+    ]
+
+
+def convert_types_to_mlir_strings(d: dict) -> dict:
+    """Convert the values of a dictionary to MLIR type strings."""
+
+    def handle_item(item):
+        if isinstance(item, type):
+            if item in _PY_DTYPES_TO_MLIR_DTYPES:
+                return _PY_DTYPES_TO_MLIR_DTYPES[item]
+            raise TypeError(
+                f"encountered unknown type {type(item)} of item {item} when converting to mlir strings."
+            )
+        elif type(item) in _PY_DTYPES_TO_MLIR_DTYPES:
+            return _PY_DTYPES_TO_MLIR_DTYPES[type(item)]
+        elif isinstance(item, str):
+            return item
+        elif isinstance(item, (list, tuple)):
+            return [handle_item(i) for i in item]
+        elif isinstance(item, (ShapedArray, qp.typing.AbstractArray)):
+            return convert_shaped_type_to_mlir_string(item)
+        else:
+            raise TypeError(
+                f"encountered unknown type {type(item)} of item {item} when converting to mlir strings."
+            )
+
+    return {k: handle_item(v) for k, v in d.items()}
+
+
+def format_for_id(d):
+    """Format a structure for ID, after calling convert_types_to_mlir_string on it."""
+
+    def handle_item(item):
+        if isinstance(item, str):
+            return item
+        elif isinstance(item, list):
+            return "[" + ",".join(handle_item(i) for i in item) + "]"
+
+    return "{" + ",".join(k + ":" + handle_item(v) for k, v in d.items()) + "}"
 
 
 def get_dummy_values_for_container(container):
