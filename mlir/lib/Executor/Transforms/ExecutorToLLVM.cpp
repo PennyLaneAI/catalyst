@@ -222,7 +222,7 @@ struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp>
 };
 
 //===----------------------------------------------------------------------===//
-// executor.launch  ->  __catalyst__executor__launch(addr, sym,
+// executor.launch  ->  __catalyst__executor__launch(session, sym, object,
 //                                               num_in,  in_descs,  in_ranks,  in_sizes,
 //                                               num_out, out_descs, out_ranks, out_sizes)
 //===----------------------------------------------------------------------===//
@@ -243,6 +243,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         // parameters:
         // - session: the executor session handle
         // - symbol: the symbol to invoke
+        // - object: the kernel object whose namespace the symbol is resolved in
         // - num_inputs: the number of input arguments
         // - input_descs: the input descriptor array
         // - input_ranks: the input rank array
@@ -251,7 +252,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         // - output_descs: the output descriptor array
         // - output_ranks: the output rank array
         Type launchSig = LLVM::LLVMFunctionType::get(
-            voidTy, {i64Ty, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
+            voidTy, {i64Ty, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
         LLVM::LLVMFuncOp launchFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__executor__launch", launchSig);
 
@@ -261,6 +262,9 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         std::string symbolName = "_catalyst_pyface_" + callee;
         Value symbolPtr =
             getGlobalString(loc, rewriter, "executor_sym_" + callee, symbolName + '\0', mod);
+
+        Value objectPtr = getGlobalString(loc, rewriter, "executor_obj_" + callee,
+                                          op.getObject().str() + '\0', mod);
 
         SmallVector<Value> inputDescPtrs;
         SmallVector<int64_t> inputRanks, inputElemSizes;
@@ -312,9 +316,9 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
             rewriter, loc, rewriter.getI64IntegerAttr(outputDescPtrs.size()));
 
         LLVM::CallOp::create(rewriter, loc, launchFn,
-                             ValueRange{session, symbolPtr, numInputs, inputDescsArr, inputRanksArr,
-                                        inputSizesArr, numOutputs, outputDescsArr, outputRanksArr,
-                                        outputSizesArr});
+                             ValueRange{session, symbolPtr, objectPtr, numInputs, inputDescsArr,
+                                        inputRanksArr, inputSizesArr, numOutputs, outputDescsArr,
+                                        outputRanksArr, outputSizesArr});
 
         SmallVector<Value> results;
         for (auto [descPtr, resultTy] : llvm::zip(outputDescPtrs, op.getResultTypes())) {
