@@ -57,7 +57,7 @@ std::string globalStrKey(StringRef prefix, StringRef value)
     std::string key = prefix.str();
     for (char c : value) {
         bool ok =
-            (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+            llvm::isAsciiIdentifierContinue(c);
         key.push_back(ok ? c : '_');
     }
     return key;
