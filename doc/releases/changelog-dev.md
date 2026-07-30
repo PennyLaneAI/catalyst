@@ -23,6 +23,10 @@
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
   [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
 
+* Catalyst can now cross-compile target nested modules to standalone object files and
+  either statically link them into the host program or ship them to an executor for dispatch.
+ [(#3033)](https://github.com/PennyLaneAI/catalyst/pull/3033)
+
 * A new `Transport` MLIR dialect is added, providing typed ops for driving a transport session's
   lifecycle at the IR level.
   [(#3047)](https://github.com/PennyLaneAI/catalyst/pull/3047)
@@ -51,6 +55,7 @@
     executor and uses LLVM's ORC v2 EPC as the wire protocol to ship cross-compiled kernel objects
     into the remote JIT.
     [(#2915)](https://github.com/PennyLaneAI/catalyst/pull/2915)
+    [(#3031)](https://github.com/PennyLaneAI/catalyst/pull/3031)
     [(#3030)](https://github.com/PennyLaneAI/catalyst/pull/3030)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
