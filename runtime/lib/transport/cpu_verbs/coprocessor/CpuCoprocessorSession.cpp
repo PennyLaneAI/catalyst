@@ -25,11 +25,11 @@ using namespace catalyst::transport::common;
 
 void CpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx)
 {
-    base_.coproc_fn_ = fn;
-    base_.coproc_ctx_ = ctx;
+    coproc_fn_ = fn;
+    coproc_ctx_ = ctx;
 }
 
-void CpuCoprocessorSession::Impl::start()
+void CpuCoprocessorSession::start()
 {
     stop();
     failed_.store(false, std::memory_order_relaxed);
@@ -52,8 +52,8 @@ void CpuCoprocessorSession::Impl::start()
     engine_ = std::jthread(body);
 }
 
-int CpuCoprocessorSession::Impl::collect(void *const *replies, const std::uint64_t *replies_bytes,
-                                         std::size_t n)
+int CpuCoprocessorSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
+                                   std::size_t n)
 {
     while (completed_.load(std::memory_order_acquire) == 0) {
         if (failed_.load(std::memory_order_acquire)) {
@@ -80,7 +80,7 @@ int CpuCoprocessorSession::Impl::collect(void *const *replies, const std::uint64
     return 0;
 }
 
-void CpuCoprocessorSession::Impl::stop()
+void CpuCoprocessorSession::stop()
 {
     if (engine_.joinable()) {
         engine_.request_stop();
@@ -92,7 +92,7 @@ void CpuCoprocessorSession::Impl::stop()
 // buffer in place, then send the result. A null fn is the built-in echo
 // (passthrough). Replies are inline + selectively signaled; the bwd CQ is
 // reaped in batches at signal points.
-void CpuCoprocessorSession::Impl::run(std::stop_token st)
+void CpuCoprocessorSession::run(std::stop_token st)
 {
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); c++) {

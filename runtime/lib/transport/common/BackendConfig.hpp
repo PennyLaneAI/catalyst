@@ -64,8 +64,6 @@ inline BackendConfig parse_backend_config(const std::string &config, const char 
                 have_dev = true;
             }
             else if (key == "gid") {
-                // from_chars, not atoi: atoi maps a malformed value to 0, which
-                // would silently reinstate a default gid.
                 const char *last = val.data() + val.size();
                 const auto res = std::from_chars(val.data(), last, gid);
                 RDMA_CHECK(res.ec == std::errc{} && res.ptr == last && gid >= 0,

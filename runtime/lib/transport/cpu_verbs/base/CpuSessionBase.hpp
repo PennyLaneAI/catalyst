@@ -34,8 +34,11 @@ using namespace catalyst::transport;
 
 /**
  * @brief Connection bring-up and data-path primitives shared by both roles.
+ *
+ * Parameterised on the role interface (`ControllerSession` or
+ * `CoprocessorSession`) so each role derives from these directly.
  */
-class CpuSessionBase : public TransportSession {
+template <class Role> class CpuSessionBase : public Role {
   public:
     explicit CpuSessionBase(std::string dev, int gid_idx);
     ~CpuSessionBase() override = default;
@@ -78,5 +81,8 @@ class CpuSessionBase : public TransportSession {
     PeerRef peer_{};
     ChannelDesc desc_{};
 };
+
+extern template class CpuSessionBase<ControllerSession>;
+extern template class CpuSessionBase<CoprocessorSession>;
 
 } // namespace catalyst::transport::cpu_verbs

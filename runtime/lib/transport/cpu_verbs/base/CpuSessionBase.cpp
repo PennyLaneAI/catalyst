@@ -42,12 +42,13 @@ constexpr int CQ_DEPTH = 4096;
 constexpr std::size_t PAGE_ALIGN = 4096;
 } // namespace
 
-CpuSessionBase::CpuSessionBase(std::string dev, int gid_idx)
+template <class Role>
+CpuSessionBase<Role>::CpuSessionBase(std::string dev, int gid_idx)
     : dev_name_(std::move(dev)), gid_idx_(gid_idx)
 {
 }
 
-int CpuSessionBase::connect(const ConnectInfo &info)
+template <class Role> int CpuSessionBase<Role>::connect(const ConnectInfo &info)
 {
     ctx_ = std::make_shared<Context>(dev_name_);
     pd_ = std::make_shared<ProtectionDomain>(ctx_);
@@ -65,7 +66,7 @@ int CpuSessionBase::connect(const ConnectInfo &info)
     return 0;
 }
 
-MemRegion CpuSessionBase::alloc_memory(std::size_t size, MemKind kind)
+template <class Role> MemRegion CpuSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind)
 {
     RDMA_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
@@ -80,7 +81,7 @@ MemRegion CpuSessionBase::alloc_memory(std::size_t size, MemKind kind)
     };
 }
 
-PeerRef CpuSessionBase::exchange_keys(const MemRegion &local)
+template <class Role> PeerRef CpuSessionBase<Role>::exchange_keys(const MemRegion &local)
 {
     HandshakeMsg my{
         .fwd = {.qpn = fwd_qp_->qpn(), .psn = 0},
@@ -116,8 +117,9 @@ PeerRef CpuSessionBase::exchange_keys(const MemRegion &local)
     };
 }
 
-void CpuSessionBase::establish_channel(const ChannelDesc &desc, const MemRegion &local,
-                                       const PeerRef &peer)
+template <class Role>
+void CpuSessionBase<Role>::establish_channel(const ChannelDesc &desc, const MemRegion &local,
+                                             const PeerRef &peer)
 {
     RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu", local.size,
                REGION_BYTES);
@@ -128,7 +130,9 @@ void CpuSessionBase::establish_channel(const ChannelDesc &desc, const MemRegion 
                                                  common::MemAccess::LOCAL_WRITE);
 }
 
-void CpuSessionBase::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled)
+template <class Role>
+void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
+                                      bool signaled)
 {
     auto *send = send_payload(); // value already written by the caller
     send->seq_num = static_cast<std::uint32_t>(cursor + 1);
@@ -156,7 +160,7 @@ void CpuSessionBase::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_da
 // REAP_BATCH) and decrement `outstanding`. With drain=true, keep polling until
 // every signaled send has completed (teardown), guarded so a lost CQE can't
 // hang the join.
-void CpuSessionBase::reap(ibv_cq *cq, int &outstanding, bool drain)
+template <class Role> void CpuSessionBase<Role>::reap(ibv_cq *cq, int &outstanding, bool drain)
 {
     std::array<ibv_wc, REAP_BATCH> wc{};
     int empty = 0;
@@ -180,7 +184,8 @@ void CpuSessionBase::reap(ibv_cq *cq, int &outstanding, bool drain)
     } while (drain && outstanding > 0);
 }
 
-Payload *CpuSessionBase::poll_message_arrival(std::uint64_t cursor, std::stop_token st)
+template <class Role>
+Payload *CpuSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st)
 {
     // Slots are reused (K_RING_SLOTS is a power of two). The ring contains
     // 64 B PayloadSlots; the peer writes the 16 B Payload into each slot's
@@ -200,5 +205,8 @@ Payload *CpuSessionBase::poll_message_arrival(std::uint64_t cursor, std::stop_to
     }
     return slot;
 }
+
+template class CpuSessionBase<ControllerSession>;
+template class CpuSessionBase<CoprocessorSession>;
 
 } // namespace catalyst::transport::cpu_verbs

@@ -28,60 +28,39 @@ namespace catalyst::transport::cpu_verbs {
 // Coprocessor role: receives messages, runs the coprocessor function, and
 // returns the result. The function is bound via set_coprocessor_fn; nullptr
 // selects the built-in echo (passthrough self-test).
-class CpuCoprocessorSession : public CoprocessorSession {
-  public:
-    explicit CpuCoprocessorSession(std::string dev, int gid_idx) : base_(std::move(dev), gid_idx) {}
+class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
+    using Base = CpuSessionBase<CoprocessorSession>;
 
-    int connect(const ConnectInfo &info) override { return base_.connect(info); }
-    MemRegion alloc_memory(std::size_t size, MemKind kind) override
-    {
-        return base_.alloc_memory(size, kind);
-    }
-    PeerRef exchange_keys(const MemRegion &local) override { return base_.exchange_keys(local); }
-    void establish_channel(const ChannelDesc &desc, const MemRegion &local,
-                           const PeerRef &peer) override
-    {
-        base_.establish_channel(desc, local, peer);
-    }
-    void start() override { base_.start(); }
-    int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override
-    {
-        return base_.collect(replies, replies_bytes, n);
-    }
-    void stop() override { base_.stop(); }
+  public:
+    explicit CpuCoprocessorSession(std::string dev, int gid_idx) : Base(std::move(dev), gid_idx) {}
+    // Joins the engine while this object is still complete: run() touches
+    // coproc_fn_/coproc_ctx_, so a join deferred to the base destructor would use
+    // them after they are gone. stop() is idempotent.
+    ~CpuCoprocessorSession() override { stop(); }
+
+    void start() override;
+    int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
+    void stop() override;
 
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
 
+  protected:
+    bool oob_listens() const override { return true; }
+
   private:
-    class Impl : public CpuSessionBase {
-      public:
-        using CpuSessionBase::CpuSessionBase;
-        ~Impl() override { stop(); }
+    // The engine loop; runs on engine_.
+    void run(std::stop_token st);
 
-        void start() override;
-        int collect(void *const *replies, const std::uint64_t *replies_bytes,
-                    std::size_t n) override;
-        void stop() override;
+    CoprocessorFn coproc_fn_ = nullptr; // nullptr -> built-in echo
+    void *coproc_ctx_ = nullptr;
 
-        CoprocessorFn coproc_fn_ = nullptr; // nullptr -> built-in echo
-        void *coproc_ctx_ = nullptr;
-
-      protected:
-        bool oob_listens() const override { return true; }
-
-      private:
-        // The engine loop; runs on engine_.
-        void run(std::stop_token st);
-
-        // failed_ (release) publishes error_; collect() acquire-loads it and
-        // rethrows.
-        std::atomic<bool> failed_{false};
-        std::exception_ptr error_;
-        std::atomic<std::uint64_t> completed_{0};
-        std::atomic<std::uint64_t> last_word_{0};
-        std::jthread engine_;
-    };
-    Impl base_;
+    // failed_ (release) publishes error_; collect() acquire-loads it and
+    // rethrows.
+    std::atomic<bool> failed_{false};
+    std::exception_ptr error_;
+    std::atomic<std::uint64_t> completed_{0};
+    std::atomic<std::uint64_t> last_word_{0};
+    std::jthread engine_;
 };
 
 } // namespace catalyst::transport::cpu_verbs
