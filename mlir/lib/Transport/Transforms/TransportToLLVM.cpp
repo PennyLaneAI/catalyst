@@ -16,7 +16,6 @@
 // CAPI (runtime/include/TransportCAPI.h).
 
 #include "llvm/ADT/StringExtras.h"
-
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
