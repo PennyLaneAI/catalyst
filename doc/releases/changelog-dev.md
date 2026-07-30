@@ -30,6 +30,10 @@
   lifecycle at the IR level.
   [(#3047)](https://github.com/PennyLaneAI/catalyst/pull/3047)
 
+* A `convert-transport-to-llvm` pass is added, lowering the `Transport` dialect ops to the
+  transport runtime CAPI.
+  [(#3048)](https://github.com/PennyLaneAI/catalyst/pull/3048)
+
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
 
