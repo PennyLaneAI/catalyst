@@ -22,6 +22,7 @@ import warnings
 from collections import deque
 from functools import partial
 
+import jax
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
@@ -29,8 +30,8 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
+    convert_types_to_mlir_strings,
     get_dummy_values_for_arg,
-    mlir_stringify_type,
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
 )
@@ -365,10 +366,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 graph_op_id = GraphOpID(op)
                 probe = (
                     graph_op_id.get_operator_name(),
-                    {
-                        name: mlir_stringify_type(shape)
-                        for name, shape in graph_op_id.get_dynamic_shape().items()
-                    },
+                    convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
                     graph_op_id.wire_lens,
                     graph_op_id.static_data,
                     graph_op_id.extra_data,
