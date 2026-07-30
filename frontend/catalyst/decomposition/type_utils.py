@@ -111,7 +111,6 @@ def get_dummy_values_for_container(dictionary):
                     f"Unexpected type in container when creating dummy values: {type(item)}"
                 )
 
-    # return tuple(handle_item(item) for item in container)
     return {k: handle_item(v) for k, v in dictionary.items()}
 
 
