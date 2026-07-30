@@ -14,14 +14,18 @@
 
 #include "Quantum/IR/QuantumInterfaces.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
 using namespace mlir;
@@ -104,16 +108,49 @@ void printType(mlir::Type type, llvm::raw_string_ostream &ss)
         .Default([&](mlir::Type other) { other.print(ss); });
 }
 
-void printTypeRange(mlir::TypeRange typerange, llvm::raw_string_ostream &ss)
+void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map,
+                       llvm::raw_string_ostream &ss)
 {
-    ss << "[";
-    for (auto [i, type] : llvm::enumerate(typerange)) {
+    llvm::SmallVector<llvm::StringRef> keys;
+    for (const llvm::StringRef key : map.keys()) {
+        keys.push_back(key);
+    }
+    llvm::sort(keys);
+
+    ss << "{";
+    for (auto [i, key] : llvm::enumerate(keys)) {
         if (i > 0) {
             ss << ",";
         }
-        printType(type, ss);
+        ss << key << ":[";
+        const auto &types = map.lookup(key);
+        for (auto [j, type] : llvm::enumerate(types)) {
+            if (j > 0) {
+                ss << ",";
+            }
+            printType(type, ss);
+        }
+        ss << "]";
     }
-    ss << "]";
+    ss << "}";
+}
+
+void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream &ss)
+{
+    llvm::SmallVector<llvm::StringRef> keys;
+    for (const llvm::StringRef key : map.keys()) {
+        keys.push_back(key);
+    }
+    llvm::sort(keys);
+
+    ss << "{";
+    for (auto [i, key] : llvm::enumerate(keys)) {
+        if (i > 0) {
+            ss << ",";
+        }
+        ss << key << ":" << std::to_string(map.lookup(key));
+    }
+    ss << "}";
 }
 
 } // namespace
@@ -133,8 +170,8 @@ std::string defaultGetGraphOpId(Operation *op)
     DecomposableGate gate = cast<DecomposableGate>(op);
 
     ss << gate.getOperatorName();
-    printTypeRange(gate.getDynamicShape(), ss);
-    printIterable(gate.getWireLens(), ss);
+    printDynamicShape(gate.getDynamicShape(), ss);
+    printWireLens(gate.getWireLens(), ss);
     printAttr(gate.getStaticData(), ss);
     if (gate.getExtraData() != "") {
         ss << '[' << gate.getExtraData() << ']';

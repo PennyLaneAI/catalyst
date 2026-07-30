@@ -49,6 +49,14 @@ class SingleParamCustomOp(qp.core.Operator2):
         super().__init__(x, wires=wires)
 
 
+class SingleParamNoCustomOpBadOrder(qp.core.Operator2):
+
+    dynamic_argnames = ("x",)
+
+    def __init__(self, wires, x):
+        super().__init__(wires, x)
+
+
 class CompilableData(qp.core.Operator2):
 
     compilable_argnames = ("a", "b", "thing")
@@ -78,8 +86,8 @@ class MultiParamsCustom(qp.core.Operator2):
 
     dynamic_argnames = ("a", "b", "c")
 
-    def __init__(self, wires, a, b, c):
-        super().__init__(wires, a, b, c)
+    def __init__(self, a, b, c, wires):
+        super().__init__(a, b, c, wires)
 
 
 class MultiRZ(qp.core.Operator2):
