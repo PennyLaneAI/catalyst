@@ -188,7 +188,7 @@ void drain_pending(CatalystTransportSession *s)
 }
 
 // Try the plugin handle first, then the process-global namespace (main image).
-void *resolve_coprocessor_symbol(CatalystTransportSession *s, const char *symbol)
+void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *symbol)
 {
     dlerror();
     if (s->backend && s->backend->handle) {
@@ -316,10 +316,10 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             std::cerr << "[transport] set_coprocessor_fn on a non-coprocessor session\n";
             return CATALYST_TRANSPORT_ERR;
         }
-        void *raw = nullptr;
+        void *resolved_fn = nullptr;
         if (symbol && *symbol) {
-            raw = resolve_coprocessor_symbol(s, symbol);
-            if (!raw) {
+            resolved_fn = resolve_coprocessor_fn_symbol(s, symbol);
+            if (!resolved_fn) {
                 std::cerr << "[transport] set_coprocessor_fn: symbol not found: " << symbol << "\n";
                 return CATALYST_TRANSPORT_ERR;
             }
@@ -327,12 +327,14 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
         switch (static_cast<CoprocConvention>(convention)) {
         case CoprocConvention::PerMessage:
             // No symbol -> the core's built-in echo.
-            co->set_coprocessor_fn(raw ? reinterpret_cast<CoprocessorFn>(raw) : &echo_fn, nullptr);
+            co->set_coprocessor_fn(
+                resolved_fn ? reinterpret_cast<CoprocessorFn>(resolved_fn) : &echo_fn, nullptr);
             return CATALYST_TRANSPORT_OK;
         case CoprocConvention::LaunchOnce:
             // No symbol -> null, letting the backend pick its own default
             // launcher; the core holds no device launcher of its own.
-            co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(raw), nullptr);
+            co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(resolved_fn),
+                                         nullptr);
             return CATALYST_TRANSPORT_OK;
         }
         std::cerr << "[transport] set_coprocessor_fn: unknown convention " << convention << "\n";
