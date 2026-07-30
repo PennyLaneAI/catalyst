@@ -67,6 +67,9 @@ std::string registry_key(std::int32_t role, const char *key)
 }
 
 // Local reply region size, provisioned automatically at exchange_keys.
+// TODO: Make this configurable rather than hard-coded. Expose an API such as
+// __catalyst__transport__set_reply_bytes(s, n) to override the region size per session, keeping
+// 16KB as the default when it is not set.
 constexpr std::uint64_t kReplyBytes = 16 * 1024;
 
 // Run fn, logging and swallowing any exception. Returns fn()'s result, or CATALYST_TRANSPORT_ERR
