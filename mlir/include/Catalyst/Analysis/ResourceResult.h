@@ -34,27 +34,27 @@ struct ResourceResult {
     // quantum, qref, pbc, mbqc operations are stored
     // as a map from operation name to a map of
     // name -> ((numWires, numParams) -> count)
-    llvm::StringMap<llvm::DenseMap<std::pair<int, int>, int64_t>> operations;
+    llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> operations;
 
-    llvm::StringMap<int64_t> measurements;
+    llvm::StringMap<double> measurements;
 
-    llvm::StringMap<int64_t> classicalInstructions;
+    llvm::StringMap<double> classicalInstructions;
 
-    llvm::StringMap<int64_t> functionCalls;
+    llvm::StringMap<double> functionCalls;
 
     // `dyn_for_loop_<N>` -> stable hash id for that loop op (not a trip count).
     // Ignored by `multiplyByScalar`; `mergeWith` mints a fresh id on key conflicts.
     llvm::StringMap<uint64_t> varFunctionCalls;
 
     // qubits from qref/quantum alloc/alloc_qubit ops
-    int64_t numAllocQubits = 0;
+    double numAllocQubits = 0;
 
     // qubits from !quantum.bit, qref.bit and qref.reg<{static}> function arguments (entry function
     // only)
     int64_t numArgQubits = 0;
 
     // total qubits (allocated + argument)
-    int64_t numQubits() const { return numAllocQubits + numArgQubits; }
+    double numQubits() const { return numAllocQubits + numArgQubits; }
 
     // from quantum.device op
     std::string deviceName;
@@ -79,8 +79,9 @@ struct ResourceResult {
     // merge another ResourceResult into this one
     void mergeWith(const ResourceResult &other, MergeMethod method = MergeMethod::Sum);
 
-    // multiply all counts by a scalar
-    void multiplyByScalar(int64_t scalar);
+    // multiply all counts by a scalar, which may be be fractional to account for probabilistic
+    // counting sometimes employed in branches for example
+    void multiplyByScalar(double scalar);
 
     // Serialize this function's resources into a JSON object.
     llvm::json::Object toJson() const;

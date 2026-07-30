@@ -1035,7 +1035,7 @@ class TestSpecsWithPPR:
                     "PPR-Phi-w1": 1,
                 },
                 measurement_processes={},
-                num_allocs=3,
+                num_allocs=4,
                 any_commuting_depth=4,
                 qubit_disjoint_depth=4,
             ),
