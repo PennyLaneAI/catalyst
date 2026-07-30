@@ -348,3 +348,10 @@ inline void RelationSchema::growPostVars(size_t n)
     postVars.reserve(postVars.size() + n);
     postVars.insert(postVars.end(), ids.begin(), ids.end());
 }
+
+template <typename ColOrderRange>
+void AffineSchema::projectOutLocs(ColOrderRange projRange) const
+{
+    // recycledLocs.reserve(projRange.size());
+    // recycledLocs.insert(recycledLocs.end(), projRange.begin(), projRange.end());
+}

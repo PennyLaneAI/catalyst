@@ -52,7 +52,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const IdxList &idxMap)
     return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const IdxView &idxView)
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, IdxView idxView)
 {
     os << "[";
     for (size_t i = 0; i < idxView.size(); ++i) {

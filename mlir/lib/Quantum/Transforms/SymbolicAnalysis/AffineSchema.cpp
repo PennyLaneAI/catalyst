@@ -88,10 +88,3 @@ void MeetSchema::combineAuxVarsWith(const RelationSchema& rhs)
         growAuxVars(rhs.numAuxVars() - numAuxVars());
     }
 }
-
-template <typename ColOrderRange>
-void AffineSchema::projectOutLocs(ColOrderRange projRange) const
-{
-    recycledLocs.reserve(projRange.size());
-    recycledLocs.insert(recycledLocs.end(), projRange.begin(), projRange.end());
-}

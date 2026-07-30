@@ -24,6 +24,8 @@
 using GateID = int; // index of Operation pointers vector! (It's Loc in feynman and l in thesis)
 
 struct GateBundle {
+    std::vector<GateID> zeroAffineGates;
+    std::vector<GateID> oneAffineGates;
     // Constructors
     GateBundle() = default;
     GateBundle(GateID gate, bool pol) { (pol ? oneAffineGates : zeroAffineGates).push_back(gate); }
@@ -37,18 +39,14 @@ struct GateBundle {
 
     // Methods
     [[nodiscard]] size_t gateCount() const;
-    [[nodiscard]] auto getAllGatesMutable();
+    [[nodiscard]] auto getAllGates();
     [[nodiscard]] GateID getMergeTarget() const;
     [[nodiscard]] bool isMergeTargetAffineZero() const;
-
-  private:
-    std::vector<GateID> zeroAffineGates;
-    std::vector<GateID> oneAffineGates;
 };
 
 inline size_t GateBundle::gateCount() const { return zeroAffineGates.size() + oneAffineGates.size(); }
 
-inline auto GateBundle::getAllGatesMutable()
+inline auto GateBundle::getAllGates()
 {
     return llvm::concat<GateID>(zeroAffineGates, oneAffineGates);
 }

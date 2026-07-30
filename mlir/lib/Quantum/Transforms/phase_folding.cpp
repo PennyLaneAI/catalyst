@@ -52,7 +52,7 @@ namespace quantum {
 
 struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     using PhaseFoldingPassBase::PhaseFoldingPassBase;
-/*
+
     llvm::DenseMap<mlir::Value, size_t> ssaToWireMap;
     llvm::DenseMap<mlir::Value, size_t> qregToBaseMap;
 
@@ -75,16 +75,16 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
     // Qubit Extraction:
-    void allocateRegister(mlir::Value qreg, auto regSize, SymbolicCircuit &symCirc)
+    void allocateRegister(mlir::Value qreg, auto regSize, ProgramAbstraction &progAbst)
     {
-        qregToBaseMap[qreg] = symCirc.getQubitNum();
-        symCirc.extendQubitsBy(static_cast<size_t>(regSize.value_or(0)));
+        qregToBaseMap[qreg] = progAbst.numQubits();
+        progAbst.extendQubitsBy(static_cast<size_t>(regSize.value_or(0)));
     }
 
-    void allocateQubit(mlir::Value qubit, SymbolicCircuit &symCirc)
+    void allocateQubit(mlir::Value qubit, ProgramAbstraction &progAbst)
     {
-        ssaToWireMap[qubit] = symCirc.getQubitNum();
-        symCirc.extendQubitsBy(1);
+        ssaToWireMap[qubit] = progAbst.numQubits();
+        progAbst.extendQubitsBy(1);
     }
 
     void extractFromQreg(ExtractOp extractOp)
@@ -126,7 +126,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }
     }
 
-    void initQubitsState(SetBasisStateOp basisOp, SymbolicCircuit &symCirc)
+    void initQubitsState(SetBasisStateOp basisOp, ProgramAbstraction &progAbst)
     {
         llvm::SmallVector<size_t, 4> qubitIndices =
             getQubitIndices(basisOp.getInQubits(), basisOp.getOutQubits());
@@ -136,12 +136,12 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 
         size_t i = 0;
         for (const llvm::APInt &val : basisState.getValues<llvm::APInt>()) {
-            symCirc.initQubit(qubitIndices[i], val.getBoolValue());
-            i++;
+            progAbst.prepareQubit(qubitIndices[i], val.getBoolValue());
+            ++i;
         }
     }
 
-    void applyUndefinedOp(Operation *op, SymbolicCircuit &symCirc)
+    void applyUndefinedOp(Operation *op, ProgramAbstraction &progAbst)
     {
         llvm::SmallVector<size_t, 4> qubitIndices;
         if (auto qGate = dyn_cast<QuantumGate>(op)) {
@@ -157,7 +157,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }
 
         Gate gate = (isa<MultiRZOp>(op) || isa<PCPhaseOp>(op)) ? Gate::I : Gate::U;
-        symCirc.applyGate(gate, false, qubitIndices);
+        progAbst.applyGate(gate, false, qubitIndices);
     }
 
     llvm::SmallVector<size_t, 4> getQubitIndices(mlir::ValueRange ins, mlir::ResultRange outs)
@@ -242,10 +242,10 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     double sumAngles(const GateBundle &contributors)
     {
         double sum = 0.0;
-        for (GateID id : contributors.zeroAffineRZs) {
+        for (GateID id : contributors.zeroAffineGates) {
             sum += getPhase(phaseOps[id]);
         }
-        for (GateID id : contributors.oneAffineRZs) {
+        for (GateID id : contributors.oneAffineGates) {
             sum -= getPhase(phaseOps[id]);
         }
         return sum;
@@ -296,10 +296,10 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 
         CustomOp newOp = CustomOp::create(
             rewriter, preOp.getLoc(),
-            gate_name= GATE_NAME[static_cast<size_t>(newGate)],
-            in_qubits= preOp.getInQubits(),
-            params= (newGate == Gate::RZ) ? mlir::ValueRange({angleVal}) : mlir::ValueRange({}),
-            adjoint= isAdjoint);
+            /*gate_name=*/ GATE_NAME[static_cast<size_t>(newGate)],
+            /*in_qubits=*/ preOp.getInQubits(),
+            /*params=*/ (newGate == Gate::RZ) ? mlir::ValueRange({angleVal}) : mlir::ValueRange({}),
+            /*adjoint=*/ isAdjoint);
 
         rewriter.replaceOp(preOp, newOp);
         updateStats(newGate, +1);
@@ -317,7 +317,7 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     }
 
     // Phase-folding Algorithm:
-    void phaseAnalysis(CustomOp customOp, SymbolicCircuit &symCirc, GateID &gateID)
+    void phaseAnalysis(CustomOp customOp, ProgramAbstraction &progAbst, GateID &gateID)
     {
         llvm::SmallVector<size_t, 4> qubitIndices =
             getQubitIndices(customOp.getInQubits(), customOp.getOutQubits());
@@ -329,75 +329,85 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }
         initialGateCount[static_cast<size_t>(gate)]++;
 
-        symCirc.applyGate(gate, customOp.getAdjointFlag(), qubitIndices, gateID);
+        progAbst.applyGate(gate, customOp.getAdjointFlag(), qubitIndices, gateID);
     }
 
-    void phaseMerge(SymbolicCircuit &symCirc)
+    void phaseMerge(ProgramAbstraction &progAbst)
     {
-        auto removeGates = [&](GateBundle &contributors,
+        auto removeGates = [&](auto gates,
                                std::optional<GateID> skipID = std::nullopt) {
-            for (GateID id : contributors.getAllGatesMutable()) {
+            for (GateID id : gates) {
                 if (id != skipID) {
                     removePhaseOp(phaseOps[id]);
                 }
             }
         };
-        for (auto &[parity, contributors] : symCirc.phasePoly.terms) {
-            if (parity.isTrivial()) {
-                removeGates(contributors);
-            }
-            else if (!parity.isUnsat() && contributors.gateCount() > 1) {
-                double angleSum = sumAngles(contributors);
-                if (!contributors.isMergeTargetAffineZero()) {
+
+        auto tryMergeBundle = [&](GateBundle &bundle) {
+            if (bundle.gateCount() > 1) {
+                double angleSum = sumAngles(bundle);
+                if (!bundle.isMergeTargetAffineZero()) {
                     angleSum = -angleSum;
                 }
 
-                GateID targetOpID = contributors.getMergeTarget();
+                GateID targetOpID = bundle.getMergeTarget();
                 updateTargetOp(phaseOps[targetOpID], angleSum);
-                removeGates(contributors, targetOpID);
+                removeGates(bundle.getAllGates(), targetOpID);
             }
+        };
+
+        for (auto &[parity, contributors] : progAbst.phases.activeBundles) {
+            if (parity.isTrivial()) {
+                removeGates(contributors.zeroAffineGates);
+                contributors.zeroAffineGates.clear();
+            }
+            tryMergeBundle(contributors);
+        }
+
+        for (GateBundle &bundle : progAbst.phases.orphanBundles) {
+            tryMergeBundle(bundle);
         }
     }
-*/
+
     void runOnOperation() override
     {
         llvm::outs() << "Hello phase-folding world!\n";
 
-        // SymbolicCircuit symCirc = SymbolicCircuit();
-        // GateID gateID = -1;
+        ProgramAbstraction progAbst;
+        GateID gateID = -1;
 
-        // getOperation()->walk([&](Operation *op) {
-        //     if (auto customOp = dyn_cast<CustomOp>(op)) {
-        //         phaseAnalysis(customOp, symCirc, gateID);
-        //     }
-        //     else if (auto extractOp = dyn_cast<ExtractOp>(op)) {
-        //         extractFromQreg(extractOp);
-        //     }
-        //     else if (auto allocQbOp = dyn_cast<AllocQubitOp>(op)) {
-        //         allocateQubit(allocQbOp.getResult(), symCirc);
-        //     }
-        //     else if (auto allocOp = dyn_cast<AllocOp>(op)) {
-        //         allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), symCirc);
-        //     }
-        //     else if (auto basisOp = dyn_cast<SetBasisStateOp>(op)) {
-        //         initQubitsState(basisOp, symCirc);
-        //     }
-        //     else if (auto gpOp = dyn_cast<GlobalPhaseOp>(op)) {
-        //         llvm::outs() << "GlobalPhaseOp\n";
-        //     }
-        //     else if (auto gpOp = dyn_cast<scf::IfOp, scf::ForOp, llvm::FunctionCallee, scf::SwitchOp>(op)) {
-        //         llvm::outs() << "GlobalPhaseOp\n";
-        //     }
-        //     else {
-        //         // llvm::outs() << "QuantumOperation\n";
-        //         applyUndefinedOp(op, symCirc);
-        //     }
-        // });
+        getOperation()->walk([&](Operation *op) {
+            if (auto customOp = dyn_cast<CustomOp>(op)) {
+                phaseAnalysis(customOp, progAbst, gateID);
+            }
+            else if (auto extractOp = dyn_cast<ExtractOp>(op)) {
+                extractFromQreg(extractOp);
+            }
+            else if (auto allocQbOp = dyn_cast<AllocQubitOp>(op)) {
+                allocateQubit(allocQbOp.getResult(), progAbst);
+            }
+            else if (auto allocOp = dyn_cast<AllocOp>(op)) {
+                allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), progAbst);
+            }
+            else if (auto basisOp = dyn_cast<SetBasisStateOp>(op)) {
+                initQubitsState(basisOp, progAbst);
+            }
+            else if (auto gpOp = dyn_cast<GlobalPhaseOp>(op)) {
+                llvm::outs() << "GlobalPhaseOp\n";
+            }
+            // else if (auto gpOp = dyn_cast<scf::IfOp, scf::ForOp, llvm::FunctionCallee, scf::SwitchOp>(op)) {
+            //     llvm::outs() << "GlobalPhaseOp\n";
+            // }
+            else {
+                // llvm::outs() << "QuantumOperation\n";
+                applyUndefinedOp(op, progAbst);
+            }
+        });
 
-        // llvm::outs() << symCirc << "\n";
+        llvm::outs() << progAbst << "\n";
 
-        // phaseMerge(symCirc);
-        // reportStats();
+        phaseMerge(progAbst);
+        reportStats();
     }
 };
 

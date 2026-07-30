@@ -51,3 +51,21 @@ struct PhaseAbstraction {
     void addOrphanBundlesWith(const std::vector<GateBundle> &rhsOrphans);
     void insertActiveBundle(const GateBundle &contributor, const Parity &parity);
 };
+
+template <typename ColOrderRange>
+std::string PhaseAbstraction::toString(ColOrderRange colOrder) const
+{
+    std::string res = "";
+    for (const auto &[parity, contributors] : activeBundles) {
+        res += (parity.toStringWithOrder(colOrder) + " -> " + contributors.toString() + "\n");
+    }
+    
+    if (!orphanBundles.empty()) {
+        res += "Unsat -> ";
+        for (const GateBundle &contributors : orphanBundles) {
+            res += contributors.toString() + ", ";
+        }
+        res += "\n";
+    }
+    return res;
+}

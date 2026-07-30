@@ -45,24 +45,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const PhaseAbstraction &pp)
     return os;
 }
 
-template <typename ColOrderRange>
-std::string PhaseAbstraction::toString(ColOrderRange colOrder) const
-{
-    std::string res = "";
-    for (const auto &[parity, contributors] : activeBundles) {
-        res += (parity.toStringWithOrder(colOrder) + " -> " + contributors.toString() + "\n");
-    }
-    
-    if (!orphanBundles.empty()) {
-        res += "Unsat -> ";
-        for (const GateBundle &contributors : orphanBundles) {
-            res += contributors.toString() + ", ";
-        }
-        res += "\n";
-    }
-    return res;
-}
-
 /*
     Methods:
 */
