@@ -79,15 +79,7 @@ class GraphOpID:
 
     def parse_dynamic_shape(self) -> dict:
         """Return the dynamic shape as a dictionary of dtypes from the dynamic arg names."""
-        # breakpoint()
-        return {
-            argname: (
-                argtype
-                if isinstance(argtype, (jax.core.ShapedArray, qp.typing.AbstractArray))
-                else [argtype]
-            )
-            for argname, argtype in sorted(self.op.dynamic_args.items())
-        }
+        return {argname: argtype for argname, argtype in sorted(self.op.dynamic_args.items())}
 
     def parse_wire_lens(self) -> dict:
         """Return the length of each of the wire args as a dictionary from the wire arg names."""
@@ -364,10 +356,6 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 graph_op_id = GraphOpID(op)
                 probe = (
                     graph_op_id.get_operator_name(),
-                    # {
-                    #     name: convert_types_to_mlir_strings(shape)
-                    #     for name, shape in graph_op_id.get_dynamic_shape().items()
-                    # },
                     convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
                     graph_op_id.wire_lens,
                     graph_op_id.static_data,

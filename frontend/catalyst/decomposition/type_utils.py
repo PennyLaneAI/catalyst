@@ -85,6 +85,8 @@ def convert_types_to_mlir_strings(d: dict) -> dict:
         elif isinstance(item, (list, tuple)):
             return [handle_item(i) for i in item]
         elif isinstance(item, (ShapedArray, qp.typing.AbstractArray)):
+            if item.shape == ():
+                return [_PY_DTYPES_TO_MLIR_DTYPES[item.dtype.type]]
             return convert_shaped_type_to_mlir_string(item)
         else:
             raise TypeError(
