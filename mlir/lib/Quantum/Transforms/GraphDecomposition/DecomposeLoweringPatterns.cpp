@@ -20,7 +20,6 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
-#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -118,7 +117,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
             // Didn't find ID match, try matching gate name
             // TODO: remove multirz's special name editing
             if (isa<quantum::MultiRZOp>(op)) {
-                gateName = gateName + "_" + std::to_string(op.getWireLens()[0]);
+                gateName = gateName + "_" + std::to_string(op.getWireLens()["wires"]);
             }
             auto it_gateName = decompositionRegistry.find(gateName);
             if (it_gateName != decompositionRegistry.end()) {

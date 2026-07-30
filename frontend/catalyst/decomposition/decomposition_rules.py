@@ -32,6 +32,7 @@ from catalyst.decomposition.type_utils import (
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
 )
+from catalyst.from_plxpr.qref_operator2_primitives import _is_custom_op
 from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
@@ -160,11 +161,10 @@ class GraphOpID:
         return ID_string
 
 
-def collect_resources_for_op(op_name, kwargs):
-    """
-    Return resource data for all decomposition rules associated to op_name.
-    """
+def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
+    """Return resource data for all decomposition rules associated to op_name."""
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
+    args = ()
 
     # map rules to resource resources, in a more generic format
     name_to_resource_ids = {}
@@ -172,7 +172,10 @@ def collect_resources_for_op(op_name, kwargs):
     for rule in decomp_rules:
         # The `compute_resources` function's signature is the same as the Operator2 signature
         # for the original op of the rule
-        resources = rule.compute_resources(**kwargs)
+        if is_custom_op:
+            args = tuple(val for key, val in kwargs.items() if key != "wires")
+            kwargs = {"wires": kwargs["wires"]}
+        resources = rule.compute_resources(*args, **kwargs)
         name_to_resources[rule.name] = resources.gate_counts
         name_to_resource_ids[rule.name] = {
             GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
@@ -182,7 +185,13 @@ def collect_resources_for_op(op_name, kwargs):
 
 
 def compile_decomposition_rules(
-    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
+    op_name,
+    op_id,
+    dynamic_shape,
+    wire_lens,
+    static_data,
+    extra_data=None,
+    is_custom_op=False,
 ) -> ModuleOp:
     """
     Return a ModuleOp containing the decomposition rules for an operator instance.
@@ -199,7 +208,7 @@ def compile_decomposition_rules(
         kwargs[arg_name] = get_dummy_values_for_container(arg_shape)
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
-        op_name, kwargs | static_data | extra_data
+        op_name, kwargs | static_data | extra_data, is_custom_op
     )
 
     # The static_data was only needed to instantiate the correct decomp rule
@@ -256,11 +265,23 @@ def compile_decomposition_rules(
 
 
 def compile_decomposition_rules_wrapper(
-    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
+    op_name,
+    op_id,
+    dynamic_shape,
+    wire_lens,
+    static_data,
+    extra_data=None,
+    is_custom_op=False,
 ) -> str:
     """Return a string MLIR module containing the decomposition rules for an operator instance."""
     return str(
         compile_decomposition_rules(
-            op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
+            op_name,
+            op_id,
+            dynamic_shape,
+            wire_lens,
+            static_data,
+            extra_data=extra_data,
+            is_custom_op=is_custom_op,
         )
     )

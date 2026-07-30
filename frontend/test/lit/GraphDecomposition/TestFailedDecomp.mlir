@@ -12,13 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: not --crash catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=PauliX=1.0 bytecode-rules="%BYTECODE_PATH"})' %s 2>&1 | FileCheck %s
+// RUN: not --crash catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=PauliX=1.0 alt-decomps=[failure=fail_decomp] bytecode-rules="%BYTECODE_PATH"})' %s 2>&1 | FileCheck %s
 
 func.func @circuit(%q0: !quantum.bit) {
     %pi = arith.constant 3.14 : f64
     %out = quantum.custom "failure"() %q0 : !quantum.bit
 
     // CHECK: GraphSolverFailedError
-    // CHECK: Decomposition rule not found for operator 'id: failure[][1]{}'
+    // CHECK: Decomposition rule not found for operator 'id: failure{}{wires:1}{}'
     return
+}
+
+func.func private @fail_decomp(%q: !quantum.bit) -> !quantum.bit attributes { target_gate = "failure{}{wires:1}{}", resources = { operations = {"impossible"=1}}} {
+  %out = quantum.custom "impossible"() %q : !quantum.bit
+  return %out : !quantum.bit
 }
