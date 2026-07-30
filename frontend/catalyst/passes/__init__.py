@@ -48,7 +48,6 @@ from catalyst.passes.builtin_passes import (
     merge_rotations,
     parity_synth,
     ppm_compilation,
-    ppm_specs,
     ppr_to_mbqc,
     ppr_to_ppm,
     reduce_t_depth,
