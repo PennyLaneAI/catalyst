@@ -63,7 +63,6 @@ __all__ = (
     "ppr_to_ppm",
     "merge_ppr_ppm",
     "ppm_compilation",
-    "ppm_specs",
     "reduce_t_depth",
     "decompose_arbitrary_ppr",
     "combine_global_phases",
