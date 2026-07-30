@@ -15,14 +15,20 @@
 #include "ExecutorSession.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <numeric>
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
+#include <thread>
 #include <vector>
 
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/EPCDynamicLibrarySearchGenerator.h"
@@ -78,6 +84,55 @@ void initialize_targets()
     (void)inited;
 }
 
+// FDSimpleRemoteEPCTransport whose disconnect() also shutdown()s the socket, to avoid a
+// teardown deadlock.
+//
+// SimpleRemoteEPC::disconnect() (via ExecutionSession::endSession()) closes the transport, then
+// waits for the listener thread to observe EOF. The stock transport only close()s the fd, but the
+// listener's in-flight read() keeps the socket alive — so close() neither wakes that read nor
+// sends a FIN, and the wait blocks forever (the peer never sees EOF either).
+//
+// shutdown(SHUT_RDWR) forces the read() to return and sends the FIN. We do it in disconnect() so
+// it runs only after endSession() has finished its own messaging (e.g. freeing JIT'd memory).
+class ShutdownFDTransport : public SimpleRemoteEPCTransport {
+  public:
+    static Expected<std::unique_ptr<ShutdownFDTransport>> Create(SimpleRemoteEPCTransportClient &C,
+                                                                 int InFD, int OutFD)
+    {
+        auto Inner = FDSimpleRemoteEPCTransport::Create(C, InFD, OutFD);
+        if (!Inner) {
+            return Inner.takeError();
+        }
+        return std::make_unique<ShutdownFDTransport>(std::move(*Inner), InFD, OutFD);
+    }
+
+    ShutdownFDTransport(std::unique_ptr<FDSimpleRemoteEPCTransport> inner, int inFD, int outFD)
+        : Inner(std::move(inner)), InFD(inFD), OutFD(outFD)
+    {
+    }
+
+    Error start() override { return Inner->start(); }
+
+    Error sendMessage(SimpleRemoteEPCOpcode OpC, uint64_t SeqNo, ExecutorAddr TagAddr,
+                      ArrayRef<char> ArgBytes) override
+    {
+        return Inner->sendMessage(OpC, SeqNo, TagAddr, ArgBytes);
+    }
+
+    void disconnect() override
+    {
+        ::shutdown(InFD, SHUT_RDWR);
+        if (OutFD != InFD) {
+            ::shutdown(OutFD, SHUT_RDWR);
+        }
+        Inner->disconnect();
+    }
+
+  private:
+    std::unique_ptr<FDSimpleRemoteEPCTransport> Inner;
+    int InFD, OutFD;
+};
+
 // For avoiding the error message being overwritten by subsequent errors in async jobs.
 // We use thread_local to store the error message.
 thread_local std::string g_last_error;
@@ -106,6 +161,20 @@ Error createTCPSocketError(Twine Details)
     return make_error<StringError>("Failed to connect TCP socket '" +
                                        Twine(OutOfProcessExecutorConnect) + "': " + Details,
                                    inconvertibleErrorCode());
+}
+
+// Seconds to wait for the catalyst-executor ORC bootstrap handshake before giving up. Overridable
+// via CATALYST_REMOTE_CONNECT_TIMEOUT; defaults to 10s. A value of 0 disables the timeout.
+unsigned remoteConnectTimeoutSeconds()
+{
+    if (const char *env = std::getenv("CATALYST_REMOTE_CONNECT_TIMEOUT")) {
+        char *end = nullptr;
+        unsigned long secs = std::strtoul(env, &end, 10);
+        if (end != env) {
+            return static_cast<unsigned>(secs);
+        }
+    }
+    return 10;
 }
 
 Expected<int> connectTCPSocket(std::string Host, std::string PortStr)
@@ -190,7 +259,12 @@ struct ExecutorSession {
     MangleAndInterner Mangle;
     ObjectLinkingLayer ObjectLayer;
 
+    // Shared namespace: the process-symbol generator (QIR runtime, libc) plus library-call objects.
     JITDylib &MainJD;
+    // One JITDylib per shipped kernel object, keyed by its object-file path. Each links against
+    // MainJD for its external deps, but keeps its own entry symbol isolated — so two objects can
+    // export the same `_catalyst_pyface_<entry>` without colliding.
+    StringMap<JITDylib *> KernelJDs;
 
     ExecutorAddr alloc_fn{0};
     ExecutorAddr free_fn{0};
@@ -234,9 +308,53 @@ struct ExecutorSession {
 
         auto setup = SimpleRemoteEPC::Setup();
         setup.CreateMemoryManager = createSimpleRemoteMemoryManager;
-        auto EPC = SimpleRemoteEPC::Create<FDSimpleRemoteEPCTransport>(
+        // The ORC bootstrap handshake inside SimpleRemoteEPC::Create is an unbounded blocking read
+        // on the socket. If the peer is not a live catalyst-executor, it would hang forever.
+        // A watchdog shuts the socket down after the timeout, which forces the blocked read to
+        // fail and Create to return an error instead of hanging.
+        const int sockFd = *SockFD;
+        const unsigned timeoutSecs = remoteConnectTimeoutSeconds();
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool handshakeDone = false;
+        bool timedOut = false;
+        std::thread watchdog;
+        if (timeoutSecs > 0) {
+            watchdog = std::thread([&] {
+                std::unique_lock<std::mutex> lock(mtx);
+                if (!cv.wait_for(lock, std::chrono::seconds(timeoutSecs),
+                                 [&] { return handshakeDone; })) {
+                    timedOut = true;
+                    ::shutdown(sockFd, SHUT_RDWR);
+                }
+            });
+        }
+
+        // ShutdownFDTransport instead of FDSimpleRemoteEPCTransport so teardown shutdown()s the
+        // socket and doesn't deadlock
+        auto EPC = SimpleRemoteEPC::Create<ShutdownFDTransport>(
             std::make_unique<DynamicThreadPoolTaskDispatcher>(std::nullopt), std::move(setup),
-            *SockFD, *SockFD);
+            sockFd, sockFd);
+
+        if (watchdog.joinable()) {
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                handshakeDone = true;
+            }
+            cv.notify_all();
+            watchdog.join();
+        }
+
+        if (timedOut) {
+            // Consume any error the forced socket shutdown produced before reporting the timeout.
+            if (!EPC) {
+                consumeError(EPC.takeError());
+            }
+            return createTCPSocketError("handshake with catalyst-executor timed out after " +
+                                        Twine(timeoutSecs) +
+                                        "s (is a catalyst-executor actually listening there?). "
+                                        "Override with CATALYST_REMOTE_CONNECT_TIMEOUT");
+        }
         if (!EPC) {
             return EPC.takeError();
         }
@@ -251,11 +369,27 @@ struct ExecutorSession {
         return std::make_unique<ExecutorSession>(std::move(ES), std::move(*DL));
     }
 
-    Error addObjectFile(std::unique_ptr<MemoryBuffer> Buf)
+    Error addObjectFile(StringRef path, std::unique_ptr<MemoryBuffer> Buf)
     {
-        return ObjectLayer.add(MainJD, std::move(Buf));
+        if (KernelJDs.count(path)) {
+            return make_error<StringError>("object already loaded: " + path,
+                                           inconvertibleErrorCode());
+        }
+        JITDylib &jd = ES->createBareJITDylib(("kernel:" + path).str());
+        jd.addToLinkOrder(MainJD);
+        KernelJDs[path] = &jd;
+        return ObjectLayer.add(jd, std::move(Buf));
     }
 
+    ExecutorAddr lookupSym(StringRef path, StringRef Name)
+    {
+        auto it = KernelJDs.find(path);
+        JITDylib *jd = (it != KernelJDs.end()) ? it->second : &MainJD;
+        auto Sym = unwrap(ES->lookup({jd}, Mangle(Name.str())), "lookup(" + Name + ")");
+        return Sym.getAddress();
+    }
+
+    // Resolve `Name` in the shared process namespace (library-call symbols).
     ExecutorAddr lookupSym(StringRef Name)
     {
         auto Sym = unwrap(ES->lookup({&MainJD}, Mangle(Name.str())), "lookup(" + Name + ")");
@@ -417,7 +551,7 @@ int load_object_path(ExecutorSession *s, const char *path)
     clear_error();
     try {
         auto buf = unwrap(getFile(path), "getFile(" + Twine(path) + ")");
-        check(s->addObjectFile(std::move(buf)), "addObjectFile");
+        check(s->addObjectFile(path, std::move(buf)), "addObjectFile");
         return 0;
     }
     catch (const std::exception &e) {
@@ -507,10 +641,13 @@ int call_wrapper_raw(ExecutorSession *s, const char *sym, const char *args_buf, 
  * @param name the name of the symbol
  * @return uint64_t the address of the symbol
  */
-uint64_t lookup(ExecutorSession *s, const char *name)
+uint64_t lookup(ExecutorSession *s, const char *name, const char *object)
 {
     clear_error();
     try {
+        if (object && *object) {
+            return s->lookupSym(object, name).getValue();
+        }
         return s->lookupSym(name).getValue();
     }
     catch (const std::exception &e) {
