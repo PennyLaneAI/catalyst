@@ -326,10 +326,10 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply,
 
 std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s)
 {
-    if (!s || !s->sess) {
-        return 0;
+    if (s && s->sess) {
+        return guard([&] { return s->sess->last_rtt_ns(); });
     }
-    return s->sess->last_rtt_ns();
+    return 0;
 }
 
 void __catalyst__transport__start(CatalystTransportSession *s)
