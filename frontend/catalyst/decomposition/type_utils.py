@@ -111,6 +111,8 @@ def get_dummy_values_for_arg(arg):
                     f"Unexpected type in container when creating dummy values: {type(item)}"
                 )
 
+    return {k: handle_item(v) for k, v in dictionary.items()}
+
 
 def replace_abstract_wires_with_concrete_wires(node):
     if isinstance(node, qp.core.Operator2):
