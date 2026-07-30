@@ -98,7 +98,7 @@ void ensure_reply(CatalystTransportSession *s)
     }
 }
 
-ControllerSession *as_controller(CatalystTransportSession *s)
+ControllerSession *cast_to_controller(CatalystTransportSession *s)
 {
     return s ? dynamic_cast<ControllerSession *>(s->sess) : nullptr;
 }
@@ -334,7 +334,7 @@ int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
                                             std::uint32_t work_item_idx, std::uint64_t in_bytes,
                                             std::uint64_t out_bytes)
 {
-    auto *c = as_controller(s);
+    auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
     }
@@ -351,7 +351,7 @@ int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
 
 void *__catalyst__transport__data_slot(CatalystTransportSession *s)
 {
-    auto *c = as_controller(s);
+    auto *c = cast_to_controller(s);
     void *slot = nullptr;
     if (c) {
         guard([&] { slot = c->data_slot(); });
@@ -361,7 +361,7 @@ void *__catalyst__transport__data_slot(CatalystTransportSession *s)
 
 int __catalyst__transport__kick(CatalystTransportSession *s, std::uint32_t work_item_idx)
 {
-    auto *c = as_controller(s);
+    auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
     }
