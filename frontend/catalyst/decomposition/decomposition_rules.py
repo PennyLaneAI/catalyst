@@ -201,6 +201,15 @@ def get_rules_from_module(module: ir.Module) -> str:
     return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
+def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
+    kwargs = {}
+    for wire_name, wire_len in wire_lens.items():
+        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
+    for arg_name, arg_shape in dynamic_shape.items():
+        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
+    return kwargs
+
+
 def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
     """Return resource data for all decomposition rules associated to op_name."""
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
@@ -331,41 +340,51 @@ def compile_decomposition_rules_wrapper(
 
 
 def fetch_all_reachable_decomposition_rules_from_op(
-    op_name, op_id, dynamic_shape, wire_lens, static_data
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
 ):
-    q = deque()
-    start = (op_name, dynamic_shape, wire_lens, static_data)
-    q.append(start)
+    queue = deque()
+    start = (op_name, dynamic_shape, wire_lens, static_data, extra_data)
+    queue.append(start)
     visited = [start]
     rules = [
         *get_rule_funcs_from_module(
             compile_decomposition_rules(op_name, op_id, dynamic_shape, wire_lens, static_data)
         )
     ]
-    while len(q) != 0:
-        this_name, this_dynamic_shape, this_wire_lens, this_static_data = q.popleft()
-        dummy_wires = tuple(jnp.array(range(length), dtype=int) for length in this_wire_lens)
-        dummy_dynamic_args = get_dummy_values_for_arg(this_dynamic_shape)
+
+    while len(queue) != 0:
+        this_name, this_dynamic_shape, this_wire_lens, this_static_data, this_extra_data = (
+            queue.popleft()
+        )
+        this_extra_data = this_extra_data or {}
+        this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         resources, _, _ = collect_resources_for_op(
-            this_name, dummy_dynamic_args | dummy_wires | this_static_data
+            this_name, this_kwargs | this_static_data | this_extra_data
         )
         for _rule_name, resource in resources.items():
             for op, _count in resource.items():
                 graph_op_id = GraphOpID(op)
                 probe = (
                     graph_op_id.get_operator_name(),
-                    graph_op_id.get_dynamic_shape(),
+                    {
+                        name: mlir_stringify_type(shape)
+                        for name, shape in graph_op_id.get_dynamic_shape().items()
+                    },
                     graph_op_id.wire_lens,
                     graph_op_id.static_data,
+                    graph_op_id.extra_data,
                 )
                 if not probe in visited:
                     visited.append(probe)
-                    q.append(probe)
-                    rules.extend(
-                        get_rule_funcs_from_module(
-                            compile_decomposition_rules(
-                                probe[0], graph_op_id.getID(), probe[1], probe[2], probe[3]
-                            )
-                        )
+                    queue.append(probe)
+
+                    module = compile_decomposition_rules(
+                        probe[0],
+                        graph_op_id.getID(),
+                        probe[1],
+                        probe[2],
+                        probe[3],
+                        probe[4],
                     )
+                    rules.extend(get_rule_funcs_from_module(module))
     return rules
