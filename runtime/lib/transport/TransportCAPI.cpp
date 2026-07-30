@@ -69,6 +69,9 @@ std::string registry_key(std::int32_t role, const char *key)
 }
 
 // Local reply region size, provisioned automatically at exchange_keys.
+// TODO: Make this configurable rather than hard-coded. Expose an API such as
+// __catalyst__transport__set_reply_bytes(s, n) to override the region size per session, keeping
+// 16KB as the default when it is not set.
 constexpr std::uint64_t kReplyBytes = 16 * 1024;
 
 // Run fn, logging and swallowing any exception. Returns fn()'s result, or CATALYST_TRANSPORT_ERR
@@ -97,7 +100,7 @@ void ensure_reply(CatalystTransportSession *s)
     }
 }
 
-ControllerSession *as_controller(CatalystTransportSession *s)
+ControllerSession *cast_to_controller(CatalystTransportSession *s)
 {
     return s ? dynamic_cast<ControllerSession *>(s->sess) : nullptr;
 }
@@ -346,7 +349,7 @@ int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
                                             std::uint32_t work_item_idx, std::uint64_t in_bytes,
                                             std::uint64_t out_bytes)
 {
-    auto *c = as_controller(s);
+    auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
     }
@@ -363,7 +366,7 @@ int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
 
 void *__catalyst__transport__data_slot(CatalystTransportSession *s)
 {
-    auto *c = as_controller(s);
+    auto *c = cast_to_controller(s);
     void *slot = nullptr;
     if (c) {
         guard([&] { slot = c->data_slot(); });
@@ -373,7 +376,7 @@ void *__catalyst__transport__data_slot(CatalystTransportSession *s)
 
 int __catalyst__transport__kick(CatalystTransportSession *s, std::uint32_t work_item_idx)
 {
-    auto *c = as_controller(s);
+    auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
     }
