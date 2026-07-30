@@ -68,6 +68,11 @@ struct InjectTransportSessionPass
         NodeAttr ctrl = backline.getController();
         ArrayRef<NodeAttr> coprocs = backline.getCoprocessors();
 
+        // A lone controller with no peer has nothing to dial, so no transport session is emitted.
+        if (coprocs.empty() && ctrl.getPeer().getValue().empty()) {
+            return;
+        }
+
         // An empty `() -> ()` public func in `target`.
         auto makeVoidFunc = [&](const Twine &name, ModuleOp target) -> func::FuncOp {
             OpBuilder mb(ctx);
