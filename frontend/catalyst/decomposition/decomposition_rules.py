@@ -33,7 +33,6 @@ from catalyst.decomposition.type_utils import (
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
 )
-from catalyst.from_plxpr.qref_operator2_primitives import _is_custom_op
 from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
