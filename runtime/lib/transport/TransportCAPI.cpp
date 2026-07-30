@@ -185,6 +185,19 @@ void drain_pending(CatalystTransportSession *s)
     }
 }
 
+// Try the plugin handle first, then the process-global namespace (main image).
+CoprocessorFn resolve_coprocessor_fn(CatalystTransportSession *s, const char *symbol)
+{
+    dlerror();
+    if (s->backend && s->backend->handle) {
+        if (auto *fn = reinterpret_cast<CoprocessorFn>(dlsym(s->backend->handle, symbol))) {
+            return fn;
+        }
+        dlerror();
+    }
+    return reinterpret_cast<CoprocessorFn>(dlsym(RTLD_DEFAULT, symbol));
+}
+
 } // namespace
 
 extern "C" {
@@ -293,7 +306,7 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
         // Empty symbol selects the built-in echo; a named-but-unresolved symbol is a hard error
         CoprocessorFn fn = &echo_fn;
         if (symbol && *symbol) {
-            fn = reinterpret_cast<CoprocessorFn>(dlsym(RTLD_DEFAULT, symbol));
+            fn = resolve_coprocessor_fn(s, symbol);
             if (!fn) {
                 std::cerr << "[transport] set_coprocessor_fn: symbol not found: " << symbol << "\n";
                 return CATALYST_TRANSPORT_ERR;
