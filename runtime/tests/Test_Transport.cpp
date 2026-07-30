@@ -175,3 +175,13 @@ TEST_CASE("commit_work_item rejects a reply larger than the provisioned region",
     CHECK(__catalyst__transport__commit_work_item(s, 0, 0, 0) == CATALYST_TRANSPORT_OK);
     __catalyst__transport__destroy(s);
 }
+
+TEST_CASE("destroy drains outstanding async tokens without a prior barrier", "[transport]")
+{
+    auto *s = make(kController, "");
+    REQUIRE(s != nullptr);
+    REQUIRE(__catalyst__transport__connect_async(s, "127.0.0.1", 0) != 0);
+    REQUIRE(__catalyst__transport__exchange_keys_async(s) != 0);
+    __catalyst__transport__destroy(s);
+    SUCCEED();
+}

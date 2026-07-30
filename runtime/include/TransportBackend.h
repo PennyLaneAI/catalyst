@@ -21,8 +21,8 @@
 #ifndef TRANSPORTBACKEND_H
 #define TRANSPORTBACKEND_H
 
-#include <cstdio>
 #include <exception>
+#include <iostream>
 
 #include "Transport.hpp"
 
@@ -46,11 +46,11 @@ using CatalystTransportCoprocessorFactoryFn =
             return (BUILDER)(config ? std::string(config) : std::string());                        \
         }                                                                                          \
         catch (const std::exception &e) {                                                          \
-            std::fprintf(stderr, "[transport] controller factory failed: %s\n", e.what());         \
+            std::cerr << "[transport] controller factory failed: " << e.what() << "\n";            \
             return nullptr;                                                                        \
         }                                                                                          \
         catch (...) {                                                                              \
-            std::fprintf(stderr, "[transport] controller factory failed: unknown exception\n");    \
+            std::cerr << "[transport] controller factory failed: unknown exception\n";             \
             return nullptr;                                                                        \
         }                                                                                          \
     }
@@ -64,11 +64,11 @@ using CatalystTransportCoprocessorFactoryFn =
             return (BUILDER)(config ? std::string(config) : std::string());                        \
         }                                                                                          \
         catch (const std::exception &e) {                                                          \
-            std::fprintf(stderr, "[transport] coprocessor factory failed: %s\n", e.what());        \
+            std::cerr << "[transport] coprocessor factory failed: " << e.what() << "\n";           \
             return nullptr;                                                                        \
         }                                                                                          \
         catch (...) {                                                                              \
-            std::fprintf(stderr, "[transport] coprocessor factory failed: unknown exception\n");   \
+            std::cerr << "[transport] coprocessor factory failed: unknown exception\n";            \
             return nullptr;                                                                        \
         }                                                                                          \
     }

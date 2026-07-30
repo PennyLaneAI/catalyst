@@ -26,6 +26,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <vector>
 
 #include "DynamicLibraryLoader.hpp"
 #include "Transport.hpp"
@@ -53,6 +54,7 @@ struct CatalystTransportSession {
     bool reply_ready = false;
     PeerRef peer; // peer region learned in exchange_keys
     bool peer_ready = false;
+    std::vector<std::int64_t> pending_tokens;
 };
 
 namespace {
@@ -129,15 +131,30 @@ std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t o
 
 // Async task registry: connect_async / exchange_keys_async run on a worker thread and return a
 // token; barrier awaits it. Tokens start at 1 so a 0 return can signal a dispatch failure.
+// Each token is also recorded on the owning session so destroy can drain outstanding work.
 std::mutex g_async_mtx;
 std::int64_t g_next_token = 1;
 std::unordered_map<std::int64_t, std::future<int>> g_async_tasks;
+std::unordered_map<std::int64_t, CatalystTransportSession *> g_token_owner;
 
-std::int64_t dispatch_async(std::function<int()> fn)
+void forget_token_locked(std::int64_t token)
+{
+    auto oit = g_token_owner.find(token);
+    if (oit == g_token_owner.end()) {
+        return;
+    }
+    auto &pending = oit->second->pending_tokens;
+    pending.erase(std::remove(pending.begin(), pending.end(), token), pending.end());
+    g_token_owner.erase(oit);
+}
+
+std::int64_t dispatch_async(CatalystTransportSession *s, std::function<int()> fn)
 {
     std::lock_guard<std::mutex> lk(g_async_mtx);
     std::int64_t token = g_next_token++;
     g_async_tasks.emplace(token, std::async(std::launch::async, std::move(fn)));
+    g_token_owner.emplace(token, s);
+    s->pending_tokens.push_back(token);
     return token;
 }
 
@@ -152,8 +169,35 @@ int await_token(std::int64_t token)
         }
         fut = std::move(it->second);
         g_async_tasks.erase(it);
+        forget_token_locked(token);
     }
     return guard([&] { return fut.get(); });
+}
+
+// Await any connect_async / exchange_keys_async work still outstanding for this session.
+void drain_pending(CatalystTransportSession *s)
+{
+    std::vector<std::int64_t> tokens;
+    {
+        std::lock_guard<std::mutex> lk(g_async_mtx);
+        tokens.swap(s->pending_tokens);
+    }
+    for (std::int64_t token : tokens) {
+        (void)await_token(token);
+    }
+}
+
+// Try the plugin handle first, then the process-global namespace (main image).
+void *resolve_coprocessor_symbol(CatalystTransportSession *s, const char *symbol)
+{
+    dlerror();
+    if (s->backend && s->backend->handle) {
+        if (void *sym = dlsym(s->backend->handle, symbol)) {
+            return sym;
+        }
+        dlerror();
+    }
+    return dlsym(RTLD_DEFAULT, symbol);
 }
 
 } // namespace
@@ -187,7 +231,17 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
         }
         auto *raw = h.release();
         if (key && *key) {
-            g_registry[registry_key(role, key)] = raw; // resolved later via get_session
+            const std::string rk = registry_key(role, key);
+            auto it = g_registry.find(rk);
+            if (it != g_registry.end() && it->second != raw) {
+                // Registry is a soft lookup only; the prior session is still owned by its
+                // create() return value and must be destroy()'d by the caller.
+                std::cerr << "[transport] create: overwriting registry entry for role " << role
+                          << " key '" << key
+                          << "' without destroying the previous session; caller must still "
+                             "destroy the old handle\n";
+            }
+            g_registry[rk] = raw; // resolved later via get_session
         }
         return raw;
     }
@@ -216,7 +270,7 @@ std::int64_t __catalyst__transport__connect_async(CatalystTransportSession *s, c
         return 0;
     }
     return dispatch_async(
-        [s, p = std::string(peer ? peer : ""), oob_port] { return do_connect(s, p, oob_port); });
+        s, [s, p = std::string(peer ? peer : ""), oob_port] { return do_connect(s, p, oob_port); });
 }
 
 int __catalyst__transport__exchange_keys(CatalystTransportSession *s)
@@ -232,7 +286,7 @@ std::int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession
     if (!s || !s->sess) {
         return 0;
     }
-    return dispatch_async([s] { return do_exchange_keys(s); });
+    return dispatch_async(s, [s] { return do_exchange_keys(s); });
 }
 
 int __catalyst__transport__barrier(std::int64_t token) { return await_token(token); }
@@ -264,7 +318,7 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
         }
         void *raw = nullptr;
         if (symbol && *symbol) {
-            raw = dlsym(RTLD_DEFAULT, symbol);
+            raw = resolve_coprocessor_symbol(s, symbol);
             if (!raw) {
                 std::cerr << "[transport] set_coprocessor_fn: symbol not found: " << symbol << "\n";
                 return CATALYST_TRANSPORT_ERR;
@@ -339,10 +393,10 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply,
 
 std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s)
 {
-    if (!s || !s->sess) {
-        return 0;
+    if (s && s->sess) {
+        return guard([&] { return s->sess->last_rtt_ns(); });
     }
-    return s->sess->last_rtt_ns();
+    return 0;
 }
 
 void __catalyst__transport__start(CatalystTransportSession *s)
@@ -375,8 +429,14 @@ void __catalyst__transport__destroy(CatalystTransportSession *s)
     if (!s) {
         return;
     }
-    for (auto it = g_registry.begin(); it != g_registry.end();)
+    for (auto it = g_registry.begin(); it != g_registry.end();) {
         it = (it->second == s) ? g_registry.erase(it) : std::next(it);
+    }
+    // Wait for any in-flight async bring-up before tearing down
+    drain_pending(s);
+    if (s->sess) {
+        guard([&] { s->sess->stop(); });
+    }
     delete s->sess; // owned by the backend factory
     s->backend.reset();
     delete s;
