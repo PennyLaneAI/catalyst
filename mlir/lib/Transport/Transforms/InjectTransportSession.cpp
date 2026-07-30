@@ -46,6 +46,7 @@ constexpr llvm::StringRef kBacklineAttr = "catalyst.backline";
 constexpr llvm::StringRef kRoleAttr = "catalyst.backline_role";
 constexpr llvm::StringRef kControllerRole = "controller";
 constexpr llvm::StringRef kCoprocessorRole = "coprocessor";
+constexpr llvm::StringRef kDefaultDataPath = "cpu_verbs";
 
 struct InjectTransportSessionPass
     : public impl::InjectTransportSessionPassBase<InjectTransportSessionPass> {
@@ -165,7 +166,7 @@ struct InjectTransportSessionPass
                            .getSession();
             ConnectOp::create(b, loc, ct, ctrl.getPeer(), i16A(ctrl.oobPort()));
             ExchangeKeysOp::create(b, loc, ct);
-            EstablishChannelOp::create(b, loc, ct, ctrl.dataPathOr("cpu_verbs"));
+            EstablishChannelOp::create(b, loc, ct, ctrl.dataPathOr(kDefaultDataPath));
             commit(ct);
             StartOp::create(b, loc, ct);
             keyed.push_back({ctrlTy, key, teardownFn});
@@ -204,7 +205,7 @@ struct InjectTransportSessionPass
                                 .getToken();
                 BarrierOp::create(cb, loc, tok);
                 ExchangeKeysOp::create(cb, loc, co);
-                EstablishChannelOp::create(cb, loc, co, coproc.dataPathOr("cpu_verbs"));
+                EstablishChannelOp::create(cb, loc, co, coproc.dataPathOr(kDefaultDataPath));
                 SetCoprocessorFnOp::create(cb, loc, co, coproc.getSymbol());
                 StartOp::create(cb, loc, co);
 
@@ -236,7 +237,7 @@ struct InjectTransportSessionPass
                         .getSession();
                 ConnectOp::create(b, loc, ctr, coproc.getPeer(), i16A(coproc.oobPort()));
                 ExchangeKeysOp::create(b, loc, ctr);
-                EstablishChannelOp::create(b, loc, ctr, ctrl.dataPathOr("cpu_verbs"));
+                EstablishChannelOp::create(b, loc, ctr, ctrl.dataPathOr(kDefaultDataPath));
                 commit(ctr);
                 StartOp::create(b, loc, ctr);
                 keyed.push_back({ctrlTy, key, teardownFn});
@@ -251,7 +252,7 @@ struct InjectTransportSessionPass
                         .getSession();
                 ConnectOp::create(b, loc, ctr, coproc.getPeer(), i16A(coproc.oobPort()));
                 ExchangeKeysOp::create(b, loc, ctr);
-                EstablishChannelOp::create(b, loc, ctr, ctrl.dataPathOr("cpu_verbs"));
+                EstablishChannelOp::create(b, loc, ctr, ctrl.dataPathOr(kDefaultDataPath));
                 commit(ctr);
                 StartOp::create(b, loc, ctr);
                 keyed.push_back({ctrlTy, key, teardownFn});
@@ -282,8 +283,8 @@ struct InjectTransportSessionPass
             Value t2 = ExchangeKeysAsyncOp::create(b, loc, tokTy, co).getToken();
             ExchangeKeysOp::create(b, loc, ct);
             BarrierOp::create(b, loc, t2);
-            EstablishChannelOp::create(b, loc, co, coproc.dataPathOr("cpu_verbs"));
-            EstablishChannelOp::create(b, loc, ct, ctrl.dataPathOr("cpu_verbs"));
+            EstablishChannelOp::create(b, loc, co, coproc.dataPathOr(kDefaultDataPath));
+            EstablishChannelOp::create(b, loc, ct, ctrl.dataPathOr(kDefaultDataPath));
             SetCoprocessorFnOp::create(b, loc, co, coproc.getSymbol());
             commit(ct);
             StartOp::create(b, loc, co);
@@ -317,7 +318,7 @@ struct InjectTransportSessionPass
             for (const PendingLocalCoproc &c : pendingLocal) {
                 BarrierOp::create(hb, loc, c.token);
                 ExchangeKeysOp::create(hb, loc, c.session);
-                EstablishChannelOp::create(hb, loc, c.session, c.node.dataPathOr("cpu_verbs"));
+                EstablishChannelOp::create(hb, loc, c.session, c.node.dataPathOr(kDefaultDataPath));
                 StartOp::create(hb, loc, c.session);
             }
 
