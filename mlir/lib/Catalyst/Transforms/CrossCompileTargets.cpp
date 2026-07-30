@@ -164,11 +164,9 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         ModuleOp host = getOperation();
 
         SmallVector<ModuleOp> targetMods;
-        for (auto &op : host.getBody()->getOperations()) {
-            if (auto mod = dyn_cast<ModuleOp>(&op)) {
-                if (mod->hasAttr("catalyst.target")) {
-                    targetMods.push_back(mod);
-                }
+        for (auto mod : host.getBody()->getOps<ModuleOp>()) {
+            if (mod->hasAttr("catalyst.target")) {
+                targetMods.push_back(mod);
             }
         }
 
