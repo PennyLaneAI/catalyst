@@ -27,6 +27,7 @@
 #include "mlir/Pass/Pass.h"
 
 #include "QecPhysical/IR/QecPhysicalOps.h"
+
 #include "Transport/IR/TransportOps.h"
 #include "Transport/Transforms/Passes.h"
 
@@ -51,16 +52,19 @@ struct LowerDecodeToTransportPass
     {
         ModuleOp mod = getOperation();
         auto backline = mod->getAttrOfType<BacklineAttr>(kBacklineAttr);
-        if (!backline)
+        if (!backline) {
             return;
+        }
 
         SmallVector<std::string> peerKeys;
-        for (auto [i, coproc] : llvm::enumerate(backline.getCoprocessors()))
+        for (auto [i, coproc] : llvm::enumerate(backline.getCoprocessors())) {
             peerKeys.push_back(coproc.keyOr("coprocessor." + std::to_string(i)).str());
+        }
         // The controller is not an offload target, so with no coprocessors declared,
         // there is nowhere to send the decode, and it stays local.
-        if (peerKeys.empty())
+        if (peerKeys.empty()) {
             return;
+        }
 
         MLIRContext *ctx = &getContext();
         auto ctrlTy = SessionType::get(ctx, Role::Controller);
@@ -76,8 +80,9 @@ struct LowerDecodeToTransportPass
 
         SmallVector<qecp::DecodeEsmCssOp> anchors;
         mod.walk([&](qecp::DecodeEsmCssOp op) {
-            if (op.isBufferized() && op.getErrIdxIn())
+            if (op.isBufferized() && op.getErrIdxIn()) {
                 anchors.push_back(op);
+            }
         });
         // Distribute the decoding tasks across the coprocessors in a round-robin fashion.
         for (size_t k = 0; k < anchors.size(); ++k) {
