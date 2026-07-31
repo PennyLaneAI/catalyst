@@ -53,7 +53,7 @@ GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes)
     // Allocate exactly `bytes` (caller passes a page-aligned REGION_BYTES).
     HbmRing r{.size = bytes};
 #if defined(__HIP_PLATFORM_AMD__)
-    // NOTE: fine grained coherence is AMD speccific and does not have
+    // NOTE: fine grained coherence is AMD specific and does not have
     // a CUDA equivalent, therefore, use standard `hipMalloc` in that case
     HIP_CHECK(hipExtMallocWithFlags(&r.ptr, r.size, hipDeviceMallocFinegrained),
               "hipExtMallocWithFlags(finegrained)");
