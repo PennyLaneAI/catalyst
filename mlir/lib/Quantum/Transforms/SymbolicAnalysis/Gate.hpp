@@ -84,5 +84,15 @@ inline static constexpr llvm::StringLiteral GATE_NAME[] = {
     "Identity", "Hadamard", "PauliX", "PauliY", "PauliZ", "S",
     "T",        "RZ",       "CNOT",   "SWAP",   "_",      "GlobalPhase"};
 
+static constexpr Gate gateWithName(llvm::StringRef gateName)
+{
+    for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
+        if ((GATE_NAME[i] == gateName)) {
+            return static_cast<Gate>(i);
+        }
+    }
+    return Gate::U;
+}
+
 static int initialGateCount[PRIMITIV_GATES_COUNT] = {0};
 static int insertedGateCount[PRIMITIV_GATES_COUNT] = {0};

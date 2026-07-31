@@ -1,4 +1,4 @@
-func.func @ex_425(%arg0: tensor<2xi64>) -> (!quantum.bit, !quantum.bit) {
+func.func @ex_425(%arg0: i1) -> (!quantum.bit, !quantum.bit) {
     %reg = quantum.alloc( 2) : !quantum.reg
     %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
     %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
@@ -17,6 +17,37 @@ func.func @ex_425(%arg0: tensor<2xi64>) -> (!quantum.bit, !quantum.bit) {
     %q6 = quantum.custom "T"() %q4#1 : !quantum.bit   // l3
 
     func.return %q7, %q6 : !quantum.bit, !quantum.bit
+}
+
+func.func @ex_if(%arg0: i1) -> () {
+    %reg = quantum.alloc( 2) : !quantum.reg
+    %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+    %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+
+    %tens01 = arith.constant dense<[true]> : tensor<1xi1>
+    %q2 = quantum.set_basis_state(%tens01) %q0 : (tensor<1xi1>, !quantum.bit) -> !quantum.bit
+
+    %q3 = quantum.custom "T"() %q2 : !quantum.bit   // l1
+    %q4 = quantum.custom "X"() %q3 : !quantum.bit
+          
+
+    %2:2 = scf.if %arg0 -> (!quantum.bit, !quantum.bit) {
+        %p0 = quantum.custom "T"() %q4 : !quantum.bit // l2
+        %p1 = quantum.custom "T"() %q1 : !quantum.bit // l3
+        %p2:2 = quantum.custom "CNOT"() %p0, %p1 : !quantum.bit, !quantum.bit
+        %p3 = quantum.custom "T"() %p2#1 : !quantum.bit // l4
+        scf.yield %p2#0, %p3 : !quantum.bit, !quantum.bit
+    } else {
+        // %r0 = quantum.custom "Hadamard"() %q1 : !quantum.bit
+        // %r1 = quantum.custom "T"() %q4 : !quantum.bit // l5
+        // scf.yield %r0, %r1 : !quantum.bit, !quantum.bit
+        scf.yield %q4, %q1 : !quantum.bit, !quantum.bit
+    }
+
+    // %q5 = quantum.insert %reg[ 0], %2#0 : !quantum.reg, !quantum.bit
+    // %q6 = quantum.insert %reg[ 1], %2#1 : !quantum.reg, !quantum.bit
+    return
+    // func.return %q5, %q6 : !quantum.bit, !quantum.bit
 }
 
 // func.func @ex_1() -> (!quantum.bit, !quantum.bit) {

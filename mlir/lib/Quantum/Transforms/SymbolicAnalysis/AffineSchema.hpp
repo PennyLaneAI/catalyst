@@ -352,6 +352,8 @@ inline void RelationSchema::growPostVars(size_t n)
 template <typename ColOrderRange>
 void AffineSchema::projectOutLocs(ColOrderRange projRange) const
 {
-    // recycledLocs.reserve(projRange.size());
-    // recycledLocs.insert(recycledLocs.end(), projRange.begin(), projRange.end());
-}
+    if (llvm::adl_begin(projRange) != llvm::adl_end(projRange)) {
+        recycledLocs.reserve(recycledLocs.size() + llvm::range_size(projRange));
+        llvm::append_range(recycledLocs, projRange);
+    }
+} // pass size
