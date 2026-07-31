@@ -42,6 +42,10 @@
 * A `BufferizableOpInterface` implementation is added for the `Transport` dialect ops.
   [(#3064)](https://github.com/PennyLaneAI/catalyst/pull/3064)
 
+* A `lower-decode-to-transport` pass is added, which replaces each qecp.decode_esm_css with 
+  a transport kick/collect round over its buffers.
+  [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
+
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
 
