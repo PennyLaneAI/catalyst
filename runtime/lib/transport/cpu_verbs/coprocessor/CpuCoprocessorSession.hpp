@@ -27,15 +27,12 @@ namespace catalyst::transport::cpu_verbs {
 
 // Coprocessor role: receives messages, runs the coprocessor function, and
 // returns the result. The function is bound via set_coprocessor_fn; nullptr
-// selects the built-in echo (passthrough self-test).
+// selects the built-in echo.
 class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
     using Base = CpuSessionBase<CoprocessorSession>;
 
   public:
     explicit CpuCoprocessorSession(std::string dev, int gid_idx) : Base(std::move(dev), gid_idx) {}
-    // Joins the engine while this object is still complete: run() touches
-    // coproc_fn_/coproc_ctx_, so a join deferred to the base destructor would use
-    // them after they are gone. stop() is idempotent.
     ~CpuCoprocessorSession() override { stop(); }
 
     void start() override;

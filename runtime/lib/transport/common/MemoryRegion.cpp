@@ -64,8 +64,7 @@ MemoryRegion MemoryRegion::alloc_host(std::shared_ptr<ProtectionDomain> pd, std:
                                       std::size_t alignment, MemAccess access)
 {
     // aligned_alloc requires a power-of-two alignment and a size that is a
-    // multiple of it; guard alignment first so a bad value throws rather than
-    // dividing by zero.
+    // multiple of it.
     RDMA_CHECK(std::has_single_bit(alignment), "alignment must be a power of two, got %zu",
                alignment);
     std::size_t rounded = ((length + alignment - 1) / alignment) * alignment;
