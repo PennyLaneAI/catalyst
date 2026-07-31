@@ -206,6 +206,43 @@ module attributes {catalyst.backline = #transport.backline<transport = "net", co
 
 // -----
 
+// Distributed with multiple remote coprocessors: each gets its own suffixed target module and
+// lifecycle funcs, so the controller dials both from its module, and the host launches every role
+// in order.
+
+// The controller dials both coprocessors from its own module.
+// CHECK:      transport.create {{.*}}key = "cop1"{{.*}} -> !transport.session<controller>
+
+// @setup launches both serves (nonblocking) before the controller setup.
+// CHECK:      catalyst.launch_kernel @module_coproc.0::@coproc_serve.0() {catalyst.nonblocking}
+// CHECK-NEXT: catalyst.launch_kernel @module_coproc.1::@coproc_serve.1() {catalyst.nonblocking}
+// CHECK-NEXT: catalyst.launch_kernel @module_ctrl::@setup_transport()
+
+// @teardown stops both coprocessors before the controller teardown.
+// CHECK:      catalyst.launch_kernel @module_coproc.0::@coproc_stop.0()
+// CHECK-NEXT: catalyst.launch_kernel @module_coproc.1::@coproc_stop.1()
+// CHECK-NEXT: catalyst.launch_kernel @module_ctrl::@teardown_transport()
+
+// The second coprocessor's own module carries its distinct serve function.
+// CHECK:      transport.set_coprocessor_fn %{{.*}} {symbol = "bar"} : !transport.session<coprocessor>
+module attributes {catalyst.backline = #transport.backline<transport = "net", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true, in_bytes = 3 : i64, out_bytes = 8 : i64>,
+  coprocessors = [#transport.node<backend_lib = "y", config = "c", peer = "10.0.0.3", oob_port = 18560 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:2", remote = true, symbol = "foo", name = "cop0">, #transport.node<backend_lib = "z", config = "c", peer = "10.0.0.4", oob_port = 18561 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:3", remote = true, symbol = "bar", name = "cop1">]>} {
+  func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
+    %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
+    return %0 : tensor<4xf64>
+  }
+  module @module_ctrl attributes {catalyst.target = {triple = "aarch64-unknown-linux-gnu"}, catalyst.dispatch = {address = "h:1"}, catalyst.backline_role = "controller"} {
+    func.func public @circuit() -> tensor<4xf64> {
+      %c = arith.constant dense<0.0> : tensor<4xf64>
+      return %c : tensor<4xf64>
+    }
+  }
+  func.func @setup() { quantum.init  return }
+  func.func @teardown() { quantum.finalize  return }
+}
+
+// -----
+
 // No catalyst.backline: the module is left untouched.
 
 // CHECK-LABEL: func.func @untouched
