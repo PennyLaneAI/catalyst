@@ -20,15 +20,6 @@
 namespace catalyst::transport {
 
 /**
- * @brief Data-plane strategy: which engine issues the transfer.
- */
-enum class DataPath : std::uint8_t {
-    CpuVerbs,  // Plain ibverbs on CPU.
-    GpuEngine, // Gpu-initiated comms.
-    Other,
-};
-
-/**
  * @brief Memory kind: selects the allocation and registration path.
  */
 enum class MemKind : std::uint8_t {
@@ -70,7 +61,7 @@ struct PeerRef {
  * @brief Configuration for the data-movement channel a session uses.
  */
 struct ChannelDesc {
-    DataPath data_path = DataPath::CpuVerbs;
+    std::string data_path = "cpu_verbs";
 };
 
 /**
@@ -102,11 +93,10 @@ class TransportSession {
      *
      * @param size Size of the region in bytes.
      * @param kind Memory kind selecting the allocation and registration path.
-     * @param access Access flags for the registration.
      *
      * @return `MemRegion` The allocated and registered region.
      */
-    virtual MemRegion alloc_memory(std::size_t size, MemKind kind, std::uint32_t access) = 0;
+    virtual MemRegion alloc_memory(std::size_t size, MemKind kind) = 0;
 
     /**
      * @brief Advertise a local region and receive the peer's region over the out-of-band channel.
@@ -133,14 +123,16 @@ class TransportSession {
     virtual void start() = 0;
 
     /**
-     * @brief Wait for a result and write it out.
+     * @brief Wait for a result and scatter it into the reply buffers.
      *
-     * @param replies Output buffer to write the result into.
-     * @param bytes Capacity of the output buffer, in bytes.
+     * @param replies Array of `n` buffers to write the results into.
+     * @param replies_bytes Array of `n` capacities (bytes), one per reply buffer.
+     * @param n Number of reply buffers.
      *
      * @return `int`
      */
-    virtual int collect(void *replies, std::uint64_t bytes) = 0;
+    virtual int collect(void *const *replies, const std::uint64_t *replies_bytes,
+                        std::size_t n) = 0;
 
     /**
      * @brief Stop the engine and join. Idempotent.
