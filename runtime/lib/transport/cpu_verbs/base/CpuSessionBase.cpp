@@ -177,7 +177,7 @@ template <class Role> void CpuSessionBase<Role>::reap(ibv_cq *cq, int &outstandi
             continue;
         }
         empty = 0;
-        for (int k = 0; k < n; ++k) {
+        for (int k = 0; k < n; k++) {
             RDMA_CHECK(wc[k].status == IBV_WC_SUCCESS, "CQE status=%d", wc[k].status);
             --outstanding;
         }

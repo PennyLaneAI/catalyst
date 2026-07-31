@@ -75,7 +75,7 @@ FdGuard tcp_connect(const char *host, std::uint16_t port)
     RDMA_CHECK(rc == 0, "getaddrinfo(%s:%s): %s", host, port_str, gai_strerror(rc));
     std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> res_guard(res, freeaddrinfo);
 
-    for (int attempt = 0; attempt < CONNECT_ATTEMPTS; ++attempt) {
+    for (int attempt = 0; attempt < CONNECT_ATTEMPTS; attempt++) {
         FdGuard s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
         RDMA_CHECK(s.valid(), "socket");
         if (connect(s.get(), res->ai_addr, res->ai_addrlen) == 0) {

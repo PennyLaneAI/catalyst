@@ -29,7 +29,7 @@ Context::Context(const std::string &dev_name)
     ibv_device *dev = (it != devs + n) ? *it : nullptr;
     if (!dev) {
         std::string avail;
-        for (int i = 0; i < n; ++i) {
+        for (int i = 0; i < n; i++) {
             avail += (i ? ", " : "");
             avail += ibv_get_device_name(devs[i]);
         }

@@ -28,7 +28,7 @@ static bool have_rxe()
     int n = 0;
     ibv_device **devs = ibv_get_device_list(&n);
     bool found = false;
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; i++) {
         if (std::string(ibv_get_device_name(devs[i])) == "rxe0") {
             found = true;
         }
