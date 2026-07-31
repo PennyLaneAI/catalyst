@@ -121,12 +121,6 @@ TEST_CASE("set_coprocessor_fn on a controller session is an error", "[transport]
 
 TEST_CASE("set_coprocessor_fn: an unsupported convention is a clean error", "[transport]")
 {
-    // The stub coprocessor supports only the per-message convention (it overrides
-    // set_coprocessor_fn, not set_coprocessor_launcher), like the CPU backend.
-    // Binding LAUNCH_ONCE hits the base class's throwing default; the CAPI guard
-    // must turn that into an error code rather than let it escape the extern "C"
-    // boundary (which would terminate). This is what makes a convention mismatch a
-    // bind-time failure instead of an unchecked cast.
     auto *s = make(kCoprocessor, "");
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "", CATALYST_COPROC_LAUNCH_ONCE) ==
