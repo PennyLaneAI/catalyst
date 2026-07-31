@@ -14,20 +14,18 @@
 
 """SSH/scp orchestration for a remote :class:`~catalyst.executor.Executor`.
 
-Grouped into five namespace classes so related items sit together:
+Grouped into three namespace classes so related items sit together:
 
 * :class:`SSH` — the ``ssh`` binary wrapper: command line (control socket, base flags), a runner
   with rc + optional-raise, non-interactive auth probing, sudo-password resolution, and remote
   filesystem verbs (``mkdir``, ``rmdir``, ``scp_bundle``).
 * :class:`SCP` — the ``scp`` binary wrapper, riding on SSH's multiplexed control socket.
-* :class:`ShellCommand` — generic POSIX shell fragments (``pkill``, ``sudo``, ``rm -rf``,
-  ``mkdir -p``) and safe path quoting.
-* :class:`ExecutorCli` — flag constants for the ``catalyst-executor`` binary itself; shared
-  between local and remote invocations.
 * :class:`ExecutorSsh` — the shell command that launches ``catalyst-executor`` on a remote
   host (``cd + env + exec``, sudo-wrapped when needed).
 
-Consumed by :mod:`.process` (the remote process) and :mod:`.manager` (deploy/teardown).
+Generic shell fragments (:class:`~catalyst.executor.utils.ShellCommand`) and executor CLI flags
+(:class:`~catalyst.executor.utils.ExecutorCli`) live in :mod:`.utils`. Consumed by :mod:`.process`
+(the remote process) and :mod:`.manager` (deploy/teardown).
 """
 
 from __future__ import annotations
@@ -39,7 +37,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from .utils import Log, Paths, Raw
+from .utils import ExecutorCli, Paths, Raw, ShellCommand, log_cmd, logger, verbose_level
 
 
 class SSH:
@@ -99,7 +97,7 @@ class SSH:
         ]
 
     @staticmethod
-    def base(
+    def base_cmd(
         user: str, host: str, opts: list[str] | None = None, multiplex: bool = True
     ) -> list[str]:
         """Build the shared ``ssh`` command prefix used by every remote op.
@@ -121,7 +119,7 @@ class SSH:
         cmd = list(SSH.BASE_CMD)
         if multiplex:
             cmd += SSH.ctl_opts()
-        cmd += ["-v"] * max(0, Log.level() - 2)  # ssh protocol debug at -vvv (verbosity 3+)
+        cmd += ["-v"] * max(0, verbose_level() - 2)  # ssh protocol debug at -vvv (verbosity 3+)
         if opts:
             cmd += opts
         cmd.append(f"{user}@{host}")
@@ -133,7 +131,7 @@ class SSH:
         ``BatchMode=yes`` + short ``ConnectTimeout``) and return stdout stripped, or ``None`` on
         any failure (SSH error, non-zero exit, timeout, spawn failure). Used for state probes
         (e.g. ``uname -sm``) where "can't tell" is a valid answer."""
-        cmd = SSH.base(user, host, list(SSH.PROBE_OPTS)) + [remote_cmd]
+        cmd = SSH.base_cmd(user, host, list(SSH.PROBE_OPTS)) + [remote_cmd]
         try:
             return subprocess.check_output(
                 cmd, text=True, timeout=timeout, stderr=subprocess.DEVNULL
@@ -166,15 +164,15 @@ class SSH:
           remote output (``mkdir: Permission denied``, scp progress, …), and any subprocess
           exception propagates.
 
-        ``log=True`` records the argv via :meth:`Log.cmd`; ``opts`` are extra ``-o`` flags
-        passed through to :meth:`base`.
+        ``log=True`` records the argv via :func:`log_cmd`; ``opts`` are extra ``-o`` flags
+        passed through to :meth:`base_cmd`.
 
         ``error``: if given and the exit code is non-zero, raise :class:`RuntimeError` with this
         message (the actual rc is appended). Sugar for the ``if SSH.run(...) != 0: raise
         RuntimeError(...)`` pattern when there's no rc-specific branching."""
-        cmd = SSH.base(user, host, opts) + [remote_cmd]
+        cmd = SSH.base_cmd(user, host, opts) + [remote_cmd]
         if log:
-            Log.cmd(cmd)
+            log_cmd(cmd)
         kwargs = {"input": input, "text": input is not None, "timeout": timeout}
         if quiet:
             kwargs["stdout"] = subprocess.DEVNULL
@@ -226,13 +224,6 @@ class SSH:
             log=True,
             error=f"failed to create remote directory {path!r}",
         )
-
-    @staticmethod
-    def rm_rf(user: str, host: str, path: str) -> None:
-        """Recursively remove ``path`` on the remote host — no safety guards; the caller is
-        responsible for verifying ``path`` is safe to delete. Best-effort: errors are swallowed.
-        For guarded removal (refuses ``/`` and ``$HOME``) use :meth:`rmdir` instead."""
-        SSH.run(user, host, ShellCommand.rm_rf(path))
 
     @staticmethod
     def rmdir(user: str, host: str, path: str, *, force: bool = False) -> None:
@@ -303,7 +294,7 @@ class SSH:
             return None
         if sudo_password is not None:
             return sudo_password
-        Log.info("remote sudo needs a password (no NOPASSWD) — prompting once")
+        logger.info("remote sudo needs a password (no NOPASSWD) — prompting once")
         try:
             return getpass.getpass(f"[remote] sudo password for {user}@{host}: ")
         except (EOFError, KeyboardInterrupt) as e:
@@ -323,8 +314,8 @@ class SCP:
     ) -> None:
         """Copy ``files`` into ``user@host:dest/`` via scp. Tries the modern SFTP backend first;
         on failure, retries with the legacy SCP protocol (``-O``) for hosts without an SFTP
-        subsystem ("subsystem request failed"). Verbosity mirrors :class:`Log`: ``-v`` at level
-        ≥ 2, ``-q`` otherwise.
+        subsystem ("subsystem request failed"). Verbosity mirrors :func:`verbose_level`: ``-v``
+        at level ≥ 2, ``-q`` otherwise.
 
         Raises:
             RuntimeError: If both the modern and legacy attempts fail.
@@ -335,17 +326,17 @@ class SCP:
                 "scp",
                 *(["-O"] if legacy else []),
                 *SSH.ctl_opts(),
-                "-v" if Log.level() >= 2 else "-q",
+                "-v" if verbose_level() >= 2 else "-q",
                 *[str(f) for f in files],
                 f"{user}@{host}:{dest}/",
             ]
             if log:
-                Log.cmd(cmd)
+                log_cmd(cmd)
             return subprocess.run(cmd).returncode
 
         if _once(legacy=False) == 0:
             return
-        Log.info("scp failed — retrying with the legacy protocol (scp -O)")
+        logger.info("scp failed — retrying with the legacy protocol (scp -O)")
         if _once(legacy=True) != 0:
             raise RuntimeError(f"scp to {user}@{host}:{dest}/ failed")
 
@@ -364,82 +355,15 @@ class SCP:
                 "runtime libs for the target, or point bundle= at a prebuilt directory."
             )
         total = sum(f.stat().st_size for f in files)
-        Log.info(
+        logger.info(
             f"copying {len(files)} artifact(s), {total/1e6:.1f} MB -> {user}@{host}:{workspace}/"
         )
         for f in files:
-            Log.info(f"  - {f.name}  ({f.stat().st_size/1e6:.2f} MB)", level=2)
+            logger.debug(f"  - {f.name}  ({f.stat().st_size/1e6:.2f} MB)")
         SSH.mkdir(user, host, workspace)
         t0 = time.monotonic()
         SCP.run(user, host, files, workspace)
-        Log.info(f"copied in {time.monotonic() - t0:.1f}s", level=2)
-
-
-class ShellCommand:
-    """Generic POSIX shell fragments and path helpers reused by remote ops — the sudo/kill/rm
-    building blocks assembled by :class:`ExecutorSsh` (executor launcher), :class:`SSH` (auth
-    probe / mkdir), and :mod:`.process` (teardown). Nothing here is catalyst-executor-specific;
-    everything runs on any Bourne-family shell."""
-
-    # Shell-command fragments reused by teardown probes (see :mod:`.process`), auth probing,
-    # and directory ops.
-    @staticmethod
-    def sudo_probe() -> str:
-        """Non-interactive sudo check: ``sudo -n true`` returns 0 iff sudo needs no password.
-        Stderr is redirected to ``/dev/null`` to silence the "a password is required" message
-        when it does."""
-        return "sudo -n true 2>/dev/null"
-
-    @staticmethod
-    def sudo_pw(cmd: str) -> str:
-        """Wrap ``cmd`` in ``sudo -S -p ''`` — sudo reads its password from stdin (the caller
-        must pipe it via ``input=``) with an empty prompt so it never leaks to the terminal.
-        ``cmd`` is a pre-built shell fragment and is inserted verbatim (no re-quoting)."""
-        return f"sudo -S -p '' {cmd}"
-
-    @staticmethod
-    def sudo_np(cmd: str) -> str:
-        """Wrap ``cmd`` in ``sudo -n`` — non-interactive: sudo fails immediately if a password
-        is required (NOPASSWD only). ``cmd`` is inserted verbatim (no re-quoting)."""
-        return f"sudo -n {cmd}"
-
-    @staticmethod
-    def pkill(pat: str) -> str:
-        """Shell command to kill any process whose ``ps``-visible argv matches ``pat`` (a regex,
-        per ``pkill -f``). ``pat`` is shell-quoted so metacharacters can't break out."""
-        return f"pkill -f {shlex.quote(pat)}"
-
-    @staticmethod
-    def rm_rf(path: str) -> str:
-        """Shell command to recursively remove ``path``, quoted via :meth:`path` so spaces and
-        ``~`` survive. Callers are responsible for whatever safety-gating the path deserves —
-        this helper only handles quoting."""
-        return f"rm -rf {ShellCommand.path(path)}"
-
-    @staticmethod
-    def mkdir_p(path: str) -> str:
-        """Shell command to create ``path`` (and any missing parents) on the remote, with the
-        path itself quoted via :meth:`path` so spaces and ``~`` survive."""
-        return f"mkdir -p {ShellCommand.path(path)}"
-
-    @staticmethod
-    def path(path: str) -> str:
-        """Shell expression for ``path`` that expands a leading ``~`` via ``$HOME`` and quotes the
-        rest, so it survives ``cd``/``rm`` without tilde-in-quotes breakage or word-splitting."""
-        if path == "~":
-            return '"$HOME"'
-        if path.startswith("~/"):
-            return '"$HOME"/' + shlex.quote(path[2:])
-        return shlex.quote(path)
-
-
-class ExecutorCli:
-    """CLI interface for the ``catalyst-executor`` binary — flag constants used to invoke it,
-    local or remote. Kept as class data so a rename on the executor side is a one-line change
-    here instead of hunting through f-strings."""
-
-    PLUGIN_FLAG = "--plugin="
-    BIND_FLAG = "--bind="
+        logger.debug(f"copied in {time.monotonic() - t0:.1f}s")
 
 
 class ExecutorSsh:
@@ -471,9 +395,9 @@ class ExecutorSsh:
             workspace, remote_port, plugins, env,
             sudo=sudo, use_password=use_pw, executor_bin=executor_bin,
         )
-        Log.info(f"remote: {remote_cmd}", level=2)
+        logger.debug(f"remote: {remote_cmd}")
         opts = ExecutorSsh._ssh_opts(local_port, remote_port, use_pw)
-        return SSH.base(user, host, opts, multiplex=False) + [remote_cmd]
+        return SSH.base_cmd(user, host, opts, multiplex=False) + [remote_cmd]
 
     @staticmethod
     def _remote_cmd(

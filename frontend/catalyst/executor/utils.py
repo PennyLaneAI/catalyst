@@ -14,14 +14,18 @@
 
 """Shared low-level helpers for the :class:`~catalyst.executor.Executor`.
 
-Grouped into three namespace classes so related items sit together:
+Grouped into namespace classes so related items sit together:
 
-* :class:`Log` — verbosity level + tagged stderr logging (single source of truth for the level).
 * :class:`Patterns` — regexes for scanning executor / ssh output (ready, auth prompt, port busy).
 * :class:`Paths` — default workspace, executor binary, and log-file path resolution.
+* :class:`ShellCommand` — generic POSIX shell fragments (``pkill``, ``sudo``, ``rm -rf``,
+  ``mkdir -p``) and safe path quoting.
+* :class:`ExecutorCli` — CLI flag constants for the ``catalyst-executor`` binary.
 
-Plus a few free helpers (:func:`random_port`, :func:`triple_from_uname`, :data:`pdeathsig`) and
-the domain types (:class:`PortInUse`, :class:`Raw`).
+Plus stdlib logging setup — :data:`logger` (a :class:`logging.Logger` under
+``catalyst.executor``), :func:`set_verbose`, :func:`verbose_level`, and :func:`log_cmd`.
+And a few free helpers (:func:`random_port`, :func:`triple_from_uname`, :data:`pdeathsig`) and
+domain types (:class:`PortInUse`, :class:`Raw`).
 Imported by :mod:`.ssh`, :mod:`.process`, and :mod:`.manager`."""
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ import contextlib
 import ctypes
 import faulthandler
 import getpass
+import logging
 import os
 import random
 import re
@@ -103,39 +108,113 @@ class Patterns:
         return bool(Patterns._SUDO_FAIL.search(line))
 
 
-class Log:
-    """Verbosity-gated stderr logger for the launcher. Single source of truth for the level so
-    submodules always read the live value (a plain ``from utils import _VERBOSITY`` would snapshot
-    the int at import time).
+class ShellCommand:
+    """Generic POSIX shell fragments and path helpers reused by remote ops — sudo/kill/rm
+    building blocks and safe path quoting. Nothing here is catalyst-executor-specific;
+    everything runs on any Bourne-family shell."""
 
-    Levels: 0 quiet (errors only) · 1 phases + executor stream (default) · 2 full ssh/scp commands
-    + scp -v + timings · 3+ adds ``ssh -v``. The executor's own output always streams regardless."""
+    @staticmethod
+    def sudo_probe() -> str:
+        """Non-interactive sudo check: ``sudo -n true`` returns 0 iff sudo needs no password.
+        Stderr is redirected to ``/dev/null`` to silence the "a password is required" message
+        when it does."""
+        return "sudo -n true 2>/dev/null"
 
-    _level: int = 1
+    @staticmethod
+    def sudo_pw(cmd: str) -> str:
+        """Wrap ``cmd`` in ``sudo -S -p ''`` — sudo reads its password from stdin (the caller
+        must pipe it via ``input=``) with an empty prompt so it never leaks to the terminal.
+        ``cmd`` is a pre-built shell fragment and is inserted verbatim (no re-quoting)."""
+        return f"sudo -S -p '' {cmd}"
 
-    @classmethod
-    def set_level(cls, level: int) -> None:
-        """Set the launcher's output verbosity (also settable per launch via ``Executor(verbose=)``)."""
-        cls._level = level
+    @staticmethod
+    def sudo_np(cmd: str) -> str:
+        """Wrap ``cmd`` in ``sudo -n`` — non-interactive: sudo fails immediately if a password
+        is required (NOPASSWD only). ``cmd`` is inserted verbatim (no re-quoting)."""
+        return f"sudo -n {cmd}"
 
-    @classmethod
-    def level(cls) -> int:
-        """The current verbosity."""
-        return cls._level
+    @staticmethod
+    def pkill(pat: str) -> str:
+        """Shell command to kill any process whose ``ps``-visible argv matches ``pat`` (a regex,
+        per ``pkill -f``). ``pat`` is shell-quoted so metacharacters can't break out."""
+        return f"pkill -f {shlex.quote(pat)}"
 
-    @classmethod
-    def info(cls, msg: str, level: int = 1) -> None:
-        """Print ``msg`` to stderr tagged ``[remote-exec]`` when verbosity is at least ``level``.
+    @staticmethod
+    def rm_rf(path: str) -> str:
+        """Shell command to recursively remove ``path``, quoted via :meth:`path` so spaces and
+        ``~`` survive. Callers are responsible for whatever safety-gating the path deserves —
+        this helper only handles quoting."""
+        return f"rm -rf {ShellCommand.path(path)}"
 
-        ``level`` defaults to 1 (the main narrative — phases, ready/stop). Pass ``level=2`` for
-        verbose-only detail (full commands, per-step timings)."""
-        if level <= cls._level:
-            print(f"[remote-exec] {msg}", file=sys.stderr, flush=True)
+    @staticmethod
+    def mkdir_p(path: str) -> str:
+        """Shell command to create ``path`` (and any missing parents) on the remote, with the
+        path itself quoted via :meth:`path` so spaces and ``~`` survive."""
+        return f"mkdir -p {ShellCommand.path(path)}"
 
-    @classmethod
-    def cmd(cls, argv: list[str]) -> None:
-        """Echo a command we're about to run (verbosity >= 2)."""
-        cls.info("$ " + " ".join(shlex.quote(c) for c in argv), level=2)
+    @staticmethod
+    def path(path: str) -> str:
+        """Shell expression for ``path`` that expands a leading ``~`` via ``$HOME`` and quotes the
+        rest, so it survives ``cd``/``rm`` without tilde-in-quotes breakage or word-splitting."""
+        if path == "~":
+            return '"$HOME"'
+        if path.startswith("~/"):
+            return '"$HOME"/' + shlex.quote(path[2:])
+        return shlex.quote(path)
+
+
+class ExecutorCli:
+    """CLI interface for the ``catalyst-executor`` binary — flag constants used to invoke it,
+    local or remote. Kept as class data so a rename on the executor side is a one-line change
+    here instead of hunting through f-strings."""
+
+    PLUGIN_FLAG = "--plugin="
+    BIND_FLAG = "--bind="
+
+
+# --- logging -----------------------------------------------------------------------------------
+# Uses stdlib :mod:`logging` — matches the rest of catalyst (compiler/jit/etc. all do
+# ``getLogger(__name__)``). Users can attach their own handlers / filters via
+# ``logging.getLogger("catalyst.executor")``.
+#
+# Verbosity levels (set via :func:`set_verbose` or ``Executor(verbose=)``):
+#   0 quiet — WARNING only (errors)
+#   1 default — INFO (phases, ready/stop, executor stdout stream)
+#   2 verbose — DEBUG (full ssh/scp commands, per-step timings)
+#   3+ trace — DEBUG plus extra ``ssh -v`` flags on the wire
+logger = logging.getLogger("catalyst.executor")
+logger.setLevel(logging.INFO)
+_stderr_handler = logging.StreamHandler(sys.stderr)
+_stderr_handler.setFormatter(logging.Formatter("[remote-exec] %(message)s"))
+logger.addHandler(_stderr_handler)
+logger.propagate = False  # avoid double-logging when a caller configures the root logger
+
+_verbose = 1  # 0-3, for external tool verbosity (``ssh -v`` flag count, ``scp -v`` vs ``-q``)
+
+
+def set_verbose(level: int) -> None:
+    """Set launcher output verbosity (also settable per launch via ``Executor(verbose=)``).
+
+    Maps to :mod:`logging` levels: 0 → WARNING, 1 → INFO, ≥2 → DEBUG. Higher values (3+) still
+    map to DEBUG but bump the ``ssh -v`` flag count and enable ``scp -v``."""
+    global _verbose
+    _verbose = level
+    if level <= 0:
+        logger.setLevel(logging.WARNING)
+    elif level == 1:
+        logger.setLevel(logging.INFO)
+    else:
+        logger.setLevel(logging.DEBUG)
+
+
+def verbose_level() -> int:
+    """Current numeric verbosity (0-3), for external-tool flag decisions (``ssh -v``, ``scp -v``)."""
+    return _verbose
+
+
+def log_cmd(argv: list[str]) -> None:
+    """DEBUG-level echo of a command we're about to run."""
+    logger.debug("$ %s", " ".join(shlex.quote(c) for c in argv))
 
 
 class Paths:

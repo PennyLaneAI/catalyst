@@ -49,11 +49,11 @@ from pathlib import Path
 from typing import Any, Callable, Self
 
 from .utils import (
-    Log,
-    Paths,
     MAX_PORT_TRIES,
+    Paths,
     PortInUse,
     random_port,
+    set_verbose,
     triple_from_uname,
 )
 from .process import _ExecutorProcess, _LocalProcess, _RemoteProcess
@@ -321,7 +321,7 @@ class Executor:
         if self._launched or not (self._local or self.host):
             self._launched = True
             return self
-        Log.set_level(self._cfg.verbose)
+        set_verbose(self._cfg.verbose)
         make = self._local_maker() if self._local else self._remote_maker()
         self._proc = _start_on_free_port(make, self._cfg.port)
         self._address = self._proc.addr
@@ -358,7 +358,7 @@ class Executor:
             )
         if not self._cfg.bundle:
             raise ValueError("setup_workspace() needs a bundle= to deploy")
-        Log.set_level(self._cfg.verbose)
+        set_verbose(self._cfg.verbose)
         user, host, workspace = self._remote_target()
         bundle = Path(self._cfg.bundle)
         if self._cfg.build is not None:
@@ -376,7 +376,7 @@ class Executor:
             raise ValueError("remove_workspace() needs a remote host=")
         if self._cfg.workspace is None:
             raise ValueError("remove_workspace() needs a pinned workspace= to remove")
-        Log.set_level(self._cfg.verbose)
+        set_verbose(self._cfg.verbose)
         user, host, workspace = self._remote_target()
         SSH.rmdir(user, host, workspace, force=force)
 

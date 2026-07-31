@@ -27,13 +27,15 @@ import time
 from typing import Self
 
 from .utils import (
-    Log,
+    ExecutorCli,
     Paths,
     Patterns,
-    pdeathsig,
     PortInUse,
+    log_cmd,
+    logger,
+    pdeathsig,
 )
-from .ssh import ExecutorCli, ExecutorSsh, SSH
+from .ssh import ExecutorSsh, SSH
 
 
 class _ExecutorProcess:
@@ -107,7 +109,7 @@ class _ExecutorProcess:
         """Log a launcher narrative line — prefixed with ``<name>:`` when non-default, teed to
         the per-launch log. Executor stdout streams separately via :meth:`_pump_output`."""
         line = msg if self.name == "executor" else f"{self.name}: {msg}"
-        Log.info(line, level)
+        (logger.debug if level >= 2 else logger.info)(line)
         self._log_tee(f"# [launcher] {line}")
 
     def _log_tee(self, text: str) -> None:
@@ -259,7 +261,7 @@ class _LocalProcess(_ExecutorProcess):
             f"{ExecutorCli.PLUGIN_FLAG}{os.path.expanduser(os.path.expandvars(p))}"
             for p in self._plugins
         ]
-        Log.cmd(argv)
+        log_cmd(argv)
         proc_env = dict(os.environ)
         for key, value in self._env.items():
             proc_env[key] = os.path.expandvars(value)
@@ -325,11 +327,13 @@ class _RemoteProcess(_ExecutorProcess):
         """Flag SSH password / sudo-failure prompts spotted in output so :meth:`_check_failure`
         can bail with a helpful message instead of hanging on stdin."""
         if Patterns.is_ssh_prompt(line):
-            self._auth_kind = "ssh"
-            self._auth_prompt.set()
+            kind = "ssh"
         elif Patterns.is_sudo_fail(line):
-            self._auth_kind = "sudo"
-            self._auth_prompt.set()
+            kind = "sudo"
+        else:
+            return
+        self._auth_kind = kind
+        self._auth_prompt.set()
 
     def _check_failure(self) -> None:
         """Abort the launch with :meth:`_auth_help`'s hint if :meth:`_scan_line` saw an
@@ -358,7 +362,7 @@ class _RemoteProcess(_ExecutorProcess):
             f"starting executor on {self.host}:{self._bind_port} "
             f"(tunnel {self.addr} -> remote:{self._bind_port})"
         )
-        Log.cmd(ssh)
+        log_cmd(ssh)
         self.proc = self._popen(
             ssh, stdin=(subprocess.PIPE if use_pw else subprocess.DEVNULL)
         )
@@ -409,7 +413,7 @@ class _RemoteProcess(_ExecutorProcess):
         if not self.cleanup_ws or not basename.startswith(Paths.WORKSPACE_PREFIX):
             return
         self._say(f"removing remote workspace {self.workspace}", level=2)
-        SSH.rm_rf(self.user, self.host, self.workspace)
+        SSH.rmdir(self.user, self.host, self.workspace)  # force=False: silent teardown
 
     def stop(self) -> None:
         """Stop the remote executor and close the SSH tunnel (idempotent)."""
