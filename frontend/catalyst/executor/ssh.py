@@ -14,16 +14,18 @@
 
 """SSH/scp orchestration for a remote :class:`~catalyst.executor.Executor`.
 
-Grouped into four namespace classes so related items sit together:
+Grouped into five namespace classes so related items sit together:
 
 * :class:`SSH` — the ``ssh`` binary wrapper: command line (control socket, base flags), a runner
   with rc + optional-raise, non-interactive auth probing, sudo-password resolution, and remote
   filesystem verbs (``mkdir``, ``rmdir``, ``scp_bundle``).
 * :class:`SCP` — the ``scp`` binary wrapper, riding on SSH's multiplexed control socket.
-* :class:`ShellCommand` — generic POSIX shell fragments (``pkill``, ``sudo``, ``rm -rf``, ``mkdir
-  -p``) and safe path quoting; consumed by SSH, RemoteExecutorShell, and the teardown probes.
-* :class:`RemoteExecutorShell` — the ``catalyst-executor`` launcher command that runs on the remote host
-  (CLI flags + full ``cd + env + exec`` line).
+* :class:`ShellCommand` — generic POSIX shell fragments (``pkill``, ``sudo``, ``rm -rf``,
+  ``mkdir -p``) and safe path quoting.
+* :class:`ExecutorCli` — flag constants for the ``catalyst-executor`` binary itself; shared
+  between local and remote invocations.
+* :class:`RemoteLauncher` — the shell command that launches ``catalyst-executor`` on a remote
+  host (``cd + env + exec``, sudo-wrapped when needed).
 
 Consumed by :mod:`.process` (the remote process) and :mod:`.manager` (deploy/teardown).
 """
@@ -188,6 +190,27 @@ class SSH:
         return rc
 
     @staticmethod
+    def pkill(
+        user: str,
+        host: str,
+        pat: str,
+        *,
+        sudo: bool = False,
+        sudo_password: str | None = None,
+    ) -> int:
+        """Fire-and-forget ``pkill -f <pat>`` on the remote. Silent; see :meth:`run`.
+
+        With ``sudo=True``, wraps in ``sudo`` — using ``sudo -S`` if ``sudo_password`` is given
+        (piped on stdin, empty prompt), else ``sudo -n`` (NOPASSWD only — fails immediately if
+        a password is required)."""
+        cmd = ShellCommand.pkill(pat)
+        if not sudo:
+            return SSH.run(user, host, cmd)
+        if sudo_password is not None:
+            return SSH.run(user, host, ShellCommand.sudo_pw(cmd), input=sudo_password + "\n")
+        return SSH.run(user, host, ShellCommand.sudo_np(cmd))
+
+    @staticmethod
     def mkdir(user: str, host: str, path: str) -> None:
         """Create ``path`` (and any missing parents) on the remote host. Inherits stdout/stderr
         so the user sees any ``mkdir: Permission denied`` from the remote.
@@ -203,6 +226,13 @@ class SSH:
             log=True,
             error=f"failed to create remote directory {path!r}",
         )
+
+    @staticmethod
+    def rm_rf(user: str, host: str, path: str) -> None:
+        """Recursively remove ``path`` on the remote host — no safety guards; the caller is
+        responsible for verifying ``path`` is safe to delete. Best-effort: errors are swallowed.
+        For guarded removal (refuses ``/`` and ``$HOME``) use :meth:`rmdir` instead."""
+        SSH.run(user, host, ShellCommand.rm_rf(path))
 
     @staticmethod
     def rmdir(user: str, host: str, path: str, *, force: bool = False) -> None:
@@ -347,7 +377,7 @@ class SCP:
 
 class ShellCommand:
     """Generic POSIX shell fragments and path helpers reused by remote ops — the sudo/kill/rm
-    building blocks assembled by :class:`RemoteExecutorShell` (executor launcher), :class:`SSH` (auth
+    building blocks assembled by :class:`RemoteLauncher` (executor launcher), :class:`SSH` (auth
     probe / mkdir), and :mod:`.process` (teardown). Nothing here is catalyst-executor-specific;
     everything runs on any Bourne-family shell."""
 
@@ -403,18 +433,22 @@ class ShellCommand:
         return shlex.quote(path)
 
 
-class RemoteExecutorShell:
-    """Builders for the ``catalyst-executor`` launcher command that runs on the *remote* host —
-    the CLI flags and the full ``cd + env + exec`` line. Generic shell fragments and path quoting
-    live on :class:`ShellCommand`."""
+class ExecutorCli:
+    """CLI interface for the ``catalyst-executor`` binary — flag constants used to invoke it,
+    local or remote. Kept as class data so a rename on the executor side is a one-line change
+    here instead of hunting through f-strings."""
 
-    # ``catalyst-executor`` CLI flags — kept as class data so a rename on the executor side is a
-    # one-line change here instead of hunting through f-strings.
     PLUGIN_FLAG = "--plugin="
     BIND_FLAG = "--bind="
 
+
+class RemoteLauncher:
+    """Builders for the shell command that launches ``catalyst-executor`` on the *remote* host —
+    ``cd + env + exec`` line, optionally wrapped in sudo. Uses :class:`ExecutorCli` for flags
+    and :class:`ShellCommand` for generic shell fragments and path quoting."""
+
     @staticmethod
-    def launcher(
+    def build(
         workspace: str,
         remote_port: int,
         plugins: list[str],
@@ -444,7 +478,7 @@ class RemoteExecutorShell:
         env_prefix = " ".join(f"{k}={_q(v)}" for k, v in env.items())
 
         def _plugin_arg(p) -> str:
-            flag = RemoteExecutorShell.PLUGIN_FLAG
+            flag = ExecutorCli.PLUGIN_FLAG
             if isinstance(p, Raw):
                 return f"{flag}{p}"
             # A bare filename resolves against the workspace (a scp'd bundle); an absolute or
@@ -467,7 +501,7 @@ class RemoteExecutorShell:
             launcher = "exec"
         return (
             f"cd {ShellCommand.path(workspace)} && {chmod}{env_prefix} "
-            f"{launcher} {executor_bin} {RemoteExecutorShell.BIND_FLAG}0.0.0.0:{remote_port} {plugin_args}"
+            f"{launcher} {executor_bin} {ExecutorCli.BIND_FLAG}0.0.0.0:{remote_port} {plugin_args}"
         )
 
 

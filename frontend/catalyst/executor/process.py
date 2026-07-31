@@ -33,13 +33,15 @@ from .utils import (
     pdeathsig,
     PortInUse,
 )
-from .ssh import RemoteExecutorShell, SSH, ShellCommand
+from .ssh import ExecutorCli, RemoteLauncher, SSH
 
 
 class _ExecutorProcess:
     """A launched ``catalyst-executor`` process — owns the subprocess, streams output, waits for
     bind, tears it down. Subclasses override :meth:`_spawn` and the ``_*`` hooks (auth, cleanup).
     ``.addr`` is the client-facing endpoint; ``.name`` tags streamed output as ``[<name>]``."""
+
+    LOCALHOST = "127.0.0.1"  # loopback: local bind, and the client end of the remote SSH tunnel
 
     def __init__(
         self, *, name: str, addr: str, bind_port: int, ready_timeout: float, log_path: str | None
@@ -79,6 +81,28 @@ class _ExecutorProcess:
         """Best-effort removal of an auto-generated remote workspace (remote only)."""
 
     # --- shared lifecycle -------------------------------------------------------------------------
+    @staticmethod
+    def _popen(
+        argv: list[str],
+        *,
+        env: dict[str, str] | None = None,
+        stdin: int | None = None,
+    ) -> subprocess.Popen:
+        """Spawn a subprocess with the shared pump-friendly settings: stdout piped, stderr
+        merged into stdout, line-buffered text mode, ``PR_SET_PDEATHSIG`` so the child dies with
+        the parent. Subclass ``_spawn`` methods should use this instead of calling
+        :class:`subprocess.Popen` directly."""
+        return subprocess.Popen(
+            argv,
+            stdin=stdin,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            env=env,
+            preexec_fn=pdeathsig,
+        )
+
     def _say(self, msg: str, level: int = 1) -> None:
         """Log a launcher narrative line — prefixed with ``<name>:`` when non-default, teed to
         the per-launch log. Executor stdout streams separately via :meth:`_pump_output`."""
@@ -216,7 +240,7 @@ class _LocalProcess(_ExecutorProcess):
     ):
         super().__init__(
             name=name,
-            addr=f"127.0.0.1:{port}",
+            addr=f"{self.LOCALHOST}:{port}",
             bind_port=port,
             ready_timeout=ready_timeout,
             log_path=log_path,
@@ -230,25 +254,17 @@ class _LocalProcess(_ExecutorProcess):
         each ``plugins`` entry passed as ``--plugin=<path>``. ``env`` extends the parent
         environment. ``PR_SET_PDEATHSIG`` ensures the child dies with the parent."""
         exe = os.path.expanduser(os.path.expandvars(self._executor_bin))
-        argv = [exe, f"{RemoteExecutorShell.BIND_FLAG}127.0.0.1:{self._bind_port}"]
+        argv = [exe, f"{ExecutorCli.BIND_FLAG}{self.LOCALHOST}:{self._bind_port}"]
         argv += [
-            f"{RemoteExecutorShell.PLUGIN_FLAG}{os.path.expanduser(os.path.expandvars(p))}"
+            f"{ExecutorCli.PLUGIN_FLAG}{os.path.expanduser(os.path.expandvars(p))}"
             for p in self._plugins
         ]
+        Log.cmd(argv)
         proc_env = dict(os.environ)
         for key, value in self._env.items():
             proc_env[key] = os.path.expandvars(value)
         self._say(f"starting local executor on {self.addr}")
-        Log.cmd(argv)
-        self.proc = subprocess.Popen(
-            argv,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            env=proc_env,
-            preexec_fn=pdeathsig,
-        )
+        self.proc = self._popen(argv, env=proc_env)
 
 
 class _RemoteProcess(_ExecutorProcess):
@@ -277,7 +293,7 @@ class _RemoteProcess(_ExecutorProcess):
         local_port = local_port or port
         super().__init__(
             name=name,
-            addr=f"127.0.0.1:{local_port}",
+            addr=f"{self.LOCALHOST}:{local_port}",
             bind_port=port,
             ready_timeout=ready_timeout,
             log_path=log_path,
@@ -331,13 +347,13 @@ class _RemoteProcess(_ExecutorProcess):
     def _spawn(self) -> None:
         """Open the SSH port-forward and start ``catalyst-executor`` on the remote host.
 
-        Builds the remote shell command via :meth:`RemoteExecutorShell.launcher` (cd + env + exec, wrapped
+        Builds the remote shell command via :meth:`RemoteLauncher.build` (cd + env + exec, wrapped
         in ``sudo`` when requested) and the local ``ssh -L <local>:localhost:<remote>`` tunnel.
         With ``sudo_password``, pipes the password into ``sudo -S`` on stdin (no PTY);
         NOPASSWD mode uses ``-tt`` so closing SSH SIGHUPs the executor. Sets ``self.proc`` to
         the started ``subprocess.Popen``."""
         use_pw = self.sudo_password is not None
-        remote_cmd = RemoteExecutorShell.launcher(
+        remote_cmd = RemoteLauncher.build(
             self.workspace,
             self._bind_port,
             self._plugins,
@@ -365,14 +381,8 @@ class _RemoteProcess(_ExecutorProcess):
         )
         self._say(f"remote: {remote_cmd}", level=2)
         Log.cmd(ssh)
-        self.proc = subprocess.Popen(
-            ssh,
-            stdin=(subprocess.PIPE if use_pw else subprocess.DEVNULL),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            preexec_fn=pdeathsig,
+        self.proc = self._popen(
+            ssh, stdin=(subprocess.PIPE if use_pw else subprocess.DEVNULL)
         )
         if use_pw:  # feed the sudo password straight into `sudo -S` on stdin
             assert self.proc.stdin is not None and self.sudo_password is not None
@@ -404,27 +414,20 @@ class _RemoteProcess(_ExecutorProcess):
         # port-scoped pkill would wrongly kill it.
         if not self._ready_reached:
             return
-        pat = f"{Paths.EXECUTOR_BIN}.*{RemoteExecutorShell.BIND_FLAG}0.0.0.0:{self._bind_port}"
-        pkill = ShellCommand.pkill(pat)
-        if not self.sudo:
-            SSH.run(self.user, self.host, pkill)
-        elif self.sudo_password is not None:
-            SSH.run(
-                self.user, self.host, ShellCommand.sudo_pw(pkill),
-                input=self.sudo_password + "\n",
-            )
-        else:
-            SSH.run(self.user, self.host, ShellCommand.sudo_np(pkill))
+        pat = f"{Paths.EXECUTOR_BIN}.*{ExecutorCli.BIND_FLAG}0.0.0.0:{self._bind_port}"
+        SSH.pkill(
+            self.user, self.host, pat,
+            sudo=self.sudo, sudo_password=self.sudo_password,
+        )
 
     def teardown_workspace(self) -> None:
         """Remove the auto-generated remote workspace. Guarded by the ``catalyst-exec-`` prefix so it
         can never wipe a user-pinned dir; a no-op for a pinned workspace."""
-        if not self.cleanup_ws:
-            return
-        if not self.workspace.rsplit("/", 1)[-1].startswith(Paths.WORKSPACE_PREFIX):
+        basename = self.workspace.rsplit("/", 1)[-1]
+        if not self.cleanup_ws or not basename.startswith(Paths.WORKSPACE_PREFIX):
             return
         self._say(f"removing remote workspace {self.workspace}", level=2)
-        SSH.run(self.user, self.host, ShellCommand.rm_rf(self.workspace))
+        SSH.rm_rf(self.user, self.host, self.workspace)
 
     def stop(self) -> None:
         """Stop the remote executor and close the SSH tunnel. Idempotent."""
