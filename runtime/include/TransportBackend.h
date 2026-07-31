@@ -46,11 +46,11 @@ using CatalystTransportCoprocessorFactoryFn =
             return (BUILDER)(config ? std::string(config) : std::string());                        \
         }                                                                                          \
         catch (const std::exception &e) {                                                          \
-            std::fprintf(stderr, "[transport] controller factory failed: %s\n", e.what());         \
+            std::cerr << "[transport] controller factory failed: " << e.what() << std::endl;       \
             return nullptr;                                                                        \
         }                                                                                          \
         catch (...) {                                                                              \
-            std::fprintf(stderr, "[transport] controller factory failed: unknown exception\n");    \
+            std::cerr << "[transport] controller factory failed: unknown exception" << std::endl;  \
             return nullptr;                                                                        \
         }                                                                                          \
     }

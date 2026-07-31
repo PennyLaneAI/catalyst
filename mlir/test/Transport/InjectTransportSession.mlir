@@ -53,6 +53,80 @@ module attributes {catalyst.backline = #transport.backline<transport = "net", co
 
 // -----
 
+// Remote controller, no coprocessors, peer present: the controller self-dials (loopback).
+
+// CHECK-LABEL: func.func @setup_transport
+// CHECK:         %[[S:.*]] = transport.create {{.*}}key = "controller"{{.*}} -> !transport.session<controller>
+// CHECK:         transport.connect %[[S]] {oob_port = 18590 : i16, peer = "127.0.0.1"} : !transport.session<controller>
+// CHECK:         transport.exchange_keys %[[S]] : !transport.session<controller>
+// CHECK:         transport.establish_channel %[[S]] "cpu_verbs" : !transport.session<controller>
+// CHECK:         transport.commit_work_item %[[S]] {{.*}} : !transport.session<controller>
+// CHECK:         transport.start %[[S]] : !transport.session<controller>
+
+// CHECK-LABEL: func.func @teardown_transport
+// CHECK:         %[[T:.*]] = transport.get_session {{.*}} : !transport.session<controller>
+// CHECK:         transport.stop %[[T]] : !transport.session<controller>
+// CHECK:         transport.destroy %[[T]] : !transport.session<controller>
+
+// The host launches the controller lifecycle; with no coprocessor, no serve precedes it.
+// CHECK-LABEL: func.func @setup() attributes {catalyst.backline_bringup}
+// CHECK:         quantum.init
+// CHECK-NEXT:    catalyst.launch_kernel @module_ctrl::@setup_transport()
+
+// CHECK-LABEL: func.func @teardown()
+// CHECK:         quantum.finalize
+// CHECK-NEXT:    catalyst.launch_kernel @module_ctrl::@teardown_transport()
+module attributes {catalyst.backline = #transport.backline<transport = "net", controller = #transport.node<backend_lib = "x", config = "c",
+    peer = "127.0.0.1", oob_port = 18590 : i16, data_path = "cpu_verbs",
+    triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true,
+    in_bytes = 8 : i64, out_bytes = 8 : i64>>} {
+  func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
+    %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
+    return %0 : tensor<4xf64>
+  }
+  module @module_ctrl attributes {catalyst.target = {triple = "aarch64-unknown-linux-gnu"}, catalyst.dispatch = {address = "h:1"}, catalyst.backline_role = "controller"} {
+    func.func public @circuit() -> tensor<4xf64> {
+      %c = arith.constant dense<0.0> : tensor<4xf64>
+      return %c : tensor<4xf64>
+    }
+  }
+  func.func @setup() { quantum.init  return }
+  func.func @teardown() { quantum.finalize  return }
+}
+
+// -----
+
+// Remote controller, no coprocessors, no peer: nothing to dial, so no transport ops are generated.
+// The controller module is still cross-compiled and dispatched, but @setup/@teardown are untouched
+
+// CHECK-LABEL: module @module_ctrl
+// CHECK-NOT:   setup_transport
+// CHECK-NOT:   teardown_transport
+// CHECK-NOT:   transport.
+
+// CHECK:      func.func @setup() {
+// CHECK-NEXT:   quantum.init
+// CHECK-NEXT:   return
+// CHECK:      func.func @teardown() {
+// CHECK-NEXT:   quantum.finalize
+// CHECK-NEXT:   return
+module attributes {catalyst.backline = #transport.backline<transport = "net", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true>>} {
+  func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
+    %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
+    return %0 : tensor<4xf64>
+  }
+  module @module_ctrl attributes {catalyst.target = {triple = "aarch64-unknown-linux-gnu"}, catalyst.dispatch = {address = "h:1"}, catalyst.backline_role = "controller"} {
+    func.func public @circuit() -> tensor<4xf64> {
+      %c = arith.constant dense<0.0> : tensor<4xf64>
+      return %c : tensor<4xf64>
+    }
+  }
+  func.func @setup() { quantum.init  return }
+  func.func @teardown() { quantum.finalize  return }
+}
+
+// -----
+
 // Co-located coprocessor: both roles brought up in @setup, released in @teardown.
 
 // CHECK-LABEL: func.func public @jit_circuit
@@ -116,6 +190,43 @@ module attributes {catalyst.backline = #transport.backline<transport = "net", co
 // CHECK-DAG: func.func @coproc_stop
 module attributes {catalyst.backline = #transport.backline<transport = "net", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true, in_bytes = 3 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "y", config = "c", peer = "10.0.0.3", oob_port = 18560 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:2", remote = true, symbol = "foo", name = "cop0">]>} {
+  func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
+    %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
+    return %0 : tensor<4xf64>
+  }
+  module @module_ctrl attributes {catalyst.target = {triple = "aarch64-unknown-linux-gnu"}, catalyst.dispatch = {address = "h:1"}, catalyst.backline_role = "controller"} {
+    func.func public @circuit() -> tensor<4xf64> {
+      %c = arith.constant dense<0.0> : tensor<4xf64>
+      return %c : tensor<4xf64>
+    }
+  }
+  func.func @setup() { quantum.init  return }
+  func.func @teardown() { quantum.finalize  return }
+}
+
+// -----
+
+// Distributed with multiple remote coprocessors: each gets its own suffixed target module and
+// lifecycle funcs, so the controller dials both from its module, and the host launches every role
+// in order.
+
+// The controller dials both coprocessors from its own module.
+// CHECK:      transport.create {{.*}}key = "cop1"{{.*}} -> !transport.session<controller>
+
+// @setup launches both serves (nonblocking) before the controller setup.
+// CHECK:      catalyst.launch_kernel @module_coproc.0::@coproc_serve.0() {catalyst.nonblocking}
+// CHECK-NEXT: catalyst.launch_kernel @module_coproc.1::@coproc_serve.1() {catalyst.nonblocking}
+// CHECK-NEXT: catalyst.launch_kernel @module_ctrl::@setup_transport()
+
+// @teardown stops both coprocessors before the controller teardown.
+// CHECK:      catalyst.launch_kernel @module_coproc.0::@coproc_stop.0()
+// CHECK-NEXT: catalyst.launch_kernel @module_coproc.1::@coproc_stop.1()
+// CHECK-NEXT: catalyst.launch_kernel @module_ctrl::@teardown_transport()
+
+// The second coprocessor's own module carries its distinct serve function.
+// CHECK:      transport.set_coprocessor_fn %{{.*}} {symbol = "bar"} : !transport.session<coprocessor>
+module attributes {catalyst.backline = #transport.backline<transport = "net", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true, in_bytes = 3 : i64, out_bytes = 8 : i64>,
+  coprocessors = [#transport.node<backend_lib = "y", config = "c", peer = "10.0.0.3", oob_port = 18560 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:2", remote = true, symbol = "foo", name = "cop0">, #transport.node<backend_lib = "z", config = "c", peer = "10.0.0.4", oob_port = 18561 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:3", remote = true, symbol = "bar", name = "cop1">]>} {
   func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
     %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
     return %0 : tensor<4xf64>
