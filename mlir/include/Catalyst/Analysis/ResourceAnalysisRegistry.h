@@ -63,7 +63,7 @@ class ResourceAnalysisRegistry {
 #define RES_EXT_CONCAT_(a, b) a##b
 #define RES_EXT_CONCAT(a, b) RES_EXT_CONCAT_(a, b)
 #define REGISTER_RESOURCE_ANALYSIS_EXTENSION(CTOR_EXPR)                                            \
-    static const int LLVM_ATTRIBUTE_UNUSED RES_EXT_CONCAT(_resExtReg_, __COUNTER__) = []() {       \
+    static const int LLVM_ATTRIBUTE_UNUSED _resExtReg_##__COUNTER__ = []() {       \
         ::catalyst::ResourceAnalysisRegistry::get().add([] { return CTOR_EXPR; });                 \
         return 0;                                                                                  \
     }()
