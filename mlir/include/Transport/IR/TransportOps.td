@@ -102,7 +102,7 @@ def Transport_CommitWorkItemOp : Transport_Op<"commit_work_item"> {
 }
 
 def Transport_SetCoprocessorFnOp : Transport_Op<"set_coprocessor_fn"> {
-    let summary = "Bind the function the coprocessor runs (coprocessor).";
+    let summary = "Bind the function the coprocessor runs.";
     let description = [{
         Binds the function the coprocessor applies to received messages before
         replying. `symbol` is the name the coprocessor resolves and invokes; an
