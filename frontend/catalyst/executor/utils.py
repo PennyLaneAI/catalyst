@@ -67,20 +67,40 @@ class Raw(str):
 
 
 class Patterns:
-    """Regexes for scanning executor / ssh output. Grouped so a reader sees at a glance the full
-    set of output-matching rules the launcher relies on."""
+    """Regex-based classifiers for lines of executor / ssh output. Callers use the ``is_*``
+    predicates — the raw regexes are implementation detail."""
 
-    # Executor stderr lines that mean "bound and accepting". The first launch prints "Listening on
-    # <h>:<p>"; "executor ready, ..." only recurs after a client disconnects.
-    READY = re.compile(r"Listening on \S+:\d+|executor ready, waiting for next connection")
+    # Executor stderr lines that mean "bound and accepting". The first launch prints "Listening
+    # on <h>:<p>"; "executor ready, ..." only recurs after a client disconnects.
+    _READY = re.compile(r"Listening on \S+:\d+|executor ready, waiting for next connection")
     # ssh login still wanting a password/passphrase means key auth isn't set up — we can't feed it.
-    SSH_PW = re.compile(r"'s password:|Enter passphrase for key")
+    _SSH_PW = re.compile(r"'s password:|Enter passphrase for key")
     # sudo telling us the password we fed (via sudo -S) was wrong.
-    SUDO_FAIL = re.compile(
+    _SUDO_FAIL = re.compile(
         r"Sorry, try again|incorrect password|authentication failure|sudo: \d+ incorrect"
     )
     # A port collision — the remote bind or the local -L forward is already taken.
-    PORT = re.compile(r"Address already in use|Could not request local forwarding")
+    _PORT = re.compile(r"Address already in use|Could not request local forwarding")
+
+    @staticmethod
+    def is_ready(line: str) -> bool:
+        """True if ``line`` signals the executor has bound its port and is accepting."""
+        return bool(Patterns._READY.search(line))
+
+    @staticmethod
+    def is_port_conflict(line: str) -> bool:
+        """True if ``line`` signals a port bind failure (remote bind or local ``-L`` forward)."""
+        return bool(Patterns._PORT.search(line))
+
+    @staticmethod
+    def is_ssh_prompt(line: str) -> bool:
+        """True if ``line`` is an SSH password/passphrase prompt — key auth isn't set up."""
+        return bool(Patterns._SSH_PW.search(line))
+
+    @staticmethod
+    def is_sudo_fail(line: str) -> bool:
+        """True if ``line`` is a ``sudo`` password-rejection message."""
+        return bool(Patterns._SUDO_FAIL.search(line))
 
 
 class Log:

@@ -24,6 +24,7 @@ import subprocess
 import sys
 import threading
 import time
+from typing import Self
 
 from .utils import (
     Log,
@@ -36,11 +37,9 @@ from .ssh import RemoteExecutorShell, SSH, ShellCommand
 
 
 class _ExecutorProcess:
-    """A launched ``catalyst-executor`` process: owns the subprocess, streams its output, waits for
-    it to bind, and tears it down. Subclasses supply only what differs — :meth:`_spawn` builds and
-    starts the process, and the ``_*`` hooks add remote-only behaviour (auth handling, cleanup).
-
-    ``.addr`` is what a client connects to; ``.name`` labels the streamed output as ``[<name>]``."""
+    """A launched ``catalyst-executor`` process — owns the subprocess, streams output, waits for
+    bind, tears it down. Subclasses override :meth:`_spawn` and the ``_*`` hooks (auth, cleanup).
+    ``.addr`` is the client-facing endpoint; ``.name`` tags streamed output as ``[<name>]``."""
 
     def __init__(
         self, *, name: str, addr: str, bind_port: int, ready_timeout: float, log_path: str | None
@@ -61,6 +60,7 @@ class _ExecutorProcess:
         raise NotImplementedError
 
     def _log_header(self) -> str:
+        """Optional header string written once at the top of a fresh log file (remote: run banner)."""
         return ""
 
     def _scan_line(self, line: str) -> None:
@@ -80,103 +80,122 @@ class _ExecutorProcess:
 
     # --- shared lifecycle -------------------------------------------------------------------------
     def _say(self, msg: str, level: int = 1) -> None:
-        """Log a launcher-side narrative line (executor stdout is streamed separately). Prefixed
-        with ``<name>:`` so multiple executors stay distinguishable, and teed to the log file so
-        the file is self-contained."""
+        """Log a launcher narrative line — prefixed with ``<name>:`` when non-default, teed to
+        the per-launch log. Executor stdout streams separately via :meth:`_pump_output`."""
         line = msg if self.name == "executor" else f"{self.name}: {msg}"
         Log.info(line, level)
-        # Tee the launcher's own narrative (launch cmd, readiness, teardown) into the log file too,
-        # so the file is self-contained rather than only the executor's stdout/stderr.
+        self._log_tee(f"# [launcher] {line}")
+
+    def _log_tee(self, text: str) -> None:
+        """Append ``text`` to the per-launch log file if one is open. Best-effort — write errors
+        are swallowed so a log-tee failure never aborts the launch."""
         if self._log_fh is not None:
             with contextlib.suppress(Exception):
-                self._log_fh.write(f"# [launcher] {line}\n")
+                self._log_fh.write(text + "\n")
                 self._log_fh.flush()
 
     def _open_log(self) -> None:
         """Open the per-launch log file (if any) in append mode and write the subclass header.
-        Failing to open the log is non-fatal — the launch continues without teeing."""
+        Failing to open is non-fatal — the launch continues without teeing."""
         if not self.log_path:
             return
         try:
             self._log_fh = open(self.log_path, "a")
-            header = self._log_header()
-            if header:
-                self._log_fh.write(header)
-                self._log_fh.flush()
-            self._say(f"teeing output -> {self.log_path}")
         except OSError as e:
             self._say(f"could not open log {self.log_path}: {e} (continuing without it)")
-            self._log_fh = None
+            return
+        header = self._log_header()
+        if header:
+            self._log_fh.write(header)
+            self._log_fh.flush()
+        self._say(f"teeing output -> {self.log_path}")
 
     def _pump_output(self) -> None:
-        """Echo the executor's stdout+stderr live, tee it to the log, and flag readiness. Each line
-        is tagged ``[<name>]`` so several executors in one terminal stay distinguishable."""
+        """Echo executor stdout live (tagged ``[<name>]``), tee to the log, and flag readiness /
+        port-conflict on matching lines. Runs in a daemon thread."""
         assert self.proc and self.proc.stdout
         for raw in self.proc.stdout:
             line = raw.rstrip("\n")
             print(f"[{self.name}] {line}", file=sys.stderr, flush=True)
-            if self._log_fh is not None:
-                with contextlib.suppress(Exception):
-                    self._log_fh.write(line + "\n")
-                    self._log_fh.flush()
-            if Patterns.PORT.search(line):
+            self._log_tee(line)
+            if Patterns.is_port_conflict(line):
                 self._port_conflict.set()
-            if Patterns.READY.search(line):
+            if Patterns.is_ready(line):
                 self._ready.set()
             self._scan_line(line)
 
-    def start(self) -> "_ExecutorProcess":
-        """Spawn the executor and block until it is listening. Raises :class:`PortInUse` on a port
-        collision (so the caller can retry another port), or ``SystemExit`` on other failures."""
+    def start(self) -> Self:
+        """Spawn the executor and block until it binds. Raises :class:`PortInUse` on a port
+        collision (retryable) or :class:`SystemExit` on other failures; :meth:`_shutdown` runs
+        before propagating."""
         self._open_log()
         self._spawn()
         assert self.proc is not None, "_spawn() must set self.proc"
         threading.Thread(target=self._pump_output, daemon=True).start()
+        try:
+            return self._wait_for_ready()
+        except BaseException:
+            self._shutdown()
+            raise
+
+    def _wait_for_ready(self, poll_interval: float = 0.25) -> Self:
+        """Block up to ``ready_timeout`` for a readiness or failure signal, polling every
+        ``poll_interval`` seconds. Raises :class:`PortInUse` on port collision or
+        :class:`SystemExit` on early exit / deadline. Cleanup is the caller's job."""
+        assert self.proc is not None
         t0 = time.monotonic()
         deadline = t0 + self.ready_timeout
         while time.monotonic() < deadline:
-            if self._ready.wait(timeout=0.25):
+            if self._ready.wait(timeout=poll_interval):
                 self._on_ready()
                 self._say(f"ready in {time.monotonic() - t0:.1f}s — address {self.addr}")
                 return self
-            if self._port_conflict.is_set():
-                self._shutdown()
-                raise PortInUse(self._bind_port)
+            self._check_port_conflict()
             self._check_failure()
-            if self.proc.poll() is not None:
-                returncode = self.proc.returncode
-                self._shutdown()
-                if self._port_conflict.is_set():
-                    raise PortInUse(self._bind_port)
-                raise SystemExit(
-                    f"executor exited (code {returncode}) before becoming ready — "
-                    f"see the [{self.name}] log above."
-                )
-        self._shutdown()
+            self._check_early_exit()
         raise SystemExit(
             f"executor did not become ready within {self.ready_timeout:.0f}s — see the "
             f"[{self.name}] log above (raise ready_timeout= if the host is slow)."
         )
 
-    def _shutdown(self) -> None:
+    def _check_port_conflict(self) -> None:
+        """Raise :class:`PortInUse` if the pump thread has flagged a port bind failure."""
+        if self._port_conflict.is_set():
+            raise PortInUse(self._bind_port)
+
+    def _check_early_exit(self) -> None:
+        """Raise if the executor died before becoming ready — :class:`PortInUse` if the pump
+        thread flagged the death as a port collision (checked one more time in case the flag
+        landed late), else :class:`SystemExit`. No-op if the child is still running."""
+        assert self.proc is not None
+        if self.proc.poll() is None:
+            return
+        self._check_port_conflict()
+        raise SystemExit(
+            f"executor exited (code {self.proc.returncode}) before becoming ready — "
+            f"see the [{self.name}] log above."
+        )
+
+    def _shutdown(self, wait_time: float = 10) -> None:
         """Close the log file and terminate the subprocess; escalate to SIGKILL if it doesn't
-        exit within 10s. Idempotent."""
+        exit within ``wait_time`` seconds. Idempotent."""
         fh, self._log_fh = self._log_fh, None  # stop the pump teeing, then close
         if fh is not None:
             with contextlib.suppress(Exception):
                 fh.close()
-        if self.proc and self.proc.poll() is None:
+        if not self.proc or self.proc.poll() is not None:
+            return  # no live child to signal
+        with contextlib.suppress(ProcessLookupError):
+            self.proc.terminate()
+        try:
+            self.proc.wait(timeout=wait_time)
+        except subprocess.TimeoutExpired:
             with contextlib.suppress(ProcessLookupError):
-                self.proc.terminate()
-            try:
-                self.proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                with contextlib.suppress(ProcessLookupError):
-                    self.proc.kill()
+                self.proc.kill()
 
     def stop(self) -> None:
-        """Terminate the executor and run any subclass-specific teardown (e.g. the remote pkill
-        backstop). Idempotent."""
+        """Terminate the executor and run subclass-specific teardown (remote: backstop
+        ``pkill``). Idempotent."""
         self._shutdown()
         self._teardown_extra()
 
@@ -289,10 +308,10 @@ class _RemoteProcess(_ExecutorProcess):
     def _scan_line(self, line: str) -> None:
         """Watch executor output for SSH password / sudo-failure prompts and flag them so
         :meth:`_check_failure` can bail with a helpful message rather than hanging on stdin."""
-        if Patterns.SSH_PW.search(line):  # ssh login prompt — key auth isn't set up
+        if Patterns.is_ssh_prompt(line):
             self._auth_kind = "ssh"
             self._auth_prompt.set()
-        elif Patterns.SUDO_FAIL.search(line):  # sudo rejected the password we fed
+        elif Patterns.is_sudo_fail(line):
             self._auth_kind = "sudo"
             self._auth_prompt.set()
 
