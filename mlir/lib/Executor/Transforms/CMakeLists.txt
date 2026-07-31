@@ -1,14 +1,22 @@
 set(LIBRARY_NAME executor-transforms)
 
+set(LLVM_LINK_COMPONENTS
+    AllTargetsAsmParsers
+    AllTargetsCodeGens
+)
+
 file(GLOB SRC
+    DispatchExecutorTargets.cpp
     ExecutorToLLVM.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+get_property(translation_libs GLOBAL PROPERTY MLIR_TRANSLATION_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
+    ${translation_libs}
     MLIRExecutor
     MLIRCatalyst
 )
