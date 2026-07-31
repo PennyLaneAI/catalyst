@@ -102,7 +102,6 @@ TEST_CASE("set_coprocessor_fn: an unresolved symbol is an error", "[transport]")
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "catalyst_no_such_symbol_xyz",
                                                     CATALYST_COPROC_PER_MESSAGE) ==
           CATALYST_TRANSPORT_ERR);
-    // Unresolved is an error for either convention, not just per-message.
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "catalyst_no_such_symbol_xyz",
                                                     CATALYST_COPROC_LAUNCH_ONCE) ==
           CATALYST_TRANSPORT_ERR);
