@@ -81,8 +81,6 @@ void QueuePair::check_transition(QpState to) const
 void QueuePair::modify(QpState to, ibv_qp_attr &attr, int mask, const char *what)
 {
     check_transition(to);
-    // ibv_modify_qp returns the error code directly; errno is unreliable for
-    // it.
     int rc = ibv_modify_qp(qp_, &attr, mask);
     RDMA_CHECK(rc == 0, "%s rc=%d (%s)", what, rc, std::strerror(rc));
     state_ = to; // advance only after a successful modify
