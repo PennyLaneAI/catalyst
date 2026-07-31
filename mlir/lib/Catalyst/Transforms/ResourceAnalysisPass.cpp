@@ -23,7 +23,7 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
-#include "Catalyst/Analysis/ResourceExtensionRegistry.h"
+#include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "PBC/Analysis/PBCDepthAnalysis.h"
 
@@ -58,10 +58,10 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
     void runOnOperation() final
     {
-        pbc::registerPBCResourceExtensions();
+        pbc::registerPBCResourceAnalysisExtensions();
 
         auto moduleOp = cast<ModuleOp>(getOperation());
-        ResourceAnalysis analysis(moduleOp, ResourceExtensionRegistry::get().all());
+        ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all());
         const auto &results = analysis.getResults();
 
         // Populate statistics from the entry function. The flattened view

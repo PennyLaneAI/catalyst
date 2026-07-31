@@ -21,19 +21,19 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
 
-#include "Catalyst/Analysis/ResourceExtension.h"
+#include "Catalyst/Analysis/ResourceResultExtension.h"
 
 namespace catalyst {
 namespace pbc {
 
 // PBC depth data stored in ResourceResult::extensions.
-class PBCDepthExtension : public ResourceExtension {
+class PBCDepthExtension : public ResourceResultExtension {
   public:
     llvm::StringRef name() const override { return "depth"; }
 
     llvm::json::Value toJson() const override;
 
-    void mergeWith(const ResourceExtension &other, MergeMethod mergeMethod) override;
+    void mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) override;
     void multiplyBy(int64_t factor) override;
 
     void setDepth(std::optional<std::pair<int64_t, int64_t>> value) { depth = std::move(value); }
@@ -44,7 +44,7 @@ class PBCDepthExtension : public ResourceExtension {
 };
 
 // Computes PBC depth for a region into a PBCDepthExtension.
-class PBCDepthAnalysis : public ResourceExtensionAnalysisOf<PBCDepthExtension> {
+class PBCDepthAnalysis : public ResourceAnalysisExtensionOf<PBCDepthExtension> {
   public:
     llvm::StringRef name() const override { return "depth"; }
 
@@ -52,8 +52,8 @@ class PBCDepthAnalysis : public ResourceExtensionAnalysisOf<PBCDepthExtension> {
     void analyze(mlir::Region &region, PBCDepthExtension &ext, bool isAdjoint) override;
 };
 
-// Registers PBCDepthAnalysis into ResourceExtensionRegistry
-void registerPBCResourceExtensions();
+// Registers PBCDepthAnalysis into ResourceAnalysisRegistry
+void registerPBCResourceAnalysisExtensions();
 
 } // namespace pbc
 } // namespace catalyst

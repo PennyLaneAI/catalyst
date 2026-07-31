@@ -16,7 +16,7 @@
 
 #include "mlir/IR/Diagnostics.h"
 
-#include "Catalyst/Analysis/ResourceExtensionRegistry.h"
+#include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "PBC/Utils/PBCLayer.h"
 
@@ -35,7 +35,7 @@ llvm::json::Value PBCDepthExtension::toJson() const
     return depthObj;
 }
 
-void PBCDepthExtension::mergeWith(const ResourceExtension &other, MergeMethod mergeMethod)
+void PBCDepthExtension::mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod)
 {
     const auto &o = static_cast<const PBCDepthExtension &>(other);
     if (!o.depth) {
@@ -86,10 +86,10 @@ void PBCDepthAnalysis::analyze(Region &region, PBCDepthExtension &ext, bool /*is
     ext.setDepth(layerContext.computePBCDepth(block));
 }
 
-void registerPBCResourceExtensions()
+void registerPBCResourceAnalysisExtensions()
 {
     [[maybe_unused]] static const bool once = [] {
-        ResourceExtensionRegistry::get().add([] { return std::make_unique<PBCDepthAnalysis>(); });
+        ResourceAnalysisRegistry::get().add([] { return std::make_unique<PBCDepthAnalysis>(); });
         return true;
     }();
 }

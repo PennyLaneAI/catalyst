@@ -20,8 +20,8 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
-#include "Catalyst/Analysis/ResourceExtension.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "Catalyst/Analysis/ResourceResultExtension.h"
 #include "PBC/IR/PBCOps.h"
 
 using namespace mlir;
@@ -30,8 +30,8 @@ namespace catalyst {
 
 class ResourceAnalysis {
   public:
-    // Callable that constructs a ResourceExtensionAnalysis collector for this run.
-    using ExtensionProvider = std::function<std::unique_ptr<ResourceExtensionAnalysis>()>;
+    // Callable that constructs a ResourceAnalysisExtension collector for this run.
+    using ExtensionProvider = std::function<std::unique_ptr<ResourceAnalysisExtension>()>;
 
     // walk all func::FuncOps within the operation.
     explicit ResourceAnalysis(ModuleOp moduleOp,
@@ -71,7 +71,7 @@ class ResourceAnalysis {
     int64_t dynForLoopCounter = 0;
 
     // Collect the extension analyses logic
-    llvm::SmallVector<std::unique_ptr<ResourceExtensionAnalysis>> extensionAnalyses;
+    llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;
 
     // Blank ResourceResult with empty data objects from each collector.
     ResourceResult makeEmptyResult() const;

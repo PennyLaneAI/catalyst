@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Catalyst/Analysis/ResourceExtensionRegistry.h"
+#include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 
 #include "llvm/Support/ManagedStatic.h"
 
@@ -20,8 +20,8 @@ using namespace llvm;
 
 namespace catalyst {
 
-static ManagedStatic<ResourceExtensionRegistry> registry;
+static ManagedStatic<ResourceAnalysisRegistry> registry;
 
-ResourceExtensionRegistry &ResourceExtensionRegistry::get() { return *registry; }
+ResourceAnalysisRegistry &ResourceAnalysisRegistry::get() { return *registry; }
 
 } // namespace catalyst

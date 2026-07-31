@@ -11,6 +11,6 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
                            ${CMAKE_BINARY_DIR}/include)
 
 # PBCUtils: PBCLayer depth computation.
-# catalyst-analysis: ResourceExtensionRegistry for self-registration.
+# catalyst-analysis: ResourceAnalysisRegistry for self-registration.
 # No reverse link from those targets into PBCAnalysis.
 target_link_libraries(${LIBRARY_NAME} PRIVATE PBCUtils catalyst-analysis)

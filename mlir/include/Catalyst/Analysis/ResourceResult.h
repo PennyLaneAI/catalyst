@@ -23,7 +23,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
 
-#include "Catalyst/Analysis/ResourceExtension.h"
+#include "Catalyst/Analysis/ResourceResultExtension.h"
 
 namespace catalyst {
 
@@ -89,7 +89,7 @@ struct ResourceResult {
 
     // It is used to store additional resource information
     // that is not covered by the core resource result
-    llvm::SmallVector<std::unique_ptr<ResourceExtension>> extensions;
+    llvm::SmallVector<std::unique_ptr<ResourceResultExtension>> extensions;
 
     ResourceResult() = default;
     ResourceResult(ResourceResult &&) = default;

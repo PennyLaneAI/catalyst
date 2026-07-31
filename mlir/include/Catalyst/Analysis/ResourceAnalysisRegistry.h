@@ -24,25 +24,25 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/WithColor.h"
 
-#include "Catalyst/Analysis/ResourceExtension.h"
+#include "Catalyst/Analysis/ResourceResultExtension.h"
 
 namespace catalyst {
 
-// Global registry of ResourceExtensionAnalysis providers.
-// Dialects / plugins self-register via the ResourceExtensionRegistry::add method,
-// or the REGISTER_RESOURCE_EXTENSION macro.
-class ResourceExtensionRegistry {
+// Global registry of ResourceAnalysisExtension providers.
+// Dialects / plugins self-register via the ResourceAnalysisRegistry::add method,
+// or the REGISTER_RESOURCE_ANALYSIS_EXTENSION macro.
+class ResourceAnalysisRegistry {
   public:
-    using ExtensionProvider = std::function<std::unique_ptr<ResourceExtensionAnalysis>()>;
+    using ExtensionProvider = std::function<std::unique_ptr<ResourceAnalysisExtension>()>;
 
-    static ResourceExtensionRegistry &get();
+    static ResourceAnalysisRegistry &get();
 
     void add(ExtensionProvider extensionProvider)
     {
         std::string name = extensionProvider()->name().str();
         if (llvm::is_contained(names, name)) {
-            llvm::WithColor::warning()
-                << "ResourceExtension '" << name << "' is already registered; ignoring duplicate\n";
+            llvm::WithColor::warning() << "ResourceAnalysisExtension '" << name
+                                       << "' is already registered; ignoring duplicate\n";
             return;
         }
         names.push_back(std::move(name));
@@ -58,14 +58,14 @@ class ResourceExtensionRegistry {
     llvm::SmallVector<std::string> names;
 };
 
-// Self-register a ResourceExtensionAnalysis factory.
+// Self-register a ResourceAnalysisExtension factory.
 // Example:
-// REGISTER_RESOURCE_EXTENSION(std::make_unique<ABCAnalysis>());
+// REGISTER_RESOURCE_ANALYSIS_EXTENSION(std::make_unique<ABCAnalysis>());
 #define RES_EXT_CONCAT_(a, b) a##b
 #define RES_EXT_CONCAT(a, b) RES_EXT_CONCAT_(a, b)
-#define REGISTER_RESOURCE_EXTENSION(CTOR_EXPR)                                                     \
+#define REGISTER_RESOURCE_ANALYSIS_EXTENSION(CTOR_EXPR)                                            \
     static const int LLVM_ATTRIBUTE_UNUSED RES_EXT_CONCAT(_resExtReg_, __COUNTER__) = []() {       \
-        ::catalyst::ResourceExtensionRegistry::get().add([] { return CTOR_EXPR; });                \
+        ::catalyst::ResourceAnalysisRegistry::get().add([] { return CTOR_EXPR; });                 \
         return 0;                                                                                  \
     }()
 

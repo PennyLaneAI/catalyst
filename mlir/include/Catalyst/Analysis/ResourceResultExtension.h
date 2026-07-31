@@ -27,56 +27,59 @@ namespace catalyst {
 enum class MergeMethod;
 
 // Value object for an optional resource metric. Lives in ResourceResult.
-class ResourceExtension {
+class ResourceResultExtension {
   public:
-    virtual ~ResourceExtension() = default;
+    virtual ~ResourceResultExtension() = default;
     virtual llvm::StringRef name() const = 0;
     virtual llvm::json::Value toJson() const = 0;
 
-    virtual void mergeWith(const ResourceExtension &other, MergeMethod mergeMethod) {}
+    virtual void mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) {}
     virtual void multiplyBy(int64_t factor) {}
 };
 
-template <typename Ext> class ResourceExtensionAnalysisOf;
+template <typename Ext> class ResourceAnalysisExtensionOf;
 
 // Owned by ResourceAnalysis for the duration of a run; writes into per-result data.
-// Do not inherit directly, use ResourceExtensionAnalysisOf<Ext>.
-class ResourceExtensionAnalysis {
-    template <typename Ext> friend class ResourceExtensionAnalysisOf;
+// Do not inherit directly, use ResourceAnalysisExtensionOf<Ext>.
+class ResourceAnalysisExtension {
+    template <typename Ext> friend class ResourceAnalysisExtensionOf;
 
-    ResourceExtensionAnalysis() = default;
+    ResourceAnalysisExtension() = default;
 
   public:
-    virtual ~ResourceExtensionAnalysis() = default;
-    ResourceExtensionAnalysis(const ResourceExtensionAnalysis &) = delete;
-    ResourceExtensionAnalysis &operator=(const ResourceExtensionAnalysis &) = delete;
+    virtual ~ResourceAnalysisExtension() = default;
+    ResourceAnalysisExtension(const ResourceAnalysisExtension &) = delete;
+    ResourceAnalysisExtension &operator=(const ResourceAnalysisExtension &) = delete;
 
-    virtual llvm::StringRef name() const = 0; // must be matched to ResourceExtension::name()
+    virtual llvm::StringRef name() const = 0; // must be matched to ResourceResultExtension::name()
 
     // Mint an empty data object for a new ResourceResult.
-    virtual std::unique_ptr<ResourceExtension> makeEmpty() const = 0;
+    virtual std::unique_ptr<ResourceResultExtension> makeEmpty() const = 0;
 
     // Walk through each individual operation.
-    virtual void collect(mlir::Operation *op, ResourceExtension &ext, bool isAdjoint) {}
+    virtual void collect(mlir::Operation *op, ResourceResultExtension &ext, bool isAdjoint) {}
 
     // Walk through the each region.
-    virtual void analyze(mlir::Region &region, ResourceExtension &ext, bool isAdjoint) {}
+    virtual void analyze(mlir::Region &region, ResourceResultExtension &ext, bool isAdjoint) {}
 };
 
 // Subclasses override the typed collect / analyze overloads.
-template <typename Ext> class ResourceExtensionAnalysisOf : public ResourceExtensionAnalysis {
+template <typename Ext> class ResourceAnalysisExtensionOf : public ResourceAnalysisExtension {
   public:
-    static_assert(std::is_base_of_v<ResourceExtension, Ext>,
-                  "Ext must derive from ResourceExtension");
+    static_assert(std::is_base_of_v<ResourceResultExtension, Ext>,
+                  "Ext must derive from ResourceResultExtension");
 
-    std::unique_ptr<ResourceExtension> makeEmpty() const final { return std::make_unique<Ext>(); }
+    std::unique_ptr<ResourceResultExtension> makeEmpty() const final
+    {
+        return std::make_unique<Ext>();
+    }
 
-    void collect(mlir::Operation *op, ResourceExtension &ext, bool isAdjoint) final
+    void collect(mlir::Operation *op, ResourceResultExtension &ext, bool isAdjoint) final
     {
         collect(op, static_cast<Ext &>(ext), isAdjoint);
     }
 
-    void analyze(mlir::Region &region, ResourceExtension &ext, bool isAdjoint) final
+    void analyze(mlir::Region &region, ResourceResultExtension &ext, bool isAdjoint) final
     {
         analyze(region, static_cast<Ext &>(ext), isAdjoint);
     }

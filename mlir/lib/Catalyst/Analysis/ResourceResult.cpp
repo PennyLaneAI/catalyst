@@ -24,7 +24,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 
-#include "Catalyst/Analysis/ResourceExtension.h"
+#include "Catalyst/Analysis/ResourceResultExtension.h"
 
 using namespace mlir;
 
