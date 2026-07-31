@@ -74,12 +74,12 @@ struct PendingLocalCoproc {
 
 // Emits the transport session lifecycle for one backline placement.
 //
-// A node is either 
+// A node is either
 // - local:
-// meaning it runs in the host process, so its session ops go straight into the host 
+// meaning it runs in the host process, so its session ops go straight into the host
 // @setup/@teardown
 // - remote: it is cross-compiled into its own target module and dispatched to an executor,
-// so its session ops go into that module and the host only launches them. 
+// so its session ops go into that module and the host only launches them.
 // If a controller and coprocessor are both local are co-located they share the host process,
 // so the controller dials the coprocessor inline.
 //
