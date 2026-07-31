@@ -33,9 +33,6 @@ class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
 
   public:
     explicit CpuCoprocessorSession(std::string dev, int gid_idx) : Base(std::move(dev), gid_idx) {}
-    // Joins the engine while this object is still complete: run() touches
-    // coproc_fn_/coproc_ctx_, so a join deferred to the base destructor would use
-    // them after they are gone. stop() is idempotent.
     ~CpuCoprocessorSession() override { stop(); }
 
     void start() override;
