@@ -27,7 +27,7 @@ namespace catalyst::transport::cpu_verbs {
 
 // Coprocessor role: receives messages, runs the coprocessor function, and
 // returns the result. The function is bound via set_coprocessor_fn; nullptr
-// selects the built-in echo (passthrough self-test).
+// selects the built-in echo.
 class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
     using Base = CpuSessionBase<CoprocessorSession>;
 
