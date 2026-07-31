@@ -21,7 +21,7 @@ Grouped into three namespace classes so related items sit together:
 * :class:`Paths` — default workspace, executor binary, and log-file path resolution.
 
 Plus a few free helpers (:func:`random_port`, :func:`triple_from_uname`, :data:`pdeathsig`) and
-the domain types (:class:`PortInUse`, :class:`SSHError`, :class:`Raw`).
+the domain types (:class:`PortInUse`, :class:`Raw`).
 Imported by :mod:`.ssh`, :mod:`.process`, and :mod:`.manager`."""
 
 from __future__ import annotations
@@ -47,18 +47,11 @@ with contextlib.suppress(Exception):
     faulthandler.enable()
 
 # Random bind port so concurrent launches on a shared host don't collide; retried on conflict.
-PORT_TRIES = 6
+MAX_PORT_TRIES = 6
 
 
 class PortInUse(Exception):
     """The chosen executor port was already taken (likely another user on the host)."""
-
-
-class SSHError(RuntimeError):
-    """A remote SSH/scp/sudo operation failed (auth, bind, transport, or command exit).
-
-    A domain exception (not :class:`SystemExit`) so callers can catch and recover — e.g. try a
-    different host, or fall back to a local executor."""
 
 
 class Raw(str):

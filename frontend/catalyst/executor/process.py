@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import contextlib
 import os
-import shlex
 import subprocess
 import sys
 import threading
@@ -33,7 +32,7 @@ from .utils import (
     pdeathsig,
     PortInUse,
 )
-from .ssh import Remote, SSH
+from .ssh import RemoteExecutorShell, SSH, ShellCommand
 
 
 class _ExecutorProcess:
@@ -212,9 +211,9 @@ class _LocalProcess(_ExecutorProcess):
         each ``plugins`` entry passed as ``--plugin=<path>``. ``env`` extends the parent
         environment. ``PR_SET_PDEATHSIG`` ensures the child dies with the parent."""
         exe = os.path.expanduser(os.path.expandvars(self._executor_bin))
-        argv = [exe, f"{Remote.BIND_FLAG}127.0.0.1:{self._bind_port}"]
+        argv = [exe, f"{RemoteExecutorShell.BIND_FLAG}127.0.0.1:{self._bind_port}"]
         argv += [
-            f"{Remote.PLUGIN_FLAG}{os.path.expanduser(os.path.expandvars(p))}"
+            f"{RemoteExecutorShell.PLUGIN_FLAG}{os.path.expanduser(os.path.expandvars(p))}"
             for p in self._plugins
         ]
         proc_env = dict(os.environ)
@@ -313,13 +312,13 @@ class _RemoteProcess(_ExecutorProcess):
     def _spawn(self) -> None:
         """Open the SSH port-forward and start ``catalyst-executor`` on the remote host.
 
-        Builds the remote shell command via :meth:`Remote.launcher` (cd + env + exec, wrapped
+        Builds the remote shell command via :meth:`RemoteExecutorShell.launcher` (cd + env + exec, wrapped
         in ``sudo`` when requested) and the local ``ssh -L <local>:localhost:<remote>`` tunnel.
         With ``sudo_password``, pipes the password into ``sudo -S`` on stdin (no PTY);
         NOPASSWD mode uses ``-tt`` so closing SSH SIGHUPs the executor. Sets ``self.proc`` to
         the started ``subprocess.Popen``."""
         use_pw = self.sudo_password is not None
-        remote_cmd = Remote.launcher(
+        remote_cmd = RemoteExecutorShell.launcher(
             self.workspace,
             self._bind_port,
             self._plugins,
@@ -386,32 +385,17 @@ class _RemoteProcess(_ExecutorProcess):
         # port-scoped pkill would wrongly kill it.
         if not self._ready_reached:
             return
-        pat = f"{Paths.EXECUTOR_BIN}.*{Remote.BIND_FLAG}0.0.0.0:{self._bind_port}"
-        with contextlib.suppress(Exception):
-            if not self.sudo:
-                subprocess.call(
-                    SSH.base(self.user, self.host) + [f"pkill -f {shlex.quote(pat)}"],
-                    timeout=15,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            elif self.sudo_password is not None:
-                subprocess.run(
-                    SSH.base(self.user, self.host)
-                    + [f"sudo -S -p '' pkill -f {shlex.quote(pat)}"],
-                    input=self.sudo_password + "\n",
-                    text=True,
-                    timeout=15,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            else:
-                subprocess.call(
-                    SSH.base(self.user, self.host) + [f"sudo -n pkill -f {shlex.quote(pat)}"],
-                    timeout=15,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
+        pat = f"{Paths.EXECUTOR_BIN}.*{RemoteExecutorShell.BIND_FLAG}0.0.0.0:{self._bind_port}"
+        pkill = ShellCommand.pkill(pat)
+        if not self.sudo:
+            SSH.run(self.user, self.host, pkill)
+        elif self.sudo_password is not None:
+            SSH.run(
+                self.user, self.host, ShellCommand.sudo_pw(pkill),
+                input=self.sudo_password + "\n",
+            )
+        else:
+            SSH.run(self.user, self.host, ShellCommand.sudo_np(pkill))
 
     def teardown_workspace(self) -> None:
         """Remove the auto-generated remote workspace. Guarded by the ``catalyst-exec-`` prefix so it
@@ -421,13 +405,7 @@ class _RemoteProcess(_ExecutorProcess):
         if not self.workspace.rsplit("/", 1)[-1].startswith(Paths.WORKSPACE_PREFIX):
             return
         self._say(f"removing remote workspace {self.workspace}", level=2)
-        with contextlib.suppress(Exception):
-            subprocess.call(
-                SSH.base(self.user, self.host) + [f"rm -rf {self.workspace}"],
-                timeout=15,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+        SSH.run(self.user, self.host, ShellCommand.rm_rf(self.workspace))
 
     def stop(self) -> None:
         """Stop the remote executor and close the SSH tunnel. Idempotent."""

@@ -14,12 +14,15 @@
 
 """SSH/scp orchestration for a remote :class:`~catalyst.executor.Executor`.
 
-Grouped into three namespace classes so related items sit together:
+Grouped into four namespace classes so related items sit together:
 
-* :class:`SSH` — builds the local ``ssh`` command line (control socket + base flags).
-* :class:`Remote` — builds shell strings that run on the remote host (safe path quoting + the
-  ``catalyst-executor`` launcher command).
-* :class:`Auth` — non-interactive SSH/sudo auth probing and sudo-password resolution.
+* :class:`SSH` — local ``ssh`` command line (control socket, base flags, fire-and-forget runner)
+  plus non-interactive auth probing and sudo-password resolution.
+* :class:`SCP` — the ``scp`` binary wrapper, riding on SSH's multiplexed control socket.
+* :class:`ShellCommand` — generic POSIX shell fragments (``pkill``, ``sudo``, ``rm -rf``, ``mkdir
+  -p``) and safe path quoting; consumed by SSH, RemoteExecutorShell, and the teardown probes.
+* :class:`RemoteExecutorShell` — the ``catalyst-executor`` launcher command that runs on the remote host
+  (CLI flags + full ``cd + env + exec`` line).
 
 Plus two free "verbs" — :func:`copy_bundle` and :func:`remove_remote_dir` — the actual remote
 operations. Consumed by :mod:`.process` (the remote process) and :mod:`.manager` (deploy/teardown).
@@ -34,20 +37,41 @@ import subprocess
 import time
 from pathlib import Path
 
-from .utils import Log, Paths, Raw, SSHError
+from .utils import Log, Paths, Raw
 
 
 class SSH:
-    """Builders for the local ``ssh`` command line — control-socket location, connection
-    multiplexing flags, and the shared ``ssh ... user@host`` prefix reused by every remote op."""
+    """Local ``ssh`` command line + non-interactive auth for the remote host: control-socket
+    location, multiplexing flags, the shared ``ssh ... user@host`` prefix reused by every remote
+    op, a fire-and-forget runner, plus SSH/sudo auth probing and sudo-password resolution."""
+
+    # Seconds a multiplexed control socket lingers idle after the last user before self-closing.
+    # Long enough to fold the follow-up teardown ops (pkill / rm) into the same master; short
+    # enough that sockets don't outlive the launch by much.
+    CONTROL_PERSIST = 30
+
+    # Argv prefix used by every ``base()`` invocation: the ``ssh`` binary plus keep-alive tuning
+    # (ping every 15s, give up after 4 misses → dead peer surfaces in ~1 min). Tuple so it can't
+    # be mutated by accident; ``base()`` copies it into a list before appending.
+    BASE_CMD: tuple[str, ...] = ("ssh", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4")
+
+    # Extra ``-o`` flags for one-shot probes (:meth:`probe`, ``_detect_triple``): ``BatchMode=yes``
+    # fails fast with rc 255 instead of prompting for a password, and a short ``ConnectTimeout``
+    # keeps launches from hanging on an unreachable host.
+    PROBE_OPTS: tuple[str, ...] = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+
+    @staticmethod
+    def _fallback_ctl_dir() -> Path:
+        """Filesystem fallback for the SSH control-socket dir when ``$XDG_RUNTIME_DIR`` isn't set.
+        Kept out of ``~/.ssh`` so hardened setups (strict perms/allowlist) don't complain."""
+        return Path.home() / ".cache" / "catalyst" / "ssh-cm"
 
     @staticmethod
     def _ctl_dir() -> Path:
         """Where to keep the SSH control sockets. Prefers ``$XDG_RUNTIME_DIR`` (tmpfs, per-user,
-        auto-cleared at logout) and falls back to ``~/.cache/catalyst/ssh-cm``. Kept out of
-        ``~/.ssh`` so hardened setups (strict perms/allowlist) don't complain."""
+        auto-cleared at logout) and falls back to :meth:`_fallback_ctl_dir`."""
         xdg = os.environ.get("XDG_RUNTIME_DIR")
-        base = Path(xdg) / "catalyst" if xdg else Path.home() / ".cache" / "catalyst" / "ssh-cm"
+        base = Path(xdg) / "catalyst" if xdg else SSH._fallback_ctl_dir()
         base.mkdir(parents=True, exist_ok=True)
         return base
 
@@ -59,7 +83,7 @@ class SSH:
         The first short op opens a master socket under :meth:`_ctl_dir` and later ops (probe /
         mkdir / scp / pkill) reuse it, skipping the auth handshake. ``%C`` (a hash of
         ``%l%h%p%r``) keeps the path short enough for the Unix-socket length limit. The socket
-        self-expires 30s after the last user.
+        self-expires ``CONTROL_PERSIST`` seconds after the last user.
 
         Applied to the chatty control ops (probe/mkdir/scp/pkill), NOT the long-lived executor
         session — that keeps one clean connection whose close SIGHUPs the executor."""
@@ -69,7 +93,7 @@ class SSH:
             "-o",
             f"ControlPath={SSH._ctl_dir()}/cm-%C",
             "-o",
-            "ControlPersist=30",
+            f"ControlPersist={SSH.CONTROL_PERSIST}",
         ]
 
     @staticmethod
@@ -92,7 +116,7 @@ class SSH:
 
         Returns:
             list[str]: The ``ssh ... user@host`` argv prefix, ready to append a remote command."""
-        cmd = ["ssh", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4"]
+        cmd = list(SSH.BASE_CMD)
         if multiplex:
             cmd += SSH.ctl_opts()
         cmd += ["-v"] * max(0, Log.level() - 2)  # ssh protocol debug at -vvv (verbosity 3+)
@@ -101,15 +125,219 @@ class SSH:
         cmd.append(f"{user}@{host}")
         return cmd
 
+    @staticmethod
+    def capture(user: str, host: str, remote_cmd: str, *, timeout: float = 15) -> str | None:
+        """Run ``ssh user@host <remote_cmd>`` non-interactively (with :data:`PROBE_OPTS`:
+        ``BatchMode=yes`` + short ``ConnectTimeout``) and return stdout stripped, or ``None`` on
+        any failure (SSH error, non-zero exit, timeout, spawn failure). Used for state probes
+        (e.g. ``uname -sm``) where "can't tell" is a valid answer."""
+        cmd = SSH.base(user, host, list(SSH.PROBE_OPTS)) + [remote_cmd]
+        try:
+            return subprocess.check_output(
+                cmd, text=True, timeout=timeout, stderr=subprocess.DEVNULL
+            ).strip()
+        except Exception:
+            return None
 
-class Remote:
-    """Builders for shell strings that run on the *remote* host — safe path quoting (with ``~``
-    expansion) and the full ``cd + env + exec`` command that launches ``catalyst-executor``."""
+    @staticmethod
+    def run(
+        user: str,
+        host: str,
+        remote_cmd: str,
+        *,
+        input: str | None = None,
+        timeout: float = 15,
+        opts: list[str] | None = None,
+        quiet: bool = True,
+        log: bool = False,
+        error: str | None = None,
+    ) -> int:
+        """Run ``ssh user@host <remote_cmd>`` and return its exit code.
 
-    # ``catalyst-executor`` CLI flags — kept as class data so a rename on the executor side is a
-    # one-line change here instead of hunting through f-strings.
-    PLUGIN_FLAG = "--plugin="
-    BIND_FLAG = "--bind="
+        Two flavors, selected by ``quiet``:
+
+        * ``quiet=True`` (default) — teardown-style: stdout/stderr → ``/dev/null``, and any
+          subprocess exception (spawn failure, ``TimeoutExpired``) is swallowed and reported as
+          rc ``-1``. A failure here isn't actionable — the caller is already cleaning up, and
+          the SSH connection close is the primary signal that stops the remote.
+        * ``quiet=False`` — deploy-style: stdout/stderr inherit the terminal so the user sees
+          remote output (``mkdir: Permission denied``, scp progress, …), and any subprocess
+          exception propagates.
+
+        ``log=True`` records the argv via :meth:`Log.cmd`; ``opts`` are extra ``-o`` flags
+        passed through to :meth:`base`.
+
+        ``error``: if given and the exit code is non-zero, raise :class:`RuntimeError` with this
+        message (the actual rc is appended). Sugar for the ``if SSH.run(...) != 0: raise
+        RuntimeError(...)`` pattern when there's no rc-specific branching."""
+        cmd = SSH.base(user, host, opts) + [remote_cmd]
+        if log:
+            Log.cmd(cmd)
+        kwargs = {"input": input, "text": input is not None, "timeout": timeout}
+        if quiet:
+            kwargs["stdout"] = subprocess.DEVNULL
+            kwargs["stderr"] = subprocess.DEVNULL
+            try:
+                rc = subprocess.run(cmd, **kwargs).returncode
+            except Exception:
+                rc = -1
+        else:
+            rc = subprocess.run(cmd, **kwargs).returncode
+        if error is not None and rc != 0:
+            raise RuntimeError(f"{error} (rc={rc})")
+        return rc
+
+    @staticmethod
+    def mkdir(user: str, host: str, path: str) -> None:
+        """Create ``path`` (and any missing parents) on the remote host. Inherits stdout/stderr
+        so the user sees any ``mkdir: Permission denied`` from the remote.
+
+        Raises:
+            RuntimeError: If the remote ``mkdir`` returned non-zero.
+        """
+        SSH.run(
+            user,
+            host,
+            ShellCommand.mkdir_p(path),
+            quiet=False,
+            log=True,
+            error=f"failed to create remote directory {path!r}",
+        )
+
+    @staticmethod
+    def probe(user: str, host: str) -> bool:
+        """Non-interactively check that key-based SSH works and whether sudo needs no password.
+
+        ``BatchMode=yes`` means a missing key fails fast (rc 255) instead of prompting;
+        ``sudo -n true`` returns 0 only when sudo needs no password.
+
+        Args:
+            user: The remote user.
+            host: The remote host.
+
+        Returns:
+            bool: ``True`` if remote sudo needs no password, ``False`` if it does.
+
+        Raises:
+            RuntimeError: If SSH itself failed (no usable key, host unreachable, …) — with an
+                ``ssh-copy-id`` hint the caller can surface to the user.
+        """
+        rc = SSH.run(user, host, ShellCommand.sudo_probe(), opts=list(SSH.PROBE_OPTS), log=True)
+        if rc == 255:
+            raise RuntimeError(
+                f"can't SSH to {user}@{host} without a password — install your key once:\n"
+                f"    ssh-copy-id {user}@{host}\n"
+                "  (this only ADDS your key; it does not affect other users of the account.)"
+            )
+        return rc == 0
+
+    @staticmethod
+    def resolve_sudo(user: str, host: str, sudo_password: str | None = None) -> str | None:
+        """The remote sudo password, when NOPASSWD isn't set: the explicit ``sudo_password`` if
+        given, else a one-time getpass prompt. Returns ``None`` when sudo needs no password
+        (nothing to do).
+
+        Raises:
+            RuntimeError: If SSH is unreachable (from :meth:`probe`), or the user aborted the
+                interactive prompt without supplying a password.
+        """
+        if SSH.probe(user, host):
+            return None
+        if sudo_password is not None:
+            return sudo_password
+        Log.info("remote sudo needs a password (no NOPASSWD) — prompting once")
+        try:
+            return getpass.getpass(f"[remote] sudo password for {user}@{host}: ")
+        except (EOFError, KeyboardInterrupt) as e:
+            raise RuntimeError(
+                "no sudo password provided — pass sudo_password= or run interactively"
+            ) from e
+
+
+class SCP:
+    """Wrapper for the ``scp`` binary — sibling to :class:`SSH`, riding on the same
+    control-socket multiplexing (see :meth:`SSH.ctl_opts`) so a copy piggybacks on the already
+    authenticated connection instead of opening a fresh one."""
+
+    @staticmethod
+    def run(
+        user: str, host: str, files: list[Path], dest: str, *, log: bool = True
+    ) -> None:
+        """Copy ``files`` into ``user@host:dest/`` via scp. Tries the modern SFTP backend first;
+        on failure, retries with the legacy SCP protocol (``-O``) for hosts without an SFTP
+        subsystem ("subsystem request failed"). Verbosity mirrors :class:`Log`: ``-v`` at level
+        ≥ 2, ``-q`` otherwise.
+
+        Raises:
+            RuntimeError: If both the modern and legacy attempts fail.
+        """
+
+        def _once(legacy: bool) -> int:
+            cmd = [
+                "scp",
+                *(["-O"] if legacy else []),
+                *SSH.ctl_opts(),
+                "-v" if Log.level() >= 2 else "-q",
+                *[str(f) for f in files],
+                f"{user}@{host}:{dest}/",
+            ]
+            if log:
+                Log.cmd(cmd)
+            return subprocess.run(cmd).returncode
+
+        if _once(legacy=False) == 0:
+            return
+        Log.info("scp failed — retrying with the legacy protocol (scp -O)")
+        if _once(legacy=True) != 0:
+            raise RuntimeError(f"scp to {user}@{host}:{dest}/ failed")
+
+
+class ShellCommand:
+    """Generic POSIX shell fragments and path helpers reused by remote ops — the sudo/kill/rm
+    building blocks assembled by :class:`RemoteExecutorShell` (executor launcher), :class:`SSH` (auth
+    probe / mkdir), and :mod:`.process` (teardown). Nothing here is catalyst-executor-specific;
+    everything runs on any Bourne-family shell."""
+
+    # Shell-command fragments reused by teardown probes (see :mod:`.process`), auth probing,
+    # and directory ops.
+    @staticmethod
+    def sudo_probe() -> str:
+        """Non-interactive sudo check: ``sudo -n true`` returns 0 iff sudo needs no password.
+        Stderr is redirected to ``/dev/null`` to silence the "a password is required" message
+        when it does."""
+        return "sudo -n true 2>/dev/null"
+
+    @staticmethod
+    def sudo_pw(cmd: str) -> str:
+        """Wrap ``cmd`` in ``sudo -S -p ''`` — sudo reads its password from stdin (the caller
+        must pipe it via ``input=``) with an empty prompt so it never leaks to the terminal.
+        ``cmd`` is a pre-built shell fragment and is inserted verbatim (no re-quoting)."""
+        return f"sudo -S -p '' {cmd}"
+
+    @staticmethod
+    def sudo_np(cmd: str) -> str:
+        """Wrap ``cmd`` in ``sudo -n`` — non-interactive: sudo fails immediately if a password
+        is required (NOPASSWD only). ``cmd`` is inserted verbatim (no re-quoting)."""
+        return f"sudo -n {cmd}"
+
+    @staticmethod
+    def pkill(pat: str) -> str:
+        """Shell command to kill any process whose ``ps``-visible argv matches ``pat`` (a regex,
+        per ``pkill -f``). ``pat`` is shell-quoted so metacharacters can't break out."""
+        return f"pkill -f {shlex.quote(pat)}"
+
+    @staticmethod
+    def rm_rf(path: str) -> str:
+        """Shell command to recursively remove ``path``, quoted via :meth:`path` so spaces and
+        ``~`` survive. Callers are responsible for whatever safety-gating the path deserves —
+        this helper only handles quoting."""
+        return f"rm -rf {ShellCommand.path(path)}"
+
+    @staticmethod
+    def mkdir_p(path: str) -> str:
+        """Shell command to create ``path`` (and any missing parents) on the remote, with the
+        path itself quoted via :meth:`path` so spaces and ``~`` survive."""
+        return f"mkdir -p {ShellCommand.path(path)}"
 
     @staticmethod
     def path(path: str) -> str:
@@ -120,6 +348,17 @@ class Remote:
         if path.startswith("~/"):
             return '"$HOME"/' + shlex.quote(path[2:])
         return shlex.quote(path)
+
+
+class RemoteExecutorShell:
+    """Builders for the ``catalyst-executor`` launcher command that runs on the *remote* host —
+    the CLI flags and the full ``cd + env + exec`` line. Generic shell fragments and path quoting
+    live on :class:`ShellCommand`."""
+
+    # ``catalyst-executor`` CLI flags — kept as class data so a rename on the executor side is a
+    # one-line change here instead of hunting through f-strings.
+    PLUGIN_FLAG = "--plugin="
+    BIND_FLAG = "--bind="
 
     @staticmethod
     def launcher(
@@ -152,7 +391,7 @@ class Remote:
         env_prefix = " ".join(f"{k}={_q(v)}" for k, v in env.items())
 
         def _plugin_arg(p) -> str:
-            flag = Remote.PLUGIN_FLAG
+            flag = RemoteExecutorShell.PLUGIN_FLAG
             if isinstance(p, Raw):
                 return f"{flag}{p}"
             # A bare filename resolves against the workspace (a scp'd bundle); an absolute or
@@ -160,7 +399,7 @@ class Remote:
             # shell-quoted.
             if "/" not in p and not p.startswith("~"):
                 return f"{flag}$PWD/{shlex.quote(p)}"
-            return f"{flag}{Remote.path(p)}"
+            return f"{flag}{ShellCommand.path(p)}"
 
         plugin_args = " ".join(_plugin_arg(p) for p in plugins)
         # scp drops the +x bit; only relevant for a workspace-local executor binary.
@@ -174,68 +413,11 @@ class Remote:
         else:
             launcher = "exec"
         return (
-            f"cd {Remote.path(workspace)} && {chmod}{env_prefix} "
-            f"{launcher} {executor_bin} {Remote.BIND_FLAG}0.0.0.0:{remote_port} {plugin_args}"
+            f"cd {ShellCommand.path(workspace)} && {chmod}{env_prefix} "
+            f"{launcher} {executor_bin} {RemoteExecutorShell.BIND_FLAG}0.0.0.0:{remote_port} {plugin_args}"
         )
 
 
-class Auth:
-    """Non-interactive SSH/sudo auth probing and sudo-password resolution — decides whether we
-    can reach the host with an installed key, and whether the launcher needs to pipe a sudo
-    password to the remote (``sudo -S``)."""
-
-    @staticmethod
-    def probe(user: str, host: str) -> bool:
-        """Non-interactively check that key-based SSH works and whether sudo needs no password.
-
-        ``BatchMode=yes`` means a missing key fails fast (rc 255) instead of prompting;
-        ``sudo -n true`` returns 0 only when sudo needs no password.
-
-        Args:
-            user: The remote user.
-            host: The remote host.
-
-        Returns:
-            bool: ``True`` if remote sudo needs no password, ``False`` if it does.
-
-        Raises:
-            SSHError: If SSH itself failed (no usable key, host unreachable, …) — with an
-                ``ssh-copy-id`` hint the caller can surface to the user.
-        """
-        cmd = SSH.base(user, host, ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]) + [
-            "sudo -n true 2>/dev/null"
-        ]
-        Log.cmd(cmd)
-        rc = subprocess.call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if rc == 255:
-            raise SSHError(
-                f"can't SSH to {user}@{host} without a password — install your key once:\n"
-                f"    ssh-copy-id {user}@{host}\n"
-                "  (this only ADDS your key; it does not affect other users of the account.)"
-            )
-        return rc == 0
-
-    @staticmethod
-    def resolve_sudo(user: str, host: str, sudo_password: str | None = None) -> str | None:
-        """The remote sudo password, when NOPASSWD isn't set: the explicit ``sudo_password`` if
-        given, else a one-time getpass prompt. Returns ``None`` when sudo needs no password
-        (nothing to do).
-
-        Raises:
-            SSHError: If SSH is unreachable (from :meth:`probe`), or the user aborted the
-                interactive prompt without supplying a password.
-        """
-        if Auth.probe(user, host):
-            return None
-        if sudo_password is not None:
-            return sudo_password
-        Log.info("remote sudo needs a password (no NOPASSWD) — prompting once")
-        try:
-            return getpass.getpass(f"[remote] sudo password for {user}@{host}: ")
-        except (EOFError, KeyboardInterrupt) as e:
-            raise SSHError(
-                "no sudo password provided — pass sudo_password= or run interactively"
-            ) from e
 
 
 def copy_bundle(bundle: Path, user: str, host: str, workspace: str) -> None:
@@ -246,7 +428,7 @@ def copy_bundle(bundle: Path, user: str, host: str, workspace: str) -> None:
     ``mkdir``; the scp target is passed as its own argv element and needs no quoting."""
     files = sorted(p for p in bundle.iterdir() if p.is_file() and p.name != "README.md")
     if not files:
-        raise SSHError(
+        raise RuntimeError(
             f"no artifacts in {bundle} — pass build=<recipe> to cross-compile the executor + "
             "runtime libs for the target, or point bundle= at a prebuilt directory."
         )
@@ -254,32 +436,10 @@ def copy_bundle(bundle: Path, user: str, host: str, workspace: str) -> None:
     Log.info(f"copying {len(files)} artifact(s), {total/1e6:.1f} MB -> {user}@{host}:{workspace}/")
     for f in files:
         Log.info(f"  - {f.name}  ({f.stat().st_size/1e6:.2f} MB)", level=2)
-    mkdir = SSH.base(user, host) + [f"mkdir -p {Remote.path(workspace)}"]
-    Log.cmd(mkdir)
-    if subprocess.call(mkdir) != 0:
-        raise SSHError(f"failed to create remote workspace {workspace!r}")
-
-    def _scp(extra: list[str]) -> int:
-        cmd = [
-            "scp",
-            *extra,
-            *SSH.ctl_opts(),
-            "-v" if Log.level() >= 2 else "-q",
-            *[str(f) for f in files],
-            f"{user}@{host}:{workspace}/",
-        ]
-        Log.cmd(cmd)
-        return subprocess.call(cmd)
+    SSH.mkdir(user, host, workspace)
 
     t0 = time.monotonic()
-    rc = _scp([])
-    if rc != 0:
-        # A modern scp uses the SFTP backend; hosts with no sftp subsystem reject it ("subsystem
-        # request failed"). Retry with the legacy SCP protocol (-O), which only needs remote scp.
-        Log.info("scp failed — retrying with the legacy protocol (scp -O)")
-        rc = _scp(["-O"])
-    if rc != 0:
-        raise SSHError(f"scp of bundle to {user}@{host}:{workspace}/ failed")
+    SCP.run(user, host, files, workspace)
     Log.info(f"copied in {time.monotonic() - t0:.1f}s", level=2)
 
 
@@ -289,17 +449,15 @@ def remove_remote_dir(user: str, host: str, workspace: str) -> None:
     Resolves ``workspace`` (including a leading ``~``) to a canonical path on the remote and
     refuses if it is empty, ``/``, or ``$HOME`` itself. A missing directory is a no-op."""
     remote = (
-        f"ws={Remote.path(workspace)}; "
+        f"ws={ShellCommand.path(workspace)}; "
         'd=$(cd "$ws" 2>/dev/null && pwd) || exit 0; '
         'if [ -z "$d" ] || [ "$d" = "/" ] || [ "$d" = "$HOME" ]; then exit 3; fi; '
         'rm -rf "$d"'
     )
-    cmd = SSH.base(user, host) + [remote]
-    Log.cmd(cmd)
-    rc = subprocess.call(cmd, timeout=30, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    rc = SSH.run(user, host, remote, timeout=30, log=True)
     if rc == 3:
         raise ValueError(
             f"refusing to remove workspace {workspace!r}: it resolves to '/' or the home directory"
         )
     if rc != 0:
-        raise SSHError(f"failed to remove remote workspace {workspace!r} (ssh rc={rc})")
+        raise RuntimeError(f"failed to remove remote workspace {workspace!r} (ssh rc={rc})")
