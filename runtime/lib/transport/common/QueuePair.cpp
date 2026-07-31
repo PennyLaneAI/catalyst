@@ -84,8 +84,6 @@ void QueuePair::modify(QpState to, ibv_qp_attr &attr, int mask, const char *what
     // ibv_modify_qp returns the error code directly; errno is unreliable for
     // it.
     int rc = ibv_modify_qp(qp_, &attr, mask);
-    // ibv_modify_qp returns an errno-style code directly (errno itself is
-    // unreliable for it), so translate rc, not errno, to a readable message.
     RDMA_CHECK(rc == 0, "%s rc=%d (%s)", what, rc, std::strerror(rc));
     state_ = to; // advance only after a successful modify
 }
