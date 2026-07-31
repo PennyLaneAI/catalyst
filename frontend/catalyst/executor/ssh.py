@@ -24,7 +24,7 @@ Grouped into five namespace classes so related items sit together:
   ``mkdir -p``) and safe path quoting.
 * :class:`ExecutorCli` — flag constants for the ``catalyst-executor`` binary itself; shared
   between local and remote invocations.
-* :class:`RemoteLauncher` — the shell command that launches ``catalyst-executor`` on a remote
+* :class:`ExecutorSsh` — the shell command that launches ``catalyst-executor`` on a remote
   host (``cd + env + exec``, sudo-wrapped when needed).
 
 Consumed by :mod:`.process` (the remote process) and :mod:`.manager` (deploy/teardown).
@@ -377,7 +377,7 @@ class SCP:
 
 class ShellCommand:
     """Generic POSIX shell fragments and path helpers reused by remote ops — the sudo/kill/rm
-    building blocks assembled by :class:`RemoteLauncher` (executor launcher), :class:`SSH` (auth
+    building blocks assembled by :class:`ExecutorSsh` (executor launcher), :class:`SSH` (auth
     probe / mkdir), and :mod:`.process` (teardown). Nothing here is catalyst-executor-specific;
     everything runs on any Bourne-family shell."""
 
@@ -442,67 +442,109 @@ class ExecutorCli:
     BIND_FLAG = "--bind="
 
 
-class RemoteLauncher:
+class ExecutorSsh:
     """Builders for the shell command that launches ``catalyst-executor`` on the *remote* host —
     ``cd + env + exec`` line, optionally wrapped in sudo. Uses :class:`ExecutorCli` for flags
     and :class:`ShellCommand` for generic shell fragments and path quoting."""
 
     @staticmethod
-    def build(
+    def ssh_argv(
+        user: str,
+        host: str,
+        workspace: str,
+        remote_port: int,
+        local_port: int,
+        plugins: list[str],
+        env: dict[str, str],
+        *,
+        sudo: bool = True,
+        sudo_password: str | None = None,
+        executor_bin: str = f"./{Paths.EXECUTOR_BIN}",
+    ) -> list[str]:
+        """The full ``ssh -L ...`` argv that opens a port-forward tunnel and starts
+        ``catalyst-executor`` on the remote host. Combines the remote-side shell command
+        (``cd + env + exec``, optionally under ``sudo``) with the local-side ssh options.
+        Bare-string values in ``env``/``plugins`` are shell-quoted; wrap in
+        :class:`~catalyst.executor.utils.Raw` to expand ``$VAR`` on the remote instead."""
+        use_pw = sudo_password is not None
+        remote_cmd = ExecutorSsh._remote_cmd(
+            workspace, remote_port, plugins, env,
+            sudo=sudo, use_password=use_pw, executor_bin=executor_bin,
+        )
+        Log.info(f"remote: {remote_cmd}", level=2)
+        opts = ExecutorSsh._ssh_opts(local_port, remote_port, use_pw)
+        return SSH.base(user, host, opts, multiplex=False) + [remote_cmd]
+
+    @staticmethod
+    def _remote_cmd(
         workspace: str,
         remote_port: int,
         plugins: list[str],
         env: dict[str, str],
-        use_password: bool = False,
-        sudo: bool = True,
-        executor_bin: str = f"./{Paths.EXECUTOR_BIN}",
+        *,
+        sudo: bool,
+        use_password: bool,
+        executor_bin: str,
     ) -> str:
-        """The shell command run on the remote host: ``cd``, export env, exec the executor.
+        """The shell command run *on* the remote host: ``cd`` into workspace, export env, exec
+        the executor."""
+        return (
+            f"cd {ShellCommand.path(workspace)} "
+            f"&& {ExecutorSsh._chmod_prefix(executor_bin)}"
+            f"{ExecutorSsh._env_prefix(env)} "
+            f"{ExecutorSsh._exec_prefix(sudo, use_password)} "
+            f"{executor_bin} {ExecutorCli.BIND_FLAG}0.0.0.0:{remote_port} "
+            f"{ExecutorSsh._plugin_args(plugins)}"
+        )
 
-        Quoting: ``env`` values, plugin paths, and ``workspace`` are shell-quoted so
-        metacharacters (spaces, ``;``, ``$``, …) can't break out. Values that need ``$VAR`` to
-        expand on the remote must be wrapped in :class:`~catalyst.executor.utils.Raw` — bare
-        :class:`str` is treated as a literal. ``executor_bin`` is used as-is (it is either a
-        repo-controlled default like ``./catalyst-executor`` or an explicit override the caller
-        vouches for).
+    @staticmethod
+    def _ssh_opts(local_port: int, remote_port: int, use_password: bool) -> list[str]:
+        """Local-side ssh options for the port-forward tunnel. NOPASSWD gets ``-tt`` so closing
+        SSH SIGHUPs the executor; password mode omits it so ``sudo -S`` sees an unechoed pipe.
+        ``ExitOnForwardFailure=yes`` fails loudly if the local port is already taken."""
+        opts = [
+            "-o", "ExitOnForwardFailure=yes",
+            "-L", f"{local_port}:localhost:{remote_port}",
+        ]
+        if not use_password:
+            opts = ["-tt"] + opts
+        return opts
 
-        ``sudo`` wraps the executor in sudo (some devices need root): with ``use_password`` use
-        ``sudo -S`` (reads the password piped to stdin) with an empty prompt, otherwise plain
-        ``sudo -E`` under a PTY (NOPASSWD). ``sudo=False`` runs it as the login user.
-        """
-
-        def _q(v) -> str:
-            # Raw values expand `$VAR` on the remote; everything else is a literal.
+    @staticmethod
+    def _env_prefix(env: dict[str, str]) -> str:
+        """``K=V K=V ...`` shell prefix. :class:`Raw` values expand ``$VAR`` on the remote;
+        bare strings are shell-quoted."""
+        def q(v):
             return v if isinstance(v, Raw) else shlex.quote(v)
+        return " ".join(f"{k}={q(v)}" for k, v in env.items())
 
-        env_prefix = " ".join(f"{k}={_q(v)}" for k, v in env.items())
-
-        def _plugin_arg(p) -> str:
+    @staticmethod
+    def _plugin_args(plugins: list[str]) -> str:
+        """``--plugin=<path>`` args, one per entry. Bare filenames resolve against the workspace
+        (``$PWD/<name>``); ``~``-rooted or absolute paths are quoted with tilde expansion."""
+        def arg(p):
             flag = ExecutorCli.PLUGIN_FLAG
             if isinstance(p, Raw):
                 return f"{flag}{p}"
-            # A bare filename resolves against the workspace (a scp'd bundle); an absolute or
-            # ~-rooted path is quoted with tilde expansion; everything else is safely
-            # shell-quoted.
             if "/" not in p and not p.startswith("~"):
                 return f"{flag}$PWD/{shlex.quote(p)}"
             return f"{flag}{ShellCommand.path(p)}"
+        return " ".join(arg(p) for p in plugins)
 
-        plugin_args = " ".join(_plugin_arg(p) for p in plugins)
-        # scp drops the +x bit; only relevant for a workspace-local executor binary.
-        chmod = (
-            f"chmod +x ./{Paths.EXECUTOR_BIN} 2>/dev/null; "
-            if executor_bin == f"./{Paths.EXECUTOR_BIN}"
-            else ""
-        )
-        if sudo:
-            launcher = "exec sudo -S -E -p ''" if use_password else "exec sudo -E"
-        else:
-            launcher = "exec"
-        return (
-            f"cd {ShellCommand.path(workspace)} && {chmod}{env_prefix} "
-            f"{launcher} {executor_bin} {ExecutorCli.BIND_FLAG}0.0.0.0:{remote_port} {plugin_args}"
-        )
+    @staticmethod
+    def _chmod_prefix(executor_bin: str) -> str:
+        """``chmod +x`` for a workspace-local binary (scp drops the +x bit); empty otherwise."""
+        if executor_bin != f"./{Paths.EXECUTOR_BIN}":
+            return ""
+        return f"chmod +x ./{Paths.EXECUTOR_BIN} 2>/dev/null; "
+
+    @staticmethod
+    def _exec_prefix(sudo: bool, use_password: bool) -> str:
+        """The ``exec [sudo ...]`` prefix. ``sudo=True`` + ``use_password``: ``sudo -S`` (piped
+        password, no PTY); ``sudo=True`` NOPASSWD: ``sudo -E``; ``sudo=False``: plain ``exec``."""
+        if not sudo:
+            return "exec"
+        return "exec sudo -S -E -p ''" if use_password else "exec sudo -E"
 
 
 

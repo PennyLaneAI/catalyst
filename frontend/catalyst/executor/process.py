@@ -33,7 +33,7 @@ from .utils import (
     pdeathsig,
     PortInUse,
 )
-from .ssh import ExecutorCli, RemoteLauncher, SSH
+from .ssh import ExecutorCli, ExecutorSsh, SSH
 
 
 class _ExecutorProcess:
@@ -268,9 +268,9 @@ class _LocalProcess(_ExecutorProcess):
 
 
 class _RemoteProcess(_ExecutorProcess):
-    """A ``catalyst-executor`` started on a remote host over a port-forwarded SSH. ``.addr`` is the
-    local tunnel endpoint ``127.0.0.1:<local_port>``; closing the SSH connection stops the executor,
-    with a port-scoped ``pkill`` backstop on teardown."""
+    """A ``catalyst-executor`` running on a remote host over a port-forwarded SSH.
+    ``.addr`` is the local tunnel endpoint; closing SSH stops the executor, with a port-scoped
+    ``pkill`` backstop on teardown."""
 
     def __init__(
         self,
@@ -313,8 +313,8 @@ class _RemoteProcess(_ExecutorProcess):
         self._ready_reached = False  # gates the teardown pkill (don't kill others' ports)
 
     def _log_header(self) -> str:
-        """Header block written once at the top of a fresh log file, recording host, port,
-        workspace, timestamp, and plugins so appended runs are separable."""
+        """Log-file banner (host, port, workspace, timestamp, plugins) so appended runs stay
+        separable."""
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         return (
             f"\n# ==== {self.name} @ {self.host}:{self._bind_port} | ws={self.workspace} | "
@@ -322,8 +322,8 @@ class _RemoteProcess(_ExecutorProcess):
         )
 
     def _scan_line(self, line: str) -> None:
-        """Watch executor output for SSH password / sudo-failure prompts and flag them so
-        :meth:`_check_failure` can bail with a helpful message rather than hanging on stdin."""
+        """Flag SSH password / sudo-failure prompts spotted in output so :meth:`_check_failure`
+        can bail with a helpful message instead of hanging on stdin."""
         if Patterns.is_ssh_prompt(line):
             self._auth_kind = "ssh"
             self._auth_prompt.set()
@@ -332,67 +332,52 @@ class _RemoteProcess(_ExecutorProcess):
             self._auth_prompt.set()
 
     def _check_failure(self) -> None:
-        """Abort the launch with a helpful message if :meth:`_scan_line` saw an auth prompt we
-        can't satisfy (missing SSH key, or wrong/absent sudo password)."""
+        """Abort the launch with :meth:`_auth_help`'s hint if :meth:`_scan_line` saw an
+        unsatisfiable auth prompt (missing SSH key, or wrong/absent sudo password)."""
         if self._auth_prompt.is_set():
             self._shutdown()
             raise SystemExit(self._auth_help())
 
     def _on_ready(self) -> None:
-        """Record that the remote executor actually bound its port. Gates the teardown
-        ``pkill`` so a port collision (where the process there is someone else's) never wrongly
-        kills it."""
+        """Mark the port as OURS — gates the teardown ``pkill`` so a port collision (someone
+        else's process there) is never wrongly killed."""
         self._ready_reached = True
 
     def _spawn(self) -> None:
-        """Open the SSH port-forward and start ``catalyst-executor`` on the remote host.
-
-        Builds the remote shell command via :meth:`RemoteLauncher.build` (cd + env + exec, wrapped
-        in ``sudo`` when requested) and the local ``ssh -L <local>:localhost:<remote>`` tunnel.
-        With ``sudo_password``, pipes the password into ``sudo -S`` on stdin (no PTY);
-        NOPASSWD mode uses ``-tt`` so closing SSH SIGHUPs the executor. Sets ``self.proc`` to
-        the started ``subprocess.Popen``."""
+        """Open the SSH port-forward and start ``catalyst-executor`` on the remote host via one
+        call to :meth:`ExecutorSsh.ssh_argv`; pipes the sudo password after launch when given."""
         use_pw = self.sudo_password is not None
-        remote_cmd = RemoteLauncher.build(
-            self.workspace,
-            self._bind_port,
-            self._plugins,
-            self._env,
-            use_password=use_pw,
-            sudo=self.sudo,
+        ssh = ExecutorSsh.ssh_argv(
+            self.user, self.host,
+            self.workspace, self._bind_port, self.local_port,
+            self._plugins, self._env,
+            sudo=self.sudo, sudo_password=self.sudo_password,
             executor_bin=self.executor_bin,
         )
-        # -L: the port-forward the client connects through. ExitOnForwardFailure: fail loudly if the
-        # local port is taken. multiplex=False: a dedicated connection. Password mode pipes into
-        # `sudo -S` so NO PTY (a PTY would echo it and break the stdin pipe); NOPASSWD keeps -tt so
-        # closing ssh SIGHUPs the executor.
-        opts = [
-            "-o",
-            "ExitOnForwardFailure=yes",
-            "-L",
-            f"{self.local_port}:localhost:{self._bind_port}",
-        ]
-        if not use_pw:
-            opts = ["-tt"] + opts
-        ssh = SSH.base(self.user, self.host, opts, multiplex=False) + [remote_cmd]
         self._say(
             f"starting executor on {self.host}:{self._bind_port} "
             f"(tunnel {self.addr} -> remote:{self._bind_port})"
         )
-        self._say(f"remote: {remote_cmd}", level=2)
         Log.cmd(ssh)
         self.proc = self._popen(
             ssh, stdin=(subprocess.PIPE if use_pw else subprocess.DEVNULL)
         )
-        if use_pw:  # feed the sudo password straight into `sudo -S` on stdin
-            assert self.proc.stdin is not None and self.sudo_password is not None
-            with contextlib.suppress(BrokenPipeError, OSError):
-                self.proc.stdin.write(self.sudo_password + "\n")
-                self.proc.stdin.flush()
+        self._pipe_sudo_password()
+
+    def _pipe_sudo_password(self) -> None:
+        """Feed :attr:`sudo_password` into the child's stdin (opened as PIPE). No-op if no
+        password was configured. Broken-pipe / OSError are swallowed — the child may have
+        already errored out, and the pump thread will surface the auth failure separately."""
+        if self.sudo_password is None:
+            return
+        assert self.proc is not None and self.proc.stdin is not None
+        with contextlib.suppress(BrokenPipeError, OSError):
+            self.proc.stdin.write(self.sudo_password + "\n")
+            self.proc.stdin.flush()
 
     def _auth_help(self) -> str:
-        """A human-readable hint for the user to fix the detected auth failure — install an SSH
-        key, or supply/verify the sudo password. Called by :meth:`_check_failure`."""
+        """Human-readable fix hint for the detected auth failure — install an SSH key or
+        supply/verify the sudo password."""
         if self._auth_kind == "ssh":
             return (
                 "SSH wants a password — install your key once (only adds your key, does not\n"
@@ -406,12 +391,9 @@ class _RemoteProcess(_ExecutorProcess):
         )
 
     def _teardown_extra(self) -> None:
-        """Backstop ``pkill`` for OUR executor on the remote host, in case closing the SSH
-        connection didn't SIGHUP it. Skipped when we never bound the port (the process there
-        would be someone else's, and a port-scoped ``pkill`` must not wrongly kill it)."""
-        # Backstop kill of OUR executor (closing the -tt ssh already SIGHUPs it). Only when we
-        # actually bound this port — on a port collision the process there is someone else's, and a
-        # port-scoped pkill would wrongly kill it.
+        """Backstop ``pkill`` for OUR executor, in case closing the SSH connection didn't SIGHUP
+        it. Skipped if we never bound the port — the process there would be someone else's, and
+        a port-scoped ``pkill`` must not wrongly kill it."""
         if not self._ready_reached:
             return
         pat = f"{Paths.EXECUTOR_BIN}.*{ExecutorCli.BIND_FLAG}0.0.0.0:{self._bind_port}"
@@ -421,8 +403,8 @@ class _RemoteProcess(_ExecutorProcess):
         )
 
     def teardown_workspace(self) -> None:
-        """Remove the auto-generated remote workspace. Guarded by the ``catalyst-exec-`` prefix so it
-        can never wipe a user-pinned dir; a no-op for a pinned workspace."""
+        """Remove the auto-generated remote workspace. Guarded by the ``catalyst-exec-`` prefix
+        so a user-pinned dir is never wiped; no-op for a pinned workspace."""
         basename = self.workspace.rsplit("/", 1)[-1]
         if not self.cleanup_ws or not basename.startswith(Paths.WORKSPACE_PREFIX):
             return
@@ -430,6 +412,6 @@ class _RemoteProcess(_ExecutorProcess):
         SSH.rm_rf(self.user, self.host, self.workspace)
 
     def stop(self) -> None:
-        """Stop the remote executor and close the SSH tunnel. Idempotent."""
+        """Stop the remote executor and close the SSH tunnel (idempotent)."""
         self._say("stopping executor + closing tunnel")
         super().stop()
