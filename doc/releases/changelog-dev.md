@@ -35,6 +35,10 @@
   transport runtime CAPI.
   [(#3048)](https://github.com/PennyLaneAI/catalyst/pull/3048)
 
+* An `inject-transport-session` pass is added, which reads the `catalyst.backline` module
+  attribute and emits the transport session lifecycle into the host entry function.
+  [(#3063)](https://github.com/PennyLaneAI/catalyst/pull/3063)
+
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
 
