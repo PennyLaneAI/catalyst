@@ -16,16 +16,16 @@
 
 Grouped into four namespace classes so related items sit together:
 
-* :class:`SSH` — local ``ssh`` command line (control socket, base flags, fire-and-forget runner)
-  plus non-interactive auth probing and sudo-password resolution.
+* :class:`SSH` — the ``ssh`` binary wrapper: command line (control socket, base flags), a runner
+  with rc + optional-raise, non-interactive auth probing, sudo-password resolution, and remote
+  filesystem verbs (``mkdir``, ``rmdir``, ``scp_bundle``).
 * :class:`SCP` — the ``scp`` binary wrapper, riding on SSH's multiplexed control socket.
 * :class:`ShellCommand` — generic POSIX shell fragments (``pkill``, ``sudo``, ``rm -rf``, ``mkdir
   -p``) and safe path quoting; consumed by SSH, RemoteExecutorShell, and the teardown probes.
 * :class:`RemoteExecutorShell` — the ``catalyst-executor`` launcher command that runs on the remote host
   (CLI flags + full ``cd + env + exec`` line).
 
-Plus two free "verbs" — :func:`copy_bundle` and :func:`remove_remote_dir` — the actual remote
-operations. Consumed by :mod:`.process` (the remote process) and :mod:`.manager` (deploy/teardown).
+Consumed by :mod:`.process` (the remote process) and :mod:`.manager` (deploy/teardown).
 """
 
 from __future__ import annotations
@@ -205,6 +205,34 @@ class SSH:
         )
 
     @staticmethod
+    def rmdir(user: str, host: str, path: str, *, force: bool = False) -> None:
+        """Remove a remote directory recursively, guarded so it can never delete ``/`` or the
+        home directory. Resolves ``path`` (including a leading ``~``) to a canonical path on
+        the remote and refuses if it is empty, ``/``, or ``$HOME``. A missing directory is a
+        no-op.
+
+        ``force=True`` re-raises SSH/remote errors on failure; default swallows them (best-effort
+        teardown). The safety refusal (``/`` or ``$HOME``) always raises regardless of ``force``.
+
+        Raises:
+            ValueError: If ``path`` resolves to ``/`` or ``$HOME``.
+            RuntimeError: If ``force`` is set and the remote ``rm`` returned non-zero.
+        """
+        remote = (
+            f"ws={ShellCommand.path(path)}; "
+            'd=$(cd "$ws" 2>/dev/null && pwd) || exit 0; '
+            'if [ -z "$d" ] || [ "$d" = "/" ] || [ "$d" = "$HOME" ]; then exit 3; fi; '
+            'rm -rf "$d"'
+        )
+        rc = SSH.run(user, host, remote, timeout=30, log=True)
+        if rc == 3:
+            raise ValueError(
+                f"refusing to remove {path!r}: it resolves to '/' or the home directory"
+            )
+        if rc != 0 and force:
+            raise RuntimeError(f"failed to remove remote directory {path!r} (ssh rc={rc})")
+
+    @staticmethod
     def probe(user: str, host: str) -> bool:
         """Non-interactively check that key-based SSH works and whether sudo needs no password.
 
@@ -290,6 +318,31 @@ class SCP:
         Log.info("scp failed — retrying with the legacy protocol (scp -O)")
         if _once(legacy=True) != 0:
             raise RuntimeError(f"scp to {user}@{host}:{dest}/ failed")
+
+    @staticmethod
+    def bundle(user: str, host: str, bundle: Path, workspace: str) -> None:
+        """Copy every artifact in ``bundle`` to ``user@host:workspace/``, first creating the
+        workspace via :meth:`SSH.mkdir`. Composite of :meth:`SSH.mkdir` + :meth:`run`.
+
+        Raises:
+            RuntimeError: If ``bundle`` has no artifacts to copy.
+        """
+        files = sorted(p for p in bundle.iterdir() if p.is_file() and p.name != "README.md")
+        if not files:
+            raise RuntimeError(
+                f"no artifacts in {bundle} — pass build=<recipe> to cross-compile the executor + "
+                "runtime libs for the target, or point bundle= at a prebuilt directory."
+            )
+        total = sum(f.stat().st_size for f in files)
+        Log.info(
+            f"copying {len(files)} artifact(s), {total/1e6:.1f} MB -> {user}@{host}:{workspace}/"
+        )
+        for f in files:
+            Log.info(f"  - {f.name}  ({f.stat().st_size/1e6:.2f} MB)", level=2)
+        SSH.mkdir(user, host, workspace)
+        t0 = time.monotonic()
+        SCP.run(user, host, files, workspace)
+        Log.info(f"copied in {time.monotonic() - t0:.1f}s", level=2)
 
 
 class ShellCommand:
@@ -420,44 +473,3 @@ class RemoteExecutorShell:
 
 
 
-def copy_bundle(bundle: Path, user: str, host: str, workspace: str) -> None:
-    """Copy every artifact in ``bundle`` to ``user@host:workspace/``, creating the workspace
-    directory if it doesn't exist.
-
-    ``workspace`` is shell-quoted (with ``~`` expansion) before it is embedded in the remote
-    ``mkdir``; the scp target is passed as its own argv element and needs no quoting."""
-    files = sorted(p for p in bundle.iterdir() if p.is_file() and p.name != "README.md")
-    if not files:
-        raise RuntimeError(
-            f"no artifacts in {bundle} — pass build=<recipe> to cross-compile the executor + "
-            "runtime libs for the target, or point bundle= at a prebuilt directory."
-        )
-    total = sum(f.stat().st_size for f in files)
-    Log.info(f"copying {len(files)} artifact(s), {total/1e6:.1f} MB -> {user}@{host}:{workspace}/")
-    for f in files:
-        Log.info(f"  - {f.name}  ({f.stat().st_size/1e6:.2f} MB)", level=2)
-    SSH.mkdir(user, host, workspace)
-
-    t0 = time.monotonic()
-    SCP.run(user, host, files, workspace)
-    Log.info(f"copied in {time.monotonic() - t0:.1f}s", level=2)
-
-
-def remove_remote_dir(user: str, host: str, workspace: str) -> None:
-    """``rm -rf`` a remote workspace, guarded so it can never delete ``/`` or the home directory.
-
-    Resolves ``workspace`` (including a leading ``~``) to a canonical path on the remote and
-    refuses if it is empty, ``/``, or ``$HOME`` itself. A missing directory is a no-op."""
-    remote = (
-        f"ws={ShellCommand.path(workspace)}; "
-        'd=$(cd "$ws" 2>/dev/null && pwd) || exit 0; '
-        'if [ -z "$d" ] || [ "$d" = "/" ] || [ "$d" = "$HOME" ]; then exit 3; fi; '
-        'rm -rf "$d"'
-    )
-    rc = SSH.run(user, host, remote, timeout=30, log=True)
-    if rc == 3:
-        raise ValueError(
-            f"refusing to remove workspace {workspace!r}: it resolves to '/' or the home directory"
-        )
-    if rc != 0:
-        raise RuntimeError(f"failed to remove remote workspace {workspace!r} (ssh rc={rc})")

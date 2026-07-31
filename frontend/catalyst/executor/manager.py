@@ -41,13 +41,12 @@ from __future__ import annotations
 
 import atexit
 import contextlib
-import functools
 import getpass
 import platform
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Self
 
 from .utils import (
     Log,
@@ -58,7 +57,7 @@ from .utils import (
     triple_from_uname,
 )
 from .process import _ExecutorProcess, _LocalProcess, _RemoteProcess
-from .ssh import copy_bundle, remove_remote_dir, SSH
+from .ssh import SCP, SSH
 
 
 def _start_on_free_port(
@@ -250,8 +249,8 @@ class Executor:
         workspace = self._cfg.workspace or Paths.default_workspace()
         return user, host, workspace
 
-    def _maybe_deploy_bundle(self, user: str, host: str, workspace: str) -> None:
-        """Cross-build (if ``build=``) and scp the bundle to the workspace when ``copy=True`` and
+    def _scp_bundle(self, user: str, host: str, workspace: str) -> None:
+        """Cross-build (if ``build=``) then delegate to :meth:`SCP.bundle` when ``copy=True`` and
         a ``bundle=`` was supplied. No-op otherwise. The build recipe is called every deploy —
         must be idempotent."""
         if not (self._cfg.copy and self._cfg.bundle):
@@ -259,79 +258,71 @@ class Executor:
         bundle = Path(self._cfg.bundle)
         if self._cfg.build is not None:
             self._cfg.build(self.triple, bundle)
-        copy_bundle(bundle, user, host, workspace)
+        SCP.bundle(user, host, bundle, workspace)
 
-    def _new_local_process(self, port: int) -> _ExecutorProcess:
-        """Build a fresh :class:`_LocalProcess` bound to ``port`` — called per port-retry by
-        :func:`_start_on_free_port`."""
-        return _LocalProcess(
-            port=port,
-            executor_bin=self._cfg.executor_bin or Paths.default_executor_bin(),
-            plugins=self._cfg.plugins or [],
-            env=self._cfg.env,
-            ready_timeout=self._cfg.ready_timeout,
-            name=self.name,
-            log_path=Paths.resolve_log("localhost", name=self.name),
-        )
+    def _local_maker(self) -> Callable[[int], _ExecutorProcess]:
+        """Return a ``make(port)`` closure that builds a :class:`_LocalProcess`. Config-derived
+        values (executor binary, log path) are captured once so port-retries share them."""
+        default_bin = Paths.default_executor_bin()
+        log_path = Paths.resolve_log("localhost", name=self.name)
+        ready_timeout = self._cfg.ready_timeout
 
-    def _new_remote_process(
-        self,
-        port: int,
-        *,
-        user: str,
-        host: str,
-        workspace: str,
-        ws_pinned: bool,
-        sudo_pw: str | None,
-    ) -> _ExecutorProcess:
-        """Build a fresh :class:`_RemoteProcess` bound to ``port``. Deploy-once state
-        (workspace, sudo password) is passed in so retries reuse the same authenticated context."""
+        def make(port: int) -> _ExecutorProcess:
+            return _LocalProcess(
+                port=port,
+                executor_bin=self._cfg.executor_bin or default_bin,
+                plugins=self._cfg.plugins or [],
+                env=self._cfg.env,
+                ready_timeout=ready_timeout,
+                name=self.name,
+                log_path=log_path,
+            )
+
+        return make
+
+    def _remote_maker(self) -> Callable[[int], _ExecutorProcess]:
+        """Prep the remote deploy (resolve target, sudo, scp bundle) and return a ``make(port)``
+        closure that builds a :class:`_RemoteProcess`. Deploy-once state is captured so
+        port-retries reuse the same authenticated context — no re-prompt, no re-scp."""
+        user, host, workspace = self._remote_target()
+        ws_pinned = self._cfg.workspace is not None  # pinned dirs are left in place on teardown
+        sudo_pw = SSH.resolve_sudo(user, host, self._cfg.sudo_password) if self._cfg.sudo else None
+        self._scp_bundle(user, host, workspace)
         # copied bundle -> run it from the workspace (./); sudo's secure_path would miss a
         # bare name. Bare only when attaching to a remote that has it on PATH.
         default_bin = f"./{Paths.EXECUTOR_BIN}" if self._cfg.copy else Paths.EXECUTOR_BIN
-        return _RemoteProcess(
-            host=host,
-            user=user,
-            port=port,
-            local_port=self._cfg.local_port,
-            workspace=workspace,
-            plugins=self._cfg.plugins or [],
-            env=self._cfg.env,
-            sudo=self._cfg.sudo,
-            sudo_password=sudo_pw,
-            executor_bin=self._cfg.executor_bin or default_bin,
-            cleanup_ws=(not ws_pinned),
-            ready_timeout=self._cfg.ready_timeout,
-            name=self.name,
-            log_path=Paths.resolve_log(host, name=self.name),
-        )
+        log_path = Paths.resolve_log(host, name=self.name)
+        ready_timeout = self._cfg.ready_timeout
 
-    def launch(self) -> "Executor":
-        """Deploy the executor and return ``self`` (idempotent, chainable). See the class docstring
-        for the three modes."""
-        if self._launched:
-            return self
-        if not (self._local or self.host):
-            self._launched = True  # manual mode: nothing to deploy, use the given address
-            return self
-        Log.set_level(self._cfg.verbose)
-
-        if self._local:
-            make = self._new_local_process
-        else:
-            user, host, workspace = self._remote_target()
-            ws_pinned = self._cfg.workspace is not None  # pinned dirs are left in place on teardown
-            sudo_pw = SSH.resolve_sudo(user, host, self._cfg.sudo_password) if self._cfg.sudo else None
-            self._maybe_deploy_bundle(user, host, workspace)
-            make = functools.partial(
-                self._new_remote_process,
-                user=user,
+        def make(port: int) -> _ExecutorProcess:
+            return _RemoteProcess(
                 host=host,
+                user=user,
+                port=port,
+                local_port=self._cfg.local_port,
                 workspace=workspace,
-                ws_pinned=ws_pinned,
-                sudo_pw=sudo_pw,
+                plugins=self._cfg.plugins or [],
+                env=self._cfg.env,
+                sudo=self._cfg.sudo,
+                sudo_password=sudo_pw,
+                executor_bin=self._cfg.executor_bin or default_bin,
+                cleanup_ws=(not ws_pinned),
+                ready_timeout=ready_timeout,
+                name=self.name,
+                log_path=log_path,
             )
 
+        return make
+
+    def launch(self) -> Self:
+        """Deploy the executor and return ``self`` (idempotent, chainable). See the class docstring
+        for the three modes."""
+        # Short-circuit: already launched, or attach-only mode with nothing to deploy.
+        if self._launched or not (self._local or self.host):
+            self._launched = True
+            return self
+        Log.set_level(self._cfg.verbose)
+        make = self._local_maker() if self._local else self._remote_maker()
         self._proc = _start_on_free_port(make, self._cfg.port)
         self._address = self._proc.addr
         self._launched = True
@@ -339,8 +330,10 @@ class Executor:
         return self
 
     def stop(self) -> None:
-        """Tear down the executor and its tunnel (idempotent; no-op in attach-only mode). Removes
-        an auto-generated workspace; a pinned ``workspace=`` is left for :meth:`remove_workspace`."""
+        """Tear down the executor + tunnel and deregister from the atexit shutdown hook.
+        Idempotent; no-op in attach-only mode. Auto-generated workspaces are removed; a pinned
+        ``workspace=`` is left for :meth:`remove_workspace`. Subprocess errors during shutdown
+        are swallowed (best-effort)."""
         self._launched = False
         if self._proc is None:
             return
@@ -350,12 +343,13 @@ class Executor:
         _sessions.unregister(self.name)
         self._proc = None
 
-    def setup_workspace(self) -> "Executor":
-        """Deploy the bundle to a persistent remote workspace *without* starting the executor.
-        Requires ``host``, pinned ``workspace=``, and ``bundle``. Idempotent — later ``launch()``
-        on this instance or a fresh ``Executor(..., workspace=<same>)`` reuses it (``copy``
-        defaults off). Delete via :meth:`remove_workspace`. Copies as the login user (no sudo).
-        Returns ``self`` for chaining; raises :class:`ValueError` if any required arg is missing."""
+    def setup_workspace(self) -> Self:
+        """Remote only. Deploy the bundle to a persistent workspace *without* starting the
+        executor. Requires ``host``, pinned ``workspace=``, and ``bundle``. Idempotent — later
+        ``launch()`` on this instance or a fresh ``Executor(..., workspace=<same>)`` reuses it
+        (``copy`` defaults off). Delete via :meth:`remove_workspace`. Copies as the login user
+        (no sudo). Returns ``self`` for chaining; raises :class:`ValueError` if any required
+        arg is missing."""
         if not self.host:
             raise ValueError("setup_workspace() needs a remote host= (nothing to deploy locally)")
         if self._cfg.workspace is None:
@@ -369,28 +363,24 @@ class Executor:
         bundle = Path(self._cfg.bundle)
         if self._cfg.build is not None:
             self._cfg.build(self.triple, bundle)  # idempotent recipe (see build=); may cross-build
-        copy_bundle(bundle, user, host, workspace)
+        SCP.bundle(user, host, bundle, workspace)
         self._cfg.copy = False  # bundle is deployed; launch() on this instance won't re-copy
         return self
 
     def remove_workspace(self, force: bool = False) -> None:
-        """Delete a pinned remote workspace (dir + bundle) — explicit teardown for a persistent
-        workspace, never auto-removed. Refuses to delete ``/`` or ``$HOME``. ``force=True``
-        re-raises SSH errors instead of swallowing (the safety refusal always raises). Raises
-        :class:`ValueError` on missing ``host``/``workspace``."""
+        """Remote only. Delete a pinned workspace (dir + bundle) — explicit teardown for a
+        persistent workspace, never auto-removed. Refuses to delete ``/`` or ``$HOME``.
+        ``force=True`` re-raises SSH errors instead of swallowing (the safety refusal always
+        raises). Raises :class:`ValueError` on missing ``host``/``workspace``."""
         if not self.host:
             raise ValueError("remove_workspace() needs a remote host=")
         if self._cfg.workspace is None:
             raise ValueError("remove_workspace() needs a pinned workspace= to remove")
         Log.set_level(self._cfg.verbose)
         user, host, workspace = self._remote_target()
-        try:
-            remove_remote_dir(user, host, workspace)
-        except RuntimeError:
-            if force:
-                raise
+        SSH.rmdir(user, host, workspace, force=force)
 
-    def __enter__(self) -> "Executor":
+    def __enter__(self) -> Self:
         return self.launch()
 
     def __exit__(self, *exc) -> None:
