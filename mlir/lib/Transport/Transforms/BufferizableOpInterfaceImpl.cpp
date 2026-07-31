@@ -54,15 +54,30 @@ struct KickOpInterface
                             bufferization::BufferizationState &state) const
     {
         auto kickOp = cast<KickOp>(op);
-        auto tensorTy = dyn_cast<RankedTensorType>(kickOp.getPayload().getType());
-        if (!tensorTy)
+        if (!isa<RankedTensorType>(kickOp.getPayload().getType())) {
             return success(); // already a memref
+        }
         Location loc = op->getLoc();
-        MemRefType memTy = MemRefType::get(tensorTy.getShape(), tensorTy.getElementType());
-        auto toBuffer =
-            bufferization::ToBufferOp::create(rewriter, loc, memTy, kickOp.getPayload());
-        KickOp::create(rewriter, loc, kickOp.getSession(), toBuffer.getResult(),
-                       kickOp.getWorkItemIdxAttr());
+
+        FailureOr<Value> payloadBuffer = getBuffer(rewriter, kickOp.getPayload(), options, state);
+        if (failed(payloadBuffer)) {
+            return failure();
+        }
+
+        // The transport backend reads the payload as a contiguous block through the memref's
+        // aligned pointer, ignoring its strides and offset. Copy any non-identity-layout payload
+        // into a fresh contiguous buffer first so the intended elements are sent.
+        Value buffer = *payloadBuffer;
+        auto memrefTy = cast<MemRefType>(buffer.getType());
+        if (!memrefTy.getLayout().isIdentity()) {
+            MemRefType contiguousTy =
+                MemRefType::get(memrefTy.getShape(), memrefTy.getElementType());
+            auto alloc = memref::AllocOp::create(rewriter, loc, contiguousTy);
+            memref::CopyOp::create(rewriter, loc, buffer, alloc.getResult());
+            buffer = alloc.getResult();
+        }
+
+        KickOp::create(rewriter, loc, kickOp.getSession(), buffer, kickOp.getWorkItemIdxAttr());
         rewriter.eraseOp(op);
         return success();
     }
@@ -70,6 +85,7 @@ struct KickOpInterface
 
 struct CollectOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CollectOpInterface, CollectOp> {
+    bool bufferizesToAllocation(Operation *, Value) const { return true; }
     bool bufferizesToMemoryRead(Operation *, OpOperand &,
                                 const bufferization::AnalysisState &) const
     {
@@ -90,12 +106,20 @@ struct CollectOpInterface
                             bufferization::BufferizationState &state) const
     {
         auto collectOp = cast<CollectOp>(op);
-        if (!collectOp.getResult())
+        if (!collectOp.getResult()) {
             return success(); // already dest-passing
+        }
         Location loc = op->getLoc();
         auto tensorTy = cast<RankedTensorType>(collectOp.getResult().getType());
+
+        FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
+            rewriter, loc, collectOp.getResult(), options, state, /*copy=*/false);
+        if (failed(tensorAlloc)) {
+            return failure();
+        }
         MemRefType memTy = MemRefType::get(tensorTy.getShape(), tensorTy.getElementType());
-        Value buffer = memref::AllocOp::create(rewriter, loc, memTy);
+        Value buffer =
+            bufferization::ToBufferOp::create(rewriter, loc, memTy, *tensorAlloc).getResult();
         CollectOp::create(rewriter, loc, TypeRange{}, ValueRange{collectOp.getSession(), buffer});
         bufferization::replaceOpWithBufferizedValues(rewriter, op, buffer);
         return success();

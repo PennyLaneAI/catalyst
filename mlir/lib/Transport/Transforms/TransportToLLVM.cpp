@@ -15,7 +15,7 @@
 // Lower the `transport` dialect to `llvm.call`s on the __catalyst__transport__*
 // CAPI (runtime/include/TransportCAPI.h).
 
-#include "llvm/ADT/Twine.h"
+#include "llvm/ADT/StringExtras.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -53,13 +53,42 @@ Value emitCall(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, 
     return call.getNumResults() ? call.getResult() : Value();
 }
 
+std::string globalStrKey(StringRef prefix, StringRef value)
+{
+    std::string key = prefix.str();
+    for (char c : value) {
+        bool ok = llvm::isAlnum(c) || c == '_';
+        key.push_back(ok ? c : '_');
+    }
+    return key;
+}
+
 Value globalStr(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, StringRef prefix,
                 StringRef value)
 {
-    static int counter = 0;
-    std::string symName = (prefix + Twine(counter++)).str();
-    return LLVM::createGlobalString(loc, rewriter, symName, Twine(value).concat(Twine('\0')).str(),
-                                    LLVM::Linkage::Internal);
+    std::string data = value.str();
+    data.push_back('\0');
+    auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), data.size());
+    StringAttr dataAttr = rewriter.getStringAttr(data);
+
+    // Since the key is lossy, an existing global holding something else is not ours to reuse.
+    std::string base = globalStrKey(prefix, value);
+    std::string symName = base;
+    LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(symName);
+    for (unsigned n = 0; glb && glb.getValueOrNull() != dataAttr; ++n) {
+        symName = base + "." + std::to_string(n);
+        glb = mod.lookupSymbol<LLVM::GlobalOp>(symName);
+    }
+
+    if (!glb) {
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(mod.getBody());
+        glb = LLVM::GlobalOp::create(rewriter, loc, type, /*isConstant=*/true,
+                                     LLVM::Linkage::Internal, symName, dataAttr);
+    }
+    return LLVM::GEPOp::create(rewriter, loc, ptrTy(rewriter.getContext()), type,
+                               LLVM::AddressOfOp::create(rewriter, loc, glb),
+                               ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
 Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64_t v)
@@ -226,8 +255,12 @@ struct KickLowering : public OpConversionPattern<KickOp> {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         auto memTy = dyn_cast<MemRefType>(op.getPayload().getType());
-        if (!memTy)
+        if (!memTy) {
             return rewriter.notifyMatchFailure(op, "kick payload must be bufferized (memref)");
+        }
+        if (!memTy.getLayout().isIdentity()) {
+            return rewriter.notifyMatchFailure(op, "kick payload must have identity layout");
+        }
         auto [srcPtr, bytes] =
             memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getPayload(), memTy);
         Value slot = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__data_slot",
@@ -248,10 +281,16 @@ struct CollectLowering : public OpConversionPattern<CollectOp> {
     {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
-        if (!op.getDest())
+        if (!op.getDest()) {
             return rewriter.notifyMatchFailure(op,
                                                "collect must be bufferized (dest-passing form)");
+        }
         auto memTy = cast<MemRefType>(op.getDest().getType());
+        // The reply is written contiguously through the aligned pointer, ignoring the memref's
+        // strides and offset, so a non-identity dest layout would scatter the bytes wrongly.
+        if (!memTy.getLayout().isIdentity()) {
+            return rewriter.notifyMatchFailure(op, "collect dest must have identity layout");
+        }
         auto [dstPtr, bytes] = memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getDest(), memTy);
         emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__collect",
                  {ptrTy(ctx), ptrTy(ctx), i64Ty(ctx)}, i32Ty(ctx),
@@ -336,8 +375,9 @@ struct ConvertTransportToLLVMPass
         target.addLegalDialect<LLVM::LLVMDialect>();
         target.addIllegalDialect<TransportDialect>();
 
-        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns))))
+        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
+        }
     }
 };
 

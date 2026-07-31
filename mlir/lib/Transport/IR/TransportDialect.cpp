@@ -37,11 +37,76 @@ using namespace catalyst::transport;
 #define GET_TYPEDEF_CLASSES
 #include "Transport/IR/TransportOpsTypes.cpp.inc"
 
+//===----------------------------------------------------------------------===//
+// Transport attribute definitions.
+//===----------------------------------------------------------------------===//
+
+#define GET_ATTRDEF_CLASSES
+#include "Transport/IR/TransportAttributes.cpp.inc"
+
+StringAttr NodeAttr::keyOr(llvm::StringRef fallback) const
+{
+    if (StringAttr n = getName(); n && !n.getValue().empty()) {
+        return n;
+    }
+    return StringAttr::get(getContext(), fallback);
+}
+
+StringAttr NodeAttr::dataPathOr(llvm::StringRef dflt) const
+{
+    if (StringAttr p = getDataPath(); p && !p.getValue().empty()) {
+        return p;
+    }
+    return StringAttr::get(getContext(), dflt);
+}
+
+bool NodeAttr::isRemote() const
+{
+    BoolAttr r = getRemote();
+    return r && r.getValue();
+}
+
+static int64_t intOr(IntegerAttr field, int64_t dflt) { return field ? field.getInt() : dflt; }
+
+// Default per-message payload width, matching the current backend's defaults.
+constexpr int64_t kDefaultMessageBytes = 8;
+
+int64_t NodeAttr::oobPort() const { return intOr(getOobPort(), 0); }
+int64_t NodeAttr::inBytes() const { return intOr(getInBytes(), kDefaultMessageBytes); }
+int64_t NodeAttr::outBytes() const { return intOr(getOutBytes(), kDefaultMessageBytes); }
+int64_t NodeAttr::workItemIdx() const { return intOr(getWorkItemIdx(), 0); }
+
+LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                                   StringAttr transport, NodeAttr controller,
+                                   llvm::ArrayRef<NodeAttr> coprocessors)
+{
+    if (!controller) {
+        return emitError() << "backline requires a controller";
+    }
+    for (NodeAttr c : coprocessors) {
+        if (!c) {
+            return emitError() << "null coprocessor";
+        }
+        if (!c.getPeer() || c.getPeer().getValue().empty()) {
+            return emitError() << "coprocessor requires a 'peer'";
+        }
+        if (!c.getSymbol() || c.getSymbol().getValue().empty()) {
+            return emitError() << "coprocessor requires a 'symbol'";
+        }
+    }
+    return success();
+}
+
 void TransportDialect::initialize()
 {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "Transport/IR/TransportOpsTypes.cpp.inc"
+        >();
+
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "Transport/IR/TransportAttributes.cpp.inc"
         >();
 
     addOperations<

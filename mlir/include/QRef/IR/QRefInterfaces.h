@@ -18,6 +18,8 @@
 
 #include "mlir/IR/OpDefinition.h"
 
+#include "Catalyst/Analysis/ResourceInterfaces.h"
+
 //===----------------------------------------------------------------------===//
 // QRef interface declarations.
 //===----------------------------------------------------------------------===//
