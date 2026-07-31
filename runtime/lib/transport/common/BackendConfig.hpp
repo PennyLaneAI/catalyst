@@ -46,8 +46,6 @@ struct BackendConfig {
  */
 inline BackendConfig parse_backend_config(const std::string &config, const char *backend)
 {
-    // Parsed into locals so a rejected config never yields a partially built
-    // BackendConfig.
     std::string dev;
     int gid = 0;
     bool have_dev = false, have_gid = false;
