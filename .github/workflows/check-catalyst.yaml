@@ -529,11 +529,8 @@ jobs:
 
     - name: Install Catalyst Frontend
       run: |
-        make frontend
-
-    - name: Install PennyLane from source
-      run: |
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
+        make frontend \
+          PENNYLANE_SOURCE=git+https://github.com/PennyLaneAI/pennylane@port-z-cz-ccz
 
     - name: Verify Graphviz installation
       run: |
@@ -616,11 +613,8 @@ jobs:
 
     - name: Install Catalyst Frontend
       run: |
-        make frontend
-
-    - name: Install PennyLane from source
-      run: |
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
+        make frontend \
+          PENNYLANE_SOURCE=git+https://github.com/PennyLaneAI/pennylane@port-z-cz-ccz
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
@@ -687,11 +681,8 @@ jobs:
 
     - name: Install Catalyst Frontend
       run: |
-        make frontend
-
-    - name: Install PennyLane from source
-      run: |
-        python3 -m pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
+        make frontend \
+          PENNYLANE_SOURCE=git+https://github.com/PennyLaneAI/pennylane@port-z-cz-ccz
 
   runtime-device-tests:
     name: Third-Party Device Tests (C++)
