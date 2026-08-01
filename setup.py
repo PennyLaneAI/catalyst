@@ -20,6 +20,7 @@ import glob
 import os
 import platform
 import re
+import shlex
 import subprocess
 import sys
 from typing import Optional
@@ -27,6 +28,7 @@ from typing import Optional
 # build deps
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools._distutils import sysconfig
+from setuptools._distutils.util import get_platform
 from setuptools.command.build_ext import build_ext
 
 system_platform = platform.system()
@@ -338,6 +340,51 @@ class CustomBuildExtMacos(UnifiedBuildExt):
 
 Py_LIMITED_API_macros = [("Py_LIMITED_API", "0x030C0000")]
 
+
+def _get_macos_local_arch():
+    """Get the local macOS architecture name used in wheel platform tags."""
+    return {"AMD64": "x86_64"}.get(platform.machine(), platform.machine())
+
+
+def _get_macos_platform_name():
+    """Get the macOS platform tag matching the local architecture."""
+    sysconfig_platform = get_platform().replace("-", "_")
+    match = re.match(r"macosx_(\d+_\d+)_", sysconfig_platform)
+    if match:
+        deployment_target = match.group(1)
+    else:
+        deployment_target = sysconfig.get_config_var("MACOSX_DEPLOYMENT_TARGET")
+        deployment_target = "_".join(deployment_target.split(".")[:2])
+    return f"macosx_{deployment_target}_{_get_macos_local_arch()}"
+
+
+def _macos_arch_flags(flags, arch):
+    """Replace any inherited macOS -arch flags with the local architecture."""
+    parts = []
+    skip_next = False
+    for part in shlex.split(flags):
+        if skip_next:
+            skip_next = False
+            continue
+        if part == "-arch":
+            skip_next = True
+            continue
+        if part.startswith("-arch="):
+            continue
+        parts.append(part)
+    return " ".join([*parts, "-arch", arch])
+
+
+def _has_command_line_option(command, option):
+    """Return whether a distutils command option was explicitly supplied."""
+    if command not in sys.argv:
+        return False
+    command_index = sys.argv.index(command)
+    return any(
+        arg == option or arg.startswith(f"{option}=") for arg in sys.argv[command_index + 1 :]
+    )
+
+
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
     custom_calls_extension = Extension(
@@ -353,11 +400,15 @@ if system_platform == "Linux":
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
 elif system_platform == "Darwin":
+    macos_arch = _get_macos_local_arch()
     variables = sysconfig.get_config_vars()
     # Here we need to switch the deault to MacOs dynamic lib
     variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
     if sysconfig.get_config_var("LDCXXSHARED"):
         variables["LDCXXSHARED"] = variables["LDCXXSHARED"].replace("-bundle", "-dynamiclib")
+    for variable in ("CFLAGS", "LDFLAGS", "LDSHARED", "LDCXXSHARED"):
+        if variables.get(variable):
+            variables[variable] = _macos_arch_flags(variables[variable], macos_arch)
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
         sources=[
@@ -365,7 +416,8 @@ elif system_platform == "Darwin":
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
         ],
-        extra_compile_args=["-std=c++20"],
+        extra_compile_args=["-std=c++20", "-arch", macos_arch],
+        extra_link_args=["-arch", macos_arch],
         define_macros=Py_LIMITED_API_macros,
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
@@ -380,6 +432,8 @@ ext_modules = [
 ]
 
 options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
+if system_platform == "Darwin" and not _has_command_line_option("bdist_wheel", "--plat-name"):
+    options.setdefault("bdist_wheel", {})["plat_name"] = _get_macos_platform_name()
 # For any compiler packages seeking to be registered in PennyLane, it is imperative that they
 # expose the entry_points metadata under the designated group name `pennylane.compilers`, with
 # the following entry points:
