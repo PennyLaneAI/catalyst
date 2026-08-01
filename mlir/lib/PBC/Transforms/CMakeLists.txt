@@ -37,6 +37,7 @@ set(LIBS
     ${conversion_libs}
     MLIRPBC
     PBCUtils
+    quantum-transforms
 )
 
 set(DEPENDS

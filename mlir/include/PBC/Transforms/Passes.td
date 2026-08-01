@@ -120,7 +120,25 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
 def PPRToPPMPass : Pass<"ppr-to-ppm"> {
     let summary = "Convert PPRotation operations to Pauli Product Measurement operations.";
 
-    let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
+    let description = [{
+        This pass first invokes `adjoint-lowering` as a nested pipeline so that
+        PPRotation operations inside `quantum.adjoint` regions are reversed before
+        they are converted to Pauli Product Measurements. Quantum allocation,
+        deallocation, register access, and global phase operations may remain in
+        the resulting PBC representation; other Quantum dialect operations must
+        be converted before this pass.
+    }];
+
+    let dependentDialects = [
+        "arith::ArithDialect",
+        "catalyst::CatalystDialect",
+        "catalyst::pbc::PBCDialect",
+        "complex::ComplexDialect",
+        "index::IndexDialect",
+        "memref::MemRefDialect",
+        "scf::SCFDialect",
+        "tensor::TensorDialect"
+    ];
 
     let options = [DecomposeMethodOption, AvoidYMeasureOption];
 }

@@ -272,6 +272,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `ppr-to-ppm` pass now supports PPRotation operations inside `quantum.adjoint` regions by
+  invoking `adjoint-lowering` before converting the reversed rotations to Pauli product
+  measurements.
+  [(#2934)](https://github.com/PennyLaneAI/catalyst/pull/2934)
+
 * Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
   the top-level module. Functions inside nested modules, such as kernels called through
   `catalyst.launch_kernel`, are now included in the output.

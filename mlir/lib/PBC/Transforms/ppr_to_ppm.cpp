@@ -14,12 +14,23 @@
 
 #define DEBUG_TYPE "ppr-to-ppm"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/Index/IR/IndexDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
+#include "PBC/IR/PBCDialect.h"
+#include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Passes.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -41,19 +52,30 @@ struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
         auto ctx = &getContext();
         auto module = getOperation();
 
-        RewritePatternSet non_clifford_patterns(ctx);
-        populateDecomposeNonCliffordPPRPatterns(non_clifford_patterns, decomposeMethod,
-                                                avoidYMeasure);
-
-        if (failed(applyPatternsGreedily(module, std::move(non_clifford_patterns)))) {
+        OpPassManager pm("builtin.module");
+        pm.addPass(quantum::createAdjointLoweringPass());
+        if (failed(runPipeline(pm, module))) {
             return signalPassFailure();
         }
 
-        // Decompose Clifford PPRs into PPMs
-        RewritePatternSet clifford_patterns(ctx);
-        populateDecomposeCliffordPPRPatterns(clifford_patterns, avoidYMeasure);
+        ConversionTarget target(*ctx);
+        target.addLegalDialect<pbc::PBCDialect>();
+        target.addLegalDialect<mlir::arith::ArithDialect>();
+        target.addLegalDialect<mlir::scf::SCFDialect>();
+        target.addDynamicallyLegalOp<pbc::PPRotationOp>([](pbc::PPRotationOp op) {
+            return !op.hasPiOverFourRotation() && (!op.isNonClifford() || op.getCondition());
+        });
+        target.addDynamicallyLegalDialect<quantum::QuantumDialect>([](Operation *op) {
+            return isa<quantum::AllocOp, quantum::AllocQubitOp, quantum::DeallocOp,
+                       quantum::DeallocQubitOp, quantum::ExtractOp, quantum::InsertOp,
+                       quantum::GlobalPhaseOp>(op);
+        });
 
-        if (failed(applyPatternsGreedily(module, std::move(clifford_patterns)))) {
+        RewritePatternSet patterns(ctx);
+        populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod, avoidYMeasure);
+        populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure);
+
+        if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
             return signalPassFailure();
         }
     }

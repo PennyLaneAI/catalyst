@@ -59,6 +59,19 @@ _Convert CliffordT operations to Pauli Product Measurement operations._
 
 _Count specs in Pauli Product Measurement operations._
 
+### `-ppr-to-ppm`
+
+_Convert PPRotation operations to Pauli Product Measurement operations._
+
+This pass first invokes `adjoint-lowering` as a nested pipeline so that PPRotation operations inside `quantum.adjoint` regions are reversed before they are converted to Pauli Product Measurements. Quantum allocation, deallocation, register access, and global phase operations may remain in the resulting PBC representation; other Quantum dialect operations must be converted before this pass.
+
+#### Options
+
+```
+-decompose-method : Decomposition method to use
+-avoid-y-measure  : Avoid Pauli-Y measurements for Clifford rotations. Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly), a Y state is used instead (requires Y state preparation).
+```
+
 ### `-to-ppr`
 
 _Convert quantum dialects to the PBC dialect._
