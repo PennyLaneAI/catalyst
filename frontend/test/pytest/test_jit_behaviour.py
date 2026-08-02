@@ -26,7 +26,9 @@ from jax import numpy as jnp
 from numpy import pi
 
 from catalyst import for_loop, grad, measure, qjit
+from catalyst.compiler import Compiler
 from catalyst.jax_primitives import _scalar_abstractify
+from catalyst.pipelines import CompileOptions
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
     get_abstract_signature,
@@ -1036,6 +1038,47 @@ class TestQJITUsagePatterns:
         expected = 30
         assert res_pattern_fn_as_argument == expected
         assert res_pattern_partial == expected
+
+    def test_cache_option_normalization(self, tmp_path, monkeypatch):
+        """Test persistent cache option normalization."""
+        cache_home = tmp_path / "cache-home"
+        explicit_cache = tmp_path / "explicit-cache"
+        monkeypatch.setenv("XDG_CACHE_HOME", str(cache_home))
+
+        assert CompileOptions(cache=False).cache is None
+        assert CompileOptions(cache=None).cache is None
+        assert CompileOptions(cache=True).cache == cache_home / "catalyst" / "qjit"
+        assert CompileOptions(cache=explicit_cache).cache == explicit_cache
+
+    def test_persistent_cache_skips_second_compile(self, backend, tmp_path, monkeypatch):
+        """Test that a fresh QJIT wrapper can reuse a persistent cache entry."""
+        calls = 0
+        run = Compiler.run
+
+        def counted_run(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return run(*args, **kwargs)
+
+        monkeypatch.setattr(Compiler, "run", counted_run)
+
+        def build_circuit():
+            @qjit(cache=tmp_path)
+            @qp.qnode(qp.device(backend, wires=1))
+            def circuit(x):
+                qp.RX(x, wires=0)
+                return qp.expval(qp.PauliZ(0))
+
+            return circuit
+
+        circuit_1 = build_circuit()
+        res_1 = circuit_1(jnp.array(0.3))
+
+        circuit_2 = build_circuit()
+        res_2 = circuit_2(jnp.array(0.3))
+
+        assert calls == 1
+        assert np.allclose(res_1, res_2)
 
 
 class TestGradPartial:

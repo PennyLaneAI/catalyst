@@ -20,11 +20,18 @@ compilation of hybrid quantum-classical functions using Catalyst.
 
 import copy
 import functools
+import hashlib
 import inspect
+import json
 import logging
 import os
+import platform
+import shutil
+import sys
+import tempfile
 import warnings
 from contextlib import contextmanager
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -96,6 +103,7 @@ def qjit(
     dialect_plugins=None,
     capture="global",
     skip_preprocess=False,
+    cache=False,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -189,6 +197,9 @@ def qjit(
             the validity of the program themselves. If ``capture=False``, or ``capture="global"``
             and ``qp.capture.enabled() == False``, this argument will be ignored. ``False``
             by default.
+        cache (bool or str or Path): Persistent compilation cache location. ``False`` disables
+            persistent caching, ``True`` uses the default user cache directory, and a path stores
+            artifacts in that directory.
 
     Returns:
         QJIT object.
@@ -755,7 +766,7 @@ class QJIT(CatalystCallable):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
             self.mlir_module = self.generate_ir()
-            self.compiled_function, self.llvm_ir = self.compile()
+            self.compiled_function, self.llvm_ir = self._compile_with_cache(args)
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -896,6 +907,25 @@ class QJIT(CatalystCallable):
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
         """
+        func_name, restype = self._get_compiled_function_abi()
+
+        if self.overwrite_ir:
+            shared_object, llvm_ir = self.compiler.run_from_ir(
+                self.overwrite_ir,
+                str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+                self.workspace,
+            )
+        else:
+            shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
+
+        if not self.compile_options.link:
+            return None, llvm_ir
+
+        compiled_fn = self._make_compiled_function(shared_object, func_name, restype)
+        return compiled_fn, llvm_ir
+
+    def _get_compiled_function_abi(self):
+        """Get the entry point symbol and return type for the compiled function."""
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
         restype = entry_point_func.type.results
@@ -911,22 +941,93 @@ class QJIT(CatalystCallable):
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        if self.overwrite_ir:
-            shared_object, llvm_ir = self.compiler.run_from_ir(
-                self.overwrite_ir,
-                str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
-                self.workspace,
-            )
-        else:
-            shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
+        return func_name, restype
 
-        if not self.compile_options.link:
-            return None, llvm_ir
+    def _make_compiled_function(self, shared_object, func_name, restype):
+        """Create a CompiledFunction for the current QJIT metadata."""
+        return CompiledFunction(shared_object, func_name, restype, self.out_type, self.compile_options)
 
-        compiled_fn = CompiledFunction(
-            shared_object, func_name, restype, self.out_type, self.compile_options
-        )
+    def _compile_with_cache(self, args):
+        """Compile the function, reusing an opt-in persistent cache when available."""
+        cache_dir = self.compile_options.cache
+        if not cache_dir or self.overwrite_ir or not self.compile_options.link:
+            return self.compile()
+
+        cache_key = self._persistent_cache_key(args)
+        entry_dir = Path(cache_dir) / cache_key
+        shared_object = entry_dir / f"{self.__name__}.so"
+        llvm_ir_file = entry_dir / f"{self.__name__}.ll"
+
+        if shared_object.exists():
+            func_name, restype = self._get_compiled_function_abi()
+            llvm_ir = llvm_ir_file.read_text(encoding="utf-8") if llvm_ir_file.exists() else None
+            return self._make_compiled_function(str(shared_object), func_name, restype), llvm_ir
+
+        compiled_fn, llvm_ir = self.compile()
+        self._store_persistent_cache_entry(entry_dir, shared_object, llvm_ir_file, compiled_fn, llvm_ir)
         return compiled_fn, llvm_ir
+
+    def _persistent_cache_key(self, args):
+        """Build a stable cache key for the current MLIR module and compilation settings."""
+        options = self.compile_options
+        cache_data = {
+            "version": 1,
+            "mlir": self.mlir,
+            "signature": repr(self.c_sig),
+            "args": repr(get_abstract_signature(filter_static_args(args, options.static_argnums))),
+            "options": {
+                "target": options.target,
+                "use_nameloc": options.use_nameloc,
+                "pipelines": repr(options.pipelines),
+                "async_qnodes": options.async_qnodes,
+                "abstracted_axes": repr(options.abstracted_axes),
+                "lower_to_llvm": options.lower_to_llvm,
+                "disable_assertions": options.disable_assertions,
+                "seed": options.seed,
+                "circuit_transform_pipeline": repr(options.circuit_transform_pipeline),
+                "pass_plugins": sorted(str(p) for p in options.pass_plugins),
+                "dialect_plugins": sorted(str(p) for p in options.dialect_plugins),
+                "capture": options.capture,
+                "skip_preprocess": options.skip_preprocess,
+            },
+            "environment": {
+                "catalyst": getattr(catalyst, "__version__", None),
+                "python": sys.version,
+                "platform": platform.platform(),
+                "machine": platform.machine(),
+            },
+        }
+        payload = json.dumps(cache_data, sort_keys=True, default=str).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    @staticmethod
+    def _atomic_copy(src, dst):
+        """Copy src to dst atomically."""
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=str(dst.parent), delete=False) as tmp:
+            tmp_name = tmp.name
+        try:
+            shutil.copy2(src, tmp_name)
+            os.replace(tmp_name, dst)
+        finally:
+            if os.path.exists(tmp_name):
+                os.remove(tmp_name)
+
+    def _store_persistent_cache_entry(
+        self, entry_dir, shared_object, llvm_ir_file, compiled_fn, llvm_ir
+    ):
+        """Persist compiled artifacts for reuse by later QJIT instances."""
+        if compiled_fn is None:
+            return
+
+        entry_dir.mkdir(parents=True, exist_ok=True)
+        self._atomic_copy(compiled_fn.shared_object.shared_object_file, shared_object)
+
+        if llvm_ir is not None:
+            with tempfile.NamedTemporaryFile("w", dir=str(entry_dir), delete=False) as tmp:
+                tmp_name = tmp.name
+                tmp.write(llvm_ir)
+            os.replace(tmp_name, llvm_ir_file)
 
     @instrument(has_finegrained=True)
     @debug_logger
