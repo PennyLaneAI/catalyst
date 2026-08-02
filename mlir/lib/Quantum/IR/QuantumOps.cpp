@@ -26,7 +26,6 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
@@ -70,63 +69,18 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 // Quantum op canonicalizers.
 //===----------------------------------------------------------------------===//
-static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
-                                               "CY",       "CZ",     "SWAP",   "Toffoli"};
-static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
-                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
-
-LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
+LogicalResult CustomOp::canonicalize(CustomOp, mlir::PatternRewriter &)
 {
-    if (op.getAdjoint()) {
-        auto name = op.getGateName();
-        if (hermitianOps.contains(name)) {
-            op.setAdjoint(false);
-            return success();
-        }
-        else if (rotationsOps.contains(name)) {
-            auto params = op.getParams();
-            SmallVector<Value> paramsNeg;
-            for (auto param : params) {
-                auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), param);
-                paramsNeg.push_back(paramNeg);
-            }
-
-            rewriter.replaceOpWithNewOp<CustomOp>(
-                op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
-                op.getInQubits(), name, false, op.getInCtrlQubits(), op.getInCtrlValues());
-
-            return success();
-        }
-        return failure();
-    }
     return failure();
 }
 
-LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
+LogicalResult MultiRZOp::canonicalize(MultiRZOp, mlir::PatternRewriter &)
 {
-    if (op.getAdjoint()) {
-        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
-
-        rewriter.replaceOpWithNewOp<MultiRZOp>(
-            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
-            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
-
-        return success();
-    };
     return failure();
 }
 
-LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter)
+LogicalResult PCPhaseOp::canonicalize(PCPhaseOp, mlir::PatternRewriter &)
 {
-    if (op.getAdjoint()) {
-        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
-
-        rewriter.replaceOpWithNewOp<PCPhaseOp>(
-            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
-            op.getDimAttr(), op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
-
-        return success();
-    };
     return failure();
 }
 

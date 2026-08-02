@@ -14,7 +14,9 @@
 
 #define DEBUG_TYPE "merge-rotation"
 
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -34,7 +36,96 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_MERGEROTATIONSPASS
+#define GEN_PASS_DEF_RESOLVEADJOINTSPASS
 #include "Quantum/Transforms/Passes.h.inc"
+
+static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
+                                               "CY",       "CZ",     "SWAP",   "Toffoli"};
+static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
+                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
+
+struct ResolveCustomAdjointRewritePattern : public OpRewritePattern<CustomOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override
+    {
+        if (!op.getAdjoint()) {
+            return failure();
+        }
+
+        auto name = op.getGateName();
+        if (hermitianOps.contains(name)) {
+            op.setAdjoint(false);
+            return success();
+        }
+        if (!rotationsOps.contains(name)) {
+            return failure();
+        }
+
+        SmallVector<Value> paramsNeg;
+        for (auto param : op.getParams()) {
+            paramsNeg.push_back(arith::NegFOp::create(rewriter, op.getLoc(), param));
+        }
+
+        rewriter.replaceOpWithNewOp<CustomOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramsNeg,
+            op.getInQubits(), name, false, op.getInCtrlQubits(), op.getInCtrlValues());
+        return success();
+    }
+};
+
+struct ResolveMultiRZAdjointRewritePattern : public OpRewritePattern<MultiRZOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override
+    {
+        if (!op.getAdjoint()) {
+            return failure();
+        }
+
+        auto paramNeg = arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
+        rewriter.replaceOpWithNewOp<MultiRZOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
+            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+        return success();
+    }
+};
+
+struct ResolvePCPhaseAdjointRewritePattern : public OpRewritePattern<PCPhaseOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(PCPhaseOp op, PatternRewriter &rewriter) const override
+    {
+        if (!op.getAdjoint()) {
+            return failure();
+        }
+
+        auto paramNeg = arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
+        rewriter.replaceOpWithNewOp<PCPhaseOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
+            op.getDimAttr(), op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+        return success();
+    }
+};
+
+static void populateResolveAdjointsPatterns(RewritePatternSet &patterns)
+{
+    patterns.add<ResolveCustomAdjointRewritePattern, ResolveMultiRZAdjointRewritePattern,
+                 ResolvePCPhaseAdjointRewritePattern>(patterns.getContext());
+}
+
+struct ResolveAdjointsPass : impl::ResolveAdjointsPassBase<ResolveAdjointsPass> {
+    using ResolveAdjointsPassBase::ResolveAdjointsPassBase;
+
+    void runOnOperation() final
+    {
+        RewritePatternSet patterns(&getContext());
+        populateResolveAdjointsPatterns(patterns);
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+            return signalPassFailure();
+        }
+    }
+};
 
 struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
     using MergeRotationsPassBase::MergeRotationsPassBase;
@@ -48,10 +139,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
 
         RewritePatternSet patternsCanonicalization(&getContext());
 
-        catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
-                                                                 &getContext());
-        catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
-                                                                  &getContext());
+        populateResolveAdjointsPatterns(patternsCanonicalization);
         catalyst::pbc::PPRotationOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
         catalyst::pbc::PPRotationArbitraryOp::getCanonicalizationPatterns(patternsCanonicalization,
