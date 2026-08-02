@@ -14,16 +14,14 @@
 
 #pragma once
 
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
+namespace mlir {
+class DialectRegistry;
+} // namespace mlir
 
-#include "Transport/IR/TransportDialect.h"
+namespace catalyst {
+namespace transport {
 
-#define GET_ATTRDEF_CLASSES
-#include "Transport/IR/TransportAttributes.h.inc"
+void registerBufferizableOpInterfaceExternalModels(mlir::DialectRegistry &registry);
 
-#define GET_OP_CLASSES
-#include "Transport/IR/TransportOps.h.inc"
+} // namespace transport
+} // namespace catalyst
