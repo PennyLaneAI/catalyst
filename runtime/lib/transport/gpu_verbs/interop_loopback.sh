@@ -6,9 +6,15 @@
 # Both observe DEMO_SYNDROME and exit 0, then the script prints "INTEROP: PASS".
 #
 # Requires a NIC with GPUDirect RDMA (dma-buf MR) support.
-# Env overrides: DEV (mlx5_1), GID (3), PORT (18560).
 set -u
-DEV=${DEV:-mlx5_1}; GID=${GID:-3}; PORT=${PORT:-18560}
+DEV=${DEV:-}; GID=${GID:-}; PORT=${PORT:-18560}
+if [ -z "$DEV" ] || [ -z "$GID" ]; then
+  echo "usage: DEV=<rdma_device> GID=<gid_index> [PORT=<n>] $0"
+  echo "devices on this host:"
+  ibv_devices 2>/dev/null || echo "  (ibv_devices not found; install rdma-core tools)"
+  echo "GID indices for a device: show_gids <dev>, or /sys/class/infiniband/<dev>/ports/1/gids"
+  exit 2
+fi
 B=$(cd "$(dirname "$0")" && pwd)/../../../build
 GPU="$B/lib/transport/gpu_verbs/gpu_verbs_selftest"
 CPU="$B/lib/transport/cpu_verbs/cpu_verbs_selftest"

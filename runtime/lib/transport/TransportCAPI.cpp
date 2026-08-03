@@ -307,8 +307,7 @@ int __catalyst__transport__establish_channel(CatalystTransportSession *s, const 
     });
 }
 
-int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol,
-                                              int32_t convention)
+int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol)
 {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
@@ -327,7 +326,7 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
                 return CATALYST_TRANSPORT_ERR;
             }
         }
-        switch (static_cast<CoprocConvention>(convention)) {
+        switch (co->coprocessor_fn_convention()) {
         case CoprocConvention::PerMessage:
             // No symbol -> the core's built-in echo.
             co->set_coprocessor_fn(
@@ -340,7 +339,8 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
                                          nullptr);
             return CATALYST_TRANSPORT_OK;
         }
-        std::cerr << "[transport] set_coprocessor_fn: unknown convention " << convention << "\n";
+        std::cerr << "[transport] set_coprocessor_fn: backend reported an unknown convention "
+                  << static_cast<std::int32_t>(co->coprocessor_fn_convention()) << "\n";
         return CATALYST_TRANSPORT_ERR;
     });
 }

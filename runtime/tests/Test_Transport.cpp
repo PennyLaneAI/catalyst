@@ -88,10 +88,8 @@ TEST_CASE("set_coprocessor_fn: an empty symbol binds the built-in echo", "[trans
 {
     auto *s = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
     REQUIRE(s != nullptr);
-    CHECK(__catalyst__transport__set_coprocessor_fn(s, "", CATALYST_COPROC_PER_MESSAGE) ==
-          CATALYST_TRANSPORT_OK);
-    CHECK(__catalyst__transport__set_coprocessor_fn(s, nullptr, CATALYST_COPROC_PER_MESSAGE) ==
-          CATALYST_TRANSPORT_OK);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "") == CATALYST_TRANSPORT_OK);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, nullptr) == CATALYST_TRANSPORT_OK);
     __catalyst__transport__destroy(s);
 }
 
@@ -99,11 +97,7 @@ TEST_CASE("set_coprocessor_fn: an unresolved symbol is an error", "[transport]")
 {
     auto *s = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
     REQUIRE(s != nullptr);
-    CHECK(__catalyst__transport__set_coprocessor_fn(s, "catalyst_no_such_symbol_xyz",
-                                                    CATALYST_COPROC_PER_MESSAGE) ==
-          CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__set_coprocessor_fn(s, "catalyst_no_such_symbol_xyz",
-                                                    CATALYST_COPROC_LAUNCH_ONCE) ==
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "catalyst_no_such_symbol_xyz") ==
           CATALYST_TRANSPORT_ERR);
     __catalyst__transport__destroy(s);
 }
@@ -112,28 +106,16 @@ TEST_CASE("set_coprocessor_fn on a controller session is an error", "[transport]
 {
     auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "");
     REQUIRE(s != nullptr);
-    CHECK(__catalyst__transport__set_coprocessor_fn(s, "", CATALYST_COPROC_PER_MESSAGE) ==
-          CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__set_coprocessor_fn(s, "", CATALYST_COPROC_LAUNCH_ONCE) ==
-          CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "") == CATALYST_TRANSPORT_ERR);
     __catalyst__transport__destroy(s);
 }
 
-TEST_CASE("set_coprocessor_fn: an unsupported convention is a clean error", "[transport]")
+TEST_CASE("set_coprocessor_fn binds through the setter the backend implements", "[transport]")
 {
-    auto *s = make(kCoprocessor, "");
+    auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "launch_once",
+                                            CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
     REQUIRE(s != nullptr);
-    CHECK(__catalyst__transport__set_coprocessor_fn(s, "", CATALYST_COPROC_LAUNCH_ONCE) ==
-          CATALYST_TRANSPORT_ERR);
-    __catalyst__transport__destroy(s);
-}
-
-TEST_CASE("set_coprocessor_fn: an out-of-range convention is rejected", "[transport]")
-{
-    auto *s = make(kCoprocessor, "");
-    REQUIRE(s != nullptr);
-    CHECK(__catalyst__transport__set_coprocessor_fn(s, "", 42) == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__set_coprocessor_fn(s, "", -1) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "") == CATALYST_TRANSPORT_OK);
     __catalyst__transport__destroy(s);
 }
 
@@ -142,10 +124,7 @@ TEST_CASE("null session arguments are rejected without crashing", "[transport]")
     CHECK(__catalyst__transport__connect(nullptr, "127.0.0.1", 0) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__exchange_keys(nullptr) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__establish_channel(nullptr, "cpu_verbs") == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__set_coprocessor_fn(nullptr, "", CATALYST_COPROC_PER_MESSAGE) ==
-          CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__set_coprocessor_fn(nullptr, "", CATALYST_COPROC_LAUNCH_ONCE) ==
-          CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__set_coprocessor_fn(nullptr, "") == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__commit_work_item(nullptr, 0, 0, 0) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__kick(nullptr, 0) == CATALYST_TRANSPORT_ERR);
     std::uint8_t buf[4] = {};
