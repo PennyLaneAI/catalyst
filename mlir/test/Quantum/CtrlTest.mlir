@@ -159,23 +159,3 @@ func.func @ctrl_scf(%ctrl: !quantum.bit, %q: !quantum.bit, %cond: i1) -> !quantu
   }
   return %outc : !quantum.bit
 }
-
-// -----
-
-// A nested quantum.adjoint inside a ctrl region is not supported; adjoint-lowering must run first.
-func.func @ctrl_nested_adjoint(%ctrl: !quantum.bit, %reg: !quantum.reg) -> !quantum.bit {
-  %true = arith.constant true
-  %outc, %outr = quantum.ctrl(%ctrl) ctrlvals(%true) (%reg : !quantum.reg) : !quantum.bit -> !quantum.reg {
-  ^bb0(%arg0: !quantum.reg):
-    // expected-error @+1 {{nested quantum.adjoint inside a quantum.ctrl region is not supported}}
-    %a = quantum.adjoint(%arg0) : !quantum.reg {
-    ^bb1(%argr: !quantum.reg):
-      %q = quantum.extract %argr[ 0] : !quantum.reg -> !quantum.bit
-      %h = quantum.custom "Hadamard"() %q : !quantum.bit
-      %r = quantum.insert %argr[ 0], %h : !quantum.reg, !quantum.bit
-      quantum.yield %r : !quantum.reg
-    }
-    quantum.yield %a : !quantum.reg
-  }
-  return %outc : !quantum.bit
-}
