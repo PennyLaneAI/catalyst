@@ -108,17 +108,12 @@ def Transport_SetCoprocessorFnOp : Transport_Op<"set_coprocessor_fn"> {
         replying. `symbol` is the name the coprocessor resolves and invokes; an
         empty symbol selects a default.
 
-        `convention` says which calling convention `symbol` follows:
-
-        * `per_message` (default) - a host function invoked once per received
-          message.
-        * `launch_once` - invoked once at start to launch a persistent engine
-          that consumes messages itself (e.g. a device kernel).
+        Whether that function is invoked per message or once at start to launch a
+        persistent engine belongs to the backend. The runtime
+        binds through whichever of the two the backend implements.
     }];
     let arguments = (ins Transport_CoprocessorSession:$session,
-                         DefaultValuedStrAttr<StrAttr, "">:$symbol,
-                         DefaultValuedAttr<Transport_CoprocConventionAttr,
-                             "::catalyst::transport::CoprocConvention::PerMessage">:$convention);
+                         DefaultValuedStrAttr<StrAttr, "">:$symbol);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
 

@@ -208,7 +208,7 @@ struct CoprocLaunchDesc {
 using CoprocessorLauncherFn = int (*)(const CoprocLaunchDesc *desc, void *ctx);
 
 /**
- * @brief Which calling convention a bound coprocessor function follows.
+ * @brief Which of the two bind methods below a coprocessor function is passed to.
  */
 enum class CoprocConvention : std::int32_t {
     PerMessage = 0, // CoprocessorFn: host, invoked once per received message
@@ -249,6 +249,16 @@ class CoprocessorSession : public TransportSession {
     {
         throw std::logic_error(
             "transport: launch-once coprocessor function not supported by this backend");
+    }
+
+    /**
+     * @brief Which of the two coprocessor function convention this backend takes.
+     *
+     * Defaults to per-message.
+     */
+    virtual CoprocConvention coprocessor_fn_convention() const
+    {
+        return CoprocConvention::PerMessage;
     }
 };
 
