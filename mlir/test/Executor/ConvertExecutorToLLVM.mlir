@@ -128,3 +128,19 @@ func.func @close() {
   executor.close %s : !executor.session
   return
 }
+
+// -----
+
+// CHECK-DAG: llvm.func @__catalyst__executor__await(i64)
+// CHECK-DAG: llvm.func @__catalyst__executor__launch_async(i64, !llvm.ptr, !llvm.ptr) -> i64
+// CHECK-LABEL: func.func @launch_async
+func.func @launch_async() {
+  // CHECK: %[[S:.*]] = llvm.call @__catalyst__executor__open(%{{.*}}) : (!llvm.ptr) -> i64
+  %s = executor.open("127.0.0.1:9000") : !executor.session
+  // CHECK-NOT: llvm.alloca
+  // CHECK: %[[T:.*]] = llvm.call @__catalyst__executor__launch_async(%[[S]], %{{.*}}, %{{.*}}) : (i64, !llvm.ptr, !llvm.ptr) -> i64
+  %t = executor.launch_async %s("serve", "/tmp/coproc.o") : !executor.session -> !executor.token
+  // CHECK: llvm.call @__catalyst__executor__await(%[[T]]) : (i64) -> ()
+  executor.await %t : !executor.token
+  return
+}
