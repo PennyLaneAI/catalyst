@@ -4,6 +4,18 @@ set(LIBRARY_NAME qref-transforms)
 file(GLOB SRC
     value_semantics_conversion.cpp
     verify_no_quantum_use_after_free.cpp
+
+    SymbolicAnalysisQRef/Gate.hpp
+    SymbolicAnalysisQRef/GateBundle.cpp
+    SymbolicAnalysisQRef/Parity.cpp
+    SymbolicAnalysisQRef/BinaryMatrix.cpp
+    SymbolicAnalysisQRef/AffineSchema.cpp
+    SymbolicAnalysisQRef/AffineTransform.cpp
+    SymbolicAnalysisQRef/AffineRelation.cpp
+    SymbolicAnalysisQRef/PhaseAbstraction.cpp
+    SymbolicAnalysisQRef/ProgramAbstraction.cpp
+    SymbolicAnalysisQRef/RegionSummary.cpp
+    phase_folding_qref.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

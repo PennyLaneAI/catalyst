@@ -55,7 +55,11 @@ inline void RegionSummary::summarizeIf(const TransformSchema &ifBodySchm)
 
 inline void RegionSummary::summarizeCond(const TransformSchema &ifBodySchm, const AffineRelation &elseRel)
 {
+    // llvm::errs() << "thenRel:\n" << affineRel << "\n";
+    // llvm::errs() << "elseRel:\n" << elseRel << "\n";
+
     affineRel.joinWith(elseRel);
+    // llvm::errs() << "joinedRel:\n" << affineRel << "\n";
     phases.reSchema(ifBodySchm, affineRel.getSchema());
 }
 

@@ -39,7 +39,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const JoinSchema &joinSchm)
 {
     os << " L_PostVars: " << joinSchm.lPostVars << "\n";
     os << " L_PreVars: " << joinSchm.lPreVars << "\n";
-    os << " L_AuxVars: " << joinSchm.lAuxVars << "\n";
+    // os << " L_AuxVars: " << joinSchm.lAuxVars << "\n";
     os << " L_AffineValue: " << joinSchm.lAffVal << "\n";
 
     const RelationSchema& relSchm = joinSchm;
@@ -80,11 +80,4 @@ BitLocation AffineSchema::getFreeLoc() const
         return loc;
     }
     return ++maxLoc;
-}
-
-void MeetSchema::combineAuxVarsWith(const RelationSchema& rhs)
-{
-    if (numAuxVars() < rhs.numAuxVars()) {
-        growAuxVars(rhs.numAuxVars() - numAuxVars());
-    }
 }

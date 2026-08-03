@@ -109,9 +109,16 @@ void ProgramAbstraction::applyGateY_dag(size_t wire, GateID gateId)
 
 void ProgramAbstraction::applySummary(RegionSummary &&summary)
 {
+    llvm::errs() << "ProgramAbstraction::applySummary...\n";
+    // llvm::errs() << "currentAbstraction:\n" << *this << "\n";
+    // llvm::errs() << "summary:\n" << summary << "\n";
+
     AffineRelation precondition(std::move(stateTransform));
+    llvm::errs() << "precondition:\n" << precondition << "\n";
 
     summary.nullifyPhasesUnder(precondition);
+    llvm::errs() << "nullifiedSummary:\n" << summary << "\n";
+
     stateTransform = precondition.propagateThrough(summary.affineRel);
     summary.accumulatePhasesInto(phases, stateTransform.getSchema());
 }

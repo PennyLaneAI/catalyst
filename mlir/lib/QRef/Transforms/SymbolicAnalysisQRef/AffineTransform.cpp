@@ -35,7 +35,7 @@ std::string AffineTransform::toString() const
     Methods:
 */
 void AffineTransform::extendQubitsBy(size_t addQubitNum)
-{    
+{
     IdxView newVars = schema.allocPreVars(addQubitNum);
     matrix.extendRowsFor(newVars, schema.maxBlock());
 }

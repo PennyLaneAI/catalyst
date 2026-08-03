@@ -96,10 +96,14 @@ void AffineRelation::embedInto(BinaryMatrix &trgtMat, const RelationSchemaView &
 
 const AffineRelation &AffineRelation::meetWith(const AffineRelation& rhs)
 {
-    opPreProcess(rhs);
-    MeetSchema meetSchm(std::move(schema), rhs.schema);
+    AffineRelation auxFreeRhs = rhs;
+    auxFreeRhs.projectOutAuxVars();
+    this->projectOutAuxVars();
+
+    opPreProcess(auxFreeRhs);
+    MeetSchema meetSchm(std::move(schema), auxFreeRhs.schema);
     
-    rhs.embedInto(matrix, RelationSchemaView(meetSchm));
+    auxFreeRhs.embedInto(matrix, RelationSchemaView(meetSchm));
 
     this->schema = std::move(meetSchm);
     matrix.semiNormalize(schema.getOrder());
@@ -108,32 +112,36 @@ const AffineRelation &AffineRelation::meetWith(const AffineRelation& rhs)
 
 const AffineRelation &AffineRelation::joinWith(const AffineRelation& rhs)
 {
-    opPreProcess(rhs);
-    size_t lAuxVarNum = schema.numAuxVars();
+    AffineRelation auxFreeRhs = rhs;
+    auxFreeRhs.projectOutAuxVars();
+    this->projectOutAuxVars();
 
-    AffineBase<JoinSchema> affJoin(std::move(matrix), JoinSchema(std::move(schema), rhs.schema));
+    opPreProcess(auxFreeRhs);
+
+    AffineBase<JoinSchema> affJoin(std::move(matrix), JoinSchema(std::move(schema), auxFreeRhs.schema));
     BinaryMatrix &joinMat = affJoin.getMatrixMutable();
     JoinSchema &joinSchm = affJoin.getSchemaMutable();
 
     RelationSchemaView rJoinSchmView(
         joinSchm.postVars, 
         joinSchm.preVars, 
-        IdxView(joinSchm.auxVars).take_front(lAuxVarNum),
+        {},
         joinSchm.affVal, 
         joinSchm.maxBlock()
     );
     RelationSchemaView lJoinSchmView(
         joinSchm.lPostVars, 
         joinSchm.lPreVars, 
-        joinSchm.lAuxVars,
+        {},
         joinSchm.lAffVal, 
         joinSchm.maxBlock()
     );
 
     for (Parity& row : joinMat.getRowsMutable()) {
         mapRowBits(row, rJoinSchmView, row, lJoinSchmView);
-    }
-    rhs.embedInto(joinMat, lJoinSchmView);
+    }    
+    auxFreeRhs.embedInto(joinMat, lJoinSchmView);
+
     affJoin.projectOutVars(joinSchm.getProjRange());
 
     this->schema = std::move(joinSchm);
@@ -184,11 +192,37 @@ AffineRelation AffineRelation::kleeneStar() const
     return sum;
 }
 
+// inline AffineTransform AffineRelation::propagateThrough(const AffineRelation& rhs)
+// {
+//     AffineBase<CompositionSchema> affCmps(std::move(matrix), CompositionSchema(std::move(schema), rhs.schema));
+//     CompositionSchema cmpsSchm = CompositionSchema(std::move(schema), rhs.schema);
+//     BinaryMatrix cmpsMat(numQubits() + matrix.getNumRows() + rhs.matrix.getNumRows());
+
+//     for (size_t i = 0; i < numQubits(); ++i) {
+//         Parity& newRow = cmpsMat.allocRow();
+//         newRow.mkBasis(cmpsSchm.postVars[i], cmpsSchm.maxBlock());
+//     }
+
+
+
+
+// }
+
+
+
+// TODO:Change propagateThrough to form a new set of constraints and project out from it. don't call compose, meet, etc.
+
 AffineTransform AffineRelation::solveRelation()
 {
+    llvm::errs() << "**********************************************\n";
+    llvm::errs() << "AffineRelation::solveRelation...\n";
     const size_t qubitNum = numQubits();
+    llvm::errs() << "qubitNum: " << qubitNum << "\n";
+    llvm::errs() << "Concretizer:\n" << concretizer(qubitNum) << "\n";
     *this = concretizer(qubitNum).meetWith(*this);
+    llvm::errs() << "concretized:\n" << *this << "\n";
     const size_t numExpr = matrix.getNumRows();
+    llvm::errs() << "numExpr: " << numExpr << "\n";
     
     assert(numExpr >= qubitNum);
 

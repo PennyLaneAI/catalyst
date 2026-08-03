@@ -31,4 +31,11 @@ def VerifyNoQuantumUseAfterFreePass : Pass<"verify-no-quantum-use-after-free"> {
     let summary = "Verify that the quantum program has no uses of qubits or registers after they have been deallocated";
 }
 
+def PhaseFoldingQRefPass : Pass<"phase-folding-qref"> {
+    let summary = "Perform phase-folding optimization on hybrid quantum-classical programs to reduce T-count.";
+
+    // let constructor = "catalyst::createMyHelloWorldPass()";
+}
+
+
 #endif // QREF_PASSES

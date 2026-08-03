@@ -50,7 +50,6 @@ void BinaryMatrix::extendRowsFor(IdxView newVars, size_t maxBlock)
     for (size_t i = 0; i < newVars.size(); ++i) {
         Parity &newRow = allocRow();
         newRow.mkBasis(newVars[i], maxBlock);
-        rows.push_back(Parity::eVec(maxBlock, newVars[i]));
     }
 }
 

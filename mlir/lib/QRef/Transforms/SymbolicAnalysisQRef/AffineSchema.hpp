@@ -155,9 +155,10 @@ struct RelationSchemaView {
     {}
 };
 
-struct TempSchema : RelationSchema, ProjectableSchema<TempSchema> {
-    // Methods
-    using ProjectableSchema<TempSchema>::getProjOrder;
+template<typename Derived>
+struct TempSchema : RelationSchema, ProjectableSchema<Derived> {
+    using ProjectableSchema<Derived>::getProjOrder;
+
     template <typename ColOrderRange>
     auto projOrderImpl(ColOrderRange projRange) const;
 
@@ -167,29 +168,23 @@ struct TempSchema : RelationSchema, ProjectableSchema<TempSchema> {
     {}
 };
 
-struct MeetSchema : TempSchema {
+// Precondition: auxVars have been projected out before meet.
+struct MeetSchema : TempSchema<MeetSchema> {
     MeetSchema(RelationSchema &&lhs, const RelationSchema &rhs) :
-        TempSchema(std::move(lhs.postVars), std::move(lhs.preVars), std::move(lhs.auxVars), lhs.affVal, 
-            lhs.takeRecycledLocs(), lhs.getMaxLoc())
-    {
-        combineAuxVarsWith(rhs);
-    }
-
-    // Methods
-    void combineAuxVarsWith(const RelationSchema& rhs);
+        TempSchema<MeetSchema>(std::move(lhs.postVars), std::move(lhs.preVars), {}, lhs.affVal, lhs.takeRecycledLocs(), lhs.getMaxLoc())
+    {}
 };
 
-struct JoinSchema : MeetSchema, OrderedSchema<JoinSchema> {
+// Precondition: auxVars have been projected out before join.
+struct JoinSchema : TempSchema<JoinSchema>, OrderedSchema<JoinSchema> { 
     IdxList lPostVars;
     IdxList lPreVars;
-    IdxList lAuxVars;
     BitLocation lAffVal;
 
     JoinSchema(RelationSchema &&lhs, const RelationSchema &rhs) :
-        MeetSchema(std::move(lhs), rhs),
+        TempSchema<JoinSchema>(std::move(lhs.postVars), std::move(lhs.preVars), {}, lhs.affVal, lhs.takeRecycledLocs(), lhs.getMaxLoc()),
         lPostVars(getFreeLocs(numQubits())),
         lPreVars(getFreeLocs(numQubits())),
-        lAuxVars(getFreeLocs(numAuxVars())),
         lAffVal(getFreeLoc())
     {}
 
@@ -207,11 +202,11 @@ struct JoinSchema : MeetSchema, OrderedSchema<JoinSchema> {
     auto orderImpl() const;
 };
 
-struct CompositionSchema : TempSchema, OrderedSchema<CompositionSchema> {
+struct CompositionSchema : TempSchema<CompositionSchema>, OrderedSchema<CompositionSchema> {
     IdxList projVars;
 
     CompositionSchema(RelationSchema &&lhs, const RelationSchema &rhs) :
-        TempSchema({}, std::move(lhs.preVars), std::move(lhs.auxVars), lhs.affVal, 
+        TempSchema<CompositionSchema>({}, std::move(lhs.preVars), std::move(lhs.auxVars), lhs.affVal, 
             lhs.takeRecycledLocs(), lhs.getMaxLoc()),
         projVars(std::move(lhs.postVars))
     {
@@ -249,8 +244,8 @@ inline auto RelationSchema::orderImpl() const{
 
 inline auto JoinSchema::orderImpl() const{
     return llvm::concat<const BitLocation>(
-        llvm::ArrayRef(lPostVars), llvm::ArrayRef(lPreVars), llvm::ArrayRef(lAuxVars), llvm::ArrayRef(lAffVal),
-        llvm::ArrayRef(postVars), llvm::ArrayRef(preVars), llvm::ArrayRef(auxVars), llvm::ArrayRef(affVal));
+        llvm::ArrayRef(lPostVars), llvm::ArrayRef(lPreVars), llvm::ArrayRef(lAffVal),
+        llvm::ArrayRef(postVars), llvm::ArrayRef(preVars), llvm::ArrayRef(affVal));
 }
 
 inline auto CompositionSchema::orderImpl() const{
@@ -258,17 +253,21 @@ inline auto CompositionSchema::orderImpl() const{
         llvm::ArrayRef(projVars), llvm::ArrayRef(postVars), llvm::ArrayRef(preVars), llvm::ArrayRef(auxVars), llvm::ArrayRef(affVal));
 }
 
+// Precondition: projRange is auxVars. could be extended to arbitrary range, but not necessary for now.
 template <typename ColOrderRange>
-inline auto RelationSchema::projOrderImpl(ColOrderRange projRange) const{
+inline auto RelationSchema::projOrderImpl(ColOrderRange projRange) const{ 
     return llvm::concat<const BitLocation>(llvm::ArrayRef(auxVars), llvm::ArrayRef(postVars), llvm::ArrayRef(preVars), llvm::ArrayRef(affVal));
 }
 
+template <typename Derived>
 template <typename ColOrderRange>
-inline auto TempSchema::projOrderImpl(ColOrderRange projRange) const { return getOrder(); }
+inline auto TempSchema<Derived>::projOrderImpl(ColOrderRange projRange) const 
+{
+    return static_cast<const Derived &>(*this).getOrder();
+}
 
 inline auto JoinSchema::getProjRange() const{
-    return llvm::concat<const BitLocation>(
-            llvm::ArrayRef(lPostVars), llvm::ArrayRef(lPreVars), llvm::ArrayRef(lAuxVars), llvm::ArrayRef(lAffVal));
+    return llvm::concat<const BitLocation>(llvm::ArrayRef(lPostVars), llvm::ArrayRef(lPreVars), llvm::ArrayRef(lAffVal));
 }
 
 // Stats:

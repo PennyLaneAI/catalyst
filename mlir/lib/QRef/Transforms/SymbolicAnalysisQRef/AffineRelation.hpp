@@ -131,6 +131,10 @@ inline AffineRelation AffineRelation::compose(const AffineRelation& rhs) const
 
 inline AffineTransform AffineRelation::propagateThrough(const AffineRelation& rhs)
 {
+    llvm::errs() << "AffineRelation::propagateThrough...\n";
+    llvm::errs() << "this:\n" << *this << "\n";
+    llvm::errs() << "rhs:\n" << rhs << "\n";
     composeWith(rhs);
+    llvm::errs() << "composed:\n" << *this << "\n";
     return solveRelation();
 }

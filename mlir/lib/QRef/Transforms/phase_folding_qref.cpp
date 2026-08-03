@@ -14,7 +14,7 @@
 
 // This algorithm is taken from https://arxiv.org/pdf/1303.2042
 
-#define DEBUG_TYPE "phase-folding"
+#define DEBUG_TYPE "phase_folding_qref"
 
 #include <cassert>
 #include <cmath> // std::abs
@@ -35,33 +35,35 @@
 #include "mlir/IR/BuiltinOps.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
+// #include "Quantum/IR/QuantumOps.h"
+#include "QRef/IR/QRefOps.h"
 
-#include "SymbolicAnalysis/Gate.hpp"
-#include "SymbolicAnalysis/ProgramAbstraction.hpp"
-#include "SymbolicAnalysis/RegionSummary.hpp"
+#include "SymbolicAnalysisQRef/ProgramAbstraction.hpp"
+#include "SymbolicAnalysisQRef/RegionSummary.hpp"
+#include "SymbolicAnalysisQRef/Gate.hpp"
+
 
 using namespace llvm;
 using namespace mlir;
-using namespace catalyst::quantum;
+using namespace catalyst;
 
 namespace {
 
 class PhaseFoldingAnalyzer {
-  public:
+    public:
     PhaseFoldingAnalyzer() = default;
 
     void analyzeFunction(mlir::func::FuncOp funcOp);
     void dumpSummaries();
     
-  private:
+    private:
     llvm::DenseMap<mlir::Value, size_t> ssaToWireMap;
     llvm::DenseMap<mlir::Value, size_t> qregToBaseMap;
 
     llvm::DenseMap<mlir::StringRef, RegionSummary> procedureSummaries; // keyed by procedure name
 
-    std::vector<CustomOp> phaseOps;
-    // GateID gateID = -1;
+    std::vector<qref::CustomOp> phaseOps;
+    GateID gateID = -1;
 
     void analyzeOperation(mlir::Operation *op, ProgramAbstraction &currentAbst);
     void analyzeBlock(mlir::Block *block, ProgramAbstraction &currentAbst);
@@ -70,16 +72,16 @@ class PhaseFoldingAnalyzer {
     void handleForOp(mlir::scf::ForOp forOp, ProgramAbstraction &parentAbst);
     void handleCallOp(mlir::func::CallOp callOp, ProgramAbstraction &parentAbst);
 
-    void phaseAnalysis(CustomOp customOp, ProgramAbstraction &progAbst, GateID &gateID);    // quantum ops
+    void phaseAnalysis(qref::CustomOp customOp, ProgramAbstraction &progAbst, GateID &gateID);    // quantum ops
     void allocateRegister(mlir::Value qreg, auto regSize, ProgramAbstraction &progAbst);
     void allocateQubit(mlir::Value qubit, ProgramAbstraction &progAbst);
-    void extractFromQreg(ExtractOp extractOp);
-    void initQubitsState(SetBasisStateOp basisOp, ProgramAbstraction &progAbst);
-    void applyUndefinedOp(Operation *op, ProgramAbstraction &progAbst);
+    void getFromQreg(qref::GetOp getOp);
+    void initQubitsState(qref::SetBasisStateOp basisOp, ProgramAbstraction &progAbst);
+    // void applyUndefinedOp(Operation *op, ProgramAbstraction &progAbst);
     
-    llvm::SmallVector<size_t, 4> getQubitIndices(mlir::ValueRange ins, mlir::ResultRange outs);
-    mlir::DenseElementsAttr extractBasisState(SetBasisStateOp basisOp);
-    Gate extractCliffTGate(CustomOp &op);
+    llvm::SmallVector<size_t, 4> getQubitIndices(mlir::ValueRange qubitValues);
+    mlir::DenseElementsAttr extractBasisState(qref::SetBasisStateOp basisOp);
+    Gate extractCliffTGate(qref::CustomOp &op);
 };
 
 void PhaseFoldingAnalyzer::analyzeFunction(mlir::func::FuncOp funcOp) {
@@ -89,7 +91,9 @@ void PhaseFoldingAnalyzer::analyzeFunction(mlir::func::FuncOp funcOp) {
     ProgramAbstraction funcAbst;//(computeNumQubits(funcOp));
     analyzeBlock(&funcOp.getBody().front(), funcAbst);
 
+    // llvm::outs() << "\n" << funcName << ": " << funcAbst << "\n";
     procedureSummaries[funcName] = RegionSummary(RegionType::Procedure, funcAbst);
+
     // Functions typically have a single block in their body region
     // if (!funcOp.getBody().empty()) {
     // }
@@ -98,54 +102,66 @@ void PhaseFoldingAnalyzer::analyzeFunction(mlir::func::FuncOp funcOp) {
 }
 
 void PhaseFoldingAnalyzer::analyzeBlock(mlir::Block *block, ProgramAbstraction &currentAbst) {
+    // llvm::outs() << "currentAbst:\n" << currentAbst << "\n";
     for (mlir::Operation &op : *block) {
         analyzeOperation(&op, currentAbst);
     }
+
+    // llvm::outs() << "\nblock: \n" << currentAbst << "\n";
 }
 
 void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstraction &currentAbst) {
     // Use TypeSwitch to elegantly handle different operations
     llvm::TypeSwitch<mlir::Operation *, void>(op)
         .Case<mlir::scf::IfOp>([&](mlir::scf::IfOp ifOp) {
-            llvm::outs() << "IfOp\n" << ifOp << "\n";
+            llvm::outs() << "IfOp:  " << "\n";
+            llvm::outs() << "currentAbst:\n" << currentAbst << "\n";
             handleIfOp(ifOp, currentAbst);
         })
         .Case<mlir::scf::ForOp>([&](mlir::scf::ForOp forOp) {
-            llvm::outs() << "ForOp\n" << forOp << "\n";
+            llvm::outs() << "ForOp: " << "\n";
             handleForOp(forOp, currentAbst);
         })
         .Case<mlir::func::CallOp>([&](mlir::func::CallOp callOp) {
-            llvm::outs() << "CallOp\n" << callOp << "\n";
+            llvm::outs() << "CallOp:    " << callOp << "\n";
             handleCallOp(callOp, currentAbst);
         })
-        .Case<CustomOp>([&](CustomOp customOp) {
-            llvm::outs() << "CustomOp\n" << customOp << "\n";
-            // phaseAnalysis(customOp, currentAbst, gateID);
+        .Case<mlir::scf::YieldOp>([&](mlir::scf::YieldOp yieldOp) {
+            llvm::outs() << "YieldOp:  " << yieldOp << "\n";
+            
         })
-        .Case<ExtractOp>([&](ExtractOp extractOp) {
-            llvm::outs() << "ExtractOp\n" << extractOp << "\n";
-            // extractFromQreg(extractOp);
+        .Case<qref::CustomOp>([&](qref::CustomOp customOp) {
+            llvm::outs() << "CustomOp:  " << customOp << "\n";
+            phaseAnalysis(customOp, currentAbst, gateID);
         })
-        .Case<AllocQubitOp>([&](AllocQubitOp allocQbOp) {
-            llvm::outs() << "AllocQubitOp\n" << allocQbOp << "\n";
-            // allocateQubit(allocQbOp.getResult(), currentAbst);
+        .Case<qref::GetOp>([&](qref::GetOp getOp) {
+            llvm::outs() << "GetOp: " << getOp << "\n";
+            getFromQreg(getOp);
         })
-        .Case<AllocOp>([&](AllocOp allocOp) {
-            llvm::outs() << "AllocOp\n" << allocOp << "\n";
-            // allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), currentAbst);
+        .Case<qref::AllocQubitOp>([&](qref::AllocQubitOp allocQbOp) {
+            llvm::outs() << "AllocQubitOp:  " << allocQbOp << "\n";
+            allocateQubit(allocQbOp.getResult(), currentAbst);
         })
-        .Case<SetBasisStateOp>([&](SetBasisStateOp basisOp) {
-            llvm::outs() << "SetBasisStateOp\n" << basisOp << "\n";
-            // initQubitsState(basisOp, currentAbst);
+        .Case<qref::AllocOp>([&](qref::AllocOp allocOp) {
+            llvm::outs() << "AllocOp:   " << allocOp << "\n";
+            allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), currentAbst);
         })
-        .Case<GlobalPhaseOp>([&](GlobalPhaseOp gpOp) {
-            llvm::outs() << "GlobalPhaseOp\n" << gpOp << "\n";
+        .Case<qref::DeallocOp>([&](qref::DeallocOp deallocOp) {
+            llvm::outs() << "DeallocOp:   " << deallocOp << "\n";
+            
         })
-        // Add cases for your quantum gates here
-        // .Case<quantum::GateOp>([&](quantum::GateOp gateOp) { ... })
+        .Case<qref::SetBasisStateOp>([&](qref::SetBasisStateOp basisOp) {
+            llvm::outs() << "SetBasisStateOp:   " << basisOp << "\n";
+            initQubitsState(basisOp, currentAbst);
+        })
+        .Case<qref::GlobalPhaseOp>([&](qref::GlobalPhaseOp gpOp) {
+            llvm::outs() << "GlobalPhaseOp: " << gpOp << "\n";
+        })
+        // // Add cases for your quantum gates here
+        // // .Case<quantum::GateOp>([&](quantum::GateOp gateOp) { ... })
         .Default([&](mlir::Operation *unknownOp) {
             // Handle or ignore operations that don't affect phases (e.g., standard arithmetic)
-            llvm::outs() << "UnknownOp\n" << unknownOp << "\n";
+            llvm::outs() << "UnknownOp: " << *unknownOp << "\n";
             // applyUndefinedOp(unknownOp, currentAbst);
         });
 }
@@ -153,6 +169,7 @@ void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstract
 // --- Control Flow Handlers ---
 
 void PhaseFoldingAnalyzer::handleIfOp(mlir::scf::IfOp ifOp, ProgramAbstraction &parentAbst) {
+    llvm::outs() << "handleIfOp...\n";
     // 1. Create fresh abstractions for branches
     ProgramAbstraction thenAbst(parentAbst.numQubits());
     ProgramAbstraction elseAbst(parentAbst.numQubits());
@@ -163,8 +180,16 @@ void PhaseFoldingAnalyzer::handleIfOp(mlir::scf::IfOp ifOp, ProgramAbstraction &
         analyzeBlock(&ifOp.getElseRegion().front(), elseAbst);
     }
 
+    llvm::outs() << "@@@@@@@@\n";
+    llvm::outs() << "thenAbst:\n" << thenAbst << "\n";
+    llvm::outs() << "elseAbst:\n" << elseAbst << "\n";
+    llvm::outs() << "parentAbst:\n" << parentAbst << "\n";
+
     // 3. Compute summary using your API
     RegionSummary summary(RegionType::Conditional, thenAbst, &elseAbst);
+
+    llvm::outs() << "summary:\n" << summary << "\n";
+    llvm::outs() << "parentAbst:\n" << parentAbst << "\n";
 
     // 4. Apply to parent
     parentAbst.applySummary(std::move(summary));
@@ -210,26 +235,26 @@ inline void PhaseFoldingAnalyzer::allocateQubit(mlir::Value qubit, ProgramAbstra
     progAbst.extendQubitsBy(1);
 }
 
-void PhaseFoldingAnalyzer::extractFromQreg(ExtractOp extractOp)
+void PhaseFoldingAnalyzer::getFromQreg(qref::GetOp getOp)
 {
-    mlir::Value qreg = extractOp.getQreg();
+    mlir::Value qreg = getOp.getQreg();
     auto regIt = qregToBaseMap.find(qreg);
     if (regIt == qregToBaseMap.end()) {
-        llvm::errs() << "Error: ExtractOp references an untracked register.\n";
+        llvm::errs() << "Error: GetOp references an untracked register.\n";
         assert(false);
     }
     size_t baseIndex = regIt->second;
 
-    auto staticIdx = extractOp.getIdxAttr();
+    auto staticIdx = getOp.getIdxAttr();
     if (!staticIdx.has_value()) {
-        // auto dynamicIdx = extractOp.getIdx();
+        // auto dynamicIdx = getOp.getIdx();
         llvm::errs() << "Error: Dynamic qubit extraction indices are not supported.\n";
         assert(false);
     }
-    ssaToWireMap[extractOp.getQubit()] = baseIndex + static_cast<size_t>(staticIdx.value_or(0));
+    ssaToWireMap[getOp.getQubit()] = baseIndex + static_cast<size_t>(staticIdx.value_or(0));
 }
 
-mlir::DenseElementsAttr PhaseFoldingAnalyzer::extractBasisState(SetBasisStateOp basisOp)
+mlir::DenseElementsAttr PhaseFoldingAnalyzer::extractBasisState(qref::SetBasisStateOp basisOp)
 {
     mlir::Value basisStateTensor = basisOp.getBasisState();
     mlir::Operation *defOp = basisStateTensor.getDefiningOp();
@@ -249,10 +274,9 @@ mlir::DenseElementsAttr PhaseFoldingAnalyzer::extractBasisState(SetBasisStateOp 
     }
 }
 
-void PhaseFoldingAnalyzer::initQubitsState(SetBasisStateOp basisOp, ProgramAbstraction &progAbst)
+void PhaseFoldingAnalyzer::initQubitsState(qref::SetBasisStateOp basisOp, ProgramAbstraction &progAbst)
 {
-    llvm::SmallVector<size_t, 4> qubitIndices =
-        getQubitIndices(basisOp.getInQubits(), basisOp.getOutQubits());
+    llvm::SmallVector<size_t, 4> qubitIndices = getQubitIndices(basisOp.getQubits());
     mlir::DenseElementsAttr basisState = extractBasisState(basisOp);
 
     assert(static_cast<size_t>(basisState.getNumElements()) == qubitIndices.size());
@@ -264,36 +288,34 @@ void PhaseFoldingAnalyzer::initQubitsState(SetBasisStateOp basisOp, ProgramAbstr
     }
 }
 
-void PhaseFoldingAnalyzer::applyUndefinedOp(Operation *op, ProgramAbstraction &progAbst)
-{
-    llvm::SmallVector<size_t, 4> qubitIndices;
-    if (auto qGate = dyn_cast<QuantumGate>(op)) {
-        qubitIndices =
-            getQubitIndices(qGate.getNonCtrlQubitOperands(), qGate.getNonCtrlQubitResults());
-    }
-    else if (auto stateOp = dyn_cast<SetStateOp>(op)) {
-        qubitIndices = getQubitIndices(stateOp.getInQubits(), stateOp.getOutQubits());
-    }
-    else {
-        // op->emitError("Not supported");
-        return;
-    }
+// void PhaseFoldingAnalyzer::applyUndefinedOp(Operation *op, ProgramAbstraction &progAbst)
+// {
+//     llvm::SmallVector<size_t, 4> qubitIndices;
+//     if (auto qGate = dyn_cast<QuantumGate>(op)) {
+//         qubitIndices =
+//             getQubitIndices(qGate.getNonCtrlQubitOperands(), qGate.getNonCtrlQubitResults());
+//     }
+//     else if (auto stateOp = dyn_cast<SetStateOp>(op)) {
+//         qubitIndices = getQubitIndices(stateOp.getInQubits(), stateOp.getOutQubits());
+//     }
+//     else {
+//         // op->emitError("Not supported");
+//         return;
+//     }
 
-    Gate gate = (isa<MultiRZOp>(op) || isa<PCPhaseOp>(op)) ? Gate::I : Gate::U;
-    progAbst.applyGate(gate, false, qubitIndices);
-}
+//     Gate gate = (isa<MultiRZOp>(op) || isa<PCPhaseOp>(op)) ? Gate::I : Gate::U;
+//     progAbst.applyGate(gate, false, qubitIndices);
+// }
 
-llvm::SmallVector<size_t, 4> PhaseFoldingAnalyzer::getQubitIndices(mlir::ValueRange ins, mlir::ResultRange outs)
+llvm::SmallVector<size_t, 4> PhaseFoldingAnalyzer::getQubitIndices(mlir::ValueRange qubitValues)
 {
-    assert(ins.size() == outs.size());
-    size_t n = ins.size();
+    size_t n = qubitValues.size();
 
     llvm::SmallVector<size_t, 4> indices;
     indices.reserve(n);
 
     for (size_t i = 0; i < n; i++) {
-        mlir::Value inValue = ins[i];
-        mlir::OpResult outValue = outs[i];
+        mlir::Value inValue = qubitValues[i];
 
         size_t index;
         auto it = ssaToWireMap.find(inValue);
@@ -303,35 +325,38 @@ llvm::SmallVector<size_t, 4> PhaseFoldingAnalyzer::getQubitIndices(mlir::ValueRa
         }
         index = it->second;
         indices.push_back(index);
-        ssaToWireMap.erase(it);
-        ssaToWireMap[outValue] = index;
     }
     return indices;
 }
 
-Gate PhaseFoldingAnalyzer::extractCliffTGate(CustomOp &op)
+Gate PhaseFoldingAnalyzer::extractCliffTGate(qref::CustomOp &op)
 {
     Gate gate = gateWithName(op.getGateName());
-    if (!op.getInCtrlQubits().empty() || !op.getInCtrlValues().empty()) {
+    if (!op.getCtrlQubits().empty() || !op.getCtrlValues().empty()) {
         if (isPhaseGate(gate)) {
             return Gate::I; // C-Rz gates don't alter state space, but alter phase space
                             // non-linearly, which I'm not going to track for now, but should be
                             // trackable using xy = x + y - (x \oplus y).
         }
-        // if (gate == Gate::X && op.getInCtrlQubits().size() == 1 &&
-        // op.getInCtrlValues().empty()) {
+        // if (gate == Gate::X && op.getCtrlQubits().size() == 1 &&
+        // op.getCtrlValues().empty()) {
         //     return Gate::CNOT;
-        // }    should pass getInCtrlQubit as qubitIn. will do it later.
+        // }    should pass getCtrlQubit as qubitIn. will do it later.
         return Gate::U;
     }
     return gate;
 }
     
-void PhaseFoldingAnalyzer::phaseAnalysis(CustomOp customOp, ProgramAbstraction &progAbst, GateID &gateID)
+void PhaseFoldingAnalyzer::phaseAnalysis(qref::CustomOp customOp, ProgramAbstraction &progAbst, GateID &gateID)
 {
-    llvm::SmallVector<size_t, 4> qubitIndices =
-        getQubitIndices(customOp.getInQubits(), customOp.getOutQubits());
-
+    llvm::SmallVector<size_t, 4> qubitIndices = getQubitIndices(customOp.getQubits());
+/*
+    llvm::outs() << "indices: " << "\n";
+    for (size_t i = 0; i < qubitIndices.size(); i++) {
+        llvm::outs() << qubitIndices[i] << "\n";
+    }
+    llvm::outs() << "\n";
+*/
     Gate gate = extractCliffTGate(customOp);
     if (isPhaseGate(gate)) {
         phaseOps.push_back(customOp);
@@ -353,14 +378,14 @@ void PhaseFoldingAnalyzer::dumpSummaries()
 }   // namespace
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
-#define GEN_PASS_DECL_PHASEFOLDINGPASS
-#define GEN_PASS_DEF_PHASEFOLDINGPASS
-#include "Quantum/Transforms/Passes.h.inc"
+#define GEN_PASS_DECL_PHASEFOLDINGQREFPASS
+#define GEN_PASS_DEF_PHASEFOLDINGQREFPASS
+#include "QRef/Transforms/Passes.h.inc"
 
-struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
-    using PhaseFoldingPassBase::PhaseFoldingPassBase;
+struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFoldingQRefPass> {
+    using impl::PhaseFoldingQRefPassBase<PhaseFoldingQRefPass>::PhaseFoldingQRefPassBase;
 
     // Gate Statistics:
     void updateStats(Gate gate, int incr) { insertedGateCount[static_cast<size_t>(gate)] += incr; }
@@ -447,36 +472,36 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 
     void replaceOpWith(CustomOp &preOp, Gate newGate, bool isAdjoint, double angle)
     {
-        updateStats(gateWithName(preOp.getGateName()), -1);
+        // updateStats(gateWithName(preOp.getGateName()), -1);
 
-        mlir::IRRewriter rewriter(preOp.getContext());
-        rewriter.setInsertionPoint(preOp.getOperation());
-        mlir::Value angleVal;
-        if (newGate == Gate::RZ) {
-            angleVal = arith::ConstantOp::create(rewriter, preOp.getLoc(),
-                                                 rewriter.getF64FloatAttr(angle));
-        }
+        // mlir::IRRewriter rewriter(preOp.getContext());
+        // rewriter.setInsertionPoint(preOp.getOperation());
+        // mlir::Value angleVal;
+        // if (newGate == Gate::RZ) {
+        //     angleVal = arith::ConstantOp::create(rewriter, preOp.getLoc(),
+        //                                          rewriter.getF64FloatAttr(angle));
+        // }
 
-        CustomOp newOp = CustomOp::create(
-            rewriter, preOp.getLoc(),
-            /*gate_name=*/ GATE_NAME[static_cast<size_t>(newGate)],
-            /*in_qubits=*/ preOp.getInQubits(),
-            /*params=*/ (newGate == Gate::RZ) ? mlir::ValueRange({angleVal}) : mlir::ValueRange({}),
-            /*adjoint=*/ isAdjoint);
+        // CustomOp newOp = CustomOp::create(
+        //     rewriter, preOp.getLoc(),
+        //     /*gate_name=*/ GATE_NAME[static_cast<size_t>(newGate)],
+        //     /*in_qubits=*/ preOp.getInQubits(),
+        //     /*params=*/ (newGate == Gate::RZ) ? mlir::ValueRange({angleVal}) : mlir::ValueRange({}),
+        //     /*adjoint=*/ isAdjoint);
 
-        rewriter.replaceOp(preOp, newOp);
-        updateStats(newGate, +1);
+        // rewriter.replaceOp(preOp, newOp);
+        // updateStats(newGate, +1);
     }
 
     void killOp(CustomOp &op)
     {
-        assert(op.getInCtrlQubits().empty() &&
-               op.getInCtrlValues().empty()); // move to somewhere better
-        updateStats(gateWithName(op.getGateName()), -1);
+        // assert(op.getInCtrlQubits().empty() &&
+        //        op.getInCtrlValues().empty()); // move to somewhere better
+        // updateStats(gateWithName(op.getGateName()), -1);
 
-        mlir::ValueRange qIns = op.getInQubits();
-        op.replaceAllUsesWith(qIns);
-        op.erase();
+        // mlir::ValueRange qIns = op.getInQubits();
+        // op.replaceAllUsesWith(qIns);
+        // op.erase();
     }
 
     // Phase-folding Algorithm:
@@ -517,97 +542,37 @@ struct PhaseFoldingPass : impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         }
     }
 
-    void runOnOperation() override
-    {
-        llvm::outs() << "Hello phase-folding world!\n";
-        
-        mlir::ModuleOp rootModule = dyn_cast<mlir::ModuleOp>(getOperation());
+    void runOnOperation() override 
+    {  
+        llvm::outs() << "Hello phase-folding-QRef world!\n";
+
+        // getOperation()->walk([&](Operation *op) {
+        //     op->dump();
+        //     llvm::outs() << "\n";
+        // });
+
         PhaseFoldingAnalyzer analyzer;
+        mlir::ModuleOp rootModule = dyn_cast<mlir::ModuleOp>(getOperation());
 
         for (auto func : rootModule.getOps<mlir::func::FuncOp>()) {
             // Skip external function declarations (functions without bodies)
-            llvm::outs() << "FuncOp\n" << func << "\n";
+            llvm::outs() << "FuncOp:\n" << func << "\n";
             if (!func.isExternal()) {
                 analyzer.analyzeFunction(func);
             }
         }
 
-        // analyzer.dumpSummaries();
-
-        // ProgramAbstraction mainProg;
-        // ProgramAbstraction bodyProg;
-        // ProgramAbstraction elseProg;
-        // GateID gateID = -1;
-
-        // getOperation()->walk([&](Operation *op, const WalkStage &stage) {
-        //     op->dump();
-        //     llvm::outs() << "\n";
-
-        //     if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
-        //         if (stage.isBeforeAllRegions()) {
-        //             llvm::outs() << "saw scf.if, about to enter regions\n";
-        //             bodyProg = ProgramAbstraction();
-        //         } // else if (stage.isBeforeRegion(0)) {
-        //             // llvm::outs() << "about to walk then-branch\n";
-        //             // // about to walk then-branch
-        //         // } 
-        //         else if (stage.isBeforeRegion(1)) {
-        //             llvm::outs() << "about to walk else-branch (if present)\n";
-        //             elseProg = ProgramAbstraction();
-        //         } else if (stage.isAfterAllRegions()) {
-        //             llvm::outs() << "done with both branches\n";
-        //             RegionSummary branchSum(RegionType::Conditional, bodyProg, &elseProg);
-        //             mainProg.applySummary(std::move(branchSum));
-        //         }
-        //     }
-            
-        // });
-
-        // getOperation()->walk([&](Operation *op) {
-            // op->dump();
-            // llvm::outs() << "\n";
-
-            // if (auto customOp = dyn_cast<CustomOp>(op)) {
-            //     phaseAnalysis(customOp, progAbst, gateID);
-            // }
-            // else if (auto extractOp = dyn_cast<ExtractOp>(op)) {
-            //     extractFromQreg(extractOp);
-            // }
-            // else if (auto allocQbOp = dyn_cast<AllocQubitOp>(op)) {
-            //     allocateQubit(allocQbOp.getResult(), progAbst);
-            // }
-            // else if (auto allocOp = dyn_cast<AllocOp>(op)) {
-            //     allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), progAbst);
-            // }
-            // else if (auto basisOp = dyn_cast<SetBasisStateOp>(op)) {
-            //     initQubitsState(basisOp, progAbst);
-            // }
-            // else if (auto gpOp = dyn_cast<GlobalPhaseOp>(op)) {
-            //     llvm::outs() << "GlobalPhaseOp\n";
-            // }
-            // // else if (auto gpOp = dyn_cast<scf::IfOp, scf::ForOp, llvm::FunctionCallee, scf::SwitchOp>(op)) {
-            // //     llvm::outs() << "GlobalPhaseOp\n";
-            // // }
-            // else {
-            //     // llvm::outs() << "QuantumOperation\n";
-            //     applyUndefinedOp(op, progAbst);
-            // }
-        // });
-
-        // llvm::outs() << mainProg << "\n";
-
-        // phaseMerge(progAbst);
-        // reportStats();
+        analyzer.dumpSummaries();
     }
 };
 
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst
 
-// Currently ignoring any blocks or dynamic allocations, only capturing pure quantum circuits.
-// quantum.insert?
 
-// 4. Provide a public hook to create the pass
-// std::unique_ptr<mlir::Pass> createPhaseFoldingPass() {
-//     return std::make_unique<PhaseFoldingPass>();
-// }
+// everything should be fine with qref now
+// test summary computation
+// modify phase merge methods, mainly IR rewritings, to be compatible with qref
+// call phase merge
+// add setBasisState
+// dealloc, return
