@@ -52,6 +52,15 @@ def Transport_Role : I32EnumAttr<"Role", "transport session role", [
     let cppNamespace = "::catalyst::transport";
 }
 
+def Transport_CoprocConvention : I32EnumAttr<"CoprocConvention",
+        "coprocessor function calling convention", [
+        I32EnumAttrCase<"PerMessage", 0, "per_message">,
+        I32EnumAttrCase<"LaunchOnce", 1, "launch_once">
+    ]> {
+    let cppNamespace = "::catalyst::transport";
+    let genSpecializedAttr = 0;
+}
+
 
 //===----------------------------------------------------------------------===//
 // Types.
@@ -99,6 +108,9 @@ class Transport_Attr<string name, string attrMnemonic, list<Trait> traits = []>
 // A string field that reads as empty when omitted, so consumers need no null checks.
 def Transport_StrField : DefaultValuedParameter<"mlir::StringAttr",
                                                 "mlir::StringAttr::get($_ctxt, \"\")">;
+
+def Transport_CoprocConventionAttr : EnumAttr<Transport_Dialect, Transport_CoprocConvention,
+                                              "coproc_convention">;
 
 def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
     let summary = "A backline participant: a controller or a coprocessor.";

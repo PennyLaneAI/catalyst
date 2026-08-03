@@ -28,6 +28,7 @@ namespace {
 
 struct StubController : ControllerSession {
     std::uint64_t slot = 0;
+    std::uint64_t reply = 0;
     int connect(const ConnectInfo &) override { return 0; }
     MemRegion alloc_memory(std::size_t, MemKind) override { return {}; }
     PeerRef exchange_keys(const MemRegion &) override { return {}; }
@@ -39,6 +40,7 @@ struct StubController : ControllerSession {
     int kick(std::uint32_t) override { return 0; }
     void *data_slot() override { return &slot; }
     void write_data_slot(const void *, std::uint64_t, std::uint32_t) override {}
+    void *reply_slot() override { return &reply; }
 };
 
 struct StubCoprocessor : CoprocessorSession {

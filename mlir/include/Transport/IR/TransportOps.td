@@ -110,14 +110,15 @@ def Transport_SetCoprocessorFnOp : Transport_Op<"set_coprocessor_fn"> {
 
         `convention` says which calling convention `symbol` follows:
 
-        * `0` (default) - per-message: a host function invoked once per received
+        * `per_message` (default) - a host function invoked once per received
           message.
-        * `1` - launch-once: invoked once at start to launch a persistent engine
+        * `launch_once` - invoked once at start to launch a persistent engine
           that consumes messages itself (e.g. a device kernel).
     }];
     let arguments = (ins Transport_CoprocessorSession:$session,
                          DefaultValuedStrAttr<StrAttr, "">:$symbol,
-                         DefaultValuedOptionalAttr<I32Attr, "0">:$convention);
+                         DefaultValuedAttr<Transport_CoprocConventionAttr,
+                             "::catalyst::transport::CoprocConvention::PerMessage">:$convention);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
 
