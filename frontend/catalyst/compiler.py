@@ -176,6 +176,10 @@ class LinkerDriver:
             "-lrt_decoder",
         ]
 
+        rt_transport_so = "librt_transport" + file_extension
+        if os.path.isfile(os.path.join(rt_lib_path, rt_transport_so)):
+            default_flags.append("-lrt_transport")
+
         rt_executor_so = "librt_executor" + file_extension
         if os.path.isfile(os.path.join(rt_lib_path, rt_executor_so)):
             default_flags.append("-lrt_executor")
