@@ -106,7 +106,7 @@ int32_t _catalyst_remote_store_asset(std::vector<char> bytes, std::string name)
         return -1;
     }
 
-    // wrirte to file
+    // write to file
     FILE *f = std::fopen(dst.c_str(), "wb");
     if (!f) {
         std::fprintf(stderr, "catalyst-executor: fopen %s failed: %s\n", dst.c_str(),
