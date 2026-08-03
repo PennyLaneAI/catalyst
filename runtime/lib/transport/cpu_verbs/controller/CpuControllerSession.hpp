@@ -19,7 +19,7 @@
 
 namespace catalyst::transport::cpu_verbs {
 
-// Controller role: caller-driven. The caller commits a work item, 
+// Controller role: caller-driven. The caller commits a work item,
 // writes the outbound payload into data_slot(), kick()s one round,
 // then collect()s the reply.
 class CpuControllerSession : public CpuSessionBase<ControllerSession> {
