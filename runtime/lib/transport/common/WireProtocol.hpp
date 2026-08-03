@@ -39,7 +39,7 @@ inline constexpr std::uint64_t DEMO_SYNDROME = 0x0123456789ABCDEFull;
 struct Payload {
     std::uint64_t value;
     std::uint32_t decoder_id; // selects which decoder handles this message
-    std::uint32_t seq_num;    // arrival flag; keep last
+    std::uint32_t seq_num;    // arrival flag
 };
 #pragma pack(pop)
 static_assert(sizeof(Payload) == 16, "Payload must be exactly 16 B");

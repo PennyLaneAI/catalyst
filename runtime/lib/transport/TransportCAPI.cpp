@@ -123,8 +123,6 @@ int do_exchange_keys(CatalystTransportSession *s)
 }
 
 // Built-in fallback coprocessor function: echo the input back.
-// Built-in fallback coprocessor function: echo the input back. `in` is the request
-// frame, whose leading bytes are the data; min() below keeps it to out_cap.
 std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *)
 {
     std::size_t n = std::min(in_len, out_cap);
