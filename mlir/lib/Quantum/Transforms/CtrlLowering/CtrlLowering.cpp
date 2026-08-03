@@ -163,9 +163,12 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
         // Defer (not an error) if the region still contains a nested quantum.adjoint region.
         // Distributing controls needs an op-level body, so the inner region must be reduced first.
         // The pipeline runs (ctrl-lowering, adjoint-lowering) to a fixpoint: adjoint-lowering
-        // reduces the inner region to op-level gates, then this ctrl op lowers on a later iteration.
-        // A pre-scan avoids a partial rewrite (creating ops, then bailing out mid-region).
-        if (ctrl.getRegion().walk([](AdjointOp) { return WalkResult::interrupt(); }).wasInterrupted()) {
+        // reduces the inner region to op-level gates, then this ctrl op lowers on a later
+        // iteration. A pre-scan avoids a partial rewrite (creating ops, then bailing out
+        // mid-region).
+        if (ctrl.getRegion()
+                .walk([](AdjointOp) { return WalkResult::interrupt(); })
+                .wasInterrupted()) {
             return failure();
         }
 
