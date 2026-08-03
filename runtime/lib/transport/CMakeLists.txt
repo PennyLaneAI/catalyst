@@ -1,4 +1,15 @@
 ###############################################
+# transport backends: shared dependencies     #
+###############################################
+
+find_package(Threads REQUIRED)
+find_library(IBVERBS_LIB ibverbs)
+if(NOT IBVERBS_LIB)
+    message(FATAL_ERROR
+        "ENABLE_TRANSPORT requires libibverbs (e.g. libibverbs-dev / rdma-core), but it was not found.")
+endif()
+
+###############################################
 # library rt_transport                        #
 ###############################################
 
@@ -17,3 +28,10 @@ target_link_libraries(rt_transport PRIVATE
 )
 
 set_property(TARGET rt_transport PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+###############################################
+# transport backends                          #
+###############################################
+
+add_subdirectory(common)
+add_subdirectory(cpu_verbs)
