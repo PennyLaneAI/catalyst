@@ -49,7 +49,9 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
         // those gates is then trivial ((C(g))^dagger = C(g^dagger)). The pipeline runs
         // (ctrl-lowering, adjoint-lowering) to a fixpoint, so this adjoint op lowers on a later
         // iteration. Pre-scanning here avoids the ReversePass "Unhandled operation" error path.
-        if (adjoint.getRegion().walk([](CtrlOp) { return WalkResult::interrupt(); }).wasInterrupted()) {
+        if (adjoint.getRegion()
+                .walk([](CtrlOp) { return WalkResult::interrupt(); })
+                .wasInterrupted()) {
             return failure();
         }
 
