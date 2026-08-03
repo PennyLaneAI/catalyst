@@ -72,10 +72,6 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
 
 def CtrlLoweringPass : Pass<"ctrl-lowering"> {
     let summary = "Lower ctrl regions by distributing the controls over the enclosed operations.";
-
-    let dependentDialects = [
-        "catalyst::CatalystDialect"
-    ];
 }
 
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
