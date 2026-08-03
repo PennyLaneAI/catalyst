@@ -155,11 +155,11 @@ llvm::json::Object ResourceResult::toJson() const {
     funcObj["num_qubits"] = std::move(numQubitObject);
 
     // Classical Operations
-    llvm::json::Object clasicalInstructionObject;
+    llvm::json::Object classicalInstructionsObject;
     for (const auto &entry : classicalInstructions) {
-        clasicalInstructionObject[entry.getKey()] = countToJson(entry.getValue());
+        classicalInstructionsObject[entry.getKey()] = countToJson(entry.getValue());
     }
-    funcObj["classical_instructions"] = std::move(clasicalInstructionObject);
+    funcObj["classical_instructions"] = std::move(classicalInstructionsObject);
 
     /// Quantum Operations
     llvm::json::Object quantumOperationObject;
