@@ -97,7 +97,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     }
 }
 
-void ResourceResult::multiplyByScalar(double scalar)
+void ResourceResult::multiplyBy(double scalar)
 {
     for (auto &opEntry : operations) {
         for (auto &sizeEntry : opEntry.getValue()) {

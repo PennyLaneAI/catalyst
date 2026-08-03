@@ -47,7 +47,7 @@ struct ResourceResult {
     llvm::StringMap<double> functionCalls;
 
     // `dyn_for_loop_<N>` -> stable hash id for that loop op (not a trip count).
-    // Ignored by `multiplyByScalar`; `mergeWith` mints a fresh id on key conflicts.
+    // Ignored by `multiplyBy`; `mergeWith` mints a fresh id on key conflicts.
     llvm::StringMap<uint64_t> varFunctionCalls;
 
     // qubits from qref/quantum alloc/alloc_qubit ops
@@ -82,7 +82,7 @@ struct ResourceResult {
 
     // multiply all counts by a scalar, which may be be fractional to account for probabilistic
     // counting sometimes employed in branches for example
-    void multiplyByScalar(double scalar);
+    void multiplyBy(double scalar);
 
     // Serialize this function's resources into a JSON object.
     llvm::json::Object toJson() const;

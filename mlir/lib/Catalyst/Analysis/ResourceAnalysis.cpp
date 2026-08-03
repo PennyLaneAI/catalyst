@@ -219,7 +219,7 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
 
     if (auto iters = getEstimatedIterationsHint(whileOp)) {
-        bodyResult.multiplyByScalar(*iters);
+        bodyResult.multiplyBy(*iters);
     }
     else {
         result.hasDynLoop = true;
@@ -247,8 +247,8 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
             analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
         }
 
-        thenResult.multiplyByScalar(pThen);
-        elseResult.multiplyByScalar(pElse);
+        thenResult.multiplyBy(pThen);
+        elseResult.multiplyBy(pElse);
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Sum);
 
         result.mergeWith(thenResult);
@@ -284,7 +284,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
             double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
             sumProb += p;
 
-            caseResult.multiplyByScalar(p);
+            caseResult.multiplyBy(p);
             expected.mergeWith(caseResult, ResourceResult::MergeMethod::Sum);
         }
 
@@ -294,7 +294,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 
         ResourceResult defaultResult = makeEmptyResult();
         analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
-        defaultResult.multiplyByScalar(pDefault);
+        defaultResult.multiplyBy(pDefault);
         expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
 
         result.mergeWith(expected);

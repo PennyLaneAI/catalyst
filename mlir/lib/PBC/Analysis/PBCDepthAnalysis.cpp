@@ -60,7 +60,7 @@ void PBCDepthExtension::mergeWith(const ResourceResultExtension &other, MergeMet
     }
 }
 
-void PBCDepthExtension::multiplyBy(int64_t factor)
+void PBCDepthExtension::multiplyBy(double factor)
 {
     if (depth) {
         depth->first *= factor;

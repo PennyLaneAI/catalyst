@@ -34,7 +34,7 @@ class PBCDepthExtension : public ResourceResultExtension {
     llvm::json::Value toJson() const override;
 
     void mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) override;
-    void multiplyBy(int64_t factor) override;
+    void multiplyBy(double factor) override;
 
     void setDepth(std::optional<std::pair<int64_t, int64_t>> value) { depth = std::move(value); }
 

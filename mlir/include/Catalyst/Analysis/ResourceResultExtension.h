@@ -33,8 +33,11 @@ class ResourceResultExtension {
     virtual llvm::StringRef name() const = 0;
     virtual llvm::json::Value toJson() const = 0;
 
-    virtual void mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) {}
-    virtual void multiplyBy(int64_t factor) {}
+    void mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) {}
+
+    // multiply resource metrics by a scalar, which may be be fractional to account for probabilistic
+    // counting sometimes employed in branches for example.
+    void multiplyBy(double factor) {}
 };
 
 template <typename Ext> class ResourceAnalysisExtensionOf;
