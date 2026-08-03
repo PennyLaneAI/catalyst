@@ -126,8 +126,9 @@ struct RuleTerm {
  * graph.
  * - Fixed: A fixed rule that cannot be changed or overridden by the solver.
  * - Alternative: An alternative rule that can be used in place of the default rule.
+ * - AdjointGenerated: A rule synthesized by adjointing a base decomposition rule.
  */
-enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2 };
+enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2, AdjointGenerated = 3 };
 
 /**
  * @brief This represents the decomposition rules in the graph decomposition problem.
@@ -173,6 +174,54 @@ using FixedDecomps = std::unordered_map<OperatorNode, RuleNode, OperatorNodeHash
 using AltDecomps = std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>;
 
 /**
+ * @brief This returns a copy of the given operator with the adjoint modifier toggled.
+ *
+ * Identity is the opaque `id` string (equality/hashing are id-only),
+ * so the modifier must be folded into the id: we wrap it in `Adjoint(...)`
+ * (or strip that wrapper to cancel adjoint).
+ * Applying twice cancels: `makeAdjoint(makeAdjoint(op)) == op`.
+ */
+inline OperatorNode makeAdjoint(OperatorNode op)
+{
+    static constexpr char kPrefix[] = "Adjoint(";
+    constexpr std::size_t kPrefixLen = sizeof(kPrefix) - 1;
+
+    if (op.adjoint) {
+        // Cancel: strip the outermost "Adjoint( ... )" wrapper from the id.
+        if (op.id.size() > kPrefixLen && op.id.compare(0, kPrefixLen, kPrefix) == 0 &&
+            op.id.back() == ')') {
+            op.id = op.id.substr(kPrefixLen, op.id.size() - kPrefixLen - 1);
+        }
+        op.adjoint = false;
+    }
+    else {
+        op.id = std::string(kPrefix) + op.id + ")";
+        op.adjoint = true;
+    }
+    return op;
+}
+
+/**
+ * @brief Constructs the Adjoint decomposition of a base rule.
+ *
+ * Given a rule `output -> {inputs}`, produces `Adjoint(output) -> {Adjoint(input), ...}`
+ * with the same multiplicities: the adjoint of a decomposition is obtained by adjointing
+ * every produced gate (and reversing their order, which does not affect resource/cost counting).
+ */
+inline RuleNode makeAdjointRule(const RuleNode &base)
+{
+    RuleNode adj;
+    adj.name = base.name + "_adjoint";
+    adj.output = makeAdjoint(base.output);
+    adj.origin = RuleOrigin::AdjointGenerated;
+    adj.inputs.reserve(base.inputs.size());
+    for (const auto &term : base.inputs) {
+        adj.inputs.push_back({makeAdjoint(term.op), term.multiplicity});
+    }
+    return adj;
+}
+
+/**
  * @brief This represents the chosen decomposition rule for an operator in
  * the solution of the graph decomposition problem.
  */
@@ -183,6 +232,9 @@ struct ChosenDecompRule {
     std::vector<RuleTerm> inputs;
     double totalCost{0.0};
     std::unordered_map<OperatorNode, std::size_t, OperatorNodeHash> basisCounts;
+
+    // TODO: revisit this after testing..
+    RuleOrigin origin{RuleOrigin::Default};
 };
 
 /**
