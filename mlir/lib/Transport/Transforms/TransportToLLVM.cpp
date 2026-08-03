@@ -223,11 +223,8 @@ struct SetCoprocessorFnLowering : public OpConversionPattern<SetCoprocessorFnOp>
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         Value sym = globalStr(rewriter, op.getLoc(), mod, "transport_coproc_fn_", op.getSymbol());
-        Value conv = constInt(rewriter, op.getLoc(), i32Ty(ctx),
-                              static_cast<std::int32_t>(op.getConvention()));
         emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__set_coprocessor_fn",
-                 {ptrTy(ctx), ptrTy(ctx), i32Ty(ctx)}, i32Ty(ctx),
-                 {adaptor.getSession(), sym, conv});
+                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), sym});
         rewriter.eraseOp(op);
         return success();
     }

@@ -53,11 +53,11 @@ class GpuCoprocessorSession : public CoprocessorSession {
     void start() override;
     int collect(void *const *outputs, const std::uint64_t *output_bytes, std::size_t n) override;
     void stop() override;
-    // Binds the launcher used to start the on-device decode kernel: a bound
-    // fn/ctx is invoked once (in start()) to launch it; nullptr selects the
-    // built-in echo launcher. The per-message decode itself always runs
-    // on-device, inside the fused kernel.
     void set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) override;
+    CoprocConvention coprocessor_fn_convention() const override
+    {
+        return CoprocConvention::LaunchOnce;
+    }
 
   private:
     void run_coprocessor(std::stop_token st);
