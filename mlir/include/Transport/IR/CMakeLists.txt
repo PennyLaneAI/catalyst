@@ -1,0 +1,10 @@
+add_mlir_dialect(TransportOps transport)
+add_mlir_doc(TransportDialect TransportDialect Transport/ -gen-dialect-doc)
+add_mlir_doc(TransportOps TransportOps Transport/ -gen-op-doc)
+
+set(LLVM_TARGET_DEFINITIONS TransportOps.td)
+mlir_tablegen(TransportEnums.h.inc -gen-enum-decls)
+mlir_tablegen(TransportEnums.cpp.inc -gen-enum-defs)
+mlir_tablegen(TransportAttributes.h.inc -gen-attrdef-decls -attrdefs-dialect=transport)
+mlir_tablegen(TransportAttributes.cpp.inc -gen-attrdef-defs -attrdefs-dialect=transport)
+add_public_tablegen_target(MLIRTransportEnumsIncGen)
