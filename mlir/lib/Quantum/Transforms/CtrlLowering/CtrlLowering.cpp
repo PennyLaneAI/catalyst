@@ -152,7 +152,8 @@ static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping
 
     // Move the nested region body into the freshly created op (its block arguments, the target
     // qubits, are unaffected by adding controls).
-    rewriter.inlineRegionBefore(inner.getRegion(), merged->getRegion(0), merged->getRegion(0).end());
+    rewriter.inlineRegionBefore(inner.getRegion(), merged->getRegion(0),
+                                merged->getRegion(0).end());
     return cast<CtrlOp>(merged);
 }
 
@@ -282,4 +283,3 @@ struct CtrlLoweringPass : impl::CtrlLoweringPassBase<CtrlLoweringPass> {
 
 } // namespace quantum
 } // namespace catalyst
-
