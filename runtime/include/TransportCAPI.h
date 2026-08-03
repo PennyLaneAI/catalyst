@@ -89,6 +89,7 @@ void *__catalyst__transport__data_slot(CatalystTransportSession *s);
 // commit_work_item committed.
 int __catalyst__transport__write_data_slot(CatalystTransportSession *s, const void *src,
                                            uint64_t bytes);
+void *__catalyst__transport__reply_slot(CatalystTransportSession *s);
 int __catalyst__transport__kick(CatalystTransportSession *s, uint32_t work_item_idx);
 
 // Run / collect / teardown.

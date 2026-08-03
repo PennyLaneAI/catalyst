@@ -387,6 +387,16 @@ int __catalyst__transport__write_data_slot(CatalystTransportSession *s, const vo
     });
 }
 
+void *__catalyst__transport__reply_slot(CatalystTransportSession *s)
+{
+    auto *c = cast_to_controller(s);
+    void *slot = nullptr;
+    if (c) {
+        guard([&] { slot = c->reply_slot(); });
+    }
+    return slot;
+}
+
 int __catalyst__transport__kick(CatalystTransportSession *s, std::uint32_t work_item_idx)
 {
     auto *c = cast_to_controller(s);

@@ -169,6 +169,9 @@ class ControllerSession : public TransportSession {
     // Throws if `bytes` exceeds what the round was committed to carry, so an oversized
     // payload will fail.
     virtual void write_data_slot(const void *src, std::uint64_t bytes) = 0;
+
+    // Current round's reply slot in the transport-owned reply ring.
+    virtual void *reply_slot() { return nullptr; }
 };
 
 /**
