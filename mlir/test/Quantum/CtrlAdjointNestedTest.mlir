@@ -18,7 +18,6 @@
 // RUN: quantum-opt --ctrl-lowering --adjoint-lowering --ctrl-lowering --adjoint-lowering \
 // RUN:   --split-input-file %s | FileCheck %s
 
-// ctrl-of-ctrl
 // CHECK-LABEL: @nested_ctrl_of_ctrl
 func.func @nested_ctrl_of_ctrl(%c1: !quantum.bit, %c2: !quantum.bit, %q: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit) {
@@ -39,7 +38,6 @@ func.func @nested_ctrl_of_ctrl(%c1: !quantum.bit, %c2: !quantum.bit, %q: !quantu
 
 // -----
 
-// ctrl-of-adj
 // CHECK-LABEL: @nested_ctrl_of_adj
 func.func @nested_ctrl_of_adj(%c: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
@@ -58,3 +56,71 @@ func.func @nested_ctrl_of_adj(%c: !quantum.bit, %q: !quantum.bit) -> (!quantum.b
   return %oc, %or : !quantum.bit, !quantum.bit
 }
 
+// -----
+
+// CHECK-LABEL: @nested_adj_of_ctrl
+func.func @nested_adj_of_ctrl(%c: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK-NOT: quantum.ctrl
+  // CHECK-NOT: quantum.adjoint
+  // CHECK: quantum.custom "S"() %{{.*}} adj ctrls(%{{.*}}) ctrlvals(%{{.*}})
+  %a:2 = quantum.adjoint(%c, %q) : !quantum.bit, !quantum.bit {
+  ^bb0(%ac: !quantum.bit, %aq: !quantum.bit):
+    %oc, %or = quantum.ctrl(%ac) ctrlvals(%true) (%aq : !quantum.bit) : !quantum.bit -> !quantum.bit {
+    ^bb1(%iq: !quantum.bit):
+      %s = quantum.custom "S"() %iq : !quantum.bit
+      quantum.yield %s : !quantum.bit
+    }
+    quantum.yield %oc, %or : !quantum.bit, !quantum.bit
+  }
+  return %a#0, %a#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: @nested_ctrl_of_adj_of_ctrl
+func.func @nested_ctrl_of_adj_of_ctrl(%c1: !quantum.bit, %c2: !quantum.bit, %q: !quantum.bit)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK-NOT: quantum.ctrl
+  // CHECK-NOT: quantum.adjoint
+  // CHECK: quantum.custom "S"() %{{.*}} adj ctrls(%{{.*}}, %{{.*}}) ctrlvals(%{{.*}}, %{{.*}})
+  %oc, %or:2 = quantum.ctrl(%c1) ctrlvals(%true) (%c2, %q : !quantum.bit, !quantum.bit) : !quantum.bit -> !quantum.bit, !quantum.bit {
+  ^bb0(%ac2: !quantum.bit, %aq: !quantum.bit):
+    %adj:2 = quantum.adjoint(%ac2, %aq) : !quantum.bit, !quantum.bit {
+    ^bb1(%bc2: !quantum.bit, %bq: !quantum.bit):
+      %ic, %iq = quantum.ctrl(%bc2) ctrlvals(%true) (%bq : !quantum.bit) : !quantum.bit -> !quantum.bit {
+      ^bb2(%iiq: !quantum.bit):
+        %s = quantum.custom "S"() %iiq : !quantum.bit
+        quantum.yield %s : !quantum.bit
+      }
+      quantum.yield %ic, %iq : !quantum.bit, !quantum.bit
+    }
+    quantum.yield %adj#0, %adj#1 : !quantum.bit, !quantum.bit
+  }
+  return %oc, %or#0, %or#1 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: @nested_adj_of_ctrl_of_adj
+func.func @nested_adj_of_ctrl_of_adj(%c: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK-NOT: quantum.ctrl
+  // CHECK-NOT: quantum.adjoint
+  // CHECK: quantum.custom "S"() %{{[^ ]+}} ctrls(%{{[^ ]+}}) ctrlvals(%{{[^ ]+}})
+  %oa:2 = quantum.adjoint(%c, %q) : !quantum.bit, !quantum.bit {
+  ^bb0(%ac: !quantum.bit, %aq: !quantum.bit):
+    %mc, %mr = quantum.ctrl(%ac) ctrlvals(%true) (%aq : !quantum.bit) : !quantum.bit -> !quantum.bit {
+    ^bb1(%iq: !quantum.bit):
+      %ia = quantum.adjoint(%iq) : !quantum.bit {
+      ^bb2(%iiq: !quantum.bit):
+        %s = quantum.custom "S"() %iiq : !quantum.bit
+        quantum.yield %s : !quantum.bit
+      }
+      quantum.yield %ia : !quantum.bit
+    }
+    quantum.yield %mc, %mr : !quantum.bit, !quantum.bit
+  }
+  return %oa#0, %oa#1 : !quantum.bit, !quantum.bit
+}
