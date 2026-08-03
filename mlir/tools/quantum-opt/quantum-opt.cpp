@@ -52,6 +52,7 @@
 
 #include "Executor/IR/ExecutorDialect.h"
 #include "Transport/IR/TransportDialect.h"
+#include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
@@ -90,6 +91,7 @@ int main(int argc, char **argv)
     catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::qecp::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::transport::registerBufferizableOpInterfaceExternalModels(registry);
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));
