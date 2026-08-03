@@ -727,8 +727,10 @@ LogicalResult AdjointOp::verify() {
 
 LogicalResult CtrlOp::verify()
 {
-    auto res =
-        this->getRegion().walk([](MeasurementProcess op) { return WalkResult::interrupt(); });
+    auto res = this->getRegion().walk([](Operation *op) {
+        return isa<MeasurementProcess, MeasureOp>(op) ? WalkResult::interrupt()
+                                                      : WalkResult::advance();
+    });
 
     if (res.wasInterrupted()) {
         return emitOpError("quantum measurements are not allowed in the ctrl regions");

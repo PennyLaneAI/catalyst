@@ -179,7 +179,7 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
         rewriter.setInsertionPoint(ctrl);
 
         for (Operation &op : block.without_terminator()) {
-            if (isa<MeasurementProcess>(op)) {
+            if (isa<MeasurementProcess, MeasureOp>(op)) {
                 op.emitError("cannot control a measurement inside a quantum.ctrl region");
                 return failure();
             }
