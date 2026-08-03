@@ -31,10 +31,10 @@ using namespace DecompGraph::Solver;
 
 TEST_CASE("Test makeAdjoint and cancels on double application", "[DecompGraph::Core]")
 {
-    const OperatorNode h{"H", 1, 0, false};
+    const OperatorNode h{"H[][1]{}"};
     const OperatorNode adjH = makeAdjoint(h);
 
-    REQUIRE(adjH.name == "H");
+    REQUIRE(adjH.id == "Adjoint(H[][1]{})");
     REQUIRE(adjH.adjoint);
     REQUIRE(adjH != h);
 
@@ -45,9 +45,9 @@ TEST_CASE("Test makeAdjoint and cancels on double application", "[DecompGraph::C
 
 TEST_CASE("Test makeAdjointRule", "[DecompGraph::Core]")
 {
-    const OperatorNode rot{"Rot", 1, 3, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
-    const OperatorNode ry{"RY", 1, 1, false};
+    const OperatorNode rot{"Rot[f64,f64,f64][1]{}"};
+    const OperatorNode rz{"RZ[f64][1]{}"};
+    const OperatorNode ry{"RY[f64][1]{}"};
     const RuleNode base{"rot_decomp", rot, {{rz, 2}, {ry, 1}}};
 
     const RuleNode adj = makeAdjointRule(base);
@@ -66,9 +66,9 @@ TEST_CASE("Test makeAdjointRule", "[DecompGraph::Core]")
 
 TEST_CASE("Test DecompositionGraph adjoint rules from base rules", "[DecompGraph::Solver]")
 {
-    const OperatorNode rot{"Rot", 1, 3, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
-    const OperatorNode ry{"RY", 1, 1, false};
+    const OperatorNode rot{"Rot[f64,f64,f64][1]{}"};
+    const OperatorNode rz{"RZ[f64][1]{}"};
+    const OperatorNode ry{"RY[f64][1]{}"};
 
     const WeightedGateset gateset{{{rz, 1.0}, {ry, 1.0}}};
     const std::vector<RuleNode> rules{{"rot_decomp", rot, {{rz, 2}, {ry, 1}}}};
@@ -91,7 +91,7 @@ TEST_CASE("Test DecompositionGraph adjoint rules from base rules", "[DecompGraph
 TEST_CASE("Test DecompositionGraph does not synthesize adjoint rules for empty or adjoint rules",
           "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H", 1, 0, false};
+    const OperatorNode h{"H[][1]{}"};
     const OperatorNode adjH = makeAdjoint(h);
 
     const WeightedGateset gateset{{{h, 1.0}}};
@@ -109,7 +109,7 @@ TEST_CASE("Test DecompositionGraph does not synthesize adjoint rules for empty o
 
 TEST_CASE("Test Adjoint: self_adjoint (Adjoint(H) -> H)", "[DecompGraph::Solver]")
 {
-    const OperatorNode h{"H", 1, 0, false};
+    const OperatorNode h{"H[][1]{}"};
     const OperatorNode adjH = makeAdjoint(h);
 
     const WeightedGateset gateset{{{h, 1.0}}};
@@ -132,7 +132,7 @@ TEST_CASE("Test Adjoint: self_adjoint (Adjoint(H) -> H)", "[DecompGraph::Solver]
 
 TEST_CASE("Test Adjoint: adjoint_rotation (Adjoint(RX) -> RX)", "[DecompGraph::Solver]")
 {
-    const OperatorNode rx{"RX", 1, 1, false};
+    const OperatorNode rx{"RX[f64][1]{}"};
     const OperatorNode adjRX = makeAdjoint(rx);
 
     const WeightedGateset gateset{{{rx, 1.0}}};
@@ -151,10 +151,10 @@ TEST_CASE("Test Adjoint: adjoint_rotation (Adjoint(RX) -> RX)", "[DecompGraph::S
 TEST_CASE("Test Adjoint: multiple rules and the solver should pick the cheapest",
           "[DecompGraph::Solver]")
 {
-    const OperatorNode rot{"Rot", 1, 3, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
-    const OperatorNode ry{"RY", 1, 1, false};
-    const OperatorNode e{"E", 1, 0, false};
+    const OperatorNode rot{"Rot[f64,f64,f64][1]{}"};
+    const OperatorNode rz{"RZ[f64][1]{}"};
+    const OperatorNode ry{"RY[f64][1]{}"};
+    const OperatorNode e{"E[][1]{}"};
 
     const std::vector<RuleNode> commonRules{
         {"rot_decomp", rot, {{rz, 2}, {ry, 1}}},
@@ -201,9 +201,9 @@ TEST_CASE("Test Adjoint: multiple rules and the solver should pick the cheapest"
 
 TEST_CASE("Test Adjoint: adjoint pushed through a decomposition", "[DecompGraph::Solver]")
 {
-    const OperatorNode myOp{"MyOp", 2, 0, false};
-    const OperatorNode a{"A", 1, 0, false};
-    const OperatorNode b{"B", 1, 0, false};
+    const OperatorNode myOp{"MyOp[][2]{}"};
+    const OperatorNode a{"A[][1]{}"};
+    const OperatorNode b{"B[][1]{}"};
 
     const WeightedGateset gateset{{{a, 1.0}, {b, 1.0}}};
     const std::vector<RuleNode> rules{

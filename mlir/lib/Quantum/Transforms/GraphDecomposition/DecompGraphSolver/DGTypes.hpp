@@ -174,14 +174,30 @@ using FixedDecomps = std::unordered_map<OperatorNode, RuleNode, OperatorNodeHash
 using AltDecomps = std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>;
 
 /**
- * @brief This returns a copy of the given operator with its adjoint flag.
+ * @brief This returns a copy of the given operator with the adjoint modifier toggled.
  *
- * Note taht because Adjoint is represented as a boolean flag in the IR,
- * applying it twice should cancel out (Adjoint(Adjoint(op)) == op).
+ * Identity is the opaque `id` string (equality/hashing are id-only),
+ * so the modifier must be folded into the id: we wrap it in `Adjoint(...)`
+ * (or strip that wrapper to cancel adjoint).
+ * Applying twice cancels: `makeAdjoint(makeAdjoint(op)) == op`.
  */
 inline OperatorNode makeAdjoint(OperatorNode op)
 {
-    op.adjoint = !op.adjoint;
+    static constexpr char kPrefix[] = "Adjoint(";
+    constexpr std::size_t kPrefixLen = sizeof(kPrefix) - 1;
+
+    if (op.adjoint) {
+        // Cancel: strip the outermost "Adjoint( ... )" wrapper from the id.
+        if (op.id.size() > kPrefixLen && op.id.compare(0, kPrefixLen, kPrefix) == 0 &&
+            op.id.back() == ')') {
+            op.id = op.id.substr(kPrefixLen, op.id.size() - kPrefixLen - 1);
+        }
+        op.adjoint = false;
+    }
+    else {
+        op.id = std::string(kPrefix) + op.id + ")";
+        op.adjoint = true;
+    }
     return op;
 }
 
