@@ -167,8 +167,9 @@ class ControllerSession : public TransportSession {
 
     // Copy `bytes` of payload into the current round's outbound slot, ready for kick().
     // Throws if `bytes` exceeds what the round was committed to carry, so an oversized
-    // payload will fail.
-    virtual void write_data_slot(const void *src, std::uint64_t bytes) = 0;
+    // payload will fail. `decoder_id` picks the coprocessor-side decoder for this round.
+    virtual void write_data_slot(const void *src, std::uint64_t bytes,
+                                 std::uint32_t decoder_id) = 0;
 
     // Current round's reply slot in the transport-owned reply ring.
     virtual void *reply_slot() { return nullptr; }
@@ -178,6 +179,15 @@ class ControllerSession : public TransportSession {
  * @brief Per-message coprocessor function (CPU-style). Invoked once per received
  * message: decode `in` (`in_len` bytes) into `out` (capacity `out_cap`) and
  * return the number of bytes written.
+ *
+ * `in` is the received message **frame**, not just its data: the data occupies the
+ * frame's leading bytes, and the frame also carries the sender's `decoder_id`. A
+ * function serving one code can read only the leading bytes and ignore the rest; one
+ * serving several (e.g. the X and Z parity-check matrices of a CSS code, which differ
+ * in general) reads `decoder_id` and switches on it. See WireProtocol.hpp for the
+ * frame layout, which this makes part of the plugin ABI.
+ *
+ * `out` is only the reply's data window, not a frame: the session owns reply framing.
  */
 using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *out,
                                       std::size_t out_cap, void *ctx);
@@ -228,8 +238,9 @@ class CoprocessorSession : public TransportSession {
     /**
      * @brief Bind a per-message coprocessor function (CPU-style).
      *
-     * Call before start(). `fn` is invoked once per received message; `ctx` is
-     * passed back on every invocation and may be null.
+     * Call before start(). `fn` is invoked once per received message, receiving the
+     * message's decoder_id so it can dispatch internally; `ctx` is passed back on
+     * every invocation and may be null.
      */
     virtual void set_coprocessor_fn(CoprocessorFn /*fn*/, void * /*ctx*/)
     {

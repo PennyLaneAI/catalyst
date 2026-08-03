@@ -24,8 +24,8 @@ TEST_CASE("Payload is the 16 B wire frame")
 {
     STATIC_REQUIRE(sizeof(Payload) == 16);
     STATIC_REQUIRE(offsetof(Payload, value) == 0);
-    STATIC_REQUIRE(offsetof(Payload, seq_num) == 8);
-    STATIC_REQUIRE(offsetof(Payload, pad) == 12);
+    STATIC_REQUIRE(offsetof(Payload, decoder_id) == 8);
+    STATIC_REQUIRE(offsetof(Payload, seq_num) == 12);
 }
 
 TEST_CASE("PayloadSlot is a 64 B slot")

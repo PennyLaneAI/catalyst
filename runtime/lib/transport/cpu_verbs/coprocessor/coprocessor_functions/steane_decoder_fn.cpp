@@ -49,6 +49,10 @@ constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1u << STEANE_CHECKS] = {-1, 6, 4
  * the wire does not carry; a decoder therefore has to know its own code's check
  * count.
  */
+// `in` is the request frame; its leading bytes are the syndrome. The frame's
+// decoder_id (a uint32 at byte offset 8) is not read: the [[7,1,3]] Steane code has
+// Hx == Hz, so one table serves both the X and Z checks. A code whose matrices differ
+// would read that field and switch on it here.
 extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len, void *out,
                                           std::size_t out_cap, void * /*ctx*/)
 {

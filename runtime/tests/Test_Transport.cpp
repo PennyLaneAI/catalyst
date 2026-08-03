@@ -121,7 +121,7 @@ TEST_CASE("set_coprocessor_fn on a controller session is an error", "[transport]
 
 TEST_CASE("set_coprocessor_fn: an unsupported convention is a clean error", "[transport]")
 {
-    auto *s = make(kCoprocessor, "");
+    auto *s = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "", CATALYST_COPROC_LAUNCH_ONCE) ==
           CATALYST_TRANSPORT_ERR);
@@ -130,7 +130,7 @@ TEST_CASE("set_coprocessor_fn: an unsupported convention is a clean error", "[tr
 
 TEST_CASE("set_coprocessor_fn: an out-of-range convention is rejected", "[transport]")
 {
-    auto *s = make(kCoprocessor, "");
+    auto *s = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "", 42) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "", -1) == CATALYST_TRANSPORT_ERR);

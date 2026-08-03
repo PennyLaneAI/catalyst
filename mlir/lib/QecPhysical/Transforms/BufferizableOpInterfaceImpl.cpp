@@ -132,7 +132,8 @@ struct DecodeEsmCssOpInterface
         Value errIdxBuffer = memref::AllocOp::create(rewriter, loc, errIdxMemRefType);
 
         DecodeEsmCssOp::create(rewriter, loc, TypeRange{}, esmToBufferOp.getResult(),
-                               decodeEsmCssOp.getTannerGraph(), errIdxBuffer);
+                               decodeEsmCssOp.getTannerGraph(), errIdxBuffer,
+                               decodeEsmCssOp.getCheckTypeAttr());
 
         bufferization::replaceOpWithBufferizedValues(rewriter, op, errIdxBuffer);
         return success();

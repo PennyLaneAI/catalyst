@@ -69,13 +69,15 @@ void *CpuControllerSession::data_slot()
     return &send_payload()->value;
 }
 
-void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes)
+void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
+                                           std::uint32_t decoder_id)
 {
     RDMA_CHECK(bytes <= in_bytes_, "payload (%zu B) exceeds the %zu B committed for this round",
                static_cast<std::size_t>(bytes), static_cast<std::size_t>(in_bytes_));
     Payload *send = send_payload();
     send->value = 0;
     std::memcpy(&send->value, src, bytes);
+    send->decoder_id = decoder_id;
 }
 
 int CpuControllerSession::kick(std::uint32_t /*work_item_idx*/)

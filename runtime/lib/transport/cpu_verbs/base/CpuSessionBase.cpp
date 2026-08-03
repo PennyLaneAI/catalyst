@@ -136,7 +136,6 @@ void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inl
 {
     auto *send = send_payload(); // value already written by the caller
     send->seq_num = static_cast<std::uint32_t>(cursor + 1);
-    send->pad = 0;
     ibv_sge sge{
         .addr = reinterpret_cast<std::uint64_t>(send),
         .length = sizeof(Payload), // 16 B on the wire, into slot's first 16 B
