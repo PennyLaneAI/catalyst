@@ -33,11 +33,12 @@ class ResourceResultExtension {
     virtual llvm::StringRef name() const = 0;
     virtual llvm::json::Value toJson() const = 0;
 
-    void mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) {}
+    // Override both if your extension accumulates state in `collect`.
+    // Skip them if it recomputes per region in `analyze` (e.g. PBCDepthExtension).
+    virtual void mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) {}
 
-    // multiply resource metrics by a scalar, which may be be fractional to account for probabilistic
-    // counting sometimes employed in branches for example.
-    void multiplyBy(double factor) {}
+    // `factor` may be fractional (e.g. probabilistic branch weighting).
+    virtual void multiplyBy(double factor) {}
 };
 
 template <typename Ext> class ResourceAnalysisExtensionOf;
