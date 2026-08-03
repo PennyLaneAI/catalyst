@@ -95,11 +95,6 @@ _BACKLINE_EXECUTOR_ATTR = "_catalyst_backline_executor"
 def attach_executor(device, executor):
     """Attach a launched :class:`catalyst.Executor` to a backline ``device``.
 
-    Source of ``address`` and ``triple`` for the remote controller's dispatch, in precedence order::
-
-        target(..., address=...)  >  executor.address  >  controller.addr[:port]
-        target(..., triple=...)   >  executor.triple   >  controller.triple
-
     Args:
         device: A PennyLane device with a backline placement whose controller is ``remote``.
         executor: A launched :class:`catalyst.Executor`.
@@ -150,10 +145,6 @@ def _get_backline_dispatch_address(device) -> Optional[str]:
 def get_target(device) -> Optional[Target]:
     """Return the cross-compilation :class:`Target` for ``device``, or ``None``.
 
-    Triple source, in precedence order::
-
-        target(..., triple=...)  >  executor.triple  >  controller.triple
-
     Args:
         device: A PennyLane device that may carry a :class:`Target` tag or a backline placement.
 
@@ -191,10 +182,6 @@ def get_backline_role(device) -> Optional[str]:
 
 def get_dispatch(device) -> Optional[RemoteDispatch]:
     """Return the :class:`RemoteDispatch` for ``device``, or ``None``.
-
-    Address source, in precedence order::
-
-        target(..., address=...)  >  executor.address  >  controller.addr[:port]
 
     Args:
         device: A PennyLane device that may carry a :class:`RemoteDispatch` tag or a remote
