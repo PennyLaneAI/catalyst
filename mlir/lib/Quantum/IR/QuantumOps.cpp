@@ -725,6 +725,36 @@ LogicalResult AdjointOp::verify() {
     return success();
 }
 
+LogicalResult CtrlOp::verify()
+{
+    auto res =
+        this->getRegion().walk([](MeasurementProcess op) { return WalkResult::interrupt(); });
+
+    if (res.wasInterrupted()) {
+        return emitOpError("quantum measurements are not allowed in the ctrl regions");
+    }
+
+    if (this->getInCtrlValues().size() != this->getInCtrlQubits().size()) {
+        return emitOpError("Ctrl op number of control values must be the same as the number of "
+                           "control qubits");
+    }
+
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != this->getArgs().size()) {
+        return emitOpError("Ctrl op number of operands must be the same as the number of "
+                           "arguments on its block");
+    }
+
+    for (auto [operand, bbArg] : llvm::zip_equal(this->getArgs(), b.getArguments())) {
+        if (operand.getType() != bbArg.getType()) {
+            return emitOpError(
+                "Ctrl op operand types must be the same as the argument types on its block");
+        }
+    }
+
+    return success();
+}
+
 //===----------------------------------------------------------------------===//
 // Quantum op builders.
 //===----------------------------------------------------------------------===//
