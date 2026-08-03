@@ -2,6 +2,9 @@ set(LIBRARY_NAME transport-transforms)
 
 file(GLOB SRC
     TransportToLLVM.cpp
+    InjectTransportSession.cpp
+    BufferizableOpInterfaceImpl.cpp
+    LowerDecodeToTransport.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -10,11 +13,13 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     MLIRTransport
+    MLIRQecPhysical
 )
 
 set(DEPENDS
     MLIRTransportPassIncGen
     MLIRTransportEnumsIncGen
+    MLIRQecPhysicalOpsIncGen
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
