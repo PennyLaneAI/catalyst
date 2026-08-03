@@ -179,15 +179,6 @@ class ControllerSession : public TransportSession {
  * @brief Per-message coprocessor function (CPU-style). Invoked once per received
  * message: decode `in` (`in_len` bytes) into `out` (capacity `out_cap`) and
  * return the number of bytes written.
- *
- * `in` is the received message **frame**, not just its data: the data occupies the
- * frame's leading bytes, and the frame also carries the sender's `decoder_id`. A
- * function serving one code can read only the leading bytes and ignore the rest; one
- * serving several (e.g. the X and Z parity-check matrices of a CSS code, which differ
- * in general) reads `decoder_id` and switches on it. See WireProtocol.hpp for the
- * frame layout, which this makes part of the plugin ABI.
- *
- * `out` is only the reply's data window, not a frame: the session owns reply framing.
  */
 using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *out,
                                       std::size_t out_cap, void *ctx);
