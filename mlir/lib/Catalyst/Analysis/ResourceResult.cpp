@@ -203,8 +203,9 @@ llvm::json::Object ResourceResult::toJson() const {
     // Stage 4 will nest these under "extended_fields".
     json::Object extendedFieldObject;
     for (const auto &ext : extensions) {
-        if (ext->toJson() != nullptr) {
-            extendedFieldObject[ext->name()] = ext->toJson();
+        auto json = ext->toJson();
+        if (json != nullptr) {
+            extendedFieldObject[ext->name()] = json;
         }
     }
     funcObj["extended_fields"] = std::move(extendedFieldObject);
