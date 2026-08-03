@@ -144,7 +144,8 @@ bool GpuCoprocessorSession::post_inline(std::uint64_t cursor)
 {
     auto *reply = reinterpret_cast<Payload *>(reply_buf_->addr());
     reply->value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
-    // The decoder_id does not matter for the coprocessor reply for now.
+    // TODO: echo the request's id by forwarding it through.
+    // Currently not sent to reduce Handoff size.
     reply->decoder_id = 0;
     reply->seq_num = static_cast<std::uint32_t>(cursor + 1);
     ibv_sge sge{
