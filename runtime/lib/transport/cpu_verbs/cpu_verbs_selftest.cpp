@@ -107,11 +107,11 @@ int main(int argc, char **argv)
     }
     else {
         // Controller: commit a work item sized by --syndrome-bytes/--correction-bytes,
-        // write the syndrome into data_slot(), kick one round, collect the correction.
+        // write the syndrome into the outbound slot, kick one round, collect the correction.
         controller->commit_work_item(/*work_item_idx=*/0, syndrome_bytes, correction_bytes);
         controller->start();
         const std::uint64_t syndrome = DEMO_SYNDROME;
-        std::memcpy(controller->data_slot(), &syndrome, sizeof(syndrome));
+        controller->write_data_slot(&syndrome, syndrome_bytes);
         controller->kick(0);
         controller->collect(outs, obytes, 1);
         controller->stop();

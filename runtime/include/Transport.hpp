@@ -161,8 +161,14 @@ class ControllerSession : public TransportSession {
     // data_slot(). Pairs with a subsequent collect(). Returns 0 on success.
     virtual int kick(std::uint32_t work_item_idx) = 0;
 
-    // Current round's outbound slot in the transport-owned ring.
+    // Current round's outbound slot in the transport-owned ring. The slot's capacity is
+    // backend-defined and not exposed here; prefer write_data_slot(), which enforces it.
     virtual void *data_slot() = 0;
+
+    // Copy `bytes` of payload into the current round's outbound slot, ready for kick().
+    // Throws if `bytes` exceeds what the round was committed to carry, so an oversized
+    // payload will fail.
+    virtual void write_data_slot(const void *src, std::uint64_t bytes) = 0;
 };
 
 /**

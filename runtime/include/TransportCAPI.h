@@ -85,6 +85,10 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
 int __catalyst__transport__commit_work_item(CatalystTransportSession *s, uint32_t work_item_idx,
                                             uint64_t in_bytes, uint64_t out_bytes);
 void *__catalyst__transport__data_slot(CatalystTransportSession *s);
+// Copy `bytes` into the round's outbound slot. Fails if `bytes` exceeds what
+// commit_work_item committed.
+int __catalyst__transport__write_data_slot(CatalystTransportSession *s, const void *src,
+                                           uint64_t bytes);
 int __catalyst__transport__kick(CatalystTransportSession *s, uint32_t work_item_idx);
 
 // Run / collect / teardown.
