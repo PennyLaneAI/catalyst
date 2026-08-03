@@ -158,7 +158,17 @@ static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping
 struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     using OpRewritePattern<CtrlOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override
+    {
+        // Defer (not an error) if the region still contains a nested quantum.adjoint region.
+        // Distributing controls needs an op-level body, so the inner region must be reduced first.
+        // The pipeline runs (ctrl-lowering, adjoint-lowering) to a fixpoint: adjoint-lowering
+        // reduces the inner region to op-level gates, then this ctrl op lowers on a later iteration.
+        // A pre-scan avoids a partial rewrite (creating ops, then bailing out mid-region).
+        if (ctrl.getRegion().walk([](AdjointOp) { return WalkResult::interrupt(); }).wasInterrupted()) {
+            return failure();
+        }
+
         Block &block = ctrl.getRegion().front();
 
         // Map the region's block arguments (the target qubits/registers) to the ctrl op operands.
@@ -218,11 +228,6 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
                 currentCtrlQubits.assign(mergedCtrlResults.begin() + numInnerControls,
                                          mergedCtrlResults.end());
                 continue;
-            }
-            if (isa<AdjointOp>(op)) {
-                op.emitError("nested quantum.adjoint inside a quantum.ctrl region is not supported "
-                             "by ctrl-lowering; run adjoint-lowering first");
-                return failure();
             }
             if (isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
                 op.emitError(
