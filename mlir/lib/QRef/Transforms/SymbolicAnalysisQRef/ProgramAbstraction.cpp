@@ -120,5 +120,9 @@ void ProgramAbstraction::applySummary(RegionSummary &&summary)
     llvm::errs() << "nullifiedSummary:\n" << summary << "\n";
 
     stateTransform = precondition.propagateThrough(summary.affineRel);
+    llvm::errs() << "propagatedThrough:\n" << stateTransform << "\n";
     summary.accumulatePhasesInto(phases, stateTransform.getSchema());
+    llvm::errs() << "accumulatedPhases:\n" << phases << "\n";
 }
+
+// TODO: normalize main phases by reducing them w.r.t. the final affine relation.

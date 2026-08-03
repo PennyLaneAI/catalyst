@@ -74,7 +74,7 @@ class AffineRelation : public AffineBase<RelationSchema> {
     void embedInto(BinaryMatrix &trgtMat, const RelationSchemaView &trgtSchm) const;
     static void mapRowBits(const Parity& srcRow, const RelationSchemaView& srcSchm, 
         Parity& trgtRow, const RelationSchemaView& trgtSchm);
-    static AffineRelation concretizer(size_t qubitNum);    
+    static BinaryMatrix concretizer(const PropagateSchema &propSchm);    
 };
 
 inline void AffineRelation::opPreProcess(const AffineRelation& rhs)
@@ -127,14 +127,4 @@ inline AffineRelation AffineRelation::compose(const AffineRelation& rhs) const
 {
     AffineRelation res = *this;
     return res.composeWith(rhs);
-}
-
-inline AffineTransform AffineRelation::propagateThrough(const AffineRelation& rhs)
-{
-    llvm::errs() << "AffineRelation::propagateThrough...\n";
-    llvm::errs() << "this:\n" << *this << "\n";
-    llvm::errs() << "rhs:\n" << rhs << "\n";
-    composeWith(rhs);
-    llvm::errs() << "composed:\n" << *this << "\n";
-    return solveRelation();
 }

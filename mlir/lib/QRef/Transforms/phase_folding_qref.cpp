@@ -115,7 +115,6 @@ void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstract
     llvm::TypeSwitch<mlir::Operation *, void>(op)
         .Case<mlir::scf::IfOp>([&](mlir::scf::IfOp ifOp) {
             llvm::outs() << "IfOp:  " << "\n";
-            llvm::outs() << "currentAbst:\n" << currentAbst << "\n";
             handleIfOp(ifOp, currentAbst);
         })
         .Case<mlir::scf::ForOp>([&](mlir::scf::ForOp forOp) {
@@ -179,11 +178,6 @@ void PhaseFoldingAnalyzer::handleIfOp(mlir::scf::IfOp ifOp, ProgramAbstraction &
     if (!ifOp.getElseRegion().empty()) {
         analyzeBlock(&ifOp.getElseRegion().front(), elseAbst);
     }
-
-    llvm::outs() << "@@@@@@@@\n";
-    llvm::outs() << "thenAbst:\n" << thenAbst << "\n";
-    llvm::outs() << "elseAbst:\n" << elseAbst << "\n";
-    llvm::outs() << "parentAbst:\n" << parentAbst << "\n";
 
     // 3. Compute summary using your API
     RegionSummary summary(RegionType::Conditional, thenAbst, &elseAbst);

@@ -50,17 +50,18 @@ AffineRelation AffineRelation::Unsat(size_t numQubits)       // \top = <0 = 1>
     return affRel;
 }
 
-AffineRelation AffineRelation::concretizer(size_t numQubits) // <X' = Y>
+BinaryMatrix AffineRelation::concretizer(const PropagateSchema &propSchm)   // <X' = Y>
 {
-    AffineRelation affRel(numQubits, numQubits, numQubits);
+    const size_t numQubits = propSchm.numQubits();
+    BinaryMatrix concretizerMat(numQubits);
 
     for (size_t i = 0; i < numQubits; ++i) {
-        Parity& curRow = affRel.matrix.allocRow();
-        curRow.mkBasis(affRel.schema.postVars[i], affRel.schema.maxBlock());
-        curRow.setBitAtLoc(affRel.schema.auxVars[i]);
+        Parity& curRow = concretizerMat.allocRow();
+        curRow.mkBasis(propSchm.postVars[i], propSchm.maxBlock());
+        curRow.setBitAtLoc(propSchm.concretizerVars[i]);
     }
-    
-    return affRel;
+
+    return concretizerMat;
 }
 
 /*
@@ -192,57 +193,48 @@ AffineRelation AffineRelation::kleeneStar() const
     return sum;
 }
 
-// inline AffineTransform AffineRelation::propagateThrough(const AffineRelation& rhs)
-// {
-//     AffineBase<CompositionSchema> affCmps(std::move(matrix), CompositionSchema(std::move(schema), rhs.schema));
-//     CompositionSchema cmpsSchm = CompositionSchema(std::move(schema), rhs.schema);
-//     BinaryMatrix cmpsMat(numQubits() + matrix.getNumRows() + rhs.matrix.getNumRows());
+AffineTransform AffineRelation::propagateThrough(const AffineRelation& rhs)
+{
+    assert(rhs.schema.numAuxVars() == 0);
 
-//     for (size_t i = 0; i < numQubits(); ++i) {
-//         Parity& newRow = cmpsMat.allocRow();
-//         newRow.mkBasis(cmpsSchm.postVars[i], cmpsSchm.maxBlock());
-//     }
+    PropagateSchema propagateSchm(std::move(schema), rhs.schema);
+    BinaryMatrix propagateMat = concretizer(propagateSchm);
 
+    propagateMat.appendRows(this->matrix);
 
+    rhs.embedInto(
+        propagateMat, 
+        RelationSchemaView(
+            propagateSchm.postVars, 
+            propagateSchm.projVars, 
+            {}, 
+            propagateSchm.affVal, 
+            propagateSchm.maxBlock())
+    );
 
+    AffineBase<CompositionSchema> affPropag(std::move(propagateMat), propagateSchm);
+    affPropag.projectOutVars(propagateSchm.projVars);
 
-// }
-
-
-
-// TODO:Change propagateThrough to form a new set of constraints and project out from it. don't call compose, meet, etc.
+    AffineRelation affPropagRel(std::move(affPropag.getMatrixMutable()), std::move(affPropag.getSchemaMutable()));
+    return affPropagRel.solveRelation();
+}
 
 AffineTransform AffineRelation::solveRelation()
 {
-    llvm::errs() << "**********************************************\n";
-    llvm::errs() << "AffineRelation::solveRelation...\n";
     const size_t qubitNum = numQubits();
-    llvm::errs() << "qubitNum: " << qubitNum << "\n";
-    llvm::errs() << "Concretizer:\n" << concretizer(qubitNum) << "\n";
-    *this = concretizer(qubitNum).meetWith(*this);
-    llvm::errs() << "concretized:\n" << *this << "\n";
-    const size_t numExpr = matrix.getNumRows();
-    llvm::errs() << "numExpr: " << numExpr << "\n";
-    
-    assert(numExpr >= qubitNum);
+    assert(qubitNum <= matrix.getNumRows());
 
-    TransformSchema solvedSchm(qubitNum, schema.numAuxVars());
-    BinaryMatrix solvedMat(numExpr);
-    
-    const size_t numBlocks = solvedSchm.maxBlock();
-    
-    for (size_t i = 0; i < numExpr; ++i) {
-        const Parity& relRow = matrix.getRowAt(i);
-        Parity& solvedRow = solvedMat.allocRow();
-        solvedRow.extendBitsTo(numBlocks);
-
-        if (relRow.getBitAtLoc(schema.postVars[i])) {
-            solvedRow.mapBitsFrom(relRow, schema.preVars, solvedSchm.preVars);
-            solvedRow.mapBitsFrom(relRow, schema.auxVars, solvedSchm.auxVars);
-            solvedRow.mapBitFrom(relRow, schema.affVal, solvedSchm.affVal);            
-        }
+    for (size_t i = 0; i < qubitNum; ++i) {
+        matrix.getRowMutableAt(i).clearBitAtLoc(schema.postVars[i]); // is it logically correct? i.e. does it make the postVars empty?
     }
-    return AffineTransform(std::move(solvedMat), std::move(solvedSchm));
+
+    schema.recycleLocs(schema.postVars);
+    schema.postVars.clear();
+    TransformSchema solvedSchm = schema.toTransformSchema();
+
+    // llvm::errs() << "solvedMat:\n" << matrix << "\n";
+    // llvm::errs() << "solvedSchm:\n" << solvedSchm << "\n\n\n";
+    return AffineTransform(std::move(matrix), std::move(solvedSchm));
 }
 
 Parity AffineRelation::reduce(const Parity& par, const AffineSchema& parSchm) const

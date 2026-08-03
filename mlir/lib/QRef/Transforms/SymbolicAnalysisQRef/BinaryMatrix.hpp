@@ -62,6 +62,7 @@ public:
 
     // Methods
     Parity &allocRow();
+    void appendRows(const BinaryMatrix &rhs);
     void extendRowsFor(IdxView newVars, size_t maxBlock);
     void reserveRowsFor(size_t addNumRows);
     void resetRow(size_t row, std::optional<size_t> newBlockNum=1);
@@ -189,6 +190,8 @@ inline Parity &BinaryMatrix::allocRow()
     rows.emplace_back();
     return rows.back();
 }
+
+inline void BinaryMatrix::appendRows(const BinaryMatrix &rhs) { rows.insert(rows.end(), rhs.rows.begin(), rhs.rows.end()); }
 
 inline void BinaryMatrix::reserveRowsFor(size_t addNumRows) { rows.reserve(rows.size() + addNumRows); }
 

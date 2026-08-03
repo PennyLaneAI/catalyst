@@ -105,14 +105,15 @@ template <typename SchemaT>
 template <typename ColOrderRange>
 void AffineBase<SchemaT>::projectOutVars(ColOrderRange projRange)
 {
-    matrix.semiNormalize(schema.getProjOrder(projRange));
+    // matrix.semiNormalize(schema.getProjOrder(projRange));
+    matrix.normalize(schema.getProjOrder(projRange));
     size_t newSt = matrix.firstTrivialInRangeRow(projRange);
 
     if (newSt <= matrix.getNumRows()) {
         matrix.dropTopRows(newSt);
     }
 
-    schema.projectOutLocs(projRange);
+    schema.recycleLocs(projRange);
 }
 
 template <typename SchemaT>

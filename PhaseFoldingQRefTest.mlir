@@ -10,20 +10,22 @@ func.func @ex_425(%arg0: i1) {
     %tens01 = arith.constant dense<[true]> : tensor<1xi1>
     qref.set_basis_state(%tens01) %q0 : tensor<1xi1>, !qref.bit
 
-    qref.custom "T"() %q0 : !qref.bit   // l1
+    qref.custom "T"() %q0 : !qref.bit   // l0
     qref.custom "PauliX"() %q0 : !qref.bit
 
     %2:2 = scf.if %arg0 -> (!qref.bit, !qref.bit) {
-        qref.custom "T"() %q0 : !qref.bit // l2
-        qref.custom "T"() %q1 : !qref.bit // l3
+        qref.custom "T"() %q0 : !qref.bit // l1
+        qref.custom "T"() %q1 : !qref.bit // l2
         qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
-        qref.custom "T"() %q1 : !qref.bit // l4
+        qref.custom "T"() %q1 : !qref.bit // l3
         scf.yield %q0, %q1 : !qref.bit, !qref.bit
     } else {
         qref.custom "Hadamard"() %q1 : !qref.bit
-        qref.custom "T"() %q0 : !qref.bit // l5
+        qref.custom "T"() %q0 : !qref.bit // l4
         scf.yield %q0, %q1 : !qref.bit, !qref.bit
     }
+
+    qref.custom "T"() %q0 : !qref.bit // l5
 
     qref.dealloc %reg : !qref.reg<2>
     return

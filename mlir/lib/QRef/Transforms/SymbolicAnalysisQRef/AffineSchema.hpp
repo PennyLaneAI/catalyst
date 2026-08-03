@@ -66,7 +66,7 @@ struct AffineSchema : OrderedSchema<AffineSchema> {
     void growAuxVars(size_t num);
     
     template <typename ColOrderRange>
-    void projectOutLocs(ColOrderRange projRange) const;
+    void recycleLocs(ColOrderRange locs) const;
 
     auto orderImpl() const;
 
@@ -94,6 +94,9 @@ struct TransformSchema : AffineSchema {
             auxVars = getFreeLocs(numAuxVars.value());
         }
     }
+    explicit TransformSchema(IdxList preVars, IdxList auxVars, BitLocation affVal, IdxList recycledLocs, BitLocation maxLoc) :
+        AffineSchema(std::move(preVars), std::move(auxVars), affVal, std::move(recycledLocs), maxLoc)
+    {}
 };
 
 struct RelationSchema : AffineSchema, OrderedSchema<RelationSchema>, ProjectableSchema<RelationSchema> {
@@ -123,6 +126,7 @@ struct RelationSchema : AffineSchema, OrderedSchema<RelationSchema>, Projectable
     // Methods
     BitLocation allocPostVar();
     IdxView allocPostVars(size_t num);
+    TransformSchema toTransformSchema();
 
     using OrderedSchema<RelationSchema>::getOrder;
     auto orderImpl() const;
@@ -222,6 +226,14 @@ struct CompositionSchema : TempSchema<CompositionSchema>, OrderedSchema<Composit
 
     using OrderedSchema<CompositionSchema>::getOrder;
     auto orderImpl() const;
+};
+
+struct PropagateSchema : CompositionSchema {
+    IdxView concretizerVars;
+
+    PropagateSchema(RelationSchema &&lhs, const RelationSchema &rhs) :
+        CompositionSchema(std::move(lhs), rhs), concretizerVars(allocAuxVars(numQubits()))
+    {}
 };
 
 // Getters:
@@ -348,11 +360,16 @@ inline void RelationSchema::growPostVars(size_t n)
     postVars.insert(postVars.end(), ids.begin(), ids.end());
 }
 
-template <typename ColOrderRange>
-void AffineSchema::projectOutLocs(ColOrderRange projRange) const
+inline TransformSchema RelationSchema::toTransformSchema()
 {
-    if (llvm::adl_begin(projRange) != llvm::adl_end(projRange)) {
-        recycledLocs.reserve(recycledLocs.size() + llvm::range_size(projRange));
-        llvm::append_range(recycledLocs, projRange);
+    return TransformSchema(std::move(preVars), std::move(auxVars), affVal, takeRecycledLocs(), getMaxLoc());
+}
+
+template <typename ColOrderRange>
+void AffineSchema::recycleLocs(ColOrderRange locs) const
+{
+    if (llvm::adl_begin(locs) != llvm::adl_end(locs)) {
+        recycledLocs.reserve(recycledLocs.size() + llvm::range_size(locs));
+        llvm::append_range(recycledLocs, locs);
     }
 } // pass size
