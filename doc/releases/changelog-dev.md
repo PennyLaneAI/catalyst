@@ -12,6 +12,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
+  through the transport passes.
+  [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
+
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
   operations in question can be annotated with either a `catalyst.estimated_probability` or
