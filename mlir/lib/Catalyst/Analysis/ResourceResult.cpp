@@ -140,12 +140,12 @@ llvm::json::Object ResourceResult::toJson() const {
     llvm::json::Object funcObj;
 
     /// Metadata
-    llvm::json::Object metadataObject;
-    metadataObject["device_name"] = deviceName;
-    metadataObject["qnode"] = isQnode;
-    metadataObject["has_branches"] = hasBranches;
-    metadataObject["auto_qubit_management"] = autoQubitManagement;
-    funcObj["metadata"] = std::move(metadataObject);
+    llvm::json::Object metatDataObject;
+    metatDataObject["device_name"] = deviceName;
+    metatDataObject["qnode"] = isQnode;
+    metatDataObject["has_branches"] = hasBranches;
+    metatDataObject["auto_qubit_management"] = autoQubitManagement;
+    funcObj["metadata"] = std::move(metatDataObject);
 
     /// Qubit Allocations
     llvm::json::Object numQubitObject;
@@ -183,12 +183,12 @@ llvm::json::Object ResourceResult::toJson() const {
     for (const auto &entry : functionCalls) {
         staticFunctionObject[entry.getKey()] = countToJson(entry.getValue());
     }
-    llvm::json::Object dynamicFunctionsObject;
+    llvm::json::Object dynamicFunctionObject;
     for (const auto &entry : varFunctionCalls) {
-        dynamicFunctionsObject[entry.getKey()] = llvm::formatv("{0:x16}", entry.getValue()).str();
+        dynamicFunctionObject[entry.getKey()] = llvm::formatv("{0:x16}", entry.getValue()).str();
     }
     functionObject["static"] = std::move(staticFunctionObject);
-    functionObject["dynamic"] = std::move(dynamicFunctionsObject);
+    functionObject["dynamic"] = std::move(dynamicFunctionObject);
     funcObj["function_calls"] = std::move(functionObject);
 
     /// Measurement processes
