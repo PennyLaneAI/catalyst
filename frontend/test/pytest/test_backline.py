@@ -24,9 +24,20 @@ pytestmark = pytest.mark.skipif(
 )
 
 if hasattr(qp, "backline"):
-    from pennylane.backline import Transport, register_transport
+    from pennylane.backline import Transport
+
+
+@pytest.fixture(autouse=True)
+def _net_transport():
+    """Register a test-only ``"net"`` transport per test; unregister on teardown."""
+    from pennylane import backline as _bl
+    from pennylane.backline import register_transport
 
     register_transport("net")(lambda: Transport("net"))
+    try:
+        yield
+    finally:
+        getattr(_bl, "_transports", {}).pop("net", None)
 
 
 def _controller(**kw):

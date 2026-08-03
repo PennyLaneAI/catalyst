@@ -25,7 +25,7 @@ _INIT_KEYS = ("backend_lib", "config", "data_path", "in_bytes", "out_bytes")
 
 
 def _node_dict(node) -> dict:
-    """Map one backline node (controller/coprocessor) to a ``catalyst.backline`` node dict."""
+    """Map a backline node to a ``catalyst.backline`` node dict. Reads ``node.executor`` as-is."""
     d = {"remote": bool(node.remote)}
     if node.name is not None:
         d["name"] = node.name
@@ -33,7 +33,7 @@ def _node_dict(node) -> dict:
         d["peer"] = node.addr
     if node.port is not None:
         d["oob_port"] = int(node.port)
-    executor = _realize_executor(node)
+    executor = getattr(node, "executor", None)
     triple = (getattr(executor, "triple", None) if executor is not None else None) or node.triple
     if triple is not None:
         d["triple"] = triple
@@ -42,6 +42,13 @@ def _node_dict(node) -> dict:
     init = node.init_args or {}
     d.update({k: init[k] for k in _INIT_KEYS if k in init})
     return d
+
+
+def realize_executors(backline) -> None:
+    """Launch every unrealized :class:`~pennylane.backline.ExecutorSpec` on ``backline`` in place. Idempotent."""
+    _realize_executor(backline.controller)
+    for coproc in backline.coprocessors:
+        _realize_executor(coproc)
 
 
 def add_transport_passes(stages):

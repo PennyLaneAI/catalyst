@@ -892,7 +892,10 @@ class QJIT(CatalystCallable):
         if backline is not None:
             from jax.interpreters.mlir import ir
 
-            from catalyst.backline import backline_attr_text
+            from catalyst.backline import backline_attr_text, realize_executors
+
+            # Launch any unlaunched ExecutorSpecs first so serialization is a pure read.
+            realize_executors(backline)
 
             with mlir_module.context:
                 mlir_module.operation.attributes["catalyst.backline"] = ir.Attribute.parse(
