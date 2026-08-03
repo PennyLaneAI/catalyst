@@ -223,8 +223,10 @@ struct SetCoprocessorFnLowering : public OpConversionPattern<SetCoprocessorFnOp>
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         Value sym = globalStr(rewriter, op.getLoc(), mod, "transport_coproc_fn_", op.getSymbol());
+        Value conv = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getConvention());
         emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__set_coprocessor_fn",
-                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), sym});
+                 {ptrTy(ctx), ptrTy(ctx), i32Ty(ctx)}, i32Ty(ctx),
+                 {adaptor.getSession(), sym, conv});
         rewriter.eraseOp(op);
         return success();
     }
@@ -263,9 +265,9 @@ struct KickLowering : public OpConversionPattern<KickOp> {
         }
         auto [srcPtr, bytes] =
             memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getPayload(), memTy);
-        Value slot = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__data_slot",
-                              {ptrTy(ctx)}, ptrTy(ctx), {adaptor.getSession()});
-        LLVM::MemcpyOp::create(rewriter, op.getLoc(), slot, srcPtr, bytes, /*isVolatile=*/false);
+        emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__write_data_slot",
+                 {ptrTy(ctx), ptrTy(ctx), i64Ty(ctx)}, i32Ty(ctx),
+                 {adaptor.getSession(), srcPtr, bytes});
         Value idx = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getWorkItemIdx());
         emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__kick",
                  {ptrTy(ctx), i32Ty(ctx)}, i32Ty(ctx), {adaptor.getSession(), idx});
