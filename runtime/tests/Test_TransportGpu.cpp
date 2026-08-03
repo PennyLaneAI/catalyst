@@ -23,7 +23,7 @@
 using namespace catalyst::transport::gpu_verbs;
 using namespace catalyst::transport::common;
 
-TEST_CASE("Wire Payload is the 16 B FPGA frame")
+TEST_CASE("Wire Payload is the 16 B frame")
 {
     STATIC_REQUIRE(sizeof(Payload) == 16);
     STATIC_REQUIRE(offsetof(Payload, value) == 0);
@@ -31,7 +31,7 @@ TEST_CASE("Wire Payload is the 16 B FPGA frame")
     STATIC_REQUIRE(offsetof(Payload, pad) == 12);
 }
 
-TEST_CASE("PayloadSlot is a 64 B ERNIC-aligned ring slot")
+TEST_CASE("PayloadSlot is a 64 B aligned ring slot")
 {
     STATIC_REQUIRE(sizeof(PayloadSlot) == 64);
     STATIC_REQUIRE(alignof(PayloadSlot) == 64);
