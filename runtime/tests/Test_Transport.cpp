@@ -110,6 +110,15 @@ TEST_CASE("set_coprocessor_fn on a controller session is an error", "[transport]
     __catalyst__transport__destroy(s);
 }
 
+TEST_CASE("set_coprocessor_fn binds through the setter the backend implements", "[transport]")
+{
+    auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "launch_once",
+                                            CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
+    REQUIRE(s != nullptr);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "") == CATALYST_TRANSPORT_OK);
+    __catalyst__transport__destroy(s);
+}
+
 TEST_CASE("null session arguments are rejected without crashing", "[transport]")
 {
     CHECK(__catalyst__transport__connect(nullptr, "127.0.0.1", 0) == CATALYST_TRANSPORT_ERR);
