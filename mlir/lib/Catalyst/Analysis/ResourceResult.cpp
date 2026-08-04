@@ -87,13 +87,9 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     hasBranches = hasBranches || other.hasBranches;
     hasDynLoop = hasDynLoop || other.hasDynLoop;
 
-    for (auto &m : extensions) {
-        for (const auto &o : other.extensions) {
-            if (m->name() == o->name()) {
-                m->mergeWith(*o, method);
-                break;
-            }
-        }
+    for (auto [ext, otherExt] : llvm::zip(extensions, other.extensions)) {
+        assert(ext->name() == otherExt->name() && "extension names must match");
+        ext->mergeWith(*otherExt, method);
     }
 }
 
