@@ -31,6 +31,13 @@
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
   [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
 
+* A CPU transport backend built on libibverbs is added, which implements the controller and coprocessor
+  session roles over RDMA.
+  [(#3062)](https://github.com/PennyLaneAI/catalyst/pull/3062)
+
+* A GPU transport backend is added, which implements the coprocessor session role.
+  [(#3069)](https://github.com/PennyLaneAI/catalyst/pull/3069)
+
 * Catalyst can now cross-compile target nested modules to standalone object files and
   either statically link them into the host program or ship them to an executor for dispatch.
  [(#3033)](https://github.com/PennyLaneAI/catalyst/pull/3033)
@@ -72,7 +79,7 @@
     [(#2915)](https://github.com/PennyLaneAI/catalyst/pull/2915)
 
   - Added `executor.launch_async` and `executor.await` ops, paired by a new `!executor.token` type
-    to the executor dialect along with the necessary lowerings. This allows one to start an async 
+    to the executor dialect along with the necessary lowerings. This allows one to start an async
     kernel on a background host thread and join it later.
     [(#3073)](https://github.com/PennyLaneAI/catalyst/pull/3073)
     [(#3031)](https://github.com/PennyLaneAI/catalyst/pull/3031)
