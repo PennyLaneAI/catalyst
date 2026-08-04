@@ -19,7 +19,7 @@
 // CHECK-DAG: llvm.func @__catalyst__transport__exchange_keys(!llvm.ptr) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__establish_channel(!llvm.ptr, !llvm.ptr) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__commit_work_item(!llvm.ptr, i32, i64, i64) -> i32
-// CHECK-DAG: llvm.func @__catalyst__transport__data_slot(!llvm.ptr) -> !llvm.ptr
+// CHECK-DAG: llvm.func @__catalyst__transport__write_data_slot(!llvm.ptr, !llvm.ptr, i64) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__kick(!llvm.ptr, i32) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__collect(!llvm.ptr, !llvm.ptr, i64) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__start(!llvm.ptr)
@@ -41,8 +41,7 @@ func.func @controller(%syndrome: memref<?xi8>, %correction: memref<?xi8>) {
   transport.commit_work_item %s {work_item_idx = 0 : i32, in_bytes = 8 : i64, out_bytes = 8 : i64} : !transport.session<controller>
   // CHECK: llvm.call @__catalyst__transport__start(%[[S]])
   transport.start %s : !transport.session<controller>
-  // CHECK: %[[SLOT:.*]] = llvm.call @__catalyst__transport__data_slot(%[[S]])
-  // CHECK: "llvm.intr.memcpy"(%[[SLOT]]
+  // CHECK: llvm.call @__catalyst__transport__write_data_slot(%[[S]]
   // CHECK: llvm.call @__catalyst__transport__kick(%[[S]]
   transport.kick %s, %syndrome {work_item_idx = 0 : i32} : !transport.session<controller>, memref<?xi8>
   // CHECK: llvm.call @__catalyst__transport__collect(%[[S]]
@@ -65,7 +64,7 @@ func.func @coprocessor() {
   %t = transport.connect_async %c {peer = "127.0.0.1", oob_port = 18560 : i16} : !transport.session<coprocessor> -> !transport.token
   // CHECK: llvm.call @__catalyst__transport__barrier
   transport.barrier %t : !transport.token
-  // CHECK: llvm.call @__catalyst__transport__set_coprocessor_fn(%[[C]], {{.*}}) : (!llvm.ptr, !llvm.ptr) -> i32
+  // CHECK: llvm.call @__catalyst__transport__set_coprocessor_fn(%[[C]], %{{.*}}) : (!llvm.ptr, !llvm.ptr) -> i32
   transport.set_coprocessor_fn %c {symbol = "foo"} : !transport.session<coprocessor>
   // CHECK: llvm.call @__catalyst__transport__destroy(%[[C]])
   transport.destroy %c : !transport.session<coprocessor>
