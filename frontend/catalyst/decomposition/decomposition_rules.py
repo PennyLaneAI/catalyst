@@ -172,12 +172,17 @@ def get_rule_funcs_from_module(module: ir.Module) -> list[ir.Operation]:
                 op.attributes["sym_name"] = ir.StringAttr.get(
                     "__builtin_" + old_attr.value.strip('"'), context=old_attr.context
                 )
-                funcOps.append(op.detach_from_parent())
+                funcOps.append(op)
                 return ir.WalkResult.SKIP
         return ir.WalkResult.ADVANCE
 
     module.operation.walk(find_condition)
     return funcOps
+
+
+def get_rules_from_module_as_list(module: ir.Module) -> list[str]:
+    funcOps = get_rule_funcs_from_module(module)
+    return [str(funcOp) for funcOp in funcOps]
 
 
 def get_rules_from_module(module: ir.Module) -> str:
@@ -192,7 +197,6 @@ def get_rules_from_module(module: ir.Module) -> str:
              `__builtin_` prefix to their names.
     """
     funcOps = get_rule_funcs_from_module(module)
-
     return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
@@ -242,7 +246,6 @@ def compile_decomposition_rules(
     """
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
-
     device = qp.device("null.qubit", wires=sum(wire_lens.values()))
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name, kwargs | static_data | extra_data, is_custom_op
@@ -264,6 +267,8 @@ def compile_decomposition_rules(
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
+
+    # TODO: reconcretify abstracted hybrid ops
 
     @qp.qjit(
         target="mlir",
@@ -331,13 +336,11 @@ def fetch_all_reachable_decomposition_rules_from_op(
     start = (op_name, dynamic_shape, wire_lens, static_data, extra_data)
     queue.append(start)
     visited = [start]
-    rules = [
-        *get_rule_funcs_from_module(
-            compile_decomposition_rules(
-                op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
-            )
+    rules = get_rules_from_module_as_list(
+        compile_decomposition_rules(
+            op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
         )
-    ]
+    )
 
     while len(queue) != 0:
         this_name, this_dynamic_shape, this_wire_lens, this_static_data, this_extra_data = (
@@ -361,7 +364,6 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 if not probe in visited:
                     visited.append(probe)
                     queue.append(probe)
-
                     module = compile_decomposition_rules(
                         probe[0],
                         graph_op_id.getID(),
@@ -370,5 +372,5 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         probe[3],
                         probe[4],
                     )
-                    rules.extend(get_rule_funcs_from_module(module))
+                    rules.extend(get_rules_from_module_as_list(module))
     return rules
