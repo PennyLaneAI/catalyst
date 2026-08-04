@@ -162,7 +162,8 @@ static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping
 /// holds the control-qubit values after the last op. New ops are created at the rewriter's current
 /// insertion point.
 static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block, IRMapping &map,
-                                        SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues);
+                                        SmallVector<Value> &currentCtrlQubits,
+                                        ValueRange ctrlValues);
 
 /// Control an `scf.if` by turning the control qubits into extra results: each branch threads the
 /// controls through its body and yields them alongside the original results. Branches are
@@ -192,7 +193,8 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
         SmallVector<Value> yielded;
         Location yieldLoc = ifOp.getLoc();
         if (oldBlock) {
-            if (failed(distributeControls(rewriter, *oldBlock, branchMap, branchCtrl, ctrlValues))) {
+            if (failed(
+                    distributeControls(rewriter, *oldBlock, branchMap, branchCtrl, ctrlValues))) {
                 return failure();
             }
             auto oldYield = cast<scf::YieldOp>(oldBlock->getTerminator());
@@ -228,7 +230,8 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
 }
 
 static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block, IRMapping &map,
-                                        SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
+                                        SmallVector<Value> &currentCtrlQubits,
+                                        ValueRange ctrlValues)
 {
     for (Operation &op : block.without_terminator()) {
         if (isa<MeasurementProcess, MeasureOp>(op)) {
@@ -280,8 +283,9 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
             continue;
         }
         if (isa<scf::ForOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
-            op.emitError("this control flow op inside a quantum.ctrl region is not supported yet by "
-                         "ctrl-lowering");
+            op.emitError(
+                "this control flow op inside a quantum.ctrl region is not supported yet by "
+                "ctrl-lowering");
             return failure();
         }
         if (isa<InsertOp, ExtractOp, AllocOp, DeallocOp, AllocQubitOp, DeallocQubitOp>(op)) {
