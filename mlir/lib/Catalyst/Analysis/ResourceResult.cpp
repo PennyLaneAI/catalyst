@@ -27,6 +27,7 @@
 
 #include "Catalyst/Analysis/ResourceResultExtension.h"
 
+#include <llvm/ADT/DenseMap.h>
 #include <llvm/Support/JSON.h>
 
 using namespace mlir;
@@ -162,16 +163,20 @@ llvm::json::Object ResourceResult::toJson() const {
     funcObj["classical_instructions"] = std::move(classicalInstructionsObject);
 
     /// Quantum Operations
-    llvm::json::Object quantumOperationObject;
+    llvm::DenseMap<int, llvm::DenseMap<StringRef, double>> quantumOperationCounts;
     for (const auto &opEntry : operations) {
         StringRef opName = opEntry.getKey();
         for (const auto &sizeEntry : opEntry.getValue()) {
             const auto &[nQubits, nParams] = sizeEntry.first;
             double count = sizeEntry.second;
-
-            // try to insert nQubits first, if not then create empty json object.
-            auto [it, _] =
-                quantumOperationObject.try_emplace(std::to_string(nQubits), llvm::json::Object{});
+            quantumOperationCounts[nQubits][opName] += count;
+        }
+    }
+    llvm::json::Object quantumOperationObject;
+    for (const auto &[nQubits, opCounts] : quantumOperationCounts) {
+        auto [it, _] =
+            quantumOperationObject.try_emplace(std::to_string(nQubits), llvm::json::Object{});
+        for (const auto &[opName, count] : opCounts) {
             (*it->getSecond().getAsObject())[opName] = countToJson(count);
         }
     }
