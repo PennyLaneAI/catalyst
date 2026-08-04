@@ -193,17 +193,16 @@ func.func @ctrl_measure(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Control flow inside a ctrl region is not supported.
-func.func @ctrl_scf(%ctrl: !quantum.bit, %q: !quantum.bit, %cond: i1) -> !quantum.bit {
+// scf.for is not supported yet.
+func.func @ctrl_scf_for(%ctrl: !quantum.bit, %q: !quantum.bit, %lb: index, %ub: index,
+                        %step: index) -> !quantum.bit {
   %true = arith.constant true
   %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
-    // expected-error @+1 {{control flow inside a quantum.ctrl region is not supported}}
-    %r = scf.if %cond -> !quantum.bit {
-      %h = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+    // expected-error @+1 {{this control flow op inside a quantum.ctrl region is not supported yet}}
+    %r = scf.for %i = %lb to %ub step %step iter_args(%qi = %arg0) -> !quantum.bit {
+      %h = quantum.custom "Hadamard"() %qi : !quantum.bit
       scf.yield %h : !quantum.bit
-    } else {
-      scf.yield %arg0 : !quantum.bit
     }
     quantum.yield %r : !quantum.bit
   }
