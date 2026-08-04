@@ -227,12 +227,33 @@ TEST_CASE("Test Adjoint: adjoint pushed through a decomposition", "[DecompGraph:
     REQUIRE(chosen.basisCounts.at(b) == 1);
 }
 
+TEST_CASE("Test makeControlled/makeAdjoint canonical ids", "[DecompGraph::Core]")
+{
+    const OperatorNode rx{"RX[f64][1]{}"};
+
+    // Control folds into the id, accumulates, and is serialized control-outermost.
+    REQUIRE(makeControlled(rx).id == "C(1, RX[f64][1]{})");
+    REQUIRE(makeControlled(rx).numControlWires == 1);
+    REQUIRE(makeControlled(rx, 2).id == "C(2, RX[f64][1]{})");
+    REQUIRE(makeControlled(makeControlled(rx)) == makeControlled(rx, 2)); // accumulate, not nest
+
+    // Adjoint and control commute: both application orders yield the same canonical node.
+    REQUIRE(makeControlled(makeAdjoint(rx)) == makeAdjoint(makeControlled(rx)));
+    REQUIRE(makeControlled(makeAdjoint(rx)).id == "C(1, Adjoint(RX[f64][1]{}))");
+    REQUIRE(makeControlled(makeAdjoint(rx)).adjoint);
+    REQUIRE(makeControlled(makeAdjoint(rx)).numControlWires == 1);
+
+    // withoutControls strips only the controls, keeping adjoint; double adjoint still cancels.
+    REQUIRE(withoutControls(makeControlled(makeAdjoint(rx))) == makeAdjoint(rx));
+    REQUIRE(makeAdjoint(makeAdjoint(makeControlled(rx))) == makeControlled(rx));
+}
+
 TEST_CASE("Test DecompositionGraph synthesizes controlled rules from base rules",
           "[DecompGraph::Solver]")
 {
-    const OperatorNode rot{"Rot", 1, 3, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
-    const OperatorNode ry{"RY", 1, 1, false};
+    const OperatorNode rot{"Rot[f64,f64,f64][1]{}"};
+    const OperatorNode rz{"RZ[f64][1]{}"};
+    const OperatorNode ry{"RY[f64][1]{}"};
 
     const WeightedGateset gateset{{{makeControlled(rz), 1.0}, {makeControlled(ry), 1.0}}};
     const std::vector<RuleNode> rules{{"rot_decomp", rot, {{rz, 2}, {ry, 1}}}};
@@ -254,10 +275,10 @@ TEST_CASE("Test DecompositionGraph synthesizes controlled rules from base rules"
 
 TEST_CASE("Test Controlled: solver picks the cheaper", "[DecompGraph::Solver]")
 {
-    const OperatorNode rot{"Rot", 1, 3, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
-    const OperatorNode ry{"RY", 1, 1, false};
-    const OperatorNode e{"E", 1, 0, false};
+    const OperatorNode rot{"Rot[f64,f64,f64][1]{}"};
+    const OperatorNode rz{"RZ[f64][1]{}"};
+    const OperatorNode ry{"RY[f64][1]{}"};
+    const OperatorNode e{"E[][1]{}"};
 
     const std::vector<RuleNode> baseRules{{"rot_decomp", rot, {{rz, 2}, {ry, 1}}}};
 
@@ -299,11 +320,38 @@ TEST_CASE("Test Controlled: solver picks the cheaper", "[DecompGraph::Solver]")
     }
 }
 
+TEST_CASE("Test Controlled: multi-control synthesis", "[DecompGraph::Solver]")
+{
+    const OperatorNode rot{"Rot[f64,f64,f64][1]{}"};
+    const OperatorNode rz{"RZ[f64][1]{}"};
+    const OperatorNode ry{"RY[f64][1]{}"};
+
+    // C(2, Rot): two control wires applied to every produced gate.
+    const OperatorNode ccRot = makeControlled(rot, 2);
+    const WeightedGateset gateset{{{makeControlled(rz, 2), 1.0}, {makeControlled(ry, 2), 1.0}}};
+    const std::vector<RuleNode> rules{{"rot_decomp", rot, {{rz, 2}, {ry, 1}}}};
+
+    const DecompositionGraph graph({ccRot}, gateset, rules);
+
+    const auto &ctrlRules = graph.getAllRulesFor(ccRot);
+    REQUIRE(ctrlRules.size() == 1);
+    REQUIRE(ctrlRules[0].name == "rot_decomp_controlled_2");
+    REQUIRE(ctrlRules[0].inputs[0].op == makeControlled(rz, 2));
+
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+    const auto &chosen = result.at(ccRot);
+    REQUIRE(chosen.origin == RuleOrigin::ControlGenerated);
+    REQUIRE(chosen.totalCost == 3.0);
+    REQUIRE(chosen.basisCounts.at(makeControlled(rz, 2)) == 2);
+    REQUIRE(chosen.basisCounts.at(makeControlled(ry, 2)) == 1);
+}
+
 TEST_CASE("Test Controlled: control pushed through a decomposition", "[DecompGraph::Solver]")
 {
-    const OperatorNode myOp{"MyOp", 2, 0, false};
-    const OperatorNode a{"A", 1, 0, false};
-    const OperatorNode b{"B", 1, 0, false};
+    const OperatorNode myOp{"MyOp[][2]{}"};
+    const OperatorNode a{"A[][1]{}"};
+    const OperatorNode b{"B[][1]{}"};
 
     const WeightedGateset gateset{{{makeControlled(a), 1.0}, {makeControlled(b), 1.0}}};
     const std::vector<RuleNode> rules{{"myop_decomp", myOp, {{a, 1}, {b, 1}}}};
@@ -325,8 +373,10 @@ TEST_CASE("Test Controlled: control pushed through a decomposition", "[DecompGra
 TEST_CASE("Test Controlled: suppressed Ctrl rule for special-cased operators",
           "[DecompGraph::Solver]")
 {
-    const OperatorNode globalPhase{"GlobalPhase", -1, -1, false};
-    const OperatorNode rz{"RZ", 1, 1, false};
+    // `name` must be set so `isCtrlRuleRequired` can special-case GlobalPhase; program ops get it
+    // from `getOperatorName()`. Field order: {id, adjoint, numControlWires, name}.
+    const OperatorNode globalPhase{"GlobalPhase[f64][0]{}", false, 0, "GlobalPhase"};
+    const OperatorNode rz{"RZ[f64][1]{}"};
 
     const WeightedGateset gateset{{{makeControlled(rz), 1.0}}};
     const std::vector<RuleNode> rules{
@@ -336,8 +386,63 @@ TEST_CASE("Test Controlled: suppressed Ctrl rule for special-cased operators",
 
     const DecompositionGraph graph({makeControlled(globalPhase)}, gateset, rules);
 
+    // Control-each-gate is suppressed for GlobalPhase, so only the dedicated rule survives.
     const auto &ctrlRules = graph.getAllRulesFor(makeControlled(globalPhase));
     REQUIRE(ctrlRules.size() == 1);
     REQUIRE(ctrlRules[0].name == "cgp_direct");
     REQUIRE(ctrlRules[0].origin == RuleOrigin::Default);
+}
+
+TEST_CASE("Test Controlled+Adjoint: dedicated nested rule (Pathway 1)", "[DecompGraph::Solver]")
+{
+    const OperatorNode rx{"RX[f64][1]{}"};
+    const OperatorNode crx{"CRX[f64][2]{}"};
+    const OperatorNode cAdjRx = makeControlled(makeAdjoint(rx)); // C(Adjoint(RX))
+
+    // A dedicated rule registered against the nested operator decomposes it directly.
+    const WeightedGateset gateset{{{crx, 1.0}}};
+    const std::vector<RuleNode> rules{{"c_adj_rx", cAdjRx, {{crx, 1}}}};
+
+    const DecompositionGraph graph({cAdjRx}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    const auto &chosen = result.at(cAdjRx);
+    REQUIRE(chosen.ruleName == "c_adj_rx");
+    REQUIRE(chosen.origin == RuleOrigin::Default);
+    REQUIRE(chosen.totalCost == 1.0);
+    REQUIRE(chosen.basisCounts.at(crx) == 1);
+}
+
+TEST_CASE("Test Controlled+Adjoint: synthesized nested decomposition (Pathway 2)",
+          "[DecompGraph::Solver]")
+{
+    const OperatorNode myOp{"MyOp[][2]{}"};
+    const OperatorNode a{"A[][1]{}"};
+    const OperatorNode b{"B[][1]{}"};
+
+    const WeightedGateset gateset{{{makeControlled(a), 1.0}, {makeControlled(b), 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"myop_decomp", myOp, {{a, 1}, {b, 1}}},
+        // self-adjoint rules so the adjointed produced gates bottom out at C(A) / C(B).
+        {"self_adjoint_A", makeAdjoint(a), {{a, 1}}},
+        {"self_adjoint_B", makeAdjoint(b), {{b, 1}}},
+    };
+
+    // Root C(Adjoint(MyOp)): no dedicated rule. The builder synthesizes it by first adjointing the
+    // base decomposition (adjoint gen) and then controlling that (controlled gen).
+    const OperatorNode root = makeControlled(makeAdjoint(myOp));
+    const DecompositionGraph graph({root}, gateset, rules);
+
+    REQUIRE(graph.getAllRulesFor(root).size() == 1);
+
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+    REQUIRE(result.find(root) != result.end());
+    const auto &chosen = result.at(root);
+    REQUIRE(chosen.ruleName == "myop_decomp_adjoint_controlled_1");
+    REQUIRE(chosen.origin == RuleOrigin::ControlGenerated);
+    REQUIRE(chosen.totalCost == 2.0);
+    REQUIRE(chosen.basisCounts.at(makeControlled(a)) == 1);
+    REQUIRE(chosen.basisCounts.at(makeControlled(b)) == 1);
 }

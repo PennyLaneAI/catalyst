@@ -210,13 +210,22 @@ struct DecompositionGraph::Impl {
                 worklist.push_back(op);
             }
         };
-        for (const auto &op : operators) {
+        // Seed each op and, for controlled-adjoint ops, its uncontrolled adjoint form. The latter
+        // lets a nested `C(Adjoint(Op))` compose across the two generators: this pass synthesizes
+        // the `Adjoint(Op)` rule, and `generateControlledRules` (run next) then controls it.
+        auto seed = [&](const OperatorNode &op) {
             enqueue(op);
+            if (op.numControlWires > 0) {
+                enqueue(withoutControls(op));
+            }
+        };
+        for (const auto &op : operators) {
+            seed(op);
         }
         for (const auto &rule : rules) {
-            enqueue(rule.output);
+            seed(rule.output);
             for (const auto &term : rule.inputs) {
-                enqueue(term.op);
+                seed(term.op);
             }
         }
 

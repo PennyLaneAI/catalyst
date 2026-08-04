@@ -175,41 +175,107 @@ using FixedDecomps = std::unordered_map<OperatorNode, RuleNode, OperatorNodeHash
  */
 using AltDecomps = std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>;
 
+namespace modifiers {
+
 /**
- * @brief This returns a copy of the given operator with the adjoint modifier toggled.
+ * @brief The modifiers parsed out of an operator id.
  *
- * Identity is the opaque `id` string (equality/hashing are id-only),
- * so the modifier must be folded into the id: we wrap it in `Adjoint(...)`
- * (or strip that wrapper to cancel adjoint).
- * Applying twice cancels: `makeAdjoint(makeAdjoint(op)) == op`.
+ * Modifiers are serialized in one canonical form, control-outermost then adjoint:
+ * `[C(<k>, ][Adjoint(]<core>[)][)]`. Because adjoint and control commute, serializing them in a
+ * fixed order means any order of application yields the same id (e.g. `C(Adjoint(op))` and
+ * `Adjoint(C(op))` are the same node), and control wires accumulate instead of nesting.
+ */
+struct Modifiers {
+    std::size_t numControlWires{0};
+    bool adjoint{false};
+    std::string core; // the base id with all modifiers stripped
+};
+
+inline Modifiers parseModifiers(const std::string &id)
+{
+    Modifiers m;
+    std::string s = id;
+
+    // Strip the outermost "C(<k>, ...)" control wrapper (op ids never start with "C(", so this is
+    // unambiguous). The control count is parsed by hand because the build has exceptions disabled.
+    if (s.rfind("C(", 0) == 0 && !s.empty() && s.back() == ')') {
+        std::size_t sep = s.find(", ", 2);
+        if (sep != std::string::npos) {
+            std::string kStr = s.substr(2, sep - 2);
+            std::size_t k = 0;
+            bool ok = !kStr.empty();
+            for (char c : kStr) {
+                if (c < '0' || c > '9') {
+                    ok = false;
+                    break;
+                }
+                k = k * 10 + static_cast<std::size_t>(c - '0');
+            }
+            if (ok) {
+                m.numControlWires = k;
+                s = s.substr(sep + 2, s.size() - (sep + 2) - 1);
+            }
+        }
+    }
+
+    // Strip the "Adjoint( ... )" wrapper.
+    static constexpr char kAdj[] = "Adjoint(";
+    constexpr std::size_t kAdjLen = sizeof(kAdj) - 1;
+    if (s.size() > kAdjLen && s.compare(0, kAdjLen, kAdj) == 0 && s.back() == ')') {
+        m.adjoint = true;
+        s = s.substr(kAdjLen, s.size() - kAdjLen - 1);
+    }
+
+    m.core = s;
+    return m;
+}
+
+inline std::string buildId(const Modifiers &m)
+{
+    std::string s = m.core;
+    if (m.adjoint) {
+        s = "Adjoint(" + s + ")";
+    }
+    if (m.numControlWires > 0) {
+        s = "C(" + std::to_string(m.numControlWires) + ", " + s + ")";
+    }
+    return s;
+}
+
+} // namespace modifiers
+
+/**
+ * @brief This returns a copy of the operator with the adjoint modifier toggled.
+ *
+ * Identity is the opaque `id` string (equality/hashing are id-only), so the modifier is folded into
+ * the id, re-serialized in canonical control-outermost form. The `adjoint` bool and
+ * `numControlWires` count are kept in lockstep with the id. Applying twice cancels:
+ * `makeAdjoint(makeAdjoint(op)) == op`.
  */
 inline OperatorNode makeAdjoint(OperatorNode op)
 {
-    static constexpr char kPrefix[] = "Adjoint(";
-    constexpr std::size_t kPrefixLen = sizeof(kPrefix) - 1;
-
-    if (op.adjoint) {
-        // Cancel: strip the outermost "Adjoint( ... )" wrapper from the id.
-        if (op.id.size() > kPrefixLen && op.id.compare(0, kPrefixLen, kPrefix) == 0 &&
-            op.id.back() == ')') {
-            op.id = op.id.substr(kPrefixLen, op.id.size() - kPrefixLen - 1);
-        }
-        op.adjoint = false;
-    }
-    else {
-        op.id = std::string(kPrefix) + op.id + ")";
-        op.adjoint = true;
-    }
+    modifiers::Modifiers m = modifiers::parseModifiers(op.id);
+    m.adjoint = !m.adjoint;
+    op.id = modifiers::buildId(m);
+    op.adjoint = m.adjoint;
+    op.numControlWires = m.numControlWires;
+    return op;
 }
 
 /**
- * @brief This returns a copy of the given operator wrapped in `numControlWires`
- * additional controls (Controlled(op)). Control wires accumulate, so applying it
- * repeatedly yields a multi-controlled operator.
+ * @brief This returns a copy of the operator with `numControlWires` additional control wires.
+ *
+ * Controls accumulate (`C(1, C(1, op)) == C(2, op)`) and the id is re-serialized in canonical
+ * control-outermost form, so control commutes with adjoint (`C(Adjoint(op)) == Adjoint(C(op))`).
+ * The `numControlWires` count and `adjoint` bool are kept in lockstep with the id.
  */
 inline OperatorNode makeControlled(OperatorNode op, std::size_t numControlWires = 1)
 {
-    op.numControlWires += numControlWires;
+    modifiers::Modifiers m = modifiers::parseModifiers(op.id);
+    m.numControlWires += numControlWires;
+    op.id = modifiers::buildId(m);
+    op.numControlWires = m.numControlWires;
+    op.adjoint = m.adjoint;
     return op;
 }
 
@@ -238,7 +304,11 @@ inline RuleNode makeAdjointRule(const RuleNode &base)
  */
 inline OperatorNode withoutControls(OperatorNode op)
 {
+    modifiers::Modifiers m = modifiers::parseModifiers(op.id);
+    m.numControlWires = 0;
+    op.id = modifiers::buildId(m);
     op.numControlWires = 0;
+    op.adjoint = m.adjoint;
     return op;
 }
 
