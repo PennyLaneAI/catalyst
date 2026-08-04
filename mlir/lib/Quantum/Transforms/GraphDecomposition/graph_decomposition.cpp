@@ -133,28 +133,34 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 2: Build and solve the decomposition graph
-        FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, rulesByName);
-        AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
-        DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
-                                 std::move(altDecomps));
-        DecompositionSolver solver(graph);
-        auto solution = solver.solve();
+        try {
+            FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, rulesByName);
+            AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
+            DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
+                                     std::move(altDecomps));
+            DecompositionSolver solver(graph);
+            auto solution = solver.solve();
 
-        ///////////////////////////
-        // Step 3: Convert python-decompositions from reference to value semantics and run
-        // decompose-lowering to apply the chosen decomposition rules
-        ModuleOp module = getOperation();
-        OpPassManager pm("builtin.module");
+            ///////////////////////////
+            // Step 3: Convert python-decompositions from reference to value semantics and run
+            // decompose-lowering to apply the chosen decomposition rules
+            ModuleOp module = getOperation();
+            OpPassManager pm("builtin.module");
 
-        DecomposeLoweringPassOptions dlOptions;
-        for (auto &[op, chosenRule] : solution) {
-            dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+            DecomposeLoweringPassOptions dlOptions;
+            for (auto &[op, chosenRule] : solution) {
+                dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+            }
+
+            pm.addPass(qref::createValueSemanticsConversionPass());
+            pm.addPass(createDecomposeLoweringPass(dlOptions));
+
+            if (failed(runPipeline(pm, module))) {
+                return signalPassFailure();
+            }
         }
-
-        pm.addPass(qref::createValueSemanticsConversionPass());
-        pm.addPass(createDecomposeLoweringPass(dlOptions));
-
-        if (failed(runPipeline(pm, module))) {
+        catch (const GraphError &error) {
+            getOperation().emitError() << error.what();
             return signalPassFailure();
         }
     }

@@ -23,7 +23,11 @@
 #include <unordered_set>
 #include <vector>
 
+#include "llvm/Support/Debug.h"
+
 #include "DGTypes.hpp"
+
+#define DEBUG_TYPE "graph-decomposition"
 
 using namespace DecompGraph::Core;
 
@@ -158,9 +162,8 @@ GraphResult DecompositionSolver::solve()
     for (const auto &root : graph.getRootOps()) {
         const auto chosen_rule = solveOperator(root);
         if (isInvalidRule(chosen_rule)) {
-            // Debugging output:
-            graph.showGraph();
-            showSolution(solvedMap);
+            LLVM_DEBUG(graph.showGraph());
+            LLVM_DEBUG(showSolution(solvedMap));
 
             // Prepare error msg:
             std::vector<std::string> rules_error;
