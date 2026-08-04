@@ -138,7 +138,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
-        auto solution = solver.solve();
+        GraphResult solution;
+        try {
+            solution = solver.solve();
+        }
+        catch (const GraphError &error) {
+            getOperation().emitError() << error.what();
+            return signalPassFailure();
+        }
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
