@@ -128,9 +128,15 @@ struct RuleTerm {
  * - Fixed: A fixed rule that cannot be changed or overridden by the solver.
  * - Alternative: An alternative rule that can be used in place of the default rule.
  * - AdjointGenerated: A rule synthesized by adjointing a base decomposition rule.
- * - ControlGenerated: A rule synthesized by controlling a base decomposition rule. 
+ * - ControlGenerated: A rule synthesized by controlling a base decomposition rule.
  */
-enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2, AdjointGenerated = 3, ControlGenerated = 4 };
+enum class RuleOrigin : uint8_t {
+    Default = 0,
+    Fixed = 1,
+    Alternative = 2,
+    AdjointGenerated = 3,
+    ControlGenerated = 4
+};
 
 /**
  * @brief This represents the decomposition rules in the graph decomposition problem.
