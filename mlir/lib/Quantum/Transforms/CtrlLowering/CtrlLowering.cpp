@@ -154,6 +154,148 @@ static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping
     return cast<CtrlOp>(merged);
 }
 
+/// Control every op in `block` (excluding its terminator) on `currentCtrlQubits`, threading the
+/// control qubits through and recording result mappings in `map`. On return, `currentCtrlQubits`
+/// holds the control-qubit values after the last op. New ops are created at the rewriter's current
+/// insertion point.
+static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block, IRMapping &map,
+                                        SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues);
+
+/// Control an `scf.if` by turning the control qubits into extra results: each branch threads the
+/// controls through its body and yields them alongside the original results. Branches are
+/// mutually exclusive, so both start from the same incoming controls; a branch with no quantum ops
+/// simply yields the incoming controls unchanged.
+static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRMapping &map,
+                                  SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
+{
+    Type qubitType = QubitType::get(rewriter.getContext());
+    unsigned numCtrl = currentCtrlQubits.size();
+
+    // New results = the if's original results, plus one qubit per threaded control.
+    SmallVector<Type> resultTypes(ifOp.getResultTypes().begin(), ifOp.getResultTypes().end());
+    resultTypes.append(numCtrl, qubitType);
+
+    Value cond = map.lookupOrDefault(ifOp.getCondition());
+    auto newIf = rewriter.create<scf::IfOp>(ifOp.getLoc(), resultTypes, cond,
+                                            /*withElseRegion=*/true);
+
+    // Control one branch: `oldBlock` may be null (a missing else), in which case the branch just
+    // threads the incoming controls through unchanged.
+    auto controlBranch = [&](Block *oldBlock, Block *newBlock) -> LogicalResult {
+        IRMapping branchMap = map; // copy: branch-local mappings must not leak across branches
+        SmallVector<Value> branchCtrl(currentCtrlQubits.begin(), currentCtrlQubits.end());
+        rewriter.setInsertionPointToStart(newBlock);
+
+        SmallVector<Value> yielded;
+        Location yieldLoc = ifOp.getLoc();
+        if (oldBlock) {
+            if (failed(distributeControls(rewriter, *oldBlock, branchMap, branchCtrl, ctrlValues))) {
+                return failure();
+            }
+            auto oldYield = cast<scf::YieldOp>(oldBlock->getTerminator());
+            yieldLoc = oldYield.getLoc();
+            for (Value v : oldYield.getOperands()) {
+                yielded.push_back(branchMap.lookupOrDefault(v));
+            }
+        }
+        yielded.append(branchCtrl.begin(), branchCtrl.end());
+        rewriter.setInsertionPointToEnd(newBlock);
+        rewriter.create<scf::YieldOp>(yieldLoc, yielded);
+        return success();
+    };
+
+    if (failed(controlBranch(&ifOp.getThenRegion().front(), newIf.thenBlock()))) {
+        return failure();
+    }
+    if (failed(controlBranch(ifOp.elseBlock(), newIf.elseBlock()))) {
+        return failure();
+    }
+
+    // Map the original results one-to-one; the trailing results are the threaded control qubits.
+    unsigned numOrig = ifOp.getNumResults();
+    for (unsigned i = 0; i < numOrig; ++i) {
+        map.map(ifOp.getResult(i), newIf.getResult(i));
+    }
+    currentCtrlQubits.assign(newIf.getResults().begin() + numOrig, newIf.getResults().end());
+
+    // Restore the insertion point to after the new op so the enclosing walk keeps appending there
+    // (controlBranch left it inside the else block).
+    rewriter.setInsertionPointAfter(newIf);
+    return success();
+}
+
+static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block, IRMapping &map,
+                                        SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
+{
+    for (Operation &op : block.without_terminator()) {
+        if (isa<MeasurementProcess, MeasureOp>(op)) {
+            op.emitError("cannot control a measurement inside a quantum.ctrl region");
+            return failure();
+        }
+        if (auto gate = dyn_cast<QuantumGate>(op)) {
+            unsigned numOldControls = gate.getCtrlQubitOperands().size();
+            Operation *newOp =
+                createControlledGate(rewriter, gate, map, currentCtrlQubits, ctrlValues);
+            auto newGate = cast<QuantumGate>(newOp);
+
+            for (auto [oldResult, newResult] :
+                 llvm::zip_equal(gate.getNonCtrlQubitResults(), newGate.getNonCtrlQubitResults())) {
+                map.map(oldResult, newResult);
+            }
+            // The new control results are [old controls ..., threaded region controls ...].
+            ResultRange newCtrlResults = newGate.getCtrlQubitResults();
+            for (unsigned i = 0; i < numOldControls; ++i) {
+                map.map(gate.getCtrlQubitResults()[i], newCtrlResults[i]);
+            }
+            currentCtrlQubits.assign(newCtrlResults.begin() + numOldControls, newCtrlResults.end());
+            continue;
+        }
+        if (auto inner = dyn_cast<CtrlOp>(op)) {
+            unsigned numInnerControls = inner.getInCtrlQubits().size();
+            CtrlOp merged = mergeNestedCtrl(rewriter, inner, map, currentCtrlQubits, ctrlValues);
+
+            ResultRange mergedCtrlResults = merged.getOutCtrlQubits();
+            for (unsigned i = 0; i < numInnerControls; ++i) {
+                map.map(inner.getOutCtrlQubits()[i], mergedCtrlResults[i]);
+            }
+            // Map the target results (everything after the out_ctrl_qubits group) one-to-one.
+            ResultRange innerAll = inner->getResults();
+            ResultRange mergedAll = merged->getResults();
+            unsigned numMergedControls = merged.getInCtrlQubits().size();
+            unsigned numTargets = innerAll.size() - numInnerControls;
+            for (unsigned i = 0; i < numTargets; ++i) {
+                map.map(innerAll[numInnerControls + i], mergedAll[numMergedControls + i]);
+            }
+            currentCtrlQubits.assign(mergedCtrlResults.begin() + numInnerControls,
+                                     mergedCtrlResults.end());
+            continue;
+        }
+        if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+            if (failed(controlScfIf(rewriter, ifOp, map, currentCtrlQubits, ctrlValues))) {
+                return failure();
+            }
+            continue;
+        }
+        if (isa<scf::ForOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
+            op.emitError("this control flow op inside a quantum.ctrl region is not supported yet by "
+                         "ctrl-lowering");
+            return failure();
+        }
+        if (isa<InsertOp, ExtractOp, AllocOp, DeallocOp, AllocQubitOp, DeallocQubitOp>(op)) {
+            // Structural ops carry no controls; thread their operands/results through the map.
+            rewriter.clone(op, map);
+            continue;
+        }
+        if (isa<QuantumDialect>(op.getDialect())) {
+            op.emitError("unsupported quantum operation inside a quantum.ctrl region");
+            return failure();
+        }
+        // Classical op: clone it, threading operands and recording result mappings.
+        rewriter.clone(op, map);
+    }
+    return success();
+}
+
 /// Lower a single `quantum.ctrl` op by distributing its controls over the enclosed operations.
 struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     using OpRewritePattern<CtrlOp>::OpRewritePattern;
@@ -187,66 +329,8 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
 
         rewriter.setInsertionPoint(ctrl);
 
-        for (Operation &op : block.without_terminator()) {
-            // Measurements (quantum.measure and MeasurementProcess ops) are already
-            // rejected by the CtrlOp verifier, so they never reach here in a verified
-            // pipeline.
-            if (auto gate = dyn_cast<QuantumGate>(op)) {
-                unsigned numOldControls = gate.getCtrlQubitOperands().size();
-                Operation *newOp =
-                    createControlledGate(rewriter, gate, map, currentCtrlQubits, ctrlValues);
-                auto newGate = cast<QuantumGate>(newOp);
-
-                for (auto [oldResult, newResult] : llvm::zip_equal(
-                         gate.getNonCtrlQubitResults(), newGate.getNonCtrlQubitResults())) {
-                    map.map(oldResult, newResult);
-                }
-                // The new control results are [old controls ..., threaded region controls ...].
-                ResultRange newCtrlResults = newGate.getCtrlQubitResults();
-                for (unsigned i = 0; i < numOldControls; ++i) {
-                    map.map(gate.getCtrlQubitResults()[i], newCtrlResults[i]);
-                }
-                currentCtrlQubits.assign(newCtrlResults.begin() + numOldControls,
-                                         newCtrlResults.end());
-                continue;
-            }
-            if (auto inner = dyn_cast<CtrlOp>(op)) {
-                unsigned numInnerControls = inner.getInCtrlQubits().size();
-                CtrlOp merged =
-                    mergeNestedCtrl(rewriter, inner, map, currentCtrlQubits, ctrlValues);
-
-                ResultRange mergedCtrlResults = merged.getOutCtrlQubits();
-                for (unsigned i = 0; i < numInnerControls; ++i) {
-                    map.map(inner.getOutCtrlQubits()[i], mergedCtrlResults[i]);
-                }
-                // Map the target results (everything after the out_ctrl_qubits group) one-to-one.
-                ResultRange innerAll = inner->getResults();
-                ResultRange mergedAll = merged->getResults();
-                unsigned numMergedControls = merged.getInCtrlQubits().size();
-                unsigned numTargets = innerAll.size() - numInnerControls;
-                for (unsigned i = 0; i < numTargets; ++i) {
-                    map.map(innerAll[numInnerControls + i], mergedAll[numMergedControls + i]);
-                }
-                currentCtrlQubits.assign(mergedCtrlResults.begin() + numInnerControls,
-                                         mergedCtrlResults.end());
-                continue;
-            }
-            if (isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
-                op.emitError(
-                    "control flow inside a quantum.ctrl region is not supported by ctrl-lowering");
-                return failure();
-            }
-            if (isa<InsertOp, ExtractOp, AllocOp, DeallocOp, AllocQubitOp, DeallocQubitOp>(op)) {
-                // Structural ops carry no controls; thread their operands/results through the map.
-                rewriter.clone(op, map);
-                continue;
-            }
-            if (isa<QuantumDialect>(op.getDialect())) {
-                op.emitError("unsupported quantum operation inside a quantum.ctrl region");
-                return failure();
-            }
-            // Classical op: clone it, threading operands and recording result mappings.
-            rewriter.clone(op, map);
+        if (failed(distributeControls(rewriter, block, map, currentCtrlQubits, ctrlValues))) {
+            return failure();
         }
 
         // Assemble the ctrl op results: out_ctrl_qubits followed by the target results.
