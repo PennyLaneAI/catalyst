@@ -88,6 +88,8 @@ def _is_custom_op(op_cls, avals_in):
         return False
     if op_cls.wire_argnames != ("wires",):
         return False
+    if list(op_cls._sig.parameters.keys())[-1] != "wires":
+        return False
     return all(p.shape == () and "float" in p.dtype.name for p in avals_in)
 
 
