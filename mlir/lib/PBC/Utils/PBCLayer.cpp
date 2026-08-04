@@ -32,6 +32,8 @@ using namespace mlir;
 namespace catalyst {
 namespace pbc {
 
+static constexpr size_t MinOpsForCommutationBasis = 32;
+
 FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp)
 {
     FailureOr<int64_t> thenDepth =
@@ -520,6 +522,12 @@ bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst)
 // Commute an op to all the ops in the layer
 bool PBCLayer::commuteToLayer(PBCOpInterface op)
 {
+    // Pairwise checks avoid basis construction overhead for the short layers
+    // that dominate small programs. Larger layers use packed basis rows.
+    if (ops.size() < MinOpsForCommutationBasis) {
+        return llvm::all_of(ops, [&](PBCOpInterface existingOp) { return commute(op, existingOp); });
+    }
+
     if (!commutationBasisValid) {
         buildCommutationBasis();
     }
