@@ -204,6 +204,11 @@ def get_rule_strings_from_module(module: ir.Module) -> list[str]:
     return funcOps
 
 
+def get_rules_from_module_as_list(module: ir.Module) -> list[str]:
+    funcOps = get_rule_funcs_from_module(module)
+    return [str(funcOp) for funcOp in funcOps]
+
+
 def get_rules_from_module(module: ir.Module) -> str:
     """
     Parse and modify decomposition rules from a ModuleOp.
