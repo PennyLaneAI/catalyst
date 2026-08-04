@@ -133,7 +133,13 @@ def GridsynthPass : Pass<"gridsynth"> {
 def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "Perform merging of chained rotation gates about the same axis.";
 
-    let dependentDialects = ["math::MathDialect"];
+    let dependentDialects = ["arith::ArithDialect", "math::MathDialect"];
+}
+
+def ResolveAdjointsPass : Pass<"resolve-adjoints"> {
+    let summary = "Resolve adjoint attributes on primitive quantum gates.";
+
+    let dependentDialects = ["arith::ArithDialect"];
 }
 
 def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
