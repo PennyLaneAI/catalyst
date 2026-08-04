@@ -1546,16 +1546,33 @@ func.func @operator2() {
     return
 }
 
+// -----
+
+// Operations with the same name and wire count but different parameter counts
+
+// CHECK-LABEL: "same_name_different_params"
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:     "VariableGate": 2
+func.func @same_name_different_params(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
+    %q0 = quantum.custom "VariableGate"() %q : !quantum.bit
+    %q1 = quantum.custom "VariableGate"(%theta) %q0 : !quantum.bit
+    return %q1 : !quantum.bit
+}
+
 
 // -----
 
 // Test OperatorOp: name, params, adjoint, and control qubits.
 
 // CHECK-LABEL: "operator2"
-// CHECK-DAG: "MyOpA(2)": 1
-// CHECK-DAG: "C(MyOpB)(2)": 1
-// CHECK-DAG: "2C(MyOpC)(3)": 1
-// CHECK-DAG: "Adjoint(MyOpD)(1)": 1
+// CHECK: "1"
+// CHECK:   "Adjoint(MyOpD)": 1
+// CHECK: "2"
+// CHECK:   "C(MyOpB)": 1
+// CHECK:   "MyOpA": 1
+// CHECK: "3"
+// CHECK:   "2C(MyOpC)": 1
 
 func.func @operator2() {
     %false = arith.constant false
