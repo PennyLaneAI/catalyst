@@ -193,7 +193,7 @@ AffineRelation AffineRelation::kleeneStar() const
     return sum;
 }
 
-AffineTransform AffineRelation::propagateThrough(const AffineRelation& rhs)
+const AffineRelation &AffineRelation::propagateThrough(const AffineRelation& rhs)
 {
     assert(rhs.schema.numAuxVars() == 0);
 
@@ -215,8 +215,11 @@ AffineTransform AffineRelation::propagateThrough(const AffineRelation& rhs)
     AffineBase<CompositionSchema> affPropag(std::move(propagateMat), propagateSchm);
     affPropag.projectOutVars(propagateSchm.projVars);
 
-    AffineRelation affPropagRel(std::move(affPropag.getMatrixMutable()), std::move(affPropag.getSchemaMutable()));
-    return affPropagRel.solveRelation();
+    this->matrix = std::move(affPropag.getMatrixMutable());
+    this->schema = std::move(affPropag.getSchemaMutable());
+    return *this;
+    // AffineRelation affPropagRel(std::move(affPropag.getMatrixMutable()), std::move(affPropag.getSchemaMutable()));
+    // return affPropagRel.solveRelation();
 }
 
 AffineTransform AffineRelation::solveRelation()
@@ -249,11 +252,11 @@ Parity AffineRelation::reduce(const Parity& par, const AffineSchema& parSchm) co
 
     Parity &lastRow = redMat.allocRow();
     
-    lastRow.extendBitsTo(relSchm.maxBlock());
+    lastRow.extendBitsFor(relSchm.maxBlock());
     lastRow.mapBitsFrom(par, parSchm.preVars, relSchm.postVars);
     lastRow.mapBitsFrom(par, parSchm.auxVars, relSchm.auxVars);
     lastRow.mapBitFrom(par, parSchm.affVal, relSchm.affVal);
 
-    redMat.toREF(relSchm.getOrder());
+    redMat.toREF(relSchm.getOrder());   // or RREF?
     return redMat.getRowAt(redMat.getNumRows() - 1);
 }

@@ -109,20 +109,25 @@ void ProgramAbstraction::applyGateY_dag(size_t wire, GateID gateId)
 
 void ProgramAbstraction::applySummary(RegionSummary &&summary)
 {
-    llvm::errs() << "ProgramAbstraction::applySummary...\n";
+    // llvm::errs() << "\nProgramAbstraction::applySummary...\n";
     // llvm::errs() << "currentAbstraction:\n" << *this << "\n";
     // llvm::errs() << "summary:\n" << summary << "\n";
 
     AffineRelation precondition(std::move(stateTransform));
-    // llvm::errs() << "precondition:\n" << precondition << "\n";
+    // llvm::errs() << "\nprecondition:\n" << precondition << "\n";
 
     summary.nullifyPhasesUnder(precondition);
-    // llvm::errs() << "nullifiedSummary:\n" << summary << "\n";
+    // llvm::errs() << "\nnullifiedSummary:\n" << summary << "\n";
 
-    stateTransform = precondition.propagateThrough(summary.affineRel);
-    // llvm::errs() << "propagatedThrough:\n" << stateTransform << "\n";
+    precondition.propagateThrough(summary.affineRel);
+    // llvm::errs() << "\npropagatedThrough:\n" << precondition << "\n";
+
+    phases.normalizeByPostcond(precondition, getSchema());
+    // llvm::errs() << "\nnormalizedPhases:\n" << phases << "\n";
+
+    stateTransform = precondition.solveRelation();
+    // llvm::errs() << "\nsolvedRelation:\n" << stateTransform << "\n";
+
     summary.accumulatePhasesInto(phases, stateTransform.getSchema());
-    // llvm::errs() << "accumulatedPhases:\n" << phases << "\n";
+    // llvm::errs() << "\naccumulatedPhases:\n" << phases << "\n";
 }
-
-// TODO: normalize main phases by reducing them w.r.t. the final affine relation.

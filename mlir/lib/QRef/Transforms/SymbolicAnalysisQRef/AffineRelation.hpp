@@ -33,13 +33,13 @@ class AffineRelation : public AffineBase<RelationSchema> {
         std::move(affTrans.getMatrixMutable()),
         RelationSchema(std::move(affTrans.getSchemaMutable())))
     {
-        const size_t numBlocks = schema.maxBlock();
+        const size_t maxBlocks = schema.maxBlock();
         const size_t numQubits = schema.numQubits();
 
         for (size_t i = 0; i < numQubits; ++i) {
             Parity &row = matrix.getRowMutableAt(i);
 
-            row.extendBitsTo(numBlocks);
+            row.extendBitsFor(maxBlocks);
             row.setBitAtLoc(schema.postVars[i]);
         }
     }
@@ -60,12 +60,12 @@ class AffineRelation : public AffineBase<RelationSchema> {
     const AffineRelation &joinWith(const AffineRelation& rhs);
     const AffineRelation &meetWith(const AffineRelation& rhs);
     const AffineRelation &composeWith(const AffineRelation& rhs);
+    const AffineRelation &propagateThrough(const AffineRelation& rhs);
     const AffineRelation &applyKleeneStar();
     [[nodiscard]] AffineRelation meet(const AffineRelation& rhs) const;
     [[nodiscard]] AffineRelation join(const AffineRelation& rhs) const;
     [[nodiscard]] AffineRelation compose(const AffineRelation& rhs) const;
     [[nodiscard]] AffineRelation kleeneStar() const;
-    [[nodiscard]] AffineTransform propagateThrough(const AffineRelation& rhs);
     [[nodiscard]] AffineTransform solveRelation();
     [[nodiscard]] Parity reduce(const Parity& par, const AffineSchema& parSchm) const;
     
@@ -86,7 +86,7 @@ inline void AffineRelation::opPreProcess(const AffineRelation& rhs)
 inline void AffineRelation::mapRowBits(const Parity& srcRow, const RelationSchemaView& srcSchm,
   Parity& trgtRow, const RelationSchemaView& trgtSchm)
 {
-    trgtRow.extendBitsTo(trgtSchm.maxBlock);
+    trgtRow.extendBitsFor(trgtSchm.maxBlock);
     
     trgtRow.mapBitsFrom(srcRow, srcSchm.postVars, trgtSchm.postVars);
     trgtRow.mapBitsFrom(srcRow, srcSchm.preVars, trgtSchm.preVars);

@@ -173,19 +173,13 @@ void Parity::flipBitAtLoc(BitLocation loc)
 /*
     Methods:
 */
-void Parity::extendBitsTo(size_t newBlockNum)
+void Parity::extendBitsFor(size_t newMaxBlock)
 {
+    const size_t newBlockNum = newMaxBlock + 1;
     if (bits.size() < newBlockNum) {
         bits.resize(newBlockNum, 0);
     }
 }
-
-void Parity::extendBitsAtWith(size_t pos, bool value)
-{
-    extendBitsTo(pos);
-    assignBitAtPos(pos, value);
-}
-
 /*
     Checks:
 */ 

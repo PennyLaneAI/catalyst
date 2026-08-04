@@ -44,6 +44,7 @@ struct PhaseAbstraction {
     void insertContributor(const GateBundle &contributor, const Parity &parity);
     void orphanNonTrivialBundles();
     void nullifyByPrecond(const AffineRelation& precond, const AffineSchema& paritySchema);
+    void normalizeByPostcond(const AffineRelation& postcond, const AffineSchema& paritySchema);
     void reSchema(const AffineSchema &oldSchm, const AffineSchema &newSchm);
 
   private:

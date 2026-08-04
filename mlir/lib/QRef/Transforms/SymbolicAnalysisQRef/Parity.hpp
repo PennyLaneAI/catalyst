@@ -109,8 +109,7 @@ class Parity {
     [[nodiscard]] bool isUnsat(BitLocation affValLoc) const;
 
     // Methods:
-    void extendBitsTo(size_t newBlockNum);
-    void extendBitsAtWith(size_t pos, bool value);
+    void extendBitsFor(size_t newMaxBlock);
     template <typename ColOrderRange>
     void mapBitsFrom(const Parity& srcPar, ColOrderRange srcLocs, ColOrderRange trgtLocs);
     void mapBitFrom(const Parity& srcPar, BitLocation srcLoc, BitLocation trgtLoc);

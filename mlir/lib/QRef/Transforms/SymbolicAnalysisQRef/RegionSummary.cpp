@@ -86,7 +86,7 @@ void RegionSummary::nullifyPhasesUnder(const AffineRelation &precondRel)
 
 void RegionSummary::accumulatePhasesInto(PhaseAbstraction &trgtPhases, const TransformSchema &trgtSchm)
 {
-    phases.reSchema(affineRel.getSchema(), trgtSchm);
+    phases.reSchema(affineRel.getSchema(), trgtSchm);   // is it necessary?
     trgtPhases += phases;
 
     if (type == RegionType::Conditional) {

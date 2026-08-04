@@ -562,6 +562,6 @@ struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFolding
 // everything should be fine with qref now
 // test summary computation
 // dealloc, return
-// normalize main phases by reducing them w.r.t. the final affine relation.
+
 
 // each module will have a single qnode, but a program can have multiple modules.
