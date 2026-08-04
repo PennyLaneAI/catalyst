@@ -158,10 +158,6 @@ GraphResult DecompositionSolver::solve()
     for (const auto &root : graph.getRootOps()) {
         const auto chosen_rule = solveOperator(root);
         if (isInvalidRule(chosen_rule)) {
-            // Debugging output:
-            graph.showGraph();
-            showSolution(solvedMap);
-
             // Prepare error msg:
             std::vector<std::string> rules_error;
             for (const auto &rule : graph.getAllRulesFor(root)) {
