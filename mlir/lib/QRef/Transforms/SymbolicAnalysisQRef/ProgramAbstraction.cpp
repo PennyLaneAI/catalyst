@@ -114,15 +114,15 @@ void ProgramAbstraction::applySummary(RegionSummary &&summary)
     // llvm::errs() << "summary:\n" << summary << "\n";
 
     AffineRelation precondition(std::move(stateTransform));
-    llvm::errs() << "precondition:\n" << precondition << "\n";
+    // llvm::errs() << "precondition:\n" << precondition << "\n";
 
     summary.nullifyPhasesUnder(precondition);
-    llvm::errs() << "nullifiedSummary:\n" << summary << "\n";
+    // llvm::errs() << "nullifiedSummary:\n" << summary << "\n";
 
     stateTransform = precondition.propagateThrough(summary.affineRel);
-    llvm::errs() << "propagatedThrough:\n" << stateTransform << "\n";
+    // llvm::errs() << "propagatedThrough:\n" << stateTransform << "\n";
     summary.accumulatePhasesInto(phases, stateTransform.getSchema());
-    llvm::errs() << "accumulatedPhases:\n" << phases << "\n";
+    // llvm::errs() << "accumulatedPhases:\n" << phases << "\n";
 }
 
 // TODO: normalize main phases by reducing them w.r.t. the final affine relation.

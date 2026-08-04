@@ -1,4 +1,4 @@
-func.func @ex_425(%arg0: i1) {
+func.func @ex_425(%arg0: i1) attributes {quantum.node} {
     %reg = qref.alloc( 2) : !qref.reg<2>
     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
     %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
@@ -23,7 +23,7 @@ func.func @ex_425(%arg0: i1) {
         // qref.custom "Hadamard"() %q1 : !qref.bit
         // qref.custom "T"() %q0 : !qref.bit // l4
         qref.custom "T"() %q1 : !qref.bit // l4
-        
+
         qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
         qref.custom "CNOT"() %q1, %q0 : !qref.bit, !qref.bit
         qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit

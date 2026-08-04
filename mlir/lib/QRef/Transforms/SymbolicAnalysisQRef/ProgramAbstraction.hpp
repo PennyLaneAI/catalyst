@@ -63,11 +63,7 @@ inline TransformSchema ProgramAbstraction::getSchema() const { return stateTrans
 
 inline void ProgramAbstraction::extendQubitsBy(size_t addQubitNum)
 {
-    llvm::outs() << "ProgramAbstraction::extendQubitsBy...\n";
-    llvm::outs() << "addQubitNum: " << addQubitNum << "\n";
-    llvm::outs() << "currentStateTransform:\n" << stateTransform << "\n";
     stateTransform.extendQubitsBy(addQubitNum);
-    llvm::outs() << "newStateTransform:\n" << stateTransform << "\n\n\n";
 }
 
 inline void ProgramAbstraction::prepareQubit(size_t wire, bool basisState)

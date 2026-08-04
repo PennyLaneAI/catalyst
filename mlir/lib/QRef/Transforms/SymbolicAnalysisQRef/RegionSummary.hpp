@@ -67,6 +67,9 @@ inline void RegionSummary::summarizeLoop(const TransformSchema &bodySchm)
 
 inline void RegionSummary::summarizeProc()
 {
+    llvm::errs() << "summarizeProc...\n";
     affineRel.projectOutAuxVars();
-    phases.orphanAllBundles();
+    // llvm::errs() << "affineRel:\n" << affineRel << "\n";
+    phases.orphanNonTrivialBundles();
+    // llvm::errs() << "phases:\n" << phases << "\n";
 }

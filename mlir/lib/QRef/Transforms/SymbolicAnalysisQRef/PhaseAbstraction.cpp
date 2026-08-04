@@ -83,13 +83,14 @@ void PhaseAbstraction::insertContributor(const GateBundle &contributor, const Pa
     // }
 }
 
-void PhaseAbstraction::orphanAllBundles()
+void PhaseAbstraction::orphanNonTrivialBundles()
 {
-    orphanBundles.reserve(orphanBundles.size() + activeBundles.size());
-    for (const auto &[parity, contributors] : activeBundles) {
-        orphanBundles.push_back(std::move(contributors));
+    for (auto &[parity, contributors] : activeBundles) {
+        if (!parity.isTrivial()) {
+            orphanBundles.push_back(std::move(contributors));
+            activeBundles.erase(parity);
+        }
     }
-    activeBundles.clear();
 }
 
 void PhaseAbstraction::nullifyByPrecond(const AffineRelation& precond, const AffineSchema& paritySchema)
