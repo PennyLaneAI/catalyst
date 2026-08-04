@@ -20,12 +20,25 @@ func.func @ex_425(%arg0: i1) {
         qref.custom "T"() %q1 : !qref.bit // l3
         scf.yield %q0, %q1 : !qref.bit, !qref.bit
     } else {
+        // qref.custom "Hadamard"() %q1 : !qref.bit
+        // qref.custom "T"() %q0 : !qref.bit // l4
+        qref.custom "T"() %q1 : !qref.bit // l4
+        
+        qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+        qref.custom "CNOT"() %q1, %q0 : !qref.bit, !qref.bit
+        qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+
         qref.custom "Hadamard"() %q1 : !qref.bit
-        qref.custom "T"() %q0 : !qref.bit // l4
+
+        qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+        qref.custom "CNOT"() %q1, %q0 : !qref.bit, !qref.bit
+        qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+        
+        qref.custom "T"() %q1 : !qref.bit // l5
         scf.yield %q0, %q1 : !qref.bit, !qref.bit
     }
 
-    qref.custom "T"() %q0 : !qref.bit // l5
+    qref.custom "T"() %q0 : !qref.bit // l6
 
     qref.dealloc %reg : !qref.reg<2>
     return
