@@ -17,6 +17,7 @@
 import numpy as np
 import pennylane as qp
 import pytest
+from pennylane.resource import PBCSpecsResources, SpecsResources
 from pennylane.transforms import to_ppr as qp_to_ppr
 
 from catalyst import measure, pipeline, qjit
@@ -27,7 +28,6 @@ from catalyst.passes import (
     disentangle_swap,
     merge_ppr_ppm,
     merge_rotations,
-    ppm_specs,
     ppr_to_ppm,
     to_ppr,
 )
@@ -212,31 +212,34 @@ def test_convert_clifford_to_ppr():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
+    @to_ppr
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_convert_clifford_to_ppr_workflow():
-
-        @to_ppr
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
-        def f():
-            qp.H(0)
-            qp.S(1)
-            qp.T(0)
-            qp.CNOT([0, 1])
-
-        return f()
+        qp.H(0)
+        qp.S(1)
+        qp.T(0)
+        qp.CNOT([0, 1])
 
     assert 'transform.apply_registered_pass "to-ppr"' in test_convert_clifford_to_ppr_workflow.mlir
     optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
     assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
     assert "pbc.ppr" in optimized_ir
 
-    ppm_specs_output = ppm_specs(test_convert_clifford_to_ppr_workflow)
-    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
-    assert ppm_specs_output["f_0"]["pi4_ppr"] == 7
-    assert ppm_specs_output["f_0"]["max_weight_pi4"] == 2
-    assert ppm_specs_output["f_0"]["pi8_ppr"] == 1
-    assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
-    assert ppm_specs_output["f_0"]["depth"] == 3
-    assert ppm_specs_output["f_0"]["depth_type"] == 0
+    ppm_specs_output = qp.specs(test_convert_clifford_to_ppr_workflow, level=1)().resources
+
+    assert ppm_specs_output == PBCSpecsResources(
+        counts={
+            "Adjoint(PPR-pi/4)": 2,
+            "GlobalPhase": 4,
+            "PPR-pi/4-w1": 4,
+            "PPR-pi/4-w2": 1,
+            "PPR-pi/8-w1": 1,
+        },
+        measurement_processes={},
+        num_allocs=2,
+        any_commuting_depth=3,
+        qubit_disjoint_depth=6,
+    )
 
 
 def test_convert_cz_to_ppr():
@@ -261,53 +264,20 @@ def test_convert_cz_to_ppr():
     assert "quantum.custom" not in optimized_ir
 
 
-def test_convert_clifford_to_ppr_only_disjoint_qubit():
-
-    @qjit(target="mlir")
-    def test_convert_clifford_to_ppr_workflow():
-
-        @to_ppr
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
-        def f():
-            qp.H(0)
-            qp.S(1)
-            qp.T(0)
-            qp.CNOT([0, 1])
-
-        return f()
-
-    assert 'transform.apply_registered_pass "to-ppr"' in test_convert_clifford_to_ppr_workflow.mlir
-    optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
-
-    ppm_specs_output = ppm_specs(test_convert_clifford_to_ppr_workflow, only_disjoint_qubit=True)
-    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
-    assert ppm_specs_output["f_0"]["pi4_ppr"] == 7
-    assert ppm_specs_output["f_0"]["max_weight_pi4"] == 2
-    assert ppm_specs_output["f_0"]["pi8_ppr"] == 1
-    assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
-    assert ppm_specs_output["f_0"]["depth"] == 6
-    assert ppm_specs_output["f_0"]["depth_type"] == 1
-
-
 def test_commute_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
+    @commute_ppr
+    @to_ppr
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_commute_ppr_workflow():
-
-        @commute_ppr
-        @to_ppr
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
-        def f():
-            qp.H(0)
-            qp.S(1)
-            qp.T(0)
-            qp.CNOT([0, 1])
-            return measure(0), measure(1)
-
-        return f()
+        qp.H(0)
+        qp.S(1)
+        qp.T(0)
+        qp.CNOT([0, 1])
+        return measure(0), measure(1)
 
     assert 'transform.apply_registered_pass "commute-ppr"' in test_commute_ppr_workflow.mlir
     optimized_ir = test_commute_ppr_workflow.mlir_opt
@@ -315,13 +285,22 @@ def test_commute_ppr():
     assert "pbc.ppr" in optimized_ir
     assert "pbc.ppm" in optimized_ir
 
-    ppm_specs_output = ppm_specs(test_commute_ppr_workflow)
-    assert ppm_specs_output["f_0"]["num_of_ppm"] == 2
-    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
-    assert ppm_specs_output["f_0"]["pi4_ppr"] == 7
-    assert ppm_specs_output["f_0"]["max_weight_pi4"] == 2
-    assert ppm_specs_output["f_0"]["pi8_ppr"] == 1
-    assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
+    ppm_specs_output = qp.specs(test_commute_ppr_workflow, level=2)().resources
+
+    assert ppm_specs_output == PBCSpecsResources(
+        counts={
+            "Adjoint(PPR-pi/4)": 2,
+            "GlobalPhase": 4,
+            "PPM-w1": 2,
+            "PPR-pi/4-w1": 4,
+            "PPR-pi/4-w2": 1,
+            "PPR-pi/8-w1": 1,
+        },
+        measurement_processes={},
+        num_allocs=2,
+        any_commuting_depth=5,
+        qubit_disjoint_depth=7,
+    )
 
 
 def test_merge_ppr_ppm():
@@ -329,18 +308,14 @@ def test_merge_ppr_ppm():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
+    @merge_ppr_ppm
+    @to_ppr
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_merge_ppr_ppm_workflow():
-
-        @merge_ppr_ppm
-        @to_ppr
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
-        def f():
-            qp.H(0)
-            qp.S(1)
-            qp.CNOT([0, 1])
-            return measure(0), measure(1)
-
-        return f()
+        qp.H(0)
+        qp.S(1)
+        qp.CNOT([0, 1])
+        return measure(0), measure(1)
 
     assert 'transform.apply_registered_pass "merge-ppr-ppm"' in test_merge_ppr_ppm_workflow.mlir
     optimized_ir = test_merge_ppr_ppm_workflow.mlir_opt
@@ -348,9 +323,15 @@ def test_merge_ppr_ppm():
     assert 'pbc.ppm ["Z", "X"]' in optimized_ir
     assert 'pbc.ppm ["X"]' in optimized_ir
 
-    ppm_specs_output = ppm_specs(test_merge_ppr_ppm_workflow)
-    assert ppm_specs_output["f_0"]["num_of_ppm"] == 2
-    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
+    ppm_specs_output = qp.specs(test_merge_ppr_ppm_workflow, level=2)().resources
+
+    assert ppm_specs_output == PBCSpecsResources(
+        counts={"GlobalPhase": 3, "PPM-w1": 1, "PPM-w2": 1},
+        measurement_processes={},
+        num_allocs=2,
+        any_commuting_depth=1,
+        qubit_disjoint_depth=2,
+    )
 
 
 def test_ppr_to_ppm_auto_corrected():
@@ -441,60 +422,62 @@ def test_ppr_to_ppm_pauli_corrected():
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
+    device = qp.device("lightning.qubit", wires=2)
 
     @qjit(pipelines=pipe, target="mlir")
-    def test_convert_clifford_to_ppr_workflow():
+    @merge_ppr_ppm
+    @commute_ppr(max_pauli_size=2)
+    @to_ppr
+    @qp.qnode(device)
+    def f_workflow():
+        qp.CNOT([0, 2])
+        qp.T(0)
+        return measure(0), measure(1)
 
-        device = qp.device("lightning.qubit", wires=2)
+    @qjit(pipelines=pipe, target="mlir")
+    @merge_ppr_ppm(max_pauli_size=1)
+    @commute_ppr
+    @to_ppr
+    @qp.qnode(device)
+    def g_workflow():
+        qp.CNOT([0, 2])
+        qp.T(0)
+        qp.T(1)
+        qp.CNOT([0, 1])
+        return measure(0), measure(1)
 
-        @merge_ppr_ppm
-        @commute_ppr(max_pauli_size=2)
-        @to_ppr
-        @qp.qnode(device)
-        def f():
-            qp.CNOT([0, 2])
-            qp.T(0)
-            return measure(0), measure(1)
+    for workflow in (f_workflow, g_workflow):
+        assert 'transform.apply_registered_pass "commute-ppr"' in workflow.mlir
+        assert 'transform.apply_registered_pass "merge-ppr-ppm"' in workflow.mlir
 
-        @merge_ppr_ppm(max_pauli_size=1)
-        @commute_ppr
-        @to_ppr
-        @qp.qnode(device)
-        def g():
-            qp.CNOT([0, 2])
-            qp.T(0)
-            qp.T(1)
-            qp.CNOT([0, 1])
-            return measure(0), measure(1)
+        optimized_ir = workflow.mlir_opt
+        assert 'transform.apply_registered_pass "commute-ppr"' not in optimized_ir
+        assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
 
-        return f(), g()
-
-    assert (
-        'transform.apply_registered_pass "commute-ppr"'
-        in test_convert_clifford_to_ppr_workflow.mlir
+    f_specs = qp.specs(f_workflow, level=3)().resources
+    assert f_specs == PBCSpecsResources(
+        counts={"GlobalPhase": 2, "PPM-w1": 2, "PPR-pi/8-w1": 1},
+        measurement_processes={},
+        num_allocs=2,
+        any_commuting_depth=1,
+        qubit_disjoint_depth=2,
     )
-    assert (
-        'transform.apply_registered_pass "merge-ppr-ppm"'
-        in test_convert_clifford_to_ppr_workflow.mlir
+
+    g_specs = qp.specs(g_workflow, level=3)().resources
+    assert g_specs == PBCSpecsResources(
+        counts={
+            "Adjoint(PPM)": 1,
+            "Adjoint(PPR-pi/4)": 1,
+            "GlobalPhase": 4,
+            "PPM-w1": 1,
+            "PPR-pi/4-w2": 2,
+            "PPR-pi/8-w1": 2,
+        },
+        measurement_processes={},
+        num_allocs=2,
+        any_commuting_depth=3,
+        qubit_disjoint_depth=6,
     )
-
-    optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "commute-ppr"' not in optimized_ir
-    assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
-
-    ppm_specs_output = ppm_specs(test_convert_clifford_to_ppr_workflow)
-
-    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
-    assert ppm_specs_output["f_0"]["num_of_ppm"] == 2
-    assert ppm_specs_output["f_0"]["pi8_ppr"] == 1
-    assert ppm_specs_output["f_0"]["max_weight_pi8"] == 1
-
-    assert ppm_specs_output["g_0"]["logical_qubits"] == 2
-    assert ppm_specs_output["g_0"]["num_of_ppm"] == 2
-    assert ppm_specs_output["g_0"]["pi4_ppr"] == 3
-    assert ppm_specs_output["g_0"]["max_weight_pi4"] == 2
-    assert ppm_specs_output["g_0"]["pi8_ppr"] == 2
-    assert ppm_specs_output["g_0"]["max_weight_pi8"] == 1
 
 
 def test_merge_rotation_ppr():
@@ -650,27 +633,6 @@ class TestLowerPBCInitOps:
 
         assert np.allclose(baseline_result, to_ppr_result)
         assert np.allclose(to_ppr_result, lowered_result)
-
-
-class TestPPMSpecsErrors:
-    """Test if errors are caught when calling ppm_specs"""
-
-    def test_jit_mode_error(self):
-        """Make sure ppm_specs only works in AOT (Ahead of Time) compilation"""
-        with pytest.raises(
-            NotImplementedError,
-            match=r"PPM passes only support AOT \(Ahead-Of-Time\) compilation mode.",
-        ):
-            dev = qp.device("lightning.qubit", wires=2)
-
-            @qjit(target="mlir")
-            @qp.qnode(dev)
-            def jit_circuit(x):  # JIT mode since x is unknown
-                qp.H(x)
-                qp.CNOT(wires=[0, 1])
-                return qp.probs()
-
-            ppm_specs(jit_circuit)
 
 
 if __name__ == "__main__":
