@@ -12,9 +12,14 @@
 
 <h3>Improvements 🛠</h3>
 
-* Add adjoint support to the decomposition graph solver, enabling `Adjoint(Op)` to be decomposed either
-  via registered adjoint rules or by adjointing the base operator's decomposition rule,
-  with the solver choosing the cheapest.
+* Add controlled support to the decomposition graph solver, enabling `C(Op)`
+  to be decomposed either via registered controlled rules or by controlling
+  the base operator's decomposition rule, with the solver choosing the cheapest.
+  [(#3003)](https://github.com/PennyLaneAI/catalyst/pull/3003)
+
+* Add adjoint support to the decomposition graph solver, enabling `Adjoint(Op)` to be
+  decomposed either via registered adjoint rules or by adjointing the base operator's
+  decomposition rule, with the solver choosing the cheapest.
   [(#3001)](https://github.com/PennyLaneAI/catalyst/pull/3001)
 
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum

@@ -55,6 +55,7 @@ namespace DecompGraph::Core {
 struct OperatorNode {
     std::string id;
     bool adjoint{false};
+    std::size_t numControlWires{0};
 
     // optional params, primarily for debug use
     std::string name{""};
@@ -127,8 +128,15 @@ struct RuleTerm {
  * - Fixed: A fixed rule that cannot be changed or overridden by the solver.
  * - Alternative: An alternative rule that can be used in place of the default rule.
  * - AdjointGenerated: A rule synthesized by adjointing a base decomposition rule.
+ * - ControlGenerated: A rule synthesized by controlling a base decomposition rule.
  */
-enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2, AdjointGenerated = 3 };
+enum class RuleOrigin : uint8_t {
+    Default = 0,
+    Fixed = 1,
+    Alternative = 2,
+    AdjointGenerated = 3,
+    ControlGenerated = 4
+};
 
 /**
  * @brief This represents the decomposition rules in the graph decomposition problem.
@@ -139,7 +147,7 @@ enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2, Adjoi
  * decomposition rules to break down complex operators into simpler ones that are part of
  * the target gateset.
  *
- * TODO:
+ * @todo
  * - We can add a field for work_wires_required if we want to consider the number of ancillary
  * wires needed for the decomposition, which can be an important factor in resource
  * optimization.
@@ -173,31 +181,107 @@ using FixedDecomps = std::unordered_map<OperatorNode, RuleNode, OperatorNodeHash
  */
 using AltDecomps = std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>;
 
+namespace modifiers {
+
 /**
- * @brief This returns a copy of the given operator with the adjoint modifier toggled.
+ * @brief The modifiers parsed out of an operator id.
  *
- * Identity is the opaque `id` string (equality/hashing are id-only),
- * so the modifier must be folded into the id: we wrap it in `Adjoint(...)`
- * (or strip that wrapper to cancel adjoint).
- * Applying twice cancels: `makeAdjoint(makeAdjoint(op)) == op`.
+ * Modifiers are serialized in one canonical form, control-outermost then adjoint:
+ * `[C(<k>, ][Adjoint(]<core>[)][)]`. Because adjoint and control commute, serializing them in a
+ * fixed order means any order of application yields the same id (e.g. `C(Adjoint(op))` and
+ * `Adjoint(C(op))` are the same node), and control wires accumulate instead of nesting.
+ */
+struct Modifiers {
+    std::size_t numControlWires{0};
+    bool adjoint{false};
+    std::string core; // the base id with all modifiers stripped
+};
+
+inline Modifiers parseModifiers(const std::string &id)
+{
+    Modifiers m;
+    std::string s = id;
+
+    // Strip the outermost "C(<k>, ...)" control wrapper (op ids never start with "C(", so this is
+    // unambiguous). The control count is parsed by hand because the build has exceptions disabled.
+    if (s.rfind("C(", 0) == 0 && !s.empty() && s.back() == ')') {
+        std::size_t sep = s.find(", ", 2);
+        if (sep != std::string::npos) {
+            std::string kStr = s.substr(2, sep - 2);
+            std::size_t k = 0;
+            bool ok = !kStr.empty();
+            for (char c : kStr) {
+                if (c < '0' || c > '9') {
+                    ok = false;
+                    break;
+                }
+                k = k * 10 + static_cast<std::size_t>(c - '0');
+            }
+            if (ok) {
+                m.numControlWires = k;
+                s = s.substr(sep + 2, s.size() - (sep + 2) - 1);
+            }
+        }
+    }
+
+    // Strip the "Adjoint( ... )" wrapper.
+    static constexpr char kAdj[] = "Adjoint(";
+    constexpr std::size_t kAdjLen = sizeof(kAdj) - 1;
+    if (s.size() > kAdjLen && s.compare(0, kAdjLen, kAdj) == 0 && s.back() == ')') {
+        m.adjoint = true;
+        s = s.substr(kAdjLen, s.size() - kAdjLen - 1);
+    }
+
+    m.core = s;
+    return m;
+}
+
+inline std::string buildId(const Modifiers &m)
+{
+    std::string s = m.core;
+    if (m.adjoint) {
+        s = "Adjoint(" + s + ")";
+    }
+    if (m.numControlWires > 0) {
+        s = "C(" + std::to_string(m.numControlWires) + ", " + s + ")";
+    }
+    return s;
+}
+
+} // namespace modifiers
+
+/**
+ * @brief This returns a copy of the operator with the adjoint modifier toggled.
+ *
+ * Identity is the opaque `id` string (equality/hashing are id-only), so the modifier is folded into
+ * the id, re-serialized in canonical control-outermost form. The `adjoint` bool and
+ * `numControlWires` count are kept in lockstep with the id. Applying twice cancels:
+ * `makeAdjoint(makeAdjoint(op)) == op`.
  */
 inline OperatorNode makeAdjoint(OperatorNode op)
 {
-    static constexpr char kPrefix[] = "Adjoint(";
-    constexpr std::size_t kPrefixLen = sizeof(kPrefix) - 1;
+    modifiers::Modifiers m = modifiers::parseModifiers(op.id);
+    m.adjoint = !m.adjoint;
+    op.id = modifiers::buildId(m);
+    op.adjoint = m.adjoint;
+    op.numControlWires = m.numControlWires;
+    return op;
+}
 
-    if (op.adjoint) {
-        // Cancel: strip the outermost "Adjoint( ... )" wrapper from the id.
-        if (op.id.size() > kPrefixLen && op.id.compare(0, kPrefixLen, kPrefix) == 0 &&
-            op.id.back() == ')') {
-            op.id = op.id.substr(kPrefixLen, op.id.size() - kPrefixLen - 1);
-        }
-        op.adjoint = false;
-    }
-    else {
-        op.id = std::string(kPrefix) + op.id + ")";
-        op.adjoint = true;
-    }
+/**
+ * @brief This returns a copy of the operator with `numControlWires` additional control wires.
+ *
+ * Controls accumulate (`C(1, C(1, op)) == C(2, op)`) and the id is re-serialized in canonical
+ * control-outermost form, so control commutes with adjoint (`C(Adjoint(op)) == Adjoint(C(op))`).
+ * The `numControlWires` count and `adjoint` bool are kept in lockstep with the id.
+ */
+inline OperatorNode makeControlled(OperatorNode op, std::size_t numControlWires = 1)
+{
+    modifiers::Modifiers m = modifiers::parseModifiers(op.id);
+    m.numControlWires += numControlWires;
+    op.id = modifiers::buildId(m);
+    op.numControlWires = m.numControlWires;
+    op.adjoint = m.adjoint;
     return op;
 }
 
@@ -219,6 +303,47 @@ inline RuleNode makeAdjointRule(const RuleNode &base)
         adj.inputs.push_back({makeAdjoint(term.op), term.multiplicity});
     }
     return adj;
+}
+
+/**
+ * @brief This returns a copy of the given operator with all controls removed.
+ */
+inline OperatorNode withoutControls(OperatorNode op)
+{
+    modifiers::Modifiers m = modifiers::parseModifiers(op.id);
+    m.numControlWires = 0;
+    op.id = modifiers::buildId(m);
+    op.numControlWires = 0;
+    op.adjoint = m.adjoint;
+    return op;
+}
+
+/**
+ * @brief Constructs the Controlled decomposition rule from a base rule.
+ *
+ * Given a rule `output -> {inputs}`, produces `Controlled(output) -> {Controlled(input), ...}`
+ * where every operator gains `numControlWires` control wires: controlling a decomposition means
+ * applying the same controls to each gate it produces.
+ *
+ * The `numControlWires` count is encoded in the rule name so distinct control counts over
+ * the same base rule stay unique. The result is tagged with `RuleOrigin::ControlGenerated`
+ * so later stages can lower it by controlling each gate.
+ *
+ * @note: PennyLane counts `PauliX` flips for zero `control_values`.
+ * Those flips and `control_values` are not supported yet; the cost reflects only the
+ * cost of controlling each produced gate.
+ */
+inline RuleNode makeControlledRule(const RuleNode &base, std::size_t numControlWires)
+{
+    RuleNode ctrl;
+    ctrl.name = base.name + "_controlled_" + std::to_string(numControlWires);
+    ctrl.output = makeControlled(base.output, numControlWires);
+    ctrl.origin = RuleOrigin::ControlGenerated;
+    ctrl.inputs.reserve(base.inputs.size());
+    for (const auto &term : base.inputs) {
+        ctrl.inputs.push_back({makeControlled(term.op, numControlWires), term.multiplicity});
+    }
+    return ctrl;
 }
 
 /**
