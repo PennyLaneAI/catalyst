@@ -226,6 +226,67 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
     return success();
 }
 
+/// Control an `scf.for` by adding the control qubits as extra loop-carried `iter_args`: the loop
+/// structure (bounds, iteration) stays classical, the control qubits are threaded through the body
+/// each iteration, and the final controls come out as the loop's trailing results.
+// Note Unlike adjoint no reversal is needed, so dynamic bounds and per-iteration classical compute
+/// need no special handling: the loop keeps its original bounds and body.
+static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, IRMapping &map,
+                                   SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
+{
+    unsigned numOrig = forOp.getInitArgs().size();
+
+    // New init args = the loop's original init args, plus the incoming control qubits.
+    SmallVector<Value> newInits;
+    for (Value init : forOp.getInitArgs()) {
+        newInits.push_back(map.lookupOrDefault(init));
+    }
+    newInits.append(currentCtrlQubits.begin(), currentCtrlQubits.end());
+
+    Value lb = map.lookupOrDefault(forOp.getLowerBound());
+    Value ub = map.lookupOrDefault(forOp.getUpperBound());
+    Value step = map.lookupOrDefault(forOp.getStep());
+
+    // With non-empty iter args and no body-builder, scf.for creates the body block (induction var +
+    // iter-arg block args) without a terminator, which we fill in below.
+    auto newFor = rewriter.create<scf::ForOp>(forOp.getLoc(), lb, ub, step, newInits);
+    Block *newBody = newFor.getBody();
+    ValueRange newIterArgs = newFor.getRegionIterArgs();
+
+    // Seed a body-local mapping; the trailing iter args are this iteration's threaded controls.
+    IRMapping bodyMap = map;
+    bodyMap.map(forOp.getInductionVar(), newFor.getInductionVar());
+    for (unsigned i = 0; i < numOrig; ++i) {
+        bodyMap.map(forOp.getRegionIterArg(i), newIterArgs[i]);
+    }
+    SmallVector<Value> bodyCtrl(newIterArgs.begin() + numOrig, newIterArgs.end());
+
+    rewriter.setInsertionPointToStart(newBody);
+    Block &oldBody = forOp.getRegion().front();
+    if (failed(distributeControls(rewriter, oldBody, bodyMap, bodyCtrl, ctrlValues))) {
+        return failure();
+    }
+
+    auto oldYield = cast<scf::YieldOp>(oldBody.getTerminator());
+    SmallVector<Value> yielded;
+    for (Value v : oldYield.getOperands()) {
+        yielded.push_back(bodyMap.lookupOrDefault(v));
+    }
+    yielded.append(bodyCtrl.begin(), bodyCtrl.end());
+    rewriter.setInsertionPointToEnd(newBody);
+    rewriter.create<scf::YieldOp>(oldYield.getLoc(), yielded);
+
+    // Map the original results one-to-one; the trailing results are the threaded control qubits.
+    for (unsigned i = 0; i < numOrig; ++i) {
+        map.map(forOp.getResult(i), newFor.getResult(i));
+    }
+    currentCtrlQubits.assign(newFor.getResults().begin() + numOrig, newFor.getResults().end());
+
+    // Restore the insertion point to after the new op so the enclosing walk keeps appending there.
+    rewriter.setInsertionPointAfter(newFor);
+    return success();
+}
+
 static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block, IRMapping &map,
                                         SmallVector<Value> &currentCtrlQubits,
                                         ValueRange ctrlValues)
@@ -279,7 +340,13 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
             }
             continue;
         }
-        if (isa<scf::ForOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
+        if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+            if (failed(controlScfFor(rewriter, forOp, map, currentCtrlQubits, ctrlValues))) {
+                return failure();
+            }
+            continue;
+        }
+        if (isa<scf::WhileOp, scf::IndexSwitchOp>(op)) {
             op.emitError(
                 "this control flow op inside a quantum.ctrl region is not supported yet by "
                 "ctrl-lowering");
