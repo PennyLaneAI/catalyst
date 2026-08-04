@@ -140,12 +140,12 @@ llvm::json::Object ResourceResult::toJson() const {
     llvm::json::Object funcObj;
 
     /// Metadata
-    llvm::json::Object metatDataObject;
-    metatDataObject["device_name"] = deviceName;
-    metatDataObject["qnode"] = isQnode;
-    metatDataObject["has_branches"] = hasBranches;
-    metatDataObject["auto_qubit_management"] = autoQubitManagement;
-    funcObj["metadata"] = std::move(metatDataObject);
+    llvm::json::Object metaDataObject;
+    metaDataObject["device_name"] = deviceName;
+    metaDataObject["qnode"] = isQnode;
+    metaDataObject["has_branches"] = hasBranches;
+    metaDataObject["auto_qubit_management"] = autoQubitManagement;
+    funcObj["metadata"] = std::move(metaDataObject);
 
     /// Qubit Allocations
     llvm::json::Object numQubitObject;
