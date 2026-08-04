@@ -12,23 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ProtectionDomain.hpp"
+#pragma once
+#include <cstdint>
+namespace catalyst::transport::gpu_verbs {
 
-#include <utility>
-
-#include "Error.hpp"
-
-namespace catalyst::transport::common {
-ProtectionDomain::ProtectionDomain(std::shared_ptr<Context> ctx) : ctx_(std::move(ctx))
+// Passthrough self-test: returns the word unchanged.
+__device__ inline std::int64_t echo_decode(std::uint64_t syndrome)
 {
-    pd_ = ibv_alloc_pd(ctx_->get());
-    RDMA_CHECK_ERRNO(pd_, "ibv_alloc_pd");
+    return static_cast<std::int64_t>(syndrome);
 }
-ProtectionDomain::~ProtectionDomain()
-{
-    if (pd_) {
-        ibv_dealloc_pd(pd_);
-    }
-}
-ibv_pd *ProtectionDomain::get() const { return pd_; }
-} // namespace catalyst::transport::common
+
+} // namespace catalyst::transport::gpu_verbs

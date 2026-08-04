@@ -35,3 +35,14 @@ set_property(TARGET rt_transport PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(common)
 add_subdirectory(cpu_verbs)
+
+# GPU coprocessor backend — only when a HIP toolchain is present.
+include(CheckLanguage)
+check_language(HIP)
+if(CMAKE_HIP_COMPILER)
+    message(STATUS "transport: HIP found (${CMAKE_HIP_COMPILER}) -> building gpu_verbs")
+    set(TRANSPORT_HAS_HIP TRUE CACHE INTERNAL "transport: HIP toolchain available")
+    add_subdirectory(gpu_verbs)
+else()
+    message(STATUS "transport: no HIP compiler -> skipping gpu_verbs")
+endif()

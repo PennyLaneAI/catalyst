@@ -42,7 +42,7 @@ MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std
     : pd_(std::move(pd)), backing_buffer_(std::move(backing))
 {
     mr_ = ibv_reg_mr(pd_->get(), addr, length, static_cast<int>(access));
-    RDMA_CHECK(mr_, "ibv_reg_mr");
+    RDMA_CHECK_ERRNO(mr_, "ibv_reg_mr");
 }
 
 /**
@@ -54,7 +54,7 @@ MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, std::uint64_t o
     : pd_(std::move(pd))
 {
     mr_ = ibv_reg_dmabuf_mr(pd_->get(), offset, length, iova, fd, static_cast<int>(access));
-    RDMA_CHECK(mr_, "ibv_reg_dmabuf_mr");
+    RDMA_CHECK_ERRNO(mr_, "ibv_reg_dmabuf_mr");
 }
 
 /**
@@ -69,7 +69,7 @@ MemoryRegion MemoryRegion::alloc_host(std::shared_ptr<ProtectionDomain> pd, std:
                alignment);
     std::size_t rounded = ((length + alignment - 1) / alignment) * alignment;
     void *buf = std::aligned_alloc(alignment, rounded);
-    RDMA_CHECK(buf, "aligned_alloc(%zu)", rounded);
+    RDMA_CHECK_ERRNO(buf, "aligned_alloc(%zu)", rounded);
     std::memset(buf, 0, rounded);
     return MemoryRegion(std::move(pd), buf, length, access, std::shared_ptr<void>(buf, std::free));
 }

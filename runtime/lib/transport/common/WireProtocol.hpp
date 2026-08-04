@@ -44,6 +44,18 @@ struct Payload {
 #pragma pack(pop)
 static_assert(sizeof(Payload) == 16, "Payload must be exactly 16 B");
 
+/**
+ * @brief Bytes of a Payload the caller and the coprocessor function may use.
+ *
+ * `value` carries the round's data. When used for decoding syndrome,
+ * for outbound it is the syndrome (one byte per check), inbound it is one
+ * `std::int64_t` error qubit index (-1 for no error).
+ *
+ * TODO: This currently holds one error index. A code correcting more than one
+ * error needs N of them. PayloadSlot currently has space for increasing.
+ */
+inline constexpr std::size_t PAYLOAD_DATA_BYTES = sizeof(Payload::value);
+
 // Some controller DMA engine requires 64-B aligned. Rings are
 // 64-B-strided slots; only the leading Payload (16 B) is transferred per slot.
 struct alignas(64) PayloadSlot {

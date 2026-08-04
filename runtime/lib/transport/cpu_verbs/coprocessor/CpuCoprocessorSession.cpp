@@ -14,7 +14,6 @@
 
 #include "CpuCoprocessorSession.hpp"
 
-#include <algorithm>
 #include <cstring>
 #include <thread>
 
@@ -73,9 +72,10 @@ int CpuCoprocessorSession::collect(void *const *replies, const std::uint64_t *re
     }
     if (n > 0 && replies && replies[0]) {
         const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
-        const std::size_t nb =
-            replies_bytes ? std::min<std::size_t>(replies_bytes[0], sizeof(w)) : sizeof(w);
-        std::memcpy(replies[0], &w, nb);
+        const std::size_t cap = replies_bytes ? replies_bytes[0] : sizeof(w);
+        RDMA_CHECK(cap <= sizeof(w), "reply capacity (%zu) exceeds the %zu B payload", cap,
+                   sizeof(w));
+        std::memcpy(replies[0], &w, cap);
     }
     return 0;
 }
@@ -106,7 +106,11 @@ void CpuCoprocessorSession::run(std::stop_token st)
         Payload *send = send_payload();
         send->value = 0; // deterministic high bytes when the result is shorter
         if (coproc_fn_) {
-            coproc_fn_(&r->value, sizeof(r->value), &send->value, sizeof(send->value), coproc_ctx_);
+            const std::size_t nb = coproc_fn_(&r->value, PAYLOAD_DATA_BYTES, &send->value,
+                                              PAYLOAD_DATA_BYTES, coproc_ctx_);
+            RDMA_CHECK(nb > 0 && nb <= PAYLOAD_DATA_BYTES,
+                       "coprocessor function wrote %zu bytes, expected 1..%zu", nb,
+                       PAYLOAD_DATA_BYTES);
         }
         else {
             send->value = r->value; // built-in echo
