@@ -126,8 +126,7 @@ def backline_attr_text(backline) -> str:
 
 
 def _launch_executor(name, triple, options):
-    """Build and launch a ``catalyst.Executor`` from a node's executor options.
-    """
+    """Build and launch a ``catalyst.Executor`` from a node's executor options."""
     from catalyst.executor import Executor
 
     options.setdefault("name", name or "executor")
@@ -137,7 +136,7 @@ def _launch_executor(name, triple, options):
 
 
 def _realize_executor(node):
-    """Return the node's launched executor, building it from an 
+    """Return the node's launched executor, building it from an
     :class:`~pennylane.backline.ExecutorSpec` on first use.
     """
     from pennylane.backline import ExecutorSpec
