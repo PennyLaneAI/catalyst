@@ -25,6 +25,7 @@ This module contains the pipelines that are used to compile a quantum function t
 """
 
 import enum
+import os
 import sys
 import warnings
 from copy import deepcopy
@@ -91,6 +92,18 @@ def _parse_keep_intermediate(
             )
 
 
+def _parse_cache(cache: Union[str, Path, bool, None]) -> Optional[Path]:
+    """Parse the persistent compilation cache location."""
+    if cache is False or cache is None:
+        return None
+    if cache is True:
+        cache_home = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+        return cache_home / "catalyst" / "qjit"
+    if isinstance(cache, (str, Path)):
+        return Path(cache).expanduser()
+    raise ValueError("Invalid value for cache. Valid values are False, None, True, or a path.")
+
+
 # pylint: disable=too-many-instance-attributes
 @dataclass
 class CompileOptions:
@@ -146,6 +159,9 @@ class CompileOptions:
             the validity of the program themselves. If ``capture=False``, or ``capture="global"``
             and ``qp.capture.enabled() == False``, this argument will be ignored. ``False``
             by default.
+        cache (Optional[Union[bool, str, Path]]): Persistent compilation cache location. ``False``
+            or ``None`` disables persistent caching, ``True`` uses the default user cache
+            directory, and a path stores artifacts in that directory.
     """
 
     verbose: Optional[bool] = False
@@ -170,10 +186,12 @@ class CompileOptions:
     dialect_plugins: Optional[Set[Path]] = None
     capture: bool | Literal["global"] = "global"
     skip_preprocess: bool = False
+    cache: Optional[Union[bool, str, Path]] = False
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
         self.keep_intermediate = _parse_keep_intermediate(self.keep_intermediate)
+        self.cache = _parse_cache(self.cache)
 
         # Check that async runs must not be seeded
         if self.async_qnodes and self.seed is not None:
