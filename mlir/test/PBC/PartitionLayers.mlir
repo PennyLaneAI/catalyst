@@ -195,3 +195,28 @@ func.func @test_partition_layers_4(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr
 
     func.return
 }
+
+// -----
+
+// The first four operators commute. YYYY is the GF(2) sum of XXXX and ZZZZ,
+// so the layer has fewer independent basis rows than operations. The final X
+// anticommutes with ZZZZ and must start a new layer.
+func.func @test_dependent_commuting_basis(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quantum.bit) {
+    // CHECK-LABEL: func.func @test_dependent_commuting_basis
+    // CHECK: [[L0:%.+]]:4 = pbc.layer
+    // CHECK:   [[P0:%.+]]:4 = pbc.ppr ["X", "X", "X", "X"]
+    // CHECK:   [[P1:%.+]]:4 = pbc.ppr ["Z", "Z", "Z", "Z"]
+    // CHECK:   [[P2:%.+]]:4 = pbc.ppr ["Y", "Y", "Y", "Y"]
+    // CHECK:   [[P3:%.+]]:4 = pbc.ppr ["X", "X", "I", "I"]
+    // CHECK:   pbc.yield
+    // CHECK: [[L1:%.+]] = pbc.layer
+    // CHECK:   [[P4:%.+]] = pbc.ppr ["X"]
+    // CHECK:   pbc.yield
+
+    %0:4 = pbc.ppr ["X", "X", "X", "X"] (8) %q0, %q1, %q2, %q3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %1:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %0#0, %0#1, %0#2, %0#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %2:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %1#0, %1#1, %1#2, %1#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %3:4 = pbc.ppr ["X", "X", "I", "I"] (8) %2#0, %2#1, %2#2, %2#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %4 = pbc.ppr ["X"] (8) %3#0 : !quantum.bit
+    func.return
+}
