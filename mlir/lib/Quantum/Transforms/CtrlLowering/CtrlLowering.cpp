@@ -180,7 +180,7 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
     resultTypes.append(numCtrl, qubitType);
 
     Value cond = map.lookupOrDefault(ifOp.getCondition());
-    auto newIf = rewriter.create<scf::IfOp>(ifOp.getLoc(), resultTypes, cond,
+    auto newIf = scf::IfOp::create(rewriter, ifOp.getLoc(), resultTypes, cond,
                                             /*withElseRegion=*/true);
 
     // Control one branch: `oldBlock` may be null (a missing else), in which case the branch just
@@ -205,7 +205,7 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
         }
         yielded.append(branchCtrl.begin(), branchCtrl.end());
         rewriter.setInsertionPointToEnd(newBlock);
-        rewriter.create<scf::YieldOp>(yieldLoc, yielded);
+        scf::YieldOp::create(rewriter, yieldLoc, yielded);
         return success();
     };
 
@@ -252,7 +252,7 @@ static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, 
 
     // With non-empty iter args and no body-builder, scf.for creates the body block (induction var +
     // iter-arg block args) without a terminator, which we fill in below.
-    auto newFor = rewriter.create<scf::ForOp>(forOp.getLoc(), lb, ub, step, newInits);
+    auto newFor = scf::ForOp::create(rewriter, forOp.getLoc(), lb, ub, step, newInits);
     Block *newBody = newFor.getBody();
     ValueRange newIterArgs = newFor.getRegionIterArgs();
 
@@ -277,7 +277,7 @@ static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, 
     }
     yielded.append(bodyCtrl.begin(), bodyCtrl.end());
     rewriter.setInsertionPointToEnd(newBody);
-    rewriter.create<scf::YieldOp>(oldYield.getLoc(), yielded);
+    scf::YieldOp::create(rewriter, oldYield.getLoc(), yielded);
 
     // Map the original results one-to-one; the trailing results are the threaded control qubits.
     for (unsigned i = 0; i < numOrig; ++i) {
