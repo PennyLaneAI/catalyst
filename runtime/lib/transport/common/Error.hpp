@@ -30,21 +30,42 @@ class RdmaError : public std::runtime_error {
 [[noreturn]] inline void rdma_throw(const char *msg) { throw RdmaError(msg); }
 } // namespace catalyst::transport::common
 
-// Unconditionally fail with "file:line: msg (errno=..)" context.
+// Unconditionally fail with "file:line: msg" context.
 #define RDMA_FAIL(...)                                                                             \
     do {                                                                                           \
         char rdma_msg_[256];                                                                       \
         std::snprintf(rdma_msg_, sizeof(rdma_msg_), __VA_ARGS__);                                  \
         char rdma_full_[512];                                                                      \
-        std::snprintf(rdma_full_, sizeof(rdma_full_), "%s:%d: %s (errno=%d: %s)", __FILE__,        \
-                      __LINE__, rdma_msg_, errno, std::strerror(errno));                           \
+        std::snprintf(rdma_full_, sizeof(rdma_full_), "%s:%d: %s", __FILE__, __LINE__, rdma_msg_); \
         ::catalyst::transport::common::rdma_throw(rdma_full_);                                     \
     } while (0)
 
-// Throw RdmaError with file:line + errno when cond is false.
+// Throw RdmaError with file:line when cond is false.
 #define RDMA_CHECK(cond, ...)                                                                      \
     do {                                                                                           \
         if (!(cond)) {                                                                             \
             RDMA_FAIL(__VA_ARGS__);                                                                \
+        }                                                                                          \
+    } while (0)
+
+// Same as RDMA_FAIL, appending "(errno=..)". Use only where the failing call is
+// documented to set errno; elsewhere errno holds an unrelated stale value.
+// errno is captured before formatting, which may itself modify it.
+#define RDMA_FAIL_ERRNO(...)                                                                       \
+    do {                                                                                           \
+        const int rdma_errno_ = errno;                                                             \
+        char rdma_msg_[256];                                                                       \
+        std::snprintf(rdma_msg_, sizeof(rdma_msg_), __VA_ARGS__);                                  \
+        char rdma_full_[512];                                                                      \
+        std::snprintf(rdma_full_, sizeof(rdma_full_), "%s:%d: %s (errno=%d: %s)", __FILE__,        \
+                      __LINE__, rdma_msg_, rdma_errno_, std::strerror(rdma_errno_));               \
+        ::catalyst::transport::common::rdma_throw(rdma_full_);                                     \
+    } while (0)
+
+// As RDMA_CHECK, appending "(errno=..)". See RDMA_FAIL_ERRNO.
+#define RDMA_CHECK_ERRNO(cond, ...)                                                                \
+    do {                                                                                           \
+        if (!(cond)) {                                                                             \
+            RDMA_FAIL_ERRNO(__VA_ARGS__);                                                          \
         }                                                                                          \
     } while (0)

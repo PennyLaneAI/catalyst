@@ -27,6 +27,9 @@
   session roles over RDMA.
   [(#3062)](https://github.com/PennyLaneAI/catalyst/pull/3062)
 
+* A GPU transport backend is added, which implements the coprocessor session role.
+  [(#3069)](https://github.com/PennyLaneAI/catalyst/pull/3069)
+
 * Catalyst can now cross-compile target nested modules to standalone object files and
   either statically link them into the host program or ship them to an executor for dispatch.
  [(#3033)](https://github.com/PennyLaneAI/catalyst/pull/3033)
