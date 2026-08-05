@@ -61,7 +61,7 @@ ifeq ($(ENABLE_TRANSPORT), ON)
 endif
 
 ifeq ($(ENABLE_EXECUTOR), ON)
-	BUILD_TARGETS += rt_executor
+	BUILD_TARGETS += rt_executor catalyst-executor
 endif
 
 .PHONY: help
