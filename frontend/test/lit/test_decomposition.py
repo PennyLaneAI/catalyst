@@ -11,7 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Tests for graph based decomposition system."""
+
+# RUN: %PYTHON %s | FileCheck %s
 
 # pylint: disable = missing-function-docstring,line-too-long
 
@@ -29,6 +32,7 @@ from operator2_dummy_gates import (
     StaticData,
     StaticDataMultiReg,
 )
+from pennylane.decomposition import add_decomps, list_decomps, local_decomps, register_resources
 from pennylane.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.decomposition_rules import (
@@ -611,6 +615,57 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a:a,b:b,thing:thing}" = 1 : i64}}
     # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
     test_multiple_rules()
+
+    def test_single_rule_custom_op():
+        def rule_resource_fn(reg):
+            return {NoParamsCustomOp(wires=Wire[2]): 1}
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            NoParamsCustomOp(wires=reg)
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+    # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+    test_single_rule_custom_op()
+
+    def test_for_loop():
+        class TestOp(qp.core.Operator2):
+            dynamic_argnames = ("angles",)
+
+            def __init__(self, angles, wires):
+                super().__init__(angles, wires)
+
+        class TestRX(qp.core.Operator2):
+            dynamic_argnames = ("theta",)
+            wires_argnames = ("wires",)
+
+            arg_specs = {"theta": Float, "wires": Wire[1]}
+
+            def __init__(self, theta, wires):
+                super().__init__(theta, wires)
+
+        @register_resources(lambda angles, wires: {TestRX(Float, Wire[1]): len(wires)})
+        def test_rule(angles, wires):
+            @qp.for_loop(len(wires))
+            def l(i):
+                TestRX(angles[i], wires[i])
+
+            l()  # pylint: disable=no-value-for-parameter
+
+        with local_decomps():
+            add_decomps(TestOp, test_rule)
+
+            assert "scf.for" in compile_decomposition_rules_wrapper(
+                "TestOp", "TestID", {"angles": ["f64", "f64", "f64"]}, {"wires": 3}, {}
+            )
 
 
 test_compile_decomposition_rules_wrapper_entry_point()
