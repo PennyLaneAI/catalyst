@@ -43,8 +43,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
-                      ModuleOp mod)
-{
+                      ModuleOp mod) {
     auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
     LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
     if (!glb) {
@@ -59,8 +58,7 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
 }
 
 // Generate a global key for an executor address.
-std::string addrGlobalKey(StringRef address)
-{
+std::string addrGlobalKey(StringRef address) {
     std::string key = "executor_addr_";
     for (char c : address) {
         bool ok =
@@ -82,8 +80,7 @@ std::string addrGlobalKey(StringRef address)
 // %ptr  = llvm.getelementptr inbounds %addr[0, 0]
 //             : (!llvm.ptr) -> !llvm.ptr, !llvm.array<N x i64>
 Value getGlobalI64Array(Location loc, OpBuilder &rewriter, StringRef key, ArrayRef<int64_t> values,
-                        ModuleOp mod)
-{
+                        ModuleOp mod) {
     Type ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
     // Skip and return a null pointer if the array is empty.
     if (values.empty()) {
@@ -117,8 +114,7 @@ Value getGlobalI64Array(Location loc, OpBuilder &rewriter, StringRef key, ArrayR
 //   ...
 //   llvm.store %aN, %slot : !llvm.array<N x ptr>, !llvm.ptr
 //
-Value buildStackPtrArray(Location loc, RewriterBase &rewriter, ArrayRef<Value> ptrs)
-{
+Value buildStackPtrArray(Location loc, RewriterBase &rewriter, ArrayRef<Value> ptrs) {
     Type ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
     if (ptrs.empty()) {
         return LLVM::ZeroOp::create(rewriter, loc, ptrTy);
@@ -134,8 +130,7 @@ Value buildStackPtrArray(Location loc, RewriterBase &rewriter, ArrayRef<Value> p
 }
 
 /// Byte size of a primitive element, used for the byte-buffer marshalling path.
-int64_t primitiveByteSize(Type ty)
-{
+int64_t primitiveByteSize(Type ty) {
     if (auto i = dyn_cast<IntegerType>(ty)) {
         return (i.getWidth() + 7) / 8;
     }
@@ -165,8 +160,7 @@ struct OpenOpLowering : public OpConversionPattern<executor::OpenOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(executor::OpenOp op, OpAdaptor /*adaptor*/,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = rewriter.getContext();
         Type ptrTy = LLVM::LLVMPointerType::get(ctx);
@@ -195,8 +189,7 @@ struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp>
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(executor::SendBinaryOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = rewriter.getContext();
         Type ptrTy = LLVM::LLVMPointerType::get(ctx);
@@ -222,7 +215,7 @@ struct SendBinaryOpLowering : public OpConversionPattern<executor::SendBinaryOp>
 };
 
 //===----------------------------------------------------------------------===//
-// executor.launch  ->  __catalyst__executor__launch(addr, sym,
+// executor.launch  ->  __catalyst__executor__launch(session, sym, object,
 //                                               num_in,  in_descs,  in_ranks,  in_sizes,
 //                                               num_out, out_descs, out_ranks, out_sizes)
 //===----------------------------------------------------------------------===//
@@ -231,8 +224,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(executor::LaunchOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = rewriter.getContext();
         Type ptrTy = LLVM::LLVMPointerType::get(ctx);
@@ -243,6 +235,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         // parameters:
         // - session: the executor session handle
         // - symbol: the symbol to invoke
+        // - object: the kernel object whose namespace the symbol is resolved in
         // - num_inputs: the number of input arguments
         // - input_descs: the input descriptor array
         // - input_ranks: the input rank array
@@ -251,7 +244,7 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         // - output_descs: the output descriptor array
         // - output_ranks: the output rank array
         Type launchSig = LLVM::LLVMFunctionType::get(
-            voidTy, {i64Ty, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
+            voidTy, {i64Ty, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy, i64Ty, ptrTy, ptrTy, ptrTy});
         LLVM::LLVMFuncOp launchFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, "__catalyst__executor__launch", launchSig);
 
@@ -261,6 +254,9 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
         std::string symbolName = "_catalyst_pyface_" + callee;
         Value symbolPtr =
             getGlobalString(loc, rewriter, "executor_sym_" + callee, symbolName + '\0', mod);
+
+        Value objectPtr = getGlobalString(loc, rewriter, "executor_obj_" + callee,
+                                          op.getObject().str() + '\0', mod);
 
         SmallVector<Value> inputDescPtrs;
         SmallVector<int64_t> inputRanks, inputElemSizes;
@@ -312,9 +308,9 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
             rewriter, loc, rewriter.getI64IntegerAttr(outputDescPtrs.size()));
 
         LLVM::CallOp::create(rewriter, loc, launchFn,
-                             ValueRange{session, symbolPtr, numInputs, inputDescsArr, inputRanksArr,
-                                        inputSizesArr, numOutputs, outputDescsArr, outputRanksArr,
-                                        outputSizesArr});
+                             ValueRange{session, symbolPtr, objectPtr, numInputs, inputDescsArr,
+                                        inputRanksArr, inputSizesArr, numOutputs, outputDescsArr,
+                                        outputRanksArr, outputSizesArr});
 
         SmallVector<Value> results;
         for (auto [descPtr, resultTy] : llvm::zip(outputDescPtrs, op.getResultTypes())) {
@@ -323,6 +319,39 @@ struct LaunchOpLowering : public OpConversionPattern<executor::LaunchOp> {
             results.push_back(loaded);
         }
         rewriter.replaceOp(op, results);
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
+// executor.launch_async  ->  __catalyst__executor__launch_async(session, sym, object) -> token
+//===----------------------------------------------------------------------===//
+
+struct LaunchAsyncOpLowering : public OpConversionPattern<executor::LaunchAsyncOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(executor::LaunchAsyncOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        Type i64Ty = rewriter.getI64Type();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        std::string callee = op.getKernelCallee().str();
+        std::string symbolName = "_catalyst_pyface_" + callee;
+        Value symbolPtr =
+            getGlobalString(loc, rewriter, "executor_sym_" + callee, symbolName + '\0', mod);
+        Value objectPtr = getGlobalString(loc, rewriter, "executor_obj_" + callee,
+                                          op.getObject().str() + '\0', mod);
+
+        Type asyncSig = LLVM::LLVMFunctionType::get(i64Ty, {i64Ty, ptrTy, ptrTy});
+        LLVM::LLVMFuncOp asyncFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__executor__launch_async", asyncSig);
+
+        auto call = LLVM::CallOp::create(rewriter, loc, asyncFn,
+                                         ValueRange{adaptor.getSession(), symbolPtr, objectPtr});
+        rewriter.replaceOp(op, call.getResult());
         return success();
     }
 };
@@ -337,8 +366,7 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
     using OpConversionPattern::OpConversionPattern;
 
     /// Static-shape memref byte count, or -1 on unsupported types.
-    static int64_t memrefBufferBytes(Type ty, Operation *op)
-    {
+    static int64_t memrefBufferBytes(Type ty, Operation *op) {
         auto memrefTy = dyn_cast<MemRefType>(ty);
         if (!memrefTy) {
             op->emitOpError("executor.call requires memref-typed operands; got ") << ty;
@@ -358,8 +386,7 @@ struct CallOpLowering : public OpConversionPattern<executor::CallOp> {
     }
 
     LogicalResult matchAndRewrite(executor::CallOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = rewriter.getContext();
         Type ptrTy = LLVM::LLVMPointerType::get(ctx);
@@ -466,8 +493,7 @@ struct CloseOpLowering : public OpConversionPattern<executor::CloseOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(executor::CloseOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         Type i64Ty = rewriter.getI64Type();
 
@@ -484,14 +510,36 @@ struct CloseOpLowering : public OpConversionPattern<executor::CloseOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// executor.await  ->  __catalyst__executor__await(token)
+//===----------------------------------------------------------------------===//
+
+struct AwaitOpLowering : public OpConversionPattern<executor::AwaitOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(executor::AwaitOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        Location loc = op.getLoc();
+        Type i64Ty = rewriter.getI64Type();
+        Type voidTy = LLVM::LLVMVoidType::get(rewriter.getContext());
+
+        Type awaitSig = LLVM::LLVMFunctionType::get(voidTy, {i64Ty});
+        LLVM::LLVMFuncOp awaitFn = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__executor__await", awaitSig);
+
+        LLVM::CallOp::create(rewriter, loc, awaitFn, ValueRange{adaptor.getToken()});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
 
 struct ConvertExecutorToLLVMPass : impl::ConvertExecutorToLLVMPassBase<ConvertExecutorToLLVMPass> {
     using ConvertExecutorToLLVMPassBase::ConvertExecutorToLLVMPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *ctx = &getContext();
         ModuleOp mod = getOperation();
 
@@ -499,10 +547,13 @@ struct ConvertExecutorToLLVMPass : impl::ConvertExecutorToLLVMPassBase<ConvertEx
         typeConverter.addConversion([](executor::SessionType type) -> Type {
             return IntegerType::get(type.getContext(), 64);
         });
+        typeConverter.addConversion([](executor::TokenType type) -> Type {
+            return IntegerType::get(type.getContext(), 64);
+        });
 
         RewritePatternSet patterns(ctx);
-        patterns.add<OpenOpLowering, SendBinaryOpLowering, LaunchOpLowering, CallOpLowering,
-                     CloseOpLowering>(typeConverter, ctx);
+        patterns.add<OpenOpLowering, SendBinaryOpLowering, LaunchOpLowering, LaunchAsyncOpLowering,
+                     CallOpLowering, CloseOpLowering, AwaitOpLowering>(typeConverter, ctx);
 
         LLVMConversionTarget target(*ctx);
         target.addLegalOp<ModuleOp>();

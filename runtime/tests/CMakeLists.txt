@@ -57,6 +57,7 @@ target_sources(runner_tests_qir_runtime PRIVATE
     Test_DataView.cpp
     Test_NullQubit.cpp
     Test_ResourceTracker.cpp
+    Test_SharedLibraryManager.cpp
 )
 
 # For tests we do require libpython in order to embed a Python interpreter.
@@ -65,6 +66,19 @@ target_link_libraries(runner_tests_qir_runtime PRIVATE
     pybind11::embed
     catalyst_runtime_testing
     rtd_null_qubit
+)
+
+# Test_SharedLibraryManager dlopens
+if(NOT APPLE)
+    set_property(TARGET runner_tests_qir_runtime APPEND PROPERTY BUILD_RPATH $ORIGIN)
+    set_property(TARGET runner_tests_qir_runtime APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
+else()
+    set_property(TARGET runner_tests_qir_runtime APPEND PROPERTY BUILD_RPATH @loader_path)
+    set_property(TARGET runner_tests_qir_runtime APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
+endif()
+
+target_compile_definitions(runner_tests_qir_runtime PRIVATE
+    RTD_NULL_QUBIT_LIB="$<TARGET_FILE:rtd_null_qubit>"
 )
 
 catch_discover_tests(runner_tests_qir_runtime)
@@ -166,3 +180,61 @@ target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
 )
 
 catch_discover_tests(runner_tests_rsdecomp_runtime)
+
+# Transport test suites
+if(ENABLE_TRANSPORT)
+    # CAPI + loader, exercised against a stub backend plugin.
+    add_library(stub_transport_backend SHARED stubs/stub_transport_backend.cpp)
+    target_include_directories(stub_transport_backend PRIVATE ${runtime_includes})
+    set_property(TARGET stub_transport_backend PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+    add_executable(runner_tests_transport)
+    target_sources(runner_tests_transport PRIVATE Test_Transport.cpp)
+    target_link_libraries(runner_tests_transport PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        rt_transport
+    )
+    target_compile_definitions(runner_tests_transport PRIVATE
+        STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>")
+    add_dependencies(runner_tests_transport stub_transport_backend)
+    catch_discover_tests(runner_tests_transport)
+
+    # CPU-verbs backend: device-agnostic common primitives (RDMA-backed; SKIP without rxe0).
+    add_executable(runner_tests_transport_common)
+    target_sources(runner_tests_transport_common PRIVATE
+        Test_TransportCommon.cpp
+        Test_TransportWireProtocol.cpp
+    )
+    target_link_libraries(runner_tests_transport_common PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        transport_common
+    )
+    catch_discover_tests(runner_tests_transport_common)
+
+    # CPU-verbs backend: both controller and coprocessor (requires RDMA - skip without rxe0).
+    add_executable(runner_tests_transport_cpu)
+    target_sources(runner_tests_transport_cpu PRIVATE
+        Test_TransportCpuVerbs.cpp
+    )
+    target_link_libraries(runner_tests_transport_cpu PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        cpu_verbs_impl
+    )
+    catch_discover_tests(runner_tests_transport_cpu)
+
+    if(TRANSPORT_HAS_HIP)
+        add_executable(runner_tests_transport_gpu)
+        target_sources(runner_tests_transport_gpu PRIVATE
+            Test_TransportGpu.cpp
+        )
+        target_link_libraries(runner_tests_transport_gpu PRIVATE
+            Catch2WithMain
+            catalyst_runtime_testing
+            catalyst_transport_gpu_coprocessor
+        )
+        catch_discover_tests(runner_tests_transport_gpu)
+    endif()
+endif()

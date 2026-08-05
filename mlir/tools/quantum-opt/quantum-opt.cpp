@@ -51,13 +51,14 @@
 #include "RegisterAllPasses.h"
 
 #include "Executor/IR/ExecutorDialect.h"
+#include "Transport/IR/TransportDialect.h"
+#include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     llvm::cl::AddExtraVersionPrinter(catalyst::printVersion);
     mlir::registerAllPasses();
     catalyst::registerAllPasses();
@@ -79,6 +80,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::pauli_frame::PauliFrameDialect>();
     registry.insert<catalyst::ion::IonDialect>();
     registry.insert<catalyst::rtio::RTIODialect>();
+    registry.insert<catalyst::transport::TransportDialect>();
     registry.insert<catalyst::executor::ExecutorDialect>();
     registry.insert<catalyst::qecl::QecLogicalDialect>();
     registry.insert<catalyst::qecp::QecPhysicalDialect>();
@@ -88,6 +90,7 @@ int main(int argc, char **argv)
     catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::qecp::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::transport::registerBufferizableOpInterfaceExternalModels(registry);
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));

@@ -12,19 +12,70 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
+  resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
+  operations in question can be annotated with either a `catalyst.estimated_probability` or
+  `catalyst.estimated_probabilities` attribute, respectively, to indicate the expected probability
+  distribution over the branches. The counted resources are then scaled proportionally and summed.
+  [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
+
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
+  [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
+
+* A CPU transport backend built on libibverbs is added, which implements the controller and coprocessor
+  session roles over RDMA.
+  [(#3062)](https://github.com/PennyLaneAI/catalyst/pull/3062)
+
+* A GPU transport backend is added, which implements the coprocessor session role.
+  [(#3069)](https://github.com/PennyLaneAI/catalyst/pull/3069)
+
+* Catalyst can now cross-compile target nested modules to standalone object files and
+  either statically link them into the host program or ship them to an executor for dispatch.
+ [(#3033)](https://github.com/PennyLaneAI/catalyst/pull/3033)
+
+* A new `Transport` MLIR dialect is added, providing typed ops for driving a transport session's
+  lifecycle at the IR level.
+  [(#3047)](https://github.com/PennyLaneAI/catalyst/pull/3047)
+
+* A `convert-transport-to-llvm` pass is added, lowering the `Transport` dialect ops to the
+  transport runtime CAPI.
+  [(#3048)](https://github.com/PennyLaneAI/catalyst/pull/3048)
+
+* An `inject-transport-session` pass is added, which reads the `catalyst.backline` module
+  attribute and emits the transport session lifecycle into the host entry function.
+  [(#3063)](https://github.com/PennyLaneAI/catalyst/pull/3063)
+
+* A `BufferizableOpInterface` implementation is added for the `Transport` dialect ops.
+  [(#3064)](https://github.com/PennyLaneAI/catalyst/pull/3064)
+
+* A `lower-decode-to-transport` pass is added, which replaces each qecp.decode_esm_css with 
+  a transport kick/collect round over its buffers.
+  [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
 
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
-  be dispatched to a separate executor process. `executor` dialect models the session lifecycle
-  through an `!executor.session` handle that is threaded from `executor.open` through `send_binary`,
-  `launch`, `call`, and `close`.
-  [(#2909)](https://github.com/PennyLaneAI/catalyst/pull/2909)
+  be dispatched to a separate executor process.
+
+  - `executor` dialect models the session lifecycle through an `!executor.session` handle that is
+    threaded from `executor.open` through `send_binary`, `launch`, `call`, and `close`.
+    [(#2909)](https://github.com/PennyLaneAI/catalyst/pull/2909)
 
   - `--convert-executor-to-llvm` pass that lowers each `executor` op to a call into the
     `__catalyst__executor__*` C-ABI runtime, marshalling string endpoints, memref descriptors, and
     per-argument metadata.
-  [(#2910)](https://github.com/PennyLaneAI/catalyst/pull/2910)
+    [(#2910)](https://github.com/PennyLaneAI/catalyst/pull/2910)
+
+  - Host-side runtime (`rt_executor`) that backs those symbols. It opens a TCP connection to the
+    executor and uses LLVM's ORC v2 EPC as the wire protocol to ship cross-compiled kernel objects
+    into the remote JIT.
+    [(#2915)](https://github.com/PennyLaneAI/catalyst/pull/2915)
+
+  - Added `executor.launch_async` and `executor.await` ops, paired by a new `!executor.token` type
+    to the executor dialect along with the necessary lowerings. This allows one to start an async
+    kernel on a background host thread and join it later.
+    [(#3073)](https://github.com/PennyLaneAI/catalyst/pull/3073)
+    [(#3031)](https://github.com/PennyLaneAI/catalyst/pull/3031)
+    [(#3030)](https://github.com/PennyLaneAI/catalyst/pull/3030)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
@@ -72,9 +123,54 @@
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
+* The `resource-analysis` pass now supports pluggable resource metrics through the
+  `ResourceResultExtension`/`ResourceAnalysisExtension` interface and a self-registering global
+  registry. Dialects and plugins can contribute additional per-function resource data
+  (such as PBC circuit depth) without modifying the core analysis.
+
+  A metric is added by defining a value object, an analysis that fills it, and
+  registering that analysis with the global registry:
+  ```cpp
+  // 1. Per-function value object; shows up in the JSON under name().
+  class TCountExtension : public ResourceResultExtension {
+   public:
+    llvm::StringRef name() const override { return "t_count"; }
+    llvm::json::Value toJson() const override { return tCount; }
+    // Accumulated in collect(), so define how it combines and scales.
+    void mergeWith(const ResourceResultExtension &other, MergeMethod method) override {
+      tCount += static_cast<const TCountExtension &>(other).tCount;  // use `method` for max/min
+    }
+    void multiplyBy(double factor) override { tCount *= factor; }
+    double tCount = 0;
+  };
+
+  // 2. Analysis that fills it, one operation at a time.
+  class TCountAnalysis : public ResourceAnalysisExtensionOf<TCountExtension> {
+   public:
+    llvm::StringRef name() const override { return "t_count"; }
+   protected:
+    void collect(mlir::Operation *op, TCountExtension &ext, bool isAdjoint) override {
+      if (isTGate(op)) ext.tCount += 1;
+    }
+  };
+
+  // 3. Self-register from your dialect or plugin (no core changes needed).
+  REGISTER_RESOURCE_ANALYSIS_EXTENSION(std::make_unique<TCountAnalysis>());
+  ```
+  The metric then appears under its `name()` key (`"t_count"`) in each function's JSON
+  output. Override `analyze(Region&, Ext&, bool)` instead of, or alongside, `collect` to
+  compute a metric per region rather than per operation (as `PBCDepthExtension` does).
+  [(#3070)](https://github.com/PennyLaneAI/catalyst/pull/3070)
+
 * `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
   duplicate serialization logic and keeping its output consistent.
   [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
+
+* The `ResourceAnalysis` pass now counts quantum, measurement, and allocation
+  ops through dialect-agnostic MLIR OpInterfaces instead of hard-coded check.
+  New dialects can opt in by implementing these interfaces without changing
+  the analysis.
+  [(#3025)](https://github.com/PennyLaneAI/catalyst/pull/3025)
 
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
@@ -205,6 +301,9 @@
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
 <h3>Breaking changes 💔</h3>
+
+* Removes the non-graph decomposition fallback when `capture=True` is enabled.
+  [(#3058)](https://github.com/PennyLaneAI/catalyst/pull/3058/)
 
 * Python 3.11 is no longer supported. Catalyst now requires Python 3.12 or newer.
   [(#2974)](https://github.com/PennyLaneAI/catalyst/pull/2974)
