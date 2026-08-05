@@ -86,11 +86,11 @@ void RegionSummary::nullifyPhasesUnder(const AffineRelation &precondRel)
 
 void RegionSummary::accumulatePhasesInto(PhaseAbstraction &trgtPhases, const TransformSchema &trgtSchm)
 {
-    phases.reSchema(affineRel.getSchema(), trgtSchm);   // is it necessary?
+    // phases.reSchema(affineRel.getSchema(), trgtSchm);   // is it necessary? no, bc all phasee are either 0 or orphaned
     trgtPhases += phases;
 
     if (type == RegionType::Conditional) {
-        falseBranchPhases.reSchema(affineRel.getSchema(), trgtSchm);
+        // falseBranchPhases.reSchema(affineRel.getSchema(), trgtSchm);
         trgtPhases += falseBranchPhases;
     }
 }   // += ops could become more optimized by actually consuming the phases

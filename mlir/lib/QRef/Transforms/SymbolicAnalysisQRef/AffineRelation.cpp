@@ -113,6 +113,9 @@ const AffineRelation &AffineRelation::meetWith(const AffineRelation& rhs)
 
 const AffineRelation &AffineRelation::joinWith(const AffineRelation& rhs)
 {
+    // if (rhs.isTrivial()) return *this;
+    // if (this->isTrivial()) return rhs;
+
     AffineRelation auxFreeRhs = rhs;
     auxFreeRhs.projectOutAuxVars();
     this->projectOutAuxVars();
@@ -218,8 +221,6 @@ const AffineRelation &AffineRelation::propagateThrough(const AffineRelation& rhs
     this->matrix = std::move(affPropag.getMatrixMutable());
     this->schema = std::move(affPropag.getSchemaMutable());
     return *this;
-    // AffineRelation affPropagRel(std::move(affPropag.getMatrixMutable()), std::move(affPropag.getSchemaMutable()));
-    // return affPropagRel.solveRelation();
 }
 
 AffineTransform AffineRelation::solveRelation()
@@ -235,12 +236,10 @@ AffineTransform AffineRelation::solveRelation()
     schema.postVars.clear();
     TransformSchema solvedSchm = schema.toTransformSchema();
 
-    // llvm::errs() << "solvedMat:\n" << matrix << "\n";
-    // llvm::errs() << "solvedSchm:\n" << solvedSchm << "\n\n\n";
     return AffineTransform(std::move(matrix), std::move(solvedSchm));
 }
 
-Parity AffineRelation::reduce(const Parity& par, const AffineSchema& parSchm) const
+Parity AffineRelation::reduce(const Parity& par, const AffineSchema& parSchm, bool isAgainstPostcond) const
 {   
     BinaryMatrix redMat = matrix;
     RelationSchema relSchm = schema;
@@ -253,7 +252,8 @@ Parity AffineRelation::reduce(const Parity& par, const AffineSchema& parSchm) co
     Parity &lastRow = redMat.allocRow();
     
     lastRow.extendBitsFor(relSchm.maxBlock());
-    lastRow.mapBitsFrom(par, parSchm.preVars, relSchm.postVars);
+
+    lastRow.mapBitsFrom(par, parSchm.preVars, isAgainstPostcond ? relSchm.preVars : relSchm.postVars);
     lastRow.mapBitsFrom(par, parSchm.auxVars, relSchm.auxVars);
     lastRow.mapBitFrom(par, parSchm.affVal, relSchm.affVal);
 

@@ -114,7 +114,6 @@ void ProgramAbstraction::applySummary(RegionSummary &&summary)
     // llvm::errs() << "summary:\n" << summary << "\n";
 
     AffineRelation precondition(std::move(stateTransform));
-    // llvm::errs() << "\nprecondition:\n" << precondition << "\n";
 
     summary.nullifyPhasesUnder(precondition);
     // llvm::errs() << "\nnullifiedSummary:\n" << summary << "\n";
@@ -122,12 +121,12 @@ void ProgramAbstraction::applySummary(RegionSummary &&summary)
     precondition.propagateThrough(summary.affineRel);
     // llvm::errs() << "\npropagatedThrough:\n" << precondition << "\n";
 
-    phases.normalizeByPostcond(precondition, getSchema());
+    this->normalizePhasesUnder(precondition);
     // llvm::errs() << "\nnormalizedPhases:\n" << phases << "\n";
 
-    stateTransform = precondition.solveRelation();
+    this->stateTransform = precondition.solveRelation();
     // llvm::errs() << "\nsolvedRelation:\n" << stateTransform << "\n";
 
-    summary.accumulatePhasesInto(phases, stateTransform.getSchema());
+    summary.accumulatePhasesInto(this->phases, getSchema());
     // llvm::errs() << "\naccumulatedPhases:\n" << phases << "\n";
 }

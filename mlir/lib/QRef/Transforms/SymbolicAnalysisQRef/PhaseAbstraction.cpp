@@ -99,7 +99,7 @@ void PhaseAbstraction::nullifyByPrecond(const AffineRelation& precond, const Aff
     GateBundle &trivContributors = trivialCondBundles[Parity::Trivial(precond.numQubits())];
         
     for (auto &[parity, contributors] : activeBundles) {
-        if (precond.reduce(parity, paritySchema).isTrivial()) { // might become unsat instead of trivial; in that case, we should look at affVal 1 gates, they become 0!
+        if (precond.reduce(parity, paritySchema, false).isTrivial()) { // might become unsat instead of trivial; in that case, we should look at affVal 1 gates, they become 0!
             trivContributors += std::move(contributors);
         } else {
             orphanBundles.push_back(std::move(contributors));
@@ -122,14 +122,11 @@ void PhaseAbstraction::normalizeByPostcond(const AffineRelation& postcond, const
     // llvm::errs() << "current phases:\n" << *this << "\n";
 
     for (auto &[parity, contributors] : activeBundles) {
-        // llvm::errs() << "original parity: " << parity << "\n";
-        Parity reducedPar = postcond.reduce(parity, paritySchema);
-        // llvm::errs() << "reduced parity: " << reducedPar << "\n";
+        Parity reducedPar = postcond.reduce(parity, paritySchema, true);
         normalizedBundles[reducedPar] = std::move(contributors);
     }
 
     activeBundles = std::move(normalizedBundles);
-    // llvm::errs() << "%%%%%%%%%%%%%%%%%%%%\n";
 }
 
 void PhaseAbstraction::reSchema(const AffineSchema &oldSchm, const AffineSchema &newSchm)

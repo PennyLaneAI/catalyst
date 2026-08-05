@@ -55,6 +55,7 @@ struct ProgramAbstraction {
     void applyGateRZ(size_t wire, GateID gateId);
     void applyGateY(size_t wire, GateID gateId);
     void applyGateY_dag(size_t wire, GateID gateId);
+    void normalizePhasesUnder(const AffineRelation &postcondRel);
 };
 
 inline size_t ProgramAbstraction::numQubits() const { return stateTransform.numQubits(); }
@@ -70,4 +71,9 @@ inline void ProgramAbstraction::prepareQubit(size_t wire, bool basisState)
 {
     assert(wire < numQubits()); // or +-1?
     stateTransform.prepareQubit(wire, basisState);
+}
+
+inline void ProgramAbstraction::normalizePhasesUnder(const AffineRelation &postcondRel)
+{
+    phases.normalizeByPostcond(postcondRel, getSchema());
 }

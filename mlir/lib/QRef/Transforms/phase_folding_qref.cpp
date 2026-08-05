@@ -169,38 +169,58 @@ void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstract
 // --- Control Flow Handlers ---
 
 void PhaseFoldingAnalyzer::handleIfOp(mlir::scf::IfOp ifOp, ProgramAbstraction &parentAbst) {
+    // llvm::outs() << "\nhandleIfOp...\n";
     // 1. Create fresh abstractions for branches
     ProgramAbstraction thenAbst(parentAbst.numQubits());
     ProgramAbstraction elseAbst(parentAbst.numQubits());
 
     // 2. Recursively analyze regions
     analyzeBlock(&ifOp.getThenRegion().front(), thenAbst);
+    // llvm::outs() << "thenAbst:\n" << thenAbst << "\n";
+
     if (!ifOp.getElseRegion().empty()) {
         analyzeBlock(&ifOp.getElseRegion().front(), elseAbst);
+        // llvm::outs() << "elseAbst:\n" << elseAbst << "\n";
     }
 
     // 3. Compute summary using your API
     RegionSummary summary(RegionType::Conditional, thenAbst, &elseAbst);
 
+    // llvm::outs() << "branch summary:\n" << summary << "\n";
     // llvm::outs() << "summary:\n" << summary << "\n";
     // llvm::outs() << "parentAbst:\n" << parentAbst << "\n";
 
     // 4. Apply to parent
     parentAbst.applySummary(std::move(summary));
+
+    // llvm::outs() << "IfOp handled:\n" << parentAbst << "\n";
 }
 
 void PhaseFoldingAnalyzer::handleForOp(mlir::scf::ForOp forOp, ProgramAbstraction &parentAbst) {
+    // llvm::outs() << "\nhandleForOp...\n";
+
     // 1. Create abstraction for the loop body
     ProgramAbstraction loopAbst(parentAbst.numQubits());
+
+    // llvm::outs() << "1\n";
 
     // 2. Analyze the loop body region
     analyzeBlock(&forOp.getBodyRegion().front(), loopAbst);
 
+    // llvm::outs() << "2\n";
+    // llvm::outs() << "loopAbst:\n" << loopAbst << "\n";
+
     // 3. Compute summary 
     RegionSummary summary(RegionType::Loop, loopAbst);
 
+    // llvm::outs() << "3\n";
+
     // 4. Apply to parent
     parentAbst.applySummary(std::move(summary));
+
+    // llvm::outs() << "4\n";
+
+    // llvm::outs() << "ForOp handled:\n" << parentAbst << "\n";
 }
 
 void PhaseFoldingAnalyzer::handleCallOp(mlir::func::CallOp callOp, ProgramAbstraction &parentAbst) {
@@ -214,6 +234,8 @@ void PhaseFoldingAnalyzer::handleCallOp(mlir::func::CallOp callOp, ProgramAbstra
     
     // RegionSummary summary(RegionType::Procedure, procAbst);
     // parentAbst.applySummary(std::move(summary));
+
+    // if getting from the stored functions, should copy the summary, since applySummary consumes it!
 }
 
 // Qubit Extraction:
@@ -559,8 +581,8 @@ struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFolding
 } // namespace catalyst
 
 
-// everything should be fine with qref now
-// test summary computation
+// test summary computation with nested control-flow
+// test with different qubit number in different blocks
 // dealloc, return
 
 
