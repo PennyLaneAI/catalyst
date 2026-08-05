@@ -112,7 +112,7 @@ def test_compile_decomposition_rules_wrapper_entry_point():
 
         @qp.register_resources(rule_resource_fn)
         def rule(reg):
-            MultiParams(reg=reg, a=0.1, b=2, c=3 + 4j)
+            MultiParams(reg=reg, a=0.1, b=jnp.array([[1, 2], [3, 4]]), c=3 + 4j)
 
         with qp.decomposition.local_decomps():
             qp.add_decomps(NoParams, rule)
@@ -213,7 +213,42 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-SAME:   target_gate = "MultipleRegisters{}{reg1:2,reg2:3}{}"
     test_from_multiple_wire_argnames()
 
-    def test_compilable_data():
+    def test_to_compilable_data():
+        """
+        Test that decomposing to an op with compilable_argnames works.
+        """
+
+        def rule_resource_fn(reg):
+            return {
+                CompilableData("a", "b", "thing", Wire[1]): 1,
+                CompilableData("aa", "bb", "stuff", Wire[1]): 2,
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            CompilableData(a="a", b="b", thing="thing", wires=reg[0])
+            CompilableData(a="aa", b="bb", thing="stuff", wires=reg[1])
+            CompilableData(a="aa", b="bb", thing="stuff", wires=reg[1])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:     "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64,
+    # CHECK-SAME:     "CompilableData{}{wires:1}{a:aa,b:bb,thing:stuff}" = 2 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+    test_to_compilable_data()
+
+    def test_from_compilable_data():
+        """
+        Test that decomposing from an op with compilable_argnames works.
+        """
+
         def rule_resource_fn(a, b, thing, wires):
             return {SingleParam(x=Float, reg=Wire[1]): 1}
 
@@ -248,12 +283,14 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64]}{reg:1}{}" = 1 : i64}
     # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:1,b:2,thing:3}"
     # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
+    # CHECK-NOT: stablehlo.constant dense<1.100000e+00> : tensor<f64>
     #
     # CHECK: func.func private @"rule_CompilableData{}{wires:1}{a:10,b:2,thing:3}"
     # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64]}{reg:1}{}" = 1 : i64}
     # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:10,b:2,thing:3}"
     # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
-    test_compilable_data()
+    # CHECK-NOT: stablehlo.constant dense<1.000000e-01> : tensor<f64>
+    test_from_compilable_data()
 
     def test_static_data():
         def rule_resource_fn(label, reg):
@@ -293,31 +330,6 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
     # CHECK: stablehlo.constant dense<2.200000e+00> : tensor<f64>
     test_static_data()
-
-    def test_decompose_to_compilable_data():
-        def rule_resource_fn(reg):
-            return {
-                CompilableData("a", "b", "thing", Wire[1]): 1,
-                CompilableData("aa", "bb", "stuff", Wire[1]): 1,
-            }
-
-        @qp.register_resources(rule_resource_fn)
-        def rule(reg):
-            CompilableData(a="a", b="b", thing="thing", wires=reg[0])
-            CompilableData(a="aa", b="bb", thing="stuff", wires=reg[0])
-
-        with qp.decomposition.local_decomps():
-            qp.add_decomps(NoParams, rule)
-            result = compile_decomposition_rules_wrapper(
-                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
-            )
-            print(result)
-
-    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
-    # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64,
-    # CHECK-SAME:     "CompilableData{}{wires:1}{a:aa,b:bb,thing:stuff}" = 1 : i64}}
-    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-    test_decompose_to_compilable_data()
 
     def test_decompose_to_static_data():
         def rule_resource_fn(reg):
