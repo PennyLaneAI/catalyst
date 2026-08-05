@@ -25,6 +25,8 @@
 
 #include "Catalyst/Analysis/ResourceResultExtension.h"
 
+#include <llvm/ADT/StringRef.h>
+
 namespace catalyst {
 
 enum class MergeMethod { Sum, Max, Min };
@@ -39,6 +41,8 @@ struct ResourceResult {
     // as a map from operation name to a map of
     // name -> ((numWires, numParams) -> count)
     llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> operations;
+
+    llvm::StringMap<double> detailOperations;
 
     llvm::StringMap<double> measurements;
 

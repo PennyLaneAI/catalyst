@@ -70,7 +70,15 @@ void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
 }
 
 void printShapedType(ArrayRef<int64_t> shape, int64_t dim, Type elementType,
-                     llvm::raw_string_ostream &ss) {
+                     llvm::raw_string_ostream &ss)
+{
+    // Rank-0 tensors (e.g. tensor<f64>) have an empty shape; print the
+    // element type directly instead of indexing into the empty ArrayRef.
+    if (shape.empty()) {
+        ss << elementType;
+        return;
+    }
+
     int64_t length = shape[dim];
     auto printList = [&](auto printItem) {
         ss << "[";
