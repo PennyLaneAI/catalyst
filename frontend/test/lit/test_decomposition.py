@@ -708,7 +708,6 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-DAG: stablehlo.constant dense<3> : tensor<i64>
     # CHECK-DAG: stablehlo.constant dense<1> : tensor<i64>
     # CHECK: scf.for
-
     test_for_loop()
 
 
