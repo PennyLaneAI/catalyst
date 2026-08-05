@@ -24,6 +24,8 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 
+#include "Catalyst/Analysis/ResourceResultExtension.h"
+
 using namespace mlir;
 
 using namespace llvm;
@@ -84,9 +86,14 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
 
     hasBranches = hasBranches || other.hasBranches;
     hasDynLoop = hasDynLoop || other.hasDynLoop;
+
+    for (auto [ext, otherExt] : llvm::zip(extensions, other.extensions)) {
+        assert(ext->name() == otherExt->name() && "extension names must match");
+        ext->mergeWith(*otherExt, method);
+    }
 }
 
-void ResourceResult::multiplyByScalar(double scalar)
+void ResourceResult::multiplyBy(double scalar)
 {
     for (auto &opEntry : operations) {
         for (auto &sizeEntry : opEntry.getValue()) {
@@ -107,6 +114,10 @@ void ResourceResult::multiplyByScalar(double scalar)
     }
 
     numAllocQubits *= scalar;
+
+    for (auto &m : extensions) {
+        m->multiplyBy(scalar);
+    }
 }
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
@@ -165,12 +176,12 @@ llvm::json::Object ResourceResult::toJson() const
     if (autoQubitManagement.has_value()) {
         funcObj["auto_qubit_management"] = *autoQubitManagement;
     }
-    llvm::json::Object depthObj;
-    if (pbcDepth) {
-        depthObj["any_commuting_depth"] = pbcDepth->first;
-        depthObj["qubit_disjoint_depth"] = pbcDepth->second;
+
+    // Emit registered extensions under their own keys (e.g. "depth").
+    // Stage 4 will nest these under "extended_fields".
+    for (const auto &ext : extensions) {
+        funcObj[ext->name()] = ext->toJson();
     }
-    funcObj["depth"] = std::move(depthObj);
 
     return funcObj;
 }
