@@ -21,12 +21,12 @@ from unittest.mock import patch
 import pytest
 
 from catalyst.executor.utils import (
-    ExecutorCli,
-    Paths,
-    Patterns,
+    ExecutorFlags,
+    ExecutorPaths,
+    OutputPatterns,
     PortInUse,
-    Raw,
-    ShellCommand,
+    Unquoted,
+    ShellText,
     log_cmd,
     random_port,
     set_verbose,
@@ -43,23 +43,23 @@ class TestPortInUse:
         assert issubclass(PortInUse, Exception)
 
 
-class TestRaw:
-    """The :class:`Raw` string marker used for no-quote shell values."""
+class TestUnquoted:
+    """The :class:`Unquoted` string marker used for no-quote shell values."""
 
     def test_is_str_subclass(self):
-        """``Raw`` is a :class:`str` subclass whose value equals the wrapped text."""
-        assert issubclass(Raw, str)
-        assert Raw("$HOME") == "$HOME"
+        """``Unquoted`` is a :class:`str` subclass whose value equals the wrapped text."""
+        assert issubclass(Unquoted, str)
+        assert Unquoted("$HOME") == "$HOME"
 
     def test_preserves_content(self):
-        """A ``Raw`` instance is both :class:`Raw` and :class:`str`."""
-        r = Raw("$LIBDIR/x.so")
-        assert isinstance(r, Raw)
+        """A ``Unquoted`` instance is both :class:`Unquoted` and :class:`str`."""
+        r = Unquoted("$LIBDIR/x.so")
+        assert isinstance(r, Unquoted)
         assert isinstance(r, str)
 
 
-class TestPatterns:
-    """Regex classifiers on :class:`Patterns` (``is_ready`` / ``is_port_conflict`` / ``is_ssh_prompt`` / ``is_sudo_fail``)."""
+class TestOutputPatterns:
+    """Regex classifiers on :class:`OutputPatterns` (``is_ready`` / ``is_port_conflict`` / ``is_ssh_prompt`` / ``is_sudo_fail``)."""
 
     @pytest.mark.parametrize(
         "line",
@@ -71,12 +71,12 @@ class TestPatterns:
     )
     def test_is_ready_true(self, line):
         """Lines announcing the bound socket are classified as ready."""
-        assert Patterns.is_ready(line)
+        assert OutputPatterns.is_ready(line)
 
     @pytest.mark.parametrize("line", ["", "just some log", "listening on nowhere"])
     def test_is_ready_false(self, line):
         """Ordinary log lines are not classified as ready."""
-        assert not Patterns.is_ready(line)
+        assert not OutputPatterns.is_ready(line)
 
     @pytest.mark.parametrize(
         "line",
@@ -84,11 +84,11 @@ class TestPatterns:
     )
     def test_is_port_conflict_true(self, line):
         """Remote-bind and local-forward failures are classified as port conflicts."""
-        assert Patterns.is_port_conflict(line)
+        assert OutputPatterns.is_port_conflict(line)
 
     def test_is_port_conflict_false(self):
         """Ordinary lines are not classified as port conflicts."""
-        assert not Patterns.is_port_conflict("no problem here")
+        assert not OutputPatterns.is_port_conflict("no problem here")
 
     @pytest.mark.parametrize(
         "line",
@@ -96,11 +96,11 @@ class TestPatterns:
     )
     def test_is_ssh_prompt_true(self, line):
         """SSH password and passphrase prompts are classified as ssh-prompt."""
-        assert Patterns.is_ssh_prompt(line)
+        assert OutputPatterns.is_ssh_prompt(line)
 
     def test_is_ssh_prompt_false(self):
         """Ordinary lines are not classified as ssh-prompt."""
-        assert not Patterns.is_ssh_prompt("Welcome to Ubuntu")
+        assert not OutputPatterns.is_ssh_prompt("Welcome to Ubuntu")
 
     @pytest.mark.parametrize(
         "line",
@@ -113,76 +113,76 @@ class TestPatterns:
     )
     def test_is_sudo_fail_true(self, line):
         """Sudo password-rejection lines are classified as sudo-fail."""
-        assert Patterns.is_sudo_fail(line)
+        assert OutputPatterns.is_sudo_fail(line)
 
     def test_is_sudo_fail_false(self):
         """Ordinary lines are not classified as sudo-fail."""
-        assert not Patterns.is_sudo_fail("all good")
+        assert not OutputPatterns.is_sudo_fail("all good")
 
 
-class TestShellCommand:
-    """Shell-fragment builders on :class:`ShellCommand`."""
+class TestShellText:
+    """Shell-fragment builders on :class:`ShellText`."""
 
     def test_sudo_probe(self):
         """``sudo_probe()`` is the exact non-interactive check string."""
-        assert ShellCommand.sudo_probe() == "sudo -n true 2>/dev/null"
+        assert ShellText.sudo_probe() == "sudo -n true 2>/dev/null"
 
     def test_sudo_pw_wraps_cmd(self):
         """``sudo_pw`` prefixes with ``sudo -S -p ''``."""
-        assert ShellCommand.sudo_pw("pkill -f x") == "sudo -S -p '' pkill -f x"
+        assert ShellText.sudo_pw("pkill -f x") == "sudo -S -p '' pkill -f x"
 
     def test_sudo_np_wraps_cmd(self):
         """``sudo_np`` prefixes with ``sudo -n`` (NOPASSWD only)."""
-        assert ShellCommand.sudo_np("pkill -f x") == "sudo -n pkill -f x"
+        assert ShellText.sudo_np("pkill -f x") == "sudo -n pkill -f x"
 
     def test_pkill_shell_quotes_pattern(self):
         """``pkill`` shell-quotes the pattern so metacharacters can't escape."""
         # Metacharacters in the pattern must not break out.
-        cmd = ShellCommand.pkill("evil; rm -rf /")
+        cmd = ShellText.pkill("evil; rm -rf /")
         assert cmd.startswith("pkill -f ")
         assert "'evil; rm -rf /'" in cmd
 
     def test_rm_rf_quotes_path(self):
         """``rm_rf`` shell-quotes paths with spaces."""
-        cmd = ShellCommand.rm_rf("/tmp/space dir")
+        cmd = ShellText.rm_rf("/tmp/space dir")
         assert cmd.startswith("rm -rf ")
         assert "'/tmp/space dir'" in cmd
 
     def test_mkdir_p_quotes_path(self):
         """``mkdir_p`` shell-quotes paths with spaces."""
-        cmd = ShellCommand.mkdir_p("/tmp/x y")
+        cmd = ShellText.mkdir_p("/tmp/x y")
         assert cmd.startswith("mkdir -p ")
         assert "'/tmp/x y'" in cmd
 
     def test_path_bare_tilde(self):
         """A bare ``~`` maps to ``"$HOME"``."""
-        assert ShellCommand.path("~") == '"$HOME"'
+        assert ShellText.path("~") == '"$HOME"'
 
     def test_path_tilde_slash(self):
         """``~/foo`` expands to ``"$HOME"/foo`` (no quotes needed on the tail)."""
         # ~/foo → "$HOME"/'foo'
-        assert ShellCommand.path("~/foo") == '"$HOME"/foo'
+        assert ShellText.path("~/foo") == '"$HOME"/foo'
 
     def test_path_tilde_slash_with_space(self):
         """The tail after ``~/`` is quoted if it needs it."""
-        assert ShellCommand.path("~/my dir") == '"$HOME"/\'my dir\''
+        assert ShellText.path("~/my dir") == '"$HOME"/\'my dir\''
 
     def test_path_absolute_quoted(self):
         """A plain absolute path without whitespace passes through unquoted."""
-        assert ShellCommand.path("/tmp/x") == "/tmp/x"
+        assert ShellText.path("/tmp/x") == "/tmp/x"
 
     def test_path_absolute_with_space_quoted(self):
         """An absolute path with whitespace is shell-quoted."""
-        assert ShellCommand.path("/tmp/x y") == "'/tmp/x y'"
+        assert ShellText.path("/tmp/x y") == "'/tmp/x y'"
 
 
-class TestExecutorCli:
+class TestExecutorFlags:
     """CLI flag constants for the ``catalyst-executor`` binary."""
 
     def test_flag_constants(self):
         """``PLUGIN_FLAG`` and ``BIND_FLAG`` are the exact expected strings."""
-        assert ExecutorCli.PLUGIN_FLAG == "--plugin="
-        assert ExecutorCli.BIND_FLAG == "--bind="
+        assert ExecutorFlags.PLUGIN_FLAG == "--plugin="
+        assert ExecutorFlags.BIND_FLAG == "--bind="
 
 
 class TestVerbosity:
@@ -208,52 +208,52 @@ class TestVerbosity:
         assert verbose_level() == 3
 
 
-class TestPaths:
-    """Path resolution helpers on :class:`Paths`."""
+class TestExecutorPaths:
+    """Path resolution helpers on :class:`ExecutorPaths`."""
 
     def test_workspace_prefix(self):
         """The workspace safety prefix is a stable constant."""
-        assert Paths.WORKSPACE_PREFIX == "catalyst-exec-"
+        assert ExecutorPaths.WORKSPACE_PREFIX == "catalyst-exec-"
 
     def test_executor_bin(self):
         """The executor-binary name is a stable constant."""
-        assert Paths.EXECUTOR_BIN == "catalyst-executor"
+        assert ExecutorPaths.EXECUTOR_BIN == "catalyst-executor"
 
     def test_default_workspace_shape(self):
         """A default workspace is ``~/``-rooted and contains the safety prefix."""
-        ws = Paths.default_workspace()
+        ws = ExecutorPaths.default_workspace()
         assert ws.startswith("~/")
-        assert Paths.WORKSPACE_PREFIX in ws
+        assert ExecutorPaths.WORKSPACE_PREFIX in ws
 
     def test_random_suffix_hex_len(self):
         """The random suffix is a 3-char hex tag."""
-        s = Paths._random_suffix()
+        s = ExecutorPaths._random_suffix()
         assert len(s) == 3
         int(s, 16)  # must parse as hex
 
     def test_resolve_log_disabled(self):
         """``disabled=True`` disables log-file resolution entirely."""
-        assert Paths.resolve_log("h", disabled=True) is None
+        assert ExecutorPaths.resolve_log("h", disabled=True) is None
 
     def test_resolve_log_explicit(self):
         """An explicit path pins the log file."""
-        assert Paths.resolve_log("h", explicit="/tmp/my.log") == "/tmp/my.log"
+        assert ExecutorPaths.resolve_log("h", explicit="/tmp/my.log") == "/tmp/my.log"
 
     def test_resolve_log_default_shape(self):
         """A default log filename includes the binary name, host, and a ``.log`` suffix."""
-        log = Paths.resolve_log("myhost")
+        log = ExecutorPaths.resolve_log("myhost")
         assert log.startswith("catalyst-executor-")
         assert "myhost" in log
         assert log.endswith(".log")
 
     def test_resolve_log_named_tag(self):
         """A non-default ``name`` is embedded in the log filename."""
-        log = Paths.resolve_log("myhost", name="worker")
+        log = ExecutorPaths.resolve_log("myhost", name="worker")
         assert "-worker-" in log
 
     def test_timestamp_format(self):
         """``_timestamp()`` follows the ``YYYY-MM-DD_HH-MM-SS`` layout."""
-        ts = Paths._timestamp()
+        ts = ExecutorPaths._timestamp()
         # Format: YYYY-MM-DD_HH-MM-SS
         assert len(ts) == 19
         assert ts[4] == ts[7] == "-"
@@ -264,17 +264,17 @@ class TestPaths:
         """Primary candidate wins: ``<lib>/catalyst-executor`` if it exists."""
         rt = tmp_path / "rt"
         rt.mkdir()
-        (rt / Paths.EXECUTOR_BIN).write_text("bin")
+        (rt / ExecutorPaths.EXECUTOR_BIN).write_text("bin")
         with patch("catalyst.executor.utils.get_lib_path", return_value=str(rt)):
-            assert Paths.default_executor_bin() == str(rt / Paths.EXECUTOR_BIN)
+            assert ExecutorPaths.default_executor_bin() == str(rt / ExecutorPaths.EXECUTOR_BIN)
 
     def test_default_executor_bin_falls_through_to_remote_subdir(self, tmp_path):
         """Primary missing: falls through to ``<lib>/remote/catalyst-executor``."""
         rt = tmp_path / "rt"
         (rt / "remote").mkdir(parents=True)
-        (rt / "remote" / Paths.EXECUTOR_BIN).write_text("bin")
+        (rt / "remote" / ExecutorPaths.EXECUTOR_BIN).write_text("bin")
         with patch("catalyst.executor.utils.get_lib_path", return_value=str(rt)):
-            assert Paths.default_executor_bin() == str(rt / "remote" / Paths.EXECUTOR_BIN)
+            assert ExecutorPaths.default_executor_bin() == str(rt / "remote" / ExecutorPaths.EXECUTOR_BIN)
 
     def test_default_executor_bin_falls_back_to_name_on_path(self, tmp_path):
         """Nothing found on disk: returns the bare binary name (assume it's on ``$PATH``)."""
@@ -282,7 +282,7 @@ class TestPaths:
         with patch(
             "catalyst.executor.utils.get_lib_path", return_value=str(tmp_path / "nope")
         ):
-            assert Paths.default_executor_bin() == Paths.EXECUTOR_BIN
+            assert ExecutorPaths.default_executor_bin() == ExecutorPaths.EXECUTOR_BIN
 
 
 class TestRandomPort:

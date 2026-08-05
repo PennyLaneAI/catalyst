@@ -15,7 +15,7 @@
 """Unit tests for :mod:`catalyst.executor.manager` — the public :class:`Executor`: config
 defaults, mode dispatch, attach-mode launch, workspace lifecycle (``setup_workspace`` /
 ``remove_workspace``), and the ``_scp_bundle`` / ``_deploy_bundle`` split. Subprocess-facing
-calls (``SCP.deploy``, ``SSH.rmdir``) are mocked."""
+calls (``SCP.deploy``, ``RemoteOps.rmdir``) are mocked."""
 
 from unittest.mock import MagicMock, patch
 
@@ -125,10 +125,10 @@ class TestRemoveWorkspace:
         with pytest.raises(ValueError, match="workspace="):
             ex.remove_workspace()
 
-    def test_delegates_to_ssh_rmdir(self):
-        """Delegates to :meth:`SSH.rmdir` and threads through ``force=``."""
+    def test_delegates_to_remote_rmdir(self):
+        """Delegates to :meth:`RemoteOps.rmdir` and threads through ``force=``."""
         ex = Executor(host="h", user="me", workspace="~/ws")
-        with patch("catalyst.executor.manager.SSH.rmdir") as rmdir:
+        with patch("catalyst.executor.manager.RemoteOps.rmdir") as rmdir:
             ex.remove_workspace(force=True)
         rmdir.assert_called_once()
         assert rmdir.call_args.kwargs.get("force") is True

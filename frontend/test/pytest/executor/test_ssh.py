@@ -23,123 +23,123 @@ from unittest.mock import patch
 
 import pytest
 
-from catalyst.executor.ssh import SCP, SSH, RemoteLauncher
-from catalyst.executor.utils import Paths, Raw, set_verbose
+from catalyst.executor.ssh import SCP, RemoteLauncher, RemoteOps, SSHArgv
+from catalyst.executor.utils import ExecutorExecutorPaths, Unquoted, set_verbose
 
 
 # ---------------------------------------------------------------------------
-# SSH — control socket, argv construction
+# SSHArgv — control socket, argv construction
 # ---------------------------------------------------------------------------
 
 
 class TestSSHConstants:
-    """Sanity checks on :class:`SSH` class-level constants."""
+    """Sanity checks on :class:`SSHArgv` class-level constants."""
 
     def test_base_cmd_tuple(self):
         """``BASE_CMD`` starts with ``ssh`` and includes the keepalive option."""
-        assert SSH.BASE_CMD[0] == "ssh"
-        assert "ServerAliveInterval=15" in SSH.BASE_CMD
+        assert SSHArgv.BASE_CMD[0] == "ssh"
+        assert "ServerAliveInterval=15" in SSHArgv.BASE_CMD
 
     def test_probe_opts(self):
         """``PROBE_OPTS`` enables ``BatchMode`` to avoid interactive prompts."""
-        assert "BatchMode=yes" in SSH.PROBE_OPTS
+        assert "BatchMode=yes" in SSHArgv.PROBE_OPTS
 
     def test_control_persist_positive(self):
         """``CONTROL_PERSIST`` is a positive duration so the multiplex socket lingers."""
-        assert SSH.CONTROL_PERSIST > 0
+        assert SSHArgv.CONTROL_PERSIST > 0
 
 
 class TestSSHCtlOpts:
-    """Verifies the shape of :meth:`SSH.ctl_opts` control-master argv fragment."""
+    """Verifies the shape of :meth:`SSHArgv.ctl_opts` control-master argv fragment."""
 
     def test_shape(self):
         """``ctl_opts`` emits ``-o`` pairs for ``ControlMaster``, ``ControlPath``, ``ControlPersist``."""
-        opts = SSH.ctl_opts()
+        opts = SSHArgv.ctl_opts()
         assert opts[0] == "-o"
         assert opts[1] == "ControlMaster=auto"
         assert opts[2] == "-o"
         assert opts[3].startswith("ControlPath=")
         assert opts[4] == "-o"
-        assert opts[5] == f"ControlPersist={SSH.CONTROL_PERSIST}"
+        assert opts[5] == f"ControlPersist={SSHArgv.CONTROL_PERSIST}"
 
 
 class TestSSHCtlDir:
-    """Resolution of the control-socket directory :meth:`SSH._ctl_dir`."""
+    """Resolution of the control-socket directory :meth:`SSHArgv._ctl_dir`."""
 
     def test_prefers_xdg_runtime_dir(self, tmp_path, monkeypatch):
         """Uses ``$XDG_RUNTIME_DIR/catalyst`` when the env var is set, creating it if missing."""
         monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
-        d = SSH._ctl_dir()
+        d = SSHArgv._ctl_dir()
         assert d == tmp_path / "catalyst"
         assert d.exists()
 
     def test_fallback_when_no_xdg(self, monkeypatch):
-        """Falls back to :meth:`SSH._fallback_ctl_dir` when ``XDG_RUNTIME_DIR`` is unset."""
+        """Falls back to :meth:`SSHArgv._fallback_ctl_dir` when ``XDG_RUNTIME_DIR`` is unset."""
         monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
-        d = SSH._ctl_dir()
+        d = SSHArgv._ctl_dir()
         # Falls back to ~/.cache/catalyst/ssh-cm.
-        assert d == SSH._fallback_ctl_dir()
+        assert d == SSHArgv._fallback_ctl_dir()
 
 
 class TestSSHBaseCmd:
-    """Argv assembly for :meth:`SSH.base_cmd`."""
+    """Argv assembly for :meth:`SSHArgv.base`."""
 
     def test_starts_with_ssh_binary(self):
         """First token is the ``ssh`` executable name."""
-        cmd = SSH.base_cmd("me", "h")
+        cmd = SSHArgv.base("me", "h")
         assert cmd[0] == "ssh"
 
     def test_target_appended_last(self):
         """``user@host`` is the final positional argument."""
-        cmd = SSH.base_cmd("me", "h")
+        cmd = SSHArgv.base("me", "h")
         assert cmd[-1] == "me@h"
 
     def test_multiplex_true_includes_control_opts(self):
         """``multiplex=True`` adds the ``ControlMaster`` option to the argv."""
-        cmd = SSH.base_cmd("me", "h", multiplex=True)
+        cmd = SSHArgv.base("me", "h", multiplex=True)
         assert "ControlMaster=auto" in cmd
 
     def test_multiplex_false_omits_control_opts(self):
         """``multiplex=False`` omits the ``ControlMaster`` option."""
-        cmd = SSH.base_cmd("me", "h", multiplex=False)
+        cmd = SSHArgv.base("me", "h", multiplex=False)
         assert "ControlMaster=auto" not in cmd
 
     def test_extra_opts_between_base_and_target(self):
         """Caller-supplied ``opts`` land between the base options and the target."""
-        cmd = SSH.base_cmd("me", "h", opts=["-L", "1:localhost:2"])
+        cmd = SSHArgv.base("me", "h", opts=["-L", "1:localhost:2"])
         idx_L = cmd.index("-L")
         idx_target = cmd.index("me@h")
         assert idx_L < idx_target
 
 
 # ---------------------------------------------------------------------------
-# SSH — command execution
+# RemoteOps — command execution
 # ---------------------------------------------------------------------------
 
 
 class TestSSHCapture:
-    """Behavior of :meth:`SSH.capture` around subprocess success and failure."""
+    """Behavior of :meth:`RemoteOps.capture` around subprocess success and failure."""
 
     def test_success_returns_stripped_stdout(self):
         """Returns remote stdout with trailing whitespace stripped."""
         with patch("subprocess.check_output", return_value="Linux x86_64\n"):
-            assert SSH.capture("me", "h", "uname -sm") == "Linux x86_64"
+            assert RemoteOps.capture("me", "h", "uname -sm") == "Linux x86_64"
 
     def test_failure_returns_none(self):
         """Returns ``None`` when the underlying subprocess raises."""
         with patch("subprocess.check_output", side_effect=subprocess.TimeoutExpired("ssh", 15)):
-            assert SSH.capture("me", "h", "uname -sm") is None
+            assert RemoteOps.capture("me", "h", "uname -sm") is None
 
 
 class TestSSHRun:
-    """Return-code and exception plumbing for :meth:`SSH.run`."""
+    """Return-code and exception plumbing for :meth:`RemoteOps.run`."""
 
     def test_quiet_returns_rc(self):
         """Default ``quiet=True`` returns the return code and pipes stdout to ``DEVNULL``."""
         with patch(
             "subprocess.run", return_value=SimpleNamespace(returncode=0)
         ) as m:
-            rc = SSH.run("me", "h", "true")
+            rc = RemoteOps.run("me", "h", "true")
         assert rc == 0
         # quiet=True should redirect stdout/stderr to DEVNULL
         assert m.call_args.kwargs.get("stdout") == subprocess.DEVNULL
@@ -147,149 +147,149 @@ class TestSSHRun:
     def test_quiet_swallows_exceptions_as_neg_one(self):
         """Quiet mode maps subprocess exceptions to ``-1``."""
         with patch("subprocess.run", side_effect=OSError("boom")):
-            assert SSH.run("me", "h", "true") == -1
+            assert RemoteOps.run("me", "h", "true") == -1
 
     def test_nonquiet_propagates_exceptions(self):
         """``quiet=False`` re-raises subprocess exceptions to the caller."""
         with patch("subprocess.run", side_effect=RuntimeError("no")):
             with pytest.raises(RuntimeError):
-                SSH.run("me", "h", "true", quiet=False)
+                RemoteOps.run("me", "h", "true", quiet=False)
 
     def test_error_kw_raises_on_nonzero(self):
         """``error=`` raises :class:`RuntimeError` including the message and return code."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=2)):
             with pytest.raises(RuntimeError, match="oh no.*rc=2"):
-                SSH.run("me", "h", "true", error="oh no")
+                RemoteOps.run("me", "h", "true", error="oh no")
 
     def test_error_kw_ok_on_zero(self):
         """``error=`` is silent on ``rc=0`` and returns the code."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)):
             # No raise expected.
-            assert SSH.run("me", "h", "true", error="oh no") == 0
+            assert RemoteOps.run("me", "h", "true", error="oh no") == 0
 
 
 class TestSSHMkdir:
-    """Success and failure paths for :meth:`SSH.mkdir`."""
+    """Success and failure paths for :meth:`RemoteOps.mkdir`."""
 
     def test_success_no_raise(self):
         """Returns silently when the remote ``mkdir`` succeeds."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)):
-            SSH.mkdir("me", "h", "~/ws")  # should not raise
+            RemoteOps.mkdir("me", "h", "~/ws")  # should not raise
 
     def test_failure_raises(self):
         """Raises :class:`RuntimeError` when the remote ``mkdir`` returns nonzero."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=1)):
             with pytest.raises(RuntimeError, match="failed to create remote directory"):
-                SSH.mkdir("me", "h", "~/ws")
+                RemoteOps.mkdir("me", "h", "~/ws")
 
 
 class TestSSHRmdir:
-    """Safety and force semantics of :meth:`SSH.rmdir`."""
+    """Safety and force semantics of :meth:`RemoteOps.rmdir`."""
 
     def test_safety_refusal_raises_valueerror(self):
         """``rc=3`` from the remote guard raises :class:`ValueError` to refuse the removal."""
         # rc=3 signals resolved to / or $HOME.
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=3)):
             with pytest.raises(ValueError, match="refusing"):
-                SSH.rmdir("me", "h", "~")
+                RemoteOps.rmdir("me", "h", "~")
 
     def test_force_reraises_on_nonzero(self):
         """``force=True`` promotes any nonzero return code to :class:`RuntimeError`."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=1)):
             with pytest.raises(RuntimeError, match="failed to remove"):
-                SSH.rmdir("me", "h", "~/ws", force=True)
+                RemoteOps.rmdir("me", "h", "~/ws", force=True)
 
     def test_default_swallows_nonzero(self):
         """Default (non-force) mode silently ignores a nonzero return code."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=1)):
             # No raise.
-            SSH.rmdir("me", "h", "~/ws")
+            RemoteOps.rmdir("me", "h", "~/ws")
 
     def test_missing_dir_ok(self):
         """``rc=0`` is the happy path when the directory does not exist."""
         # rc=0 is the happy path (cd fails inside the remote, script `exit 0`s).
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)):
-            SSH.rmdir("me", "h", "~/ws")
+            RemoteOps.rmdir("me", "h", "~/ws")
 
 
 class TestSSHPkill:
-    """Sudo flag composition in :meth:`SSH.pkill`."""
+    """Sudo flag composition in :meth:`RemoteOps.pkill`."""
 
     def test_no_sudo(self):
         """No ``sudo`` prefix appears in the remote command when ``sudo=False``."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)) as m:
-            SSH.pkill("me", "h", "catalyst-exec")
+            RemoteOps.pkill("me", "h", "catalyst-exec")
         # Verify no sudo wrapper in the remote cmd.
         assert "sudo" not in m.call_args.args[0][-1]
 
     def test_sudo_with_password_uses_stdin(self):
         """``sudo=True`` with a password uses ``sudo -S`` and pipes the password on stdin."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)) as m:
-            SSH.pkill("me", "h", "x", sudo=True, sudo_password="pw")
+            RemoteOps.pkill("me", "h", "x", sudo=True, sudo_password="pw")
         assert m.call_args.kwargs.get("input") == "pw\n"
         assert "sudo -S" in m.call_args.args[0][-1]
 
     def test_sudo_no_password_uses_np(self):
         """``sudo=True`` without a password uses non-interactive ``sudo -n``."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)) as m:
-            SSH.pkill("me", "h", "x", sudo=True)
+            RemoteOps.pkill("me", "h", "x", sudo=True)
         assert "sudo -n" in m.call_args.args[0][-1]
 
 
 # ---------------------------------------------------------------------------
-# SSH — auth probing
+# RemoteOps — auth probing
 # ---------------------------------------------------------------------------
 
 
 class TestSSHNeedsSudoPassword:
-    """Probing sudo policy via :meth:`SSH.needs_sudo_password`."""
+    """Probing sudo policy via :meth:`RemoteOps.needs_sudo_password`."""
 
     def test_rc_zero_means_no_password_needed(self):
         """``rc=0`` from the sudo probe returns ``False`` (NOPASSWD path)."""
         # NOPASSWD path: rc=0 → returns False (no password needed).
-        with patch("catalyst.executor.ssh.SSH.run", return_value=0):
-            assert SSH.needs_sudo_password("me", "h") is False
+        with patch("catalyst.executor.ssh.RemoteOps.run", return_value=0):
+            assert RemoteOps.needs_sudo_password("me", "h") is False
 
     def test_rc_nonzero_means_password_needed(self):
         """Nonzero (non-255) return codes indicate a password is required."""
         # sudo -n rejected → returns True (password required).
-        with patch("catalyst.executor.ssh.SSH.run", return_value=1):
-            assert SSH.needs_sudo_password("me", "h") is True
+        with patch("catalyst.executor.ssh.RemoteOps.run", return_value=1):
+            assert RemoteOps.needs_sudo_password("me", "h") is True
 
     def test_rc_255_raises_ssh_error(self):
         """``rc=255`` (ssh transport failure) raises :class:`RuntimeError` pointing at ``ssh-copy-id``."""
-        with patch("catalyst.executor.ssh.SSH.run", return_value=255):
+        with patch("catalyst.executor.ssh.RemoteOps.run", return_value=255):
             with pytest.raises(RuntimeError, match="ssh-copy-id"):
-                SSH.needs_sudo_password("me", "h")
+                RemoteOps.needs_sudo_password("me", "h")
 
 
 class TestSSHResolveSudo:
-    """Password resolution logic in :meth:`SSH.resolve_sudo`."""
+    """Password resolution logic in :meth:`RemoteOps.resolve_sudo`."""
 
     def test_nopasswd_returns_none(self):
         """Returns ``None`` when the remote does not require a sudo password."""
-        with patch("catalyst.executor.ssh.SSH.needs_sudo_password", return_value=False):
-            assert SSH.resolve_sudo("me", "h") is None
+        with patch("catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=False):
+            assert RemoteOps.resolve_sudo("me", "h") is None
 
     def test_explicit_password_used_when_needed(self):
         """An attached password is returned verbatim when a password is required."""
-        with patch("catalyst.executor.ssh.SSH.needs_sudo_password", return_value=True):
-            assert SSH.resolve_sudo("me", "h", "secret") == "secret"
+        with patch("catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True):
+            assert RemoteOps.resolve_sudo("me", "h", "secret") == "secret"
 
     def test_interactive_prompt_when_no_password(self):
         """Prompts via :func:`getpass` when a password is required but none is attached."""
         with patch(
-            "catalyst.executor.ssh.SSH.needs_sudo_password", return_value=True
+            "catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True
         ), patch("catalyst.executor.ssh.getpass.getpass", return_value="typed"):
-            assert SSH.resolve_sudo("me", "h") == "typed"
+            assert RemoteOps.resolve_sudo("me", "h") == "typed"
 
     def test_aborted_prompt_raises(self):
         """A ``KeyboardInterrupt`` at the prompt is converted to :class:`RuntimeError`."""
         with patch(
-            "catalyst.executor.ssh.SSH.needs_sudo_password", return_value=True
+            "catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True
         ), patch("catalyst.executor.ssh.getpass.getpass", side_effect=KeyboardInterrupt):
             with pytest.raises(RuntimeError, match="no sudo password"):
-                SSH.resolve_sudo("me", "h")
+                RemoteOps.resolve_sudo("me", "h")
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ class TestSSHResolveSudo:
 
 
 class TestSCPRun:
-    """Retry and error semantics of :meth:`SCP.run`."""
+    """Retry and error semantics of :meth:`SCP.copy`."""
 
     def _mock_run(self, rcs):
         """Yield SimpleNamespace(returncode=rc) once per rc, in order."""
@@ -308,7 +308,7 @@ class TestSCPRun:
     def test_success_on_first_try_no_retry(self):
         """A first-attempt success completes without a retry."""
         with patch("subprocess.run", side_effect=self._mock_run([0])) as m:
-            SCP.run("me", "h", [Path("/a")], "ws")
+            SCP.copy("me", "h", [Path("/a")], "ws")
         assert m.call_count == 1
 
     def test_retries_with_legacy_o_flag(self):
@@ -321,7 +321,7 @@ class TestSCPRun:
             return SimpleNamespace(returncode=(1 if len(calls) == 1 else 0))
 
         with patch("subprocess.run", side_effect=fake_run):
-            SCP.run("me", "h", [Path("/a")], "ws")
+            SCP.copy("me", "h", [Path("/a")], "ws")
         assert len(calls) == 2
         assert "-O" not in calls[0]
         assert "-O" in calls[1]
@@ -330,11 +330,11 @@ class TestSCPRun:
         """Both attempts failing raises :class:`RuntimeError`."""
         with patch("subprocess.run", side_effect=self._mock_run([1, 1])):
             with pytest.raises(RuntimeError, match="scp to"):
-                SCP.run("me", "h", [Path("/a")], "ws")
+                SCP.copy("me", "h", [Path("/a")], "ws")
 
 
 class TestSCPRunVerbosity:
-    """Verbosity flag routing in :meth:`SCP.run`."""
+    """Verbosity flag routing in :meth:`SCP.copy`."""
 
     def test_verbose_flag_at_level_2(self):
         """Verbosity level 2 threads ``-v`` into the scp argv."""
@@ -348,7 +348,7 @@ class TestSCPRunVerbosity:
                     SimpleNamespace(returncode=0),
                 )[1],
             ):
-                SCP.run("me", "h", [Path("/a")], "ws")
+                SCP.copy("me", "h", [Path("/a")], "ws")
             # -v should appear (not -q).
             assert "-v" in captured[0]
         finally:
@@ -365,7 +365,7 @@ class TestSCPRunVerbosity:
                 SimpleNamespace(returncode=0),
             )[1],
         ):
-            SCP.run("me", "h", [Path("/a")], "ws")
+            SCP.copy("me", "h", [Path("/a")], "ws")
         assert "-q" in captured[0]
 
 
@@ -386,11 +386,11 @@ class TestSCPDeploy:
             SCP.deploy("me", "h", tmp_path, "ws")
 
     def test_deploys_via_ssh_mkdir_then_scp_run(self, tmp_path):
-        """Creates the remote workspace then invokes :meth:`SCP.run` with the filtered file list."""
+        """Creates the remote workspace then invokes :meth:`SCP.copy` with the filtered file list."""
         (tmp_path / "catalyst-executor").write_text("bin")
         (tmp_path / "libfoo.so").write_text("lib")
-        with patch("catalyst.executor.ssh.SSH.mkdir") as mkdir, patch(
-            "catalyst.executor.ssh.SCP.run"
+        with patch("catalyst.executor.ssh.RemoteOps.mkdir") as mkdir, patch(
+            "catalyst.executor.ssh.SCP.copy"
         ) as scprun:
             SCP.deploy("me", "h", tmp_path, "ws")
         mkdir.assert_called_once_with("me", "h", "ws")
@@ -414,8 +414,8 @@ class TestRemoteLauncherHelpers:
         assert RemoteLauncher._env_prefix({"FOO": "bar baz"}) == "FOO='bar baz'"
 
     def test_env_prefix_leaves_raw_unquoted(self):
-        """:class:`Raw` env values pass through without quoting so shell expansion works."""
-        out = RemoteLauncher._env_prefix({"LD_LIBRARY_PATH": Raw("$HOME/lib")})
+        """:class:`Unquoted` env values pass through without quoting so shell expansion works."""
+        out = RemoteLauncher._env_prefix({"LD_LIBRARY_PATH": Unquoted("$HOME/lib")})
         assert out == "LD_LIBRARY_PATH=$HOME/lib"
 
     def test_plugin_args_bare_name_pins_to_pwd(self):
@@ -429,13 +429,13 @@ class TestRemoteLauncherHelpers:
         assert "--plugin=/opt/lib/x.so" in out
 
     def test_plugin_args_raw_pass_through(self):
-        """:class:`Raw` plugin values are emitted without any path prefixing."""
-        out = RemoteLauncher._plugin_args([Raw("$LIBDIR/x.so")])
+        """:class:`Unquoted` plugin values are emitted without any path prefixing."""
+        out = RemoteLauncher._plugin_args([Unquoted("$LIBDIR/x.so")])
         assert out == "--plugin=$LIBDIR/x.so"
 
     def test_chmod_prefix_only_for_local_binary(self):
         """``chmod +x`` prefix is emitted only for the workspace-local executor binary."""
-        assert RemoteLauncher._chmod_prefix(f"./{Paths.EXECUTOR_BIN}").startswith("chmod +x")
+        assert RemoteLauncher._chmod_prefix(f"./{ExecutorPaths.EXECUTOR_BIN}").startswith("chmod +x")
         assert RemoteLauncher._chmod_prefix("/opt/bin/catalyst-executor") == ""
 
     def test_exec_prefix_no_sudo(self):
@@ -464,7 +464,7 @@ class TestRemoteLauncherRemoteCmd:
             env={"FOO": "bar"},
             sudo=False,
             use_password=False,
-            executor_bin=f"./{Paths.EXECUTOR_BIN}",
+            executor_bin=f"./{ExecutorPaths.EXECUTOR_BIN}",
         )
         assert "cd " in cmd
         assert "FOO=bar" in cmd

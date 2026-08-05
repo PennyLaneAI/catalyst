@@ -22,7 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from catalyst.executor.process import _ExecutorProcess, _LocalProcess, _RemoteProcess
-from catalyst.executor.utils import Paths, Patterns, PortInUse
+from catalyst.executor.utils import ExecutorPaths, OutputPatterns, PortInUse
 
 
 def _mk_base_proc(**overrides):
@@ -84,14 +84,14 @@ class TestExecutorProcessLog:
 
 
 class TestExecutorProcessPumpFlags:
-    """Pump-side flag transitions driven by :class:`Patterns` matches on output lines."""
+    """Pump-side flag transitions driven by :class:`OutputPatterns` matches on output lines."""
 
     def test_ready_line_sets_flag(self):
         """A ready-pattern match sets the ``_ready`` event."""
         p = _mk_base_proc()
         # Simulate the pump identifying a ready line.
         line = "Listening on 127.0.0.1:9999"
-        if Patterns.is_ready(line):
+        if OutputPatterns.is_ready(line):
             p._ready.set()
         assert p._ready.is_set()
 
@@ -99,7 +99,7 @@ class TestExecutorProcessPumpFlags:
         """A port-conflict-pattern match sets the ``_port_conflict`` event."""
         p = _mk_base_proc()
         line = "Address already in use"
-        if Patterns.is_port_conflict(line):
+        if OutputPatterns.is_port_conflict(line):
             p._port_conflict.set()
         assert p._port_conflict.is_set()
 
@@ -303,7 +303,7 @@ class TestRemoteProcessConstruction:
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
         assert p.sudo is True
         assert p.cleanup_ws is False
-        assert p.executor_bin == f"./{Paths.EXECUTOR_BIN}"
+        assert p.executor_bin == f"./{ExecutorPaths.EXECUTOR_BIN}"
         assert not p._ready_reached
 
 
@@ -403,7 +403,7 @@ class TestRemoteProcessTeardownExtra:
     def test_skips_when_not_ready(self):
         """No-op before the ready hook has fired: nothing to pkill remotely."""
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
-        with patch("catalyst.executor.process.SSH.pkill") as pkill:
+        with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
         pkill.assert_not_called()
 
@@ -411,7 +411,7 @@ class TestRemoteProcessTeardownExtra:
         """Runs a port-scoped pkill once the remote executor has been ready."""
         p = _RemoteProcess(host="h", user="me", port=1373, workspace="~/ws")
         p._ready_reached = True
-        with patch("catalyst.executor.process.SSH.pkill") as pkill:
+        with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
         pkill.assert_called_once()
         # Pattern should be port-scoped so we can't kill someone else's process.
@@ -426,7 +426,7 @@ class TestRemoteProcessTeardownWorkspace:
         """Pinned workspace (``cleanup_ws=False``) is never removed."""
         # cleanup_ws=False (pinned) — never remove.
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/mydir", cleanup_ws=False)
-        with patch("catalyst.executor.process.SSH.rmdir") as rmdir:
+        with patch("catalyst.executor.process.RemoteOps.rmdir") as rmdir:
             p.teardown_workspace()
         rmdir.assert_not_called()
 
@@ -434,15 +434,15 @@ class TestRemoteProcessTeardownWorkspace:
         """Directories without the safe workspace prefix are not removed even when cleanup is enabled."""
         # cleanup_ws=True but the basename lacks the safe prefix.
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/mydir", cleanup_ws=True)
-        with patch("catalyst.executor.process.SSH.rmdir") as rmdir:
+        with patch("catalyst.executor.process.RemoteOps.rmdir") as rmdir:
             p.teardown_workspace()
         rmdir.assert_not_called()
 
     def test_auto_dir_with_prefix_removed(self):
         """Auto-generated workspace matching the safe prefix is removed when cleanup is enabled."""
-        ws = f"~/{Paths.WORKSPACE_PREFIX}me-2026-01-01_00-00-00-abc"
+        ws = f"~/{ExecutorPaths.WORKSPACE_PREFIX}me-2026-01-01_00-00-00-abc"
         p = _RemoteProcess(host="h", user="me", port=1, workspace=ws, cleanup_ws=True)
-        with patch("catalyst.executor.process.SSH.rmdir") as rmdir:
+        with patch("catalyst.executor.process.RemoteOps.rmdir") as rmdir:
             p.teardown_workspace()
         rmdir.assert_called_once()
 
