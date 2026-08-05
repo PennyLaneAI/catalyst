@@ -26,7 +26,6 @@ import pytest
 from catalyst.executor.ssh import SCP, SSH, RemoteLauncher
 from catalyst.executor.utils import Paths, Raw, set_verbose
 
-
 # ---------------------------------------------------------------------------
 # SSH — control socket, argv construction
 # ---------------------------------------------------------------------------
@@ -54,13 +53,25 @@ class TestSSHCtlOpts:
 
     def test_shape(self):
         """``ctl_opts`` emits ``-o`` pairs for ``ControlMaster``, ``ControlPath``, ``ControlPersist``."""
-        opts = SSH.ctl_opts()
+        opts = SSH._ctl_flags(Path("/tmp/cm"))
         assert opts[0] == "-o"
         assert opts[1] == "ControlMaster=auto"
         assert opts[2] == "-o"
         assert opts[3].startswith("ControlPath=")
         assert opts[4] == "-o"
         assert opts[5] == f"ControlPersist={SSH.CONTROL_PERSIST}"
+
+    def test_disabled_when_path_too_long(self):
+        """No flags at all when the control path would overflow ``sun_path``.
+
+        ssh fails every multiplexed op with "unix_listener: path ... too long" rather than
+        degrading, so multiplexing is dropped instead: correctness over the saved handshake.
+        """
+        assert SSH._ctl_flags(Path("/tmp") / ("x" * 200)) == []
+
+    def test_ctl_opts_delegates_to_ctl_flags(self):
+        """``ctl_opts`` is :meth:`_ctl_flags` applied to the resolved socket dir."""
+        assert SSH.ctl_opts() == SSH._ctl_flags(SSH._ctl_dir())
 
 
 class TestSSHCtlDir:
@@ -95,9 +106,11 @@ class TestSSHBaseCmd:
         assert cmd[-1] == "me@h"
 
     def test_multiplex_true_includes_control_opts(self):
-        """``multiplex=True`` adds the ``ControlMaster`` option to the argv."""
+        """``multiplex=True`` splices :meth:`SSH.ctl_opts` in right after the base options."""
+        opts = SSH.ctl_opts()
         cmd = SSH.base_cmd("me", "h", multiplex=True)
-        assert "ControlMaster=auto" in cmd
+        n = len(SSH.BASE_CMD)
+        assert cmd[n : n + len(opts)] == opts
 
     def test_multiplex_false_omits_control_opts(self):
         """``multiplex=False`` omits the ``ControlMaster`` option."""
@@ -136,9 +149,7 @@ class TestSSHRun:
 
     def test_quiet_returns_rc(self):
         """Default ``quiet=True`` returns the return code and pipes stdout to ``DEVNULL``."""
-        with patch(
-            "subprocess.run", return_value=SimpleNamespace(returncode=0)
-        ) as m:
+        with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)) as m:
             rc = SSH.run("me", "h", "true")
         assert rc == 0
         # quiet=True should redirect stdout/stderr to DEVNULL
@@ -278,16 +289,16 @@ class TestSSHResolveSudo:
 
     def test_interactive_prompt_when_no_password(self):
         """Prompts via :func:`getpass` when a password is required but none is attached."""
-        with patch(
-            "catalyst.executor.ssh.SSH.needs_sudo_password", return_value=True
-        ), patch("catalyst.executor.ssh.getpass.getpass", return_value="typed"):
+        with patch("catalyst.executor.ssh.SSH.needs_sudo_password", return_value=True), patch(
+            "catalyst.executor.ssh.getpass.getpass", return_value="typed"
+        ):
             assert SSH.resolve_sudo("me", "h") == "typed"
 
     def test_aborted_prompt_raises(self):
         """A ``KeyboardInterrupt`` at the prompt is converted to :class:`RuntimeError`."""
-        with patch(
-            "catalyst.executor.ssh.SSH.needs_sudo_password", return_value=True
-        ), patch("catalyst.executor.ssh.getpass.getpass", side_effect=KeyboardInterrupt):
+        with patch("catalyst.executor.ssh.SSH.needs_sudo_password", return_value=True), patch(
+            "catalyst.executor.ssh.getpass.getpass", side_effect=KeyboardInterrupt
+        ):
             with pytest.raises(RuntimeError, match="no sudo password"):
                 SSH.resolve_sudo("me", "h")
 
@@ -507,9 +518,13 @@ class TestRemoteLauncherSshArgv:
     def test_full_argv_shape(self):
         """Argv starts with ``ssh``, contains ``user@host`` and the port forward, ends with the remote command."""
         argv = RemoteLauncher.ssh_argv(
-            "me", "h",
-            "~/ws", 1373, 5000,
-            plugins=["libx.so"], env={"FOO": "bar"},
+            "me",
+            "h",
+            "~/ws",
+            1373,
+            5000,
+            plugins=["libx.so"],
+            env={"FOO": "bar"},
             sudo=False,
         )
         assert argv[0] == "ssh"

@@ -39,10 +39,23 @@ class SSH:
     CONTROL_PERSIST = 30
 
     # Shared ``ssh`` argv prefix; keep-alive tuning surfaces a dead peer within ~1 min.
-    BASE_CMD: tuple[str, ...] = ("ssh", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4")
+    BASE_CMD: tuple[str, ...] = (
+        "ssh",
+        "-o",
+        "ServerAliveInterval=15",
+        "-o",
+        "ServerAliveCountMax=4",
+    )
 
     # One-shot probe flags: fail fast on missing key (rc 255), short connect timeout.
     PROBE_OPTS: tuple[str, ...] = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+
+    # Bytes available to a ControlPath: ``sun_path`` is 104 on macOS (108 on Linux), and while the
+    # master socket is being created ssh appends a random suffix to the resolved path. Exceeding it
+    # fails every multiplexed op with "unix_listener: path ... too long", so an over-long path
+    # disables multiplexing instead (see :meth:`ctl_opts`).
+    CONTROL_PATH_MAX = 104
+    CONTROL_PATH_RESERVE = 20
 
     @staticmethod
     def _fallback_ctl_dir() -> Path:
@@ -61,13 +74,39 @@ class SSH:
     def ctl_opts() -> list[str]:
         """``ControlMaster``/``ControlPath``/``ControlPersist`` flags for connection multiplexing.
 
-        The first op opens a master socket; later ops (probe/mkdir/scp/pkill) reuse it. Not
-        applied to the long-lived executor session, whose close SIGHUPs the executor cleanly.
+        The first op opens a master socket under :meth:`_ctl_dir`; later ops
+        (probe/mkdir/scp/pkill) reuse it, skipping the auth handshake. ``%C`` (a hash of
+        ``%l%h%p%r``) keeps the name short. The socket self-expires ``CONTROL_PERSIST`` seconds
+        after its last user. Not applied to the long-lived executor session, whose close SIGHUPs
+        the executor cleanly.
         """
+        return SSH._ctl_flags(SSH._ctl_dir())
+
+    @staticmethod
+    def _ctl_flags(base: Path) -> list[str]:
+        """:meth:`ctl_opts` for a socket dir, split out so the length rule is decidable
+        without touching the environment or the filesystem.
+
+        Returns no flags when the path would not fit a Unix socket: multiplexing is an
+        optimisation, and one auth handshake per op still works.
+        """
+        path = f"{base}/cm-%C"
+        # %C expands to a 40-character hash, plus the suffix ssh appends while creating the master.
+        expanded = len(path) - len("%C") + 40 + SSH.CONTROL_PATH_RESERVE
+        if expanded > SSH.CONTROL_PATH_MAX:
+            logger.debug(
+                "ControlPath %r would exceed the %d-byte socket limit; disabling multiplexing",
+                path,
+                SSH.CONTROL_PATH_MAX,
+            )
+            return []
         return [
-            "-o", "ControlMaster=auto",
-            "-o", f"ControlPath={SSH._ctl_dir()}/cm-%C",
-            "-o", f"ControlPersist={SSH.CONTROL_PERSIST}",
+            "-o",
+            "ControlMaster=auto",
+            "-o",
+            f"ControlPath={path}",
+            "-o",
+            f"ControlPersist={SSH.CONTROL_PERSIST}",
         ]
 
     @staticmethod
@@ -211,13 +250,16 @@ class SSH:
             bool: ``True`` if remote sudo needs a password, ``False`` if NOPASSWD.
 
         Raises:
-            RuntimeError: If SSH itself failed (rc 255), with an ``ssh-copy-id`` hint.
+            RuntimeError: If SSH itself failed (rc 255), listing the causes that produce it.
         """
         rc = SSH.run(user, host, ShellCommand.sudo_probe(), opts=list(SSH.PROBE_OPTS), log=True)
         if rc == 255:
             raise RuntimeError(
-                f"SSH to {user}@{host} needs a password. Install your key:\n"
-                f"    ssh-copy-id {user}@{host}"
+                f"ssh to {user}@{host} failed (exit 255). Common causes:\n"
+                f"  * no usable key — install yours once: ssh-copy-id {user}@{host}\n"
+                f"  * the host key changed (e.g. reimaged): ssh-keygen -R {host}\n"
+                "  * the host is unreachable or refusing connections.\n"
+                f"Run 'ssh -v {user}@{host} true' to see which."
             )
         return rc != 0
 
@@ -248,9 +290,7 @@ class SCP:
     an already-authenticated connection."""
 
     @staticmethod
-    def run(
-        user: str, host: str, files: list[Path], dest: str, *, log: bool = True
-    ) -> None:
+    def run(user: str, host: str, files: list[Path], dest: str, *, log: bool = True) -> None:
         """Copy ``files`` into ``user@host:dest/``. Tries the modern SFTP backend, then retries
         with the legacy protocol (``-O``) on hosts without an SFTP subsystem.
 
@@ -327,8 +367,13 @@ class RemoteLauncher:
         """
         use_pw = sudo_password is not None
         remote_cmd = RemoteLauncher._remote_cmd(
-            workspace, remote_port, plugins, env,
-            sudo=sudo, use_password=use_pw, executor_bin=executor_bin,
+            workspace,
+            remote_port,
+            plugins,
+            env,
+            sudo=sudo,
+            use_password=use_pw,
+            executor_bin=executor_bin,
         )
         logger.debug(f"remote: {remote_cmd}")
         opts = RemoteLauncher._ssh_opts(local_port, remote_port, use_pw)
@@ -360,8 +405,10 @@ class RemoteLauncher:
         """Local-side ssh options for the port-forward. ``-tt`` on NOPASSWD so SSH close
         SIGHUPs the executor; omitted with a password so ``sudo -S`` sees an unechoed pipe."""
         opts = [
-            "-o", "ExitOnForwardFailure=yes",
-            "-L", f"{local_port}:localhost:{remote_port}",
+            "-o",
+            "ExitOnForwardFailure=yes",
+            "-L",
+            f"{local_port}:localhost:{remote_port}",
         ]
         if not use_password:
             opts = ["-tt"] + opts
@@ -370,14 +417,17 @@ class RemoteLauncher:
     @staticmethod
     def _env_prefix(env: dict[str, str]) -> str:
         """``K=V K=V ...`` prefix. :class:`Raw` values expand on the remote; bare strings are quoted."""
+
         def q(v):
             return v if isinstance(v, Raw) else shlex.quote(v)
+
         return " ".join(f"{k}={q(v)}" for k, v in env.items())
 
     @staticmethod
     def _plugin_args(plugins: list[str]) -> str:
         """``--plugin=<path>`` args. Bare filenames resolve against ``$PWD``; ``~``/absolute
         paths are quoted with tilde expansion."""
+
         def arg(p):
             flag = ExecutorCli.PLUGIN_FLAG
             if isinstance(p, Raw):
@@ -385,6 +435,7 @@ class RemoteLauncher:
             if "/" not in p and not p.startswith("~"):
                 return f"{flag}$PWD/{shlex.quote(p)}"
             return f"{flag}{ShellCommand.path(p)}"
+
         return " ".join(arg(p) for p in plugins)
 
     @staticmethod
