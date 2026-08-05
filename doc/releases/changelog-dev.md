@@ -167,7 +167,7 @@
   compute a metric per region rather than per operation (as `PBCDepthExtension` does).
   [(#3070)](https://github.com/PennyLaneAI/catalyst/pull/3070)
 
-* The `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
+* The `resource-analysis` pass now uses a single JSON serializer owned by `ResourceResult`, removing
   duplicate serialization logic and keeping its output consistent.
   [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
 
