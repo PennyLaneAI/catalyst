@@ -57,7 +57,7 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 
 ifeq ($(ENABLE_TRANSPORT), ON)
-	BUILD_TARGETS += rt_transport
+	BUILD_TARGETS += rt_transport transport_backends
 endif
 
 ifeq ($(ENABLE_EXECUTOR), ON)
