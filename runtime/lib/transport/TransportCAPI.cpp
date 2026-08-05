@@ -31,6 +31,7 @@
 
 #include "DynamicLibraryLoader.hpp"
 #include "Transport.hpp"
+#include "WireProtocol.hpp"
 #include "TransportBackend.h"
 
 using catalyst::transport::ChannelDesc;
@@ -446,8 +447,8 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
     const bool progress = (flags & CATALYST_BENCH_PROGRESS) != 0;
 
     return guard([&] {
-        // Syndrome staging buffer (>=12 B to hold Payload.value @0 + seq_num @8).
-        std::vector<std::uint8_t> syndrome(std::max<std::uint32_t>(syndrome_bytes, 12u), 0);
+        std::vector<std::uint8_t> syndrome(
+            std::max<std::size_t>(syndrome_bytes, sizeof(catalyst::transport::common::Payload)), 0);
         std::uint64_t written = 0;
         int rc = CATALYST_TRANSPORT_OK;
 
@@ -456,9 +457,10 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
             // write_data_slot copies it into the outbound slot and enforces the slot capacity.
             std::uint64_t value = (static_cast<std::uint64_t>(i) << 32) | 0xC0DE1515u;
             std::memcpy(syndrome.data(), &value, sizeof(value));
-            if (syndrome_bytes >= 12) {
-                std::uint32_t seq = i + 1; // Payload.seq_num @ 8
-                std::memcpy(syndrome.data() + 8, &seq, sizeof(seq));
+            if (syndrome_bytes >= sizeof(catalyst::transport::common::Payload)) {
+                std::uint32_t seq = i + 1; // Payload.seq_num @ 12
+                std::memcpy(syndrome.data() + offsetof(catalyst::transport::common::Payload, seq_num),
+                            &seq, sizeof(seq));
             }
 
             c->write_data_slot(syndrome.data(), syndrome_bytes, decoder_id);

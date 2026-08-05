@@ -9,6 +9,7 @@ target_include_directories(rt_transport
     ${runtime_includes}
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/common       # WireProtocol.hpp
     ${PROJECT_SOURCE_DIR}/lib/backend/common  # DynamicLibraryLoader.hpp
 )
 
