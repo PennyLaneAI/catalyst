@@ -115,7 +115,7 @@ def attach_executor(device: Device, executor: Executor) -> Device:
 
 def _get_backline_controller(device: Device) -> Any:
     """The controller node of a backline placement attached to ``device``, or ``None``."""
-    return _attr(_attr(device, "backline"), "controller")
+    return _attr(_attr(device, "placement"), "controller")
 
 
 def _get_controller_executors(device: Device) -> list[Executor]:
@@ -129,28 +129,27 @@ def _get_controller_executors(device: Device) -> list[Executor]:
 
 
 def _get_backline_triple(device: Device) -> Optional[str]:
-    """Triple for a remote backline controller, sourced from an executor. Defaults to the controller's own."""
+    """Triple for a remote backline controller, sourced from its executor.
+
+    Backline nodes carry no triple of their own: the executor determines it, detecting it on the
+    target host when it was not given explicitly.
+    """
     for ex in _get_controller_executors(device):
         if _attr(ex, "triple"):
             return ex.triple
-    return _attr(_get_backline_controller(device), "triple")
+    return None
 
 
 def _get_backline_dispatch_address(device: Device) -> Optional[str]:
-    """Dispatch address for a remote backline controller, sourced from an executor. Defaults to the controller's own ``addr:port``.
+    """Dispatch address for a remote backline controller, sourced from its executor.
 
-    Note: this ``port`` is the executor dispatch port, distinct from the backline transport's
-    ``oob_port`` used for controller/coprocessor traffic. The two must not collide on one host.
+    Only an executor supplies this. It is the executor's dispatch address, distinct from the
+    backline transport's ``comm_host``/``oob_port`` used for controller/coprocessor traffic.
     """
     for ex in _get_controller_executors(device):
         if _attr(ex, "address"):
             return ex.address
-    ctrl = _get_backline_controller(device)
-    addr = _attr(ctrl, "addr")
-    if not addr:
-        return None
-    port = _attr(ctrl, "port")
-    return f"{addr}:{port}" if port else addr
+    return None
 
 
 def get_target(device: Device) -> Optional[Target]:

@@ -24,8 +24,7 @@ from unittest.mock import patch
 import pytest
 
 from catalyst.executor.ssh import SCP, RemoteLauncher, RemoteOps, SSHArgv
-from catalyst.executor.utils import ExecutorExecutorPaths, Unquoted, set_verbose
-
+from catalyst.executor.utils import ExecutorPaths, Unquoted, set_verbose
 
 # ---------------------------------------------------------------------------
 # SSHArgv — control socket, argv construction
@@ -136,9 +135,7 @@ class TestSSHRun:
 
     def test_quiet_returns_rc(self):
         """Default ``quiet=True`` returns the return code and pipes stdout to ``DEVNULL``."""
-        with patch(
-            "subprocess.run", return_value=SimpleNamespace(returncode=0)
-        ) as m:
+        with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)) as m:
             rc = RemoteOps.run("me", "h", "true")
         assert rc == 0
         # quiet=True should redirect stdout/stderr to DEVNULL
@@ -278,16 +275,16 @@ class TestSSHResolveSudo:
 
     def test_interactive_prompt_when_no_password(self):
         """Prompts via :func:`getpass` when a password is required but none is attached."""
-        with patch(
-            "catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True
-        ), patch("catalyst.executor.ssh.getpass.getpass", return_value="typed"):
+        with patch("catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True), patch(
+            "catalyst.executor.ssh.getpass.getpass", return_value="typed"
+        ):
             assert RemoteOps.resolve_sudo("me", "h") == "typed"
 
     def test_aborted_prompt_raises(self):
         """A ``KeyboardInterrupt`` at the prompt is converted to :class:`RuntimeError`."""
-        with patch(
-            "catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True
-        ), patch("catalyst.executor.ssh.getpass.getpass", side_effect=KeyboardInterrupt):
+        with patch("catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True), patch(
+            "catalyst.executor.ssh.getpass.getpass", side_effect=KeyboardInterrupt
+        ):
             with pytest.raises(RuntimeError, match="no sudo password"):
                 RemoteOps.resolve_sudo("me", "h")
 
@@ -435,7 +432,9 @@ class TestRemoteLauncherHelpers:
 
     def test_chmod_prefix_only_for_local_binary(self):
         """``chmod +x`` prefix is emitted only for the workspace-local executor binary."""
-        assert RemoteLauncher._chmod_prefix(f"./{ExecutorPaths.EXECUTOR_BIN}").startswith("chmod +x")
+        assert RemoteLauncher._chmod_prefix(f"./{ExecutorPaths.EXECUTOR_BIN}").startswith(
+            "chmod +x"
+        )
         assert RemoteLauncher._chmod_prefix("/opt/bin/catalyst-executor") == ""
 
     def test_exec_prefix_no_sudo(self):
@@ -507,9 +506,13 @@ class TestRemoteLauncherSshArgv:
     def test_full_argv_shape(self):
         """Argv starts with ``ssh``, contains ``user@host`` and the port forward, ends with the remote command."""
         argv = RemoteLauncher.ssh_argv(
-            "me", "h",
-            "~/ws", 1373, 5000,
-            plugins=["libx.so"], env={"FOO": "bar"},
+            "me",
+            "h",
+            "~/ws",
+            1373,
+            5000,
+            plugins=["libx.so"],
+            env={"FOO": "bar"},
             sudo=False,
         )
         assert argv[0] == "ssh"

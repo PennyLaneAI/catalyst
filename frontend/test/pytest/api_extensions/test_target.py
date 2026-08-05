@@ -43,16 +43,14 @@ class _Dev:
 
 
 class _Ctrl:
-    """Stand-in for a backline controller node with optional coord/triple/executor fields."""
+    """Stand-in for a backline controller node.
 
-    def __init__(self, *, remote=False, addr=None, port=None, triple=None, executor=None):
+    A controller carries no address or triple of its own: the executor supplies both, and the
+    transport endpoint (``comm_host``/``oob_port``) belongs to a coprocessor.
+    """
+
+    def __init__(self, *, remote=False, executor=None):
         self.remote = remote
-        if addr is not None:
-            self.addr = addr
-        if port is not None:
-            self.port = port
-        if triple is not None:
-            self.triple = triple
         if executor is not None:
             self.executor = executor
 
@@ -155,31 +153,29 @@ class TestGetTarget:
         target(dev, triple="x86_64")
         assert get_target(dev) == Target(pipeline=None, triple="x86_64")
 
-    def test_derived_from_remote_backline_uses_controller_triple(self):
-        """No attached tag: derives a :class:`Target` from a remote backline controller."""
+    def test_derived_from_remote_backline_has_no_triple_without_an_executor(self):
+        """A remote controller derives a :class:`Target`, but the triple comes only from an executor."""
         dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=True, triple="aarch64"))
-        assert get_target(dev) == Target(pipeline=None, triple="aarch64")
+        dev.placement = _Placement(_Ctrl(remote=True))
+        assert get_target(dev) == Target(pipeline=None, triple=None)
 
     def test_backline_but_non_remote_returns_none(self):
         """A non-remote backline controller does not produce a derived tag."""
         dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=False, triple="aarch64"))
+        dev.placement = _Placement(_Ctrl(remote=False))
         assert get_target(dev) is None
 
-    def test_attached_executor_triple_wins_over_controller(self):
-        """A device-attached executor's triple overrides the controller's."""
+    def test_attached_executor_supplies_the_triple(self):
+        """A device-attached executor's triple is used for the derived target."""
         dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=True, triple="ctrl-triple"))
+        dev.placement = _Placement(_Ctrl(remote=True))
         attach_executor(dev, _Ex(triple="ex-triple"))
         assert get_target(dev).triple == "ex-triple"
 
     def test_node_executor_triple_wins_over_device_attached_executor(self):
         """The controller-node's own executor takes precedence over a device-attached one."""
         dev = _Dev()
-        dev.backline = _Placement(
-            _Ctrl(remote=True, triple="ctrl-triple", executor=_Ex(triple="node-triple"))
-        )
+        dev.placement = _Placement(_Ctrl(remote=True, executor=_Ex(triple="node-triple")))
         attach_executor(dev, _Ex(triple="attached-triple"))
         assert get_target(dev).triple == "node-triple"
 
@@ -197,35 +193,34 @@ class TestGetDispatch:
         target(dev, address="1.2.3.4:1373")
         assert get_dispatch(dev) == RemoteDispatch(address="1.2.3.4:1373")
 
-    def test_derived_from_controller_addr_port(self):
-        """Derives ``RemoteDispatch(addr:port)`` from a remote backline controller."""
+    def test_derived_from_attached_executor_address(self):
+        """Derives ``RemoteDispatch`` from the executor's address."""
         dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=True, addr="10.0.0.5", port=1373))
+        dev.placement = _Placement(_Ctrl(remote=True))
+        attach_executor(dev, _Ex(address="10.0.0.5:1373"))
         assert get_dispatch(dev) == RemoteDispatch(address="10.0.0.5:1373")
 
-    def test_derived_falls_back_to_addr_only_when_no_port(self):
-        """A remote controller without a port yields ``RemoteDispatch(addr)`` (no port suffix)."""
+    def test_node_executor_address_wins_over_device_attached_executor(self):
+        """The controller-node's own executor takes precedence over a device-attached one."""
         dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=True, addr="10.0.0.5"))
-        assert get_dispatch(dev) == RemoteDispatch(address="10.0.0.5")
-
-    def test_executor_address_wins_over_controller_addr(self):
-        """A device-attached executor's address overrides the controller's ``addr[:port]``."""
-        dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=True, addr="ctrl-addr", port=1))
-        attach_executor(dev, _Ex(address="ex-addr:2"))
-        assert get_dispatch(dev) == RemoteDispatch(address="ex-addr:2")
+        dev.placement = _Placement(_Ctrl(remote=True, executor=_Ex(address="node-addr:1")))
+        attach_executor(dev, _Ex(address="attached-addr:2"))
+        assert get_dispatch(dev) == RemoteDispatch(address="node-addr:1")
 
     def test_non_remote_controller_returns_none(self):
         """A non-remote backline controller does not produce a derived dispatch."""
         dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=False, addr="a", port=1))
+        dev.placement = _Placement(_Ctrl(remote=False, executor=_Ex(address="a:1")))
         assert get_dispatch(dev) is None
 
-    def test_remote_controller_without_addr_returns_none(self):
-        """A remote controller with no address source at all returns ``None``."""
+    def test_remote_controller_without_an_executor_returns_none(self):
+        """A remote controller with no executor has nowhere to dispatch to.
+
+        A node's own address is the transport's out-of-band endpoint, on a different channel from
+        the executor's dispatch address, so it must not be used as a fallback.
+        """
         dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=True))
+        dev.placement = _Placement(_Ctrl(remote=True))
         assert get_dispatch(dev) is None
 
 
@@ -239,11 +234,11 @@ class TestGetBacklineRole:
     def test_remote_backline_returns_controller(self):
         """A remote backline placement identifies the device as the ``"controller"``."""
         dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=True))
+        dev.placement = _Placement(_Ctrl(remote=True))
         assert get_backline_role(dev) == "controller"
 
     def test_non_remote_backline_returns_none(self):
         """A non-remote backline placement does not confer a role."""
         dev = _Dev()
-        dev.backline = _Placement(_Ctrl(remote=False))
+        dev.placement = _Placement(_Ctrl(remote=False))
         assert get_backline_role(dev) is None
