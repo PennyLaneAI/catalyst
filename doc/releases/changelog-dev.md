@@ -127,6 +127,45 @@
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
+* The `resource-analysis` pass now supports pluggable resource metrics through the
+  `ResourceResultExtension`/`ResourceAnalysisExtension` interface and a self-registering global
+  registry. Dialects and plugins can contribute additional per-function resource data
+  (such as PBC circuit depth) without modifying the core analysis.
+
+  A metric is added by defining a value object, an analysis that fills it, and
+  registering that analysis with the global registry:
+  ```cpp
+  // 1. Per-function value object; shows up in the JSON under name().
+  class TCountExtension : public ResourceResultExtension {
+   public:
+    llvm::StringRef name() const override { return "t_count"; }
+    llvm::json::Value toJson() const override { return tCount; }
+    // Accumulated in collect(), so define how it combines and scales.
+    void mergeWith(const ResourceResultExtension &other, MergeMethod method) override {
+      tCount += static_cast<const TCountExtension &>(other).tCount;  // use `method` for max/min
+    }
+    void multiplyBy(double factor) override { tCount *= factor; }
+    double tCount = 0;
+  };
+
+  // 2. Analysis that fills it, one operation at a time.
+  class TCountAnalysis : public ResourceAnalysisExtensionOf<TCountExtension> {
+   public:
+    llvm::StringRef name() const override { return "t_count"; }
+   protected:
+    void collect(mlir::Operation *op, TCountExtension &ext, bool isAdjoint) override {
+      if (isTGate(op)) ext.tCount += 1;
+    }
+  };
+
+  // 3. Self-register from your dialect or plugin (no core changes needed).
+  REGISTER_RESOURCE_ANALYSIS_EXTENSION(std::make_unique<TCountAnalysis>());
+  ```
+  The metric then appears under its `name()` key (`"t_count"`) in each function's JSON
+  output. Override `analyze(Region&, Ext&, bool)` instead of, or alongside, `collect` to
+  compute a metric per region rather than per operation (as `PBCDepthExtension` does).
+  [(#3070)](https://github.com/PennyLaneAI/catalyst/pull/3070)
+
 * `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
   duplicate serialization logic and keeping its output consistent.
   [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
