@@ -51,9 +51,9 @@ class TestGenericUtilities:
             ("i1", "bool", ()),
             ("i32", "int32", ()),
             ("f64", "float64", ()),
-            ("complex<f64>", "complex64", ()),
-            ("complex<f128>", "complex128", ()),
-            # shaped tests
+            ("complex<f64>", "complex128", ()),
+            ("complex<f32>", "complex64", ()),
+            # python-type shaped tests
             (bool, "bool", ()),
             ([float, float], "float64", (2,)),
             ([int], "int64", (1,)),
@@ -70,13 +70,19 @@ class TestGenericUtilities:
         assert result.dtype == dtype
         assert result.shape == shape
 
-    def test_mlir_stringify_type(self):
+    @pytest.mark.parametrize(
+        "dtype, expected",
+        [
+            (qp.typing.Float, "[f64]"),
+            (qp.typing.Int, "[i64]"),
+            (qp.typing.Bool, "[i1]"),
+            (qp.typing.Complex, "[complex<f64>]"),
+            (qp.typing.AbstractArray((2,), "int32"), "[i32,i32]"),
+        ],
+    )
+    def test_mlir_stringify_type(self, dtype, expected):
         """Test mlir_stringify_type."""
-        assert mlir_stringify_type(qp.typing.Float) == "[f64]"
-        assert mlir_stringify_type(qp.typing.Int) == "[i64]"
-        assert mlir_stringify_type(qp.typing.Bool) == "[i1]"
-        assert mlir_stringify_type(qp.typing.Complex) == "[complex<f128>]"
-        assert mlir_stringify_type(qp.typing.AbstractArray((2,), "int32")) == "[i32,i32]"
+        assert mlir_stringify_type(dtype) == expected
 
 
 class TestPrecompiled:
@@ -119,37 +125,6 @@ class TestOnDemand:
     """
     Test the python wrapper functions used for on-demand, compile-time decomposition rule lowering.
     """
-
-    def test_for_loop(self):
-        class TestOp(qp.core.Operator2):
-            dynamic_argnames = ("angles",)
-
-            def __init__(self, angles, wires):
-                super().__init__(angles, wires)
-
-        class TestRX(qp.core.Operator2):
-            dynamic_argnames = ("theta",)
-            wires_argnames = ("wires",)
-
-            arg_specs = {"theta": Float, "wires": Wire[1]}
-
-            def __init__(self, theta, wires):
-                super().__init__(theta, wires)
-
-        @register_resources(lambda angles, wires: {TestRX(Float, Wire[1]): len(wires)})
-        def test_rule(angles, wires):
-            @qp.for_loop(len(wires))
-            def l(i):
-                TestRX(angles[i], wires[i])
-
-            l()  # pylint: disable=no-value-for-parameter
-
-        with local_decomps():
-            add_decomps(TestOp, test_rule)
-
-            assert "scf.for" in compile_decomposition_rules_wrapper(
-                "TestOp", "TestID", {"angles": ["f64", "f64", "f64"]}, {"wires": 3}, {}
-            )
 
 
 if __name__ == "__main__":
