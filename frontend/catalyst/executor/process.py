@@ -35,7 +35,7 @@ from .utils import (
     log_cmd,
     pdeathsig,
 )
-from .ssh import RemoteLauncher, SSH
+from .ssh import RemoteLauncher, RemoteOps
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -400,7 +400,7 @@ class _RemoteProcess(_ExecutorProcess):
         if not self._ready_reached:
             return
         pat = f"{ExecutorPaths.EXECUTOR_BIN}.*{ExecutorFlags.BIND_FLAG}0.0.0.0:{self._bind_port}"
-        SSH.pkill(
+        RemoteOps.pkill(
             self.user, self.host, pat,
             sudo=self.sudo, sudo_password=self.sudo_password,
         )
@@ -412,7 +412,7 @@ class _RemoteProcess(_ExecutorProcess):
         if not self.cleanup_ws or not basename.startswith(ExecutorPaths.WORKSPACE_PREFIX):
             return
         self._say(f"removing remote workspace {self.workspace}", level=2)
-        SSH.rmdir(self.user, self.host, self.workspace)  # force=False: silent teardown
+        RemoteOps.rmdir(self.user, self.host, self.workspace)  # force=False: silent teardown
 
     def stop(self) -> None:
         """Stop the remote executor and close the SSH tunnel. Idempotent."""

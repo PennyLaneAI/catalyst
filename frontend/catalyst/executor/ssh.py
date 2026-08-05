@@ -14,8 +14,10 @@
 
 """SSH/scp orchestration for a remote :class:`~catalyst.executor.Executor`.
 
-* :class:`SSH`: ``ssh`` wrapper for argv, auth probing, and remote filesystem verbs.
-* :class:`SCP`: ``scp`` wrapper that shares SSH's multiplexed control socket.
+* :class:`SSHArgv`: builds the ``ssh`` argv — constants, control-socket options, base command.
+* :class:`RemoteOps`: runs commands on the remote via ssh — generic ``run``/``capture`` plus
+  named verbs (``pkill``, ``mkdir``, ``rmdir``) and sudo probing.
+* :class:`SCP`: ``scp`` wrapper that shares :class:`SSHArgv`'s multiplexed control socket.
 * :class:`RemoteLauncher`: builds the remote ``catalyst-executor`` launch command.
 """
 
@@ -35,9 +37,8 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-class SSH:
-    """Local ``ssh`` command builder and runner: argv, auth probing, sudo-password resolution,
-    and remote filesystem verbs."""
+class SSHArgv:
+    """Builders for the local ``ssh`` argv: base command, control-socket options, argv prefix."""
 
     # Idle lifetime of a multiplexed control socket, so follow-up ops (pkill/rm) reuse it.
     CONTROL_PERSIST = 30
@@ -57,7 +58,7 @@ class SSH:
     def _ctl_dir() -> Path:
         """Control-socket dir under ``$XDG_RUNTIME_DIR``. Defaults to :meth:`_fallback_ctl_dir`."""
         xdg = os.environ.get("XDG_RUNTIME_DIR")
-        base = Path(xdg) / "catalyst" if xdg else SSH._fallback_ctl_dir()
+        base = Path(xdg) / "catalyst" if xdg else SSHArgv._fallback_ctl_dir()
         base.mkdir(parents=True, exist_ok=True)
         return base
 
@@ -70,12 +71,12 @@ class SSH:
         """
         return [
             "-o", "ControlMaster=auto",
-            "-o", f"ControlPath={SSH._ctl_dir()}/cm-%C",
-            "-o", f"ControlPersist={SSH.CONTROL_PERSIST}",
+            "-o", f"ControlPath={SSHArgv._ctl_dir()}/cm-%C",
+            "-o", f"ControlPersist={SSHArgv.CONTROL_PERSIST}",
         ]
 
     @staticmethod
-    def base_cmd(
+    def base(
         user: str, host: str, opts: list[str] | None = None, multiplex: bool = True
     ) -> list[str]:
         """Return the ``ssh ... user@host`` argv prefix.
@@ -87,20 +88,24 @@ class SSH:
             multiplex: Include the :meth:`ctl_opts` multiplexing flags. Set ``False`` for the
                 long-lived executor session so its close SIGHUPs the executor.
         """
-        cmd = list(SSH.BASE_CMD)
+        cmd = list(SSHArgv.BASE_CMD)
         if multiplex:
-            cmd += SSH.ctl_opts()
+            cmd += SSHArgv.ctl_opts()
         cmd += ["-v"] * max(0, verbose_level() - 2)  # ssh protocol debug at -vvv (verbosity 3+)
         if opts:
             cmd += opts
         cmd.append(f"{user}@{host}")
         return cmd
 
+
+class RemoteOps:
+    """Operations performed on the remote via ssh: generic runners, named verbs, sudo probing."""
+
     @staticmethod
     def capture(user: str, host: str, remote_cmd: str, *, timeout: float = 15) -> str | None:
         """Run ``remote_cmd`` non-interactively and return stripped stdout, or ``None`` on any
         failure. Used for state probes (e.g. ``uname -sm``) where "can't tell" is a valid answer."""
-        cmd = SSH.base_cmd(user, host, list(SSH.PROBE_OPTS)) + [remote_cmd]
+        cmd = SSHArgv.base(user, host, list(SSHArgv.PROBE_OPTS)) + [remote_cmd]
         try:
             return subprocess.check_output(
                 cmd, text=True, timeout=timeout, stderr=subprocess.DEVNULL
@@ -128,7 +133,7 @@ class SSH:
 
         ``error``: if set and rc is non-zero, raise :class:`RuntimeError` with this message.
         """
-        cmd = SSH.base_cmd(user, host, opts) + [remote_cmd]
+        cmd = SSHArgv.base(user, host, opts) + [remote_cmd]
         if log:
             log_cmd(cmd)
         kwargs = {"input": input, "text": input is not None, "timeout": timeout}
@@ -161,10 +166,10 @@ class SSH:
         """
         cmd = ShellText.pkill(pat)
         if not sudo:
-            return SSH.run(user, host, cmd)
+            return RemoteOps.run(user, host, cmd)
         if sudo_password is not None:
-            return SSH.run(user, host, ShellText.sudo_pw(cmd), input=sudo_password + "\n")
-        return SSH.run(user, host, ShellText.sudo_np(cmd))
+            return RemoteOps.run(user, host, ShellText.sudo_pw(cmd), input=sudo_password + "\n")
+        return RemoteOps.run(user, host, ShellText.sudo_np(cmd))
 
     @staticmethod
     def mkdir(user: str, host: str, path: str) -> None:
@@ -173,7 +178,7 @@ class SSH:
         Raises:
             RuntimeError: If the remote ``mkdir`` returned non-zero.
         """
-        SSH.run(
+        RemoteOps.run(
             user,
             host,
             ShellText.mkdir_p(path),
@@ -199,7 +204,7 @@ class SSH:
             'if [ -z "$d" ] || [ "$d" = "/" ] || [ "$d" = "$HOME" ]; then exit 3; fi; '
             'rm -rf "$d"'
         )
-        rc = SSH.run(user, host, remote, timeout=30, log=True)
+        rc = RemoteOps.run(user, host, remote, timeout=30, log=True)
         if rc == 3:
             raise ValueError(
                 f"refusing to remove {path!r}: it resolves to '/' or the home directory"
@@ -217,7 +222,7 @@ class SSH:
         Raises:
             RuntimeError: If SSH itself failed (rc 255), with an ``ssh-copy-id`` hint.
         """
-        rc = SSH.run(user, host, ShellText.sudo_probe(), opts=list(SSH.PROBE_OPTS), log=True)
+        rc = RemoteOps.run(user, host, ShellText.sudo_probe(), opts=list(SSHArgv.PROBE_OPTS), log=True)
         if rc == 255:
             raise RuntimeError(
                 f"SSH to {user}@{host} needs a password. Install your key:\n"
@@ -234,7 +239,7 @@ class SSH:
         Raises:
             RuntimeError: If SSH is unreachable or the user aborted the prompt.
         """
-        if not SSH.needs_sudo_password(user, host):
+        if not RemoteOps.needs_sudo_password(user, host):
             return None
         if sudo_password is not None:
             return sudo_password
@@ -248,11 +253,11 @@ class SSH:
 
 
 class SCP:
-    """``scp`` wrapper. Shares :class:`SSH`'s control-socket multiplexing so copies piggyback on
+    """``scp`` wrapper. Shares :class:`SSHArgv`'s control-socket multiplexing so copies piggyback on
     an already-authenticated connection."""
 
     @staticmethod
-    def run(
+    def copy(
         user: str, host: str, files: list[Path], dest: str, *, log: bool = True
     ) -> None:
         """Copy ``files`` into ``user@host:dest/``. Tries the modern SFTP backend, then retries
@@ -266,7 +271,7 @@ class SCP:
             cmd = [
                 "scp",
                 *(["-O"] if legacy else []),
-                *SSH.ctl_opts(),
+                *SSHArgv.ctl_opts(),
                 "-v" if verbose_level() >= 2 else "-q",
                 *[str(f) for f in files],
                 f"{user}@{host}:{dest}/",
@@ -300,9 +305,9 @@ class SCP:
         )
         for f in files:
             logger.debug(f"  - {f.name}  ({f.stat().st_size/1e6:.2f} MB)")
-        SSH.mkdir(user, host, workspace)
+        RemoteOps.mkdir(user, host, workspace)
         t0 = time.monotonic()
-        SCP.run(user, host, files, workspace)
+        SCP.copy(user, host, files, workspace)
         logger.debug(f"copied in {time.monotonic() - t0:.1f}s")
 
 
@@ -336,7 +341,7 @@ class RemoteLauncher:
         )
         logger.debug(f"remote: {remote_cmd}")
         opts = RemoteLauncher._ssh_opts(local_port, remote_port, use_pw)
-        return SSH.base_cmd(user, host, opts, multiplex=False) + [remote_cmd]
+        return SSHArgv.base(user, host, opts, multiplex=False) + [remote_cmd]
 
     @staticmethod
     def _remote_cmd(

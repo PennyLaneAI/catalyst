@@ -56,7 +56,7 @@ from .utils import (
     triple_from_uname,
 )
 from .process import _ExecutorProcess, _LocalProcess, _RemoteProcess
-from .ssh import SCP, SSH
+from .ssh import SCP, RemoteOps
 
 
 def _start_on_free_port(
@@ -215,7 +215,7 @@ class Executor:
             return triple_from_uname(platform.system(), platform.machine())
         if self.host:
             user = self._cfg.user or getpass.getuser()
-            if (out := SSH.capture(user, self.host.strip(), "uname -sm")) is None:
+            if (out := RemoteOps.capture(user, self.host.strip(), "uname -sm")) is None:
                 return None
             system, _, machine = out.partition(" ")
             return triple_from_uname(system, machine)
@@ -269,7 +269,7 @@ class Executor:
         so port retries reuse the same auth context — no re-prompt, no re-scp."""
         user, host, workspace = self._remote_target()
         ws_pinned = self._cfg.workspace is not None  # pinned dirs are left in place on teardown
-        sudo_pw = SSH.resolve_sudo(user, host, self._cfg.sudo_password) if self._cfg.sudo else None
+        sudo_pw = RemoteOps.resolve_sudo(user, host, self._cfg.sudo_password) if self._cfg.sudo else None
         self._scp_bundle(user, host, workspace)
         # Copied bundle -> run it from the workspace (./); sudo's secure_path would miss a bare
         # name. Bare name only when attaching to a remote that has it on PATH.
@@ -362,7 +362,7 @@ class Executor:
             raise ValueError("remove_workspace() requires a pinned workspace=")
         set_verbose(self._cfg.verbose)
         user, host, workspace = self._remote_target()
-        SSH.rmdir(user, host, workspace, force=force)
+        RemoteOps.rmdir(user, host, workspace, force=force)
 
     def __enter__(self) -> Self:
         return self.launch()
