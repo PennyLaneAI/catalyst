@@ -63,8 +63,7 @@ namespace {
 // brought up in one function can be resolved in another.
 std::unordered_map<std::string, CatalystTransportSession *> g_registry;
 
-std::string registry_key(std::int32_t role, const char *key)
-{
+std::string registry_key(std::int32_t role, const char *key) {
     return std::to_string(role) + "/" + (key ? key : "");
 }
 
@@ -76,15 +75,12 @@ constexpr std::uint64_t kReplyBytes = 16 * 1024;
 
 // Run fn, logging and swallowing any exception. Returns fn()'s result, or CATALYST_TRANSPORT_ERR
 // if it threw; when fn() returns void there is nothing to return.
-template <typename Fn> auto guard(Fn &&fn) -> decltype(fn())
-{
+template <typename Fn> auto guard(Fn &&fn) -> decltype(fn()) {
     try {
         return fn();
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         std::cerr << "[transport] " << e.what() << "\n";
-    }
-    catch (...) {
+    } catch (...) {
     }
     if constexpr (!std::is_void_v<decltype(fn())>) {
         return CATALYST_TRANSPORT_ERR;
@@ -92,30 +88,26 @@ template <typename Fn> auto guard(Fn &&fn) -> decltype(fn())
 }
 
 // Provision the local reply region on first use (idempotent).
-void ensure_reply(CatalystTransportSession *s)
-{
+void ensure_reply(CatalystTransportSession *s) {
     if (!s->reply_ready) {
         s->reply = s->sess->alloc_memory(kReplyBytes, MemKind::CpuRam);
         s->reply_ready = true;
     }
 }
 
-ControllerSession *cast_to_controller(CatalystTransportSession *s)
-{
+ControllerSession *cast_to_controller(CatalystTransportSession *s) {
     return s ? dynamic_cast<ControllerSession *>(s->sess) : nullptr;
 }
 
 // Bring-up bodies shared by the blocking and async (worker-thread) entry points.
-int do_connect(CatalystTransportSession *s, std::string peer, std::uint16_t oob_port)
-{
+int do_connect(CatalystTransportSession *s, std::string peer, std::uint16_t oob_port) {
     ConnectInfo info;
     info.peer = std::move(peer);
     info.oob_port = oob_port;
     return s->sess->connect(info);
 }
 
-int do_exchange_keys(CatalystTransportSession *s)
-{
+int do_exchange_keys(CatalystTransportSession *s) {
     ensure_reply(s);
     s->peer = s->sess->exchange_keys(s->reply);
     s->peer_ready = true;
@@ -123,8 +115,7 @@ int do_exchange_keys(CatalystTransportSession *s)
 }
 
 // Built-in fallback coprocessor function: echo the input back.
-std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *)
-{
+std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
     std::size_t n = std::min(in_len, out_cap);
     if (n && in && out) {
         std::memcpy(out, in, n);
@@ -140,8 +131,7 @@ std::int64_t g_next_token = 1;
 std::unordered_map<std::int64_t, std::future<int>> g_async_tasks;
 std::unordered_map<std::int64_t, CatalystTransportSession *> g_token_owner;
 
-void forget_token_locked(std::int64_t token)
-{
+void forget_token_locked(std::int64_t token) {
     auto oit = g_token_owner.find(token);
     if (oit == g_token_owner.end()) {
         return;
@@ -151,8 +141,7 @@ void forget_token_locked(std::int64_t token)
     g_token_owner.erase(oit);
 }
 
-std::int64_t dispatch_async(CatalystTransportSession *s, std::function<int()> fn)
-{
+std::int64_t dispatch_async(CatalystTransportSession *s, std::function<int()> fn) {
     std::lock_guard<std::mutex> lk(g_async_mtx);
     std::int64_t token = g_next_token++;
     g_async_tasks.emplace(token, std::async(std::launch::async, std::move(fn)));
@@ -161,8 +150,7 @@ std::int64_t dispatch_async(CatalystTransportSession *s, std::function<int()> fn
     return token;
 }
 
-int await_token(std::int64_t token)
-{
+int await_token(std::int64_t token) {
     std::future<int> fut;
     {
         std::lock_guard<std::mutex> lk(g_async_mtx);
@@ -178,8 +166,7 @@ int await_token(std::int64_t token)
 }
 
 // Await any connect_async / exchange_keys_async work still outstanding for this session.
-void drain_pending(CatalystTransportSession *s)
-{
+void drain_pending(CatalystTransportSession *s) {
     std::vector<std::int64_t> tokens;
     {
         std::lock_guard<std::mutex> lk(g_async_mtx);
@@ -191,8 +178,7 @@ void drain_pending(CatalystTransportSession *s)
 }
 
 // Try the plugin handle first, then the process-global namespace (main image).
-void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *symbol)
-{
+void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *symbol) {
     dlerror();
     if (s->backend && s->backend->handle) {
         if (void *sym = dlsym(s->backend->handle, symbol)) {
@@ -208,8 +194,7 @@ void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *sym
 extern "C" {
 
 CatalystTransportSession *__catalyst__transport__create(const char *backend_lib, const char *config,
-                                                        std::int32_t role, const char *key)
-{
+                                                        std::int32_t role, const char *key) {
     try {
         if (!backend_lib || !*backend_lib) {
             std::cerr << "[transport] no backend library given\n";
@@ -222,8 +207,7 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
             auto *factory = h->backend->getSymbol<CatalystTransportCoprocessorFactoryFn *>(
                 CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL);
             h->sess = factory(cfg);
-        }
-        else {
+        } else {
             auto *factory = h->backend->getSymbol<CatalystTransportControllerFactoryFn *>(
                 CATALYST_TRANSPORT_CONTROLLER_FACTORY_SYMBOL);
             h->sess = factory(cfg);
@@ -247,19 +231,16 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
             g_registry[rk] = raw; // resolved later via get_session
         }
         return raw;
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         std::cerr << "[transport] create: " << e.what() << "\n";
         return nullptr;
-    }
-    catch (...) {
+    } catch (...) {
         return nullptr;
     }
 }
 
 int __catalyst__transport__connect(CatalystTransportSession *s, const char *peer,
-                                   std::uint16_t oob_port)
-{
+                                   std::uint16_t oob_port) {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
@@ -267,8 +248,7 @@ int __catalyst__transport__connect(CatalystTransportSession *s, const char *peer
 }
 
 std::int64_t __catalyst__transport__connect_async(CatalystTransportSession *s, const char *peer,
-                                                  std::uint16_t oob_port)
-{
+                                                  std::uint16_t oob_port) {
     if (!s || !s->sess) {
         return 0;
     }
@@ -276,16 +256,14 @@ std::int64_t __catalyst__transport__connect_async(CatalystTransportSession *s, c
         s, [s, p = std::string(peer ? peer : ""), oob_port] { return do_connect(s, p, oob_port); });
 }
 
-int __catalyst__transport__exchange_keys(CatalystTransportSession *s)
-{
+int __catalyst__transport__exchange_keys(CatalystTransportSession *s) {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
     return guard([&] { return do_exchange_keys(s); });
 }
 
-std::int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession *s)
-{
+std::int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession *s) {
     if (!s || !s->sess) {
         return 0;
     }
@@ -294,8 +272,7 @@ std::int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession
 
 int __catalyst__transport__barrier(std::int64_t token) { return await_token(token); }
 
-int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path)
-{
+int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path) {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
@@ -307,8 +284,7 @@ int __catalyst__transport__establish_channel(CatalystTransportSession *s, const 
     });
 }
 
-int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol)
-{
+int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol) {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
@@ -347,8 +323,7 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
 
 int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
                                             std::uint32_t work_item_idx, std::uint64_t in_bytes,
-                                            std::uint64_t out_bytes)
-{
+                                            std::uint64_t out_bytes) {
     auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
@@ -364,8 +339,7 @@ int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
     });
 }
 
-void *__catalyst__transport__data_slot(CatalystTransportSession *s)
-{
+void *__catalyst__transport__data_slot(CatalystTransportSession *s) {
     auto *c = cast_to_controller(s);
     void *slot = nullptr;
     if (c) {
@@ -387,8 +361,7 @@ int __catalyst__transport__write_data_slot(CatalystTransportSession *s, const vo
     });
 }
 
-void *__catalyst__transport__reply_slot(CatalystTransportSession *s)
-{
+void *__catalyst__transport__reply_slot(CatalystTransportSession *s) {
     auto *c = cast_to_controller(s);
     void *slot = nullptr;
     if (c) {
@@ -397,8 +370,7 @@ void *__catalyst__transport__reply_slot(CatalystTransportSession *s)
     return slot;
 }
 
-int __catalyst__transport__kick(CatalystTransportSession *s, std::uint32_t work_item_idx)
-{
+int __catalyst__transport__kick(CatalystTransportSession *s, std::uint32_t work_item_idx) {
     auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
@@ -407,8 +379,7 @@ int __catalyst__transport__kick(CatalystTransportSession *s, std::uint32_t work_
 }
 
 int __catalyst__transport__collect(CatalystTransportSession *s, void *reply,
-                                   std::uint64_t reply_bytes)
-{
+                                   std::uint64_t reply_bytes) {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
@@ -419,30 +390,26 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply,
     });
 }
 
-std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s)
-{
+std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s) {
     if (s && s->sess) {
         return guard([&] { return s->sess->last_rtt_ns(); });
     }
     return 0;
 }
 
-void __catalyst__transport__start(CatalystTransportSession *s)
-{
+void __catalyst__transport__start(CatalystTransportSession *s) {
     if (s && s->sess) {
         guard([&] { s->sess->start(); });
     }
 }
 
-void __catalyst__transport__stop(CatalystTransportSession *s)
-{
+void __catalyst__transport__stop(CatalystTransportSession *s) {
     if (s && s->sess) {
         guard([&] { s->sess->stop(); });
     }
 }
 
-CatalystTransportSession *__catalyst__transport__get_session(std::int32_t role, const char *key)
-{
+CatalystTransportSession *__catalyst__transport__get_session(std::int32_t role, const char *key) {
     auto it = g_registry.find(registry_key(role, key));
     if (it == g_registry.end()) {
         std::cerr << "[transport] get_session: no session registered for role " << role << " key '"
@@ -452,8 +419,7 @@ CatalystTransportSession *__catalyst__transport__get_session(std::int32_t role, 
     return it->second;
 }
 
-void __catalyst__transport__destroy(CatalystTransportSession *s)
-{
+void __catalyst__transport__destroy(CatalystTransportSession *s) {
     if (!s) {
         return;
     }

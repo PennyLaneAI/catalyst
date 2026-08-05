@@ -34,13 +34,11 @@ constexpr const char *kWrongExt = ".dylib";
 static const std::string kNullQubitAbs = RTD_NULL_QUBIT_LIB;
 static const std::string kNullQubitBasename = std::string("librtd_null_qubit") + kPlatformExt;
 
-TEST_CASE("SharedLibraryManager loads from absolute path", "[shared_lib]")
-{
+TEST_CASE("SharedLibraryManager loads from absolute path", "[shared_lib]") {
     REQUIRE_NOTHROW(SharedLibraryManager{kNullQubitAbs});
 }
 
-TEST_CASE("SharedLibraryManager rewrites wrong extension", "[shared_lib]")
-{
+TEST_CASE("SharedLibraryManager rewrites wrong extension", "[shared_lib]") {
     std::string mangled = kNullQubitAbs;
     auto dot = mangled.find_last_of('.');
     REQUIRE(dot != std::string::npos);
@@ -50,20 +48,17 @@ TEST_CASE("SharedLibraryManager rewrites wrong extension", "[shared_lib]")
     REQUIRE_NOTHROW(SharedLibraryManager{mangled});
 }
 
-TEST_CASE("SharedLibraryManager falls back when directory is stale", "[shared_lib]")
-{
+TEST_CASE("SharedLibraryManager falls back when directory is stale", "[shared_lib]") {
     std::string mangled = "/this/path/does/not/exist/" + kNullQubitBasename;
     REQUIRE_NOTHROW(SharedLibraryManager{mangled});
 }
 
-TEST_CASE("SharedLibraryManager throws with original filename on hard failure", "[shared_lib]")
-{
+TEST_CASE("SharedLibraryManager throws with original filename on hard failure", "[shared_lib]") {
     const std::string bogus = "lib_not_real.so";
     REQUIRE_THROWS_WITH(SharedLibraryManager{bogus}, ContainsSubstring(bogus));
 }
 
-TEST_CASE("SharedLibraryManager resolves a known symbol", "[shared_lib]")
-{
+TEST_CASE("SharedLibraryManager resolves a known symbol", "[shared_lib]") {
     SharedLibraryManager mgr{kNullQubitAbs};
     REQUIRE(mgr.getSymbol("NullQubitFactory") != nullptr);
 }

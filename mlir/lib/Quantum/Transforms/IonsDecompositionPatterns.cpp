@@ -31,8 +31,7 @@ constexpr double PI = llvm::numbers::pi;
 // operation theta is an attribute, hence the use of std::variant.
 
 void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter, double phi,
-                    std::variant<mlir::Value, double> theta, double lambda)
-{
+                    std::variant<mlir::Value, double> theta, double lambda) {
     TypeRange outQubitsTypes = op.getOutQubits().getTypes();
 
     ValueRange inQubits = op.getInQubits();
@@ -43,8 +42,7 @@ void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewri
     mlir::Value thetaValue;
     if (std::holds_alternative<mlir::Value>(theta)) {
         thetaValue = std::get<mlir::Value>(theta);
-    }
-    else if (std::holds_alternative<double>(theta)) {
+    } else if (std::holds_alternative<double>(theta)) {
         TypedAttr thetaAttr = rewriter.getF64FloatAttr(std::get<double>(theta));
         thetaValue = arith::ConstantOp::create(rewriter, op.getLoc(), thetaAttr);
     }
@@ -62,48 +60,39 @@ void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewri
     op.replaceAllUsesWith(rxLambda);
 }
 
-void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
-{
+void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         oneQubitDecomp(op, rewriter, -PI / 2, -PI / 4, PI / 2);
-    }
-    else {
+    } else {
         oneQubitDecomp(op, rewriter, -PI / 2, PI / 4, PI / 2);
     }
 }
 
-void sDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
-{
+void sDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         oneQubitDecomp(op, rewriter, -PI / 2, -PI / 2, PI / 2);
-    }
-    else {
+    } else {
         oneQubitDecomp(op, rewriter, -PI / 2, PI / 2, PI / 2);
     }
 }
 
-void zDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
-{
+void zDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter) {
     oneQubitDecomp(op, rewriter, -PI / 2, PI, PI / 2);
 }
 
-void hDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
-{
+void hDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter) {
     oneQubitDecomp(op, rewriter, 0.0, PI / 2, PI);
 }
 
-void psDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
-{
+void psDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter) {
     oneQubitDecomp(op, rewriter, -PI / 2, op.getParams().front(), PI / 2);
 }
 
-void rzDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
-{
+void rzDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter) {
     oneQubitDecomp(op, rewriter, -PI / 2, op.getParams().front(), PI / 2);
 }
 
-void cnotDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
-{
+void cnotDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter) {
     TypeRange outQubitsTypes = op.getOutQubits().getTypes();
 
     mlir::Value inQubit0 = op.getInQubits().front();
@@ -151,15 +140,14 @@ namespace {
 struct IonsDecompositionRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
-    {
+    mlir::LogicalResult matchAndRewrite(CustomOp op,
+                                        mlir::PatternRewriter &rewriter) const override {
         auto it = funcMap.find(op.getGateName().str());
         if (it != funcMap.end()) {
             auto decompFunc = it->second;
             decompFunc(op, rewriter);
             return success();
-        }
-        else {
+        } else {
             return failure();
         }
     }
@@ -169,8 +157,7 @@ struct IonsDecompositionRewritePattern : public mlir::OpRewritePattern<CustomOp>
 namespace catalyst {
 namespace quantum {
 
-void populateIonsDecompositionPatterns(RewritePatternSet &patterns)
-{
+void populateIonsDecompositionPatterns(RewritePatternSet &patterns) {
     patterns.add<IonsDecompositionRewritePattern>(patterns.getContext(), 1);
 }
 

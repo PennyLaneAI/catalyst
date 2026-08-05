@@ -28,8 +28,7 @@ using namespace catalyst::ion;
 
 #include "Ion/IR/IonOpsDialect.cpp.inc"
 
-void IonDialect::initialize()
-{
+void IonDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "Ion/IR/IonOpsTypes.cpp.inc"

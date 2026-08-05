@@ -33,15 +33,13 @@ namespace {
 constexpr int CONNECT_ATTEMPTS = 200;
 constexpr auto CONNECT_RETRY_DELAY = std::chrono::milliseconds(50);
 
-void set_tcp_nodelay(int fd)
-{
+void set_tcp_nodelay(int fd) {
     int one = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
 }
 } // namespace
 
-FdGuard tcp_listen_accept(std::uint16_t port)
-{
+FdGuard tcp_listen_accept(std::uint16_t port) {
     FdGuard listener(socket(AF_INET, SOCK_STREAM, 0));
     RDMA_CHECK_ERRNO(listener.valid(), "socket");
     int one = 1;
@@ -60,8 +58,7 @@ FdGuard tcp_listen_accept(std::uint16_t port)
     return client; // listener closed by its FdGuard on return
 }
 
-FdGuard tcp_connect(const char *host, std::uint16_t port)
-{
+FdGuard tcp_connect(const char *host, std::uint16_t port) {
     // getaddrinfo resolves both numeric IPs ("127.0.0.1") and hostnames
     // ("localhost", "node01"). IPv4-only.
     addrinfo hints{
@@ -87,8 +84,7 @@ FdGuard tcp_connect(const char *host, std::uint16_t port)
     RDMA_FAIL("tcp_connect(%s:%u) failed after %d attempts", host, port, CONNECT_ATTEMPTS);
 }
 
-void send_exact(int fd, const void *buf, std::size_t n)
-{
+void send_exact(int fd, const void *buf, std::size_t n) {
     std::size_t done = 0;
     const char *p = static_cast<const char *>(buf);
     while (done < n) {
@@ -103,8 +99,7 @@ void send_exact(int fd, const void *buf, std::size_t n)
     }
 }
 
-void recv_exact(int fd, void *buf, std::size_t n)
-{
+void recv_exact(int fd, void *buf, std::size_t n) {
     std::size_t done = 0;
     char *p = static_cast<char *>(buf);
     while (done < n) {

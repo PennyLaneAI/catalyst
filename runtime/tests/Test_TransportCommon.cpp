@@ -23,8 +23,7 @@
 
 using namespace catalyst::transport::common;
 
-static bool have_rxe()
-{
+static bool have_rxe() {
     int n = 0;
     ibv_device **devs = ibv_get_device_list(&n);
     bool found = false;
@@ -39,10 +38,8 @@ static bool have_rxe()
     return found;
 }
 
-TEST_CASE("parse_backend_config requires an explicit dev and gid", "[common]")
-{
-    SECTION("both keys present, order-independent")
-    {
+TEST_CASE("parse_backend_config requires an explicit dev and gid", "[common]") {
+    SECTION("both keys present, order-independent") {
         const BackendConfig a = parse_backend_config("dev=rxe0;gid=1");
         CHECK(a.dev == "rxe0");
         CHECK(a.gid == 1);
@@ -52,21 +49,18 @@ TEST_CASE("parse_backend_config requires an explicit dev and gid", "[common]")
         // 0 is a valid GID index, not a "missing" sentinel.
         CHECK(parse_backend_config("dev=rxe0;gid=0").gid == 0);
     }
-    SECTION("unknown keys are ignored, required ones still enforced")
-    {
+    SECTION("unknown keys are ignored, required ones still enforced") {
         const BackendConfig c = parse_backend_config("foo=bar;dev=rxe0;gid=2");
         CHECK(c.dev == "rxe0");
         CHECK(c.gid == 2);
     }
-    SECTION("a missing key is rejected rather than defaulted")
-    {
+    SECTION("a missing key is rejected rather than defaulted") {
         CHECK_THROWS_AS(parse_backend_config(""), RdmaError);
         CHECK_THROWS_AS(parse_backend_config("dev=rxe0"), RdmaError);
         CHECK_THROWS_AS(parse_backend_config("gid=1"), RdmaError);
         CHECK_THROWS_AS(parse_backend_config("junk"), RdmaError);
     }
-    SECTION("an empty or malformed value is rejected")
-    {
+    SECTION("an empty or malformed value is rejected") {
         CHECK_THROWS_AS(parse_backend_config("dev=;gid=1"), RdmaError);
         CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid="), RdmaError);
         // std::atoi would have silently turned each of these into gid 0.
@@ -76,8 +70,7 @@ TEST_CASE("parse_backend_config requires an explicit dev and gid", "[common]")
     }
 }
 
-TEST_CASE("QpState transitions gate the RC bring-up edges", "[common]")
-{
+TEST_CASE("QpState transitions gate the RC bring-up edges", "[common]") {
     REQUIRE(is_valid_transition(QpState::RESET, QpState::INIT));
     REQUIRE(is_valid_transition(QpState::INIT, QpState::RTR));
     REQUIRE(is_valid_transition(QpState::RTR, QpState::RTS));
@@ -87,8 +80,7 @@ TEST_CASE("QpState transitions gate the RC bring-up edges", "[common]")
     REQUIRE_FALSE(is_valid_transition(QpState::INIT, QpState::RTS));
 }
 
-TEST_CASE("Context opens rxe0 with an active port", "[common]")
-{
+TEST_CASE("Context opens rxe0 with an active port", "[common]") {
     if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
     }

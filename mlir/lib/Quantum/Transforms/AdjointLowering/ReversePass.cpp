@@ -51,8 +51,7 @@ namespace {
 /// Trace the value-semantic register use-def chain backwards to the `quantum.alloc` operation that
 /// originally produced it, following straight-line `quantum.insert` operations. Returns a null op
 /// if the allocation cannot be determined statically, i.e. the register crosses the block boundary.
-quantum::AllocOp findSourceAllocOp(Value qreg)
-{
+quantum::AllocOp findSourceAllocOp(Value qreg) {
     while (Operation *defOp = qreg.getDefiningOp()) {
         if (auto allocOp = dyn_cast<quantum::AllocOp>(defOp)) {
             return allocOp;
@@ -69,8 +68,7 @@ quantum::AllocOp findSourceAllocOp(Value qreg)
 /// Clone the region of the adjoint operation `op` to the insertion point specified by the
 /// `builder`. Build and return the value mapping `mapping`.
 void cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping,
-                        SmallVector<Value> &reversedResults)
-{
+                        SmallVector<Value> &reversedResults) {
     Block &block = op.getRegion().front();
     for (Operation &op : block.without_terminator()) {
         builder.clone(op, mapping);
@@ -86,41 +84,32 @@ void cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping,
 class AdjointGenerator {
   public:
     AdjointGenerator(IRMapping &remappedValues, QuantumCache &cache)
-        : remappedValues(remappedValues), cache(cache)
-    {
-    }
+        : remappedValues(remappedValues), cache(cache) {}
 
     /// Recursively generate the adjoint version of `region` with reversed control flow and adjoint
     /// quantum gates.
-    LogicalResult generate(Region &region, OpBuilder &builder)
-    {
+    LogicalResult generate(Region &region, OpBuilder &builder) {
         generateImpl(region, builder);
         return failure(generationFailed);
     }
 
   private:
-    void generateImpl(Region &region, OpBuilder &builder)
-    {
+    void generateImpl(Region &region, OpBuilder &builder) {
         assert(region.hasOneBlock() &&
                "Expected only structured control flow (each region should have a single block)");
 
         for (Operation &op : llvm::reverse(region.front().without_terminator())) {
             if (auto callOp = dyn_cast<func::CallOp>(op)) {
                 visitOperation(callOp, builder);
-            }
-            else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+            } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
                 visitOperation(forOp, builder);
-            }
-            else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+            } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
                 visitOperation(ifOp, builder);
-            }
-            else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
+            } else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
                 visitOperation(whileOp, builder);
-            }
-            else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
+            } else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
                 visitOperation(switchOp, builder);
-            }
-            else if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
+            } else if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
                 Value dynamicWire = getDynamicWire(insertOp, builder);
                 auto extractOp = quantum::ExtractOp::create(
                     builder, insertOp.getLoc(), insertOp.getQubit().getType(),
@@ -129,20 +118,17 @@ class AdjointGenerator {
                 remappedValues.map(insertOp.getQubit(), extractOp.getResult());
                 remappedValues.map(insertOp.getInQreg(),
                                    remappedValues.lookup(insertOp.getOutQreg()));
-            }
-            else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
+            } else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
                 Value dynamicWire = getDynamicWire(extractOp, builder);
                 auto insertOp = quantum::InsertOp::create(
                     builder, extractOp.getLoc(), extractOp.getQreg().getType(),
                     remappedValues.lookup(extractOp.getQreg()), dynamicWire,
                     extractOp.getIdxAttrAttr(), remappedValues.lookup(extractOp.getQubit()));
                 remappedValues.map(extractOp.getQreg(), insertOp.getResult());
-            }
-            else if (auto allocOp = dyn_cast<quantum::AllocOp>(op)) {
+            } else if (auto allocOp = dyn_cast<quantum::AllocOp>(op)) {
                 quantum::DeallocOp::create(builder, allocOp.getLoc(),
                                            remappedValues.lookup(allocOp.getQreg()));
-            }
-            else if (auto deallocOp = dyn_cast<quantum::DeallocOp>(op)) {
+            } else if (auto deallocOp = dyn_cast<quantum::DeallocOp>(op)) {
                 quantum::AllocOp sourceAlloc = findSourceAllocOp(deallocOp.getQreg());
                 if (!sourceAlloc) {
                     deallocOp.emitError("Unable to reverse dynamic register deallocation in the "
@@ -158,22 +144,17 @@ class AdjointGenerator {
                                                          deallocOp.getQreg().getType(), nqubits,
                                                          sourceAlloc.getNqubitsAttrAttr());
                 remappedValues.map(deallocOp.getQreg(), newAlloc.getQreg());
-            }
-            else if (auto allocQubitOp = dyn_cast<quantum::AllocQubitOp>(op)) {
+            } else if (auto allocQubitOp = dyn_cast<quantum::AllocQubitOp>(op)) {
                 quantum::DeallocQubitOp::create(builder, allocQubitOp.getLoc(),
                                                 remappedValues.lookup(allocQubitOp.getQubit()));
-            }
-            else if (auto deallocQubitOp = dyn_cast<quantum::DeallocQubitOp>(op)) {
+            } else if (auto deallocQubitOp = dyn_cast<quantum::DeallocQubitOp>(op)) {
                 auto newAlloc = quantum::AllocQubitOp::create(builder, deallocQubitOp.getLoc());
                 remappedValues.map(deallocQubitOp.getQubit(), newAlloc.getQubit());
-            }
-            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+            } else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
                 visitOperation(gate, builder);
-            }
-            else if (auto ppr = dyn_cast<pbc::PPRotationOp>(op)) {
+            } else if (auto ppr = dyn_cast<pbc::PPRotationOp>(op)) {
                 visitOperation(ppr, builder);
-            }
-            else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(&op)) {
+            } else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(&op)) {
                 for (auto [regionArg, result] : llvm::zip_equal(
                          adjointOp.getRegion().getArguments(), adjointOp.getResults())) {
                     remappedValues.map(regionArg, remappedValues.lookup(result));
@@ -184,8 +165,7 @@ class AdjointGenerator {
                      llvm::zip_equal(adjointOp.getArgs(), reversedResults)) {
                     remappedValues.map(operand, reversedResult);
                 }
-            }
-            else if (isa<QuantumDialect>(op.getDialect())) {
+            } else if (isa<QuantumDialect>(op.getDialect())) {
                 op.emitError("Unhandled operation in adjoint region");
                 generationFailed = true;
                 return;
@@ -193,8 +173,7 @@ class AdjointGenerator {
         }
     }
 
-    template <typename IndexingOp> Value getDynamicWire(IndexingOp op, OpBuilder &builder)
-    {
+    template <typename IndexingOp> Value getDynamicWire(IndexingOp op, OpBuilder &builder) {
         Value dynamicWire;
         if (!op.getIdxAttr().has_value()) {
             dynamicWire = ListPopOp::create(builder, op.getLoc(), cache.wireVector);
@@ -202,8 +181,7 @@ class AdjointGenerator {
         return dynamicWire;
     }
 
-    SmallVector<Value> getQuantumValues(ValueRange values)
-    {
+    SmallVector<Value> getQuantumValues(ValueRange values) {
         SmallVector<Value> qvalues;
         for (Value value : values) {
             if (isa<quantum::QuregType, quantum::QubitType>(value.getType())) {
@@ -213,8 +191,7 @@ class AdjointGenerator {
         return qvalues;
     }
 
-    void visitOperation(quantum::QuantumGate gate, OpBuilder &builder)
-    {
+    void visitOperation(quantum::QuantumGate gate, OpBuilder &builder) {
         for (const auto &[qubitResult, qubitOperand] :
              llvm::zip(gate.getQubitResults(), gate.getQubitOperands())) {
             remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
@@ -337,8 +314,7 @@ class AdjointGenerator {
         }
     }
 
-    void visitOperation(pbc::PPRotationOp ppr, OpBuilder &builder)
-    {
+    void visitOperation(pbc::PPRotationOp ppr, OpBuilder &builder) {
         for (const auto &[qubitResult, qubitOperand] :
              llvm::zip(ppr.getOutQubits(), ppr.getInQubits())) {
             remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
@@ -353,8 +329,7 @@ class AdjointGenerator {
         }
     }
 
-    void getAdjointCallOpArgs(func::CallOp callOp, std::vector<Value> &args)
-    {
+    void getAdjointCallOpArgs(func::CallOp callOp, std::vector<Value> &args) {
         // Get the reversed results
         args = {callOp.getArgOperands().begin(), callOp.getArgOperands().end()};
         std::queue<Value> reversedResults;
@@ -372,15 +347,13 @@ class AdjointGenerator {
                     // Must use the clone outside
                     args[i] = remappedValues.lookup(args[i]);
                 }
-            }
-            else {
+            } else {
                 args[i] = reversedResults.front();
                 reversedResults.pop();
             }
         }
     }
-    void visitOperation(func::CallOp callOp, OpBuilder &builder)
-    {
+    void visitOperation(func::CallOp callOp, OpBuilder &builder) {
         // Get the the original function
         SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(callOp.getCallableForCallee());
         func::FuncOp funcOp =
@@ -483,8 +456,7 @@ class AdjointGenerator {
         }
     }
 
-    void visitOperation(scf::ForOp forOp, OpBuilder &builder)
-    {
+    void visitOperation(scf::ForOp forOp, OpBuilder &builder) {
         SmallVector<Value> yieldedQValues =
             getQuantumValues(forOp.getBody()->getTerminator()->getOperands());
         if (yieldedQValues.empty()) {
@@ -535,8 +507,7 @@ class AdjointGenerator {
         }
     }
 
-    void visitOperation(scf::IfOp ifOp, OpBuilder &builder)
-    {
+    void visitOperation(scf::IfOp ifOp, OpBuilder &builder) {
         SmallVector<Value> yieldedQValues = getQuantumValues(ifOp.getResults());
         if (yieldedQValues.empty()) {
             // This operation is purely classical
@@ -605,8 +576,7 @@ class AdjointGenerator {
         }
     }
 
-    void visitOperation(scf::WhileOp whileOp, OpBuilder &builder)
-    {
+    void visitOperation(scf::WhileOp whileOp, OpBuilder &builder) {
         SmallVector<Value> yieldedQValues =
             getQuantumValues(whileOp.getAfter().front().getTerminator()->getOperands());
         if (yieldedQValues.empty()) {
@@ -652,8 +622,7 @@ class AdjointGenerator {
         }
     }
 
-    void visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder)
-    {
+    void visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder) {
         SmallVector<Value> yieldedQValues = getQuantumValues(switchOp.getResults());
         if (yieldedQValues.empty()) {
             // This operation is purely classical
@@ -735,8 +704,7 @@ namespace catalyst {
 namespace quantum {
 
 LogicalResult generateAdjointReversePass(Region &region, OpBuilder &builder,
-                                         IRMapping &remappedValues, QuantumCache &cache)
-{
+                                         IRMapping &remappedValues, QuantumCache &cache) {
     AdjointGenerator generator{remappedValues, cache};
     return generator.generate(region, builder);
 }

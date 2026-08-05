@@ -77,8 +77,7 @@ namespace quantum {
 
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         // Debugging output for command-line options
         LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");
         LLVM_DEBUG({
@@ -161,8 +160,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
   private:
     void parseFixedDecomps(llvm::StringMap<std::string> &opToFixedDecompName,
-                           llvm::StringSet<> &userRuleNames)
-    {
+                           llvm::StringSet<> &userRuleNames) {
         for (const std::string &opRulePair : fixedDecompsOption) {
             llvm::StringRef pairRef(opRulePair);
 
@@ -181,8 +179,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
     void parseAltDecomps(llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                         llvm::StringSet<> &userRuleNames)
-    {
+                         llvm::StringSet<> &userRuleNames) {
         for (const std::string &opRulesPair : altDecompsOption) {
             llvm::StringRef pairRef(opRulesPair);
 
@@ -208,8 +205,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
     }
 
-    LogicalResult parseGateset(WeightedGateset &targetGateSet)
-    {
+    LogicalResult parseGateset(WeightedGateset &targetGateSet) {
         for (const std::string &opCostPair : targetGateSetOption) {
             llvm::StringRef pairRef(opCostPair);
 
@@ -229,8 +225,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
-    LogicalResult addRuleNode(mlir::func::FuncOp rule, std::vector<RuleNode> &ruleNodes)
-    {
+    LogicalResult addRuleNode(mlir::func::FuncOp rule, std::vector<RuleNode> &ruleNodes) {
         llvm::StringRef ruleName = rule.getName();
 
         // 1. Mandatory Attribute Check (Target Gate and Resources)
@@ -287,8 +282,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
     LogicalResult loadBuiltInDecompositionRules(llvm::StringRef filename,
-                                                std::vector<RuleNode> &ruleNodes)
-    {
+                                                std::vector<RuleNode> &ruleNodes) {
         mlir::MLIRContext *context = &getContext();
         mlir::ModuleOp module = getOperation();
         mlir::ParserConfig config(context);
@@ -321,8 +315,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief Load the listed user rules into the set of RuleNodes for the graph.
      */
     LogicalResult loadUserDecompositionRules(llvm::StringSet<> &userRuleNames,
-                                             std::vector<RuleNode> &ruleNodes)
-    {
+                                             std::vector<RuleNode> &ruleNodes) {
         mlir::ModuleOp module = getOperation();
         if (userRuleNames.empty()) {
             return success();
@@ -351,8 +344,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * Use python to lower decomposition rules for all unhandled decomposable operations in the
      * circuit, annotating the lowered decomposition rules with resources and target gates.
      */
-    mlir::LogicalResult loadPythonDecomps(std::vector<RuleNode> &ruleNodes)
-    {
+    mlir::LogicalResult loadPythonDecomps(std::vector<RuleNode> &ruleNodes) {
         mlir::ModuleOp module = getOperation();
         MLIRContext *context = &getContext();
 
@@ -415,8 +407,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
-    void getOperators(std::vector<OperatorNode> &operators)
-    {
+    void getOperators(std::vector<OperatorNode> &operators) {
         // TODO: replace this with DecomposableGate interface. We will drop support for any other op
         // types once the interface has been implemented for the core operations in the quantum
         // dialect.
@@ -438,8 +429,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 std::string name = op->getName().stripDialect().str();
                 if (name == "gphase") {
                     name = "GlobalPhase";
-                }
-                else if (name == "paulirot") {
+                } else if (name == "paulirot") {
                     name = cast<DecomposableGate>(op.getOperation()).getGraphOpId();
                 }
                 node.name = name;
@@ -448,8 +438,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (auto paramOp =
                     llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
                 node.numParams = paramOp.getAllParams().size();
-            }
-            else {
+            } else {
                 node.numParams = 0;
             }
 
@@ -461,8 +450,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief Helper to parse a gate name into an OperatorNode.
      * Handles patterns like "Adjoint(GateName)" and "GateName(metadata)".
      */
-    OperatorNode parseOperator(llvm::StringRef raw)
-    {
+    OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
 
         // Unwrap "Adjoint(GateName)"
@@ -475,8 +463,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             node.name = raw.take_front(closeIdx).trim().str();
             raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
-        }
-        else {
+        } else {
             auto openIdx = raw.find('(');
             if (openIdx == llvm::StringRef::npos) {
                 node.name = raw.trim().str();
@@ -508,8 +495,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief Create RuleNodes for each rule available to be used in graph decomposition.
      */
     LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
-                               llvm::StringSet<> &userRuleNames)
-    {
+                               llvm::StringSet<> &userRuleNames) {
         // Load pre-compiled rules (ignore failure, we can try to solve without)
         std::ignore = loadBuiltInDecompositionRules(filename, rules);
 
@@ -537,8 +523,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @return Core::FixedDecomps  Mapping from OperatorNode to its fixed RuleNode.
      */
     FixedDecomps buildFixedDecomps(const llvm::StringMap<std::string> &opToFixedDecompName,
-                                   const llvm::StringMap<const RuleNode *> &rulesByName)
-    {
+                                   const llvm::StringMap<const RuleNode *> &rulesByName) {
         FixedDecomps fixedDecomps;
         fixedDecomps.reserve(opToFixedDecompName.size());
 
@@ -570,8 +555,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      */
     AltDecomps
     buildAltDecomps(const llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                    const llvm::StringMap<const RuleNode *> &rulesByName)
-    {
+                    const llvm::StringMap<const RuleNode *> &rulesByName) {
         AltDecomps altDecomps;
         altDecomps.reserve(opToAltDecompNames.size());
 
