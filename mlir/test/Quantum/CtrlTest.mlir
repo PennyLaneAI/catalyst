@@ -140,23 +140,3 @@ func.func @ctrl_measure(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quantum.bit {
   }
   return %outc : !quantum.bit
 }
-
-// -----
-
-// Control flow other than scf.if or scf.for is not supported yet.
-func.func @ctrl_scf_while(%ctrl: !quantum.bit, %q: !quantum.bit, %cond: i1) -> !quantum.bit {
-  %true = arith.constant true
-  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
-  ^bb0(%arg0: !quantum.bit):
-    // expected-error @+1 {{this control flow op inside a quantum.ctrl region is not supported yet}}
-    %r = scf.while (%qi = %arg0) : (!quantum.bit) -> !quantum.bit {
-      scf.condition(%cond) %qi : !quantum.bit
-    } do {
-    ^bb0(%q2: !quantum.bit):
-      %h = quantum.custom "Hadamard"() %q2 : !quantum.bit
-      scf.yield %h : !quantum.bit
-    }
-    quantum.yield %r : !quantum.bit
-  }
-  return %outc : !quantum.bit
-}

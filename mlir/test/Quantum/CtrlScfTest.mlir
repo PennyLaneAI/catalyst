@@ -160,3 +160,33 @@ func.func @ctrl_scf_for_with_if(%ctrl: !quantum.bit, %q: !quantum.bit, %lb: inde
   }
   return %outc, %outq : !quantum.bit, !quantum.bit
 }
+
+// -----
+
+// CHECK-LABEL: @ctrl_scf_while
+func.func @ctrl_scf_while(%ctrl: !quantum.bit, %q: !quantum.bit, %n: i64) -> (!quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  %c0 = arith.constant 0 : i64
+  %c1 = arith.constant 1 : i64
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: scf.while ({{.*}}) : (i64, !quantum.bit, !quantum.bit) -> (i64, !quantum.bit, !quantum.bit)
+  // CHECK:   scf.condition(%{{.*}}) %{{.*}}, %{{.*}}, %{{.*}} : i64, !quantum.bit, !quantum.bit
+  // CHECK: } do {
+  // CHECK:   quantum.custom "Hadamard"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
+  // CHECK:   scf.yield %{{.*}}, %{{.*}}, %{{.*}} : i64, !quantum.bit, !quantum.bit
+  // CHECK: }
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %r:2 = scf.while (%i = %c0, %qi = %arg0) : (i64, !quantum.bit) -> (i64, !quantum.bit) {
+      %cond = arith.cmpi slt, %i, %n : i64
+      scf.condition(%cond) %i, %qi : i64, !quantum.bit
+    } do {
+    ^bb0(%i2: i64, %q2: !quantum.bit):
+      %h = quantum.custom "Hadamard"() %q2 : !quantum.bit
+      %inext = arith.addi %i2, %c1 : i64
+      scf.yield %inext, %h : i64, !quantum.bit
+    }
+    quantum.yield %r#1 : !quantum.bit
+  }
+  return %outc, %outq : !quantum.bit, !quantum.bit
+}
