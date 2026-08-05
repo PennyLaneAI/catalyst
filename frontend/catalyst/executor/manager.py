@@ -49,7 +49,7 @@ from typing import Any, Callable, Self
 
 from .utils import (
     MAX_PORT_TRIES,
-    Paths,
+    ExecutorPaths,
     PortInUse,
     random_port,
     set_verbose,
@@ -223,11 +223,11 @@ class Executor:
 
     def _remote_target(self) -> tuple[str, str, str]:
         """Resolve ``(user, host, workspace)`` for a remote op. Defaults: ``user`` from
-        ``getpass.getuser()``, ``workspace`` from :meth:`Paths.default_workspace`."""
+        ``getpass.getuser()``, ``workspace`` from :meth:`ExecutorPaths.default_workspace`."""
         assert self.host is not None
         host = self.host.strip()
         user = self._cfg.user or getpass.getuser()
-        workspace = self._cfg.workspace or Paths.default_workspace()
+        workspace = self._cfg.workspace or ExecutorPaths.default_workspace()
         return user, host, workspace
 
     def _deploy_bundle(self, user: str, host: str, workspace: str) -> None:
@@ -247,8 +247,8 @@ class Executor:
     def _local_maker(self) -> Callable[[int], _ExecutorProcess]:
         """``make(port) -> _LocalProcess`` closure. Config-derived values are captured once so
         port retries share them."""
-        default_bin = Paths.default_executor_bin()
-        log_path = Paths.resolve_log("localhost", name=self.name)
+        default_bin = ExecutorPaths.default_executor_bin()
+        log_path = ExecutorPaths.resolve_log("localhost", name=self.name)
         ready_timeout = self._cfg.ready_timeout
 
         def make(port: int) -> _ExecutorProcess:
@@ -273,8 +273,8 @@ class Executor:
         self._scp_bundle(user, host, workspace)
         # Copied bundle -> run it from the workspace (./); sudo's secure_path would miss a bare
         # name. Bare name only when attaching to a remote that has it on PATH.
-        default_bin = f"./{Paths.EXECUTOR_BIN}" if self._cfg.copy else Paths.EXECUTOR_BIN
-        log_path = Paths.resolve_log(host, name=self.name)
+        default_bin = f"./{ExecutorPaths.EXECUTOR_BIN}" if self._cfg.copy else ExecutorPaths.EXECUTOR_BIN
+        log_path = ExecutorPaths.resolve_log(host, name=self.name)
         ready_timeout = self._cfg.ready_timeout
 
         def make(port: int) -> _ExecutorProcess:

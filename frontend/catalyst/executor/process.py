@@ -19,6 +19,7 @@ in :mod:`.ssh`."""
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import subprocess
 import sys
@@ -27,15 +28,17 @@ import time
 from typing import Self, TextIO
 
 from .utils import (
-    ExecutorCli,
-    Paths,
-    Patterns,
+    ExecutorFlags,
+    ExecutorPaths,
+    OutputPatterns,
     PortInUse,
     log_cmd,
-    logger,
     pdeathsig,
 )
 from .ssh import RemoteLauncher, SSH
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class _ExecutorProcess:
@@ -141,9 +144,9 @@ class _ExecutorProcess:
             line = raw.rstrip("\n")
             print(f"[{self.name}] {line}", file=sys.stderr, flush=True)
             self._log_tee(line)
-            if Patterns.is_port_conflict(line):
+            if OutputPatterns.is_port_conflict(line):
                 self._port_conflict.set()
-            if Patterns.is_ready(line):
+            if OutputPatterns.is_ready(line):
                 self._ready.set()
             self._scan_line(line)
 
@@ -259,9 +262,9 @@ class _LocalProcess(_ExecutorProcess):
         """Start ``catalyst-executor`` bound to ``127.0.0.1:<port>``. ``env`` extends the parent
         environment; ``plugins`` become ``--plugin=<path>`` args."""
         exe = os.path.expanduser(os.path.expandvars(self._executor_bin))
-        argv = [exe, f"{ExecutorCli.BIND_FLAG}{self.LOCALHOST}:{self._bind_port}"]
+        argv = [exe, f"{ExecutorFlags.BIND_FLAG}{self.LOCALHOST}:{self._bind_port}"]
         argv += [
-            f"{ExecutorCli.PLUGIN_FLAG}{os.path.expanduser(os.path.expandvars(p))}"
+            f"{ExecutorFlags.PLUGIN_FLAG}{os.path.expanduser(os.path.expandvars(p))}"
             for p in self._plugins
         ]
         log_cmd(argv)
@@ -291,7 +294,7 @@ class _RemoteProcess(_ExecutorProcess):
         env: dict[str, str] | None = None,
         sudo: bool = True,
         sudo_password: str | None = None,
-        executor_bin: str = f"./{Paths.EXECUTOR_BIN}",
+        executor_bin: str = f"./{ExecutorPaths.EXECUTOR_BIN}",
         cleanup_ws: bool = False,
         ready_timeout: float = 60.0,
         name: str = "executor",
@@ -329,9 +332,9 @@ class _RemoteProcess(_ExecutorProcess):
 
     def _scan_line(self, line: str) -> None:
         """Flag SSH-password or sudo-failure prompts for :meth:`_check_failure` to bail on."""
-        if Patterns.is_ssh_prompt(line):
+        if OutputPatterns.is_ssh_prompt(line):
             kind = "ssh"
-        elif Patterns.is_sudo_fail(line):
+        elif OutputPatterns.is_sudo_fail(line):
             kind = "sudo"
         else:
             return
@@ -396,7 +399,7 @@ class _RemoteProcess(_ExecutorProcess):
         someone else's process there is never wrongly killed."""
         if not self._ready_reached:
             return
-        pat = f"{Paths.EXECUTOR_BIN}.*{ExecutorCli.BIND_FLAG}0.0.0.0:{self._bind_port}"
+        pat = f"{ExecutorPaths.EXECUTOR_BIN}.*{ExecutorFlags.BIND_FLAG}0.0.0.0:{self._bind_port}"
         SSH.pkill(
             self.user, self.host, pat,
             sudo=self.sudo, sudo_password=self.sudo_password,
@@ -406,7 +409,7 @@ class _RemoteProcess(_ExecutorProcess):
         """Remove the auto-generated remote workspace. Guarded by the ``catalyst-exec-`` prefix
         so a user-pinned dir is never wiped."""
         basename = self.workspace.rsplit("/", 1)[-1]
-        if not self.cleanup_ws or not basename.startswith(Paths.WORKSPACE_PREFIX):
+        if not self.cleanup_ws or not basename.startswith(ExecutorPaths.WORKSPACE_PREFIX):
             return
         self._say(f"removing remote workspace {self.workspace}", level=2)
         SSH.rmdir(self.user, self.host, self.workspace)  # force=False: silent teardown

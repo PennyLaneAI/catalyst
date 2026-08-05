@@ -14,24 +14,21 @@
 
 """Shared helpers for the :class:`~catalyst.executor.Executor`.
 
-* :class:`Patterns`: regexes for scanning executor/ssh output.
-* :class:`Paths`: workspace, binary, and log-file path resolvers.
-* :class:`ShellCommand`: POSIX shell fragments and path quoting.
-* :class:`ExecutorCli`: CLI flag constants for ``catalyst-executor``.
+* :class:`OutputPatterns`: regexes for scanning executor/ssh output.
+* :class:`ExecutorPaths`: workspace, binary, and log-file path resolvers.
+* :class:`ShellText`: POSIX shell fragments and path quoting.
+* :class:`ExecutorFlags`: CLI flag constants for ``catalyst-executor``.
 
 Plus stdlib logging (:data:`logger`, :func:`set_verbose`, :func:`verbose_level`, :func:`log_cmd`),
 free helpers (:func:`random_port`, :func:`triple_from_uname`, :data:`pdeathsig`), and domain
-types (:class:`PortInUse`, :class:`Raw`).
+types (:class:`PortInUse`, :class:`Unquoted`).
 """
 
 from __future__ import annotations
 
-import contextlib
 import ctypes
-import faulthandler
 import getpass
 import logging
-import os
 import random
 import re
 import shlex
@@ -39,14 +36,11 @@ import signal
 import sys
 import time
 from pathlib import Path
+from typing import Final
 
 from catalyst.utils.runtime_environment import get_lib_path
 
-# Print a C-level traceback on a plugin segfault instead of a silent core dump.
-with contextlib.suppress(Exception):
-    faulthandler.enable()
-
-# Random bind-port retries on collision.
+# Random fallback ports to try on a bind collision.
 MAX_PORT_TRIES = 6
 
 
@@ -54,7 +48,7 @@ class PortInUse(Exception):
     """The chosen executor port was already taken."""
 
 
-class Raw(str):
+class Unquoted(str):
     """Marker for a string that must not be shell-quoted when embedded into a remote command.
 
     Use for :attr:`~catalyst.Executor.env` values or plugin paths that need ``$VAR`` to expand
@@ -62,11 +56,11 @@ class Raw(str):
 
     Example::
 
-        Executor(host="h", env={"LD_LIBRARY_PATH": Raw("$HOME/lib")}, plugins=[Raw("$LIBDIR/x.so")])
+        Executor(host="h", env={"LD_LIBRARY_PATH": Unquoted("$HOME/lib")}, plugins=[Unquoted("$LIBDIR/x.so")])
     """
 
 
-class Patterns:
+class OutputPatterns:
     """Regex classifiers for executor/ssh output lines. Use the ``is_*`` predicates."""
 
     # "bound and accepting". First launch prints "Listening on <h>:<p>"; the other recurs after
@@ -84,26 +78,30 @@ class Patterns:
     @staticmethod
     def is_ready(line: str) -> bool:
         """True if ``line`` signals the executor bound its port."""
-        return bool(Patterns._READY.search(line))
+        return bool(OutputPatterns._READY.search(line))
 
     @staticmethod
     def is_port_conflict(line: str) -> bool:
         """True if ``line`` signals a port bind failure."""
-        return bool(Patterns._PORT.search(line))
+        return bool(OutputPatterns._PORT.search(line))
 
     @staticmethod
     def is_ssh_prompt(line: str) -> bool:
         """True if ``line`` is an SSH password/passphrase prompt."""
-        return bool(Patterns._SSH_PW.search(line))
+        return bool(OutputPatterns._SSH_PW.search(line))
 
     @staticmethod
     def is_sudo_fail(line: str) -> bool:
         """True if ``line`` is a sudo password rejection."""
-        return bool(Patterns._SUDO_FAIL.search(line))
+        return bool(OutputPatterns._SUDO_FAIL.search(line))
 
 
-class ShellCommand:
+class ShellText:
     """Generic POSIX shell fragments and path quoting for remote ops."""
+
+    # Shell expression that expands to ``$HOME`` on the remote; quoted to survive one round of
+    # shell parsing.
+    HOME: Final = '"$HOME"'
 
     @staticmethod
     def sudo_probe() -> str:
@@ -128,24 +126,24 @@ class ShellCommand:
     @staticmethod
     def rm_rf(path: str) -> str:
         """``rm -rf <path>``. Caller is responsible for safety-gating."""
-        return f"rm -rf {ShellCommand.path(path)}"
+        return f"rm -rf {ShellText.path(path)}"
 
     @staticmethod
     def mkdir_p(path: str) -> str:
         """``mkdir -p <path>``."""
-        return f"mkdir -p {ShellCommand.path(path)}"
+        return f"mkdir -p {ShellText.path(path)}"
 
     @staticmethod
     def path(path: str) -> str:
         """Shell expression for ``path`` with ``~`` expanded via ``$HOME`` and the rest quoted."""
         if path == "~":
-            return '"$HOME"'
+            return ShellText.HOME
         if path.startswith("~/"):
-            return '"$HOME"/' + shlex.quote(path[2:])
+            return f"{ShellText.HOME}/{shlex.quote(path[2:])}"
         return shlex.quote(path)
 
 
-class ExecutorCli:
+class ExecutorFlags:
     """CLI flag constants for the ``catalyst-executor`` binary."""
 
     PLUGIN_FLAG = "--plugin="
@@ -153,36 +151,36 @@ class ExecutorCli:
 
 
 # --- logging -----------------------------------------------------------------------------------
-# Verbosity levels (via :func:`set_verbose` or ``Executor(verbose=)``):
-#   0 quiet    — WARNING only
-#   1 default  — INFO (phases, ready/stop, executor stdout stream)
-#   2 verbose  — DEBUG (ssh/scp commands, timings)
-#   3+ trace   — DEBUG + extra ``ssh -v`` flags on the wire
-logger = logging.getLogger("catalyst.executor")
-logger.setLevel(logging.INFO)
-_stderr_handler = logging.StreamHandler(sys.stderr)
-_stderr_handler.setFormatter(logging.Formatter("[remote-exec] %(message)s"))
-logger.addHandler(_stderr_handler)
-logger.propagate = False  # avoid double-logging when a caller configures the root logger
+# PennyLane convention: library-silent by default. Attach a handler to the ``catalyst.executor``
+# logger tree (or call :func:`pennylane.logging.enable_logging`) to see output.
+#
+# ``Executor(verbose=)`` / :func:`set_verbose` maps an int 0-3 to log level and ssh-verbosity:
+#   0 quiet    → WARNING
+#   1 default  → INFO   (launch phases, ready/stop, remote stdout)
+#   2 verbose  → DEBUG  (ssh/scp commands, timings)
+#   3+ trace   → DEBUG + ``ssh -v`` flags on the wire
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
-_verbose = 1  # 0-3, drives external-tool flags (``ssh -v``, ``scp -v``)
+# set_verbose targets ``catalyst.executor`` so every child module inherits the level.
+_pkg_logger = logging.getLogger("catalyst.executor")
+_verbose = 1
 
 
 def set_verbose(level: int) -> None:
-    """Set launcher verbosity. Maps to :mod:`logging`: 0 → WARNING, 1 → INFO, ≥2 → DEBUG.
-    Higher values (3+) also bump the ``ssh -v`` flag count."""
+    """Set launcher verbosity (0-3). See the module-level table for the mapping."""
     global _verbose
     _verbose = level
     if level <= 0:
-        logger.setLevel(logging.WARNING)
+        _pkg_logger.setLevel(logging.WARNING)
     elif level == 1:
-        logger.setLevel(logging.INFO)
+        _pkg_logger.setLevel(logging.INFO)
     else:
-        logger.setLevel(logging.DEBUG)
+        _pkg_logger.setLevel(logging.DEBUG)
 
 
 def verbose_level() -> int:
-    """Current numeric verbosity (0-3)."""
+    """Current verbosity (0-3)."""
     return _verbose
 
 
@@ -191,22 +189,22 @@ def log_cmd(argv: list[str]) -> None:
     logger.debug("$ %s", " ".join(shlex.quote(c) for c in argv))
 
 
-class Paths:
+class ExecutorPaths:
     """Default paths for workspace, executor binary, and per-launch log file."""
 
     # Guards the ``rm -rf`` teardown so a user-pinned workspace can never be wiped.
-    WORKSPACE_PREFIX = "catalyst-exec-"
+    WORKSPACE_PREFIX: Final = "catalyst-exec-"
 
     # Executor binary name; also used as ``./<name>`` inside a scp'd workspace.
-    EXECUTOR_BIN = "catalyst-executor"
+    EXECUTOR_BIN: Final = "catalyst-executor"
 
     # Filesystem-safe timestamp: 2026-06-30_04-48-15.
-    _TS_FMT = "%Y-%m-%d_%H-%M-%S"
+    _TS_FMT: Final = "%Y-%m-%d_%H-%M-%S"
 
     @staticmethod
     def _timestamp() -> str:
         """Filesystem-safe timestamp for workspace and log names."""
-        return time.strftime(Paths._TS_FMT, time.localtime())
+        return time.strftime(ExecutorPaths._TS_FMT, time.localtime())
 
     @staticmethod
     def _random_suffix() -> str:
@@ -217,8 +215,8 @@ class Paths:
     def default_workspace() -> str:
         """Per-run remote workspace path under ``~/``, tagged with user/timestamp/random suffix."""
         return (
-            f"~/{Paths.WORKSPACE_PREFIX}{getpass.getuser()}-"
-            f"{Paths._timestamp()}-{Paths._random_suffix()}"
+            f"~/{ExecutorPaths.WORKSPACE_PREFIX}{getpass.getuser()}-"
+            f"{ExecutorPaths._timestamp()}-{ExecutorPaths._random_suffix()}"
         )
 
     @staticmethod
@@ -229,10 +227,10 @@ class Paths:
         ``$PATH``.
         """
         rt_lib = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-        for candidate in (rt_lib / Paths.EXECUTOR_BIN, rt_lib / "remote" / Paths.EXECUTOR_BIN):
+        for candidate in (rt_lib / ExecutorPaths.EXECUTOR_BIN, rt_lib / "remote" / ExecutorPaths.EXECUTOR_BIN):
             if candidate.exists():
                 return str(candidate)
-        return Paths.EXECUTOR_BIN
+        return ExecutorPaths.EXECUTOR_BIN
 
     @staticmethod
     def resolve_log(
@@ -245,7 +243,7 @@ class Paths:
         if explicit:
             return explicit
         tag = "" if name == "executor" else f"-{name}"
-        return f"{Paths.EXECUTOR_BIN}{tag}-{host}-{Paths._timestamp()}.log"
+        return f"{ExecutorPaths.EXECUTOR_BIN}{tag}-{host}-{ExecutorPaths._timestamp()}.log"
 
 
 def random_port() -> int:
@@ -268,12 +266,17 @@ def triple_from_uname(system: str, machine: str) -> str | None:
     return None
 
 
-def _set_pdeathsig() -> None:
-    """preexec_fn: kernel SIGTERMs this child when the parent dies, so a host crash doesn't
-    leak the ssh tunnel + executor."""
-    with contextlib.suppress(Exception):
-        ctypes.CDLL("libc.so.6", use_errno=True).prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG=1
+if sys.platform == "linux":
+    _libc = ctypes.CDLL("libc.so.6", use_errno=True)
 
+    def _set_pdeathsig() -> None:
+        """preexec_fn: kernel SIGTERMs this child when the parent dies, so a host crash
+        doesn't leak the ssh tunnel + executor."""
+        PR_SET_PDEATHSIG = 1  # linux/prctl.h
+        _libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
 
-# preexec_fn only exists on POSIX; None elsewhere. Lowercased since it's a callable-or-None.
-pdeathsig = _set_pdeathsig if hasattr(os, "fork") else None
+    pdeathsig = _set_pdeathsig
+else:
+    # PR_SET_PDEATHSIG is Linux-only; on macOS/Windows the executor still runs, it just
+    # won't be auto-killed if the parent dies uncleanly.
+    pdeathsig = None

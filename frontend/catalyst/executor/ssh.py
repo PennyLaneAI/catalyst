@@ -22,13 +22,17 @@
 from __future__ import annotations
 
 import getpass
+import logging
 import os
 import shlex
 import subprocess
 import time
 from pathlib import Path
 
-from .utils import ExecutorCli, Paths, Raw, ShellCommand, log_cmd, logger, verbose_level
+from .utils import ExecutorFlags, ExecutorPaths, Unquoted, ShellText, log_cmd, verbose_level
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class SSH:
@@ -155,12 +159,12 @@ class SSH:
         With ``sudo=True``: uses ``sudo -S`` when ``sudo_password`` is given, else ``sudo -n``
         (NOPASSWD only).
         """
-        cmd = ShellCommand.pkill(pat)
+        cmd = ShellText.pkill(pat)
         if not sudo:
             return SSH.run(user, host, cmd)
         if sudo_password is not None:
-            return SSH.run(user, host, ShellCommand.sudo_pw(cmd), input=sudo_password + "\n")
-        return SSH.run(user, host, ShellCommand.sudo_np(cmd))
+            return SSH.run(user, host, ShellText.sudo_pw(cmd), input=sudo_password + "\n")
+        return SSH.run(user, host, ShellText.sudo_np(cmd))
 
     @staticmethod
     def mkdir(user: str, host: str, path: str) -> None:
@@ -172,7 +176,7 @@ class SSH:
         SSH.run(
             user,
             host,
-            ShellCommand.mkdir_p(path),
+            ShellText.mkdir_p(path),
             quiet=False,
             log=True,
             error=f"failed to create remote directory {path!r}",
@@ -190,7 +194,7 @@ class SSH:
             RuntimeError: If ``force`` is set and the remote ``rm`` returned non-zero.
         """
         remote = (
-            f"ws={ShellCommand.path(path)}; "
+            f"ws={ShellText.path(path)}; "
             'd=$(cd "$ws" 2>/dev/null && pwd) || exit 0; '
             'if [ -z "$d" ] || [ "$d" = "/" ] || [ "$d" = "$HOME" ]; then exit 3; fi; '
             'rm -rf "$d"'
@@ -213,7 +217,7 @@ class SSH:
         Raises:
             RuntimeError: If SSH itself failed (rc 255), with an ``ssh-copy-id`` hint.
         """
-        rc = SSH.run(user, host, ShellCommand.sudo_probe(), opts=list(SSH.PROBE_OPTS), log=True)
+        rc = SSH.run(user, host, ShellText.sudo_probe(), opts=list(SSH.PROBE_OPTS), log=True)
         if rc == 255:
             raise RuntimeError(
                 f"SSH to {user}@{host} needs a password. Install your key:\n"
@@ -317,13 +321,13 @@ class RemoteLauncher:
         *,
         sudo: bool = True,
         sudo_password: str | None = None,
-        executor_bin: str = f"./{Paths.EXECUTOR_BIN}",
+        executor_bin: str = f"./{ExecutorPaths.EXECUTOR_BIN}",
     ) -> list[str]:
         """Full ``ssh -L ...`` argv that opens a port-forward and starts ``catalyst-executor`` on
         the remote host.
 
         Bare-string values in ``env``/``plugins`` are shell-quoted; wrap in
-        :class:`~catalyst.executor.utils.Raw` to expand ``$VAR`` on the remote instead.
+        :class:`~catalyst.executor.utils.Unquoted` to expand ``$VAR`` on the remote instead.
         """
         use_pw = sudo_password is not None
         remote_cmd = RemoteLauncher._remote_cmd(
@@ -347,11 +351,11 @@ class RemoteLauncher:
     ) -> str:
         """Remote shell command: ``cd`` into workspace, export env, exec the executor."""
         return (
-            f"cd {ShellCommand.path(workspace)} "
+            f"cd {ShellText.path(workspace)} "
             f"&& {RemoteLauncher._chmod_prefix(executor_bin)}"
             f"{RemoteLauncher._env_prefix(env)} "
             f"{RemoteLauncher._exec_prefix(sudo, use_password)} "
-            f"{executor_bin} {ExecutorCli.BIND_FLAG}0.0.0.0:{remote_port} "
+            f"{executor_bin} {ExecutorFlags.BIND_FLAG}0.0.0.0:{remote_port} "
             f"{RemoteLauncher._plugin_args(plugins)}"
         )
 
@@ -369,9 +373,9 @@ class RemoteLauncher:
 
     @staticmethod
     def _env_prefix(env: dict[str, str]) -> str:
-        """``K=V K=V ...`` prefix. :class:`Raw` values expand on the remote; bare strings are quoted."""
+        """``K=V K=V ...`` prefix. :class:`Unquoted` values expand on the remote; bare strings are quoted."""
         def q(v: str) -> str:
-            return v if isinstance(v, Raw) else shlex.quote(v)
+            return v if isinstance(v, Unquoted) else shlex.quote(v)
         return " ".join(f"{k}={q(v)}" for k, v in env.items())
 
     @staticmethod
@@ -379,20 +383,20 @@ class RemoteLauncher:
         """``--plugin=<path>`` args. Bare filenames resolve against ``$PWD``; ``~``/absolute
         paths are quoted with tilde expansion."""
         def arg(p: str) -> str:
-            flag = ExecutorCli.PLUGIN_FLAG
-            if isinstance(p, Raw):
+            flag = ExecutorFlags.PLUGIN_FLAG
+            if isinstance(p, Unquoted):
                 return f"{flag}{p}"
             if "/" not in p and not p.startswith("~"):
                 return f"{flag}$PWD/{shlex.quote(p)}"
-            return f"{flag}{ShellCommand.path(p)}"
+            return f"{flag}{ShellText.path(p)}"
         return " ".join(arg(p) for p in plugins)
 
     @staticmethod
     def _chmod_prefix(executor_bin: str) -> str:
         """``chmod +x`` for a workspace-local binary (scp drops the +x bit); empty otherwise."""
-        if executor_bin != f"./{Paths.EXECUTOR_BIN}":
+        if executor_bin != f"./{ExecutorPaths.EXECUTOR_BIN}":
             return ""
-        return f"chmod +x ./{Paths.EXECUTOR_BIN} 2>/dev/null; "
+        return f"chmod +x ./{ExecutorPaths.EXECUTOR_BIN} 2>/dev/null; "
 
     @staticmethod
     def _exec_prefix(sudo: bool, use_password: bool) -> str:
