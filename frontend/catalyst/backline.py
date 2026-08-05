@@ -120,11 +120,26 @@ def _node_dict(node, role: str) -> dict:
     return d
 
 
+def _load_coprocessor_fn_libs(placement) -> None:
+    """Load the library providing each in-process (local) coprocessor's CoprocessorFn.
+    """
+    import ctypes  # pylint: disable=import-outside-toplevel
+
+    for coproc in placement.coprocessors:
+        if coproc.remote:
+            continue
+        lib_path = getattr(coproc.coprocessor_fn, "lib_path", None)
+        if lib_path:
+            ctypes.CDLL(str(lib_path), mode=ctypes.RTLD_GLOBAL)
+
+
 def realize_executors(placement) -> None:
-    """Launch an executor for every node of ``placement`` that requested one. Idempotent."""
+    """Prepare ``placement`` for execution: launch the executors it asked for, and load the
+    CoprocessorFn libraries its in-process coprocessors need. Idempotent."""
     _realize_executor(placement.controller)
     for coproc in placement.coprocessors:
         _realize_executor(coproc)
+    _load_coprocessor_fn_libs(placement)
 
 
 def add_transport_passes(stages):

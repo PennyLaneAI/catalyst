@@ -102,6 +102,49 @@ def test_single_coprocessor():
     assert d["coprocessors"][0]["symbol"] == "coproc_fn"
 
 
+def test_in_process_coprocessor_fn_lib_is_loaded(monkeypatch):
+    """An in-process coprocessor's CoprocessorFn library is loaded, so its symbol can resolve.
+
+    Nothing else loads it: there is no executor to have taken it as a ``--plugin``, and for
+    ``cpu_verbs`` the decoder is a library of its own rather than part of the backend.
+    """
+    loaded = []
+    monkeypatch.setattr(
+        "ctypes.CDLL", lambda path, mode=None: loaded.append((path, mode)) or object()
+    )
+    import ctypes  # pylint: disable=import-outside-toplevel
+
+    fn = qp.CoprocessorFunction("decode_fn", lib_path="/opt/libdecode.so")
+    dev = qp.backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="net"
+    )
+    realize_executors(dev.placement)
+    assert loaded == [("/opt/libdecode.so", ctypes.RTLD_GLOBAL)]
+
+
+def test_remote_coprocessor_fn_lib_is_not_loaded_here(monkeypatch):
+    """A remote coprocessor's library belongs on its own machine; its executor loads it there."""
+    loaded = []
+    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
+    fn = qp.CoprocessorFunction("decode_fn", lib_path="/opt/libdecode.so")
+    dev = qp.backline(
+        controller=_controller(),
+        coprocessors=[_coproc("cop0", fn=fn, remote=True)],
+        transport="net",
+    )
+    realize_executors(dev.placement)
+    assert loaded == []
+
+
+def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
+    """No ``lib_path`` means resolve from what is already loaded, so nothing is opened."""
+    loaded = []
+    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
+    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    realize_executors(dev.placement)
+    assert loaded == []
+
+
 def test_multiple_coprocessors_all_serialized():
     """All coprocessors are serialized as a list, in order."""
     dev = qp.backline(
