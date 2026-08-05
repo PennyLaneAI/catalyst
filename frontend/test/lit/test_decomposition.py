@@ -437,7 +437,11 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: stablehlo.constant dense<3> : tensor<i64>
     test_from_hybrid_wires()
 
-    def test_decompose_to_hybrid_op():
+    def test_to_hybrid_op():
+        """
+        Test that decomposing to an op with a non-wire-like hybrid_argnames works.
+        """
+
         def rule_resource_fn(reg):
             return {
                 HybridOpArg(
@@ -489,7 +493,44 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
-    test_decompose_to_hybrid_op()
+    test_to_hybrid_op()
+
+    def test_from_hybrid_op():
+        """
+        Test that decomposing from an op with a non-wire-like hybrid_argnames works.
+        """
+
+        def rule_resource_fn(angle, op, cwires, n_iters):
+            return {NoParams(reg=Wire[1]): 1, op: 1}
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(angle, op, cwires, n_iters):
+            qp.apply(op)
+            NoParams(reg=cwires[0])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(HybridOpArg, rule)
+            result = compile_decomposition_rules_wrapper(
+                "HybridOpArg",
+                "HybridOpArg{angle:[f64]}{cwires:1}{}[5678]",
+                {"angle": ["f64"]},
+                {"cwires": 1},
+                {},
+                extra_data={
+                    "op": StaticDataMultiReg("hello", reg=[1], reg2=[2, 3], theta=0.2),
+                    "n_iters": 100,
+                },
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_HybridOpArg{angle:[f64]}{cwires:1}{}[5678]"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
+    # CHECK-SAME:   "StaticDataMultiReg{theta:[f64]}{reg:1,reg2:2}{}[[[uid_1:[-0-9]+]]]" = 1 : i64
+    # CHECK-SAME:   target_gate = "HybridOpArg{angle:[f64]}{cwires:1}{}[5678]"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]] : i64, op_name = "StaticDataMultiReg"
+
+    test_from_hybrid_op()
 
     def test_decompose_to_hybrid_op_nested():
         def rule_resource_fn(reg):
