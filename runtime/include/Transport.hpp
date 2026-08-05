@@ -233,8 +233,7 @@ class CoprocessorSession : public TransportSession {
      * message's decoder_id so it can dispatch internally; `ctx` is passed back on
      * every invocation and may be null.
      */
-    virtual void set_coprocessor_fn(CoprocessorFn /*fn*/, void * /*ctx*/)
-    {
+    virtual void set_coprocessor_fn(CoprocessorFn /*fn*/, void * /*ctx*/) {
         throw std::logic_error(
             "transport: per-message coprocessor function not supported by this backend");
     }
@@ -245,8 +244,7 @@ class CoprocessorSession : public TransportSession {
      * Call before start(). `fn` is invoked once (in start()) to launch a
      * persistent engine on the session's datapath; `ctx` may be null.
      */
-    virtual void set_coprocessor_launcher(CoprocessorLauncherFn /*fn*/, void * /*ctx*/)
-    {
+    virtual void set_coprocessor_launcher(CoprocessorLauncherFn /*fn*/, void * /*ctx*/) {
         throw std::logic_error(
             "transport: launch-once coprocessor function not supported by this backend");
     }
@@ -256,8 +254,7 @@ class CoprocessorSession : public TransportSession {
      *
      * Defaults to per-message.
      */
-    virtual CoprocConvention coprocessor_fn_convention() const
-    {
+    virtual CoprocConvention coprocessor_fn_convention() const {
         return CoprocConvention::PerMessage;
     }
 };

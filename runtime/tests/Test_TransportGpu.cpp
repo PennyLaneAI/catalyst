@@ -23,24 +23,21 @@
 using namespace catalyst::transport::gpu_verbs;
 using namespace catalyst::transport::common;
 
-TEST_CASE("Wire Payload is the 16 B frame")
-{
+TEST_CASE("Wire Payload is the 16 B frame") {
     STATIC_REQUIRE(sizeof(Payload) == 16);
     STATIC_REQUIRE(offsetof(Payload, value) == 0);
     STATIC_REQUIRE(offsetof(Payload, decoder_id) == 8);
     STATIC_REQUIRE(offsetof(Payload, seq_num) == 12);
 }
 
-TEST_CASE("PayloadSlot is a 64 B aligned ring slot")
-{
+TEST_CASE("PayloadSlot is a 64 B aligned ring slot") {
     STATIC_REQUIRE(sizeof(PayloadSlot) == 64);
     STATIC_REQUIRE(alignof(PayloadSlot) == 64);
     STATIC_REQUIRE(K_RING_SLOTS == 256);
     STATIC_REQUIRE(REGION_BYTES == K_RING_SLOTS * sizeof(PayloadSlot));
 }
 
-TEST_CASE("HandoffSlot carries correction + trailing seq, fits one 16 B store")
-{
+TEST_CASE("HandoffSlot carries correction + trailing seq, fits one 16 B store") {
     STATIC_REQUIRE(offsetof(HandoffSlot, correction) == 0);
     STATIC_REQUIRE(sizeof(HandoffSlot) == 16);
     STATIC_REQUIRE(alignof(HandoffSlot) == 16);

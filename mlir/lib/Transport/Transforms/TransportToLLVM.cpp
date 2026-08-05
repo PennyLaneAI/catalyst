@@ -44,8 +44,7 @@ IntegerType i64Ty(MLIRContext *ctx) { return IntegerType::get(ctx, 64); }
 ModuleOp moduleOf(Operation *op) { return op->getParentOfType<ModuleOp>(); }
 
 Value emitCall(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, StringRef name,
-               ArrayRef<Type> paramTys, Type resultTy, ValueRange args)
-{
+               ArrayRef<Type> paramTys, Type resultTy, ValueRange args) {
     Type rty = resultTy ? resultTy : LLVM::LLVMVoidType::get(rewriter.getContext());
     auto fn = LLVM::lookupOrCreateFn(rewriter, mod, name, paramTys, rty);
     assert(succeeded(fn) && "failed to declare transport CAPI function");
@@ -53,8 +52,7 @@ Value emitCall(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, 
     return call.getNumResults() ? call.getResult() : Value();
 }
 
-std::string globalStrKey(StringRef prefix, StringRef value)
-{
+std::string globalStrKey(StringRef prefix, StringRef value) {
     std::string key = prefix.str();
     for (char c : value) {
         bool ok = llvm::isAlnum(c) || c == '_';
@@ -64,8 +62,7 @@ std::string globalStrKey(StringRef prefix, StringRef value)
 }
 
 Value globalStr(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod, StringRef prefix,
-                StringRef value)
-{
+                StringRef value) {
     std::string data = value.str();
     data.push_back('\0');
     auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), data.size());
@@ -91,16 +88,14 @@ Value globalStr(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod,
                                ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
-Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64_t v)
-{
+Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64_t v) {
     return LLVM::ConstantOp::create(rewriter, loc, ty, rewriter.getIntegerAttr(ty, v));
 }
 
 // From a lowered 1-D memref descriptor (an LLVM struct), extract the aligned data
 // pointer and the buffer's size in bytes (num elements * element byte width).
 std::pair<Value, Value> memrefPtrAndBytes(ConversionPatternRewriter &rewriter, Location loc,
-                                          Value descriptor, MemRefType memTy)
-{
+                                          Value descriptor, MemRefType memTy) {
     Value ptr = LLVM::ExtractValueOp::create(rewriter, loc, descriptor, ArrayRef<int64_t>{1});
     Value nelem = LLVM::ExtractValueOp::create(rewriter, loc, descriptor, ArrayRef<int64_t>{3, 0});
     Type elemTy = memTy.getElementType();
@@ -117,8 +112,7 @@ std::pair<Value, Value> memrefPtrAndBytes(ConversionPatternRewriter &rewriter, L
 struct CreateLowering : public OpConversionPattern<CreateOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(CreateOp op, OpAdaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         auto sessTy = cast<SessionType>(op.getSession().getType());
@@ -138,8 +132,7 @@ struct CreateLowering : public OpConversionPattern<CreateOp> {
 template <typename OpT, bool Async> struct ConnectLoweringBase : public OpConversionPattern<OpT> {
     using OpConversionPattern<OpT>::OpConversionPattern;
     LogicalResult matchAndRewrite(OpT op, typename OpT::Adaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         ModuleOp mod = op->template getParentOfType<ModuleOp>();
         Value peer = globalStr(rewriter, op.getLoc(), mod, "transport_peer_", op.getPeer());
@@ -149,8 +142,7 @@ template <typename OpT, bool Async> struct ConnectLoweringBase : public OpConver
                                {ptrTy(ctx), ptrTy(ctx), IntegerType::get(ctx, 16)}, i64Ty(ctx),
                                {adaptor.getSession(), peer, port});
             rewriter.replaceOp(op, r);
-        }
-        else {
+        } else {
             emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__connect",
                      {ptrTy(ctx), ptrTy(ctx), IntegerType::get(ctx, 16)}, i32Ty(ctx),
                      {adaptor.getSession(), peer, port});
@@ -166,8 +158,7 @@ template <typename OpT, bool Async>
 struct ExchangeKeysLoweringBase : public OpConversionPattern<OpT> {
     using OpConversionPattern<OpT>::OpConversionPattern;
     LogicalResult matchAndRewrite(OpT op, typename OpT::Adaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         ModuleOp mod = op->template getParentOfType<ModuleOp>();
         if (Async) {
@@ -175,8 +166,7 @@ struct ExchangeKeysLoweringBase : public OpConversionPattern<OpT> {
                 emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__exchange_keys_async",
                          {ptrTy(ctx)}, i64Ty(ctx), {adaptor.getSession()});
             rewriter.replaceOp(op, r);
-        }
-        else {
+        } else {
             emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__exchange_keys",
                      {ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession()});
             rewriter.eraseOp(op);
@@ -190,8 +180,7 @@ using ExchangeKeysAsyncLowering = ExchangeKeysLoweringBase<ExchangeKeysAsyncOp, 
 struct BarrierLowering : public OpConversionPattern<BarrierOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(BarrierOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__barrier",
                  {i64Ty(ctx)}, i32Ty(ctx), {adaptor.getToken()});
@@ -203,8 +192,7 @@ struct BarrierLowering : public OpConversionPattern<BarrierOp> {
 struct EstablishChannelLowering : public OpConversionPattern<EstablishChannelOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(EstablishChannelOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         Value dp = globalStr(rewriter, op.getLoc(), moduleOf(op), "transport_data_path_",
                              op.getDataPath());
@@ -218,8 +206,7 @@ struct EstablishChannelLowering : public OpConversionPattern<EstablishChannelOp>
 struct SetCoprocessorFnLowering : public OpConversionPattern<SetCoprocessorFnOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(SetCoprocessorFnOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         Value sym = globalStr(rewriter, op.getLoc(), mod, "transport_coproc_fn_", op.getSymbol());
@@ -233,8 +220,7 @@ struct SetCoprocessorFnLowering : public OpConversionPattern<SetCoprocessorFnOp>
 struct CommitWorkItemLowering : public OpConversionPattern<CommitWorkItemOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(CommitWorkItemOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         Value idx = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getWorkItemIdx());
         Value inB = constInt(rewriter, op.getLoc(), i64Ty(ctx), op.getInBytes());
@@ -250,8 +236,7 @@ struct CommitWorkItemLowering : public OpConversionPattern<CommitWorkItemOp> {
 struct KickLowering : public OpConversionPattern<KickOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(KickOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         auto memTy = dyn_cast<MemRefType>(op.getPayload().getType());
@@ -278,8 +263,7 @@ struct KickLowering : public OpConversionPattern<KickOp> {
 struct CollectLowering : public OpConversionPattern<CollectOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(CollectOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         if (!op.getDest()) {
@@ -304,8 +288,7 @@ struct CollectLowering : public OpConversionPattern<CollectOp> {
 struct LastRttLowering : public OpConversionPattern<LastRttNsOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(LastRttNsOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Value r =
             emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__last_rtt_ns",
                      {ptrTy(op.getContext())}, i64Ty(op.getContext()), {adaptor.getSession()});
@@ -317,12 +300,9 @@ struct LastRttLowering : public OpConversionPattern<LastRttNsOp> {
 // Void-returning single-session ops: start / stop / close / destroy.
 template <typename OpT> struct VoidSessionLowering : public OpConversionPattern<OpT> {
     VoidSessionLowering(const TypeConverter &tc, MLIRContext *ctx, StringRef sym)
-        : OpConversionPattern<OpT>(tc, ctx), symbol(sym)
-    {
-    }
+        : OpConversionPattern<OpT>(tc, ctx), symbol(sym) {}
     LogicalResult matchAndRewrite(OpT op, typename OpT::Adaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         emitCall(rewriter, op.getLoc(), op->template getParentOfType<ModuleOp>(), symbol,
                  {ptrTy(op.getContext())}, Type(), {adaptor.getSession()});
         rewriter.eraseOp(op);
@@ -335,8 +315,7 @@ template <typename OpT> struct VoidSessionLowering : public OpConversionPattern<
 struct GetSessionLowering : public OpConversionPattern<GetSessionOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(GetSessionOp op, OpAdaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         auto sessTy = cast<SessionType>(op.getSession().getType());
@@ -356,8 +335,7 @@ struct ConvertTransportToLLVMPass
     : public impl::ConvertTransportToLLVMPassBase<ConvertTransportToLLVMPass> {
     using ConvertTransportToLLVMPassBase::ConvertTransportToLLVMPassBase;
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         MLIRContext *ctx = &getContext();
         LLVMTypeConverter tc(ctx);
         tc.addConversion([ctx](SessionType) -> Type { return LLVM::LLVMPointerType::get(ctx); });

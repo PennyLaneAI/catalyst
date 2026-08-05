@@ -31,8 +31,7 @@ namespace catalyst::utils {
  */
 class LinesCount {
   public:
-    template <class T> static void call(const T &op, const std::string &name = {})
-    {
+    template <class T> static void call(const T &op, const std::string &name = {}) {
         LinesCount::impl<T>(op, name);
     }
 

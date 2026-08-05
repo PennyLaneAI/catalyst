@@ -49,8 +49,7 @@ struct LowerDecodeToTransportPass
     : public impl::LowerDecodeToTransportPassBase<LowerDecodeToTransportPass> {
     using LowerDecodeToTransportPassBase::LowerDecodeToTransportPassBase;
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         ModuleOp mod = getOperation();
         auto backline = mod->getAttrOfType<BacklineAttr>(kBacklineAttr);
         if (!backline) {

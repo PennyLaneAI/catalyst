@@ -31,8 +31,7 @@
 #include "TransportBackend.h"
 
 namespace {
-catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string &config)
-{
+catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string &config) {
     const auto cfg = catalyst::transport::common::parse_backend_config(config);
     // `gpu` is optional and defaults to device 0
     const int gpu_device =
