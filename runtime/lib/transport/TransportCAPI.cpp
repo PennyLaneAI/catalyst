@@ -95,7 +95,7 @@ template <typename Fn> auto guard(Fn &&fn) -> decltype(fn())
 void ensure_reply(CatalystTransportSession *s)
 {
     if (!s->reply_ready) {
-        s->reply = s->sess->alloc_memory(kReplyBytes, MemKind::CpuRam);
+        s->reply = s->sess->alloc_memory(kReplyBytes, s->sess->preferred_mem_kind());
         s->reply_ready = true;
     }
 }
