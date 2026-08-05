@@ -316,9 +316,9 @@ class SessionEmitter {
 
         OpBuilder hb(terminatorOf(hostSetup));
         Value lco = createSession(hb, coTy, coproc, key);
-        Value ltok =
-            ConnectAsyncOp::create(hb, loc, tokTy, lco, coproc.getPeer(), portAttr(coproc.oobPort()))
-                .getToken();
+        Value ltok = ConnectAsyncOp::create(hb, loc, tokTy, lco, coproc.getPeer(),
+                                            portAttr(coproc.oobPort()))
+                         .getToken();
         SetCoprocessorFnOp::create(hb, loc, lco, coproc.getSymbol());
         pendingLocal.push_back({lco, ltok, coproc});
         keyed.push_back({coTy, key, hostTeardown});
