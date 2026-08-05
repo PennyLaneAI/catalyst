@@ -17,12 +17,12 @@ target_link_libraries(cpu_verbs_impl PUBLIC transport_common)
 set_property(TARGET cpu_verbs_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Controller library
-add_library(catalyst_transport_cpu_controller SHARED controller/CpuControllerFactory.cpp)
-target_link_libraries(catalyst_transport_cpu_controller PRIVATE cpu_verbs_impl)
+add_library(catalyst_transport_cpu_verbs_controller SHARED controller/CpuControllerFactory.cpp)
+target_link_libraries(catalyst_transport_cpu_verbs_controller PRIVATE cpu_verbs_impl)
 
 # Coprocessor library
-add_library(catalyst_transport_cpu_coprocessor SHARED coprocessor/CpuCoprocessorFactory.cpp)
-target_link_libraries(catalyst_transport_cpu_coprocessor PRIVATE cpu_verbs_impl)
+add_library(catalyst_transport_cpu_verbs_coprocessor SHARED coprocessor/CpuCoprocessorFactory.cpp)
+target_link_libraries(catalyst_transport_cpu_verbs_coprocessor PRIVATE cpu_verbs_impl)
 
 # Reference coprocessor function (Steane decode), built as a standalone shared lib
 # exporting a CoprocessorFn symbol.

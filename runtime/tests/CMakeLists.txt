@@ -233,7 +233,7 @@ if(ENABLE_TRANSPORT)
         target_link_libraries(runner_tests_transport_gpu PRIVATE
             Catch2WithMain
             catalyst_runtime_testing
-            catalyst_transport_gpu_coprocessor
+            catalyst_transport_gpu_verbs_coprocessor
         )
         catch_discover_tests(runner_tests_transport_gpu)
     endif()

@@ -137,7 +137,7 @@ class SessionEmitter {
     {
         StringAttr key = ctrl.keyOr("controller");
         Value ct = createSession(b, ctrlTy, ctrl, key);
-        ConnectOp::create(b, loc, ct, ctrl.getPeer(), i16A(ctrl.oobPort()));
+        ConnectOp::create(b, loc, ct, ctrl.getPeer(), portAttr(ctrl.oobPort()));
         ExchangeKeysOp::create(b, loc, ct);
         EstablishChannelOp::create(b, loc, ct, ctrl.dataPathOr(kDefaultDataPath));
         commit(ct);
@@ -213,7 +213,9 @@ class SessionEmitter {
         }
     }
 
-    IntegerAttr i16A(int64_t v) { return b.getIntegerAttr(b.getIntegerType(16), v); }
+    // Ports are carried as i32 so a value above 32767 reads as itself rather than as a negative
+    // number; the LLVM lowering narrows to the runtime's uint16_t.
+    IntegerAttr portAttr(int64_t v) { return b.getIntegerAttr(b.getIntegerType(32), v); }
 
     void commit(Value ct)
     {
@@ -236,7 +238,7 @@ class SessionEmitter {
     void emitControllerDial(NodeAttr coproc, StringAttr key)
     {
         Value ctr = createSession(b, ctrlTy, ctrl, key);
-        ConnectOp::create(b, loc, ctr, coproc.getPeer(), i16A(coproc.oobPort()));
+        ConnectOp::create(b, loc, ctr, coproc.getPeer(), portAttr(coproc.oobPort()));
         ExchangeKeysOp::create(b, loc, ctr);
         EstablishChannelOp::create(b, loc, ctr, ctrl.dataPathOr(kDefaultDataPath));
         commit(ctr);
@@ -267,7 +269,7 @@ class SessionEmitter {
         cb.setInsertionPoint(terminatorOf(serveFn));
         Value co = createSession(cb, coTy, coproc, key);
         Value tok =
-            ConnectAsyncOp::create(cb, loc, tokTy, co, coproc.getPeer(), i16A(coproc.oobPort()))
+            ConnectAsyncOp::create(cb, loc, tokTy, co, coproc.getPeer(), portAttr(coproc.oobPort()))
                 .getToken();
         BarrierOp::create(cb, loc, tok);
         ExchangeKeysOp::create(cb, loc, co);
@@ -315,7 +317,7 @@ class SessionEmitter {
         OpBuilder hb(terminatorOf(hostSetup));
         Value lco = createSession(hb, coTy, coproc, key);
         Value ltok =
-            ConnectAsyncOp::create(hb, loc, tokTy, lco, coproc.getPeer(), i16A(coproc.oobPort()))
+            ConnectAsyncOp::create(hb, loc, tokTy, lco, coproc.getPeer(), portAttr(coproc.oobPort()))
                 .getToken();
         SetCoprocessorFnOp::create(hb, loc, lco, coproc.getSymbol());
         pendingLocal.push_back({lco, ltok, coproc});
@@ -328,9 +330,9 @@ class SessionEmitter {
         Value ct = createSession(b, ctrlTy, ctrl, key);
         Value co = createSession(b, coTy, coproc, key);
         Value t1 =
-            ConnectAsyncOp::create(b, loc, tokTy, co, coproc.getPeer(), i16A(coproc.oobPort()))
+            ConnectAsyncOp::create(b, loc, tokTy, co, coproc.getPeer(), portAttr(coproc.oobPort()))
                 .getToken();
-        ConnectOp::create(b, loc, ct, coproc.getPeer(), i16A(coproc.oobPort()));
+        ConnectOp::create(b, loc, ct, coproc.getPeer(), portAttr(coproc.oobPort()));
         BarrierOp::create(b, loc, t1);
         Value t2 = ExchangeKeysAsyncOp::create(b, loc, tokTy, co).getToken();
         ExchangeKeysOp::create(b, loc, ct);
