@@ -165,10 +165,8 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
                                         SmallVector<Value> &currentCtrlQubits,
                                         ValueRange ctrlValues);
 
-/// Control an `scf.if` by turning the control qubits into extra results: each branch threads the
-/// controls through its body and yields them alongside the original results. Branches are
-/// mutually exclusive, so both start from the same incoming controls; a branch with no quantum ops
-/// simply yields the incoming controls unchanged.
+/// Control an `scf.if` by turning the control qubits into extra results: each branch tracks the
+/// controls through its body and yields them alongside the original results.
 static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRMapping &map,
                                   SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
 {
@@ -181,7 +179,7 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
 
     Value cond = map.lookupOrDefault(ifOp.getCondition());
     auto newIf = scf::IfOp::create(rewriter, ifOp.getLoc(), resultTypes, cond,
-                                            /*withElseRegion=*/true);
+                                   /*withElseRegion=*/true);
 
     // Control one branch: `oldBlock` may be null (a missing else), in which case the branch just
     // threads the incoming controls through unchanged.
@@ -230,10 +228,8 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
 }
 
 /// Control an `scf.for` by adding the control qubits as extra loop-carried `iter_args`: the loop
-/// structure (bounds, iteration) stays classical, the control qubits are threaded through the body
+/// structure (bounds, iteration) stays classical, the control qubits are tracked through the body
 /// each iteration, and the final controls come out as the loop's trailing results.
-// Note Unlike adjoint no reversal is needed, so dynamic bounds and per-iteration classical compute
-/// need no special handling: the loop keeps its original bounds and body.
 static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, IRMapping &map,
                                    SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
 {
@@ -291,8 +287,9 @@ static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, 
 }
 
 /// Control an `scf.while` by adding the control qubits as extra loop-carried values.
-static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whileOp, IRMapping &map,
-                                     SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
+static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whileOp,
+                                     IRMapping &map, SmallVector<Value> &currentCtrlQubits,
+                                     ValueRange ctrlValues)
 {
     Type qubitType = QubitType::get(rewriter.getContext());
     unsigned numCtrl = currentCtrlQubits.size();
@@ -330,7 +327,8 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
                 beforeMap.map(oldBefore.getArgument(i), beforeArgs[i]);
             }
             SmallVector<Value> beforeCtrl(beforeArgs.begin() + numInit, beforeArgs.end());
-            if (failed(distributeControls(rewriter, oldBefore, beforeMap, beforeCtrl, ctrlValues))) {
+            if (failed(
+                    distributeControls(rewriter, oldBefore, beforeMap, beforeCtrl, ctrlValues))) {
                 status = failure();
                 return;
             }
@@ -371,6 +369,63 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
     }
     currentCtrlQubits.assign(newWhile.getResults().begin() + numOrig, newWhile.getResults().end());
     rewriter.setInsertionPointAfter(newWhile);
+    return success();
+}
+
+/// Control an `scf.index_switch` by turning the control qubits into extra results
+static LogicalResult controlScfIndexSwitch(PatternRewriter &rewriter, scf::IndexSwitchOp switchOp,
+                                           IRMapping &map, SmallVector<Value> &currentCtrlQubits,
+                                           ValueRange ctrlValues)
+{
+    Type qubitType = QubitType::get(rewriter.getContext());
+    unsigned numCtrl = currentCtrlQubits.size();
+
+    SmallVector<Type> resultTypes(switchOp.getResultTypes().begin(),
+                                  switchOp.getResultTypes().end());
+    resultTypes.append(numCtrl, qubitType);
+
+    Value arg = map.lookupOrDefault(switchOp.getArg());
+    SmallVector<int64_t> cases(switchOp.getCases().begin(), switchOp.getCases().end());
+    auto newSwitch = scf::IndexSwitchOp::create(rewriter, switchOp.getLoc(), resultTypes, arg,
+                                                cases, cases.size());
+
+    // Control one region.
+    // Regions have no block arguments, so bodies reference outer
+    // values via `map`, as with scf.if branches.
+    auto controlCase = [&](Block &oldBlock, Region &newRegion) -> LogicalResult {
+        IRMapping caseMap = map;
+        SmallVector<Value> caseCtrl(currentCtrlQubits.begin(), currentCtrlQubits.end());
+        Block *newBlock = rewriter.createBlock(&newRegion);
+        if (failed(distributeControls(rewriter, oldBlock, caseMap, caseCtrl, ctrlValues))) {
+            return failure();
+        }
+        auto oldYield = cast<scf::YieldOp>(oldBlock.getTerminator());
+        SmallVector<Value> yielded;
+        for (Value v : oldYield.getOperands()) {
+            yielded.push_back(caseMap.lookupOrDefault(v));
+        }
+        yielded.append(caseCtrl.begin(), caseCtrl.end());
+        rewriter.setInsertionPointToEnd(newBlock);
+        scf::YieldOp::create(rewriter, oldYield.getLoc(), yielded);
+        return success();
+    };
+
+    for (unsigned i = 0; i < cases.size(); ++i) {
+        if (failed(controlCase(switchOp.getCaseBlock(i), newSwitch.getCaseRegions()[i]))) {
+            return failure();
+        }
+    }
+    if (failed(controlCase(switchOp.getDefaultBlock(), newSwitch.getDefaultRegion()))) {
+        return failure();
+    }
+
+    unsigned numOrig = switchOp.getNumResults();
+    for (unsigned i = 0; i < numOrig; ++i) {
+        map.map(switchOp.getResult(i), newSwitch.getResult(i));
+    }
+    currentCtrlQubits.assign(newSwitch.getResults().begin() + numOrig,
+                             newSwitch.getResults().end());
+    rewriter.setInsertionPointAfter(newSwitch);
     return success();
 }
 
@@ -439,11 +494,12 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
             }
             continue;
         }
-        if (isa<scf::IndexSwitchOp>(op)) {
-            op.emitError(
-                "this control flow op inside a quantum.ctrl region is not supported yet by "
-                "ctrl-lowering");
-            return failure();
+        if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
+            if (failed(controlScfIndexSwitch(rewriter, switchOp, map, currentCtrlQubits,
+                                             ctrlValues))) {
+                return failure();
+            }
+            continue;
         }
         if (isa<InsertOp, ExtractOp, AllocOp, DeallocOp, AllocQubitOp, DeallocQubitOp>(op)) {
             // Structural ops carry no controls; thread their operands/results through the map.
@@ -454,7 +510,13 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
             op.emitError("unsupported quantum operation inside a quantum.ctrl region");
             return failure();
         }
-        // Classical op: clone it, threading operands and recording result mappings.
+        // Any other scf ops would need their body controlled too,
+        // which is not supported:
+        if (op.getNumRegions() > 0) {
+            op.emitError("unsupported scf operation inside a quantum.ctrl region");
+            return failure();
+        }
+        // Classical op: clone it:
         rewriter.clone(op, map);
     }
     return success();
