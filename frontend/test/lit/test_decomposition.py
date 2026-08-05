@@ -13,7 +13,7 @@
 # limitations under the License.
 """Tests for graph based decomposition system."""
 
-# pylint: disable = missing-function-docstring, line-too-long
+# pylint: disable = missing-function-docstring,line-too-long
 
 import pennylane as qp
 from jax import numpy as jnp
@@ -29,7 +29,7 @@ from operator2_dummy_gates import (
     StaticData,
     StaticDataMultiReg,
 )
-from pennylane.typing import Float, Wire
+from pennylane.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.decomposition_rules import (
     compile_decomposition_rules_wrapper,
@@ -41,17 +41,22 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     Unit tests for the compile_decomposition_rules_wrapper() entry point function.
     """
 
-    def test_single_rule():
+    def test_to_dynamic_argnames():
+        """
+        Test that decomposing to an op with a single dynamic_argname works.
+        """
+
         def rule_resource_fn(reg):
             return {
-                SingleParam(x=Float, reg=Wire[2]): 1,
-                CompilableData("a", "b", "thing", Wire[1]): 1,
+                SingleParam(x=Float, reg=Wire[2]): 2,
+                SingleParam(x=Float[2], reg=Wire[2]): 1,
             }
 
         @qp.register_resources(rule_resource_fn)
         def rule(reg):
             SingleParam(x=0.1, reg=reg)
-            CompilableData(a="a", b="b", thing="thing", wires=reg[0])
+            SingleParam(x=0.2, reg=reg)
+            SingleParam(x=jnp.array([0.3, 0.4]), reg=reg)
 
         with qp.decomposition.local_decomps():
             qp.add_decomps(NoParams, rule)
@@ -61,67 +66,72 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             print(result)
 
     # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
-    # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64,
-    # CHECK-SAME:     "SingleParam{x:[f64]}{reg:2}{}" = 1 : i64}}
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:2}{}" = 1 : i64,
+    # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 2 : i64
     # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-    test_single_rule()
+    test_to_dynamic_argnames()
 
-    def test_multiple_rules():
-        def rule1_resource_fn(reg):
-            return {
-                SingleParam(x=Float, reg=Wire[1]): 1,
-            }
+    def test_from_dynamic_argnames():
+        """
+        Test that decomposing from an op with a single dynamic_argname works.
+        """
 
-        @qp.register_resources(rule1_resource_fn)
-        def rule1(reg):
-            SingleParam(x=0.1, reg=[reg])
+        def rule_resource_fn(x, reg):
+            return {NoParams(reg=Wire[1]): 1}
 
-        def rule2_resource_fn(reg):
-            return {
-                CompilableData("a", "b", "thing", Wire[3]): 1,
-            }
-
-        @qp.register_resources(rule2_resource_fn)
-        def rule2(reg):
-            CompilableData(b="b", thing="thing", a="a", wires=[reg, reg + 1, reg + 2])
+        @qp.register_resources(rule_resource_fn)
+        def rule(x, reg):
+            NoParams(reg=reg[0])
 
         with qp.decomposition.local_decomps():
-            qp.add_decomps(NoParams, rule1)
-            qp.add_decomps(NoParams, rule2)
+            qp.add_decomps(SingleParam, rule)
+            result = compile_decomposition_rules_wrapper(
+                "SingleParam",
+                "SingleParam{x:[f64,f64]}{reg:2}{}",
+                {"x": ["f64", "f64"]},
+                {"reg": 2},
+                {},
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_SingleParam{x:[f64,f64]}{reg:2}{}"
+    # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 1 : i64}}
+    # CHECK-SAME:   target_gate = "SingleParam{x:[f64,f64]}{reg:2}{}"
+    test_from_dynamic_argnames()
+
+    def test_to_multiple_dynamic_argnames():
+        """
+        Test that decomposing to an op with multiple dynamic_argnames works.
+        """
+
+        def rule_resource_fn(reg):
+            return {
+                MultiParams(reg=Wire[1], a=Float, b=Int[2, 2], c=Complex): 1,
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            MultiParams(reg=reg, a=0.1, b=2, c=3 + 4j)
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
             result = compile_decomposition_rules_wrapper(
                 "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
             )
             print(result)
 
-    # CHECK: func.func private @"rule1_NoParams{}{reg:1}{}"
-    # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64]}{reg:1}{}" = 1 : i64}}
+    # CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
+    # CHECK-SAME:   resources = {operations =
+    # CHECK-SAME:   "MultiParams{a:[f64],b:{{\[\[}}i64,i64],[i64,i64{{\]\]}},c:[complex<f64>]}{reg:1}{}" = 1 : i64
     # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
-    # CHECK: func.func private @"rule2_NoParams{}{reg:1}{}"
-    # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a:a,b:b,thing:thing}" = 1 : i64}}
-    # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
-    test_multiple_rules()
+    test_to_multiple_dynamic_argnames()
 
-    def test_single_rule_custom_op():
-        def rule_resource_fn(reg):
-            return {NoParamsCustomOp(wires=Wire[2]): 1}
+    def test_from_multiple_dynamic_argnames():
+        """
+        Test that decomposing from an op with multiple dynamic_argnames works.
+        """
 
-        @qp.register_resources(rule_resource_fn)
-        def rule(reg):
-            NoParamsCustomOp(wires=reg)
-
-        with qp.decomposition.local_decomps():
-            qp.add_decomps(NoParams, rule)
-            result = compile_decomposition_rules_wrapper(
-                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
-            )
-            print(result)
-
-    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
-    # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
-    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-    test_single_rule_custom_op()
-
-    def test_multi_params():
         def rule_resource_fn(reg, a, b, c):
             return {NoParamsCustomOp(wires=Wire[2]): 1}
 
@@ -143,29 +153,40 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: func.func private @"rule_MultiParams{a:[f64],b:[i32,f64],c:{{\[\[}}i32],[f64{{\]\]}}}{reg:2}{}"
     # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
     # CHECK-SAME:   target_gate = "MultiParams{a:[f64],b:[i32,f64],c:{{\[\[}}i32],[f64{{\]\]}}}{reg:2}{}"
-    test_multi_params()
+    test_from_multiple_dynamic_argnames()
 
-    def test_decompose_to_tensor_params():
+    def test_to_multiple_wire_argnames():
+        """
+        Test that decomposing to an op with multiple wire_argnames works.
+        """
+
         def rule_resource_fn(reg):
-            return {SingleParam(x=Float[2], reg=Wire[3]): 1}
+            return {
+                MultipleRegisters(reg1=Wire[1], reg2=Wire[2]): 1,
+            }
 
         @qp.register_resources(rule_resource_fn)
         def rule(reg):
-            SingleParam(x=jnp.array([0.2, 0.3]), reg=reg)
+            MultipleRegisters(reg1=0, reg2=[0, 1])
 
         with qp.decomposition.local_decomps():
             qp.add_decomps(NoParams, rule)
             result = compile_decomposition_rules_wrapper(
-                "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+                "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
             )
             print(result)
 
-    # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-    # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64,f64]}{reg:3}{}" = 1 : i64}
-    # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
-    test_decompose_to_tensor_params()
+    # CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
+    # CHECK-SAME:   resources = {operations =
+    # CHECK-SAME:   "MultipleRegisters{}{reg1:1,reg2:2}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+    test_to_multiple_wire_argnames()
 
-    def test_multi_wires():
+    def test_from_multiple_wire_argnames():
+        """
+        Test that decomposing from an op with multiple wire_argnames works.
+        """
+
         def rule_resource_fn(reg1, reg2):
             return {NoParamsCustomOp(wires=Wire[2]): 1, NoParamsCustomOp(wires=Wire[3]): 1}
 
@@ -186,9 +207,11 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             print(result)
 
     # CHECK: func.func private @"rule_MultipleRegisters{}{reg1:2,reg2:3}{}"
-    # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64, "NoParamsCustomOp{}{wires:3}{}" = 1 : i64}
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "NoParamsCustomOp{}{wires:2}{}" = 1 : i64
+    # CHECK-SAME:   "NoParamsCustomOp{}{wires:3}{}" = 1 : i64
     # CHECK-SAME:   target_gate = "MultipleRegisters{}{reg1:2,reg2:3}{}"
-    test_multi_wires()
+    test_from_multiple_wire_argnames()
 
     def test_compilable_data():
         def rule_resource_fn(a, b, thing, wires):
@@ -454,6 +477,61 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
     test_decompose_to_hybrid_op_nested()
+
+    def test_multiple_rules():
+        def rule1_resource_fn(reg):
+            return {
+                SingleParam(x=Float, reg=Wire[1]): 1,
+            }
+
+        @qp.register_resources(rule1_resource_fn)
+        def rule1(reg):
+            SingleParam(x=0.1, reg=[reg])
+
+        def rule2_resource_fn(reg):
+            return {
+                CompilableData("a", "b", "thing", Wire[3]): 1,
+            }
+
+        @qp.register_resources(rule2_resource_fn)
+        def rule2(reg):
+            CompilableData(b="b", thing="thing", a="a", wires=[reg, reg + 1, reg + 2])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule1)
+            qp.add_decomps(NoParams, rule2)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule1_NoParams{}{reg:1}{}"
+    # CHECK-SAME:   resources = {operations = {"SingleParam{x:[f64]}{reg:1}{}" = 1 : i64}}
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+    # CHECK: func.func private @"rule2_NoParams{}{reg:1}{}"
+    # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a:a,b:b,thing:thing}" = 1 : i64}}
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+    test_multiple_rules()
+
+    def test_single_rule_custom_op():
+        def rule_resource_fn(reg):
+            return {NoParamsCustomOp(wires=Wire[2]): 1}
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            NoParamsCustomOp(wires=reg)
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+    # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+    test_single_rule_custom_op()
 
 
 test_compile_decomposition_rules_wrapper_entry_point()
