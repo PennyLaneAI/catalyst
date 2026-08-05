@@ -349,8 +349,7 @@ void *__catalyst__transport__data_slot(CatalystTransportSession *s) {
 }
 
 int __catalyst__transport__write_data_slot(CatalystTransportSession *s, const void *src,
-                                           std::uint64_t bytes, std::uint32_t decoder_id)
-{
+                                           std::uint64_t bytes, std::uint32_t decoder_id) {
     auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
