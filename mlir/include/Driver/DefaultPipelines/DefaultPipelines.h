@@ -68,6 +68,7 @@ const PipelineList pipelineList{
       "func.func(stablehlo-legalize-sort)",
       "stablehlo-convert-to-signless",
       "canonicalize",
+      "fft-lowering",
       "scatter-lowering",
       "hlo-custom-call-lowering",
       "cse",

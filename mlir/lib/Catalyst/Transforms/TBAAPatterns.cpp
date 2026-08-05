@@ -148,6 +148,10 @@ struct MemrefLoadTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Load
         else if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
             setTag(baseType, tree, loadOp.getContext(), op);
         }
+        else if (isa<ComplexType>(baseType)) {
+            // Complex loads become struct loads with no scalar TBAA node.
+            // Leave them untagged which conservatively may alias everything.
+        }
         else {
             return failure();
         }
@@ -184,6 +188,10 @@ struct MemrefStoreTBAARewritePattern : public ConvertOpToLLVMPattern<memref::Sto
         }
         else if (isAnyOf<IndexType, IntegerType, FloatType, MemRefType>(baseType)) {
             setTag(baseType, tree, storeOp.getContext(), op);
+        }
+        else if (isa<ComplexType>(baseType)) {
+            // Complex stores become struct stores with no scalar TBAA node.
+            // Leave them untagged which conservatively may alias everything.
         }
         else {
             return failure();

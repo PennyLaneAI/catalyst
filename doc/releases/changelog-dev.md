@@ -10,6 +10,11 @@
   require integral values and convert the count internally.
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
+* `jax.numpy.fft` functions (`fft`, `ifft`, `rfft`, `irfft` and their 2D/ND variants) can now be
+  compiled with `@qjit`. All four transform types are supported for any transform length and the generated
+  code is differentiable with `catalyst.grad`.
+  [(#3077)](https://github.com/PennyLaneAI/catalyst/pull/3077)
+
 <h3>Improvements 🛠</h3>
 
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
@@ -371,6 +376,11 @@
 
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
+
+* Fixed a bug where `catalyst.grad` failed to compile functions with complex valued intermediate
+  results. The TBAA lowering used for gradient modules now accepts loads and stores of complex
+  element types and leaves them untagged instead of rejecting them.
+  [(#3077)](https://github.com/PennyLaneAI/catalyst/pull/3077)
 
 <h3>Internal changes ⚙️</h3>
 

@@ -154,3 +154,19 @@ module @my_model {
         return %0, %alloc: memref<f64>, memref<memref<f64>>
     }
 }
+
+// -----
+
+// Complex loads and stores lower to struct accesses and stay untagged
+
+module @my_model {
+    llvm.func @__enzyme_autodiff4(...)
+    func.func @func_complex(%arg0: memref<complex<f64>>, %arg1: memref<4xcomplex<f64>>) -> memref<4xcomplex<f64>> {
+        // CHECK: llvm.load [[ANY:%[0-9]+]] : !llvm.ptr -> !llvm.struct<(f64, f64)>
+        %0 = memref.load %arg0[] : memref<complex<f64>>
+        %idx0 = index.constant 0
+        // CHECK: llvm.store [[ANY:%[0-9]+]], [[ANY:%[0-9]+]] : !llvm.struct<(f64, f64)>, !llvm.ptr
+        memref.store %0, %arg1[%idx0] : memref<4xcomplex<f64>>
+        return %arg1: memref<4xcomplex<f64>>
+    }
+}

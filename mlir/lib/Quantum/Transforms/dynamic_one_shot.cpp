@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "dynamic-one-shot"
 
+#include <algorithm>
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
@@ -426,7 +427,9 @@ void editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel, quantum
     auto totalIndex =
         arith::ConstantOp::create(builder, loc, i64Type, builder.getIntegerAttr(i64Type, 0));
     Operation *loopUpdater = totalIndex;
-    for (auto [i, mcm] : llvm::enumerate(llvm::reverse(mcmobs.getMcms()))) {
+    SmallVector<Value> reversedMcms = llvm::to_vector(mcmobs.getMcms());
+    std::reverse(reversedMcms.begin(), reversedMcms.end());
+    for (auto [i, mcm] : llvm::enumerate(reversedMcms)) {
         // Power of 2 for this bit position
         auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
         auto shiftSize =
