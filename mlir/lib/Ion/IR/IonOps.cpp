@@ -40,14 +40,14 @@ using namespace catalyst::ion;
 //===----------------------------------------------------------------------===//
 
 void ParallelProtocolOp::build(OpBuilder &builder, OperationState &result, ValueRange inQubits,
-                               BodyBuilderFn bodyBuilder)
-{
+                               BodyBuilderFn bodyBuilder) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = result.location;
 
     result.addOperands(inQubits);
-    for (Value v : inQubits)
+    for (Value v : inQubits) {
         result.addTypes(v.getType());
+    }
 
     Region *bodyRegion = result.addRegion();
     Block *bodyBlock = builder.createBlock(bodyRegion);

@@ -50,8 +50,7 @@ constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1u << STEANE_CHECKS] = {-1, 6, 4
  * count.
  */
 extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len, void *out,
-                                          std::size_t out_cap, void * /*ctx*/)
-{
+                                          std::size_t out_cap, void * /*ctx*/) {
     if (in == nullptr || out == nullptr || in_len < STEANE_CHECKS ||
         out_cap < sizeof(std::int64_t)) {
         return 0;

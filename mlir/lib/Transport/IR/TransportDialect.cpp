@@ -44,24 +44,21 @@ using namespace catalyst::transport;
 #define GET_ATTRDEF_CLASSES
 #include "Transport/IR/TransportAttributes.cpp.inc"
 
-StringAttr NodeAttr::keyOr(llvm::StringRef fallback) const
-{
+StringAttr NodeAttr::keyOr(llvm::StringRef fallback) const {
     if (StringAttr n = getName(); n && !n.getValue().empty()) {
         return n;
     }
     return StringAttr::get(getContext(), fallback);
 }
 
-StringAttr NodeAttr::dataPathOr(llvm::StringRef dflt) const
-{
+StringAttr NodeAttr::dataPathOr(llvm::StringRef dflt) const {
     if (StringAttr p = getDataPath(); p && !p.getValue().empty()) {
         return p;
     }
     return StringAttr::get(getContext(), dflt);
 }
 
-bool NodeAttr::isRemote() const
-{
+bool NodeAttr::isRemote() const {
     BoolAttr r = getRemote();
     return r && r.getValue();
 }
@@ -78,8 +75,7 @@ int64_t NodeAttr::workItemIdx() const { return intOr(getWorkItemIdx(), 0); }
 
 LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                                    StringAttr transport, NodeAttr controller,
-                                   llvm::ArrayRef<NodeAttr> coprocessors)
-{
+                                   llvm::ArrayRef<NodeAttr> coprocessors) {
     if (!controller) {
         return emitError() << "backline requires a controller";
     }
@@ -97,8 +93,7 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
     return success();
 }
 
-void TransportDialect::initialize()
-{
+void TransportDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "Transport/IR/TransportOpsTypes.cpp.inc"
