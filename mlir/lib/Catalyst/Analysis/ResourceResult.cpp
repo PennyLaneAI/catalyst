@@ -132,8 +132,7 @@ void ResourceResult::multiplyBy(double scalar) {
 //   measurement_processes: { "meas_type": count, ... }
 //   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
 //   qubit_disjoint_depth }
-static llvm::json::Value countToJson(double count)
-{
+static llvm::json::Value countToJson(double count) {
     return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
 }
 
@@ -156,11 +155,11 @@ llvm::json::Object ResourceResult::toJson() const {
     funcObj["num_qubits"] = std::move(numQubitObject);
 
     // Classical Operations
-    llvm::json::Object classicalInstructionObject;
+    llvm::json::Object classicalInstructionsObject;
     for (const auto &entry : classicalInstructions) {
-        classicalInstructionObject[entry.getKey()] = countToJson(entry.getValue());
+        classicalInstructionsObject[entry.getKey()] = countToJson(entry.getValue());
     }
-    funcObj["classical_instructions"] = std::move(classicalInstructionObject);
+    funcObj["classical_instructions"] = std::move(classicalInstructionsObject);
 
     /// Quantum Operations
     llvm::DenseMap<int, llvm::DenseMap<StringRef, double>> quantumOperationCounts;
