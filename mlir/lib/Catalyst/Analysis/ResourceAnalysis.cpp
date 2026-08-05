@@ -75,8 +75,24 @@ static bool isCustomDialectOp(Operation *op)
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
 
-ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
+ResourceResult ResourceAnalysis::makeEmptyResult() const
 {
+    ResourceResult result;
+    result.extensions.reserve(extensionAnalyses.size());
+    for (const auto &analysis : extensionAnalyses) {
+        result.extensions.push_back(analysis->makeEmpty());
+    }
+    return result;
+}
+
+ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
+                                   ArrayRef<ExtensionProvider> extensionProviders)
+{
+    extensionAnalyses.reserve(extensionProviders.size());
+    for (const auto &provider : extensionProviders) {
+        extensionAnalyses.push_back(provider());
+    }
+
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
 
     SmallVector<func::FuncOp> definedFuncOps;
@@ -113,7 +129,7 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
     entryFuncName = entryFunc.str();
 
     for (auto funcOp : definedFuncOps) {
-        ResourceResult result;
+        ResourceResult result = makeEmptyResult();
         for (auto &region : funcOp->getRegions()) {
             analyzeRegion(region, result, /*isAdjoint=*/false);
         }
@@ -136,9 +152,15 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
     }
 }
 
-ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp)
+ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
+                                   ArrayRef<ExtensionProvider> extensionProviders)
 {
-    ResourceResult result;
+    extensionAnalyses.reserve(extensionProviders.size());
+    for (const auto &provider : extensionProviders) {
+        extensionAnalyses.push_back(provider());
+    }
+
+    ResourceResult result = makeEmptyResult();
 
     for (auto &region : funcOp->getRegions()) {
         analyzeRegion(region, result, /*isAdjoint*/ false);
@@ -165,7 +187,7 @@ std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t 
 
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
 {
-    ResourceResult bodyResult;
+    ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
     // Try to resolve a static trip count.
@@ -178,7 +200,6 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         // The name is always new, so we don't overwrite an old entry.
         std::string name = makeUniqueSyntheticName("for_loop_", forLoopCounter);
         funcResults[name] = std::move(bodyResult);
-        syntheticLoopBodies[name] = forOp;
         result.functionCalls[name] = tripCount.value();
         return;
     }
@@ -187,7 +208,6 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     // and store a fixed number (hash) so each such loop has its own id in the output.
     std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
     funcResults[name] = std::move(bodyResult);
-    syntheticLoopBodies[name] = forOp;
     result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
     result.hasDynLoop = true;
 }
@@ -195,11 +215,11 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
                                         bool isAdjoint)
 {
-    ResourceResult bodyResult;
+    ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
 
     if (auto iters = getEstimatedIterationsHint(whileOp)) {
-        bodyResult.multiplyByScalar(*iters);
+        bodyResult.multiplyBy(*iters);
     }
     else {
         result.hasDynLoop = true;
@@ -212,7 +232,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 {
     result.hasBranches = true;
 
-    ResourceResult thenResult;
+    ResourceResult thenResult = makeEmptyResult();
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint);
 
     // If a branch probability hint is present, compute the expected (average) resource counts
@@ -222,13 +242,13 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
         double pThen = probAttr.getValueAsDouble();
         double pElse = 1.0 - pThen;
 
-        ResourceResult elseResult;
+        ResourceResult elseResult = makeEmptyResult();
         if (!ifOp.getElseRegion().empty()) {
             analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
         }
 
-        thenResult.multiplyByScalar(pThen);
-        elseResult.multiplyByScalar(pElse);
+        thenResult.multiplyBy(pThen);
+        elseResult.multiplyBy(pElse);
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Sum);
 
         result.mergeWith(thenResult);
@@ -237,7 +257,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 
     // No hint: fall back to worst-case (max across branches).
     if (!ifOp.getElseRegion().empty()) {
-        ResourceResult elseResult;
+        ResourceResult elseResult = makeEmptyResult();
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Max);
     }
@@ -254,17 +274,17 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     // (excluding the default which is computed automatically).
     auto caseRegions = switchOp.getCaseRegions();
     if (auto probsAttr = switchOp->getAttrOfType<ArrayAttr>(EstimatedProbabilitiesAttrName)) {
-        ResourceResult expected;
+        ResourceResult expected = makeEmptyResult();
         double sumProb = 0.0;
 
         for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
-            ResourceResult caseResult;
+            ResourceResult caseResult = makeEmptyResult();
             analyzeRegion(caseRegion, caseResult, isAdjoint);
 
             double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
             sumProb += p;
 
-            caseResult.multiplyByScalar(p);
+            caseResult.multiplyBy(p);
             expected.mergeWith(caseResult, ResourceResult::MergeMethod::Sum);
         }
 
@@ -272,9 +292,9 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         // of floating-point error.
         double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
 
-        ResourceResult defaultResult;
+        ResourceResult defaultResult = makeEmptyResult();
         analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
-        defaultResult.multiplyByScalar(pDefault);
+        defaultResult.multiplyBy(pDefault);
         expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
 
         result.mergeWith(expected);
@@ -282,11 +302,11 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // No hint: fall back to worst-case (max across all cases).
-    ResourceResult maxResult;
+    ResourceResult maxResult = makeEmptyResult();
     bool first = true;
 
     for (auto &caseRegion : caseRegions) {
-        ResourceResult caseResult;
+        ResourceResult caseResult = makeEmptyResult();
         analyzeRegion(caseRegion, caseResult, isAdjoint);
         if (first) {
             maxResult = std::move(caseResult);
@@ -298,7 +318,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // default region
-    ResourceResult defaultResult;
+    ResourceResult defaultResult = makeEmptyResult();
     analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
     maxResult.mergeWith(defaultResult, ResourceResult::MergeMethod::Max);
 
@@ -356,6 +376,12 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
             }
         }
     }
+
+    assert(result.extensions.size() == extensionAnalyses.size() &&
+           "extension data/collector size mismatch");
+    for (size_t i = 0, e = extensionAnalyses.size(); i < e; ++i) {
+        extensionAnalyses[i]->analyze(region, *result.extensions[i], isAdjoint);
+    }
 }
 
 /**
@@ -368,8 +394,14 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @param result The ResourceResult to update with the operation's resource usage.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  */
-void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
+void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint) const
 {
+    // Collect extensions for the operation
+    assert(result.extensions.size() == extensionAnalyses.size() &&
+           "extension data/collector size mismatch");
+    for (size_t i = 0, e = extensionAnalyses.size(); i < e; ++i) {
+        extensionAnalyses[i]->collect(op, *result.extensions[i], isAdjoint);
+    }
 
     // Skipped ops
     if (isSkippedOp(op)) {

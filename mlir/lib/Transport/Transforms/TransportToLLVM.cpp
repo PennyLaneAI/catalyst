@@ -263,9 +263,9 @@ struct KickLowering : public OpConversionPattern<KickOp> {
         }
         auto [srcPtr, bytes] =
             memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getPayload(), memTy);
-        Value slot = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__data_slot",
-                              {ptrTy(ctx)}, ptrTy(ctx), {adaptor.getSession()});
-        LLVM::MemcpyOp::create(rewriter, op.getLoc(), slot, srcPtr, bytes, /*isVolatile=*/false);
+        emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__write_data_slot",
+                 {ptrTy(ctx), ptrTy(ctx), i64Ty(ctx)}, i32Ty(ctx),
+                 {adaptor.getSession(), srcPtr, bytes});
         Value idx = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getWorkItemIdx());
         emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__kick",
                  {ptrTy(ctx), i32Ty(ctx)}, i32Ty(ctx), {adaptor.getSession(), idx});
