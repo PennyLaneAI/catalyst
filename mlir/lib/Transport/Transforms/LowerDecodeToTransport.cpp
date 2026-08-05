@@ -22,6 +22,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
@@ -68,11 +69,18 @@ struct LowerDecodeToTransportPass
         MLIRContext *ctx = &getContext();
         auto ctrlTy = SessionType::get(ctx, Role::Controller);
 
-        auto emitRound = [&](Operation *anchor, Value syndrome, Value correction, StringRef key) {
+        auto emitRound = [&](qecp::DecodeEsmCssOp anchor, Value syndrome, Value correction,
+                             StringRef key) {
             OpBuilder b(anchor);
             Value s = GetSessionOp::create(b, anchor->getLoc(), ctrlTy, b.getStringAttr(key))
                           .getSession();
-            KickOp::create(b, anchor->getLoc(), s, syndrome, b.getI32IntegerAttr(0));
+            const std::int32_t decoderSlot =
+                llvm::StringSwitch<std::int32_t>(anchor.getCheckType().value_or(""))
+                    .Case("x", 0)
+                    .Case("z", 1)
+                    .Default(0);
+            KickOp::create(b, anchor->getLoc(), s, syndrome, b.getI32IntegerAttr(0),
+                           b.getI32IntegerAttr(decoderSlot));
             CollectOp::create(b, anchor->getLoc(), TypeRange{}, ValueRange{s, correction});
             anchor->erase();
         };
