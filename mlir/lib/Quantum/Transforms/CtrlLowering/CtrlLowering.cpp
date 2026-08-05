@@ -287,6 +287,90 @@ static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, 
     return success();
 }
 
+/// Control an `scf.while` by adding the control qubits as extra loop-carried values.
+static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whileOp, IRMapping &map,
+                                     SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
+{
+    Type qubitType = QubitType::get(rewriter.getContext());
+    unsigned numCtrl = currentCtrlQubits.size();
+    unsigned numInit = whileOp.getInits().size();
+
+    // New inits = original inits, plus the incoming control qubits.
+    SmallVector<Value> newInits;
+    for (Value init : whileOp.getInits()) {
+        newInits.push_back(map.lookupOrDefault(init));
+    }
+    newInits.append(currentCtrlQubits.begin(), currentCtrlQubits.end());
+
+    SmallVector<Type> newResultTypes(whileOp.getResultTypes().begin(),
+                                     whileOp.getResultTypes().end());
+    newResultTypes.append(numCtrl, qubitType);
+
+    Block &oldBefore = whileOp.getBefore().front();
+    Block &oldAfter = whileOp.getAfter().front();
+    scf::ConditionOp oldCond = whileOp.getConditionOp();
+    auto oldYield = cast<scf::YieldOp>(oldAfter.getTerminator());
+    // For the results: the `before` block forwards them and the `after` block
+    // receives them, and they all surface as the while results when the condition
+    // is false.
+    unsigned numFwd = oldCond.getArgs().size();
+
+    LogicalResult status = success();
+    // The before/after builder overload creates the before block args (init types + controls)
+    // and after block args (result types + controls);
+    // the callbacks fill each region.
+    auto newWhile = scf::WhileOp::create(
+        rewriter, whileOp.getLoc(), newResultTypes, newInits,
+        [&](OpBuilder & /*builder*/, Location /*loc*/, ValueRange beforeArgs) {
+            IRMapping beforeMap = map;
+            for (unsigned i = 0; i < numInit; ++i) {
+                beforeMap.map(oldBefore.getArgument(i), beforeArgs[i]);
+            }
+            SmallVector<Value> beforeCtrl(beforeArgs.begin() + numInit, beforeArgs.end());
+            if (failed(distributeControls(rewriter, oldBefore, beforeMap, beforeCtrl, ctrlValues))) {
+                status = failure();
+                return;
+            }
+            Value cond = beforeMap.lookupOrDefault(oldCond.getCondition());
+            SmallVector<Value> fwd;
+            for (Value v : oldCond.getArgs()) {
+                fwd.push_back(beforeMap.lookupOrDefault(v));
+            }
+            fwd.append(beforeCtrl.begin(), beforeCtrl.end());
+            scf::ConditionOp::create(rewriter, oldCond.getLoc(), cond, fwd);
+        },
+        [&](OpBuilder & /*builder*/, Location /*loc*/, ValueRange afterArgs) {
+            IRMapping afterMap = map;
+            for (unsigned i = 0; i < numFwd; ++i) {
+                afterMap.map(oldAfter.getArgument(i), afterArgs[i]);
+            }
+            SmallVector<Value> afterCtrl(afterArgs.begin() + numFwd, afterArgs.end());
+            if (failed(distributeControls(rewriter, oldAfter, afterMap, afterCtrl, ctrlValues))) {
+                status = failure();
+                return;
+            }
+            SmallVector<Value> yielded;
+            for (Value v : oldYield.getOperands()) {
+                yielded.push_back(afterMap.lookupOrDefault(v));
+            }
+            yielded.append(afterCtrl.begin(), afterCtrl.end());
+            scf::YieldOp::create(rewriter, oldYield.getLoc(), yielded);
+        });
+
+    if (failed(status)) {
+        return failure();
+    }
+
+    // Map the original results one-to-one; the trailing results are the threaded control qubits.
+    unsigned numOrig = whileOp.getNumResults();
+    for (unsigned i = 0; i < numOrig; ++i) {
+        map.map(whileOp.getResult(i), newWhile.getResult(i));
+    }
+    currentCtrlQubits.assign(newWhile.getResults().begin() + numOrig, newWhile.getResults().end());
+    rewriter.setInsertionPointAfter(newWhile);
+    return success();
+}
+
 static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block, IRMapping &map,
                                         SmallVector<Value> &currentCtrlQubits,
                                         ValueRange ctrlValues)
@@ -346,7 +430,13 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
             }
             continue;
         }
-        if (isa<scf::WhileOp, scf::IndexSwitchOp>(op)) {
+        if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
+            if (failed(controlScfWhile(rewriter, whileOp, map, currentCtrlQubits, ctrlValues))) {
+                return failure();
+            }
+            continue;
+        }
+        if (isa<scf::IndexSwitchOp>(op)) {
             op.emitError(
                 "this control flow op inside a quantum.ctrl region is not supported yet by "
                 "ctrl-lowering");
