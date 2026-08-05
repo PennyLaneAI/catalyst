@@ -368,7 +368,11 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: stablehlo.constant dense<2.200000e+00> : tensor<f64>
     test_from_static_data()
 
-    def test_decompose_to_hybrid_wires():
+    def test_to_hybrid_wires():
+        """
+        Test that decomposing to an op with a wire-like hybrid_argnames works.
+        """
+
         def rule_resource_fn(reg):
             return {
                 HybridWires(cwires=[Wire[1]]): 2,
@@ -397,7 +401,41 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
-    test_decompose_to_hybrid_wires()
+    test_to_hybrid_wires()
+
+    def test_from_hybrid_wires():
+        """
+        Test that decomposing from an op with a wire-like hybrid_argnames works.
+        """
+
+        def rule_resource_fn(cwires):
+            return {NoParams(reg=Wire[1]): 3}
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(cwires):
+            NoParams(reg=cwires[0])
+            NoParams(reg=cwires[1][0])
+            NoParams(reg=cwires[1][1])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(HybridWires, rule)
+            result = compile_decomposition_rules_wrapper(
+                "HybridWires",
+                "HybridWires{}{}{}[3742]",
+                {},
+                {},
+                {},
+                extra_data={"cwires": [1, [2, qp.wires.Wires(3)]]},
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_HybridWires{}{}{}[3742]"
+    # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 3 : i64}}
+    # CHECK-SAME:   target_gate = "HybridWires{}{}{}[3742]"
+    # CHECK: stablehlo.constant dense<1> : tensor<i64>
+    # CHECK: stablehlo.constant dense<2> : tensor<i64>
+    # CHECK: stablehlo.constant dense<3> : tensor<i64>
+    test_from_hybrid_wires()
 
     def test_decompose_to_hybrid_op():
         def rule_resource_fn(reg):
@@ -532,26 +570,6 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a:a,b:b,thing:thing}" = 1 : i64}}
     # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
     test_multiple_rules()
-
-    def test_single_rule_custom_op():
-        def rule_resource_fn(reg):
-            return {NoParamsCustomOp(wires=Wire[2]): 1}
-
-        @qp.register_resources(rule_resource_fn)
-        def rule(reg):
-            NoParamsCustomOp(wires=reg)
-
-        with qp.decomposition.local_decomps():
-            qp.add_decomps(NoParams, rule)
-            result = compile_decomposition_rules_wrapper(
-                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
-            )
-            print(result)
-
-    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
-    # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
-    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-    test_single_rule_custom_op()
 
 
 test_compile_decomposition_rules_wrapper_entry_point()
