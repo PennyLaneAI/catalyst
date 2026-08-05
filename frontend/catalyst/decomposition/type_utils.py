@@ -59,7 +59,7 @@ def mlir_stringify_type(dtype: qp.typing.AbstractArray):
         return _stringify_shaped_type(dtype.shape, 0, element_type)
 
 
-def get_dummy_values_for_container(container):
+def get_dummy_values_for_arg(arg):
     """
     Given a container of python or MLIR types, replace the types with corresponding dummy values.
 
@@ -68,25 +68,22 @@ def get_dummy_values_for_container(container):
     Ex.
     [[float, float], [int, int, int], [int32, int32, int32, int32]]
     """
-    if isinstance(container, str):
-        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[container])
+    if isinstance(arg, str):
+        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
 
-    def handle_item(item):
-        if isinstance(item, (list, tuple)):
-            return jnp.zeros(len(item), dtype=handle_item(item[0]).dtype)
-        if isinstance(item, ShapedArray):
-            return jnp.zeros(item.shape[0], dtype=item.dtype)
-        elif isinstance(item, str):
-            return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[item])
-        elif isinstance(item, (type, jnp.dtype)):
-            try:
-                return jnp.zeros((), jnp.dtype(item))
-            except TypeError:
-                raise TypeError(
-                    f"Unexpected type in container when creating dummy values: {type(item)}"
-                )
+    elif isinstance(arg, (list, tuple)):
+        return jnp.zeros(len(arg), dtype=get_dummy_values_for_arg(arg[0]).dtype)
+    elif isinstance(arg, ShapedArray):
+        return jnp.zeros(arg.shape[0], dtype=arg.dtype)
+    elif isinstance(arg, str):
+        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
+    elif isinstance(arg, (type, jnp.dtype)):
+        try:
+            return jnp.zeros((), jnp.dtype(arg))
+        except TypeError:
+            pass
 
-    return tuple(handle_item(item) for item in container)
+    raise TypeError(f"Unexpected type in container when creating dummy values: {type(arg)}")
 
 
 def replace_abstract_wires_with_concrete_wires(node):
