@@ -31,8 +31,7 @@ constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1 << STEANE_CHECKS] = {-1, 6, 4,
  * @brief STEANE_SYNDROME_TO_QUBIT packed into a single 32-bit word, 4 bits per
  * entry; 0xF encodes the -1 (no error) sentinel. Packed for reduced memory access.
  */
-constexpr std::uint32_t pack_steane_table()
-{
+constexpr std::uint32_t pack_steane_table() {
     std::uint32_t packed = 0;
     for (int i = 0; i < (1 << STEANE_CHECKS); ++i) {
         const std::int64_t qubit = STEANE_SYNDROME_TO_QUBIT[i];
@@ -52,8 +51,7 @@ static_assert(STEANE_TABLE_PACKED == 0x2130546FU,
  *                 element, so the checks arrive unpacked).
  * @return The error qubit index, or -1 for no error.
  */
-__device__ inline std::int64_t steane_decode(std::uint64_t syndrome)
-{
+__device__ inline std::int64_t steane_decode(std::uint64_t syndrome) {
     std::uint32_t packed = 0;
     for (int i = 0; i < STEANE_CHECKS; ++i) {
         packed = (packed << 1U) | static_cast<std::uint32_t>((syndrome >> (8 * i)) & 1U);

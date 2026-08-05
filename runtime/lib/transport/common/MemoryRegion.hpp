@@ -36,8 +36,7 @@ enum class MemAccess : int {
 /**
  * @brief Bitwise OR operator for combining MemAccess flags.
  */
-constexpr MemAccess operator|(MemAccess a, MemAccess b)
-{
+constexpr MemAccess operator|(MemAccess a, MemAccess b) {
     return static_cast<MemAccess>(static_cast<int>(a) | static_cast<int>(b));
 }
 

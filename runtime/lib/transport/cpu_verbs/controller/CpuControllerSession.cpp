@@ -26,16 +26,14 @@ namespace catalyst::transport::cpu_verbs {
 using namespace catalyst::transport::common;
 
 namespace {
-std::uint64_t now_ns()
-{
+std::uint64_t now_ns() {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                           std::chrono::steady_clock::now().time_since_epoch())
                                           .count());
 }
 } // namespace
 
-void CpuControllerSession::start()
-{
+void CpuControllerSession::start() {
     stop(); // drain any leftovers + reset (idempotent)
     next_send_ = 0;
     next_recv_ = 0;
@@ -43,8 +41,7 @@ void CpuControllerSession::start()
     rtt_ns_ = 0;
 }
 
-void CpuControllerSession::stop()
-{
+void CpuControllerSession::stop() {
     if (fwd_cq_) {
         reap(fwd_cq_->get(), signaled_outstanding_, /*drain=*/true);
     }
@@ -53,8 +50,7 @@ void CpuControllerSession::stop()
 // Single work item, fixed-size frame: work_item_idx is ignored; the sizes are
 // just recorded (out_bytes_ caps the reply in collect()).
 void CpuControllerSession::commit_work_item(std::uint32_t /*work_item_idx*/, std::uint64_t in_bytes,
-                                            std::uint64_t out_bytes)
-{
+                                            std::uint64_t out_bytes) {
     RDMA_CHECK(in_bytes <= PAYLOAD_DATA_BYTES, "in_bytes (%zu) exceeds the %zu B payload",
                static_cast<std::size_t>(in_bytes), PAYLOAD_DATA_BYTES);
     RDMA_CHECK(out_bytes <= PAYLOAD_DATA_BYTES, "out_bytes (%zu) exceeds the %zu B payload",
@@ -63,14 +59,12 @@ void CpuControllerSession::commit_work_item(std::uint32_t /*work_item_idx*/, std
     out_bytes_ = out_bytes;
 }
 
-void *CpuControllerSession::data_slot()
-{
+void *CpuControllerSession::data_slot() {
     // Current round's outbound slot: the caller writes up to in_bytes_ here, then kick()s.
     return &send_payload()->value;
 }
 
-void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes)
-{
+void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes) {
     RDMA_CHECK(bytes <= in_bytes_, "payload (%zu B) exceeds the %zu B committed for this round",
                static_cast<std::size_t>(bytes), static_cast<std::size_t>(in_bytes_));
     Payload *send = send_payload();
@@ -78,8 +72,7 @@ void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes)
     std::memcpy(&send->value, src, bytes);
 }
 
-int CpuControllerSession::kick(std::uint32_t /*work_item_idx*/)
-{
+int CpuControllerSession::kick(std::uint32_t /*work_item_idx*/) {
     // The payload was written into data_slot() by the caller; fire one round.
     kick_ns_ = now_ns();
     const bool sig = (next_send_ % SIGNAL_EVERY == 0);
@@ -93,8 +86,7 @@ int CpuControllerSession::kick(std::uint32_t /*work_item_idx*/)
 }
 
 int CpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
-                                  std::size_t n)
-{
+                                  std::size_t n) {
     std::stop_token none; // blocking wait for this round's reply
     Payload *r = poll_message_arrival(next_recv_, none);
     if (!r) {

@@ -37,8 +37,7 @@ namespace catalyst::mbqc {
 // MBQC op verifiers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult RefGraphStatePrepOp::verify()
-{
+LogicalResult RefGraphStatePrepOp::verify() {
     qref::QuregType qregType = getQreg().getType();
     if (qregType.isDynamic()) {
         return emitOpError() << "expected static allocation size";
@@ -85,8 +84,7 @@ uint64_t GraphStatePrepOp::getResourceNumParams() { return 0; }
 uint64_t RefGraphStatePrepOp::getResourceNumParams() { return 0; }
 
 uint64_t GraphStatePrepOp::getResourceNumAllocQubits() { return getNumQubitsFromAdjMatrixSize(); }
-uint64_t RefGraphStatePrepOp::getResourceNumAllocQubits()
-{
+uint64_t RefGraphStatePrepOp::getResourceNumAllocQubits() {
     return getNumQubitsFromAdjMatrixSize();
 }
 

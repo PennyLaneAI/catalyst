@@ -50,9 +50,7 @@ class TracingError : public QPDError {
     TracingError(std::string moduleName, std::string functionName, std::string args,
                  std::string error)
         : QPDError("An error occurred while tracing " + functionName + " from module " +
-                   moduleName + " with args " + args + ": " + error)
-    {
-    }
+                   moduleName + " with args " + args + ": " + error) {}
 };
 
 class PyInterpreterGuard {
@@ -60,8 +58,7 @@ class PyInterpreterGuard {
     PyInterpreterGuard(const PyInterpreterGuard &) = delete;
     PyInterpreterGuard &operator=(const PyInterpreterGuard &) = delete;
 
-    PyInterpreterGuard()
-    {
+    PyInterpreterGuard() {
         if (!Py_IsInitialized()) {
             Py_Initialize();
             PyEval_SaveThread(); // release the GIL
@@ -71,13 +68,11 @@ class PyInterpreterGuard {
         syncSitePackages();
     };
 
-    template <class T> decltype(auto) withGil(T &&func)
-    {
+    template <class T> decltype(auto) withGil(T &&func) {
         nb::gil_scoped_acquire acquire;
         try {
             return std::invoke(std::forward<T>(func));
-        }
-        catch (const nb::python_error &e) {
+        } catch (const nb::python_error &e) {
             throw QPDError(e.what());
         }
     }
@@ -86,14 +81,12 @@ class PyInterpreterGuard {
     /**
      * @brief Ensure that site-packages are synced for the spawned interpreter.
      */
-    void syncSitePackages()
-    {
+    void syncSitePackages() {
         try {
             nb::object scope = nb::module_::import_("__main__").attr("__dict__");
 
             nb::exec(sitePackagesScript, scope);
-        }
-        catch (const nb::python_error &e) {
+        } catch (const nb::python_error &e) {
             std::cerr << "Failed to load site-packages: " << e.what();
             return;
         }

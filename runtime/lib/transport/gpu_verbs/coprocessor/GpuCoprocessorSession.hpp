@@ -54,8 +54,7 @@ class GpuCoprocessorSession : public CoprocessorSession {
     int collect(void *const *outputs, const std::uint64_t *output_bytes, std::size_t n) override;
     void stop() override;
     void set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) override;
-    CoprocConvention coprocessor_fn_convention() const override
-    {
+    CoprocConvention coprocessor_fn_convention() const override {
         return CoprocConvention::LaunchOnce;
     }
 
