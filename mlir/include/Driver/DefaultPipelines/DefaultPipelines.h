@@ -71,6 +71,13 @@ const PipelineList pipelineList{
       "scatter-lowering",
       "hlo-custom-call-lowering",
       "cse",
+      // Reconstruct the loops that tracing unrolled (e.g. Trotter steps); a
+      // repeat of multiplicity k shrinks its region k-fold before the
+      // bufferization and LLVM stages amplify it. Computations duplicated per
+      // iteration sit inside each repeated window and reroll as part of it,
+      // and constants (the only cross-window operands that must be identical
+      // SSA values) are already uniqued by the preceding cse.
+      "reroll-loops",
       "func.func(linalg-detensorize{aggressive-mode})",
       "detensorize-scf",
       "detensorize-function-boundary",
