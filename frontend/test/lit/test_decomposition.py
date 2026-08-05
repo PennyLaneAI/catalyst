@@ -583,6 +583,50 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
     test_to_hybrid_op_nested()
 
+    def test_from_hybrid_op_nested():
+        """
+        Test that decomposing from an op with a hybrid_argnames that is a nested op works.
+        """
+
+        def rule_resource_fn(angle, op, cwires, n_iters):
+            return {NoParams(reg=Wire[1]): 1, op: 1, op.op: 1}
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(angle, op, cwires, n_iters):
+            qp.apply(op)
+            qp.apply(op.op)
+            NoParams(reg=cwires[0])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(HybridOpArg, rule)
+            result = compile_decomposition_rules_wrapper(
+                "HybridOpArg",
+                "HybridOpArg{angle:[f64]}{cwires:1}{}[7654]",
+                {"angle": ["f64"]},
+                {"cwires": 1},
+                {},
+                extra_data={
+                    "op": HybridOpArg(
+                        angle=0.2,
+                        op=StaticDataMultiReg("hello", reg=[1], reg2=[2, 3], theta=0.2),
+                        cwires=2,
+                        n_iters=200,
+                    ),
+                    "n_iters": 100,
+                },
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_HybridOpArg{angle:[f64]}{cwires:1}{}[7654]"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_outer:[-0-9]+]]]" = 1 : i64,
+    # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
+    # CHECK-SAME:   "StaticDataMultiReg{theta:[f64]}{reg:1,reg2:2}{}[[[uid_inner:[-0-9]+]]]" = 1 : i64
+    # CHECK-SAME:   target_gate = "HybridOpArg{angle:[f64]}{cwires:1}{}[7654]"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
+    test_from_hybrid_op_nested()
+
     def test_multiple_rules():
         """
         Test when multiple rules are registered on an op.
