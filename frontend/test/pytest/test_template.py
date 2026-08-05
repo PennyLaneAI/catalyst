@@ -1015,11 +1015,6 @@ def test_mod_exp(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(
-    reason="Arithmetic template decomposition passes non-JAX-traceable kwargs (work_wire_type)",
-    raises=TypeError,
-    strict=True,
-)
 def test_multiplier(backend):
     """Test Multiplier."""
     x = 3
@@ -1041,11 +1036,6 @@ def test_multiplier(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(
-    reason="Arithmetic template decomposition passes non-JAX-traceable kwargs (work_wire_type)",
-    raises=TypeError,
-    strict=True,
-)
 def test_out_adder(backend):
     """Test OutAdder."""
     mod = 7
@@ -1070,11 +1060,6 @@ def test_out_adder(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(
-    reason="Arithmetic template decomposition passes non-JAX-traceable kwargs (work_wire_type)",
-    raises=TypeError,
-    strict=True,
-)
 def test_out_multiplier(backend):
     """Test OutMultiplier."""
     mod = 12
