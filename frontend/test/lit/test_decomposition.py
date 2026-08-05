@@ -292,7 +292,44 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-NOT: stablehlo.constant dense<1.000000e-01> : tensor<f64>
     test_from_compilable_data()
 
-    def test_static_data():
+    def test_to_static_data():
+        """
+        Test that decomposing to an op with static_argnames works.
+        """
+
+        def rule_resource_fn(reg):
+            return {
+                StaticData(label="hello", reg=Wire[1]): 1,
+                StaticData(label="world", reg=Wire[1]): 2,
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            StaticData(label="hello", reg=reg[0])
+            StaticData(label="world", reg=reg[1])
+            StaticData(label="world", reg=reg[0])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:[-0-9]+]]]" = 1
+    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:[-0-9]+]]]" = 2
+    # CHECK-DAG:   target_gate = "NoParams{}{reg:2}{}"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
+    test_to_static_data()
+
+    def test_from_static_data():
+        """
+        Test that decomposing from an op with static_argnames works.
+        """
+
         def rule_resource_fn(label, reg):
             if label == 1234:
                 return {SingleParam(x=Float, reg=Wire[1]): 1}
@@ -329,36 +366,7 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[4321]"
     # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
     # CHECK: stablehlo.constant dense<2.200000e+00> : tensor<f64>
-    test_static_data()
-
-    def test_decompose_to_static_data():
-        def rule_resource_fn(reg):
-            return {
-                StaticData(label="hello", reg=Wire[1]): 1,
-                StaticData(label="world", reg=Wire[1]): 2,
-            }
-
-        @qp.register_resources(rule_resource_fn)
-        def rule(reg):
-            StaticData(label="hello", reg=reg[0])
-            StaticData(label="world", reg=reg[1])
-            StaticData(label="world", reg=reg[0])
-
-        with qp.decomposition.local_decomps():
-            qp.add_decomps(NoParams, rule)
-            result = compile_decomposition_rules_wrapper(
-                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
-            )
-            print(result)
-
-    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
-    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:[-0-9]+]]]" = 1
-    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:[-0-9]+]]]" = 2
-    # CHECK-DAG:   target_gate = "NoParams{}{reg:2}{}"
-    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
-    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
-    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
-    test_decompose_to_static_data()
+    test_from_static_data()
 
     def test_decompose_to_hybrid_wires():
         def rule_resource_fn(reg):
