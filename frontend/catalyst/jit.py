@@ -59,6 +59,7 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
+from catalyst.utils.runtime_artifacts import collect_runtime_artifacts
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -885,6 +886,9 @@ class QJIT(CatalystCallable):
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
+
+        # Collect the shared libraries a local `runtime_call` recorded, so the linker gets them.
+        collect_runtime_artifacts(mlir_module, self.compile_options)
 
         return mlir_module
 

@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <ctime>
 #include <dlfcn.h>
 #include <exception>
 #include <functional>
@@ -55,9 +56,22 @@ struct CatalystTransportSession {
     PeerRef peer; // peer region learned in exchange_keys
     bool peer_ready = false;
     std::vector<std::int64_t> pending_tokens;
+
+    std::uint32_t work_item = 0;
+    std::uint64_t in_bytes = 0;
+    std::uint64_t out_bytes = 0;
+    bool work_item_ready = false;
 };
 
 namespace {
+
+std::uint64_t now_ns()
+{
+    timespec ts = {};
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    return static_cast<std::uint64_t>(ts.tv_sec) * 1000000000ull +
+           static_cast<std::uint64_t>(ts.tv_nsec);
+}
 
 // (role, key) -> live session registry. Populated at create, read by get_session so a session
 // brought up in one function can be resolved in another.
@@ -360,6 +374,10 @@ int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
             return CATALYST_TRANSPORT_ERR;
         }
         c->commit_work_item(work_item_idx, in_bytes, out_bytes);
+        s->work_item = work_item_idx;
+        s->in_bytes = in_bytes;
+        s->out_bytes = out_bytes;
+        s->work_item_ready = true;
         return CATALYST_TRANSPORT_OK;
     });
 }
@@ -425,6 +443,95 @@ std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s)
         return guard([&] { return s->sess->last_rtt_ns(); });
     }
     return 0;
+}
+
+// The benchmark loop
+// Flags:
+//     CATALYST_BENCH_CLEAR_SENTINEL: Clear the sentinel value in the reply slot.
+//     CATALYST_BENCH_FORCE_SW_RTT: Force the use of the software RTT.
+//     CATALYST_BENCH_PROGRESS: Print progress information.
+int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uint32_t iters,
+                                           std::uint32_t decoder_id, std::uint32_t flags,
+                                           std::uint64_t *samples, std::uint64_t *rounds)
+{
+    if (rounds) {
+        *rounds = 0;
+    }
+    auto *c = cast_to_controller(s);
+    if (!c || (iters && !samples)) {
+        return CATALYST_TRANSPORT_ERR;
+    }
+    if (!s->work_item_ready) {
+        std::cerr << "[transport] start_benchmark: no work item committed; call "
+                     "commit_work_item first so the round's sizes are known\n";
+        return CATALYST_TRANSPORT_ERR;
+    }
+
+    // The round's shape is whatever was committed, so it cannot disagree with it.
+    const std::uint32_t work_item_idx = s->work_item;
+    const auto syndrome_bytes = static_cast<std::uint32_t>(s->in_bytes);
+    const auto correction_bytes = static_cast<std::uint32_t>(s->out_bytes);
+
+    const bool clear_sentinel = (flags & CATALYST_BENCH_CLEAR_SENTINEL) != 0;
+    const bool force_sw_rtt = (flags & CATALYST_BENCH_FORCE_SW_RTT) != 0;
+    const bool progress = (flags & CATALYST_BENCH_PROGRESS) != 0;
+
+    return guard([&] {
+        // Syndrome staging buffer (>=12 B to hold Payload.value @0 + seq_num @8).
+        std::vector<std::uint8_t> syndrome(std::max<std::uint32_t>(syndrome_bytes, 12u), 0);
+        std::uint64_t written = 0;
+        int rc = CATALYST_TRANSPORT_OK;
+
+        for (std::uint32_t i = 0; i < iters; ++i) {
+            // Frame the syndrome as a Payload in a local buffer, then hand it to the transport.
+            // write_data_slot copies it into the outbound slot and enforces the slot capacity.
+            std::uint64_t value = (static_cast<std::uint64_t>(i) << 32) | 0xC0DE1515u;
+            std::memcpy(syndrome.data(), &value, sizeof(value));
+            if (syndrome_bytes >= 12) {
+                std::uint32_t seq = i + 1; // Payload.seq_num @ 8
+                std::memcpy(syndrome.data() + 8, &seq, sizeof(seq));
+            }
+
+            c->write_data_slot(syndrome.data(), syndrome_bytes, decoder_id);
+
+            void *rslot = c->reply_slot();
+            if (clear_sentinel) {
+                *static_cast<volatile std::uint32_t *>(rslot) = 0u;
+            }
+
+            std::uint64_t t0 = now_ns();
+
+            rc = c->kick(work_item_idx);
+            if (rc == CATALYST_TRANSPORT_OK) {
+                void *replies[1] = {rslot};
+                std::uint64_t replies_bytes[1] = {correction_bytes};
+                rc = s->sess->collect(replies, replies_bytes, 1);
+            }
+            std::uint64_t sw_rtt = now_ns() - t0;
+
+            if (rc != CATALYST_TRANSPORT_OK) {
+                std::cerr << "[transport] start_benchmark: round " << i << " failed rc=" << rc
+                          << "\n";
+                break;
+            }
+
+            std::uint64_t hw_rtt = force_sw_rtt ? 0 : s->sess->last_rtt_ns();
+            samples[written++] = (hw_rtt != 0) ? hw_rtt : sw_rtt;
+
+            if (progress && ((i & 1023) == 0 || i == iters - 1)) {
+                std::uint64_t cval = 0;
+                std::memcpy(&cval, rslot, std::min<std::size_t>(correction_bytes, sizeof(cval)));
+                std::cerr << "[transport] round " << i << " rtt=" << samples[written - 1] << " ns ["
+                          << (hw_rtt ? "hw" : "sw") << "] corr[0:8]=0x" << std::hex << cval
+                          << std::dec << "\n";
+            }
+        }
+
+        if (rounds) {
+            *rounds = written;
+        }
+        return rc;
+    });
 }
 
 void __catalyst__transport__start(CatalystTransportSession *s)

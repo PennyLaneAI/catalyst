@@ -23,6 +23,13 @@
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
   [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
 
+* `qp.runtime_call` is supported to lower to an ordinary `catalyst.custom_call`. The shared library
+  exporting the symbol is given via `qp.runtime_declare(..., library=...)` (or `runtime_call(..., library=...)`)
+  and recorded on the module so the compiler links it. A local call may take a `buf` argument and
+  may return nothing (a `void` call is kept for its side effects), neither of which a dispatched
+  call allows.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * A CPU transport backend built on libibverbs is added, which implements the controller and coprocessor
   session roles over RDMA.
   [(#3062)](https://github.com/PennyLaneAI/catalyst/pull/3062)
