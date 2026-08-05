@@ -30,9 +30,11 @@ _INIT_KEYS = ("backend_lib", "config", "data_path", "in_bytes", "out_bytes")
 
 # A transport backend library is named for its backend and role:
 #     libcatalyst_transport_<backend>_<role>.<ext>
-# In-tree backends build under ``<RUNTIME_LIB_DIR>/transport/<backend>/``. Out-of-tree ones build
-# elsewhere entirely, so ``CATALYST_TRANSPORT_PATH`` (``:``-separated, like ``PATH``) lists extra
-# directories to search first; each is searched directly, assuming no layout within it.
+# A ``make -C runtime`` build passes ``CMAKE_LIBRARY_OUTPUT_DIRECTORY``, so in-tree backends land
+# flat in ``<RUNTIME_LIB_DIR>``; a bare ``cmake`` build instead mirrors the source tree, nesting them
+# under ``transport/<backend>/``. Both are searched. Out-of-tree backends build elsewhere entirely,
+# so ``CATALYST_TRANSPORT_PATH`` (``:``-separated, like ``PATH``) lists extra directories to search
+# first; each is searched directly, assuming no layout within it.
 _BACKEND_PATH_ENV = "CATALYST_TRANSPORT_PATH"
 _BACKEND_SUBDIR = "transport"
 _BACKEND_LIB_EXTS = ("so", "dylib")
@@ -42,7 +44,9 @@ def _backend_search_dirs(backend: str) -> list[Path]:
     """Directories to search for ``backend``'s libraries, most specific first."""
     override = os.environ.get(_BACKEND_PATH_ENV, "")
     dirs = [Path(p) for p in override.split(os.pathsep) if p]
-    dirs.append(Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / _BACKEND_SUBDIR / backend)
+    lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    dirs.append(lib_dir)
+    dirs.append(lib_dir / _BACKEND_SUBDIR / backend)
     return dirs
 
 
@@ -60,18 +64,19 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
         str: The library path for a local node, or its bare filename for a remote one.
 
     Raises:
-        ValueError: If no library matches, naming every directory searched. A backend shipping only
-            one role (``gpu_verbs`` has no controller library) fails here rather than later at
-            ``dlopen``.
+        ValueError: If no library matches on a local node, naming every directory searched. A
+            backend shipping only one role (``gpu_verbs`` has no controller library) fails here
+            rather than later at ``dlopen``.
     """
     names = [f"libcatalyst_transport_{backend}_{role}.{ext}" for ext in _BACKEND_LIB_EXTS]
+    if remote:
+        return names[0]
     search = _backend_search_dirs(backend)
     for directory in search:
         for name in names:
             candidate = directory / name
             if candidate.exists():
-                # A remote node resolves the name itself, against the bundle deployed with it.
-                return name if remote else str(candidate)
+                return str(candidate)
     searched = ", ".join(str(d) for d in search)
     raise ValueError(
         f"no transport backend library for backend={backend!r} role={role!r}: looked for "

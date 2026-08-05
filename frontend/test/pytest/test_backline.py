@@ -18,9 +18,11 @@ import pytest
 
 from catalyst import qjit
 from catalyst.backline import (
+    _realize_executor,
     _resolve_backend_lib,
     add_transport_passes,
     backline_pipeline,
+    realize_executors,
     serialize_backline,
 )
 
@@ -53,20 +55,18 @@ def _controller(**kw):
         "in_bytes": 3,
         "out_bytes": 8,
     }
-    return qp.Controller(
-        device=qp.device("null.qubit", wires=2), label="ctrl", remote=False, init_args=init, **kw
-    )
+    kw.setdefault("remote", False)
+    kw.setdefault("init_args", init)
+    return qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl", **kw)
 
 
 def _coproc(label, oob_port=18590, fn="coproc_fn", **kw):
+    kw.setdefault("remote", False)
+    kw.setdefault(
+        "init_args", {"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"}
+    )
     return qp.Coprocessor(
-        label=label,
-        comm_host="127.0.0.1",
-        oob_port=oob_port,
-        remote=False,
-        coprocessor_fn=fn,
-        init_args={"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"},
-        **kw,
+        label=label, comm_host="127.0.0.1", oob_port=oob_port, coprocessor_fn=fn, **kw
     )
 
 
@@ -187,10 +187,11 @@ def test_remote_controller_module_tagged_with_role(use_capture):
 
 @pytest.fixture
 def fake_lib_dir(tmp_path, monkeypatch):
-    """Stand in for the built runtime lib dir, mirroring the real layout.
+    """Stand in for the built runtime lib dir, laid out as a bare ``cmake`` build.
 
-    The build puts each backend under ``<RUNTIME_LIB_DIR>/transport/<backend>/``, so entries are
-    given as ``"<backend>/<libname>"``.
+    That build mirrors the source tree, nesting each backend under
+    ``<RUNTIME_LIB_DIR>/transport/<backend>/``, so entries are given as ``"<backend>/<libname>"``.
+    See :func:`flat_lib_dir` for the layout ``make -C runtime`` produces.
     """
     monkeypatch.setattr("catalyst.backline.get_lib_path", lambda *_: str(tmp_path))
 
@@ -199,6 +200,23 @@ def fake_lib_dir(tmp_path, monkeypatch):
             path = tmp_path / "transport" / e
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"")
+        return tmp_path
+
+    return make
+
+
+@pytest.fixture
+def flat_lib_dir(tmp_path, monkeypatch):
+    """Stand in for the built runtime lib dir as ``make -C runtime`` lays it out.
+
+    That build passes ``CMAKE_LIBRARY_OUTPUT_DIRECTORY``, which puts every library flat in
+    ``<RUNTIME_LIB_DIR>``, so entries are bare library names.
+    """
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda *_: str(tmp_path))
+
+    def make(*entries):
+        for e in entries:
+            (tmp_path / e).write_bytes(b"")
         return tmp_path
 
     return make
@@ -220,12 +238,35 @@ class TestBackendResolution:
             "transport/cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so"
         )
 
+    def test_flat_lib_dir_is_searched(self, flat_lib_dir):
+        """``make -C runtime`` passes ``CMAKE_LIBRARY_OUTPUT_DIRECTORY``, flattening the lib dir.
+
+        That is the layout a released or ``make``-built tree has, so it must resolve without the
+        ``transport/<backend>/`` nesting a bare ``cmake`` build produces.
+        """
+        root = flat_lib_dir("libcatalyst_transport_cpu_verbs_controller.so")
+        assert _resolve_backend_lib("cpu_verbs", "controller", False) == str(
+            root / "libcatalyst_transport_cpu_verbs_controller.so"
+        )
+
     def test_remote_node_gets_the_bare_filename(self, fake_lib_dir):
         """A remote node loads from its deployed bundle, so it is given a name, not a local path."""
         fake_lib_dir("cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so")
         assert (
             _resolve_backend_lib("cpu_verbs", "coprocessor", True)
             == "libcatalyst_transport_cpu_verbs_coprocessor.so"
+        )
+
+    def test_remote_node_does_not_probe_this_machine(self, fake_lib_dir):
+        """A remote backend need not exist here: the bundle it loads from is on the other machine.
+
+        The FPGA's ``hwhs`` library is built for aarch64 and lives only on the board, so probing
+        the host would test the wrong filesystem and reject a valid placement.
+        """
+        fake_lib_dir()  # nothing built locally
+        assert (
+            _resolve_backend_lib("hwhs", "controller", True)
+            == "libcatalyst_transport_hwhs_controller.so"
         )
 
     def test_out_of_tree_backend_via_search_path(self, tmp_path, monkeypatch):
@@ -309,3 +350,86 @@ class TestBackendResolution:
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl")
         d = serialize_backline(qp.backline(controller=ctrl, transport="net").placement)
         assert "backend_lib" not in d["controller"]
+
+
+class TestExecutorRealization:
+    """``executor_options`` on a node becomes a launched ``catalyst.Executor``.
+
+    These use an attach-only executor (an ``address`` with neither ``local`` nor ``host``), whose
+    ``launch()`` short-circuits without spawning a process — so the whole path is exercised without
+    needing the ``catalyst-executor`` binary.
+    """
+
+    def test_no_options_launches_nothing(self):
+        """``executor_options=None`` means no executor was requested."""
+        node = _controller()
+        assert node.executor_options is None
+        assert _realize_executor(node) is None
+        assert node.executor is None
+
+    def test_options_produce_a_launched_executor_cached_on_the_node(self):
+        """The executor is built, launched, and cached back onto the frozen node."""
+        node = _controller(
+            executor_options={"address": "10.0.0.9:1373", "triple": "aarch64-unknown-linux-gnu"}
+        )
+        ex = _realize_executor(node)
+        assert ex is not None
+        assert ex.address == "10.0.0.9:1373"
+        assert ex.triple == "aarch64-unknown-linux-gnu"
+        assert node.executor is ex
+
+    def test_realization_is_idempotent(self):
+        """A second call returns the same executor rather than launching another."""
+        node = _controller(executor_options={"address": "10.0.0.9:1373"})
+        assert _realize_executor(node) is _realize_executor(node)
+
+    def test_label_seeds_the_executor_name(self):
+        """The node's label names the executor, which uses it for its logs."""
+        node = _controller(executor_options={"address": "10.0.0.9:1373"})
+        assert _realize_executor(node).name == "ctrl"
+
+    def test_a_preset_executor_is_returned_untouched(self):
+        """Setting ``executor`` directly attaches an already-launched one; options are ignored."""
+
+        class _Ex:
+            address = "attached:1"
+            triple = "x86_64-unknown-linux-gnu"
+
+        ex = _Ex()
+        node = _controller(executor=ex, executor_options={"address": "ignored:2"})
+        assert _realize_executor(node) is ex
+
+    def test_realize_executors_walks_every_node(self):
+        """``realize_executors`` covers the controller and each coprocessor."""
+        ctrl = _controller(executor_options={"address": "ctrl:1"})
+        cop = _coproc("cop0", executor_options={"address": "cop:2"})
+        dev = qp.backline(controller=ctrl, coprocessors=[cop], transport="net")
+        realize_executors(dev.placement)
+        assert ctrl.executor.address == "ctrl:1"
+        assert cop.executor.address == "cop:2"
+
+    def test_executor_address_and_triple_reach_the_serialized_node(self):
+        """The launched executor supplies the node's dispatch address and target triple."""
+        ctrl = _controller(
+            remote=True,
+            executor_options={"address": "10.0.0.9:1373", "triple": "aarch64-unknown-linux-gnu"},
+        )
+        dev = qp.backline(controller=ctrl, transport="net")
+        realize_executors(dev.placement)
+        node = serialize_backline(dev.placement)["controller"]
+        assert node["address"] == "10.0.0.9:1373"
+        assert node["triple"] == "aarch64-unknown-linux-gnu"
+
+    def test_a_high_oob_port_survives_to_the_ir(self, use_capture):
+        """A port above 32767 appears as itself, not as a negative number."""
+        cop = _coproc("cop0", oob_port=40000)
+        dev = qp.backline(controller=_controller(), coprocessors=[cop], transport="net")
+
+        @qjit(target="mlir", capture=True)
+        @qp.qnode(dev)
+        def circuit():
+            qp.Hadamard(0)
+            return qp.probs()
+
+        assert "oob_port = 40000" in circuit.mlir
+        assert "-25536" not in circuit.mlir
