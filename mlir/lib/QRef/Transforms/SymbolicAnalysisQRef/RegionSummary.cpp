@@ -20,25 +20,17 @@
 */
 RegionSummary::RegionSummary(RegionType type, ProgramAbstraction &circ1, ProgramAbstraction *circ2)
 {
-    TransformSchema circ1Schm;
-    if (type != RegionType::Procedure) {
-        circ1Schm = circ1.getSchema();
-    }
-        
-    this->affineRel = AffineRelation(std::move(circ1.stateTransform));
+    this->phasesSchm = circ1.getSchema();
     this->phases = std::move(circ1.phases);
+    this->affineRel = AffineRelation(std::move(circ1.stateTransform));
     this->type = type;
 
     switch (type) {
     case RegionType::Conditional:
-        if (circ2){
-            summarizeIfElse(circ1Schm, *circ2);
-        } else {
-            summarizeIf(circ1Schm);
-        }
+        summarizeCond(circ2);
         break;
     case RegionType::Loop:
-        summarizeLoop(circ1Schm);
+        summarizeLoop();
         break;
     case RegionType::Procedure:
         summarizeProc();
@@ -46,15 +38,17 @@ RegionSummary::RegionSummary(RegionType type, ProgramAbstraction &circ1, Program
     }
 }
 
-void RegionSummary::summarizeIfElse(const TransformSchema &ifBodySchm, ProgramAbstraction &elseBody)
+void RegionSummary::summarizeCond(ProgramAbstraction *elseBody)
 {
-    TransformSchema elseSchm = elseBody.getSchema();
-    AffineRelation elseRel(std::move(elseBody.stateTransform));
-    
-    summarizeCond(ifBodySchm, elseRel);
-    
-    elseBody.phases.reSchema(elseSchm, affineRel.getSchema());
-    this->falseBranchPhases = std::move(elseBody.phases);
+    AffineRelation elseRel;
+    if (elseBody) {
+        this->falseBranchPhasesSchm = elseBody->getSchema();
+        this->falseBranchPhases = std::move(elseBody->phases);
+        elseRel = AffineRelation(std::move(elseBody->stateTransform));
+    } else {
+        elseRel = AffineRelation::Identity(phasesSchm.numQubits());
+    }
+    affineRel.joinWith(elseRel);
 }
 
 /*
@@ -77,10 +71,10 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const RegionSummary &sum)
 */
 void RegionSummary::nullifyPhasesUnder(const AffineRelation &precondRel)
 {
-    phases.nullifyByPrecond(precondRel, affineRel.getSchema());
+    phases.nullifyByPrecond(precondRel, phasesSchm);
 
     if (type == RegionType::Conditional) {
-        falseBranchPhases.nullifyByPrecond(precondRel, affineRel.getSchema());
+        falseBranchPhases.nullifyByPrecond(precondRel, falseBranchPhasesSchm);
     }
 }
 

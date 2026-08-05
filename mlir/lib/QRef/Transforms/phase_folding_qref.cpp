@@ -136,9 +136,8 @@ void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstract
             llvm::outs() << "CustomOp:  " << customOp << "\n";
             handleCustomOp(customOp, currentAbst, gateID);
         })
-        .Case<qref::GetOp>([&](qref::GetOp getOp) {
-            llvm::outs() << "GetOp: " << getOp << "\n";
-            getFromQreg(getOp);
+        .Case<qref::MeasureOp>([&](qref::MeasureOp measureOp) {
+            llvm::outs() << "MeasureOp:  " << measureOp << "\n";
         })
         .Case<qref::AllocQubitOp>([&](qref::AllocQubitOp allocQbOp) {
             llvm::outs() << "AllocQubitOp:  " << allocQbOp << "\n";
@@ -148,9 +147,17 @@ void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstract
             llvm::outs() << "AllocOp:   " << allocOp << "\n";
             allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), currentAbst);
         })
+        .Case<qref::DeallocQubitOp>([&](qref::DeallocQubitOp deallocQbOp) {
+            llvm::outs() << "DeallocQubitOp:   " << deallocQbOp << "\n";
+            
+        })
         .Case<qref::DeallocOp>([&](qref::DeallocOp deallocOp) {
             llvm::outs() << "DeallocOp:   " << deallocOp << "\n";
             
+        })
+        .Case<qref::GetOp>([&](qref::GetOp getOp) {
+            llvm::outs() << "GetOp: " << getOp << "\n";
+            getFromQreg(getOp);
         })
         .Case<qref::SetBasisStateOp>([&](qref::SetBasisStateOp basisOp) {
             llvm::outs() << "SetBasisStateOp:   " << basisOp << "\n";
@@ -169,58 +176,36 @@ void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstract
 // --- Control Flow Handlers ---
 
 void PhaseFoldingAnalyzer::handleIfOp(mlir::scf::IfOp ifOp, ProgramAbstraction &parentAbst) {
-    // llvm::outs() << "\nhandleIfOp...\n";
     // 1. Create fresh abstractions for branches
     ProgramAbstraction thenAbst(parentAbst.numQubits());
     ProgramAbstraction elseAbst(parentAbst.numQubits());
 
     // 2. Recursively analyze regions
     analyzeBlock(&ifOp.getThenRegion().front(), thenAbst);
-    // llvm::outs() << "thenAbst:\n" << thenAbst << "\n";
-
+    
     if (!ifOp.getElseRegion().empty()) {
         analyzeBlock(&ifOp.getElseRegion().front(), elseAbst);
-        // llvm::outs() << "elseAbst:\n" << elseAbst << "\n";
     }
 
     // 3. Compute summary using your API
-    RegionSummary summary(RegionType::Conditional, thenAbst, &elseAbst);
-
-    // llvm::outs() << "branch summary:\n" << summary << "\n";
-    // llvm::outs() << "summary:\n" << summary << "\n";
-    // llvm::outs() << "parentAbst:\n" << parentAbst << "\n";
-
+    RegionSummary branchSummary(RegionType::Conditional, thenAbst, &elseAbst);
+    
     // 4. Apply to parent
-    parentAbst.applySummary(std::move(summary));
-
-    // llvm::outs() << "IfOp handled:\n" << parentAbst << "\n";
+    parentAbst.applySummary(std::move(branchSummary));
 }
 
 void PhaseFoldingAnalyzer::handleForOp(mlir::scf::ForOp forOp, ProgramAbstraction &parentAbst) {
-    // llvm::outs() << "\nhandleForOp...\n";
-
     // 1. Create abstraction for the loop body
     ProgramAbstraction loopAbst(parentAbst.numQubits());
-
-    // llvm::outs() << "1\n";
 
     // 2. Analyze the loop body region
     analyzeBlock(&forOp.getBodyRegion().front(), loopAbst);
 
-    // llvm::outs() << "2\n";
-    // llvm::outs() << "loopAbst:\n" << loopAbst << "\n";
-
     // 3. Compute summary 
-    RegionSummary summary(RegionType::Loop, loopAbst);
-
-    // llvm::outs() << "3\n";
+    RegionSummary loopSummary(RegionType::Loop, loopAbst);
 
     // 4. Apply to parent
-    parentAbst.applySummary(std::move(summary));
-
-    // llvm::outs() << "4\n";
-
-    // llvm::outs() << "ForOp handled:\n" << parentAbst << "\n";
+    parentAbst.applySummary(std::move(loopSummary));
 }
 
 void PhaseFoldingAnalyzer::handleCallOp(mlir::func::CallOp callOp, ProgramAbstraction &parentAbst) {
@@ -583,7 +568,7 @@ struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFolding
 
 // test summary computation with nested control-flow
 // test with different qubit number in different blocks
-// dealloc, return
+// dealloc, return, measure
 
 
 // each module will have a single qnode, but a program can have multiple modules.

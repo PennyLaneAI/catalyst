@@ -25,7 +25,11 @@ enum class RegionType { Conditional, Loop, Procedure };
 
 struct RegionSummary {
     PhaseAbstraction phases;
+    TransformSchema phasesSchm;
+    
     PhaseAbstraction falseBranchPhases; // for Conditional
+    TransformSchema falseBranchPhasesSchm;
+
     AffineRelation affineRel;
     RegionType type;
 
@@ -41,28 +45,15 @@ struct RegionSummary {
     void accumulatePhasesInto(PhaseAbstraction &trgtPhases, const TransformSchema &trgtSchm);
 
   private:
-    void summarizeIf(const TransformSchema &ifBodySchm);
-    void summarizeIfElse(const TransformSchema &ifBodySchm, ProgramAbstraction &elseBody);
-    void summarizeCond(const TransformSchema &ifBodySchm, const AffineRelation &elseRel);
-    void summarizeLoop(const TransformSchema &bodySchm);
+    void summarizeCond(ProgramAbstraction *elseBody = nullptr);
+    void summarizeLoop();
     void summarizeProc();
 };
 
-inline void RegionSummary::summarizeIf(const TransformSchema &ifBodySchm)
-{
-    summarizeCond(ifBodySchm, AffineRelation::Identity(ifBodySchm.numQubits()));
-}
-
-inline void RegionSummary::summarizeCond(const TransformSchema &ifBodySchm, const AffineRelation &elseRel)
-{
-    affineRel.joinWith(elseRel);
-    phases.reSchema(ifBodySchm, affineRel.getSchema());
-}
-
-inline void RegionSummary::summarizeLoop(const TransformSchema &bodySchm)
+inline void RegionSummary::summarizeLoop()
 {
     affineRel.applyKleeneStar();
-    phases.reSchema(bodySchm, affineRel.getSchema());
+    // phases.reSchema(bodySchm, affineRel.getSchema());
 }
 
 inline void RegionSummary::summarizeProc()
@@ -73,3 +64,5 @@ inline void RegionSummary::summarizeProc()
     phases.orphanNonTrivialBundles();
     // llvm::errs() << "phases:\n" << phases << "\n";
 }
+
+// I'm thinking of keeping all phases, and nullifying at the and of all nested blocks. think about multiple blocks?
