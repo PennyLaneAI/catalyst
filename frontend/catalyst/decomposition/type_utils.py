@@ -29,8 +29,7 @@ _MLIR_DTYPES_TO_PY_DTYPES = {
     "f16": jnp.float16,
     "f32": jnp.float32,
     "f64": jnp.float64,
-    "complex<f64>": jnp.complex64,
-    # TODO: for now, OperatorOp converts all complex types to complex<f64> during lowering
+    "complex<f32>": jnp.complex64,
     "complex<f64>": jnp.complex128,
 }
 
