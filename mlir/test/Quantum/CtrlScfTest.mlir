@@ -190,3 +190,40 @@ func.func @ctrl_scf_while(%ctrl: !quantum.bit, %q: !quantum.bit, %n: i64) -> (!q
   }
   return %outc, %outq : !quantum.bit, !quantum.bit
 }
+
+// -----
+
+// CHECK-LABEL: @ctrl_scf_index_switch
+func.func @ctrl_scf_index_switch(%ctrl: !quantum.bit, %q: !quantum.bit, %idx: index)
+    -> (!quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: scf.index_switch %{{.*}} -> !quantum.bit, !quantum.bit
+  // CHECK: case 0 {
+  // CHECK:   quantum.custom "Hadamard"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
+  // CHECK:   scf.yield %{{.*}}, %{{.*}} : !quantum.bit, !quantum.bit
+  // CHECK: }
+  // CHECK: case 1 {
+  // CHECK:   quantum.custom "PauliX"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
+  // CHECK: }
+  // CHECK: default {
+  // CHECK:   scf.yield %{{.*}}, %{{.*}} : !quantum.bit, !quantum.bit
+  // CHECK: }
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %r = scf.index_switch %idx -> !quantum.bit
+    case 0 {
+      %h = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+      scf.yield %h : !quantum.bit
+    }
+    case 1 {
+      %x = quantum.custom "PauliX"() %arg0 : !quantum.bit
+      scf.yield %x : !quantum.bit
+    }
+    default {
+      scf.yield %arg0 : !quantum.bit
+    }
+    quantum.yield %r : !quantum.bit
+  }
+  return %outc, %outq : !quantum.bit, !quantum.bit
+}
