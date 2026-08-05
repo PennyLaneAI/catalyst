@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <csignal>
-
 #include "nanobind/nanobind.h"
+#include "nanobind/stl/string.h"
+#include "nanobind/stl/vector.h"
+
+#include <csignal>
+#include <string>
+#include <vector>
 
 // TODO: Periodically check and increment version.
 // https://endoflife.date/numpy
@@ -30,8 +34,7 @@ struct memref_beginning_t {
     size_t offset;
 };
 
-size_t memref_size_based_on_rank(size_t rank)
-{
+size_t memref_size_based_on_rank(size_t rank) {
     size_t allocated = sizeof(void *);
     size_t aligned = sizeof(void *);
     size_t offset = sizeof(size_t);
@@ -40,8 +43,7 @@ size_t memref_size_based_on_rank(size_t rank)
     return allocated + aligned + offset + sizes + strides;
 }
 
-size_t *to_sizes(char *base, size_t rank)
-{
+size_t *to_sizes(char *base, size_t rank) {
     if (rank == 0) {
         return NULL;
     }
@@ -53,8 +55,7 @@ size_t *to_sizes(char *base, size_t rank)
     return reinterpret_cast<size_t *>(base + bytes_offset);
 }
 
-size_t *to_strides(char *base, size_t rank)
-{
+size_t *to_strides(char *base, size_t rank) {
     if (rank == 0) {
         return NULL;
     }
@@ -67,21 +68,18 @@ size_t *to_strides(char *base, size_t rank)
     return reinterpret_cast<size_t *>(base + bytes_offset);
 }
 
-void free_wrap(PyObject *capsule)
-{
+void free_wrap(PyObject *capsule) {
     void *obj = PyCapsule_GetPointer(capsule, NULL);
     free(obj);
 }
 
-const npy_intp *npy_get_dimensions(char *memref, size_t rank)
-{
+const npy_intp *npy_get_dimensions(char *memref, size_t rank) {
     size_t *sizes = to_sizes(memref, rank);
     const npy_intp *dims = reinterpret_cast<npy_intp *>(sizes);
     return dims;
 }
 
-const npy_intp *npy_get_strides(char *memref, size_t element_size, size_t rank)
-{
+const npy_intp *npy_get_strides(char *memref, size_t element_size, size_t rank) {
     size_t *strides = to_strides(memref, rank);
     for (unsigned int idx = 0; idx < rank; idx++) {
         // memref strides are in terms of elements.
@@ -95,8 +93,7 @@ const npy_intp *npy_get_strides(char *memref, size_t element_size, size_t rank)
 }
 
 nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object transfer,
-                      nb::dict numpy_arrays)
-{
+                      nb::dict numpy_arrays) {
     nb::list returns;
     if (result_desc.is_none()) {
         return returns;
@@ -198,8 +195,7 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
 }
 
 nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::object transfer,
-              nb::dict numpy_arrays)
-{
+              nb::dict numpy_arrays) {
     // Install signal handler to catch user interrupts (e.g. CTRL-C).
     signal(SIGINT, [](int code) { throw std::runtime_error("KeyboardInterrupt (SIGINT)"); });
 
@@ -230,13 +226,49 @@ nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::ob
     return returns;
 }
 
-NB_MODULE(wrapper, m)
-{
+template <typename FnPtr> static FnPtr extract_fn_ptr(nb::object fn_obj) {
+    auto ctypes = nb::module_::import_("ctypes");
+    return *reinterpret_cast<FnPtr *>(nb::cast<size_t>(ctypes.attr("addressof")(fn_obj)));
+}
+
+void invoke_setup(nb::object setup_fn, std::vector<std::string> argv) {
+    using setup_fn_t = void (*)(int, char **);
+    setup_fn_t fn = extract_fn_ptr<setup_fn_t>(setup_fn);
+
+    std::vector<char *> argv_c;
+    argv_c.reserve(argv.size());
+    for (auto &s : argv) {
+        argv_c.push_back(s.data());
+    }
+
+    {
+        nb::gil_scoped_release lock;
+        fn(static_cast<int>(argv.size()), argv_c.data());
+    }
+}
+
+void invoke_teardown(nb::object teardown_fn) {
+    using teardown_fn_t = void (*)();
+    teardown_fn_t fn = extract_fn_ptr<teardown_fn_t>(teardown_fn);
+
+    {
+        nb::gil_scoped_release lock;
+        fn();
+    }
+}
+
+NB_MODULE(wrapper, m) {
     m.doc() = "wrapper module";
     // We have to annotate all the arguments to `wrap` to allow `result_desc` to be None
     // See https://nanobind.readthedocs.io/en/latest/functions.html#none-arguments
     m.def("wrap", &wrap, "A wrapper function.", nb::arg("func"), nb::arg("py_args"),
           nb::arg("result_desc").none(), nb::arg("transfer"), nb::arg("numpy_arrays"));
+
+    m.def("invoke_setup", &invoke_setup, "Call the JIT'd setup(argc, argv)", nb::arg("setup_fn"),
+          nb::arg("argv"));
+
+    m.def("invoke_teardown", &invoke_teardown, "Call the JIT'd teardown()", nb::arg("teardown_fn"));
+
     int retval = _import_array();
     bool success = retval >= 0;
     if (!success) {

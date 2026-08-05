@@ -29,7 +29,7 @@
 namespace catalyst::quantum {
 
 // TODO: genericize this
-LowerPauliRotFn pythonLowerPauliRot = nullptr;
+PythonRuleLoweringFn pythonRuleLowering = nullptr;
 
 namespace {
 
@@ -45,8 +45,7 @@ static const std::string pluginName = "libQuantumPythonDecompositions.so";
 // 2. function parameter
 // 3. <exe_dir>/../lib/libQuantumPythonDecompositions.so (build & install)
 // 4. <exe_dir>/libQuantumPythonDecompositions.so (alongside)
-std::string resolvePluginPath(std::string libQPDPath)
-{
+std::string resolvePluginPath(std::string libQPDPath) {
     if (auto override_ = llvm::sys::Process::GetEnv("CATALYST_QPD")) {
         return *override_;
     }
@@ -94,8 +93,7 @@ std::string resolvePluginPath(std::string libQPDPath)
 }
 
 // Ensure libpython is loaded into the process before the plugin .so is opened.
-bool tryLoadLibpython(llvm::StringRef where)
-{
+bool tryLoadLibpython(llvm::StringRef where) {
     if (where.empty()) {
         return false;
     }
@@ -112,11 +110,11 @@ bool tryLoadLibpython(llvm::StringRef where)
 // Try, in order:
 //   1. $CATALYST_LIBPYTHON: explicit user override (any deployment)
 //   2. function parameter
-void ensureLibpythonLoaded(std::string libpythonPath)
-{
+void ensureLibpythonLoaded(std::string libpythonPath) {
     if (auto over = llvm::sys::Process::GetEnv("CATALYST_LIBPYTHON")) {
-        if (tryLoadLibpython(*over))
+        if (tryLoadLibpython(*over)) {
             LDBG() << "Found python from CATALYST_LIBPYTHON environment variable:" << over;
+        }
         return;
     }
 
@@ -131,8 +129,7 @@ void ensureLibpythonLoaded(std::string libpythonPath)
                     "library path to prevent this.\n";
 }
 
-LowerPauliRotFn loadAndResolve(std::string libQPDPath, std::string libpythonPath)
-{
+PythonRuleLoweringFn loadAndResolve(std::string libQPDPath, std::string libpythonPath) {
     std::string path = resolvePluginPath(libQPDPath);
     if (path.empty()) {
         llvm::errs() << "[QPD-loader] The plugin path could not be resolved.\n";
@@ -153,18 +150,18 @@ LowerPauliRotFn loadAndResolve(std::string libQPDPath, std::string libpythonPath
     // use a c-safe function for getting the lowering function to allow cpp types in the python
     // caller
     auto *getLoweringFunction =
-        reinterpret_cast<void *(*)()>(::dlsym(libHandle, "getPythonLowerPauliRot"));
+        reinterpret_cast<void *(*)()>(::dlsym(libHandle, "getPythonRuleLoweringFunction"));
     if (!getLoweringFunction) {
         llvm::errs() << "[QPD-loader] dlopen succeeded but symbol "
-                        "'getPythonLowerPauliRot' not found in '"
+                        "'getPythonRuleLoweringFunction' not found in '"
                      << path << "'\n";
     }
 
     // resolve the proper python-decomposition lowering function via the getter
-    auto *sym = reinterpret_cast<LowerPauliRotFn>(getLoweringFunction());
+    auto *sym = reinterpret_cast<PythonRuleLoweringFn>(getLoweringFunction());
     if (!sym) {
         llvm::errs() << "[QPD-loader] dlopen succeeded but symbol "
-                        "'pythonLowerPauliRot' not found in '"
+                        "'pythonRuleLoweringFunction' not found in '"
                      << path << "'\n";
     }
     return sym;
@@ -172,21 +169,20 @@ LowerPauliRotFn loadAndResolve(std::string libQPDPath, std::string libpythonPath
 
 } // namespace
 
-bool loadQPD(std::string libQPDPath, std::string libpythonPath)
-{
-    if (pythonLowerPauliRot) {
+bool loadQPD(std::string libQPDPath, std::string libpythonPath) {
+    if (pythonRuleLowering) {
         return true;
     }
 
     // Avoid additional lookups
     if (resolutionAttempted.exchange(true)) {
         // explicit check in case of thread race conditions
-        return pythonLowerPauliRot != nullptr;
+        return pythonRuleLowering != nullptr;
     }
 
-    pythonLowerPauliRot = loadAndResolve(libQPDPath, libpythonPath);
+    pythonRuleLowering = loadAndResolve(libQPDPath, libpythonPath);
 
-    return pythonLowerPauliRot != nullptr;
+    return pythonRuleLowering != nullptr;
 }
 
 } // namespace catalyst::quantum

@@ -40,8 +40,8 @@ struct ChainedNamedHermitianOpRewritePattern : public mlir::OpRewritePattern<Cus
     /// Hermitian gates are self-inverse and applying the same gate twice in succession
     /// cancels out the effect. This pattern rewrites such redundant operations by
     /// replacing the operation with its "grandparent" operation in the quantum circuit.
-    mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
-    {
+    mlir::LogicalResult matchAndRewrite(CustomOp op,
+                                        mlir::PatternRewriter &rewriter) const override {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
         StringRef OpGateName = op.getGateName();
@@ -71,8 +71,7 @@ template <typename OpType>
 struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     using mlir::OpRewritePattern<OpType>::OpRewritePattern;
 
-    bool verifyParentGateParams(OpType op, OpType parentOp) const
-    {
+    bool verifyParentGateParams(OpType op, OpType parentOp) const {
         // Verify that the parent gate has the same parameters
         ValueRange opParams = op.getAllParams();
         ValueRange parentOpParams = parentOp.getAllParams();
@@ -90,8 +89,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
         return true;
     }
 
-    bool verifyOneAdjoint(OpType op, OpType parentOp) const
-    {
+    bool verifyOneAdjoint(OpType op, OpType parentOp) const {
         // Verify that exactly one of the neighbouring pair is an adjoint
         bool opIsAdj = op->hasAttr("adjoint");
         bool parentIsAdj = parentOp->hasAttr("adjoint");
@@ -104,8 +102,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
     ///  1. Parent gate verification must pass. See VerifyParentGateAnalysis.hpp.
     ///  2. If there are parameters, both gate must have the same parameters.
     ///     [This pattern assumes the IR is already processed by CSE]
-    mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override
-    {
+    mlir::LogicalResult matchAndRewrite(OpType op, mlir::PatternRewriter &rewriter) const override {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
         if (isa<CustomOp>(op)) {
@@ -113,8 +110,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
             if (!vpga.getVerifierResult()) {
                 return failure();
             }
-        }
-        else {
+        } else {
             VerifyParentGateAnalysis<OpType> vpga(op);
             if (!vpga.getVerifierResult()) {
                 return failure();
@@ -150,8 +146,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
 namespace catalyst {
 namespace quantum {
 
-void populateCancelInversesPatterns(RewritePatternSet &patterns)
-{
+void populateCancelInversesPatterns(RewritePatternSet &patterns) {
     patterns.add<ChainedNamedHermitianOpRewritePattern>(patterns.getContext(), 1);
 
     // TODO: better organize the quantum dialect

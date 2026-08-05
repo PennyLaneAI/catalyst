@@ -1,28 +1,31 @@
 set(LIBRARY_NAME quantum-transforms)
 
-add_subdirectory(DecompGraphSolver)
+add_subdirectory(GraphDecomposition/DecompGraphSolver)
 
 file(GLOB SRC
-    AdjointPatterns.cpp
+    AdjointLowering/AdjointLowering.cpp
+    AdjointLowering/ForwardPass.cpp
+    AdjointLowering/QuantumCache.cpp
+    AdjointLowering/ReversePass.cpp
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
     ConversionPatterns.cpp
-    DecomposeLoweringPatterns.cpp
-    QPDLoader.cpp
+    GraphDecomposition/DecompUtils.cpp
+    GraphDecomposition/DecomposeLoweringPatterns.cpp
+    GraphDecomposition/decompose_lowering.cpp
+    GraphDecomposition/graph_decomposition.cpp
     DisentangleCNOT.cpp
     DisentangleSWAP.cpp
     GridsynthPatterns.cpp
     IonsDecompositionPatterns.cpp
     LoopBoundaryOptimizationPatterns.cpp
     MergeRotationsPatterns.cpp
+    QPDLoader.cpp
     SplitMultipleTapes.cpp
-    adjoint_lowering.cpp
     cancel_inverses.cpp
     cp_global_buffers.cpp
-    decompose_lowering.cpp
     dynamic_one_shot.cpp
     emit_catalyst_pyface.cpp
-    graph_decomposition.cpp
     gridsynth.cpp
     ions_decompositions.cpp
     loop_boundary_optimization.cpp
@@ -58,8 +61,11 @@ add_mlir_library(${LIBRARY_NAME} STATIC
 )
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
-                           .
-                           ${PROJECT_SOURCE_DIR}/include
-                           ${CMAKE_BINARY_DIR}/include
-                           DecompGraphSolver/
-                       )
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/AdjointLowering/>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/GraphDecomposition/>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/GraphDecomposition/DecompGraphSolver/>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)

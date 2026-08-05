@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "split-to-single-terms"
 
+#include <cstdint>
+
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -53,8 +55,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     static bool isSupportedMeasOp(Operation *op) { return isa<ExpvalOp>(op); }
 
     /// Check if an observable is Identity
-    bool isIdentityObservable(Value obs)
-    {
+    bool isIdentityObservable(Value obs) {
         if (auto namedObsOp = obs.getDefiningOp<NamedObsOp>()) {
             return namedObsOp.getType() == NamedObservable::Identity;
         }
@@ -62,16 +63,14 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     }
 
     /// Recursively collect all leaf observables from a potentially nested Hamiltonian
-    void collectLeafObservables(Value obs, SmallVectorImpl<Value> &leafObs)
-    {
+    void collectLeafObservables(Value obs, SmallVectorImpl<Value> &leafObs) {
         Operation *defOp = obs.getDefiningOp();
 
         if (auto hamOp = dyn_cast_or_null<HamiltonianOp>(defOp)) {
             for (Value term : hamOp.getTerms()) {
                 collectLeafObservables(term, leafObs);
             }
-        }
-        else {
+        } else {
             leafObs.push_back(obs);
         }
     }
@@ -79,8 +78,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     /// Recursively collect coefficients from Hamiltonian.
     /// This creates coefficient computation operations in the current insertion point
     void buildCoefficientsExpr(Value obs, Value coeffMultiplier, OpBuilder &builder, Location loc,
-                               SmallVectorImpl<Value> &coefficients)
-    {
+                               SmallVectorImpl<Value> &coefficients) {
         Operation *defOp = obs.getDefiningOp();
 
         if (auto hamOp = dyn_cast_or_null<HamiltonianOp>(defOp)) {
@@ -98,8 +96,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
                 Value coeff;
                 if (isTensor) {
                     coeff = tensor::ExtractOp::create(builder, loc, coeffs, ValueRange{idx});
-                }
-                else {
+                } else {
                     coeff = memref::LoadOp::create(builder, loc, coeffs, ValueRange{idx});
                 }
 
@@ -111,15 +108,13 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
                 if (coeffMultiplier) {
                     finalCoeff =
                         stablehlo::MulOp::create(builder, loc, coeffMultiplier, coeffTensor);
-                }
-                else {
+                } else {
                     finalCoeff = coeffTensor;
                 }
 
                 buildCoefficientsExpr(termOperands[i], finalCoeff, builder, loc, coefficients);
             }
-        }
-        else {
+        } else {
             if (!coeffMultiplier) {
                 Value one = arith::ConstantOp::create(builder, loc, builder.getF64FloatAttr(1.0));
                 coeffMultiplier = tensor::FromElementsOp::create(
@@ -150,8 +145,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     ///   %result = stablehlo.reduce(%concat init: %zero) applies stablehlo.add
     ///
     Value createPostProcessing(OpBuilder &builder, Location loc, ValueRange expvalResults,
-                               ValueRange coefficients)
-    {
+                               ValueRange coefficients) {
         assert(expvalResults.size() == coefficients.size());
         assert(expvalResults.size() > 0 && "Hamiltonian must have at least one observable");
 
@@ -209,8 +203,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     /// Remove dead operations before a given operation in a block
     /// Iteratively removes ops with no users until no more can be removed
     void removeDeadOpsBeforeOp(func::FuncOp func, Operation *boundaryOp,
-                               bool reserveDeviceOps = false)
-    {
+                               bool reserveDeviceOps = false) {
         bool changed = true;
         while (changed) {
             changed = false;
@@ -264,8 +257,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     ///
     /// Returns the mapping info needed for the entry function transformation
     LogicalResult rewriteQuantumFunc(func::FuncOp quantumFunc, Location loc,
-                                     ReturnValueMappingInfo &mappingInfo)
-    {
+                                     ReturnValueMappingInfo &mappingInfo) {
         // Collect hamiltonian-expval pairs
         SmallVector<std::pair<ExpvalOp, Value>> hamiltonianExpvalPairs;
         quantumFunc.walk([&](ExpvalOp expvalOp) {
@@ -297,8 +289,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
                     tensor = tensor::FromElementsOp::create(
                         builder, loc, RankedTensorType::get({}, builder.getF64Type()),
                         ValueRange{one});
-                }
-                else {
+                } else {
                     Value expval = ExpvalOp::create(builder, loc, builder.getF64Type(), leaf);
                     tensor = tensor::FromElementsOp::create(
                         builder, loc, RankedTensorType::get({}, builder.getF64Type()),
@@ -317,8 +308,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             Operation *user = *expvalOp.getResult().getUsers().begin();
             if (auto fromElementsOp = dyn_cast<tensor::FromElementsOp>(user)) {
                 replacementMap[fromElementsOp.getResult()] = newExpvalTensors;
-            }
-            else {
+            } else {
                 replacementMap[expvalOp.getResult()] = newExpvalTensors;
             }
         }
@@ -342,8 +332,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
                     newReturnValues.push_back(newVal);
                     mappingInfo.newReturnTypes.push_back(newVal.getType());
                 }
-            }
-            else {
+            } else {
                 mappingInfo.mapping.push_back({false, 1});
                 newReturnValues.push_back(oldRetVal);
                 mappingInfo.newReturnTypes.push_back(oldRetVal.getType());
@@ -378,8 +367,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
 
     /// Remove unused arguments from the quantum function
     /// And update information in the removalInfo to indicate which arguments were removed
-    void removeUnusedArguments(func::FuncOp quantumFunc, ArgumentRemovalInfo &removalInfo)
-    {
+    void removeUnusedArguments(func::FuncOp quantumFunc, ArgumentRemovalInfo &removalInfo) {
         Block &entryBlock = quantumFunc.getBody().front();
         SmallVector<unsigned> argsToRemove;
 
@@ -416,8 +404,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     /// After:  origFunc calls quantumFunc, computes weighted sum, returns (<H>, <Z>)
     LogicalResult rewriteEntryFunc(func::FuncOp origFunc, func::FuncOp quantumFunc, Location loc,
                                    const ReturnValueMappingInfo &mappingInfo,
-                                   const ArgumentRemovalInfo &removalInfo)
-    {
+                                   const ArgumentRemovalInfo &removalInfo) {
         // Find Hamiltonian expvals in original function (for coefficient extraction)
         SmallVector<std::pair<ExpvalOp, Value>> hamiltonianExpvalPairs;
         origFunc.walk([&](ExpvalOp expvalOp) {
@@ -472,8 +459,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
                 Value result = createPostProcessing(builder, loc, expvalResults, coefficients);
                 finalResults.push_back(result);
                 hamIdx++;
-            }
-            else {
+            } else {
                 // Non-Hamiltonian result: pass through from call
                 finalResults.push_back(callOp.getResult(callResultIdx));
                 callResultIdx++;
@@ -492,8 +478,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         return success();
     }
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         ModuleOp moduleOp = getOperation();
 
         // Raise an error if any measurement processes aside from expval are found

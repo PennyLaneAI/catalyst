@@ -32,7 +32,7 @@ using PipelineList = std::vector<PipelineInfo>;
 
 // clang-format off
 const PipelineList pipelineList{
-    {"quantum-compilation-pipeline",
+    {"quantum-compilation-stage",
      {"canonicalize",
       "verify-no-quantum-use-after-free",
       "convert-to-value-semantics",
@@ -58,7 +58,7 @@ const PipelineList pipelineList{
       "lower-pbc-init-ops",
       "disable-assertion",
       "symbol-dce"}},  // to remove user decomposition rules after all graph-decomposition passes
-    {"hlo-lowering-pipeline",
+    {"hlo-lowering-stage",
      {"canonicalize",
       "func.func(chlo-legalize-to-stablehlo)",
       "func.func(stablehlo-legalize-control-flow)",
@@ -76,10 +76,10 @@ const PipelineList pipelineList{
       "detensorize-function-boundary",
       "canonicalize",
       "symbol-dce"}},
-    {"gradient-lowering-pipeline",
+    {"gradient-lowering-stage",
      {"annotate-invalid-gradient-functions",
       "lower-gradients"}},
-    {"bufferization-pipeline",
+    {"bufferization-stage",
      {// tensor.pad
       "convert-tensor-to-linalg",
       // Must be run before --one-shot-bufferize.
@@ -116,7 +116,7 @@ const PipelineList pipelineList{
        * "cse",
        */
       "cp-global-memref"}},
-    {"llvm-dialect-lowering-pipeline",
+    {"llvm-dialect-lowering-stage",
      {"qnode-to-async-lowering",
       "async-func-to-async-runtime",
       "async-to-async-runtime",
@@ -147,6 +147,7 @@ const PipelineList pipelineList{
       "memref-to-llvm-tbaa",
       "finalize-memref-to-llvm{use-generic-functions}",
       "convert-index-to-llvm",
+      "convert-executor-to-llvm",
       "convert-catalyst-to-llvm",
       // TODO: remove this once PBC has its own pipeline
       "convert-pbc-to-llvm",
@@ -167,8 +168,7 @@ const PipelineList pipelineList{
       "register-inactive-callback"}}};
 // clang-format on
 
-PipelineNames getPipelineNames()
-{
+inline PipelineNames getPipelineNames() {
     static std::vector<std::string> names =
         std::accumulate(driver::pipelineList.begin(), driver::pipelineList.end(),
                         std::vector<std::string>{}, [](auto acc, const auto &pipelineInfo) {
@@ -178,8 +178,7 @@ PipelineNames getPipelineNames()
     return names;
 }
 
-PassNames getQuantumCompilationStage(bool disableAssertion = true)
-{
+inline PassNames getQuantumCompilationStage(bool disableAssertion = true) {
     PassNames ret;
     std::copy_if(pipelineList[0].passNames.begin(), pipelineList[0].passNames.end(),
                  std::back_inserter(ret), [&disableAssertion](const auto &passName) {
@@ -188,12 +187,11 @@ PassNames getQuantumCompilationStage(bool disableAssertion = true)
     return ret;
 }
 
-PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
+inline PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
 
-PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
+inline PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
 
-PassNames getBufferizationStage(bool asyncQNodes = false)
-{
+inline PassNames getBufferizationStage(bool asyncQNodes = false) {
     const std::string bufferizationOptions =
         std::string("{bufferize-function-boundaries ") + "allow-return-allocs-from-loops " +
         "function-boundary-type-conversion=identity-layout-map " +
@@ -210,8 +208,7 @@ PassNames getBufferizationStage(bool asyncQNodes = false)
     return ret;
 }
 
-PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false)
-{
+inline PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false) {
     PassNames ret;
     std::copy_if(pipelineList[4].passNames.begin(), pipelineList[4].passNames.end(),
                  std::back_inserter(ret), [&asyncQNodes](const auto &passName) {

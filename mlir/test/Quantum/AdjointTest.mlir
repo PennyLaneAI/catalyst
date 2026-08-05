@@ -354,45 +354,89 @@ func.func private @param_ordering(%0: !quantum.reg) -> !quantum.reg {
 
 // Test adjoint of scf.for
 
-  func.func public @adjoint_for_loop() {
-    %c1 = arith.constant 1 : index
-    %c4 = arith.constant 4 : index
-    %c0 = arith.constant 0 : index
+func.func public @adjoint_for_loop_static() {
+  // CHECK-DAG: [[start:%.+]] = index.constant 0
+  // CHECK-DAG: [[stop:%.+]] = index.constant 4
+  // CHECK-DAG: [[step:%.+]] = index.constant 1
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c0 = arith.constant 0 : index
 
-    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
-    // CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[q1:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
-    %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+  // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+  // CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+  // CHECK: [[q1:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
 
-    // CHECK-NOT: quantum.adjoint
-    %3:2 = quantum.adjoint(%1, %2) : !quantum.bit, !quantum.bit {
-    ^bb0(%arg1: !quantum.bit, %arg2: !quantum.bit):
+  // CHECK-NOT: quantum.adjoint
+  %3:2 = quantum.adjoint(%1, %2) : !quantum.bit, !quantum.bit {
+  ^bb0(%arg1: !quantum.bit, %arg2: !quantum.bit):
 
-      // CHECK: [[for_out:%.+]]:2 = scf.for
-      // CHECK-SAME: iter_args(%arg1 = [[q0]], %arg2 = [[q1]]) -> (!quantum.bit, !quantum.bit) {
-      // CHECK:   [[gate2:%.+]]:2 = quantum.custom "gate2"() %arg1, %arg2 adj : !quantum.bit, !quantum.bit
-      // CHECK:   [[gate1:%.+]]:2 = quantum.custom "gate1"() [[gate2]]#0, [[gate2]]#1 adj : !quantum.bit, !quantum.bit
-      // CHECK:   scf.yield [[gate1]]#0, [[gate1]]#1 : !quantum.bit, !quantum.bit
-      // CHECK: }
-      %8:2 = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg5 = %arg1, %arg6 = %arg2) -> (!quantum.bit, !quantum.bit) {
-        %out_qubits:2 = quantum.custom "gate1"() %arg5, %arg6 : !quantum.bit, !quantum.bit
-        %out_qubits_0:2 = quantum.custom "gate2"() %out_qubits#0, %out_qubits#1 : !quantum.bit, !quantum.bit
-        scf.yield %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
-      }
-
-      quantum.yield %8#0, %8#1 : !quantum.bit, !quantum.bit
+    // CHECK-NOT: catalyst.list_push
+    // CHECK-NOT: catalyst.list_pop
+    // CHECK: [[for_out:%.+]]:2 = scf.for {{%.+}} = [[start]] to [[stop]] step [[step]]
+    // CHECK-SAME: iter_args(%arg1 = [[q0]], %arg2 = [[q1]]) -> (!quantum.bit, !quantum.bit) {
+    // CHECK:   [[gate2:%.+]]:2 = quantum.custom "gate2"() %arg1, %arg2 adj : !quantum.bit, !quantum.bit
+    // CHECK:   [[gate1:%.+]]:2 = quantum.custom "gate1"() [[gate2]]#0, [[gate2]]#1 adj : !quantum.bit, !quantum.bit
+    // CHECK:   scf.yield [[gate1]]#0, [[gate1]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: }
+    %8:2 = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg5 = %arg1, %arg6 = %arg2) -> (!quantum.bit, !quantum.bit) {
+      %out_qubits:2 = quantum.custom "gate1"() %arg5, %arg6 : !quantum.bit, !quantum.bit
+      %out_qubits_0:2 = quantum.custom "gate2"() %out_qubits#0, %out_qubits#1 : !quantum.bit, !quantum.bit
+      scf.yield %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
     }
 
-    // CHECK: [[insert0:%.+]] = quantum.insert [[reg]][ 0], [[for_out]]#0 : !quantum.reg, !quantum.bit
-    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[for_out]]#1 : !quantum.reg, !quantum.bit
-    // CHECK: quantum.dealloc [[insert1]]
-    %4 = quantum.insert %0[ 0], %3#0 : !quantum.reg, !quantum.bit
-    %5 = quantum.insert %4[ 1], %3#1 : !quantum.reg, !quantum.bit
-    quantum.dealloc %5 : !quantum.reg
-    return
+    quantum.yield %8#0, %8#1 : !quantum.bit, !quantum.bit
   }
+
+  // CHECK: [[insert0:%.+]] = quantum.insert [[reg]][ 0], [[for_out]]#0 : !quantum.reg, !quantum.bit
+  // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[for_out]]#1 : !quantum.reg, !quantum.bit
+  // CHECK: quantum.dealloc [[insert1]]
+  %4 = quantum.insert %0[ 0], %3#0 : !quantum.reg, !quantum.bit
+  %5 = quantum.insert %4[ 1], %3#1 : !quantum.reg, !quantum.bit
+  quantum.dealloc %5 : !quantum.reg
+  return
+}
+
+// -----
+
+// Test adjoint of scf.for with dynamic bounds: only the non-constant bound is cached, while
+// constant bounds (start, step) are still rematerialized.
+func.func public @adjoint_for_loop_mixed_static_dynamic(%stop: index) {
+  // CHECK-DAG: [[start:%.+]] = index.constant 0
+  // CHECK-DAG: [[step:%.+]] = index.constant 1
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+  // CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+  // CHECK: [[q1:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+  // CHECK-NOT: quantum.adjoint
+  %3:2 = quantum.adjoint(%1, %2) : !quantum.bit, !quantum.bit {
+  ^bb0(%arg1: !quantum.bit, %arg2: !quantum.bit):
+
+    // CHECK: catalyst.list_push %arg0
+    // CHECK: [[stop:%.+]] = catalyst.list_pop
+    // CHECK: [[for_out:%.+]]:2 = scf.for {{%.+}} = [[start]] to [[stop]] step [[step]]
+    %8:2 = scf.for %arg3 = %c0 to %stop step %c1 iter_args(%arg5 = %arg1, %arg6 = %arg2) -> (!quantum.bit, !quantum.bit) {
+      %out_qubits:2 = quantum.custom "gate1"() %arg5, %arg6 : !quantum.bit, !quantum.bit
+      %out_qubits_0:2 = quantum.custom "gate2"() %out_qubits#0, %out_qubits#1 : !quantum.bit, !quantum.bit
+      scf.yield %out_qubits_0#0, %out_qubits_0#1 : !quantum.bit, !quantum.bit
+    }
+
+    quantum.yield %8#0, %8#1 : !quantum.bit, !quantum.bit
+  }
+
+  %4 = quantum.insert %0[ 0], %3#0 : !quantum.reg, !quantum.bit
+  %5 = quantum.insert %4[ 1], %3#1 : !quantum.reg, !quantum.bit
+  quantum.dealloc %5 : !quantum.reg
+  return
+}
 
 // -----
 

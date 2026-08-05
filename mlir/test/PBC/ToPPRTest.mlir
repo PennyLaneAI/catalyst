@@ -40,7 +40,21 @@ func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // CHECK: [[q1_4:%.+]] = pbc.ppr ["Z"](-4) [[q1_3]]#0
     // CHECK: [[q1_5:%.+]] = pbc.ppr ["X"](-4) [[q1_3]]#1
     // CHECK-NOT: quantum.custom
-    // CHECK-NEXT: return
+    // CHECK: return
+    func.return
+}
+
+// -----
+
+func.func @test_cz_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
+    // CHECK-NOT: quantum.custom
+    // CHECK: quantum.gphase
+    // CHECK: [[q1_3:%.+]]:2 = pbc.ppr ["Z", "Z"](4) [[q1:%.+]], [[q2:%.+]]
+    %q1_3:2 = quantum.custom "CZ"() %q1, %q2 : !quantum.bit, !quantum.bit
+    // CHECK: [[q1_4:%.+]] = pbc.ppr ["Z"](-4) [[q1_3]]#0
+    // CHECK: [[q1_5:%.+]] = pbc.ppr ["Z"](-4) [[q1_3]]#1
+    // CHECK-NOT: quantum.custom
+    // CHECK: return
     func.return
 }
 

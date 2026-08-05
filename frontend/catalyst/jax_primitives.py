@@ -50,6 +50,7 @@ from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, IndexSwitchOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
+from pennylane.capture.primitives import symbolic_array_prim
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -76,6 +77,7 @@ with Patcher(
         CallbackCallOp,
         CallbackOp,
         PrintOp,
+        SymbolicArrayOp,
     )
     from mlir_quantum.dialects.gradient import (
         CustomGradOp,
@@ -1350,7 +1352,13 @@ def _gphase_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
+    *qubits_or_params,
+    op=None,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
+    pcphase_dim=None,
 ):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
@@ -1360,6 +1368,9 @@ def _qinst_abstract_eval(
     for idx in range(qubits_len + ctrl_len):
         qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
+    assert (pcphase_dim is not None) == (
+        op == "PCPhase"
+    ), "pcphase_dim must be provided exactly for PCPhase ops"
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 
@@ -1377,6 +1388,7 @@ def _qinst_lowering(
     params_len=0,
     ctrl_len=0,
     adjoint=False,
+    pcphase_dim=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -1425,14 +1437,13 @@ def _qinst_lowering(
         ).results
 
     if name_str == "PCPhase":
-        assert len(float_params) == 2, "PCPhase takes two float parameters"
+        assert len(float_params) == 1, "PCPhase takes one float parameter (theta)"
         float_param = float_params[0]
-        dim_param = float_params[1]
         return PCPhaseOp(
             out_qubits=[qubit.type for qubit in qubits],
             out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
             theta=float_param,
-            dim=dim_param,
+            dim=ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), pcphase_dim),
             in_qubits=qubits,
             in_ctrl_qubits=ctrl_qubits,
             in_ctrl_values=ctrl_values_i1,
@@ -2296,7 +2307,7 @@ def _pl_cond_lowering(
     args_slice,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
-    num_preds = len(jaxpr_branches)
+    num_preds = len(jaxpr_branches) - 1
     preds = invals[:num_preds]
     args = invals[slice(*args_slice)]
 
@@ -2349,7 +2360,6 @@ def _pl_cond_lowering(
                 new_jaxpr = else_jaxpr.replace(
                     constvars=(), invars=else_jaxpr.constvars + else_jaxpr.invars
                 )
-
                 with ir.InsertionPoint(else_block):
                     out, _ = mlir.jaxpr_subcomp(
                         else_ctx.module_context,
@@ -3066,7 +3076,13 @@ def subroutine_lowering(*args, **kwargs):
     return retval
 
 
+def _symbolic_array_lowering(ctx, *, shape, dtype):
+    result_types = [mlir.aval_to_ir_types(a)[0] for a in ctx.avals_out]
+    return SymbolicArrayOp(result_types[0]).results
+
+
 CUSTOM_LOWERING_RULES = (
+    (symbolic_array_prim, _symbolic_array_lowering),
     (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
     (device_release_p, _device_release_lowering),

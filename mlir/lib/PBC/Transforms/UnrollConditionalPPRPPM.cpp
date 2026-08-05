@@ -40,8 +40,7 @@ struct LowerSelectPPM : public OpRewritePattern<SelectPPMeasurementOp> {
     using OpRewritePattern::OpRewritePattern;
 
     LogicalResult matchAndRewrite(SelectPPMeasurementOp op,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         mlir::Value selectSwitch = op.getSelectSwitch();
         ArrayAttr pauliProduct0 = op.getPauliProduct_0();
@@ -95,8 +94,7 @@ struct LowerSelectPPM : public OpRewritePattern<SelectPPMeasurementOp> {
 struct LowerCondPPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override {
         // Only match if there's a condition
         if (!op.getCondition()) {
             return failure();
@@ -138,8 +136,7 @@ struct LowerCondPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace pbc {
 
-void populateUnrollConditionalPPRPPMPatterns(RewritePatternSet &patterns)
-{
+void populateUnrollConditionalPPRPPMPatterns(RewritePatternSet &patterns) {
     patterns.add<LowerSelectPPM>(patterns.getContext());
     patterns.add<LowerCondPPR>(patterns.getContext());
 }

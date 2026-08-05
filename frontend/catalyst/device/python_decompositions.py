@@ -36,33 +36,55 @@ Python decomposition wrappers should adhere to the following specifications:
         - Is self-contained, and does not contain any device initialization, setup/teardown etc.
 """
 
-# pylint: disable=protected-access,unused-argument
+# pylint: disable=protected-access,bare-except
+
+import warnings
 
 import jax.numpy as jnp
 import pennylane as qp
 
 
-def paulirot_decomposition_wrapper(theta, pauli_word, wires):
-    """Wraps the paulirot decomp rule for compile-time lowering with a static pauli word.
+def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, static_data) -> str:
+    """Generic decomposition wrapper."""
+    device = qp.device("null.qubit", wires=sum(wire_lens))
+    wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
 
-    The decomposition rule is identifiable by the name `paulirot_decomp_rule`.
-    """
-    device = qp.device("null.qubit", wires=len(wires))
-    wires = jnp.array(wires)
+    def rule_to_subroutine(rule):
+        def decomp_rule(*params, wires):
+            rule._impl(*params, *wires, **static_data)
 
-    def paulirot_decomp_rule(theta, wires):
-        qp.ops.qubit.parametric_ops_multi_qubit._pauli_rot_decomposition._impl(
-            theta, wires, pauli_word
+        # TODO remove this once we have unified lowering, we should be able to set target_gate and
+        # stop relying on function names
+        decomp_rule.__name__ = op_id + "_" + rule.name
+
+        return qp.capture.subroutine(decomp_rule)
+
+    # let this fail with the standard error message if the op is not found
+    subroutines = [rule_to_subroutine(rule) for rule in qp.decomposition.list_decomps(op_name)]
+
+    # TODO: not all PL ops have been migrated to the operator 2 format expected by mlir graph decomp
+    # This means some rules will fail the python callback compilation.
+    # When migration is complete, remove the try-except.
+    try:
+
+        @qp.qjit(
+            target="mlir",
+            capture=True,
         )
+        @qp.qnode(device=device)
+        def circuit():
+            for subroutine in subroutines:
+                # TODO: I know this is dynamic, but we should probably have a better way of handling
+                # this than hard-coded dummy values. Revisit this when unifying the decomp-rule
+                # lowering pipeline
+                subroutine(*[0.5 for _ in dynamic_shape], wires=wires)
 
-    paulirot_subroutine = qp.capture.subroutine(paulirot_decomp_rule)
-
-    @qp.qjit(
-        target="mlir",
-        capture=True,
-    )
-    @qp.qnode(device=device)
-    def circuit():
-        paulirot_subroutine(theta, wires)
-
-    return str(circuit.mlir_module)
+        return str(circuit.mlir_module)
+    except:
+        warnings.warn(
+            f"Python decomposition rule compilation failed for operator "
+            f"'{op_name}' (id: {op_id}); it will be treated as non-decomposable "
+            f"by the graph solver.",
+            UserWarning,
+        )
+        return "builtin.module{}"

@@ -12,6 +12,7 @@ endfunction()
 if (CATALYST_GTEST_AVAILABLE)
   add_subdirectory(Example)
   add_subdirectory(QRef)
+  add_subdirectory(Quantum)
   add_subdirectory(Utils)
 endif()
 

@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "resource-analysis"
 
+#include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <string>
 
@@ -21,7 +23,9 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
+#include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "PBC/Analysis/PBCDepthAnalysis.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -52,9 +56,11 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
                                 "Total number of classical instructions"};
     Statistic totalFunctionCalls{this, "total-function-calls", "Total number of function calls"};
 
-    void runOnOperation() final
-    {
-        auto &analysis = getAnalysis<ResourceAnalysis, ModuleOp>();
+    void runOnOperation() final {
+        pbc::registerPBCResourceAnalysisExtensions();
+
+        auto moduleOp = cast<ModuleOp>(getOperation());
+        ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all());
         const auto &results = analysis.getResults();
 
         // Populate statistics from the entry function. The flattened view
@@ -65,8 +71,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
             if (const ResourceResult *flat = analysis.getFlattenedResource(entry)) {
                 accumulateStats(*flat);
             }
-        }
-        else {
+        } else {
             for (const auto &funcEntry : results) {
                 accumulateStats(funcEntry.getValue());
             }
@@ -78,8 +83,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
             if (outputFname.empty()) {
                 printJsonOutput(jsonStr);
-            }
-            else {
+            } else {
                 writeJsonToFile(jsonStr, outputFname);
             }
         }
@@ -91,97 +95,52 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     /// Sum a ResourceResult's content into the pass's
     /// Statistic counters. Caller is responsible for choosing whether to
     /// pass a per-function or flattened result.
-    void accumulateStats(const ResourceResult &r)
-    {
+    void accumulateStats(const ResourceResult &r) {
+        double gates = 0.0;
         for (const auto &opEntry : r.operations) {
             for (const auto &sizeEntry : opEntry.getValue()) {
-                totalGates += sizeEntry.second;
+                gates += sizeEntry.second;
             }
         }
+        totalGates += static_cast<int64_t>(std::llround(gates));
+
+        double measurements = 0.0;
         for (const auto &measEntry : r.measurements) {
-            totalMeasurements += measEntry.getValue();
+            measurements += measEntry.getValue();
         }
+        totalMeasurements += static_cast<int64_t>(std::llround(measurements));
+
+        double classicalOps = 0.0;
         for (const auto &classEntry : r.classicalInstructions) {
-            totalClassicalOps += classEntry.getValue();
+            classicalOps += classEntry.getValue();
         }
-        totalAllocQubits += r.numAllocQubits;
-        totalArgQubits += r.numArgQubits;
-        totalQubits += r.numQubits();
+        totalClassicalOps += static_cast<int64_t>(std::llround(classicalOps));
+
+        double functionCalls = 0.0;
         for (const auto &fcEntry : r.functionCalls) {
-            totalFunctionCalls += fcEntry.getValue();
+            functionCalls += fcEntry.getValue();
         }
-    }
+        totalFunctionCalls += static_cast<int64_t>(std::llround(functionCalls));
 
-    /// Serialize a single ResourceResult into a JSON object.
-    static llvm::json::Object resultToJson(const ResourceResult &result)
-    {
-        llvm::json::Object funcObj;
-
-        llvm::json::Object opsObj;
-        for (const auto &opEntry : result.operations) {
-            StringRef opName = opEntry.getKey();
-            for (const auto &sizeEntry : opEntry.getValue()) {
-                const auto &[nQubits, nParams] = sizeEntry.first;
-                int64_t count = sizeEntry.second;
-                std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
-                opsObj[key] = count;
-            }
-        }
-        funcObj["operations"] = std::move(opsObj);
-
-        llvm::json::Object measObj;
-        for (const auto &entry : result.measurements) {
-            measObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["measurements"] = std::move(measObj);
-
-        llvm::json::Object classObj;
-        for (const auto &entry : result.classicalInstructions) {
-            classObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["classical_instructions"] = std::move(classObj);
-
-        llvm::json::Object fcObj;
-        for (const auto &entry : result.functionCalls) {
-            fcObj[entry.getKey()] = entry.getValue();
-        }
-        funcObj["function_calls"] = std::move(fcObj);
-
-        // Store hashes as hex strings so JSON readers don't break high bits
-        llvm::json::Object vfcObj;
-        for (const auto &entry : result.varFunctionCalls) {
-            vfcObj[entry.getKey()] = formatv("{0:x16}", entry.getValue()).str();
-        }
-        funcObj["var_function_calls"] = std::move(vfcObj);
-
-        funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
-        funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
-        funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
-        funcObj["device_name"] = result.deviceName;
-        funcObj["qnode"] = result.isQnode;
-        funcObj["has_branches"] = result.hasBranches;
-        if (result.autoQubitManagement.has_value()) {
-            funcObj["auto_qubit_management"] = *result.autoQubitManagement;
-        }
-
-        return funcObj;
+        totalAllocQubits += static_cast<int64_t>(std::llround(r.numAllocQubits));
+        totalArgQubits += r.numArgQubits;
+        totalQubits += static_cast<int64_t>(std::llround(r.numQubits()));
     }
 
     /// Serialize all per-function ResourceResults into a JSON string.
     /// qnode functions are inserted first so that the PennyLane reader
     /// (which uses the first entry) picks the correct function.
-    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results) const
-    {
+    std::string buildJsonString(const llvm::StringMap<ResourceResult> &results) const {
         llvm::json::Object root;
 
         for (const auto &funcEntry : results) {
             if (funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                root[funcEntry.getKey()] = funcEntry.getValue().toJson();
             }
         }
         for (const auto &funcEntry : results) {
             if (!funcEntry.getValue().isQnode) {
-                root[funcEntry.getKey()] = resultToJson(funcEntry.getValue());
+                root[funcEntry.getKey()] = funcEntry.getValue().toJson();
             }
         }
 
@@ -193,8 +152,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     void printJsonOutput(const std::string &jsonStr) const { llvm::outs() << jsonStr; }
 
     /// Write JSON to a file.
-    static void writeJsonToFile(const std::string &jsonStr, const std::string &fileName)
-    {
+    static void writeJsonToFile(const std::string &jsonStr, const std::string &fileName) {
         std::ofstream ofile(fileName);
         if (!ofile.is_open()) {
             llvm::errs() << "Error: could not open resource output file: " << fileName << "\n";

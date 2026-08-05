@@ -9,7 +9,9 @@ permissions:
 jobs:
   setup:
     name: Setup the release
-    runs-on: ubuntu-24.04-arm
+    runs-on:  
+      group: 'PennyLaneAI-Static-IP-Runners'
+      labels: ['pl-2-core-gh-runner']   
     outputs:
       rc_branch: ${{ steps.check_rc.outputs.rc_branch }}
       branch_exists: ${{ steps.check_rc.outputs.branch_exists }}
@@ -25,7 +27,7 @@ jobs:
         RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc"
         if git ls-remote --exit-code origin "refs/heads/$RC_BRANCH"; then
           echo "branch_exists=true" >> $GITHUB_OUTPUT
-          echo "rc_branch=$RC_BRANCH" >> $GITHUB_OUTPUT 
+          echo "rc_branch=$RC_BRANCH" >> $GITHUB_OUTPUT
           echo "Found rc branch: $RC_BRANCH"
         else
           echo "branch_exists=false" >> $GITHUB_OUTPUT
@@ -83,7 +85,7 @@ jobs:
 
     steps:
     - name: Download wheels
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         merge-multiple: true
         path: dist
@@ -95,8 +97,8 @@ jobs:
     - name: Prepare wheels
       run: |
         rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-*
-        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
-        rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
+        rename "s/macosx_15_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
+        rename "s/macosx_15/macosx_13/" dist/pennylane_catalyst-*
 
     - name: Upload wheels
       uses: pypa/gh-action-pypi-publish@release/v1
@@ -109,12 +111,14 @@ jobs:
     name: Trigger PennyLane RC release workflow
     if: ${{ always() && !cancelled() }}
     needs: [upload]
-    runs-on: ubuntu-24.04
+    runs-on:  
+      group: 'PennyLaneAI-Static-IP-Runners'
+      labels: ['pl-2-core-gh-runner']   
 
     steps:
     - name: Trigger PennyLane release workflow
       env:
-        GITHUB_TOKEN: "${{ secrets.PENNYLANE_TRIGGER_RC_WORKFLOW }}"    
+        GITHUB_TOKEN: "${{ secrets.PENNYLANE_TRIGGER_RC_WORKFLOW }}"
       run: |
         gh workflow run upload-nightly-rc-release.yml \
-          --repo PennyLaneAI/pennylane 
+          --repo PennyLaneAI/pennylane
