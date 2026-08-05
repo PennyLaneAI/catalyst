@@ -91,6 +91,20 @@ template <typename Fn> auto guard(Fn &&fn) -> decltype(fn())
     }
 }
 
+const char *collect_error_name(int rc)
+{
+    switch (rc) {
+    case CATALYST_TRANSPORT_ERR_MEMORY:
+        return "memory";
+    case CATALYST_TRANSPORT_ERR_TIMEOUT:
+        return "timeout";
+    case CATALYST_TRANSPORT_ERR_STUCK:
+        return "stuck — no reply before the deadline";
+    default:
+        return "error";
+    }
+}
+
 // Provision the local reply region on first use (idempotent).
 void ensure_reply(CatalystTransportSession *s)
 {
@@ -412,11 +426,18 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply,
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
-    return guard([&] {
+    const int rc = guard([&] {
         void *replies[1] = {reply};
         std::uint64_t replies_bytes[1] = {reply_bytes};
         return s->sess->collect(replies, replies_bytes, 1);
     });
+    if (rc != CATALYST_TRANSPORT_OK) {
+        // The generated code discards this return value, so a failed round is otherwise silent:
+        // `reply` keeps whatever it held, and the caller consumes that as a valid result.
+        std::cerr << "[transport] collect failed (rc=" << rc << ": " << collect_error_name(rc)
+                  << "); the reply buffer was not written\n";
+    }
+    return rc;
 }
 
 std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s)
