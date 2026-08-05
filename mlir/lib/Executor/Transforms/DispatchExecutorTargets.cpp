@@ -50,8 +50,7 @@ struct DispatchExecutorTargetsPass
     : impl::DispatchExecutorTargetsPassBase<DispatchExecutorTargetsPass> {
     using DispatchExecutorTargetsPassBase::DispatchExecutorTargetsPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         ModuleOp host = getOperation();
 
         SmallVector<ModuleOp> targetMods;
@@ -147,16 +146,14 @@ struct DispatchExecutorTargetsPass
         }
     }
 
-    static StringAttr executorDispatchOf(catalyst::CustomCallOp call)
-    {
+    static StringAttr executorDispatchOf(catalyst::CustomCallOp call) {
         if (auto cfg = call.getBackendConfigAttr()) {
             return cfg.getAs<StringAttr>("dispatch");
         }
         return nullptr;
     }
 
-    static StringAttr libCallAddress(catalyst::CustomCallOp call, StringAttr fallbackAddress)
-    {
+    static StringAttr libCallAddress(catalyst::CustomCallOp call, StringAttr fallbackAddress) {
         if (StringAttr dispatch = executorDispatchOf(call)) {
             if (!dispatch.getValue().empty()) {
                 return dispatch;
@@ -172,8 +169,7 @@ struct DispatchExecutorTargetsPass
 
     // Return the session handle for `addressAttr` in `user`'s function, opening one at the function
     // entry on first use and caching it for subsequent sites.
-    Value getOrOpenSession(Operation *user, StringAttr addressAttr)
-    {
+    Value getOrOpenSession(Operation *user, StringAttr addressAttr) {
         auto func = user->getParentOfType<func::FuncOp>();
         std::pair<Operation *, Attribute> key{func.getOperation(), addressAttr};
         if (Value cached = sessionCache.lookup(key)) {
@@ -189,8 +185,7 @@ struct DispatchExecutorTargetsPass
     }
 
     LogicalResult rewriteExecutorLibCalls(ArrayRef<catalyst::CustomCallOp> libCalls,
-                                          StringAttr fallbackAddress)
-    {
+                                          StringAttr fallbackAddress) {
         MLIRContext *ctx = &getContext();
         for (catalyst::CustomCallOp call : libCalls) {
             StringAttr addressAttr = libCallAddress(call, fallbackAddress);
@@ -220,8 +215,7 @@ struct DispatchExecutorTargetsPass
 
     // Ship `pathAttr` over the session for `addressAttr`, once per (function, object). Emitted
     // right after the function's `executor.open` so it precedes every launch of the object.
-    void ensureBinaryShipped(Operation *user, StringAttr addressAttr, StringAttr pathAttr)
-    {
+    void ensureBinaryShipped(Operation *user, StringAttr addressAttr, StringAttr pathAttr) {
         auto func = user->getParentOfType<func::FuncOp>();
         std::pair<Operation *, Attribute> key{func.getOperation(), pathAttr};
         if (!shippedObjects.insert(key).second) {
@@ -239,8 +233,7 @@ struct DispatchExecutorTargetsPass
     // function.
     LogicalResult dispatchTargetModule(ModuleOp host, ModuleOp nested,
                                        llvm::SmallSet<std::string, 4> &openedAddresses,
-                                       StringAttr &executorAddress)
-    {
+                                       StringAttr &executorAddress) {
         MLIRContext *ctx = &getContext();
 
         // The object path is produced by the cross-compile-targets pass.

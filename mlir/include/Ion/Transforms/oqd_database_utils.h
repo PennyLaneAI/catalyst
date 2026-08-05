@@ -21,8 +21,7 @@
 
 namespace {
 
-template <typename T> std::vector<T> tomlArray2StdVector(const toml::array &arr)
-{
+template <typename T> std::vector<T> tomlArray2StdVector(const toml::array &arr) {
     // A toml node can contain toml objects of arbitrary types, even other toml nodes
     // i.e. toml nodes are similar to pytrees
     // Therefore, toml++ does not provide a simple "toml array to std vector" converter
@@ -36,13 +35,11 @@ template <typename T> std::vector<T> tomlArray2StdVector(const toml::array &arr)
         for (const auto &elem : arr) {
             vec.push_back(elem.as_integer()->get());
         }
-    }
-    else if constexpr (std::is_same_v<T, double>) {
+    } else if constexpr (std::is_same_v<T, double>) {
         for (const auto &elem : arr) {
             if (auto fp = elem.as_floating_point()) {
                 vec.push_back(fp->get());
-            }
-            else if (auto i = elem.as_integer()) {
+            } else if (auto i = elem.as_integer()) {
                 vec.push_back(static_cast<double>(i->get()));
             }
         }

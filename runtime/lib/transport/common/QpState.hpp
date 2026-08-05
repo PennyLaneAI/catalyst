@@ -21,8 +21,7 @@ namespace catalyst::transport::common {
 
 enum class QpState : std::uint8_t { RESET, INIT, RTR, RTS, ERROR };
 
-inline const char *to_string(QpState s)
-{
+inline const char *to_string(QpState s) {
     switch (s) {
     case QpState::RESET:
         return "Reset";
@@ -39,8 +38,7 @@ inline const char *to_string(QpState s)
 }
 
 // Checks whether a given transition is valid.
-constexpr bool is_valid_transition(QpState from, QpState to)
-{
+constexpr bool is_valid_transition(QpState from, QpState to) {
     if (to == QpState::ERROR || to == QpState::RESET) {
         return true;
     }

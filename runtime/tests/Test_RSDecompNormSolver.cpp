@@ -19,8 +19,7 @@
 
 using namespace RSDecomp::NormSolver;
 
-TEST_CASE("Test Factorization", "[RSDecomp][NormSolver]")
-{
+TEST_CASE("Test Factorization", "[RSDecomp][NormSolver]") {
     CHECK(prime_factorize(28) == std::nullopt); //  28 = 2^2 * 7 (7 is not included)
     CHECK(prime_factorize(1) == std::vector<INT_TYPE>{});
     CHECK(prime_factorize(0) == std::vector<INT_TYPE>{});
@@ -29,8 +28,7 @@ TEST_CASE("Test Factorization", "[RSDecomp][NormSolver]")
     CHECK(prime_factorize(53) == std::vector<INT_TYPE>{53});
 }
 
-TEST_CASE("Test Integer Factorization", "[RSDecomp][NormSolver]")
-{
+TEST_CASE("Test Integer Factorization", "[RSDecomp][NormSolver]") {
     auto [num, valid_values] = GENERATE(table<INT_TYPE, std::vector<INT_TYPE>>({
         {28, {2, 4, 7}},
         {1, {}},
@@ -43,8 +41,7 @@ TEST_CASE("Test Integer Factorization", "[RSDecomp][NormSolver]")
 
     if (valid_values.empty()) {
         CHECK_FALSE(result.has_value());
-    }
-    else {
+    } else {
         REQUIRE(result.has_value());
         bool found = std::find(valid_values.begin(), valid_values.end(), result.value()) !=
                      valid_values.end();
@@ -52,8 +49,7 @@ TEST_CASE("Test Integer Factorization", "[RSDecomp][NormSolver]")
     }
 }
 
-TEST_CASE("Test Factorize Prime ZSqrtTwo", "[RSDecomp][NormSolver]")
-{
+TEST_CASE("Test Factorize Prime ZSqrtTwo", "[RSDecomp][NormSolver]") {
     auto [num, valid_values] = GENERATE(table<INT_TYPE, std::vector<ZSqrtTwo>>({
         {2, {ZSqrtTwo(0, 1), ZSqrtTwo(0, 1)}},
         {3, {ZSqrtTwo(3, 0)}},
@@ -66,8 +62,7 @@ TEST_CASE("Test Factorize Prime ZSqrtTwo", "[RSDecomp][NormSolver]")
 
     if (valid_values.empty()) {
         CHECK_FALSE(result.has_value());
-    }
-    else {
+    } else {
         REQUIRE(result.has_value());
         CHECK(result == valid_values);
 
@@ -77,8 +72,7 @@ TEST_CASE("Test Factorize Prime ZSqrtTwo", "[RSDecomp][NormSolver]")
     }
 }
 
-TEST_CASE("Test Factorize Prime ZOmega", "[RSDecomp][NormSolver]")
-{
+TEST_CASE("Test Factorize Prime ZOmega", "[RSDecomp][NormSolver]") {
     auto [num, valid_values] = GENERATE(table<INT_TYPE, std::vector<ZOmega>>({
         {3, {ZOmega(-1, 0, -1, -1)}}, // ADD MORE TESTS AFTER UTKARSH UPDATE
     }));
@@ -88,15 +82,13 @@ TEST_CASE("Test Factorize Prime ZOmega", "[RSDecomp][NormSolver]")
 
     if (valid_values.empty()) {
         CHECK_FALSE(result.has_value());
-    }
-    else {
+    } else {
         REQUIRE(result.has_value());
         CHECK(result.value() == valid_values[0]);
     }
 }
 
-TEST_CASE("Test Primality Test", "[RSDecomp][NormSolver]")
-{
+TEST_CASE("Test Primality Test", "[RSDecomp][NormSolver]") {
     CHECK(primality_test(2) == true);
     CHECK(primality_test(4) == false);
     CHECK(primality_test(5) == true);
@@ -108,8 +100,7 @@ TEST_CASE("Test Primality Test", "[RSDecomp][NormSolver]")
     CHECK(primality_test(101 * 431) == false);
 }
 
-TEST_CASE("Test Legendre Symbol", "[RSDecomp][NormSolver]")
-{
+TEST_CASE("Test Legendre Symbol", "[RSDecomp][NormSolver]") {
     CHECK(legendre_symbol(1, 3) == 1);
     CHECK(legendre_symbol(2, 3) == 2);
     CHECK(legendre_symbol(1, 5) == 1);
@@ -120,8 +111,7 @@ TEST_CASE("Test Legendre Symbol", "[RSDecomp][NormSolver]")
     CHECK(legendre_symbol(25, 101) == 1);
 }
 
-TEST_CASE("Test Sqrt Modulo", "[RSDecomp][NormSolver]")
-{
+TEST_CASE("Test Sqrt Modulo", "[RSDecomp][NormSolver]") {
     auto [input, expected] = GENERATE(table<std::vector<INT_TYPE>, std::optional<INT_TYPE>>({
         {{3, 2}, 1},
         {{0, 1}, 0},
@@ -141,10 +131,8 @@ TEST_CASE("Test Sqrt Modulo", "[RSDecomp][NormSolver]")
     }
 }
 
-TEST_CASE("Test Solve Diophantine", "[RSDecomp][NormSolver]")
-{
-    SECTION("Small Numbers")
-    {
+TEST_CASE("Test Solve Diophantine", "[RSDecomp][NormSolver]") {
+    SECTION("Small Numbers") {
         // Columns: Input ZSqrtTwo, Expect Solution (bool)
         auto [input, expect_solution] = GENERATE(table<ZSqrtTwo, bool>({{ZSqrtTwo(0, 0), true},
                                                                         {ZSqrtTwo(0, 1), false},
@@ -161,8 +149,7 @@ TEST_CASE("Test Solve Diophantine", "[RSDecomp][NormSolver]")
 
         if (!expect_solution) {
             CHECK_FALSE(result.has_value());
-        }
-        else {
+        } else {
             REQUIRE(result.has_value());
             ZOmega sol = result.value();
             ZSqrtTwo sol_norm = (sol.conj() * sol).to_sqrt_two();
@@ -170,8 +157,7 @@ TEST_CASE("Test Solve Diophantine", "[RSDecomp][NormSolver]")
         }
     }
 
-    SECTION("Large Numbers")
-    {
+    SECTION("Large Numbers") {
         // Columns: "u" (used to generate input), "k" (power of 2 factor)
         // These test cases are from the paper
         auto [u, k] = GENERATE(table<ZOmega, INT_TYPE>(

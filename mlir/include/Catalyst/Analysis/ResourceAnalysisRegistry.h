@@ -37,8 +37,7 @@ class ResourceAnalysisRegistry {
 
     static ResourceAnalysisRegistry &get();
 
-    void add(ExtensionProvider extensionProvider)
-    {
+    void add(ExtensionProvider extensionProvider) {
         std::string name = extensionProvider()->name().str();
         if (llvm::is_contained(names, name)) {
             llvm::WithColor::warning() << "ResourceAnalysisExtension '" << name

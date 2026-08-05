@@ -79,7 +79,7 @@ void *__catalyst__transport__data_slot(CatalystTransportSession *s);
 // Copy `bytes` into the round's outbound slot. Fails if `bytes` exceeds what
 // commit_work_item committed.
 int __catalyst__transport__write_data_slot(CatalystTransportSession *s, const void *src,
-                                           uint64_t bytes);
+                                           uint64_t bytes, uint32_t decoder_id);
 void *__catalyst__transport__reply_slot(CatalystTransportSession *s);
 int __catalyst__transport__kick(CatalystTransportSession *s, uint32_t work_item_idx);
 

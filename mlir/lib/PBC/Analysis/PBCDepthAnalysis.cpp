@@ -25,8 +25,7 @@ using namespace mlir;
 namespace catalyst {
 namespace pbc {
 
-llvm::json::Value PBCDepthExtension::toJson() const
-{
+llvm::json::Value PBCDepthExtension::toJson() const {
     llvm::json::Object depthObj;
     if (depth) {
         depthObj["any_commuting_depth"] = depth->first;
@@ -35,8 +34,7 @@ llvm::json::Value PBCDepthExtension::toJson() const
     return depthObj;
 }
 
-void PBCDepthExtension::mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod)
-{
+void PBCDepthExtension::mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) {
     const auto &o = static_cast<const PBCDepthExtension &>(other);
     if (!o.depth) {
         return;
@@ -60,16 +58,14 @@ void PBCDepthExtension::mergeWith(const ResourceResultExtension &other, MergeMet
     }
 }
 
-void PBCDepthExtension::multiplyBy(double factor)
-{
+void PBCDepthExtension::multiplyBy(double factor) {
     if (depth) {
         depth->first *= factor;
         depth->second *= factor;
     }
 }
 
-void PBCDepthAnalysis::analyze(Region &region, PBCDepthExtension &ext, bool /*isAdjoint*/)
-{
+void PBCDepthAnalysis::analyze(Region &region, PBCDepthExtension &ext, bool /*isAdjoint*/) {
     Block *block = &region.front();
 
     // Swallow expected errors from dynamic-loop depth computation.
@@ -86,8 +82,7 @@ void PBCDepthAnalysis::analyze(Region &region, PBCDepthExtension &ext, bool /*is
     ext.setDepth(layerContext.computePBCDepth(block));
 }
 
-void registerPBCResourceAnalysisExtensions()
-{
+void registerPBCResourceAnalysisExtensions() {
     [[maybe_unused]] static const bool once = [] {
         ResourceAnalysisRegistry::get().add([] { return std::make_unique<PBCDepthAnalysis>(); });
         return true;

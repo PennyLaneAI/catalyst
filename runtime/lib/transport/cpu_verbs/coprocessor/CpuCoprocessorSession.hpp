@@ -25,9 +25,10 @@
 
 namespace catalyst::transport::cpu_verbs {
 
-// Coprocessor role: receives messages, runs the coprocessor function, and
-// returns the result. The function is bound via set_coprocessor_fn; nullptr
-// selects the built-in echo.
+// Coprocessor role: receives messages, runs the coprocessor function, and returns
+// the result. The function is bound via set_coprocessor_fn; nullptr selects the
+// built-in echo. Each message's decoder_id is handed to the function, which may
+// serve several codes and dispatch on it, or ignore it if it serves only one.
 class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
     using Base = CpuSessionBase<CoprocessorSession>;
 
