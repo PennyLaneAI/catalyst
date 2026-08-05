@@ -60,7 +60,9 @@ from .ssh import SCP, SSH
 
 
 def _start_on_free_port(
-    make_process, pinned_port: int | None, max_tries: int = MAX_PORT_TRIES
+    make_process: Callable[[int], _ExecutorProcess],
+    pinned_port: int | None,
+    max_tries: int = MAX_PORT_TRIES,
 ) -> _ExecutorProcess:
     """Start a process on a free port. Tries ``pinned_port`` first, then up to ``max_tries``
     random ports; retries on :class:`PortInUse`.
@@ -120,10 +122,10 @@ class ExecutorConfig:
     port: int | None = None
     local_port: int | None = None
     workspace: str | None = None
-    bundle: Any = None
+    bundle: str | Path | None = None
     plugins: list[str] | None = None
     copy: bool = False
-    build: Any = None
+    build: Callable[[str | None, Path], Any] | None = None
     ready_timeout: float = 60.0
     sudo: bool = True
     sudo_password: str | None = None
@@ -156,10 +158,10 @@ class Executor:
         port: int | None = None,
         local_port: int | None = None,
         workspace: str | None = None,
-        bundle=None,
+        bundle: str | Path | None = None,
         plugins: list[str] | None = None,
         copy: bool = False,
-        build=None,
+        build: Callable[[str | None, Path], Any] | None = None,
         ready_timeout: float = 60.0,
         name: str = "executor",
         sudo: bool = True,
@@ -365,7 +367,7 @@ class Executor:
     def __enter__(self) -> Self:
         return self.launch()
 
-    def __exit__(self, *exc) -> None:
+    def __exit__(self, *exc: object) -> None:
         self.stop()
 
     def __repr__(self) -> str:

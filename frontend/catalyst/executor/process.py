@@ -24,7 +24,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Self
+from typing import Self, TextIO
 
 from .utils import (
     ExecutorCli,
@@ -56,7 +56,7 @@ class _ExecutorProcess:
         self.ready_timeout = ready_timeout
         self.log_path = log_path
         self.proc: subprocess.Popen | None = None
-        self._log_fh = None
+        self._log_fh: TextIO | None = None
         self._ready = threading.Event()
         self._port_conflict = threading.Event()
 

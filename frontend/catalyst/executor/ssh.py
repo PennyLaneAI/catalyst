@@ -370,7 +370,7 @@ class RemoteLauncher:
     @staticmethod
     def _env_prefix(env: dict[str, str]) -> str:
         """``K=V K=V ...`` prefix. :class:`Raw` values expand on the remote; bare strings are quoted."""
-        def q(v):
+        def q(v: str) -> str:
             return v if isinstance(v, Raw) else shlex.quote(v)
         return " ".join(f"{k}={q(v)}" for k, v in env.items())
 
@@ -378,7 +378,7 @@ class RemoteLauncher:
     def _plugin_args(plugins: list[str]) -> str:
         """``--plugin=<path>`` args. Bare filenames resolve against ``$PWD``; ``~``/absolute
         paths are quoted with tilde expansion."""
-        def arg(p):
+        def arg(p: str) -> str:
             flag = ExecutorCli.PLUGIN_FLAG
             if isinstance(p, Raw):
                 return f"{flag}{p}"
