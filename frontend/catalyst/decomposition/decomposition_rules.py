@@ -27,7 +27,7 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
-    get_dummy_values_for_container,
+    get_dummy_values_for_arg,
     mlir_stringify_type,
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
@@ -205,7 +205,7 @@ def compile_decomposition_rules(
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_container(arg_shape)
+        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name, kwargs | static_data | extra_data, is_custom_op
