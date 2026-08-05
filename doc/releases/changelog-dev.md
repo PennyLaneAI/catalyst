@@ -12,6 +12,8 @@
 
 <h3>Improvements 🛠</h3>
 
+* A failure during AOT compilation is now downgraded to a warning and logged.
+
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
   operations in question can be annotated with either a `catalyst.estimated_probability` or
