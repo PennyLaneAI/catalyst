@@ -24,10 +24,8 @@ target_link_libraries(catalyst_transport_cpu_verbs_controller PRIVATE cpu_verbs_
 add_library(catalyst_transport_cpu_verbs_coprocessor SHARED coprocessor/CpuCoprocessorFactory.cpp)
 target_link_libraries(catalyst_transport_cpu_verbs_coprocessor PRIVATE cpu_verbs_impl)
 
-# Reference coprocessor function (Steane decode), built as a standalone shared lib
-# exporting a CoprocessorFn symbol.
-add_library(steane_coprocessor SHARED coprocessor/coprocessor_functions/steane_decoder_fn.cpp)
-set_property(TARGET steane_coprocessor PROPERTY POSITION_INDEPENDENT_CODE ON)
+add_library(steane_coprocessor_cpu SHARED coprocessor/coprocessor_functions/steane_decoder_fn.cpp)
+set_property(TARGET steane_coprocessor_cpu PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Self-contained loopback application for testing
 add_executable(cpu_verbs_selftest cpu_verbs_selftest.cpp)
