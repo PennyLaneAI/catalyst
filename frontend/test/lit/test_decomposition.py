@@ -32,7 +32,6 @@ from operator2_dummy_gates import (
     StaticData,
     StaticDataMultiReg,
 )
-from pennylane.decomposition import add_decomps, list_decomps, local_decomps, register_resources
 from pennylane.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.decomposition_rules import (
@@ -533,10 +532,13 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-SAME:   "StaticDataMultiReg{theta:[f64]}{reg:1,reg2:2}{}[[[uid_1:[-0-9]+]]]" = 1 : i64
     # CHECK-SAME:   target_gate = "HybridOpArg{angle:[f64]}{cwires:1}{}[5678]"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]] : i64, op_name = "StaticDataMultiReg"
-
     test_from_hybrid_op()
 
-    def test_decompose_to_hybrid_op_nested():
+    def test_to_hybrid_op_nested():
+        """
+        Test that decomposing to an op with a hybrid_argnames that is a nested op works.
+        """
+
         def rule_resource_fn(reg):
             return {
                 HybridOpArg(
@@ -579,9 +581,13 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-DAG: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_1:[-0-9]+]]]" = 1
     # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
-    test_decompose_to_hybrid_op_nested()
+    test_to_hybrid_op_nested()
 
     def test_multiple_rules():
+        """
+        Test when multiple rules are registered on an op.
+        """
+
         def rule1_resource_fn(reg):
             return {
                 SingleParam(x=Float, reg=Wire[1]): 1,
@@ -616,28 +622,12 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
     test_multiple_rules()
 
-    def test_single_rule_custom_op():
-        def rule_resource_fn(reg):
-            return {NoParamsCustomOp(wires=Wire[2]): 1}
-
-        @qp.register_resources(rule_resource_fn)
-        def rule(reg):
-            NoParamsCustomOp(wires=reg)
-
-        with qp.decomposition.local_decomps():
-            qp.add_decomps(NoParams, rule)
-            result = compile_decomposition_rules_wrapper(
-                "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
-            )
-            print(result)
-
-    # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
-    # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
-    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-    test_single_rule_custom_op()
-
     def test_for_loop():
-        class TestOp(qp.core.Operator2):
+        """
+        Test when the rule body has a for loop.
+        """
+
+        class LayerRX(qp.core.Operator2):
             dynamic_argnames = ("angles",)
 
             def __init__(self, angles, wires):
@@ -646,13 +636,12 @@ def test_compile_decomposition_rules_wrapper_entry_point():
         class TestRX(qp.core.Operator2):
             dynamic_argnames = ("theta",)
             wires_argnames = ("wires",)
-
             arg_specs = {"theta": Float, "wires": Wire[1]}
 
             def __init__(self, theta, wires):
                 super().__init__(theta, wires)
 
-        @register_resources(lambda angles, wires: {TestRX(Float, Wire[1]): len(wires)})
+        @qp.register_resources(lambda angles, wires: {TestRX(Float, Wire[1]): len(wires)})
         def test_rule(angles, wires):
             @qp.for_loop(len(wires))
             def l(i):
@@ -660,12 +649,23 @@ def test_compile_decomposition_rules_wrapper_entry_point():
 
             l()  # pylint: disable=no-value-for-parameter
 
-        with local_decomps():
-            add_decomps(TestOp, test_rule)
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(LayerRX, test_rule)
 
-            assert "scf.for" in compile_decomposition_rules_wrapper(
-                "TestOp", "TestID", {"angles": ["f64", "f64", "f64"]}, {"wires": 3}, {}
+            result = compile_decomposition_rules_wrapper(
+                "LayerRX", "TestID", {"angles": ["f64", "f64", "f64"]}, {"wires": 3}, {}
             )
+            print(result)
+
+    # CHECK: func.func private @test_rule_TestID
+    # CHECK-SAME:   resources = {operations = {"TestRX{theta:[f64]}{wires:1}{}" = 3 : i64}}
+    # CHECK-SAME:   target_gate = "TestID"
+    # CHECK-DAG: stablehlo.constant dense<0> : tensor<i64>
+    # CHECK-DAG: stablehlo.constant dense<3> : tensor<i64>
+    # CHECK-DAG: stablehlo.constant dense<1> : tensor<i64>
+    # CHECK: scf.for
+
+    test_for_loop()
 
 
 test_compile_decomposition_rules_wrapper_entry_point()
