@@ -62,8 +62,7 @@ struct OperatorNode {
     std::unordered_map<std::string, std::string> staticNamedArgs{};
     std::string id{""};
 
-    bool operator==(const OperatorNode &other) const
-    {
+    bool operator==(const OperatorNode &other) const {
         // id match
         if (!id.empty() && !other.id.empty() && id == other.id) {
             return true;
@@ -105,8 +104,7 @@ struct OperatorNode {
  * in the hash when converting MLIR operations to OperatorNodes.
  */
 struct OperatorNodeHash {
-    std::size_t operator()(const OperatorNode &node) const
-    {
+    std::size_t operator()(const OperatorNode &node) const {
         // prefer id if available
         if (!node.id.empty()) {
             return std::hash<std::string>{}(node.id);
@@ -121,8 +119,7 @@ struct OperatorNodeHash {
 struct WeightedGateset {
     std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;
 
-    [[nodiscard]] bool contains(const OperatorNode &op) const
-    {
+    [[nodiscard]] bool contains(const OperatorNode &op) const {
         // hash match
         if (ops.find(op) != ops.end()) {
             return true;
@@ -138,8 +135,7 @@ struct WeightedGateset {
         return false;
     }
 
-    [[nodiscard]] double getCost(const OperatorNode &op) const
-    {
+    [[nodiscard]] double getCost(const OperatorNode &op) const {
         auto it = ops.find(op);
         if (it != ops.end()) {
             return it->second;
@@ -196,8 +192,7 @@ struct RuleNode {
     std::vector<RuleTerm> inputs;
     RuleOrigin origin{RuleOrigin::Default};
 
-    bool operator==(const RuleNode &other) const
-    {
+    bool operator==(const RuleNode &other) const {
         return name == other.name && output == other.output && origin == other.origin;
     }
 

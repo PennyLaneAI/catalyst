@@ -96,3 +96,42 @@ module attributes {catalyst.backline = #transport.backline<transport = "net",
     return
   }
 }
+
+// -----
+
+// Check decode check_type mapping to decoder_id
+
+// CHECK-LABEL: func.func @qec_cycle_css
+// CHECK:         %[[SX:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
+// CHECK:         transport.kick %[[SX]], %{{.*}} {work_item_idx = 0 : i32}
+// CHECK:         %[[SZ:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
+// CHECK:         transport.kick %[[SZ]], %{{.*}} {decoder_id = 1 : i32, work_item_idx = 0 : i32}
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c">,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
+  func.func @qec_cycle_css(%tannerX: !qecp.tanner_graph<8, 6, i32>,
+                           %tannerZ: !qecp.tanner_graph<8, 6, i32>,
+                           %esmX: memref<?xi1>, %iX: memref<?xindex>,
+                           %esmZ: memref<?xi1>, %iZ: memref<?xindex>) {
+    qecp.decode_esm_css(%tannerX : !qecp.tanner_graph<8, 6, i32>) %esmX in (%iX : memref<?xindex>) {check_type = "x"} : memref<?xi1>
+    qecp.decode_esm_css(%tannerZ : !qecp.tanner_graph<8, 6, i32>) %esmZ in (%iZ : memref<?xindex>) {check_type = "z"} : memref<?xi1>
+    return
+  }
+}
+
+// -----
+
+// A decode that declares no check family takes decoder 0, so IR from before the attribute
+// existed lowers unchanged.
+
+// CHECK-LABEL: func.func @untagged
+// CHECK:         transport.kick %{{.*}} {work_item_idx = 0 : i32}
+// CHECK-NOT:     decoder_id
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c">,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
+  func.func @untagged(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<?xi1>, %erridx: memref<?xindex>) {
+    qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<?xindex>) : memref<?xi1>
+    return
+  }
+}

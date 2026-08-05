@@ -36,8 +36,7 @@ namespace nb = nanobind;
 
 namespace {
 
-static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange)
-{
+static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange) {
     nb::list pyTypes;
     for (auto type : typerange) {
         std::string typestr;
@@ -48,8 +47,7 @@ static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange)
     return pyTypes;
 }
 
-static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
-{
+static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
     return llvm::TypeSwitch<mlir::Attribute, nb::object>(attr)
         .Case<mlir::DictionaryAttr>([](auto dictAttr) {
             nb::dict outDict;
@@ -72,8 +70,7 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
 
 } // namespace
 
-std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
-{
+std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
     QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
         const char *moduleName = "catalyst.device.python_decompositions";
@@ -89,12 +86,10 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
                                 getPyvalFromMlirAttribute(op.getStaticData()));
 
             return nb::borrow<nb::str>(pythonResult).c_str();
-        }
-        catch (const nb::python_error &error) {
+        } catch (const nb::python_error &error) {
             throw QuantumPythonDecompositions::TracingError(moduleName, functionName,
                                                             op.getGraphOpId(), error.what());
-        }
-        catch (const std::exception &error) {
+        } catch (const std::exception &error) {
             throw;
         }
     });
@@ -102,7 +97,6 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
     return mlirText;
 }
 
-extern "C" __attribute__((visibility("default"))) void *getPythonRuleLoweringFunction()
-{
+extern "C" __attribute__((visibility("default"))) void *getPythonRuleLoweringFunction() {
     return reinterpret_cast<void *>(pythonRuleLowering);
 }

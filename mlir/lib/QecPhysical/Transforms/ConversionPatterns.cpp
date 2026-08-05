@@ -34,8 +34,7 @@ struct AssembleTannerGraphOpPattern : public OpConversionPattern<AssembleTannerG
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(AssembleTannerGraphOp op, AssembleTannerGraphOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         const TypeConverter *conv = getTypeConverter();
 
@@ -64,8 +63,7 @@ struct DecodeEsmCssOpPattern : public OpConversionPattern<DecodeEsmCssOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(DecodeEsmCssOp op, DecodeEsmCssOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         auto i1 = IntegerType::get(ctx, 1);
@@ -118,8 +116,7 @@ namespace catalyst {
 namespace qecp {
 
 void populateQecPhysicalConversionPatterns(LLVMTypeConverter &typeConverter,
-                                           RewritePatternSet &patterns)
-{
+                                           RewritePatternSet &patterns) {
     patterns.add<AssembleTannerGraphOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DecodeEsmCssOpPattern>(typeConverter, patterns.getContext());
 }
