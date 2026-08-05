@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Controlling an scf.if pushes the control into each branch (the branch structure stays classical)
-// and threads the control qubit through as an extra result of the scf.if.
 // RUN: quantum-opt --ctrl-lowering --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @ctrl_scf_if_then_only
