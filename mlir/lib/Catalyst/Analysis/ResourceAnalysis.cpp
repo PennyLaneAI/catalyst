@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/Support/raw_ostream.h>
+#include <mlir/IR/MLIRContext.h>
 #define DEBUG_TYPE "resource-analysis"
-
-#include "Catalyst/Analysis/ResourceAnalysis.h"
 
 #include <algorithm>
 #include <cmath>
@@ -30,6 +30,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
+#include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/SCFUtils.h"
@@ -360,6 +361,7 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 
             if (needsCollection) {
                 collectOperation(&op, result, isAdjoint);
+                collectDetailOperation(&op, result, isAdjoint);
             }
         }
     }
@@ -462,6 +464,14 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
     result.classicalInstructions[op->getName().getStringRef()] += 1;
 }
 
+void ResourceAnalysis::collectDetailOperation(Operation *op, ResourceResult &result,
+                                              bool isAdjoint) const
+{
+    if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
+        result.detailOperations[inst.getGraphOpId()] += 1;
+    }
+}
+
 /**
  * @brief Merge `source`'s quantum content, classical content, and transitive
  * call counts into `dest`, scaled by `count`. Used to fold callee/loop-body
@@ -478,6 +488,9 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
         for (const auto &sizeEntry : opEntry.getValue()) {
             innerDst[sizeEntry.first] += sizeEntry.second * count;
         }
+    }
+    for (const auto &opEntry : source.detailOperations) {
+        dest.detailOperations[opEntry.getKey()] += opEntry.getValue() * count;
     }
     for (const auto &m : source.measurements) {
         dest.measurements[m.getKey()] += m.getValue() * count;

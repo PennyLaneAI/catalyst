@@ -214,6 +214,13 @@ llvm::json::Object ResourceResult::toJson() const {
     }
     funcObj["extended_fields"] = std::move(extendedFieldObject);
 
+    // Detail operations
+    llvm::json::Object detailOperationsObject;
+    for (const auto &entry : detailOperations) {
+        detailOperationsObject[entry.getKey()] = countToJson(entry.getValue());
+    }
+    funcObj["quantum_operations_detailed"] = std::move(detailOperationsObject);
+
     return funcObj;
 }
 
@@ -239,17 +246,11 @@ DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
 
     // operations
     SmallVector<NamedAttribute> opsEntries;
-    for (const auto &opEntry : result.operations) {
+    for (const auto &opEntry : result.detailOperations) {
         llvm::StringRef opName = opEntry.getKey();
-        for (const auto &sizeEntry : opEntry.getValue()) {
-            auto &[nQubits, nParams] = sizeEntry.first;
-            int64_t count = static_cast<int64_t>(std::llround(sizeEntry.second));
-            std::string key =
-                (opName + "(" + std::to_string(nQubits) + "," + std::to_string(nParams) + ")")
-                    .str();
-            opsEntries.push_back(NamedAttribute(
-                StringAttr::get(ctx, key), IntegerAttr::get(IntegerType::get(ctx, 64), count)));
-        }
+        int64_t count = static_cast<int64_t>(std::llround(opEntry.getValue()));
+        opsEntries.push_back(NamedAttribute(StringAttr::get(ctx, opName),
+                                            IntegerAttr::get(IntegerType::get(ctx, 64), count)));
     }
     entries.push_back(
         NamedAttribute(StringAttr::get(ctx, "operations"), DictionaryAttr::get(ctx, opsEntries)));
