@@ -189,6 +189,9 @@ AffineRelation AffineRelation::kleeneStar() const
     AffineRelation prevSum = AffineRelation::Trivial(numQubits());  // 0
 
     while (prevSum != sum) {
+        // llvm::outs() << "\nkleeneStar:\n";
+        // llvm::outs() << "\nsum:\n" << sum << "\n";
+        // llvm::outs() << "\ncur:\n" << cur << "\n";
         prevSum = sum;
         cur.composeWith(rel);
         sum.joinWith(cur);

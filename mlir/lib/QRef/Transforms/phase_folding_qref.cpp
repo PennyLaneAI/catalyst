@@ -64,6 +64,7 @@ class PhaseFoldingAnalyzer {
     std::vector<qref::CustomOp> phaseOps;
     GateID gateID = -1;
 
+    // llvm::StringMap<RegionSummary> procedureSummaries; // keyed by procedure name
     llvm::DenseMap<mlir::StringRef, RegionSummary> procedureSummaries; // keyed by procedure name
 
     llvm::DenseMap<mlir::Value, size_t> ssaToWireMap;
@@ -78,14 +79,17 @@ class PhaseFoldingAnalyzer {
     void handleForOp(mlir::scf::ForOp forOp, ProgramAbstraction &parentAbst);
     void handleCallOp(mlir::func::CallOp callOp, ProgramAbstraction &parentAbst);
 
+    bool isTrackedDialectOp(mlir::Operation *op);
     void handleCustomOp(qref::CustomOp customOp, ProgramAbstraction &progAbst, GateID &gateID);    // quantum ops
     void allocateRegister(mlir::Value qreg, auto regSize, ProgramAbstraction &progAbst);
     void allocateQubit(mlir::Value qubit, ProgramAbstraction &progAbst);
+    void deallocateRegister(mlir::Value qreg);
+    void deallocateQubit(mlir::Value qubit);
     void getFromQreg(qref::GetOp getOp);
     void initQubitsState(qref::SetBasisStateOp basisOp, ProgramAbstraction &progAbst);
     // void applyUndefinedOp(Operation *op, ProgramAbstraction &progAbst);
     
-    llvm::SmallVector<size_t, 4> getQubitIndices(mlir::ValueRange qubitValues);
+    llvm::SmallVector<size_t, 4> getWireIndices(mlir::ValueRange qubitValues);
     mlir::DenseElementsAttr extractBasisState(qref::SetBasisStateOp basisOp);
     Gate extractCliffTGate(qref::CustomOp &op);
 };
@@ -97,6 +101,7 @@ void PhaseFoldingAnalyzer::analyzeFunction(mlir::func::FuncOp funcOp) {
     ProgramAbstraction funcAbst; //(computeNumQubits(funcOp));
     analyzeBlock(&funcOp.getBody().front(), funcAbst);
 
+    // TODO: what if we had multiple qnodes? better way of specifying the main function?
     if (funcOp->hasAttrOfType<mlir::UnitAttr>(mainFuncIndicator)) {
         mainProgramAbst = funcAbst; // is it a deep copy?
     }    
@@ -114,7 +119,19 @@ void PhaseFoldingAnalyzer::analyzeBlock(mlir::Block *block, ProgramAbstraction &
     // llvm::outs() << "\nblock: \n" << currentAbst << "\n";
 }
 
+inline bool PhaseFoldingAnalyzer::isTrackedDialectOp(mlir::Operation *op) {
+    mlir::Dialect *dialect = op->getDialect();
+    if (!dialect) {
+        return false;
+    }
+    return isa<qref::QRefDialect, scf::SCFDialect>(dialect);
+}
+
 void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstraction &currentAbst) {
+    if (!isTrackedDialectOp(op)) {
+        op->emitError("Operation is not a tracked dialect operation: " + op->getName().getStringRef());
+        return;
+    }
     llvm::TypeSwitch<mlir::Operation *, void>(op)
         .Case<mlir::scf::IfOp>([&](mlir::scf::IfOp ifOp) {
             llvm::outs() << "IfOp:  " << "\n";
@@ -128,32 +145,25 @@ void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstract
             llvm::outs() << "CallOp:    " << callOp << "\n";
             handleCallOp(callOp, currentAbst);
         })
-        .Case<mlir::scf::YieldOp>([&](mlir::scf::YieldOp yieldOp) {
-            llvm::outs() << "YieldOp:  " << yieldOp << "\n";
-            
-        })
         .Case<qref::CustomOp>([&](qref::CustomOp customOp) {
             llvm::outs() << "CustomOp:  " << customOp << "\n";
             handleCustomOp(customOp, currentAbst, gateID);
-        })
-        .Case<qref::MeasureOp>([&](qref::MeasureOp measureOp) {
-            llvm::outs() << "MeasureOp:  " << measureOp << "\n";
-        })
-        .Case<qref::AllocQubitOp>([&](qref::AllocQubitOp allocQbOp) {
-            llvm::outs() << "AllocQubitOp:  " << allocQbOp << "\n";
-            allocateQubit(allocQbOp.getResult(), currentAbst);
         })
         .Case<qref::AllocOp>([&](qref::AllocOp allocOp) {
             llvm::outs() << "AllocOp:   " << allocOp << "\n";
             allocateRegister(allocOp.getResult(), allocOp.getNqubitsAttr(), currentAbst);
         })
-        .Case<qref::DeallocQubitOp>([&](qref::DeallocQubitOp deallocQbOp) {
-            llvm::outs() << "DeallocQubitOp:   " << deallocQbOp << "\n";
-            
+        .Case<qref::AllocQubitOp>([&](qref::AllocQubitOp allocQbOp) {
+            llvm::outs() << "AllocQubitOp:  " << allocQbOp << "\n";
+            allocateQubit(allocQbOp.getResult(), currentAbst);
         })
         .Case<qref::DeallocOp>([&](qref::DeallocOp deallocOp) {
             llvm::outs() << "DeallocOp:   " << deallocOp << "\n";
-            
+            deallocateRegister(deallocOp.getQreg());
+        })
+        .Case<qref::DeallocQubitOp>([&](qref::DeallocQubitOp deallocQbOp) {
+            llvm::outs() << "DeallocQubitOp:   " << deallocQbOp << "\n";
+            deallocateQubit(deallocQbOp.getQubit());
         })
         .Case<qref::GetOp>([&](qref::GetOp getOp) {
             llvm::outs() << "GetOp: " << getOp << "\n";
@@ -163,8 +173,15 @@ void PhaseFoldingAnalyzer::analyzeOperation(mlir::Operation *op, ProgramAbstract
             llvm::outs() << "SetBasisStateOp:   " << basisOp << "\n";
             initQubitsState(basisOp, currentAbst);
         })
+        .Case<qref::MeasureOp>([&](qref::MeasureOp measureOp) {
+            llvm::outs() << "MeasureOp:  " << measureOp << "\n";
+        })
         .Case<qref::GlobalPhaseOp>([&](qref::GlobalPhaseOp gpOp) {
             llvm::outs() << "GlobalPhaseOp: " << gpOp << "\n";
+        })
+        .Case<mlir::scf::YieldOp>([&](mlir::scf::YieldOp yieldOp) {
+            llvm::outs() << "YieldOp:  " << yieldOp << "\n";
+            
         })
         .Default([&](mlir::Operation *unknownOp) {
             // Handle or ignore operations that don't affect phases (e.g., standard arithmetic)
@@ -187,11 +204,15 @@ void PhaseFoldingAnalyzer::handleIfOp(mlir::scf::IfOp ifOp, ProgramAbstraction &
         analyzeBlock(&ifOp.getElseRegion().front(), elseAbst);
     }
 
+    // llvm::outs() << "thenAbst: " << thenAbst << "\n";
+    // llvm::outs() << "elseAbst: " << elseAbst << "\n";
+    // llvm::outs() << "parentAbst: " << parentAbst << "\n";
     // 3. Compute summary using your API
     RegionSummary branchSummary(RegionType::Conditional, thenAbst, &elseAbst);
-    
+    // llvm::outs() << "branchSummary: " << branchSummary << "\n";
     // 4. Apply to parent
     parentAbst.applySummary(std::move(branchSummary));
+    // llvm::outs() << "parentAbst after applySummary: " << parentAbst << "\n";
 }
 
 void PhaseFoldingAnalyzer::handleForOp(mlir::scf::ForOp forOp, ProgramAbstraction &parentAbst) {
@@ -223,9 +244,10 @@ void PhaseFoldingAnalyzer::handleCallOp(mlir::func::CallOp callOp, ProgramAbstra
     // if getting from the stored functions, should copy the summary, since applySummary consumes it!
 }
 
-// Qubit Extraction:
+// --- Qubit Management ---
+
 inline void PhaseFoldingAnalyzer::allocateRegister(mlir::Value qreg, auto regSize, ProgramAbstraction &progAbst)
-{
+{   // TODO: size 0 register! -- auto_qubit_management mode
     qregToBaseMap[qreg] = progAbst.numQubits();
     progAbst.extendQubitsBy(static_cast<size_t>(regSize.value_or(0)));
 }
@@ -236,21 +258,29 @@ inline void PhaseFoldingAnalyzer::allocateQubit(mlir::Value qubit, ProgramAbstra
     progAbst.extendQubitsBy(1);
 }
 
+inline void PhaseFoldingAnalyzer::deallocateRegister(mlir::Value qreg)
+{
+    qregToBaseMap.erase(qreg);
+}
+
+inline void PhaseFoldingAnalyzer::deallocateQubit(mlir::Value qubit)
+{
+    ssaToWireMap.erase(qubit);
+}
+
 void PhaseFoldingAnalyzer::getFromQreg(qref::GetOp getOp)
 {
     mlir::Value qreg = getOp.getQreg();
     auto regIt = qregToBaseMap.find(qreg);
     if (regIt == qregToBaseMap.end()) {
-        llvm::errs() << "Error: GetOp references an untracked register.\n";
-        assert(false);
+        assert(false && "Error: GetOp references an untracked register.\n");
     }
     size_t baseIndex = regIt->second;
 
     auto staticIdx = getOp.getIdxAttr();
     if (!staticIdx.has_value()) {
         // auto dynamicIdx = getOp.getIdx();
-        llvm::errs() << "Error: Dynamic qubit extraction indices are not supported.\n";
-        assert(false);
+        assert(false && "Error: Dynamic qubit extraction indices are not supported.\n");
     }
     ssaToWireMap[getOp.getQubit()] = baseIndex + static_cast<size_t>(staticIdx.value_or(0));
 }
@@ -265,27 +295,23 @@ mlir::DenseElementsAttr PhaseFoldingAnalyzer::extractBasisState(qref::SetBasisSt
             return denseAttr;
         }
         else {
-            llvm::errs() << "Error: Basis state constant is not a DenseElementsAttr.\n";
-            assert(false);
+            assert(false && "Error: Basis state constant is not a DenseElementsAttr.\n");
         }
     }
     else {
-        llvm::errs() << "Error: Dynamic basis state initialization is not supported.\n";
-        assert(false);
+        assert(false && "Error: Dynamic basis state initialization is not supported.\n");
     }
 }
 
 void PhaseFoldingAnalyzer::initQubitsState(qref::SetBasisStateOp basisOp, ProgramAbstraction &progAbst)
 {
-    llvm::SmallVector<size_t, 4> qubitIndices = getQubitIndices(basisOp.getQubits());
+    llvm::SmallVector<size_t, 4> wires = getWireIndices(basisOp.getQubits());
     mlir::DenseElementsAttr basisState = extractBasisState(basisOp);
 
-    assert(static_cast<size_t>(basisState.getNumElements()) == qubitIndices.size());
+    assert(static_cast<size_t>(basisState.getNumElements()) == wires.size());
 
-    size_t i = 0;
-    for (const llvm::APInt &val : basisState.getValues<llvm::APInt>()) {
-        progAbst.prepareQubit(qubitIndices[i], val.getBoolValue());
-        ++i;
+    for (const auto &[idx, val] : llvm::zip(wires, basisState.getValues<llvm::APInt>())) {
+        progAbst.prepareQubit(idx, val.getBoolValue());
     }
 }
 
@@ -294,10 +320,10 @@ void PhaseFoldingAnalyzer::initQubitsState(qref::SetBasisStateOp basisOp, Progra
 //     llvm::SmallVector<size_t, 4> qubitIndices;
 //     if (auto qGate = dyn_cast<QuantumGate>(op)) {
 //         qubitIndices =
-//             getQubitIndices(qGate.getNonCtrlQubitOperands(), qGate.getNonCtrlQubitResults());
+//             getWireIndices(qGate.getNonCtrlQubitOperands(), qGate.getNonCtrlQubitResults());
 //     }
 //     else if (auto stateOp = dyn_cast<SetStateOp>(op)) {
-//         qubitIndices = getQubitIndices(stateOp.getInQubits(), stateOp.getOutQubits());
+//         qubitIndices = getWireIndices(stateOp.getInQubits(), stateOp.getOutQubits());
 //     }
 //     else {
 //         // op->emitError("Not supported");
@@ -308,7 +334,7 @@ void PhaseFoldingAnalyzer::initQubitsState(qref::SetBasisStateOp basisOp, Progra
 //     progAbst.applyGate(gate, false, qubitIndices);
 // }
 
-llvm::SmallVector<size_t, 4> PhaseFoldingAnalyzer::getQubitIndices(mlir::ValueRange qubitValues)
+llvm::SmallVector<size_t, 4> PhaseFoldingAnalyzer::getWireIndices(mlir::ValueRange qubitValues)
 {
     size_t n = qubitValues.size();
 
@@ -318,14 +344,13 @@ llvm::SmallVector<size_t, 4> PhaseFoldingAnalyzer::getQubitIndices(mlir::ValueRa
     for (size_t i = 0; i < n; i++) {
         mlir::Value inValue = qubitValues[i];
 
-        size_t index;
+        size_t wire;
         auto it = ssaToWireMap.find(inValue);
         if (it == ssaToWireMap.end()) {
-            llvm::errs() << "Error: Operation references an untracked value.\n";
-            assert(false);
+            assert(false && "Error: Operation references an untracked value.\n");
         }
-        index = it->second;
-        indices.push_back(index);
+        wire = it->second;
+        indices.push_back(wire);
     }
     return indices;
 }
@@ -350,7 +375,7 @@ Gate PhaseFoldingAnalyzer::extractCliffTGate(qref::CustomOp &op)
     
 void PhaseFoldingAnalyzer::handleCustomOp(qref::CustomOp customOp, ProgramAbstraction &progAbst, GateID &gateID)
 {
-    llvm::SmallVector<size_t, 4> qubitIndices = getQubitIndices(customOp.getQubits());
+    llvm::SmallVector<size_t, 4> wires = getWireIndices(customOp.getQubits());
     Gate gate = extractCliffTGate(customOp);
 
     if (isPhaseGate(gate)) {
@@ -359,7 +384,7 @@ void PhaseFoldingAnalyzer::handleCustomOp(qref::CustomOp customOp, ProgramAbstra
     }
     initialGateCount[static_cast<size_t>(gate)]++;
 
-    progAbst.applyGate(gate, customOp.getAdjointFlag(), qubitIndices, gateID);
+    progAbst.applyGate(gate, customOp.getAdjointFlag(), wires, gateID);
 }
 
 void PhaseFoldingAnalyzer::dumpSummaries()
@@ -549,7 +574,7 @@ struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFolding
         for (auto func : rootModule.getOps<mlir::func::FuncOp>()) {
             // Skip external function declarations (functions without bodies)
             llvm::outs() << "FuncOp:\n" << func << "\n";
-            if (!func.isExternal()) {
+            if (!func.isExternal()) {   // only analyze functions with bodies
                 analyzer.analyzeFunction(func);
             }
         }

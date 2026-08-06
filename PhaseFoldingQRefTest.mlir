@@ -402,17 +402,113 @@
 //     return
 // }
 
-func.func @test_reset() attributes {quantum.node} {
-    %reg = qref.alloc( 1) : !qref.reg<1>
-    %q0 = qref.get %reg[ 0] : !qref.reg<1> -> !qref.bit
+// func.func @test_reset() attributes {quantum.node} {
+//     %reg = qref.alloc( 1) : !qref.reg<1>
+//     %q0 = qref.get %reg[ 0] : !qref.reg<1> -> !qref.bit
 
-    qref.custom "T"() %q0 : !qref.bit   // l0
+//     qref.custom "T"() %q0 : !qref.bit   // l0
     
-    %tens01 = arith.constant dense<[false]> : tensor<1xi1>
-    qref.set_basis_state(%tens01) %q0 : tensor<1xi1>, !qref.bit
+//     %tens01 = arith.constant dense<[false]> : tensor<1xi1>
+//     qref.set_basis_state(%tens01) %q0 : tensor<1xi1>, !qref.bit
 
-    qref.custom "T"() %q0 : !qref.bit   // l0
+//     qref.custom "T"() %q0 : !qref.bit   // l0
 
-    qref.dealloc %reg : !qref.reg<1>
-    return
+//     qref.dealloc %reg : !qref.reg<1>
+//     return
+// }
+
+// func.func @test_temp_anc() attributes {quantum.node} {
+//     %start = arith.constant 0 : index
+//     %step = arith.constant 1 : index
+//     %stop = arith.constant 37 : index
+
+//     %reg = qref.alloc( 2) : !qref.reg<2>
+//     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
+//     %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
+
+//     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+//     // qref.custom "S"() %2 : !qref.bit
+//     qref.custom "T"() %q1 : !qref.bit   // l0   // will be removed
+//     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+
+//     scf.for %i = %start to %stop step %step {
+//         qref.custom "T"() %q0 : !qref.bit   // l1   // will be removed
+//         qref.custom "SWAP"() %q0, %q1 : !qref.bit, !qref.bit
+
+//         %anc = qref.alloc_qb : !qref.bit
+//         qref.custom "Hadamard"() %anc : !qref.bit
+//         %mres = qref.measure %anc : i1
+
+//         qref.custom "T"() %q1 : !qref.bit   // l2   // will be removed
+
+//         scf.yield
+//     } 
+
+//     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+//     qref.custom "T"() %q1 : !qref.bit   // l3   // will be removed
+//     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+
+//     qref.dealloc %reg : !qref.reg<2>
+//     return
+// }
+
+// func.func @test_loop() attributes {quantum.node} {
+//     %start = arith.constant 0 : index
+//     %step = arith.constant 1 : index
+//     %stop = arith.constant 37 : index
+
+//     %reg = qref.alloc( 3) : !qref.reg<3>
+//     %q0 = qref.get %reg[ 0] : !qref.reg<3> -> !qref.bit
+//     %q1 = qref.get %reg[ 1] : !qref.reg<3> -> !qref.bit
+//     %q2 = qref.get %reg[ 2] : !qref.reg<3> -> !qref.bit
+
+//     // qref.custom "S"() %2 : !qref.bit
+//     qref.custom "T"() %q0 : !qref.bit   // l0   // will be removed
+
+//     scf.for %i = %start to %stop step %step {
+//         qref.custom "CNOT"() %q0, %q2 : !qref.bit, !qref.bit
+
+//         qref.custom "Hadamard"() %q1 : !qref.bit
+        
+//         qref.custom "CNOT"() %q2, %q1 : !qref.bit, !qref.bit
+
+//         scf.yield
+//     } 
+
+//     qref.custom "T"() %q0 : !qref.bit   // l2   // will be removed
+    
+//     qref.dealloc %reg : !qref.reg<3>
+//     return
+// }
+
+module @module_circuit_base {
+  func.func public @circuit_base(%arg0: tensor<f64>) -> tensor<4xf64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
+    %c0_i64 = arith.constant 0 : i64
+    %cst = stablehlo.constant dense<1.400000e+00> : tensor<f64>
+    %0 = stablehlo.compare  GT, %arg0, %cst,  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
+    quantum.device shots(%c0_i64) ["/Users/sara.babaeekhanehsar/Desktop/Home/Coding/Catalyst/catalyst/.venv/lib/python3.14/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
+    %1 = qref.alloc( 2) : !qref.reg<2>
+    %2 = qref.get %1[ 0] : !qref.reg<2> -> !qref.bit
+    qref.custom "T"() %2 : !qref.bit
+    %extracted = tensor.extract %0[] : tensor<i1>
+    scf.if %extracted {
+      %6 = qref.get %1[ 0] : !qref.reg<2> -> !qref.bit
+      qref.custom "PauliX"() %6 : !qref.bit
+      %7 = qref.get %1[ 1] : !qref.reg<2> -> !qref.bit
+      qref.custom "Hadamard"() %7 : !qref.bit
+    } else {
+      %6 = qref.get %1[ 0] : !qref.reg<2> -> !qref.bit
+      qref.custom "PauliY"() %6 : !qref.bit
+      %7 = qref.get %1[ 1] : !qref.reg<2> -> !qref.bit
+      %extracted_0 = tensor.extract %arg0[] : tensor<f64>
+      qref.custom "RZ"(%extracted_0) %7 : !qref.bit
+    }
+    %3 = qref.get %1[ 0] : !qref.reg<2> -> !qref.bit
+    qref.custom "T"() %3 : !qref.bit
+    %4 = qref.compbasis(qreg %1 : !qref.reg<2>) : !quantum.obs
+    %5 = quantum.probs %4 : tensor<4xf64>
+    qref.dealloc %1 : !qref.reg<2>
+    quantum.device_release
+    return %5 : tensor<4xf64>
+  }
 }
