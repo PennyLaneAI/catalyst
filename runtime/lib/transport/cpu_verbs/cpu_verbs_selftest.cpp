@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
         controller->commit_work_item(/*work_item_idx=*/0, syndrome_bytes, correction_bytes);
         controller->start();
         const std::uint64_t syndrome = DEMO_SYNDROME;
-        controller->write_data_slot(&syndrome, syndrome_bytes);
+        controller->write_data_slot(&syndrome, syndrome_bytes, /*decoder_id=*/0);
         controller->kick(0);
         controller->collect(outs, obytes, 1);
         controller->stop();

@@ -52,9 +52,14 @@
 * A `BufferizableOpInterface` implementation is added for the `Transport` dialect ops.
   [(#3064)](https://github.com/PennyLaneAI/catalyst/pull/3064)
 
-* A `lower-decode-to-transport` pass is added, which replaces each qecp.decode_esm_css with 
+* A `lower-decode-to-transport` pass is added, which replaces each qecp.decode_esm_css with
   a transport kick/collect round over its buffers.
   [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
+
+* An X/Z syndrome decode can now be routed to its own decoder in a backline coprocessor.
+  `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
+  syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
+  [(#3092)](https://github.com/PennyLaneAI/catalyst/pull/3092)
 
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.

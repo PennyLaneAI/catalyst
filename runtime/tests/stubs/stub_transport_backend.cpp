@@ -41,7 +41,7 @@ struct StubController : ControllerSession {
     void commit_work_item(std::uint32_t, std::uint64_t, std::uint64_t) override {}
     int kick(std::uint32_t) override { return 0; }
     void *data_slot() override { return &slot; }
-    void write_data_slot(const void *, std::uint64_t) override {}
+    void write_data_slot(const void *, std::uint64_t, std::uint32_t) override {}
     void *reply_slot() override { return &reply; }
 };
 
