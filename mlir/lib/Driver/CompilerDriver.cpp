@@ -490,10 +490,23 @@ llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const Compile
         if (pipeline.getName() == "BufferizationStage" && !options.workspace.empty()) {
             Pipeline targetPipeline;
             targetPipeline.setName("CrossCompileTargets");
-            std::string dumpIntermediate = options.keepIntermediate ? "true" : "false";
+            std::string saveIrAfterEach;
+            switch (options.keepIntermediate) {
+            case SaveTemps::AfterPipeline:
+                saveIrAfterEach = "pipeline";
+                break;
+            case SaveTemps::AfterPassChanged:
+                saveIrAfterEach = "changed";
+                break;
+            case SaveTemps::AfterPass:
+                saveIrAfterEach = "pass";
+                break;
+            case SaveTemps::None:
+                break;
+            }
             targetPipeline.setPasses({"cross-compile-targets{workspace=\"" +
                                           options.workspace.str() +
-                                          "\" dump-intermediate=" + dumpIntermediate + "}",
+                                          "\" save-ir-after-each=" + saveIrAfterEach + "}",
                                       "dispatch-executor-targets"});
             if (failed(catalyst::utils::Timer<>::timer(
                     catalyst::driver::runPipeline, targetPipeline.getName(),

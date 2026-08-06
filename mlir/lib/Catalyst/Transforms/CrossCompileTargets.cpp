@@ -248,7 +248,38 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         return std::string(dir.str());
     }
 
-    // Write `op`/`mod` to {dir}/{filename} (used only when dump-intermediate is set).
+    struct SubPipelineDumper : public mlir::PassInstrumentation {
+        SubPipelineDumper(CrossCompileTargetsPass *owner, std::string dir, bool onlyChanged)
+            : owner(owner), dir(std::move(dir)), onlyChanged(onlyChanged)
+        {
+        }
+
+        void runBeforePass(mlir::Pass *pass, mlir::Operation *op) override
+        {
+            // Only `changed` needs the before-image, and fingerprinting a module is not free.
+            if (onlyChanged) {
+                before.insert_or_assign(pass, mlir::OperationFingerPrint(op));
+            }
+        }
+
+        void runAfterPass(mlir::Pass *pass, mlir::Operation *op) override
+        {
+            if (onlyChanged) {
+                auto it = before.find(pass);
+                if (it != before.end() && *it->second == mlir::OperationFingerPrint(op)) {
+                    return;
+                }
+            }
+            owner->dumpMLIR(op, dir, std::to_string(++index) + "_" + pass->getName().str() + ".mlir");
+        }
+
+        CrossCompileTargetsPass *owner;
+        std::string dir;
+        bool onlyChanged;
+        unsigned index = 0;
+        llvm::DenseMap<mlir::Pass *, std::optional<mlir::OperationFingerPrint>> before;
+    };
+
     void dumpMLIR(mlir::Operation *op, StringRef dir, StringRef filename)
     {
         llvm::SmallString<128> path(dir);
@@ -409,6 +440,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
             }
         }
 
+        const bool dumpIntermediate = !saveIrAfterEach.empty();
         if (dumpIntermediate) {
             dumpMLIR(*standalone, kernelDir, "extracted.mlir");
         }
@@ -426,6 +458,10 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
                 isBackline ? backlineLoweringPassList() : defaultLoweringPassList(), ",");
         }
         PassManager subPM(ctx);
+        if (saveIrAfterEach == "changed" || saveIrAfterEach == "pass") {
+            subPM.addInstrumentation(
+                std::make_unique<SubPipelineDumper>(this, kernelDir, saveIrAfterEach == "changed"));
+        }
         if (failed(parsePassPipeline(pipelineSpec, subPM))) {
             nested.emitError("failed to build the target-lowering pipeline '" + pipelineSpec + "'");
             return failure();
