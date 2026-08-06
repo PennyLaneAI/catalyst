@@ -465,8 +465,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
 }
 
 void ResourceAnalysis::collectDetailOperation(Operation *op, ResourceResult &result,
-                                              bool isAdjoint) const
-{
+                                              bool isAdjoint) const {
     if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
         result.detailOperations[inst.getGraphOpId()] += 1;
     }
