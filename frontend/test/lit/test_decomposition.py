@@ -25,6 +25,7 @@ from operator2_dummy_gates import (
     HybridOpArg,
     HybridWires,
     MultiParams,
+    MultipleFullArgs,
     MultipleRegisters,
     NoParams,
     NoParamsCustomOp,
@@ -626,6 +627,114 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
     test_from_hybrid_op_nested()
+
+    def test_to_multiple_full_args_op():
+        """
+        Test that decomposing to an op with multiple names on all arg types works.
+        """
+
+        def rule_resource_fn(reg):
+            return {
+                MultipleFullArgs(
+                    reg1=Wire[1],
+                    reg2=Wire[2],
+                    angles1=Float,
+                    angles2=Float[2],
+                    pytree1=[1],
+                    pytree2=[2],
+                    op1=SingleParam(x=Float, reg=Wire[1]),
+                    op2=SingleParam(x=Int, reg=Wire[1]),
+                    hwires1=[Wire[1], Wire[1]],
+                    hwires2=[Wire[1]],
+                ): 2
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            MultipleFullArgs(
+                reg1=reg[0],
+                reg2=reg[1:3],
+                angles1=0.1,
+                angles2=jnp.array([0.1, 0.2]),
+                pytree1=[1],
+                pytree2=[2],
+                op1=SingleParam(x=0.1, reg=[reg[0]]),
+                op2=SingleParam(x=1, reg=[reg[1]]),
+                hwires1=[qp.wires.Wires(reg[0]), qp.wires.Wires(reg[1])],
+                hwires2=[qp.wires.Wires(reg[2])],
+            )
+            MultipleFullArgs(
+                reg1=reg[2],
+                reg2=reg[0:2],
+                angles1=1.2,
+                angles2=jnp.array([1.1, 1.2]),
+                pytree1=[1],
+                pytree2=[2],
+                op1=SingleParam(x=1.1, reg=[reg[1]]),
+                op2=SingleParam(x=2, reg=[reg[2]]),
+                hwires1=[qp.wires.Wires(reg[1]), qp.wires.Wires(reg[2])],
+                hwires2=[qp.wires.Wires(reg[0])],
+            )
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+            result = compile_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
+    # CHECK-DAG: "MultipleFullArgs{angles1:[f64],angles2:[f64,f64]}{reg1:1,reg2:2}{}[[[uid:[-0-9]+]]]" = 2
+    # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid]]
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid]]
+    test_to_multiple_full_args_op()
+
+    def test_from_multiple_full_args_op():
+        """
+        Test that decomposing from an op with multiple names on all arg types works.
+        """
+
+        def rule_resource_fn(
+            reg1, reg2, angles1, angles2, pytree1, pytree2, op1, op2, hwires1, hwires2
+        ):
+            return {NoParams(reg=Wire[1]): 1, op1: 1, op2: 1}
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg1, reg2, angles1, angles2, pytree1, pytree2, op1, op2, hwires1, hwires2):
+            qp.apply(op1)
+            qp.apply(op2)
+            NoParams(reg=hwires1[0])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(MultipleFullArgs, rule)
+            result = compile_decomposition_rules_wrapper(
+                "MultipleFullArgs",
+                "MultipleFullArgs{angles1:[f64],angles2:[f64,f64]}{reg1:1,reg2:2}{}[-4321]",
+                {"angles1": ["f64"], "angles2": ["f64", "f64"]},
+                {"reg1": 1, "reg2": 2},
+                {},
+                extra_data={
+                    "pytree1": [1],
+                    "pytree2": [2],
+                    "op1": SingleParam(x=1.1, reg=[1]),
+                    "op2": SingleParam(x=2, reg=[2]),
+                    "hwires1": [qp.wires.Wires(3), qp.wires.Wires(2)],
+                    "hwires2": [qp.wires.Wires(1)],
+                },
+            )
+            print(result)
+
+    # CHECK: func.func private @"rule_MultipleFullArgs{angles1:[f64],angles2:[f64,f64]}{reg1:1,reg2:2}{}[-4321]"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
+    # CHECK-SAME:   "SingleParam{x:[f64]}{reg:1}{}" = 1 : i64
+    # CHECK-SAME:   "SingleParam{x:[i64]}{reg:1}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:[f64],angles2:[f64,f64]}{reg1:1,reg2:2}{}[-4321]"
+    # CHECK: "qref.operator"({{%.+}}) {op_name = "SingleParam"
+    # CHECK: "qref.operator"({{%.+}}) {op_name = "SingleParam"
+    # CHECK: "qref.operator"({{%.+}}) {op_name = "NoParams"
+    test_from_multiple_full_args_op()
 
     def test_multiple_rules():
         """

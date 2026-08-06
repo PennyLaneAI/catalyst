@@ -178,3 +178,26 @@ class HybridOpArg(qp.core.Operator2):
 
     def __init__(self, angle, op, cwires, n_iters=1):
         super().__init__(angle, op, cwires, n_iters)
+
+
+class MultipleFullArgs(qp.core.Operator2):
+
+    wire_argnames = ("reg1", "reg2", "hwires1", "hwires2")
+    dynamic_argnames = ("angles1", "angles2")
+    static_argnames = ("pytree1", "pytree2")
+    hybrid_argnames = ("op1", "op2", "hwires1", "hwires2")
+
+    def __init__(
+        self,
+        reg1,
+        reg2,
+        angles1,
+        angles2,
+        pytree1,
+        pytree2,
+        op1,
+        op2,
+        hwires1,
+        hwires2,
+    ):
+        super().__init__(reg1, reg2, angles1, angles2, pytree1, pytree2, op1, op2, hwires1, hwires2)
