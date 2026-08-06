@@ -20,6 +20,8 @@ import jax.numpy as jnp
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
+from pennylane.decomposition import add_decomps, local_decomps, register_resources
+from pennylane.typing import Float, Wire
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.decomposition_rules import (
@@ -29,62 +31,58 @@ from catalyst.decomposition.precompile_decomposition_rules import (
     get_abstract_args,
     precompile_decomp_rules,
 )
-from catalyst.decomposition.type_utils import get_dummy_values_for_container, mlir_stringify_type
+from catalyst.decomposition.type_utils import get_dummy_values_for_arg, mlir_stringify_type
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
 
-    def test_get_dummy_values_types(self):
+    @pytest.mark.parametrize(
+        "input, dtype, shape",
+        [
+            # python-type scalar tests
+            (int, "int64", ()),
+            (float, "float64", ()),
+            (jnp.dtype("int32"), "int32", ()),
+            (bool, "bool", ()),
+            (complex, "complex128", ()),
+            # mlir-type scalar tests
+            ("i1", "bool", ()),
+            ("i32", "int32", ()),
+            ("f64", "float64", ()),
+            ("complex<f64>", "complex128", ()),
+            ("complex<f32>", "complex64", ()),
+            # python-type shaped tests
+            (bool, "bool", ()),
+            ([float, float], "float64", (2,)),
+            ([int], "int64", (1,)),
+            (ShapedArray((4,), "int32"), "int32", (4,)),
+            # mlir-type shaped tests
+            ("i32", "int32", ()),
+            (["f64", "f64"], "float64", (2,)),
+            (["i1", "i1", "i1"], "bool", (3,)),
+        ],
+    )
+    def test_get_dummy_values_types(self, input, dtype, shape):
         """Test that get_dummy_values_for_container handles MLIR and Python types correctly."""
-        python_types = [int, float, jnp.dtype("int32"), bool, complex]
-        result = get_dummy_values_for_container(python_types)
+        result = get_dummy_values_for_arg(input)
+        assert result.dtype == dtype
+        assert result.shape == shape
 
-        assert result[0].dtype == "int64"
-        assert result[1].dtype == "float64"
-        assert result[2].dtype == "int32"
-        assert result[3].dtype == "bool"
-        assert result[4].dtype == "complex128"
-
-        mlir_types = ["i1", "i32", "f64", "complex<f64>", "complex<f128>"]
-        result = get_dummy_values_for_container(mlir_types)
-
-        assert result[0].dtype == "bool"
-        assert result[1].dtype == "int32"
-        assert result[2].dtype == "float64"
-        assert result[3].dtype == "complex64"
-        assert result[4].dtype == "complex128"
-
-        string_type = "f64"
-        result = get_dummy_values_for_container(string_type)
-
-        assert result.dtype == "float64"
-
-    def test_get_dummy_values_shapes(self):
-        """Test that get_dummy_values_for_container handles MLIR and python shapes correctly."""
-        python_shapes = [bool, [float, float], [int], ShapedArray((4,), "int32")]
-        result = get_dummy_values_for_container(python_shapes)
-
-        assert result[0].shape == ()
-        assert result[1].shape == (2,)
-        assert result[2].shape == (1,)
-        assert result[3].shape == (4,)
-
-        mlir_types = ["i32", ["f64", "f64"], ["i1", "i1", "i1"]]
-        result = get_dummy_values_for_container(mlir_types)
-
-        assert result[0].shape == ()
-        assert result[1].shape == (2,)
-        assert result[2].shape == (3,)
-
-    def test_mlir_stringify_type(self):
+    @pytest.mark.parametrize(
+        "dtype, expected",
+        [
+            (qp.typing.Float, "[f64]"),
+            (qp.typing.Int, "[i64]"),
+            (qp.typing.Bool, "[i1]"),
+            (qp.typing.Complex, "[complex<f64>]"),
+            (qp.typing.AbstractArray((2,), "int32"), "[i32,i32]"),
+        ],
+    )
+    def test_mlir_stringify_type(self, dtype, expected):
         """Test mlir_stringify_type."""
-        assert mlir_stringify_type(qp.typing.Float) == "[f64]"
-        assert mlir_stringify_type(qp.typing.Int) == "[i64]"
-        assert mlir_stringify_type(qp.typing.Bool) == "[i1]"
-        assert mlir_stringify_type(qp.typing.Complex) == "[complex<f128>]"
-        assert mlir_stringify_type(qp.typing.AbstractArray((2,), "int32")) == "[i32,i32]"
+        assert mlir_stringify_type(dtype) == expected
 
 
 class TestPrecompiled:

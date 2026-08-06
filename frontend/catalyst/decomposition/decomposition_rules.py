@@ -30,7 +30,7 @@ from pennylane.pytrees import flatten
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
     format_dynamic_params_for_id,
-    get_dummy_values_for_container,
+    get_dummy_values_for_arg,
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
 )
@@ -214,6 +214,7 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
         if is_custom_op:
             args = tuple(val for key, val in kwargs.items() if key != "wires")
             kwargs = {"wires": kwargs["wires"]}
+
         resources = rule.compute_resources(*args, **kwargs)
         name_to_resources[rule.name] = resources.gate_counts
         name_to_resource_ids[rule.name] = {
@@ -227,7 +228,9 @@ def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
     kwargs = {}
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
-    return kwargs | get_dummy_values_for_container(dynamic_shape)
+    for arg_name, arg_shape in dynamic_shape.items():
+        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
+    return kwargs
 
 
 def compile_decomposition_rules(
@@ -247,6 +250,7 @@ def compile_decomposition_rules(
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
     device = qp.device("null.qubit", wires=sum(wire_lens.values()))
+
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name, kwargs | static_data | extra_data, is_custom_op
     )
@@ -336,6 +340,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
     start = (op_name, dynamic_shape, wire_lens, static_data, extra_data)
     queue.append(start)
     visited = [start]
+
     rules = get_rules_from_module_as_list(
         compile_decomposition_rules(
             op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
