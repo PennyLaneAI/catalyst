@@ -43,23 +43,20 @@ class LibraryManager {
     void *_handle;
 
   public:
-    LibraryManager(std::string path)
-    {
+    LibraryManager(std::string path) {
         this->_handle = dlopen(path.c_str(), RTLD_LAZY);
         if (!this->_handle) {
             throw nb::value_error(dlerror());
         }
     }
 
-    ~LibraryManager()
-    {
+    ~LibraryManager() {
         if (this->_handle) {
             dlclose(this->_handle);
         }
     }
 
-    void operator()(long elementSize, UnrankedMemrefType *src, UnrankedMemrefType *dst)
-    {
+    void operator()(long elementSize, UnrankedMemrefType *src, UnrankedMemrefType *dst) {
         void *f_ptr = dlsym(this->_handle, "memrefCopy");
         if (!f_ptr) {
             throw nb::value_error(dlerror());
@@ -71,8 +68,7 @@ class LibraryManager {
     }
 };
 
-inline const char *ext()
-{
+inline const char *ext() {
 #ifdef __APPLE__
     return ".dylib";
 #elif __linux__
@@ -84,8 +80,7 @@ inline const char *ext()
 
 std::string library_name(std::string name) { return name + ext(); }
 
-void convertResult(nb::handle tuple)
-{
+void convertResult(nb::handle tuple) {
     nb::object unrankedMemrefPtrSizeTuple = tuple.attr("__getitem__")(0);
 
     nb::object unranked_memref = unrankedMemrefPtrSizeTuple.attr("__getitem__")(0);
@@ -108,8 +103,7 @@ void convertResult(nb::handle tuple)
     memrefCopy(e_size, src, &destMemref);
 }
 
-void convertResults(nb::list results, nb::list allocated)
-{
+void convertResults(nb::list results, nb::list allocated) {
     auto builtins = nb::module_::import_("builtins");
     auto zip = builtins.attr("zip");
     for (nb::handle obj : zip(results, allocated)) {
@@ -119,8 +113,7 @@ void convertResults(nb::list results, nb::list allocated)
 
 extern "C" {
 [[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, int64_t retc,
-                                                 va_list args)
-{
+                                                 va_list args) {
     nb::gil_scoped_acquire lock;
     auto it = references->find(identifier);
     if (it == references->end()) {
@@ -155,8 +148,7 @@ extern "C" {
 
 void setMLIRLibPath(std::string path) { libmlirpath = path; }
 
-auto registerImpl(nb::callable f)
-{
+auto registerImpl(nb::callable f) {
     // Do we need to see if it is already present or can we just override it? Just override is fine.
     // Does python reuse id's? Yes.
     // But only after they have been garbaged collected.
@@ -167,8 +159,7 @@ auto registerImpl(nb::callable f)
     return id;
 }
 
-NB_MODULE(catalyst_callback_registry, m)
-{
+NB_MODULE(catalyst_callback_registry, m) {
     if (references == nullptr) {
         references = new std::unordered_map<int64_t, nb::callable>();
     }

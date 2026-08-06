@@ -45,8 +45,7 @@ namespace backendconfig {
  * @param config The config string, e.g. "dev=rxe0;gid=1".
  * @param fn Invoked once per entry, in the order the entries appear.
  */
-template <class Fn> void for_each_config_kv(std::string_view config, Fn fn)
-{
+template <class Fn> void for_each_config_kv(std::string_view config, Fn fn) {
     while (!config.empty()) {
         const std::size_t sep = config.find(';');
         const std::string_view tok =
@@ -62,8 +61,7 @@ template <class Fn> void for_each_config_kv(std::string_view config, Fn fn)
 }
 
 // Parse a non-negative integer, throwing on anything malformed.
-inline int parse_index(std::string_view val, const char *key)
-{
+inline int parse_index(std::string_view val, const char *key) {
     int out = 0;
     const char *last = val.data() + val.size();
     const auto res = std::from_chars(val.data(), last, out);
@@ -85,8 +83,7 @@ inline int parse_index(std::string_view val, const char *key)
  * @param config The config string, e.g. "dev=rxe0;gid=1".
  * @return The parsed device name and GID index.
  */
-inline BackendConfig parse_backend_config(const std::string &config)
-{
+inline BackendConfig parse_backend_config(const std::string &config) {
     std::string dev;
     int gid = 0;
     bool have_dev = false, have_gid = false;
@@ -95,8 +92,7 @@ inline BackendConfig parse_backend_config(const std::string &config)
             RDMA_CHECK(!val.empty(), "config: 'dev' must not be empty");
             dev = std::string(val);
             have_dev = true;
-        }
-        else if (key == "gid") {
+        } else if (key == "gid") {
             gid = backendconfig::parse_index(val, "gid");
             have_gid = true;
         }
@@ -120,8 +116,7 @@ inline BackendConfig parse_backend_config(const std::string &config)
  * @param fallback Value to return when the key is absent.
  * @return The parsed value, or `fallback` if the key is not present.
  */
-inline int parse_optional_index(const std::string &config, const char *key, int fallback)
-{
+inline int parse_optional_index(const std::string &config, const char *key, int fallback) {
     int out = fallback;
     backendconfig::for_each_config_kv(config, [&](std::string_view k, std::string_view val) {
         if (k == key) {

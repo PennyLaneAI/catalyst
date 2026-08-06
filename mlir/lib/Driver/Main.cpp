@@ -56,8 +56,7 @@ using namespace catalyst;
 using namespace catalyst::driver;
 
 llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output,
-                                      mlir::DialectRegistry &registry)
-{
+                                      mlir::DialectRegistry &registry) {
     using timer = catalyst::utils::Timer<>;
 
     mlir::OpPrintingFlags opPrintingFlags{};
@@ -109,8 +108,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         if (options.verbosity == Verbosity::All) {
             llvm::outs() << "MLIR parsing successful" << "\n";
         }
-    }
-    else {
+    } else {
         llvm::SMDiagnostic err;
         llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", false, llvmContext,
                                   options.source, options.moduleName, err);
@@ -271,15 +269,12 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     if (!outfile) {
         llvm::errs() << errorMessage << "\n";
         return llvm::failure();
-    }
-    else if (output.outputFilename == "-" && llvmModule) {
+    } else if (output.outputFilename == "-" && llvmModule) {
         // already handled
-    }
-    else if (output.outputFilename == "-" && mlirModule) {
+    } else if (output.outputFilename == "-" && mlirModule) {
         if (options.shouldEmitBytecode) {
             return mlir::writeBytecodeToFile(mlirModule.get(), outfile->os());
-        }
-        else {
+        } else {
             mlirModule->print(outfile->os(), opPrintingFlags);
             outfile->keep();
         }
@@ -293,8 +288,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     return llvm::success();
 }
 
-int QuantumDriverMainFromCL(int argc, char **argv)
-{
+int QuantumDriverMainFromCL(int argc, char **argv) {
     namespace cl = llvm::cl;
     // Command-line options
 
@@ -425,7 +419,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         return llvm::to_underlying(ErrorCode::Failure);
     }
 
-    if (Verbose)
+    if (Verbose) {
         llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
+    }
     return llvm::to_underlying(ErrorCode::Success);
 }

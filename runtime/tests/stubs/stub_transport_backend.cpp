@@ -41,7 +41,7 @@ struct StubController : ControllerSession {
     void commit_work_item(std::uint32_t, std::uint64_t, std::uint64_t) override {}
     int kick(std::uint32_t) override { return 0; }
     void *data_slot() override { return &slot; }
-    void write_data_slot(const void *, std::uint64_t) override {}
+    void write_data_slot(const void *, std::uint64_t, std::uint32_t) override {}
     void *reply_slot() override { return &reply; }
 };
 
@@ -59,26 +59,22 @@ struct StubCoprocessor : CoprocessorSession {
 // Stands in for a backend that runs its own message loop (as the GPU one does), so the
 // launch-once side of bind-by-symbol is reachable from a test.
 struct StubLaunchOnceCoprocessor : StubCoprocessor {
-    void set_coprocessor_fn(CoprocessorFn, void *) override
-    {
+    void set_coprocessor_fn(CoprocessorFn, void *) override {
         throw std::logic_error("stub: per-message binding is not supported by this backend");
     }
     void set_coprocessor_launcher(CoprocessorLauncherFn, void *) override {}
-    CoprocConvention coprocessor_fn_convention() const override
-    {
+    CoprocConvention coprocessor_fn_convention() const override {
         return CoprocConvention::LaunchOnce;
     }
 };
 
 } // namespace
 
-extern "C" ControllerSession *CatalystTransportControllerFactory(const char *)
-{
+extern "C" ControllerSession *CatalystTransportControllerFactory(const char *) {
     return new StubController();
 }
 
-extern "C" CoprocessorSession *CatalystTransportCoprocessorFactory(const char *config)
-{
+extern "C" CoprocessorSession *CatalystTransportCoprocessorFactory(const char *config) {
     const std::string cfg = config ? config : "";
     if (cfg == "launch_once") {
         return new StubLaunchOnceCoprocessor();
