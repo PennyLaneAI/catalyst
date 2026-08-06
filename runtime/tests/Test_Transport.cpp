@@ -21,14 +21,12 @@
 #include "TransportCAPI.h"
 
 namespace {
-CatalystTransportSession *make(std::int32_t role, const char *key)
-{
+CatalystTransportSession *make(std::int32_t role, const char *key) {
     return __catalyst__transport__create(STUB_BACKEND_PATH, "cfg", role, key);
 }
 } // namespace
 
-TEST_CASE("create registers a session resolvable by (role, key)", "[transport]")
-{
+TEST_CASE("create registers a session resolvable by (role, key)", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "reg_ctrl");
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "reg_ctrl") == s);
@@ -43,8 +41,7 @@ TEST_CASE("create registers a session resolvable by (role, key)", "[transport]")
           nullptr);
 }
 
-TEST_CASE("role disambiguates the same key", "[transport]")
-{
+TEST_CASE("role disambiguates the same key", "[transport]") {
     auto *ct = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "dis_key");
     auto *co = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "dis_key");
     REQUIRE(ct != nullptr);
@@ -56,16 +53,14 @@ TEST_CASE("role disambiguates the same key", "[transport]")
     __catalyst__transport__destroy(co);
 }
 
-TEST_CASE("an empty key is not registered", "[transport]")
-{
+TEST_CASE("an empty key is not registered", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "") == nullptr);
     __catalyst__transport__destroy(s);
 }
 
-TEST_CASE("re-create under the same key overwrites", "[transport]")
-{
+TEST_CASE("re-create under the same key overwrites", "[transport]") {
     auto *s1 = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "ovr_key");
     auto *s2 = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "ovr_key");
     REQUIRE(s1 != s2);
@@ -78,14 +73,12 @@ TEST_CASE("re-create under the same key overwrites", "[transport]")
           nullptr);
 }
 
-TEST_CASE("get_session on an unregistered role/key returns null", "[transport]")
-{
+TEST_CASE("get_session on an unregistered role/key returns null", "[transport]") {
     CHECK(__catalyst__transport__get_session(CATALYST_TRANSPORT_ROLE_CONTROLLER, "never_created") ==
           nullptr);
 }
 
-TEST_CASE("set_coprocessor_fn: an empty symbol binds the built-in echo", "[transport]")
-{
+TEST_CASE("set_coprocessor_fn: an empty symbol binds the built-in echo", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "") == CATALYST_TRANSPORT_OK);
@@ -93,8 +86,7 @@ TEST_CASE("set_coprocessor_fn: an empty symbol binds the built-in echo", "[trans
     __catalyst__transport__destroy(s);
 }
 
-TEST_CASE("set_coprocessor_fn: an unresolved symbol is an error", "[transport]")
-{
+TEST_CASE("set_coprocessor_fn: an unresolved symbol is an error", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "catalyst_no_such_symbol_xyz") ==
@@ -102,16 +94,14 @@ TEST_CASE("set_coprocessor_fn: an unresolved symbol is an error", "[transport]")
     __catalyst__transport__destroy(s);
 }
 
-TEST_CASE("set_coprocessor_fn on a controller session is an error", "[transport]")
-{
+TEST_CASE("set_coprocessor_fn on a controller session is an error", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "");
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "") == CATALYST_TRANSPORT_ERR);
     __catalyst__transport__destroy(s);
 }
 
-TEST_CASE("set_coprocessor_fn binds through the setter the backend implements", "[transport]")
-{
+TEST_CASE("set_coprocessor_fn binds through the setter the backend implements", "[transport]") {
     auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "launch_once",
                                             CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
     REQUIRE(s != nullptr);
@@ -119,8 +109,7 @@ TEST_CASE("set_coprocessor_fn binds through the setter the backend implements", 
     __catalyst__transport__destroy(s);
 }
 
-TEST_CASE("null session arguments are rejected without crashing", "[transport]")
-{
+TEST_CASE("null session arguments are rejected without crashing", "[transport]") {
     CHECK(__catalyst__transport__connect(nullptr, "127.0.0.1", 0) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__exchange_keys(nullptr) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__establish_channel(nullptr, "cpu_verbs") == CATALYST_TRANSPORT_ERR);
@@ -138,8 +127,7 @@ TEST_CASE("null session arguments are rejected without crashing", "[transport]")
     SUCCEED();
 }
 
-TEST_CASE("commit_work_item rejects a reply larger than the provisioned region", "[transport]")
-{
+TEST_CASE("commit_work_item rejects a reply larger than the provisioned region", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "");
     REQUIRE(s != nullptr);
     // exchange_keys provisions the local reply region (the stub reports a zero-size region).
@@ -149,8 +137,7 @@ TEST_CASE("commit_work_item rejects a reply larger than the provisioned region",
     __catalyst__transport__destroy(s);
 }
 
-TEST_CASE("destroy drains outstanding async tokens without a prior barrier", "[transport]")
-{
+TEST_CASE("destroy drains outstanding async tokens without a prior barrier", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "");
     REQUIRE(s != nullptr);
     REQUIRE(__catalyst__transport__connect_async(s, "127.0.0.1", 0) != 0);

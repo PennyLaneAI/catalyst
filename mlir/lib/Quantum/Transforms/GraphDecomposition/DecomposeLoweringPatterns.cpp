@@ -56,8 +56,7 @@ namespace quantum {
  * moved to the end of the inlined function body.
  */
 static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule,
-                                         ValueRange operands)
-{
+                                         ValueRange operands) {
     assert(rule.getBlocks().size() == 1);
     Block &body = rule.front();
     auto returnOp = cast<func::ReturnOp>(body.getTerminator());
@@ -85,12 +84,9 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
     DecomposableGatePattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
                             const llvm::StringSet<llvm::MallocAllocator> &gateSet)
         : OpInterfaceRewritePattern<DecomposableGate>(context), decompositionRegistry(registry),
-          targetGateSet(gateSet)
-    {
-    }
+          targetGateSet(gateSet) {}
 
-    LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
 
         // Only decompose the op if it is not in the target gate set
@@ -118,8 +114,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         if (it_gateID != decompositionRegistry.end()) {
             // Found a rule with the wanted ID, highest priority rule, just use this one
             rule = it_gateID->second;
-        }
-        else {
+        } else {
             // Didn't find ID match, try matching gate name
             // TODO: remove multirz's special name editing
             if (isa<quantum::MultiRZOp>(op)) {
@@ -128,8 +123,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
             auto it_gateName = decompositionRegistry.find(gateName);
             if (it_gateName != decompositionRegistry.end()) {
                 rule = it_gateName->second;
-            }
-            else {
+            } else {
                 // Didn't find any rule
                 return failure();
             }
@@ -173,8 +167,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
             auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
                                                           op.getLoc(), rewriter);
             rewriter.replaceOp(op, results);
-        }
-        else {
+        } else {
             rewriter.replaceOp(op, inlinedFunctionResults);
         }
 
@@ -182,10 +175,9 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
     }
 };
 
-void populateDecomposeLoweringPatterns(RewritePatternSet &patterns,
-                                       const llvm::StringMap<func::FuncOp> &decompositionRegistry,
-                                       const llvm::StringSet<llvm::MallocAllocator> &targetGateSet)
-{
+void populateDecomposeLoweringPatterns(
+    RewritePatternSet &patterns, const llvm::StringMap<func::FuncOp> &decompositionRegistry,
+    const llvm::StringSet<llvm::MallocAllocator> &targetGateSet) {
     patterns.add<DecomposableGatePattern>(patterns.getContext(), decompositionRegistry,
                                           targetGateSet);
 }

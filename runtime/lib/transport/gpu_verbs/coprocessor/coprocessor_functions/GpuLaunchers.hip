@@ -52,8 +52,7 @@ constexpr std::uint32_t STOP_POLL_INTERVAL = 1024;
  */
 template <std::int64_t (*DECODE)(std::uint64_t)>
 __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
-                      volatile std::uint32_t *stop, std::uint64_t total)
-{
+                      volatile std::uint32_t *stop, std::uint64_t total) {
     if (threadIdx.x != 0 || blockIdx.x != 0) {
         return;
     }
@@ -87,8 +86,7 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
             *reinterpret_cast<int4 *>(const_cast<HandoffSlot *>(slot)) =
                 *reinterpret_cast<const int4 *>(&reply);
             __threadfence_system();
-        }
-        else {
+        } else {
             // Larger reply cannot be published atomically: fall back to the
             // seq-as-trailer protocol (write payload, fence, release seq, fence).
             slot->correction = reply.correction;
@@ -101,8 +99,7 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
 
 // Launch fused<DECODE> on the session-owned stream, wired to the datapath in
 // `desc`.
-template <std::int64_t (*DECODE)(std::uint64_t)> static void launch(const CoprocLaunchDesc *desc)
-{
+template <std::int64_t (*DECODE)(std::uint64_t)> static void launch(const CoprocLaunchDesc *desc) {
     hipLaunchKernelGGL((fused<DECODE>), dim3(1), dim3(1), 0, static_cast<hipStream_t>(desc->stream),
                        reinterpret_cast<PayloadSlot *>(desc->ring),
                        reinterpret_cast<HandoffSlot *>(desc->handoff),
@@ -112,34 +109,28 @@ template <std::int64_t (*DECODE)(std::uint64_t)> static void launch(const Coproc
 
 // Make sure we don't throw exception across C ABI.
 template <std::int64_t (*DECODE)(std::uint64_t)>
-static int launch_noexcept(const CoprocLaunchDesc *desc) noexcept
-{
+static int launch_noexcept(const CoprocLaunchDesc *desc) noexcept {
     try {
         launch<DECODE>(desc);
         return 0;
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         std::fprintf(stderr, "[gpu_verbs] %s\n", e.what());
         return 1;
-    }
-    catch (...) {
+    } catch (...) {
         std::fprintf(stderr, "[gpu_verbs] kernel launch failed: unknown error\n");
         return 1;
     }
 }
 
-extern "C" int catalyst_gpu_echo_launcher(const CoprocLaunchDesc *desc, void *)
-{
+extern "C" int catalyst_gpu_echo_launcher(const CoprocLaunchDesc *desc, void *) {
     return launch_noexcept<echo_decode>(desc);
 }
 
-extern "C" int catalyst_gpu_steane_launcher(const CoprocLaunchDesc *desc, void *)
-{
+extern "C" int catalyst_gpu_steane_launcher(const CoprocLaunchDesc *desc, void *) {
     return launch_noexcept<steane_decode>(desc);
 }
 
-int default_echo_launcher(const CoprocLaunchDesc *desc, void *ctx)
-{
+int default_echo_launcher(const CoprocLaunchDesc *desc, void *ctx) {
     return catalyst_gpu_echo_launcher(desc, ctx);
 }
 

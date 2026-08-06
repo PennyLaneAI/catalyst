@@ -29,8 +29,7 @@ using namespace catalyst::pbc;
 
 #include "PBC/IR/PBCOpsDialect.cpp.inc"
 
-void PBCDialect::initialize()
-{
+void PBCDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "PBC/IR/PBCOpsTypes.cpp.inc"
