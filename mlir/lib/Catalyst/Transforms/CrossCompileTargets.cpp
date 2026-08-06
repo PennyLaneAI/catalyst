@@ -17,6 +17,8 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
+#include <algorithm>
+
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -34,6 +36,8 @@
 #include "mlir/InitAllDialects.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/Pass/PassInstrumentation.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
@@ -93,6 +97,11 @@ std::vector<std::string> backlineLoweringPassList()
     std::vector<std::string> passes;
     passes.reserve(buf.size() + llvmPasses.size() + 3);
     passes.insert(passes.end(), buf.begin(), buf.end());
+
+    // Promote heap allocations to stack
+    auto dealloc = std::find(passes.begin(), passes.end(), "func.func(buffer-deallocation)");
+    assert(dealloc != passes.end() && "bufferization stage no longer runs buffer-deallocation");
+    passes.insert(dealloc, "func.func(promote-buffers-to-stack{max-alloc-size-in-bytes=64})");
     passes.push_back("lower-decode-to-transport");
     for (const auto &passName : llvmPasses) {
         if (passName == "convert-executor-to-llvm") {
