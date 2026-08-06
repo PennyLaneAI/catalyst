@@ -86,24 +86,25 @@ class TestCompileOpDecompRules:
     def test_compile_error(self):
         """Test that compile_op_decomp_rules warns when compilation of a rule fails."""
 
-        with pytest.warns(match="Failed to compile"):
-            with qp.decomposition.local_decomps():
+        with pytest.warns(match="Unexpected error while trying to compile fake_op_decomp:"):
+            with pytest.warns(match="AOT capture of jaxpr failed."):
+                with qp.decomposition.local_decomps():
 
-                class FakeOp(qp.operation.Operator):
-                    """Test class with incompatible decomp rule."""
+                    class FakeOp(qp.operation.Operator):
+                        """Test class with incompatible decomp rule."""
 
-                    num_wires = 3
-                    num_params = 1
-                    ndim_params = (0,)
+                        num_wires = 3
+                        num_params = 1
+                        ndim_params = (0,)
 
-                @qp.register_resources({})
-                def fake_op_decomp(param, wires):
-                    _quantum_opt(stdin="module {")
-                    return param, wires
+                    @qp.register_resources({})
+                    def fake_op_decomp(param, wires):
+                        _quantum_opt(stdin="module {")
+                        return param, wires
 
-                qp.add_decomps(FakeOp, fake_op_decomp)
+                    qp.add_decomps(FakeOp, fake_op_decomp)
 
-                compile_op_decomp_rules(FakeOp)
+                    compile_op_decomp_rules(FakeOp)
 
     def test_unexpected_error(self):
         """Test that compile_op_decomp_rules warns when an unexpected exception is thrown."""
