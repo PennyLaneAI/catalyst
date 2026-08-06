@@ -130,7 +130,8 @@ def Transport_StartOp : Transport_Op<"start"> {
 def Transport_KickOp : Transport_Op<"kick"> {
     let summary = "Send a payload as one round's request (controller).";
     let arguments = (ins Transport_ControllerSession:$session, Transport_AnyBuffer:$payload,
-                         I32Attr:$work_item_idx);
+                         I32Attr:$work_item_idx,
+                         DefaultValuedOptionalAttr<I32Attr, "0">:$decoder_id);
     let assemblyFormat = "$session `,` $payload attr-dict `:` qualified(type($session)) `,` type($payload)";
 }
 

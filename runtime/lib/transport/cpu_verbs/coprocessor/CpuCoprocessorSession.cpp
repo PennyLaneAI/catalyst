@@ -98,10 +98,11 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         last_word_.store(r->value, std::memory_order_relaxed);
         completed_.fetch_add(1, std::memory_order_release);
         Payload *send = send_payload();
-        send->value = 0; // deterministic high bytes when the result is shorter
+        send->value = 0;
+        send->decoder_id = r->decoder_id;
         if (coproc_fn_) {
-            const std::size_t nb = coproc_fn_(&r->value, PAYLOAD_DATA_BYTES, &send->value,
-                                              PAYLOAD_DATA_BYTES, coproc_ctx_);
+            const std::size_t nb =
+                coproc_fn_(r, sizeof(Payload), &send->value, PAYLOAD_DATA_BYTES, coproc_ctx_);
             RDMA_CHECK(nb > 0 && nb <= PAYLOAD_DATA_BYTES,
                        "coprocessor function wrote %zu bytes, expected 1..%zu", nb,
                        PAYLOAD_DATA_BYTES);
