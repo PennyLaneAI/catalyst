@@ -14,19 +14,29 @@
 
 // RUN: quantum-opt --lower-decode-to-transport --split-input-file %s | FileCheck %s
 
-// A bufferized qecp.decode_esm_css becomes a transport round to the coprocessor.
+// A bufferized qecp.decode_esm_css becomes a transport round to the coprocessor: the syndrome is
+// staged and posted, and the correction is collected in the session's reply slot.
 
 // CHECK-LABEL: func.func @qec_circuit
 // CHECK-NOT:     qecp.decode_esm_css
+// CHECK-NOT:     memref.alloc
 // CHECK:         %[[S:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
-// CHECK:         transport.kick %[[S]], %{{.*}} {work_item_idx = 0 : i32} : !transport.session<controller>, memref<?xi1>
-// CHECK:         transport.collect %[[S]], %{{.*}} : !transport.session<controller>, memref<?xindex>
+// CHECK:         transport.stage_payload %[[S]], %{{.*}} : !transport.session<controller>, memref<3xi1>
+// CHECK:         transport.post %[[S]] : !transport.session<controller>
+// CHECK:         %[[REP:.*]] = transport.reply_slot %[[S]] : !transport.session<controller> -> memref<1xindex>
+// CHECK:         transport.collect %[[S]], %[[REP]] : !transport.session<controller>, memref<1xindex>
+// CHECK:         memref.load %[[REP]]
+// CHECK-NOT:     memref.dealloc
 module attributes {catalyst.backline = #transport.backline<transport = "net",
   controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18590 : i16>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
-  func.func @qec_circuit(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<?xi1>, %erridx: memref<?xindex>) {
-    qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<?xindex>) : memref<?xi1>
-    return
+  func.func @qec_circuit(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<3xi1>) -> index {
+    %c0 = arith.constant 0 : index
+    %alloc = memref.alloc() : memref<1xindex>
+    qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%alloc : memref<1xindex>) : memref<3xi1>
+    %v = memref.load %alloc[%c0] : memref<1xindex>
+    memref.dealloc %alloc : memref<1xindex>
+    return %v : index
   }
 }
 
@@ -93,6 +103,41 @@ module attributes {catalyst.backline = #transport.backline<transport = "net",
                          %e1: memref<?xi1>, %i1: memref<?xindex>) {
     qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %e0 in (%i0 : memref<?xindex>) : memref<?xi1>
     qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %e1 in (%i1 : memref<?xindex>) : memref<?xi1>
+    return
+  }
+}
+
+// -----
+
+// A correction the caller passed in is an out-parameter: the caller expects to find the reply in
+// its own buffer, so the round collects there rather than in the reply slot.
+
+// CHECK-LABEL: func.func @qec_circuit_out_param
+// CHECK-NOT:     transport.reply_slot
+// CHECK:         transport.collect %{{.*}}, %arg2 : !transport.session<controller>, memref<1xindex>
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c">,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
+  func.func @qec_circuit_out_param(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<3xi1>,
+                                   %erridx: memref<1xindex>) {
+    qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<1xindex>) : memref<3xi1>
+    return
+  }
+}
+
+// -----
+
+// A dynamically shaped correction gives the reply slot no size to take, so the round falls back to
+// the buffer the caller supplied and collect writes into that.
+
+// CHECK-LABEL: func.func @qec_circuit_dynamic
+// CHECK-NOT:     transport.reply_slot
+// CHECK:         transport.collect %{{.*}}, %{{.*}} : !transport.session<controller>, memref<?xindex>
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c">,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
+  func.func @qec_circuit_dynamic(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<?xi1>, %erridx: memref<?xindex>) {
+    qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<?xindex>) : memref<?xi1>
     return
   }
 }
