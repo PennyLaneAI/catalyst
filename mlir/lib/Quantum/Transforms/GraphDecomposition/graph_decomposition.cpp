@@ -13,13 +13,12 @@
 // limitations under the License.
 
 #include <cstdint>
+#include <fstream>
 #include <numeric>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include <fstream>
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -80,12 +79,8 @@ namespace quantum {
 
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         bool estimateMode = this->estJsonPath != "";
-
-        llvm::outs() << "!!! RUNNING ON OPERATION\n";
-        llvm::outs() << "!!! ESTIMATE_MODE: " << estimateMode << "\n";
 
         // Debugging output for command-line options
         LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");
@@ -106,6 +101,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             for (auto item : altDecompsOption) {
                 llvm::dbgs() << "\t" << item << ",\n";
             }
+            llvm::dbgs() << "\n";
+
+            llvm::dbgs() << "estJsonPath\n";
+            llvm::dbgs() << "\t" << estJsonPath << "\n";
             llvm::dbgs() << "\n";
         });
 
@@ -132,11 +131,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             return signalPassFailure();
         }
 
-        llvm::outs() << userRuleNames.size() << " user rules found\n";
-        for (const auto &ruleName : userRuleNames) {
-            llvm::outs() << "\t" << ruleName.getKey() << "\n";
-        }
-
         // NOTE: getOperators must be after getRuleNodes, which removes user rules from the module.
         // This prevents operators in user rules from being added to the graph.
         if (failed(getRuleNodes(bytecodeRulesFile, setOfRules, userRuleNames))) {
@@ -152,6 +146,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
         auto solution = solver.solve();
+
+        if (estimateMode) {
+            ///////////////////////////
+            // Step 3: If in estimate mode, write the graph solution to a JSON file for later
+            // use by the resource estimation pass. Exit here since no rewrite is actually needed
+
+            std::string jsonStr = buildJsonString(solution);
+            std::ofstream ofile(estJsonPath);
+            if (!ofile.is_open()) {
+                llvm::errs() << "Error: could not open resource output file: " << estJsonPath
+                             << "\n";
+                return;
+            }
+            ofile << jsonStr;
+            ofile.close();
+            return;
+        }
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
@@ -169,18 +180,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         if (failed(runPipeline(pm, module))) {
             return signalPassFailure();
-        }
-
-        if (estimateMode) {
-            std::string jsonStr = buildJsonString(solution);
-            std::ofstream ofile(estJsonPath);
-            if (!ofile.is_open()) {
-                llvm::errs() << "Error: could not open resource output file: " << estJsonPath
-                             << "\n";
-                return;
-            }
-            ofile << jsonStr;
-            ofile.close();
         }
     }
 
@@ -607,8 +606,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return altDecomps;
     }
 
-    std::string buildJsonString(const GraphResult &solution) const
-    {
+    std::string buildJsonString(const GraphResult &solution) const {
         llvm::json::Object root;
 
         for (const auto &[op, chosenRule] : solution) {
