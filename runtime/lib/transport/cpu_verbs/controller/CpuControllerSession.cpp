@@ -92,6 +92,12 @@ int CpuControllerSession::kick(std::uint32_t /*work_item_idx*/)
     return 0;
 }
 
+void *CpuControllerSession::reply_slot()
+{
+    auto *ring = reinterpret_cast<common::PayloadSlot *>(local_.addr);
+    return &ring[next_recv_ & (common::K_RING_SLOTS - 1)].p.value;
+}
+
 int CpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                   std::size_t n)
 {
@@ -102,7 +108,7 @@ int CpuControllerSession::collect(void *const *replies, const std::uint64_t *rep
     }
     rtt_ns_ = now_ns() - kick_ns_;
     ++next_recv_;
-    if (n > 0 && replies && replies[0]) {
+    if (n > 0 && replies && replies[0] && replies[0] != &r->value) {
         const std::size_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
         RDMA_CHECK(cap <= PAYLOAD_DATA_BYTES,
                    "reply capacity (%zu) exceeds the %zu B payload; a round carries one "

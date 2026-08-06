@@ -71,7 +71,7 @@ def Transport_SessionType : Transport_Type<"Session", "session"> {
 }
 
 def Transport_TokenType : Transport_Type<"Token", "token"> {
-    let summary = "A handle to an in-flight asynchronous step, awaited with transport.barrier.";
+    let summary = "A handle to an in-flight asynchronous step, awaited with transport.await.";
 }
 
 // Role-constrained session types used by the role-specific ops.

@@ -306,7 +306,7 @@ std::int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession
     return dispatch_async(s, [s] { return do_exchange_keys(s); });
 }
 
-int __catalyst__transport__barrier(std::int64_t token) { return await_token(token); }
+int __catalyst__transport__await(std::int64_t token) { return await_token(token); }
 
 int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path)
 {
@@ -359,7 +359,7 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
     });
 }
 
-int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
+int __catalyst__transport__set_message_sizes(CatalystTransportSession *s,
                                             std::uint32_t work_item_idx, std::uint64_t in_bytes,
                                             std::uint64_t out_bytes)
 {
@@ -378,7 +378,7 @@ int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
     });
 }
 
-void *__catalyst__transport__data_slot(CatalystTransportSession *s)
+void *__catalyst__transport__request_slot(CatalystTransportSession *s)
 {
     auto *c = cast_to_controller(s);
     void *slot = nullptr;
@@ -388,7 +388,7 @@ void *__catalyst__transport__data_slot(CatalystTransportSession *s)
     return slot;
 }
 
-int __catalyst__transport__write_data_slot(CatalystTransportSession *s, const void *src,
+int __catalyst__transport__stage_payload(CatalystTransportSession *s, const void *src,
                                            std::uint64_t bytes)
 {
     auto *c = cast_to_controller(s);
@@ -411,7 +411,7 @@ void *__catalyst__transport__reply_slot(CatalystTransportSession *s)
     return slot;
 }
 
-int __catalyst__transport__kick(CatalystTransportSession *s, std::uint32_t work_item_idx)
+int __catalyst__transport__post(CatalystTransportSession *s, std::uint32_t work_item_idx)
 {
     auto *c = cast_to_controller(s);
     if (!c) {
@@ -424,6 +424,9 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply,
                                    std::uint64_t reply_bytes)
 {
     if (!s || !s->sess) {
+        return CATALYST_TRANSPORT_ERR;
+    }
+    if (!reply) {
         return CATALYST_TRANSPORT_ERR;
     }
     const int rc = guard([&] {

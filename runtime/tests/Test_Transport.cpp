@@ -125,11 +125,11 @@ TEST_CASE("null session arguments are rejected without crashing", "[transport]")
     CHECK(__catalyst__transport__exchange_keys(nullptr) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__establish_channel(nullptr, "cpu_verbs") == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__set_coprocessor_fn(nullptr, "") == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__commit_work_item(nullptr, 0, 0, 0) == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__kick(nullptr, 0) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__set_message_sizes(nullptr, 0, 0, 0) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__post(nullptr, 0) == CATALYST_TRANSPORT_ERR);
     std::uint8_t buf[4] = {};
     CHECK(__catalyst__transport__collect(nullptr, buf, sizeof(buf)) == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__data_slot(nullptr) == nullptr);
+    CHECK(__catalyst__transport__request_slot(nullptr) == nullptr);
     CHECK(__catalyst__transport__last_rtt_ns(nullptr) == 0);
     // The void entry points must simply not crash on null.
     __catalyst__transport__start(nullptr);
@@ -144,8 +144,8 @@ TEST_CASE("commit_work_item rejects a reply larger than the provisioned region",
     REQUIRE(s != nullptr);
     // exchange_keys provisions the local reply region (the stub reports a zero-size region).
     REQUIRE(__catalyst__transport__exchange_keys(s) == CATALYST_TRANSPORT_OK);
-    CHECK(__catalyst__transport__commit_work_item(s, 0, 0, 1) == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__commit_work_item(s, 0, 0, 0) == CATALYST_TRANSPORT_OK);
+    CHECK(__catalyst__transport__set_message_sizes(s, 0, 0, 1) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__set_message_sizes(s, 0, 0, 0) == CATALYST_TRANSPORT_OK);
     __catalyst__transport__destroy(s);
 }
 
