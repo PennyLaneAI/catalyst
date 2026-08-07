@@ -315,6 +315,34 @@ std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len)
     return std::string(Host) + ":" + Port;
 }
 
+void initializeCatalystRuntime(const std::string &GLabel)
+{
+    auto *initFn = reinterpret_cast<void (*)(uint32_t *)>(
+        ::dlsym(RTLD_DEFAULT, "__catalyst__rt__initialize"));
+    if (!initFn) {
+        std::fprintf(stderr,
+                     "[%s] Warning: __catalyst__rt__initialize not found "
+                     "in any loaded plugin\n",
+                     GLabel.c_str());
+        return;
+    }
+    initFn(nullptr);
+}
+
+void finalizeCatalystRuntime(const std::string &GLabel)
+{
+    auto *finalizeFn =
+        reinterpret_cast<void (*)()>(::dlsym(RTLD_DEFAULT, "__catalyst__rt__finalize"));
+    if (!finalizeFn) {
+        std::fprintf(stderr,
+                     "[%s] Warning: __catalyst__rt__finalize not found "
+                     "in any loaded plugin\n",
+                     GLabel.c_str());
+        return;
+    }
+    finalizeFn();
+}
+
 // Listener loop
 [[noreturn]] void runServerLoop(int ListenFD, const std::string &Label)
 {
@@ -351,18 +379,7 @@ std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len)
             ::close(ListenFD);
             std::string GLabel = Label + "#" + std::to_string(::getpid());
 
-            // TODO: This is a temporary solution to initialize the catalyst CTX.
-            // Done per-connection so each circuit owns its own context.
-            if (auto *initFn = reinterpret_cast<void (*)(uint32_t *)>(
-                    ::dlsym(RTLD_DEFAULT, "__catalyst__rt__initialize"))) {
-                initFn(nullptr);
-            }
-            else {
-                std::fprintf(stderr,
-                             "[%s] Warning: __catalyst__rt__initialize not found "
-                             "in any loaded plugin\n",
-                             GLabel.c_str());
-            }
+            initializeCatalystRuntime(GLabel);
 
             ExitOnError ExitOnErr;
             ExitOnErr.setBanner("CatalystExecutor[" + GLabel + "]: ");
@@ -372,6 +389,7 @@ std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len)
                         setupCatalystServer, CSock, CSock));
                 ExitOnErr(Server->waitForDisconnect());
             }
+            finalizeCatalystRuntime(GLabel);
             catalyst_services::clearAssets();
             std::fprintf(stderr, "[%s] client disconnected, exiting\n", GLabel.c_str());
             ::_exit(0);
