@@ -79,7 +79,18 @@ void PhaseAbstraction::insertContributor(const GateBundle &contributor, const Pa
     // if (parity.isUnsat(schema.affVal)) {
     //     orphanBundles.push_back(contributor);
     // } else {
-        insertActiveBundle(contributor, parity);
+       insertActiveBundle(contributor, parity);
+    // }
+
+    // BitLocation affValLoc = schema.affVal;
+    // bool affineValue = parity.getBitAtLoc(affValLoc);
+
+    // if (affineValue) {
+    //     parity.clearBitAtLoc(affValLoc);
+    // }
+    // insertActiveBundle(contributor, parity);
+    // if (affineValue) {
+    //     parity.assignBitAtLoc(affValLoc, affineValue);
     // }
 }
 
@@ -93,40 +104,21 @@ void PhaseAbstraction::orphanNonTrivialBundles()
     }
 }
 
-void PhaseAbstraction::nullifyByPrecond(const AffineRelation& precond, const AffineSchema& paritySchema)
+void PhaseAbstraction::normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPostcond)
 {
-    llvm::DenseMap<Parity, GateBundle> trivialCondBundles;
-    GateBundle &trivContributors = trivialCondBundles[Parity::Trivial(precond.numQubits())];
-        
-    for (auto &[parity, contributors] : activeBundles) {
-        if (precond.reduce(parity, paritySchema, false).isTrivial()) { // might become unsat instead of trivial; in that case, we should look at affVal 1 gates, they become 0!
-            trivContributors += std::move(contributors);
-        } else {
-            orphanBundles.push_back(std::move(contributors));
+    llvm::DenseMap<Parity, GateBundle> oldBundles;
+    std::swap(activeBundles, oldBundles);
+
+    for (auto &[parity, contributors] : oldBundles) {
+        Parity reducedPar = cond.reduce(parity, paritySchema, isPostcond);
+                
+        BitLocation affValLoc = cond.getSchema().affVal;
+        if (reducedPar.getBitAtLoc(affValLoc)) {
+            reducedPar.clearBitAtLoc(affValLoc);
+            contributors.flipGatesAffineValues();
         }
+        insertActiveBundle(contributors, reducedPar);
     }
-
-    if (trivContributors.gateCount() > 0) {
-        activeBundles = std::move(trivialCondBundles);
-    } else {
-        activeBundles.clear();
-    }
-}
-
-void PhaseAbstraction::normalizeByPostcond(const AffineRelation& postcond, const AffineSchema& paritySchema)
-{
-    // if it was empty initially, if result became unsat,...
-    llvm::DenseMap<Parity, GateBundle> normalizedBundles;
-
-    // llvm::errs() << "\normalizeByPostcond:\n";
-    // llvm::errs() << "current phases:\n" << *this << "\n";
-
-    for (auto &[parity, contributors] : activeBundles) {
-        Parity reducedPar = postcond.reduce(parity, paritySchema, true);
-        normalizedBundles[reducedPar] = std::move(contributors);
-    }
-
-    activeBundles = std::move(normalizedBundles);
 }
 
 void PhaseAbstraction::reSchema(const AffineSchema &oldSchm, const AffineSchema &newSchm)

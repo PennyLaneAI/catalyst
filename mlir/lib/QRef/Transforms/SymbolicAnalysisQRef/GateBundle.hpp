@@ -42,6 +42,7 @@ struct GateBundle {
     [[nodiscard]] auto getAllGates();
     [[nodiscard]] GateID getMergeTarget() const;
     [[nodiscard]] bool isMergeTargetAffineZero() const;
+    void flipGatesAffineValues();
 };
 
 inline size_t GateBundle::gateCount() const { return zeroAffineGates.size() + oneAffineGates.size(); }
@@ -52,3 +53,8 @@ inline auto GateBundle::getAllGates()
 }
 
 inline bool GateBundle::isMergeTargetAffineZero() const { return !zeroAffineGates.empty(); }
+
+inline void GateBundle::flipGatesAffineValues()
+{
+    std::swap(zeroAffineGates, oneAffineGates);
+}

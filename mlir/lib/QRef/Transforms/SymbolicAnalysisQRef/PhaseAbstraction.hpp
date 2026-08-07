@@ -51,6 +51,7 @@ struct PhaseAbstraction {
     void addActiveBundlesWith(const llvm::DenseMap<Parity, GateBundle> &rhsActives);
     void addOrphanBundlesWith(const std::vector<GateBundle> &rhsOrphans);
     void insertActiveBundle(const GateBundle &contributor, const Parity &parity);
+    void normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPostcond);
 };
 
 template <typename ColOrderRange>
@@ -69,4 +70,15 @@ std::string PhaseAbstraction::toString(ColOrderRange colOrder) const
         res += "\n";
     }
     return res;
+}
+
+inline void PhaseAbstraction::nullifyByPrecond(const AffineRelation& precond, const AffineSchema& paritySchema)
+{    
+    normalizeByCond(precond, paritySchema, false);
+    orphanNonTrivialBundles();
+}
+
+inline void PhaseAbstraction::normalizeByPostcond(const AffineRelation& postcond, const AffineSchema& paritySchema)
+{    
+    normalizeByCond(postcond, paritySchema, true);
 }
