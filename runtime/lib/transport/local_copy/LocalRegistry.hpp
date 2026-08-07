@@ -24,13 +24,18 @@
 namespace catalyst::transport::local_copy {
 
 class LocalCpuControllerSession;
-class LocalCoprocessorSession;
+
+class LocalCoprocessorEndpoint {
+  public:
+    virtual ~LocalCoprocessorEndpoint() = default;
+    virtual int run_once() = 0;
+};
 
 // Process-local rendezvous: who is paired with whom, plus the two advertised peer-memory
 // regions the request/reply copies target.
 struct EndpointPair {
     LocalCpuControllerSession *controller = nullptr;
-    LocalCoprocessorSession *coprocessor = nullptr;
+    LocalCoprocessorEndpoint *coprocessor = nullptr;
 
     MemRegion controller_reply{};
     bool controller_reply_ready = false;

@@ -16,8 +16,8 @@
 #include <cstdint>
 #include <cstring>
 
-#include "LocalCoprocessorSession.hpp"
 #include "LocalCpuControllerSession.hpp"
+#include "LocalCpuCoprocessorSession.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -38,7 +38,7 @@ std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t
 
 TEST_CASE("local_copy round-trip echoes through peer memory", "[transport_local_copy]") {
     LocalCpuControllerSession controller;
-    LocalCoprocessorSession coprocessor;
+    LocalCpuCoprocessorSession coprocessor;
 
     ConnectInfo ci{.peer = "loopback", .oob_port = 19001};
     REQUIRE(controller.connect(ci) == 0);
@@ -73,7 +73,7 @@ TEST_CASE("local_copy round-trip echoes through peer memory", "[transport_local_
 
 TEST_CASE("local_copy uses the bound coprocessor function", "[transport_local_copy]") {
     LocalCpuControllerSession controller;
-    LocalCoprocessorSession coprocessor;
+    LocalCpuCoprocessorSession coprocessor;
 
     ConnectInfo ci{.peer = "loopback", .oob_port = 19002};
     REQUIRE(controller.connect(ci) == 0);
