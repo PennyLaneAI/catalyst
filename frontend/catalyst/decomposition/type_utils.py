@@ -128,7 +128,6 @@ def get_dummy_values_for_arg(arg):
     """
     if isinstance(arg, str):
         return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
-
     elif isinstance(arg, (list, tuple)):
         return jnp.zeros(len(arg), dtype=get_dummy_values_for_arg(arg[0]).dtype)
     elif isinstance(arg, ShapedArray):
