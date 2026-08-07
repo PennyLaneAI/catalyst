@@ -1,5 +1,4 @@
 PYTHON ?= $(shell which python3)
-PENNYLANE_SOURCE ?=
 C_COMPILER ?= $(shell which clang)
 CXX_COMPILER ?= $(shell which clang++)
 BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
@@ -122,9 +121,6 @@ frontend:
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
-	if [ -n "$(PENNYLANE_SOURCE)" ]; then \
-		$(PYTHON) -m pip install --no-deps --force-reinstall "$(PENNYLANE_SOURCE)" $(PIP_VERBOSE_FLAG); \
-	fi
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
