@@ -241,11 +241,11 @@ TEST_CASE("a staged asset is stored byte for byte", "[executor]") {
     catalyst::executor::close(S);
 }
 
-TEST_CASE("concurrent connections stage same-named assets without collision", "[executor]") {
+TEST_CASE("each connection stages a same-named asset in its own directory", "[executor]") {
     ExecutorProcess Executor;
-    // Same asset name from two directories. The executor stages by basename,
-    // so these would land on top of each other if connections shared a
-    // staging directory.
+    // Same asset name sent over two open connections. The executor stages by
+    // basename, so these would land on top of each other if connections
+    // shared a staging directory.
     ScratchDir ScratchA("collide-a");
     ScratchDir ScratchB("collide-b");
     const std::string Name = assetName("collide");
