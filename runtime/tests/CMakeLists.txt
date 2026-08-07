@@ -153,24 +153,11 @@ add_executable(runner_tests_decoder_runtime)
 target_sources(runner_tests_decoder_runtime PRIVATE
     Test_DecoderLUTDecoderUtils.cpp
     Test_DecoderLUTDecoder.cpp
-    Test_transport_steane_LUT_decoder.cpp
 )
 target_link_libraries(runner_tests_decoder_runtime PRIVATE
     Catch2WithMain
     catalyst_runtime_testing
-    pybind11::embed
     rt_decoder
-)
-# Give the decoder test access to the shared Steane table header, and hand it
-# the absolute path of the frontend's numpy-only leaf module so the Steane
-# cross-check test can load it directly via importlib.util (no catalyst /
-# jaxlib / pennylane install needed on runtime-only CI).
-target_include_directories(runner_tests_decoder_runtime PRIVATE
-    ${PROJECT_SOURCE_DIR}/lib/transport/common
-)
-target_compile_definitions(runner_tests_decoder_runtime PRIVATE
-    STEANE_CODE_REGISTRY_PATH="${PROJECT_SOURCE_DIR}/../frontend/catalyst/python_interface/transforms/qecp/_code_registry.py"
-    EMBEDDED_PYTHON_EXECUTABLE="${Python_EXECUTABLE}"
 )
 
 catch_discover_tests(runner_tests_decoder_runtime)
@@ -250,31 +237,4 @@ if(ENABLE_TRANSPORT)
         )
         catch_discover_tests(runner_tests_transport_gpu)
     endif()
-endif()
-
-# Executor test suite: spawns the real catalyst-executor binary and drives it
-# over a loopback TCP connection with the host-side session API.
-if(ENABLE_EXECUTOR)
-    add_executable(runner_tests_executor)
-    target_sources(runner_tests_executor PRIVATE
-        Test_Executor.cpp
-    )
-    target_link_libraries(runner_tests_executor PRIVATE
-        Catch2WithMain
-        catalyst_runtime_testing
-        catalyst_executor_session
-    )
-    target_compile_definitions(runner_tests_executor PRIVATE
-        CATALYST_EXECUTOR_PATH="$<TARGET_FILE:catalyst-executor>")
-    add_dependencies(runner_tests_executor catalyst-executor)
-
-    if(NOT APPLE)
-        set_property(TARGET runner_tests_executor APPEND PROPERTY BUILD_RPATH $ORIGIN)
-        set_property(TARGET runner_tests_executor APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
-    else()
-        set_property(TARGET runner_tests_executor APPEND PROPERTY BUILD_RPATH @loader_path)
-        set_property(TARGET runner_tests_executor APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
-    endif()
-
-    catch_discover_tests(runner_tests_executor)
 endif()

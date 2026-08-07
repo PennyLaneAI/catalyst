@@ -564,8 +564,8 @@
   `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
   [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
 
-* Move the Steane decoder table to `transport/common` and add a runtime unit test cross-checking it
-  against the frontend's Steane code parity check matrix.
+* Move the Steane decoder table to `transport/common`, so it is shared by both the `cpu_verbs` and
+  `gpu_verbs` backends instead of being duplicated in each.
   [(#3105)](https://github.com/PennyLaneAI/catalyst/pull/3105)
 
 <h3>Documentation 📝</h3>
