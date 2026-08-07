@@ -27,6 +27,7 @@ import threading
 import time
 from typing import Self, TextIO
 
+from .ssh import RemoteLauncher, RemoteOps
 from .utils import (
     ExecutorFlags,
     ExecutorPaths,
@@ -35,7 +36,6 @@ from .utils import (
     log_cmd,
     pdeathsig,
 )
-from .ssh import RemoteLauncher, RemoteOps
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -356,10 +356,15 @@ class _RemoteProcess(_ExecutorProcess):
         Pipes the sudo password on stdin when given."""
         use_pw = self.sudo_password is not None
         ssh = RemoteLauncher.ssh_argv(
-            self.user, self.host,
-            self.workspace, self._bind_port, self.local_port,
-            self._plugins, self._env,
-            sudo=self.sudo, sudo_password=self.sudo_password,
+            self.user,
+            self.host,
+            self.workspace,
+            self._bind_port,
+            self.local_port,
+            self._plugins,
+            self._env,
+            sudo=self.sudo,
+            sudo_password=self.sudo_password,
             executor_bin=self.executor_bin,
         )
         self._say(
@@ -367,9 +372,7 @@ class _RemoteProcess(_ExecutorProcess):
             f"(tunnel {self.addr} -> remote:{self._bind_port})"
         )
         log_cmd(ssh)
-        self.proc = self._popen(
-            ssh, stdin=(subprocess.PIPE if use_pw else subprocess.DEVNULL)
-        )
+        self.proc = self._popen(ssh, stdin=(subprocess.PIPE if use_pw else subprocess.DEVNULL))
         self._pipe_sudo_password()
 
     def _pipe_sudo_password(self) -> None:
@@ -401,8 +404,11 @@ class _RemoteProcess(_ExecutorProcess):
             return
         pat = f"{ExecutorPaths.EXECUTOR_BIN}.*{ExecutorFlags.BIND_FLAG}0.0.0.0:{self._bind_port}"
         RemoteOps.pkill(
-            self.user, self.host, pat,
-            sudo=self.sudo, sudo_password=self.sudo_password,
+            self.user,
+            self.host,
+            pat,
+            sudo=self.sudo,
+            sudo_password=self.sudo_password,
         )
 
     def teardown_workspace(self) -> None:

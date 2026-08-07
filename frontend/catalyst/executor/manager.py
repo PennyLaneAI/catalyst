@@ -47,6 +47,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable, Self
 
+from .process import _ExecutorProcess, _LocalProcess, _RemoteProcess
+from .ssh import SCP, RemoteOps
 from .utils import (
     MAX_PORT_TRIES,
     ExecutorPaths,
@@ -55,8 +57,6 @@ from .utils import (
     set_verbose,
     triple_from_uname,
 )
-from .process import _ExecutorProcess, _LocalProcess, _RemoteProcess
-from .ssh import SCP, RemoteOps
 
 
 def _start_on_free_port(
@@ -269,11 +269,15 @@ class Executor:
         so port retries reuse the same auth context — no re-prompt, no re-scp."""
         user, host, workspace = self._remote_target()
         ws_pinned = self._cfg.workspace is not None  # pinned dirs are left in place on teardown
-        sudo_pw = RemoteOps.resolve_sudo(user, host, self._cfg.sudo_password) if self._cfg.sudo else None
+        sudo_pw = (
+            RemoteOps.resolve_sudo(user, host, self._cfg.sudo_password) if self._cfg.sudo else None
+        )
         self._scp_bundle(user, host, workspace)
         # Copied bundle -> run it from the workspace (./); sudo's secure_path would miss a bare
         # name. Bare name only when attaching to a remote that has it on PATH.
-        default_bin = f"./{ExecutorPaths.EXECUTOR_BIN}" if self._cfg.copy else ExecutorPaths.EXECUTOR_BIN
+        default_bin = (
+            f"./{ExecutorPaths.EXECUTOR_BIN}" if self._cfg.copy else ExecutorPaths.EXECUTOR_BIN
+        )
         log_path = ExecutorPaths.resolve_log(host, name=self.name)
         ready_timeout = self._cfg.ready_timeout
 

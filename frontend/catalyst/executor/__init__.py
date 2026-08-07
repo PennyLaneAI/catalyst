@@ -18,7 +18,7 @@ server used by ``target(address=...)`` and ``kernel.declare(remote=...)`` to run
 out-of-process.
 """
 
-from .utils import PortInUse
 from .manager import Executor
+from .utils import PortInUse
 
 __all__ = ("Executor", "PortInUse")

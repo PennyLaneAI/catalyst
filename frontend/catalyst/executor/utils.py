@@ -227,7 +227,10 @@ class ExecutorPaths:
         ``$PATH``.
         """
         rt_lib = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-        for candidate in (rt_lib / ExecutorPaths.EXECUTOR_BIN, rt_lib / "remote" / ExecutorPaths.EXECUTOR_BIN):
+        for candidate in (
+            rt_lib / ExecutorPaths.EXECUTOR_BIN,
+            rt_lib / "remote" / ExecutorPaths.EXECUTOR_BIN,
+        ):
             if candidate.exists():
                 return str(candidate)
         return ExecutorPaths.EXECUTOR_BIN

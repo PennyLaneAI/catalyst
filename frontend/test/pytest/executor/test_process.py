@@ -277,7 +277,9 @@ class TestLocalProcessSpawn:
         with patch.object(
             _LocalProcess,
             "_popen",
-            side_effect=lambda argv, **kw: (captured.setdefault("env", kw.get("env")), MagicMock())[1],
+            side_effect=lambda argv, **kw: (captured.setdefault("env", kw.get("env")), MagicMock())[
+                1
+            ],
         ):
             p._spawn()
         assert captured["env"]["LIB"] == "/opt/mylib/x"

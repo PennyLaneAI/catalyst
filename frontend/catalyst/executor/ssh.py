@@ -31,7 +31,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from .utils import ExecutorFlags, ExecutorPaths, Unquoted, ShellText, log_cmd, verbose_level
+from .utils import ExecutorFlags, ExecutorPaths, ShellText, Unquoted, log_cmd, verbose_level
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -44,7 +44,13 @@ class SSHArgv:
     CONTROL_PERSIST = 30
 
     # Shared ``ssh`` argv prefix; keep-alive tuning surfaces a dead peer within ~1 min.
-    BASE_CMD: tuple[str, ...] = ("ssh", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4")
+    BASE_CMD: tuple[str, ...] = (
+        "ssh",
+        "-o",
+        "ServerAliveInterval=15",
+        "-o",
+        "ServerAliveCountMax=4",
+    )
 
     # One-shot probe flags: fail fast on missing key (rc 255), short connect timeout.
     PROBE_OPTS: tuple[str, ...] = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
@@ -70,9 +76,12 @@ class SSHArgv:
         applied to the long-lived executor session, whose close SIGHUPs the executor cleanly.
         """
         return [
-            "-o", "ControlMaster=auto",
-            "-o", f"ControlPath={SSHArgv._ctl_dir()}/cm-%C",
-            "-o", f"ControlPersist={SSHArgv.CONTROL_PERSIST}",
+            "-o",
+            "ControlMaster=auto",
+            "-o",
+            f"ControlPath={SSHArgv._ctl_dir()}/cm-%C",
+            "-o",
+            f"ControlPersist={SSHArgv.CONTROL_PERSIST}",
         ]
 
     @staticmethod
@@ -222,7 +231,9 @@ class RemoteOps:
         Raises:
             RuntimeError: If SSH itself failed (rc 255), with an ``ssh-copy-id`` hint.
         """
-        rc = RemoteOps.run(user, host, ShellText.sudo_probe(), opts=list(SSHArgv.PROBE_OPTS), log=True)
+        rc = RemoteOps.run(
+            user, host, ShellText.sudo_probe(), opts=list(SSHArgv.PROBE_OPTS), log=True
+        )
         if rc == 255:
             raise RuntimeError(
                 f"SSH to {user}@{host} needs a password. Install your key:\n"
@@ -257,9 +268,7 @@ class SCP:
     an already-authenticated connection."""
 
     @staticmethod
-    def copy(
-        user: str, host: str, files: list[Path], dest: str, *, log: bool = True
-    ) -> None:
+    def copy(user: str, host: str, files: list[Path], dest: str, *, log: bool = True) -> None:
         """Copy ``files`` into ``user@host:dest/``. Tries the modern SFTP backend, then retries
         with the legacy protocol (``-O``) on hosts without an SFTP subsystem.
 
@@ -336,8 +345,13 @@ class RemoteLauncher:
         """
         use_pw = sudo_password is not None
         remote_cmd = RemoteLauncher._remote_cmd(
-            workspace, remote_port, plugins, env,
-            sudo=sudo, use_password=use_pw, executor_bin=executor_bin,
+            workspace,
+            remote_port,
+            plugins,
+            env,
+            sudo=sudo,
+            use_password=use_pw,
+            executor_bin=executor_bin,
         )
         logger.debug(f"remote: {remote_cmd}")
         opts = RemoteLauncher._ssh_opts(local_port, remote_port, use_pw)
@@ -369,8 +383,10 @@ class RemoteLauncher:
         """Local-side ssh options for the port-forward. ``-tt`` on NOPASSWD so SSH close
         SIGHUPs the executor; omitted with a password so ``sudo -S`` sees an unechoed pipe."""
         opts = [
-            "-o", "ExitOnForwardFailure=yes",
-            "-L", f"{local_port}:localhost:{remote_port}",
+            "-o",
+            "ExitOnForwardFailure=yes",
+            "-L",
+            f"{local_port}:localhost:{remote_port}",
         ]
         if not use_password:
             opts = ["-tt"] + opts
@@ -379,14 +395,17 @@ class RemoteLauncher:
     @staticmethod
     def _env_prefix(env: dict[str, str]) -> str:
         """``K=V K=V ...`` prefix. :class:`Unquoted` values expand on the remote; bare strings are quoted."""
+
         def q(v: str) -> str:
             return v if isinstance(v, Unquoted) else shlex.quote(v)
+
         return " ".join(f"{k}={q(v)}" for k, v in env.items())
 
     @staticmethod
     def _plugin_args(plugins: list[str]) -> str:
         """``--plugin=<path>`` args. Bare filenames resolve against ``$PWD``; ``~``/absolute
         paths are quoted with tilde expansion."""
+
         def arg(p: str) -> str:
             flag = ExecutorFlags.PLUGIN_FLAG
             if isinstance(p, Unquoted):
@@ -394,6 +413,7 @@ class RemoteLauncher:
             if "/" not in p and not p.startswith("~"):
                 return f"{flag}$PWD/{shlex.quote(p)}"
             return f"{flag}{ShellText.path(p)}"
+
         return " ".join(arg(p) for p in plugins)
 
     @staticmethod

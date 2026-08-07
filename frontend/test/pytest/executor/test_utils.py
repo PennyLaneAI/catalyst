@@ -25,8 +25,8 @@ from catalyst.executor.utils import (
     ExecutorPaths,
     OutputPatterns,
     PortInUse,
-    Unquoted,
     ShellText,
+    Unquoted,
     log_cmd,
     random_port,
     set_verbose,
@@ -165,7 +165,7 @@ class TestShellText:
 
     def test_path_tilde_slash_with_space(self):
         """The tail after ``~/`` is quoted if it needs it."""
-        assert ShellText.path("~/my dir") == '"$HOME"/\'my dir\''
+        assert ShellText.path("~/my dir") == "\"$HOME\"/'my dir'"
 
     def test_path_absolute_quoted(self):
         """A plain absolute path without whitespace passes through unquoted."""
@@ -274,14 +274,14 @@ class TestExecutorPaths:
         (rt / "remote").mkdir(parents=True)
         (rt / "remote" / ExecutorPaths.EXECUTOR_BIN).write_text("bin")
         with patch("catalyst.executor.utils.get_lib_path", return_value=str(rt)):
-            assert ExecutorPaths.default_executor_bin() == str(rt / "remote" / ExecutorPaths.EXECUTOR_BIN)
+            assert ExecutorPaths.default_executor_bin() == str(
+                rt / "remote" / ExecutorPaths.EXECUTOR_BIN
+            )
 
     def test_default_executor_bin_falls_back_to_name_on_path(self, tmp_path):
         """Nothing found on disk: returns the bare binary name (assume it's on ``$PATH``)."""
         # Neither candidate exists → fall back to the bare binary name (assume it's on $PATH).
-        with patch(
-            "catalyst.executor.utils.get_lib_path", return_value=str(tmp_path / "nope")
-        ):
+        with patch("catalyst.executor.utils.get_lib_path", return_value=str(tmp_path / "nope")):
             assert ExecutorPaths.default_executor_bin() == ExecutorPaths.EXECUTOR_BIN
 
 
