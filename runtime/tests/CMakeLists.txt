@@ -161,9 +161,16 @@ target_link_libraries(runner_tests_decoder_runtime PRIVATE
     pybind11::embed
     rt_decoder
 )
-# Give the decoder test access to the shared Steane table header.
+# Give the decoder test access to the shared Steane table header, and hand it
+# the absolute path of the frontend's numpy-only leaf module so the Steane
+# cross-check test can load it directly via importlib.util (no catalyst /
+# jaxlib / pennylane install needed on runtime-only CI).
 target_include_directories(runner_tests_decoder_runtime PRIVATE
     ${PROJECT_SOURCE_DIR}/lib/transport/common
+)
+target_compile_definitions(runner_tests_decoder_runtime PRIVATE
+    STEANE_CODE_REGISTRY_PATH="${PROJECT_SOURCE_DIR}/../frontend/catalyst/python_interface/transforms/qecp/_code_registry.py"
+    EMBEDDED_PYTHON_EXECUTABLE="${Python_EXECUTABLE}"
 )
 
 catch_discover_tests(runner_tests_decoder_runtime)

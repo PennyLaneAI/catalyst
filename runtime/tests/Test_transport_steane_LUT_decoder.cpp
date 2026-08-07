@@ -25,26 +25,42 @@ namespace py = pybind11;
 
 namespace {
 
-// pybind11 rather than nanobind: nanobind does not support embedding an
-// interpreter (see Test_OpenQasmDevice.cpp).
+// pybind11 (nanobind does not support embedding). Setting PyConfig.program_name
+// to CMake's Python_EXECUTABLE routes Python's venv detection to that binary,
+// so sys.prefix and site-packages match the interpreter CMake found.
 void ensurePythonInterpreter() {
-    if (!Py_IsInitialized()) {
-        py::initialize_interpreter();
+    if (Py_IsInitialized()) {
+        return;
     }
+    PyConfig config;
+    PyConfig_InitPythonConfig(&config);
+    PyStatus status = PyConfig_SetBytesString(&config, &config.program_name,
+                                              EMBEDDED_PYTHON_EXECUTABLE);
+    if (PyStatus_Exception(status)) {
+        PyConfig_Clear(&config);
+        throw std::runtime_error("PyConfig_SetBytesString(program_name) failed");
+    }
+    py::initialize_interpreter(&config);
 }
 
 } // namespace
 
 // Cross-check STEANE_SYNDROME_TO_QUBIT (transport/common/SteaneDecoderTable.hpp)
-// against the frontend's Steane parity check matrix in qec_code_lib.py.
+// against the frontend's Steane parity check matrix. Loads the numpy-only leaf
+// _code_registry.py by path so catalyst's package __init__ chain never runs.
 TEST_CASE("STEANE_SYNDROME_TO_QUBIT decodes the Steane code from qec_code_lib.py",
           "[steane_decoder][frontend]") {
     ensurePythonInterpreter();
 
-    py::module_ code_lib =
-        py::module_::import("catalyst.python_interface.transforms.qecp.qec_code_lib");
-    REQUIRE(py::hasattr(code_lib, "_CODE_REGISTRY"));
-    py::dict registry = code_lib.attr("_CODE_REGISTRY").cast<py::dict>();
+    py::module_ importlib_util = py::module_::import("importlib.util");
+    py::object spec = importlib_util.attr("spec_from_file_location")(
+        "_steane_code_registry", STEANE_CODE_REGISTRY_PATH);
+    REQUIRE(!spec.is_none());
+    py::module_ code_registry = importlib_util.attr("module_from_spec")(spec);
+    spec.attr("loader").attr("exec_module")(code_registry);
+
+    REQUIRE(py::hasattr(code_registry, "_CODE_REGISTRY"));
+    py::dict registry = code_registry.attr("_CODE_REGISTRY").cast<py::dict>();
     REQUIRE(registry.contains("Steane"));
 
     // _CODE_REGISTRY["Steane"] layout: (n, k, d, x_tanner, z_tanner, ...); Hx == Hz.
