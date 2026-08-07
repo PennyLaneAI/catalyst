@@ -225,6 +225,24 @@ if(ENABLE_TRANSPORT)
     )
     catch_discover_tests(runner_tests_transport_cpu)
 
+    # Local peer-memory backend: in-process request/reply copies via memcpy.
+    add_executable(runner_tests_transport_local)
+    target_sources(runner_tests_transport_local PRIVATE
+        Test_TransportLocalCopy.cpp
+        ../lib/transport/local_copy/cpu_controller/LocalCpuControllerSession.cpp
+        ../lib/transport/local_copy/cpu_coprocessor/LocalCoprocessorSession.cpp
+    )
+    target_include_directories(runner_tests_transport_local PRIVATE
+        ${runtime_includes}
+        ${PROJECT_SOURCE_DIR}/lib/transport/local_copy
+        ${PROJECT_SOURCE_DIR}/lib/transport/local_copy/cpu_controller
+        ${PROJECT_SOURCE_DIR}/lib/transport/local_copy/cpu_coprocessor
+    )
+    target_link_libraries(runner_tests_transport_local PRIVATE
+        Catch2WithMain
+    )
+    catch_discover_tests(runner_tests_transport_local)
+
     if(TRANSPORT_HAS_HIP)
         add_executable(runner_tests_transport_gpu)
         target_sources(runner_tests_transport_gpu PRIVATE
