@@ -161,9 +161,7 @@ target_link_libraries(runner_tests_decoder_runtime PRIVATE
     pybind11::embed
     rt_decoder
 )
-# Test_transport_steane_LUT_decoder.cpp verifies STEANE_SYNDROME_TO_QUBIT
-# (shared between cpu_verbs and gpu_verbs via transport/common) against the
-# Steane H matrix defined in the frontend's qec_code_lib.py.
+# Give the decoder test access to the shared Steane table header.
 target_include_directories(runner_tests_decoder_runtime PRIVATE
     ${PROJECT_SOURCE_DIR}/lib/transport/common
 )

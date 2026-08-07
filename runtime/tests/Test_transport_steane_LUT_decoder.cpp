@@ -36,13 +36,8 @@ void ensurePythonInterpreter()
 
 } // namespace
 
-// STEANE_SYNDROME_TO_QUBIT is a hard-coded Steane decoder lookup table shared
-// by the transport backends (defined in transport/common/SteaneDecoderTable.hpp
-// and consumed by both cpu_verbs and gpu_verbs). The Steane code H is defined
-// in the frontend at qec_code_lib.py; pull H from there and check the table
-// realizes the ideal single-error decoder for that H. Fails hard if the
-// frontend module cannot be imported or does not expose a Steane entry in
-// _CODE_REGISTRY.
+// Cross-check STEANE_SYNDROME_TO_QUBIT (transport/common/SteaneDecoderTable.hpp)
+// against the frontend's Steane parity check matrix in qec_code_lib.py.
 TEST_CASE("STEANE_SYNDROME_TO_QUBIT decodes the Steane code from qec_code_lib.py",
           "[steane_decoder][frontend]")
 {

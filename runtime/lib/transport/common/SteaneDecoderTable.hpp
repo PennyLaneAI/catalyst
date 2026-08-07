@@ -23,13 +23,9 @@ namespace catalyst::transport::common {
 constexpr int STEANE_CHECKS = 3;
 
 /**
- * @brief Syndrome-to-error-qubit lookup for the [[7,1,3]] Steane code; -1 is
- * no error. Indexed by the 3 checks packed with check 0 as the MSB.
+ * @brief Syndrome -> error qubit index for the [[7,1,3]] Steane code (-1 = no error).
  *
- * Single source of truth for the hard-coded Steane decoder shared by the CPU-
- * and GPU-verbs transport backends. Correctness against the frontend Steane
- * definition (qec_code_lib.py) is enforced by
- * runtime/tests/Test_transport_steane_LUT_decoder.cpp.
+ * Indexed by the 3 checks packed with check 0 as the MSB.
  */
 constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1 << STEANE_CHECKS] = {-1, 6, 4, 5, 0, 3, 1, 2};
 
