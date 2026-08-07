@@ -195,16 +195,20 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         # and compile them to Catalyst JAXPR decomposition rules
         for op, rule in self._decomp_graph_solution.items():
             op_num_wires, pauli_word = _resource_metadata(op.op)
-            if op.op.name in COMPILER_OPS_FOR_DECOMPOSITION and (
-                o := next(
-                    (
-                        o
-                        for o in self._operations
-                        if o.name == op.op.name and len(o.wires) == op_num_wires
-                    ),
-                    None,
+            if (
+                op.op.name in COMPILER_OPS_FOR_DECOMPOSITION
+                and (
+                    o := next(
+                        (
+                            o
+                            for o in self._operations
+                            if o.name == op.op.name and len(o.wires) == op_num_wires
+                        ),
+                        None,
+                    )
                 )
-            ) is not None:
+                is not None
+            ):
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                 _create_decomposition_rule(
                     rule,
