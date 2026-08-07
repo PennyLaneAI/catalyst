@@ -25,8 +25,12 @@ add_library(catalyst_transport_cpu_coprocessor SHARED coprocessor/CpuCoprocessor
 target_link_libraries(catalyst_transport_cpu_coprocessor PRIVATE cpu_verbs_impl)
 
 # Reference coprocessor function (Steane decode), built as a standalone shared lib
-# exporting a CoprocessorFn symbol.
+# exporting a CoprocessorFn symbol. Reads STEANE_SYNDROME_TO_QUBIT from the
+# transport/common header without linking any of transport_common's RDMA code.
 add_library(steane_coprocessor SHARED coprocessor/coprocessor_functions/steane_decoder_fn.cpp)
+target_include_directories(steane_coprocessor PRIVATE
+    ${PROJECT_SOURCE_DIR}/lib/transport/common
+)
 set_property(TARGET steane_coprocessor PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Self-contained loopback application for testing
