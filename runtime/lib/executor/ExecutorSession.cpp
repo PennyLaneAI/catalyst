@@ -236,8 +236,7 @@ Expected<std::unique_ptr<MemoryBuffer>> getFile(const Twine &filename) {
     return createFileError(filename, F.getError());
 }
 
-void discardEPC(Expected<std::unique_ptr<SimpleRemoteEPC>> &EPC)
-{
+void discardEPC(Expected<std::unique_ptr<SimpleRemoteEPC>> &EPC) {
     consumeError(EPC ? (*EPC)->disconnect() : EPC.takeError());
 }
 
