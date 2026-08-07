@@ -30,9 +30,12 @@ from operator2_dummy_gates import (
     NoParams,
     NoParamsCustomOp,
     SingleParam,
+    SingleParamCustomOp,
     StaticData,
     StaticDataMultiReg,
 )
+from pennylane.core import Operator2
+from pennylane.decomposition import add_decomps, local_decomps, register_resources
 from pennylane.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.decomposition_rules import (
@@ -590,11 +593,12 @@ def test_compile_decomposition_rules_wrapper_entry_point():
         """
 
         def rule_resource_fn(angle, op, cwires, n_iters):
-            return {NoParams(reg=Wire[1]): 1, op: 1}
+            return {NoParams(reg=Wire[1]): 1, op: 1, op.op: 1}
 
         @qp.register_resources(rule_resource_fn)
         def rule(angle, op, cwires, n_iters):
-            # qp.apply(op)  # TODO
+            qp.apply(op)
+            qp.apply(op.op)
             NoParams(reg=cwires[0])
 
         with qp.decomposition.local_decomps():
@@ -620,9 +624,11 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: func.func private @"rule_HybridOpArg{angle:[f64]}{cwires:1}{}[7654]"
     # CHECK-SAME:   resources = {operations = {
     # CHECK-SAME:   "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_outer:[-0-9]+]]]" = 1 : i64,
-    # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
+    # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
+    # CHECK-SAME:   "StaticDataMultiReg{theta:[f64]}{reg:1,reg2:2}{}[[[uid_inner:[-0-9]+]]]" = 1 : i64
     # CHECK-SAME:   target_gate = "HybridOpArg{angle:[f64]}{cwires:1}{}[7654]"
-    # COM: CHECK: "qref.operator"({{%.+}}) {UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
     test_from_hybrid_op_nested()
 
     def test_to_multiple_full_args_op():
@@ -773,9 +779,7 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     test_multiple_rules()
 
     def test_for_loop():
-        """
-        Test when the rule body has a for loop.
-        """
+        """Test when the rule body has a for loop."""
 
         class LayerRX(qp.core.Operator2):
             dynamic_argnames = ("angles",)
@@ -815,6 +819,60 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK-DAG: stablehlo.constant dense<1> : tensor<i64>
     # CHECK: scf.for
     test_for_loop()
+
+    def test_if():
+        class TestOp(Operator2):
+            dynamic_argnames = ("flag",)
+            wire_argnames = ("wires",)
+
+            def __init__(self, flag, wires):
+                super().__init__(flag, wires)
+
+        @register_resources(lambda flag, wires: {NoParams(Wire[1]): 1})
+        def if_decomp(flag, wires):
+            qp.cond(flag[0], NoParams)(wires)
+
+        add_decomps(TestOp, if_decomp)
+
+        print(
+            compile_decomposition_rules_wrapper(
+                "TestOp", "IfID", {"flag": ["i1"]}, {"wires": 1}, {}
+            )
+        )
+
+    # CHECK: if_decomp
+    # CHECK: scf.if
+    test_if()
+
+    def test_while():
+        class WhileOp(Operator2):
+            dynamic_argnames = ("angle",)
+            wire_argnames = ("wires",)
+
+            def __init__(self, angle, wires):
+                super().__init__(angle, wires)
+
+        @register_resources(lambda angle, wires: {SingleParamCustomOp(Float[1], Wire[1]): 1})
+        def while_decomp(angle, wires):
+            @qp.while_loop(lambda angle: angle < jnp.pi)
+            def while_body(angle):
+                return angle + 1.5
+
+            angle = while_body(angle)
+
+            SingleParamCustomOp(angle, wires)
+
+        add_decomps(WhileOp, while_decomp)
+
+        print(
+            compile_decomposition_rules_wrapper(
+                "WhileOp", "whileID", {"angle": ["f64"]}, {"wires": 1}, {}
+            )
+        )
+
+    # CHECK: while_decomp
+    # CHECK: scf.while
+    test_while()
 
 
 test_compile_decomposition_rules_wrapper_entry_point()
