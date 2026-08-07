@@ -472,20 +472,13 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
     return guard([&] {
         std::vector<std::uint8_t> syndrome(
-            std::max<std::size_t>(syndrome_bytes, sizeof(catalyst::transport::common::Payload)), 0);
+            std::max<std::size_t>(syndrome_bytes, sizeof(std::uint64_t)), 0);
         std::uint64_t written = 0;
         int rc = CATALYST_TRANSPORT_OK;
 
         for (std::uint32_t i = 0; i < iters; ++i) {
-            // Frame the syndrome as a Payload in a local buffer, then hand it to the transport.
-            // write_data_slot copies it into the outbound slot and enforces the slot capacity.
-            std::uint64_t value = (static_cast<std::uint64_t>(i) << 32) | 0xC0DE1515u;
+            const std::uint64_t value = static_cast<std::uint64_t>(i) + 1;
             std::memcpy(syndrome.data(), &value, sizeof(value));
-            if (syndrome_bytes >= sizeof(catalyst::transport::common::Payload)) {
-                std::uint32_t seq = i + 1; // Payload.seq_num @ 12
-                std::memcpy(syndrome.data() + offsetof(catalyst::transport::common::Payload, seq_num),
-                            &seq, sizeof(seq));
-            }
 
             c->write_data_slot(syndrome.data(), syndrome_bytes, decoder_id);
 
@@ -505,8 +498,18 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
             std::uint64_t sw_rtt = now_ns() - t0;
 
             if (rc != CATALYST_TRANSPORT_OK) {
+                std::uint64_t reply_value = 0;
+                std::uint32_t reply_seq = 0;
+                std::memcpy(&reply_value, rslot, sizeof(reply_value));
+                std::memcpy(&reply_seq,
+                            static_cast<const std::uint8_t *>(rslot) +
+                                offsetof(catalyst::transport::common::Payload, seq_num),
+                            sizeof(reply_seq));
                 std::cerr << "[transport] start_benchmark: round " << i << " failed rc=" << rc
-                          << "\n";
+                          << " [sent 0x" << std::hex << value << ", reply slot 0x" << reply_value
+                          << std::dec << " seq=" << reply_seq << "; work_item=" << work_item_idx
+                          << " in=" << syndrome_bytes << "B out=" << correction_bytes
+                          << "B clear_sentinel=" << clear_sentinel << "]\n";
                 break;
             }
 
