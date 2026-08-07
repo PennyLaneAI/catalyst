@@ -333,7 +333,7 @@ class RemoteLauncher:
         plugins: list[str],
         env: dict[str, str],
         *,
-        sudo: bool = True,
+        sudo: bool = False,
         sudo_password: str | None = None,
         executor_bin: str = f"./{ExecutorPaths.EXECUTOR_BIN}",
     ) -> list[str]:
@@ -374,7 +374,7 @@ class RemoteLauncher:
             f"&& {RemoteLauncher._chmod_prefix(executor_bin)}"
             f"{RemoteLauncher._env_prefix(env)} "
             f"{RemoteLauncher._exec_prefix(sudo, use_password)} "
-            f"{executor_bin} {ExecutorFlags.BIND_FLAG}0.0.0.0:{remote_port} "
+            f"{executor_bin} {ExecutorFlags.BIND_FLAG}{ExecutorFlags.BIND_HOST}:{remote_port} "
             f"{RemoteLauncher._plugin_args(plugins)}"
         )
 

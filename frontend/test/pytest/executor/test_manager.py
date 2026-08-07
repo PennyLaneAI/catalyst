@@ -33,7 +33,7 @@ class TestExecutorConfigDefaults:
         assert c.user == ""
         assert c.port is None
         assert c.copy is False
-        assert c.sudo is True
+        assert c.sudo is False  # root is opt-in: the executor runs arbitrary compiled objects
         assert c.ready_timeout == 60.0
         assert c.verbose == 1
 

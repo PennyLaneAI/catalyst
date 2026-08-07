@@ -292,7 +292,7 @@ class _RemoteProcess(_ExecutorProcess):
         workspace: str,
         plugins: list[str] | None = None,
         env: dict[str, str] | None = None,
-        sudo: bool = True,
+        sudo: bool = False,
         sudo_password: str | None = None,
         executor_bin: str = f"./{ExecutorPaths.EXECUTOR_BIN}",
         cleanup_ws: bool = False,
@@ -402,7 +402,10 @@ class _RemoteProcess(_ExecutorProcess):
         someone else's process there is never wrongly killed."""
         if not self._ready_reached:
             return
-        pat = f"{ExecutorPaths.EXECUTOR_BIN}.*{ExecutorFlags.BIND_FLAG}0.0.0.0:{self._bind_port}"
+        pat = (
+            f"{ExecutorPaths.EXECUTOR_BIN}.*"
+            f"{ExecutorFlags.BIND_FLAG}{ExecutorFlags.BIND_HOST}:{self._bind_port}"
+        )
         RemoteOps.pkill(
             self.user,
             self.host,

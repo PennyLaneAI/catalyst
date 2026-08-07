@@ -127,7 +127,7 @@ class ExecutorConfig:
     copy: bool = False
     build: Callable[[str | None, Path], Any] | None = None
     ready_timeout: float = 60.0
-    sudo: bool = True
+    sudo: bool = False
     sudo_password: str | None = None
     executor_bin: str | None = None
     triple: str | None = None
@@ -164,7 +164,7 @@ class Executor:
         build: Callable[[str | None, Path], Any] | None = None,
         ready_timeout: float = 60.0,
         name: str = "executor",
-        sudo: bool = True,
+        sudo: bool = False,
         sudo_password: str | None = None,
         executor_bin: str | None = None,
         triple: str | None = None,

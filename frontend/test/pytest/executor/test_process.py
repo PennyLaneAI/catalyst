@@ -16,13 +16,15 @@
 lifecycle (spawn, output pump, ready/port-conflict detection, teardown) for the base class and
 its local / remote subclasses. ``subprocess.Popen`` is mocked throughout."""
 
+import re
 import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from catalyst.executor.process import _ExecutorProcess, _LocalProcess, _RemoteProcess
-from catalyst.executor.utils import ExecutorPaths, OutputPatterns, PortInUse
+from catalyst.executor.ssh import RemoteLauncher
+from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, OutputPatterns, PortInUse
 
 
 def _mk_base_proc(**overrides):
@@ -303,7 +305,7 @@ class TestRemoteProcessConstruction:
     def test_defaults(self):
         """Applies default sudo, workspace-cleanup, executor-binary, and ready-tracking values."""
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
-        assert p.sudo is True
+        assert p.sudo is False
         assert p.cleanup_ws is False
         assert p.executor_bin == f"./{ExecutorPaths.EXECUTOR_BIN}"
         assert not p._ready_reached
@@ -416,9 +418,32 @@ class TestRemoteProcessTeardownExtra:
         with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
         pkill.assert_called_once()
-        # Pattern should be port-scoped so we can't kill someone else's process.
+        # Pattern should be port-scoped so we can't kill someone else's process, and must match
+        # the loopback bind address the remote launch command actually uses.
         pat = pkill.call_args.args[2]
-        assert "0.0.0.0:1373" in pat
+        assert f"{ExecutorFlags.BIND_HOST}:1373" in pat
+        assert "0.0.0.0" not in pat
+
+    def test_pkill_pattern_matches_the_real_launch_command(self):
+        """The teardown pattern is a regex run against the live process list, so it has to match
+        the command :meth:`RemoteLauncher._remote_cmd` actually emits.
+        """
+        p = _RemoteProcess(host="h", user="me", port=1373, workspace="~/ws")
+        p._ready_reached = True
+        with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
+            p._teardown_extra()
+        pat = pkill.call_args.args[2]
+
+        launch_cmd = RemoteLauncher._remote_cmd(
+            "~/ws",
+            1373,
+            plugins=[],
+            env={},
+            sudo=False,
+            use_password=False,
+            executor_bin=f"./{ExecutorPaths.EXECUTOR_BIN}",
+        )
+        assert re.search(pat, launch_cmd), f"{pat!r} does not match {launch_cmd!r}"
 
 
 class TestRemoteProcessTeardownWorkspace:

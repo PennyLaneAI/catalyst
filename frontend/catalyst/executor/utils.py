@@ -148,6 +148,7 @@ class ExecutorFlags:
 
     PLUGIN_FLAG = "--plugin="
     BIND_FLAG = "--bind="
+    BIND_HOST: Final = "127.0.0.1"
 
 
 # --- logging -----------------------------------------------------------------------------------

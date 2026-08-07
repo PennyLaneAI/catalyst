@@ -24,7 +24,7 @@ from unittest.mock import patch
 import pytest
 
 from catalyst.executor.ssh import SCP, RemoteLauncher, RemoteOps, SSHArgv
-from catalyst.executor.utils import ExecutorPaths, Unquoted, set_verbose
+from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, Unquoted, set_verbose
 
 # ---------------------------------------------------------------------------
 # SSHArgv — control socket, argv construction
@@ -467,10 +467,42 @@ class TestRemoteLauncherRemoteCmd:
         )
         assert "cd " in cmd
         assert "FOO=bar" in cmd
-        assert "--bind=0.0.0.0:1373" in cmd
+        assert "--bind=127.0.0.1:1373" in cmd
         assert "--plugin=$PWD/libx.so" in cmd
         # chmod prefix should be present because we're using the workspace-local binary.
         assert "chmod +x" in cmd
+
+
+class TestRemoteLauncherSecurityDefaults:
+    """The remote executor must not be network-exposed, nor root, unless asked for."""
+
+    def _cmd(self, **overrides):
+        kwargs = dict(
+            workspace="~/ws",
+            remote_port=1373,
+            plugins=[],
+            env={},
+            sudo=False,
+            use_password=False,
+            executor_bin=f"./{ExecutorPaths.EXECUTOR_BIN}",
+        )
+        kwargs.update(overrides)
+        return RemoteLauncher._remote_cmd(**kwargs)
+
+    def test_binds_loopback_never_wildcard(self):
+        """The executor runs arbitrary compiled objects, so it must bind loopback only."""
+        cmd = self._cmd()
+        assert "0.0.0.0" not in cmd
+        assert f"--bind={ExecutorFlags.BIND_HOST}:1373" in cmd
+
+    def test_no_sudo_by_default(self):
+        """``ssh_argv`` runs the executor as the connecting user unless ``sudo=True``."""
+        argv = RemoteLauncher.ssh_argv("me", "h", "~/ws", 1373, 5000, [], {})
+        assert "sudo" not in argv[-1]
+
+    def test_sudo_is_opt_in(self):
+        """``sudo=True`` is still honored for backends needing privileged memory registration."""
+        assert "exec sudo -E" in self._cmd(sudo=True)
 
 
 class TestRemoteLauncherSshOpts:
