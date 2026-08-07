@@ -315,32 +315,30 @@ std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len)
     return std::string(Host) + ":" + Port;
 }
 
+template <typename FnT> FnT lookupRuntimeSymbol(const char *Name, const std::string &GLabel)
+{
+    auto *Fn = reinterpret_cast<FnT>(::dlsym(RTLD_DEFAULT, Name));
+    if (!Fn) {
+        std::fprintf(stderr, "[%s] Warning: %s not found in any loaded plugin\n", GLabel.c_str(),
+                     Name);
+    }
+    return Fn;
+}
+
 void initializeCatalystRuntime(const std::string &GLabel)
 {
-    auto *initFn =
-        reinterpret_cast<void (*)(uint32_t *)>(::dlsym(RTLD_DEFAULT, "__catalyst__rt__initialize"));
-    if (!initFn) {
-        std::fprintf(stderr,
-                     "[%s] Warning: __catalyst__rt__initialize not found "
-                     "in any loaded plugin\n",
-                     GLabel.c_str());
-        return;
+    auto *initFn = lookupRuntimeSymbol<void (*)(uint32_t *)>("__catalyst__rt__initialize", GLabel);
+    if (initFn) {
+        initFn(nullptr);
     }
-    initFn(nullptr);
 }
 
 void finalizeCatalystRuntime(const std::string &GLabel)
 {
-    auto *finalizeFn =
-        reinterpret_cast<void (*)()>(::dlsym(RTLD_DEFAULT, "__catalyst__rt__finalize"));
-    if (!finalizeFn) {
-        std::fprintf(stderr,
-                     "[%s] Warning: __catalyst__rt__finalize not found "
-                     "in any loaded plugin\n",
-                     GLabel.c_str());
-        return;
+    auto *finalizeFn = lookupRuntimeSymbol<void (*)()>("__catalyst__rt__finalize", GLabel);
+    if (finalizeFn) {
+        finalizeFn();
     }
-    finalizeFn();
 }
 
 // Listener loop
