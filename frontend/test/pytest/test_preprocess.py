@@ -592,6 +592,8 @@ class TestPreprocessHybridOp:
         class NoMatrixMultiControlledX(qp.MultiControlledX):
             """A version of MulitControlledX with no matrix defined"""
 
+            has_decomposition = False
+
             def matrix(self):
                 """raise an error"""
                 raise qp.operation.MatrixUndefinedError
@@ -608,7 +610,10 @@ class TestPreprocessHybridOp:
 
         with pytest.raises(
             CompileError,
-            match="not supported with catalyst on this device and does not provide a decomposition",
+            match=(
+                "could not be decomposed|not supported with catalyst on this device "
+                "and does not provide a decomposition"
+            ),
         ):
             _ = catalyst_decompose(tape, **kwargs)
 

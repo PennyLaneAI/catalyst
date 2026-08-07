@@ -1049,7 +1049,7 @@ class TestControlledMiscMethods:
         assert len(ob) == 1
         assert ob[0].__class__ is base_gen.__class__
 
-        expected = qp.exp(op.generator(), 1j * op.data[0])
+        expected = qp.exp(op.generator(), 1j * op.base.data[0])
         assert qp.math.allclose(
             expected.matrix(wire_order=["a", "b", "c"]), op.matrix(wire_order=["a", "b", "c"])
         )
@@ -1444,20 +1444,20 @@ class TestDecomposition:
             assert qp.equal(actual_op, expected_op)
 
     def test_non_differentiable_one_qubit_special_unitary(self):
-        """Assert that a non-differentiable on qubit special unitary uses the bisect
-        decomposition."""
+        """Assert that a controlled RZ uses the specialized Operator2 decomposition."""
 
         op = C_ctrl(qp.RZ(1.2, wires=0), (1, 2, 3, 4))
         decomp = op.decomposition()
 
-        assert qp.equal(decomp[0], qp.MultiControlledX(wires=(1, 2, 0), work_wires=(3, 4)))
-        assert isinstance(decomp[1], qp.QubitUnitary)
-        assert qp.equal(decomp[2], qp.MultiControlledX(wires=(3, 4, 0), work_wires=(1, 2)))
-        assert isinstance(decomp[3].base, qp.QubitUnitary)
-        assert qp.equal(decomp[4], qp.MultiControlledX(wires=(1, 2, 0), work_wires=(3, 4)))
-        assert isinstance(decomp[5], qp.QubitUnitary)
-        assert qp.equal(decomp[6], qp.MultiControlledX(wires=(3, 4, 0), work_wires=(1, 2)))
-        assert isinstance(decomp[7].base, qp.QubitUnitary)
+        expected = [
+            qp.RZ(0.6, wires=0),
+            qp.MultiControlledX(wires=(1, 2, 3, 4, 0)),
+            qp.RZ(-0.6, wires=0),
+            qp.MultiControlledX(wires=(1, 2, 3, 4, 0)),
+        ]
+        assert all(
+            qp.equal(actual, target) for actual, target in zip(decomp, expected, strict=True)
+        )
 
         decomp_mat = qp.matrix(op.decomposition, wire_order=op.wires)()
         assert qp.math.allclose(op.matrix(), decomp_mat)

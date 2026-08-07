@@ -269,10 +269,10 @@ class TestGraphDecomposition:
         """Test that TensorLike parameters in MultiRZ are handled correctly in rules."""
 
         @graph_decomposition(op_type="MultiRZ")
-        def custom_multirz(params: TensorLike, wires: WiresLike, **__):
+        def custom_multirz(theta: TensorLike, wires: WiresLike, **__):
             qp.CNOT(wires=(wires[2], wires[1]))
             qp.CNOT(wires=(wires[1], wires[0]))
-            qp.RZ(params, wires=wires[0])
+            qp.RZ(theta, wires=wires[0])
             qp.CNOT(wires=(wires[1], wires[0]))
             qp.CNOT(wires=(wires[2], wires[1]))
 
@@ -652,10 +652,10 @@ class TestPlxPRDecomposition:
         qp.decomposition.enable_graph()
 
         @qp.register_resources({qp.RZ: 1, qp.CNOT: 4})
-        def custom_multirz(params: TensorLike, wires: WiresLike, **__):
+        def custom_multirz(theta: TensorLike, wires: WiresLike, **__):
             qp.CNOT(wires=(wires[2], wires[1]))
             qp.CNOT(wires=(wires[1], wires[0]))
-            qp.RZ(params, wires=wires[0])
+            qp.RZ(theta, wires=wires[0])
             qp.CNOT(wires=(wires[1], wires[0]))
             qp.CNOT(wires=(wires[2], wires[1]))
 
@@ -1154,7 +1154,7 @@ class TestPlxPRDecomposition:
         """
         qp.decomposition.enable_graph()
 
-        def _resources():
+        def _resources(phi, wires):  # pylint: disable=unused-argument
             return {
                 controlled_resource_rep(
                     qp.BasisEmbedding, {"num_wires": 1}, num_control_wires=1
