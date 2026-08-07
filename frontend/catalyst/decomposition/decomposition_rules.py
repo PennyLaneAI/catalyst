@@ -201,6 +201,38 @@ def get_rules_from_module(module: ir.Module) -> str:
     return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
+def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
+    with ir.InsertionPoint(module.body):
+        for decomp_rule in decomp_rules:
+            if not decomp_rule:
+                continue
+
+            decomp_rule_op = ir.Operation.parse(decomp_rule)
+            rule_already_exists = False
+
+            def find_condition(op):
+                nonlocal rule_already_exists
+                if op.name == "func.func":
+                    if "target_gate" in op.attributes:
+                        target_gate = op.attributes["target_gate"]
+                        resources = op.attributes["resources"]
+
+                        current_rule_target_gate = decomp_rule_op.attributes["target_gate"]
+                        current_rule_resources = decomp_rule_op.attributes["resources"]
+                        if (
+                            target_gate == current_rule_target_gate
+                            and resources == current_rule_resources
+                        ):
+                            rule_already_exists = True
+                            return ir.WalkResult.INTERRUPT
+                        return ir.WalkResult.SKIP
+                return ir.WalkResult.ADVANCE
+
+            module.operation.walk(find_condition)
+            if not rule_already_exists:
+                decomp_rule_op.clone()
+
+
 def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
     """Return resource data for all decomposition rules associated to op_name."""
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
