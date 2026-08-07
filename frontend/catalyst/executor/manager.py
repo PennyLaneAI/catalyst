@@ -27,7 +27,7 @@ works as a context manager::
     ex = Executor(host="10.0.0.9", user="me", plugins=[...]).launch()
     dev = target(qml.device(...), address=ex.address)   # ... ex.stop() (also at process exit)
 
-    # attach to one already running/tunnelled:
+    # attach to one already running/tunnelled (address is required here, there is no default):
     ex = Executor("127.0.0.1:1234").launch()
 
     # persistent remote workspace:
@@ -145,12 +145,16 @@ class Executor:
     * ``local=True``: subprocess on ``127.0.0.1`` (no SSH).
     * ``host=<addr>``: remote over forwarded SSH. ``copy=True`` + ``bundle=<dir>`` first scp's
       the bundle (cross-built via ``build=`` if given).
-    * neither: carry ``address`` for an executor already running or tunnelled there.
+    * ``address``: attach to an executor already running or tunnelled there.
+
+    Exactly one of the three is required; :meth:`launch` raises :class:`ValueError` if none was
+    given. ``address`` has no default on purpose — silently attaching to a well-known port would
+    turn "nothing is listening there" into a failure at dispatch time, far from its cause.
     """
 
     def __init__(
         self,
-        address: str = "127.0.0.1:1373",
+        address: str | None = None,
         *,
         host: str | None = None,
         local: bool = False,
@@ -304,8 +308,16 @@ class Executor:
     def launch(self) -> Self:
         """Deploy the executor and return ``self``. Idempotent, chainable. See the class docstring
         for the three modes."""
-        # Short-circuit: already launched, or attach-only mode.
-        if self._launched or not (self._local or self.host):
+        if self._launched:
+            return self
+        # Attach-only mode: nothing to deploy, just carry the address the caller supplied.
+        if not (self._local or self.host):
+            if self._address is None:
+                raise ValueError(
+                    "Executor has no mode: pass local=True to run it as a local subprocess, "
+                    "host=<addr> to deploy it over SSH, or an address to attach to one that is "
+                    "already serving."
+                )
             self._launched = True
             return self
         set_verbose(self._cfg.verbose)

@@ -60,6 +60,34 @@ class TestExecutorConstruction:
         assert ex.host == "10.0.0.9"
         assert ex._cfg.user == "me"
 
+    def test_no_address_default(self):
+        """``address`` has no default: nothing is assumed about where an executor is serving."""
+        assert Executor()._address is None
+
+
+class TestLaunchRequiresAMode:
+    """:meth:`Executor.launch` refuses to guess a mode."""
+
+    def test_no_mode_raises(self):
+        """Neither ``local=``, ``host=``, nor an address: launch() reports it immediately.
+
+        Defaulting to a well-known address would let a program get all the way to dispatch
+        before failing, with an error pointing at the wrong place.
+        """
+        with pytest.raises(ValueError, match="no mode"):
+            Executor().launch()
+
+    def test_construction_stays_inert(self):
+        """The check happens in launch(), not __init__ — construction never raises."""
+        ex = Executor()  # must not raise
+        assert not ex._launched
+
+    def test_each_mode_satisfies_the_check(self):
+        """Any one of the three modes is enough."""
+        assert Executor("1.2.3.4:5").launch()._launched
+        assert Executor(local=True)._local is True  # launch() would spawn; mode itself is enough
+        assert Executor(host="h").host == "h"
+
 
 class TestExecutorAddress:
     """The :attr:`Executor.address` property guard."""
