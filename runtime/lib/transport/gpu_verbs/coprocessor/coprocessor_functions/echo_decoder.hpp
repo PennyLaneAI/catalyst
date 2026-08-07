@@ -17,8 +17,7 @@
 namespace catalyst::transport::gpu_verbs {
 
 // Passthrough self-test: returns the word unchanged.
-__device__ inline std::int64_t echo_decode(std::uint64_t syndrome)
-{
+__device__ inline std::int64_t echo_decode(std::uint64_t syndrome) {
     return static_cast<std::int64_t>(syndrome);
 }
 

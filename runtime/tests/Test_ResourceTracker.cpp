@@ -45,8 +45,7 @@ static const std::string MEASUREMENT_NAMES[] = {
     "probs(2 wires)",
 };
 
-static void ApplyGates(ResourceTracker &tracker)
-{
+static void ApplyGates(ResourceTracker &tracker) {
     if (tracker.GetMaxWires() < 3) {
         FAIL_CHECK("ApplyGates requires at least 3 wires to operate");
     }
@@ -66,8 +65,7 @@ static void ApplyGates(ResourceTracker &tracker)
     tracker.MatrixOperation(true, {0}, {1, 2});
 }
 
-static void ApplyMeasurements(ResourceTracker &tracker)
-{
+static void ApplyMeasurements(ResourceTracker &tracker) {
     // Apply named gates to test all possible name modifiers (adj, controlled, etc.)
     auto pauli_x = tracker.Observable(ObsId::PauliX);
     auto pauli_z = tracker.Observable(ObsId::PauliZ);
@@ -86,8 +84,7 @@ static void ApplyMeasurements(ResourceTracker &tracker)
 
 } // namespace
 
-TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]") {
     // Constructor should call Reset
     ResourceTracker tracker;
 
@@ -126,8 +123,7 @@ TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
     CHECK(tracker.GetComputeDepth() == true);
 }
 
-TEST_CASE("Test Resource Tracker Wires", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker Wires", "[resourcetracking]") {
     ResourceTracker tracker;
     CHECK(tracker.GetMaxWires() == 0);
     CHECK(tracker.GetTotalAllocations() == 0);
@@ -152,8 +148,7 @@ TEST_CASE("Test Resource Tracker Wires", "[resourcetracking]")
     CHECK(tracker.GetTotalAllocations() == 10);
 }
 
-TEST_CASE("Test Resource Tracker Gate Types", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker Gate Types", "[resourcetracking]") {
     ResourceTracker tracker;
     for (size_t i = 0; i < 5; i++) {
         tracker.AllocateQubit(i);
@@ -179,8 +174,7 @@ TEST_CASE("Test Resource Tracker Gate Types", "[resourcetracking]")
     CHECK(tracker.GetNumGates("NonExistentGate") == 0); // should not exist
 }
 
-TEST_CASE("Test Resource Tracker Gate Sizes", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker Gate Sizes", "[resourcetracking]") {
     ResourceTracker tracker;
     CHECK(tracker.GetNumGates() == 0);
 
@@ -204,8 +198,7 @@ TEST_CASE("Test Resource Tracker Gate Sizes", "[resourcetracking]")
     CHECK(tracker.GetNumGatesBySize(4) == 0);
 }
 
-TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]") {
     ResourceTracker tracker;
     for (size_t i = 0; i < 5; i++) {
         tracker.AllocateQubit(i);
@@ -265,8 +258,7 @@ TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]")
     CHECK(tracker.GetDepth() == 0); // Should not change if depth tracking disabled
 }
 
-TEST_CASE("Test Resource Tracker Runtime Checks", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker Runtime Checks", "[resourcetracking]") {
     ResourceTracker tracker;
     tracker.SetComputeDepth(true);
     for (size_t i = 0; i < 5; i++) {
@@ -291,8 +283,7 @@ TEST_CASE("Test Resource Tracker Runtime Checks", "[resourcetracking]")
     CHECK(tracker.GetDepth() == 0);
 }
 
-TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]") {
     // The name of the file where the resource usage data is stored
     constexpr char RESOURCES_FILENAME[] = "__pennylane_resources_data.json";
 
@@ -368,8 +359,7 @@ TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
     }
 }
 
-TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]") {
     ResourceTracker tracker;
     CHECK(tracker.GetFilename() == "");
     CHECK(tracker.GetNumGates() == 0);
@@ -448,8 +438,7 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
     }
 }
 
-TEST_CASE("Test Resource Tracker SetState Operations", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker SetState Operations", "[resourcetracking]") {
     ResourceTracker tracker;
     tracker.SetComputeDepth(true);
     for (size_t i = 0; i < 5; i++) {
@@ -470,8 +459,7 @@ TEST_CASE("Test Resource Tracker SetState Operations", "[resourcetracking]")
     CHECK(tracker.GetDepth() == 2);
 }
 
-TEST_CASE("Test Resource Tracker Measurements", "[resourcetracking]")
-{
+TEST_CASE("Test Resource Tracker Measurements", "[resourcetracking]") {
     ResourceTracker tracker;
     for (size_t i = 0; i < 5; i++) {
         tracker.AllocateQubit(i);

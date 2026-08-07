@@ -50,12 +50,9 @@ constexpr int FWD_INLINE_MAX = 0;
 } // namespace
 
 GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device)
-    : dev_name_(std::move(dev)), gid_idx_(gid_idx), gpu_(gpu_device)
-{
-}
+    : dev_name_(std::move(dev)), gid_idx_(gid_idx), gpu_(gpu_device) {}
 
-int GpuCoprocessorSession::connect(const ConnectInfo &info)
-{
+int GpuCoprocessorSession::connect(const ConnectInfo &info) {
     ctx_ = std::make_shared<Context>(dev_name_);
     pd_ = std::make_shared<ProtectionDomain>(ctx_);
     fwd_cq_ = std::make_shared<CompletionQueue>(ctx_, FWD_CQ_DEPTH);
@@ -71,8 +68,7 @@ int GpuCoprocessorSession::connect(const ConnectInfo &info)
     return 0;
 }
 
-MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind)
-{
+MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     RDMA_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
     hbm_ = gpu_.alloc_hbm_ring(size);
     hbm_ring_.emplace(pd_, /*offset=*/static_cast<std::uint64_t>(0), hbm_.size,
@@ -89,8 +85,7 @@ MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind)
     };
 }
 
-PeerRef GpuCoprocessorSession::exchange_keys(const MemRegion &local)
-{
+PeerRef GpuCoprocessorSession::exchange_keys(const MemRegion &local) {
     HandshakeMsg my{
         .fwd = {.qpn = fwd_qp_->qpn(), .psn = 0},
         .bwd = {.qpn = bwd_qp_->qpn(), .psn = 0},
@@ -119,8 +114,7 @@ PeerRef GpuCoprocessorSession::exchange_keys(const MemRegion &local)
 }
 
 void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
-                                              const PeerRef &peer)
-{
+                                              const PeerRef &peer) {
     RDMA_CHECK(desc.data_path == "cpu_verbs", "gpu_verbs: only data_path \"cpu_verbs\" supported");
     RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
                static_cast<std::size_t>(local.size), REGION_BYTES);
@@ -132,20 +126,20 @@ void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const Mem
                                                   common::MemAccess::LOCAL_WRITE);
 }
 
-void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx)
-{
+void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) {
     // Store the launcher; start() invokes it once to launch the on-device decode
     // kernel. nullptr selects the built-in echo launcher.
     coproc_launcher_ = fn;
     coproc_ctx_ = ctx;
 }
 
-bool GpuCoprocessorSession::post_inline(std::uint64_t cursor)
-{
+bool GpuCoprocessorSession::post_inline(std::uint64_t cursor) {
     auto *reply = reinterpret_cast<Payload *>(reply_buf_->addr());
     reply->value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
+    // TODO: echo the request's id by forwarding it through.
+    // Currently not sent to reduce Handoff size.
+    reply->decoder_id = 0;
     reply->seq_num = static_cast<std::uint32_t>(cursor + 1);
-    reply->pad = 0;
     ibv_sge sge{
         .addr = reinterpret_cast<std::uint64_t>(reply),
         .length = sizeof(Payload),
@@ -171,8 +165,7 @@ bool GpuCoprocessorSession::post_inline(std::uint64_t cursor)
 // (up to REAP_BATCH at a time) and decrement `outstanding`. With drain=true,
 // keep polling until every signaled send has completed (teardown), guarded so a
 // lost completion can't hang the join forever.
-void GpuCoprocessorSession::reap_bwd(int &outstanding, bool drain)
-{
+void GpuCoprocessorSession::reap_bwd(int &outstanding, bool drain) {
     std::array<ibv_wc, REAP_BATCH> wc{};
     int empty = 0;
     constexpr int DRAIN_MAX_EMPTY = 1000000;
@@ -199,8 +192,7 @@ void GpuCoprocessorSession::reap_bwd(int &outstanding, bool drain)
 // the host-mapped handoff ring, then post it inline on the bwd QP. Sends are
 // selectively signaled (1 in SIGNAL_EVERY) and the bwd CQ is reaped in batches
 // at those points, so completions stay off the per-shot critical path.
-void GpuCoprocessorSession::run_coprocessor(std::stop_token st)
-{
+void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
         const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
@@ -227,8 +219,7 @@ void GpuCoprocessorSession::run_coprocessor(std::stop_token st)
     reap_bwd(signaled_outstanding, /*drain=*/true);
 }
 
-void GpuCoprocessorSession::start()
-{
+void GpuCoprocessorSession::start() {
     stop();
     failed_.store(false, std::memory_order_relaxed);
     error_ = nullptr;
@@ -257,8 +248,7 @@ void GpuCoprocessorSession::start()
     auto body = [this](std::stop_token st) {
         try {
             run_coprocessor(st);
-        }
-        catch (...) {
+        } catch (...) {
             error_ = std::current_exception();
             failed_.store(true, std::memory_order_release);
         }
@@ -267,8 +257,7 @@ void GpuCoprocessorSession::start()
 }
 
 int GpuCoprocessorSession::collect(void *const *outputs, const std::uint64_t *output_bytes,
-                                   std::size_t n)
-{
+                                   std::size_t n) {
     while (completed_.load(std::memory_order_acquire) == 0) {
         if (failed_.load(std::memory_order_acquire)) {
             std::rethrow_exception(error_);
@@ -294,8 +283,7 @@ int GpuCoprocessorSession::collect(void *const *outputs, const std::uint64_t *ou
     return 0;
 }
 
-void GpuCoprocessorSession::stop()
-{
+void GpuCoprocessorSession::stop() {
     if (handoff_.stop_host) {
         *handoff_.stop_host = 1; // let the fused kernel exit its loop
     }

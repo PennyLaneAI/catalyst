@@ -49,8 +49,7 @@ namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
 
-TEST(DecomposableGateInterfaceTests, CustomOp)
-{
+TEST(DecomposableGateInterfaceTests, CustomOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -84,8 +83,7 @@ module {
     ASSERT_EQ(customOp.getGraphOpId(), "RX[f64][2]{}");
 }
 
-TEST(DecomposableGateInterfaceTests, MultiRZOp)
-{
+TEST(DecomposableGateInterfaceTests, MultiRZOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -120,8 +118,7 @@ module {
     ASSERT_EQ(multiRZ.getGraphOpId(), "MultiRZ[f64][3]{}");
 }
 
-TEST(DecomposableGateInterfaceTests, PauliRotOp)
-{
+TEST(DecomposableGateInterfaceTests, PauliRotOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -159,8 +156,7 @@ module {
     ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot[f64][3]{pauli_word:XYZ}");
 }
 
-TEST(DecomposableGateInterfaceTests, PCPhaseOP)
-{
+TEST(DecomposableGateInterfaceTests, PCPhaseOP) {
     std::string moduleStr = R"mlir(
 module {
   %theta = arith.constant 3.7 : f64
@@ -200,8 +196,7 @@ module {
     ASSERT_EQ(pcphase.getGraphOpId(), "PCPhase[f64][2]{dim:0}");
 }
 
-TEST(DecomposableGateInterfaceTests, GlobalPhaseOp)
-{
+TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -233,8 +228,7 @@ module {
     ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase[f64][0]{}");
 }
 
-TEST(DecomposableGateInterfaceTests, ControlledGlobalPhaseOp)
-{
+TEST(DecomposableGateInterfaceTests, ControlledGlobalPhaseOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -268,8 +262,7 @@ module {
     ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase[f64][0]{}");
 }
 
-TEST(DecomposableGateInterfaceTests, QubitUnitaryOp)
-{
+TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
     std::string moduleStr = R"mlir(
 module {
   %matrix = "test.op"() : () -> tensor<4x4xcomplex<f64>>
@@ -312,8 +305,7 @@ module {
                                       "][2]{}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpQubits)
-{
+TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -370,8 +362,7 @@ module {
         "testInterfaceOp[i1,f64,i64][2]{myStaticArray:[1,2,3],myStaticInt:4,myStaticString:Test}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpQureg)
-{
+TEST(DecomposableGateInterfaceTests, OperatorOpQureg) {
     std::string moduleStr = R"mlir(
 func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
   %angle = arith.constant 3.1 : f64
@@ -431,8 +422,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
               "myStaticInt:8,myStaticString:string}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpUID)
-{
+TEST(DecomposableGateInterfaceTests, OperatorOpUID) {
     std::string moduleStr = R"mlir(
 func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
   %angle = arith.constant 3.1 : f64
