@@ -62,6 +62,22 @@ func.func @ctrl_merge_existing(%ctrl: !quantum.bit, %inner: !quantum.bit, %q: !q
 
 // -----
 
+// CHECK-LABEL: @ctrl_duplicate
+func.func @ctrl_duplicate(%ctrl: !quantum.bit, %inner: !quantum.bit, %q: !quantum.bit)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+  // CHECK: %[[TRUE:.*]] = arith.constant true
+  %true = arith.constant true
+  // CHECK: quantum.custom "PauliX"() %{{.*}} ctrls(%{{.*}}, %{{.*}}) ctrlvals(%[[TRUE]], %[[TRUE]]) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+  %outc, %outq:2 = quantum.ctrl(%ctrl) ctrlvals(%true) (%inner, %q : !quantum.bit, !quantum.bit) : !quantum.bit -> !quantum.bit, !quantum.bit {
+  ^bb0(%argc: !quantum.bit, %argq: !quantum.bit):
+    %xo, %xc = quantum.custom "PauliX"() %argq ctrls(%argc) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+    quantum.yield %xc, %xo : !quantum.bit, !quantum.bit
+  }
+  return %outq#0, %outq#1, %outc : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
 // CHECK-LABEL: @ctrl_zero_value
 func.func @ctrl_zero_value(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   // CHECK: %[[FALSE:.*]] = arith.constant false
