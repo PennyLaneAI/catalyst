@@ -560,6 +560,10 @@
   `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
   [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
 
+* Move the Steane decoder table to `transport/common` and add a runtime unit test cross-checking it
+  against the frontend's Steane code parity check matrix.
+  [(#3105)](https://github.com/PennyLaneAI/catalyst/pull/3105)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
