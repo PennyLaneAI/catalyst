@@ -275,10 +275,7 @@ def compile_decomposition_rules(
 
     # TODO: reconcretify abstracted hybrid ops
 
-    @qp.qjit(
-        target="mlir",
-        capture=True,
-    )
+    @qp.qjit(target="mlir", capture=True, skip_decomp_rules=True)
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
@@ -332,3 +329,53 @@ def compile_decomposition_rules_wrapper(
             is_custom_op=is_custom_op,
         )
     )
+
+
+def fetch_all_reachable_decomposition_rules_from_op(
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
+):
+    extra_data = extra_data or {}
+    queue = deque()
+    start = (op_name, dynamic_shape, wire_lens, static_data, extra_data)
+    queue.append(start)
+    visited = [start]
+
+    rules = get_rules_from_module_as_list(
+        compile_decomposition_rules(
+            op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
+        )
+    )
+
+    while len(queue) != 0:
+        this_name, this_dynamic_shape, this_wire_lens, this_static_data, this_extra_data = (
+            queue.popleft()
+        )
+        this_extra_data = this_extra_data or {}
+        this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
+        resources, _, _ = collect_resources_for_op(
+            this_name, this_kwargs | this_static_data | this_extra_data
+        )
+        for _rule_name, resource in resources.items():
+            for op, _count in resource.items():
+                graph_op_id = GraphOpID(op)
+                probe = (
+                    graph_op_id.get_operator_name(),
+                    convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
+                    graph_op_id.wire_lens,
+                    graph_op_id.static_data,
+                    graph_op_id.extra_data,
+                )
+
+                if not probe in visited:
+                    visited.append(probe)
+                    queue.append(probe)
+                    module = compile_decomposition_rules(
+                        probe[0],
+                        graph_op_id.getID(),
+                        probe[1],
+                        probe[2],
+                        probe[3],
+                        probe[4],
+                    )
+                    rules.extend(get_rules_from_module_as_list(module))
+    return rules
