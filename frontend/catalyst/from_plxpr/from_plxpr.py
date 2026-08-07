@@ -304,7 +304,7 @@ def handle_qnode(
         # as supporting multiple gatesets requires an MLIR/C++ graph-decomposition
         # implementation. The current Python implementation cannot be mixed
         # with other transforms in between.
-        gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
+        gateset = [to_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
         gateset = list(sorted(gateset))  # consistent ordering for testing
         setattr(qnode, "decompose_gatesets", [gateset])
     pipelines = (("main", tuple(self._pass_pipeline)),)
@@ -550,12 +550,3 @@ def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
             )
 
     return final_jaxpr, graph_succeeded
-
-
-def _get_operator_name(op):
-    """Get the name of a pennylane operator, handling wrapped operators.
-
-    Note: Controlled and Adjoint ops aren't supported in `gate_set`
-    by PennyLane's DecompositionGraph; unit tests were added in PennyLane.
-    """
-    return to_name(op)
