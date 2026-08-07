@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "Transport.hpp"
+
 #include "../LocalRegistry.hpp"
 
 namespace catalyst::transport::local_copy {
@@ -36,8 +37,7 @@ class LocalCoprocessorSession : public CoprocessorSession {
     void establish_channel(const ChannelDesc &desc, const MemRegion &local,
                            const PeerRef &peer) override;
     void start() override;
-    int collect(void *const *replies, const std::uint64_t *replies_bytes,
-                std::size_t n) override;
+    int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
     void stop() override;
 
     // CoprocessorSession
