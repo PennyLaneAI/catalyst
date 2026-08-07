@@ -177,8 +177,9 @@ class ControllerSession : public TransportSession {
 
     // Copy `bytes` of payload into the current round's outbound slot, ready for kick().
     // Throws if `bytes` exceeds what the round was committed to carry, so an oversized
-    // payload will fail.
-    virtual void write_data_slot(const void *src, std::uint64_t bytes) = 0;
+    // payload will fail. `decoder_id` picks the coprocessor-side decoder for this round.
+    virtual void write_data_slot(const void *src, std::uint64_t bytes,
+                                 std::uint32_t decoder_id) = 0;
 
     // Current round's reply slot in the transport-owned reply ring.
     virtual void *reply_slot() { return nullptr; }
@@ -238,11 +239,11 @@ class CoprocessorSession : public TransportSession {
     /**
      * @brief Bind a per-message coprocessor function (CPU-style).
      *
-     * Call before start(). `fn` is invoked once per received message; `ctx` is
-     * passed back on every invocation and may be null.
+     * Call before start(). `fn` is invoked once per received message, receiving the
+     * message's decoder_id so it can dispatch internally; `ctx` is passed back on
+     * every invocation and may be null.
      */
-    virtual void set_coprocessor_fn(CoprocessorFn /*fn*/, void * /*ctx*/)
-    {
+    virtual void set_coprocessor_fn(CoprocessorFn /*fn*/, void * /*ctx*/) {
         throw std::logic_error(
             "transport: per-message coprocessor function not supported by this backend");
     }
@@ -253,8 +254,7 @@ class CoprocessorSession : public TransportSession {
      * Call before start(). `fn` is invoked once (in start()) to launch a
      * persistent engine on the session's datapath; `ctx` may be null.
      */
-    virtual void set_coprocessor_launcher(CoprocessorLauncherFn /*fn*/, void * /*ctx*/)
-    {
+    virtual void set_coprocessor_launcher(CoprocessorLauncherFn /*fn*/, void * /*ctx*/) {
         throw std::logic_error(
             "transport: launch-once coprocessor function not supported by this backend");
     }
@@ -264,8 +264,7 @@ class CoprocessorSession : public TransportSession {
      *
      * Defaults to per-message.
      */
-    virtual CoprocConvention coprocessor_fn_convention() const
-    {
+    virtual CoprocConvention coprocessor_fn_convention() const {
         return CoprocConvention::PerMessage;
     }
 };

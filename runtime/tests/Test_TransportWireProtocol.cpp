@@ -20,23 +20,20 @@
 
 using namespace catalyst::transport::common;
 
-TEST_CASE("Payload is the 16 B wire frame")
-{
+TEST_CASE("Payload is the 16 B wire frame") {
     STATIC_REQUIRE(sizeof(Payload) == 16);
     STATIC_REQUIRE(offsetof(Payload, value) == 0);
-    STATIC_REQUIRE(offsetof(Payload, seq_num) == 8);
-    STATIC_REQUIRE(offsetof(Payload, pad) == 12);
+    STATIC_REQUIRE(offsetof(Payload, decoder_id) == 8);
+    STATIC_REQUIRE(offsetof(Payload, seq_num) == 12);
 }
 
-TEST_CASE("PayloadSlot is a 64 B slot")
-{
+TEST_CASE("PayloadSlot is a 64 B slot") {
     STATIC_REQUIRE(sizeof(PayloadSlot) == 64);
     STATIC_REQUIRE(alignof(PayloadSlot) == 64);
     STATIC_REQUIRE(offsetof(PayloadSlot, p) == 0);
 }
 
-TEST_CASE("Ring geometry and constants match the trampoline")
-{
+TEST_CASE("Ring geometry and constants match the trampoline") {
     STATIC_REQUIRE(K_RING_SLOTS == 256);
     STATIC_REQUIRE((K_RING_SLOTS & (K_RING_SLOTS - 1)) == 0);
     STATIC_REQUIRE(REGION_BYTES == K_RING_SLOTS * sizeof(PayloadSlot));

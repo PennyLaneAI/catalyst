@@ -105,8 +105,7 @@ class SessionEmitter {
         : ctx(mod.getContext()), loc(mod.getLoc()), mod(mod), ctrl(ctrl),
           remoteController(remoteController), ctrlMod(ctrlMod),
           ctrlTy(SessionType::get(ctx, Role::Controller)),
-          coTy(SessionType::get(ctx, Role::Coprocessor)), tokTy(TokenType::get(ctx)), b(ctx)
-    {
+          coTy(SessionType::get(ctx, Role::Coprocessor)), tokTy(TokenType::get(ctx)), b(ctx) {
         // The runtime calls @setup/@teardown around every execution; reuse them if present.
         hostSetup = findOrCreate("setup");
         hostTeardown = findOrCreate("teardown");
@@ -118,12 +117,10 @@ class SessionEmitter {
 
     // Emit the whole session lifecycle: bring up each participant, then teardown and host
     // orchestration.
-    void run(ArrayRef<NodeAttr> coprocs)
-    {
+    void run(ArrayRef<NodeAttr> coprocs) {
         if (coprocs.empty()) {
             emitControllerOnly();
-        }
-        else {
+        } else {
             for (auto [i, coproc] : llvm::enumerate(coprocs)) {
                 emitCoproc(coproc, i, coprocs.size());
             }
@@ -133,8 +130,7 @@ class SessionEmitter {
 
   private:
     // Controller-only: a single controller session dialing its own peer.
-    void emitControllerOnly()
-    {
+    void emitControllerOnly() {
         StringAttr key = ctrl.keyOr("controller");
         Value ct = createSession(b, ctrlTy, ctrl, key);
         ConnectOp::create(b, loc, ct, ctrl.getPeer(), i16A(ctrl.oobPort()));
@@ -146,29 +142,24 @@ class SessionEmitter {
     }
 
     // Dispatch one coprocessor to the handler for its (controller, coprocessor) remoteness.
-    void emitCoproc(NodeAttr coproc, size_t index, size_t count)
-    {
+    void emitCoproc(NodeAttr coproc, size_t index, size_t count) {
         StringAttr key = coproc.keyOr("coprocessor." + std::to_string(index));
         if (coproc.isRemote()) {
             std::string sfx = count > 1 ? ("." + std::to_string(index)) : std::string();
             if (remoteController) {
                 emitRemoteControllerRemoteCoproc(coproc, key, sfx);
-            }
-            else {
+            } else {
                 emitLocalControllerRemoteCoproc(coproc, key, sfx);
             }
-        }
-        else if (remoteController) {
+        } else if (remoteController) {
             emitRemoteControllerLocalCoproc(coproc, key);
-        }
-        else {
+        } else {
             emitColocated(coproc, key);
         }
     }
 
     // Teardown every session by key, then the host orchestration that drives dispatched roles.
-    void finalize()
-    {
+    void finalize() {
         for (auto it = keyed.rbegin(); it != keyed.rend(); ++it) {
             OpBuilder tb(terminatorOf(it->releaseIn));
             Value s = GetSessionOp::create(tb, loc, it->role, it->key).getSession();
@@ -181,8 +172,7 @@ class SessionEmitter {
     }
 
     // An empty `() -> ()` public func in `target`.
-    func::FuncOp makeVoidFunc(const Twine &name, ModuleOp target)
-    {
+    func::FuncOp makeVoidFunc(const Twine &name, ModuleOp target) {
         OpBuilder mb(ctx);
         mb.setInsertionPointToEnd(target.getBody());
         auto fn = func::FuncOp::create(mb, loc, name.str(), mb.getFunctionType({}, {}));
@@ -193,8 +183,7 @@ class SessionEmitter {
         return fn;
     }
 
-    func::FuncOp findOrCreate(StringRef name)
-    {
+    func::FuncOp findOrCreate(StringRef name) {
         if (auto fn = mod.lookupSymbol<func::FuncOp>(name)) {
             return fn;
         }
@@ -202,8 +191,8 @@ class SessionEmitter {
     }
 
     // Launch a `() -> ()` func in a dispatched module.
-    void launchVoid(OpBuilder &lb, StringAttr modName, StringAttr fnName, bool nonblocking = false)
-    {
+    void launchVoid(OpBuilder &lb, StringAttr modName, StringAttr fnName,
+                    bool nonblocking = false) {
         auto callee = SymbolRefAttr::get(modName, {FlatSymbolRefAttr::get(ctx, fnName)});
         auto lk = catalyst::LaunchKernelOp::create(lb, loc, TypeRange{}, callee, ValueRange{},
                                                    /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
@@ -215,8 +204,7 @@ class SessionEmitter {
 
     IntegerAttr i16A(int64_t v) { return b.getIntegerAttr(b.getIntegerType(16), v); }
 
-    void commit(Value ct)
-    {
+    void commit(Value ct) {
         SetMessageSizesOp::create(b, loc, ct, b.getI32IntegerAttr(ctrl.workItemIdx()),
                                  b.getI64IntegerAttr(ctrl.inBytes()),
                                  b.getI64IntegerAttr(ctrl.outBytes()));
@@ -226,15 +214,13 @@ class SessionEmitter {
     static Operation *terminatorOf(func::FuncOp fn) { return fn.getBody().front().getTerminator(); }
 
     // Create a `role` session for `node`, keyed so teardown and the qnode can resolve it.
-    Value createSession(OpBuilder &bld, Type role, NodeAttr node, StringAttr key)
-    {
+    Value createSession(OpBuilder &bld, Type role, NodeAttr node, StringAttr key) {
         return CreateOp::create(bld, loc, role, node.getBackendLib(), node.getConfig(), key)
             .getSession();
     }
 
     // The controller-side session dialing a coprocessor's peer, released in teardown.
-    void emitControllerDial(NodeAttr coproc, StringAttr key)
-    {
+    void emitControllerDial(NodeAttr coproc, StringAttr key) {
         Value ctr = createSession(b, ctrlTy, ctrl, key);
         ConnectOp::create(b, loc, ctr, coproc.getPeer(), i16A(coproc.oobPort()));
         ExchangeKeysOp::create(b, loc, ctr);
@@ -246,8 +232,7 @@ class SessionEmitter {
 
     // A remote coprocessor's target module, cross-compiled to its triple and dispatched by the
     // host, returned as the serve/stop launch targets the host orchestration drives.
-    RemoteCoproc emitCoprocModule(NodeAttr coproc, StringAttr key, const std::string &sfx)
-    {
+    RemoteCoproc emitCoprocModule(NodeAttr coproc, StringAttr key, const std::string &sfx) {
         OpBuilder mmb(ctx);
         mmb.setInsertionPointToEnd(mod.getBody());
         std::string coprocModName = ("module_coproc" + sfx);
@@ -287,16 +272,14 @@ class SessionEmitter {
     }
 
     // Remote controller, remote coprocessor: both dispatched, so host orchestration launches them.
-    void emitRemoteControllerRemoteCoproc(NodeAttr coproc, StringAttr key, const std::string &sfx)
-    {
+    void emitRemoteControllerRemoteCoproc(NodeAttr coproc, StringAttr key, const std::string &sfx) {
         remoteCoprocs.push_back(emitCoprocModule(coproc, key, sfx));
         emitControllerDial(coproc, key);
     }
 
     // Local controller, remote coprocessor: the controller dials inline below, so serve must
     // already be running, and its stop must precede the controller's.
-    void emitLocalControllerRemoteCoproc(NodeAttr coproc, StringAttr key, const std::string &sfx)
-    {
+    void emitLocalControllerRemoteCoproc(NodeAttr coproc, StringAttr key, const std::string &sfx) {
         RemoteCoproc cm = emitCoprocModule(coproc, key, sfx);
         OpBuilder hb(terminatorOf(hostSetup));
         launchVoid(hb, cm.module, cm.serve, /*nonblocking=*/true);
@@ -308,8 +291,7 @@ class SessionEmitter {
     // Remote controller, host-process coprocessor: the controller dials from its target module, and
     // the coprocessor's handshake completes after the launch that dials it (see
     // emitHostOrchestration()).
-    void emitRemoteControllerLocalCoproc(NodeAttr coproc, StringAttr key)
-    {
+    void emitRemoteControllerLocalCoproc(NodeAttr coproc, StringAttr key) {
         emitControllerDial(coproc, key);
 
         OpBuilder hb(terminatorOf(hostSetup));
@@ -323,8 +305,7 @@ class SessionEmitter {
     }
 
     // Co-located controller and coprocessor: both brought up inline with an async handshake.
-    void emitColocated(NodeAttr coproc, StringAttr key)
-    {
+    void emitColocated(NodeAttr coproc, StringAttr key) {
         Value ct = createSession(b, ctrlTy, ctrl, key);
         Value co = createSession(b, coTy, coproc, key);
         Value t1 =
@@ -346,8 +327,7 @@ class SessionEmitter {
     }
 
     // @setup/@teardown launch the dispatched lifecycle funcs in dependency order.
-    void emitHostOrchestration()
-    {
+    void emitHostOrchestration() {
         StringAttr ctrlModName = ctrlMod.getSymNameAttr();
 
         // @setup reaches every role, so it is the single point that ships objects.
@@ -399,8 +379,7 @@ struct InjectTransportSessionPass
     : public impl::InjectTransportSessionPassBase<InjectTransportSessionPass> {
     using InjectTransportSessionPassBase::InjectTransportSessionPassBase;
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         ModuleOp mod = getOperation();
         auto backline = mod->getAttrOfType<BacklineAttr>(kBacklineAttr);
         if (!backline) {

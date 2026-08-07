@@ -19,7 +19,7 @@
 // CHECK-DAG: llvm.func @__catalyst__transport__exchange_keys(!llvm.ptr) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__establish_channel(!llvm.ptr, !llvm.ptr) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__set_message_sizes(!llvm.ptr, i32, i64, i64) -> i32
-// CHECK-DAG: llvm.func @__catalyst__transport__stage_payload(!llvm.ptr, !llvm.ptr, i64) -> i32
+// CHECK-DAG: llvm.func @__catalyst__transport__stage_payload(!llvm.ptr, !llvm.ptr, i64, i32) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__post(!llvm.ptr, i32) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__collect(!llvm.ptr, !llvm.ptr, i64) -> i32
 // CHECK-DAG: llvm.func @__catalyst__transport__start(!llvm.ptr)

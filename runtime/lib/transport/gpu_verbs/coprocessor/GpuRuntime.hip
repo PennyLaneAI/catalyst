@@ -23,8 +23,7 @@
 
 namespace catalyst::transport::gpu_verbs {
 
-GpuRuntime::GpuRuntime(int device)
-{
+GpuRuntime::GpuRuntime(int device) {
     int dc = 0;
     HIP_CHECK(hipGetDeviceCount(&dc), "hipGetDeviceCount");
     RDMA_CHECK(dc > 0, "GpuRuntime: no HIP device");
@@ -36,20 +35,22 @@ GpuRuntime::GpuRuntime(int device)
     stream_ = s;
 }
 
-GpuRuntime::~GpuRuntime()
-{
-    if (stop_host_)
+GpuRuntime::~GpuRuntime() {
+    if (stop_host_) {
         (void)hipHostFree(stop_host_);
-    if (handoff_host_)
+    }
+    if (handoff_host_) {
         (void)hipHostFree(handoff_host_);
-    if (hbm_ptr_)
+    }
+    if (hbm_ptr_) {
         (void)hipFree(hbm_ptr_);
-    if (stream_)
+    }
+    if (stream_) {
         (void)hipStreamDestroy(static_cast<hipStream_t>(stream_));
+    }
 }
 
-GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes)
-{
+GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes) {
     // Allocate exactly `bytes` (caller passes a page-aligned REGION_BYTES).
     HbmRing r{.size = bytes};
 #if defined(__HIP_PLATFORM_AMD__)
@@ -70,8 +71,7 @@ GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes)
     return r;
 }
 
-GpuRuntime::Handoff GpuRuntime::alloc_handoff(std::size_t num_slots)
-{
+GpuRuntime::Handoff GpuRuntime::alloc_handoff(std::size_t num_slots) {
     Handoff h;
     h.num_slots = num_slots;
     HIP_CHECK(hipHostMalloc((void **)&h.host, num_slots * sizeof(HandoffSlot),
@@ -92,10 +92,10 @@ GpuRuntime::Handoff GpuRuntime::alloc_handoff(std::size_t num_slots)
     return h;
 }
 
-void GpuRuntime::sync()
-{
-    if (stream_)
+void GpuRuntime::sync() {
+    if (stream_) {
         HIP_CHECK(hipStreamSynchronize(static_cast<hipStream_t>(stream_)), "hipStreamSynchronize");
+    }
 }
 
 } // namespace catalyst::transport::gpu_verbs

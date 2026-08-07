@@ -37,8 +37,7 @@ namespace pbc {
 struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
     using ToPPRPassBase::ToPPRPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
 

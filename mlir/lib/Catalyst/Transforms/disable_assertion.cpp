@@ -33,8 +33,7 @@ namespace catalyst {
 struct DisableAssertionPass : impl::DisableAssertionPassBase<DisableAssertionPass> {
     using DisableAssertionPassBase::DisableAssertionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
         populateDisableAssertionPatterns(patterns);
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {

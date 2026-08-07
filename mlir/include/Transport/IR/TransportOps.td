@@ -147,8 +147,12 @@ def Transport_StagePayloadOp : Transport_Op<"stage_payload"> {
     let summary = "Stage a payload into this round's request slot (controller).";
     let description = [{
         Writes through the backend, which knows how its slot memory has to be written.
+
+        `decoder_id` addresses the round at one of the peer's decoders. It travels in the frame
+        beside the payload, so it is staged with the payload rather than given to the send.
     }];
-    let arguments = (ins Transport_ControllerSession:$session, Transport_AnyBuffer:$payload);
+    let arguments = (ins Transport_ControllerSession:$session, Transport_AnyBuffer:$payload,
+                         DefaultValuedOptionalAttr<I32Attr, "0">:$decoder_id);
     let assemblyFormat = "$session `,` $payload attr-dict `:` qualified(type($session)) `,` type($payload)";
 }
 

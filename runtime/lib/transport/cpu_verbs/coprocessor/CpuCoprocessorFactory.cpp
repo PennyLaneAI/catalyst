@@ -25,8 +25,7 @@
 #include "TransportBackend.h"
 
 namespace {
-catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string &config)
-{
+catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string &config) {
     const auto cfg = catalyst::transport::common::parse_backend_config(config);
     return new catalyst::transport::cpu_verbs::CpuCoprocessorSession(cfg.dev, cfg.gid);
 }

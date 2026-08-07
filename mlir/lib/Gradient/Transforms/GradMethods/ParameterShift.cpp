@@ -26,8 +26,7 @@ namespace catalyst {
 namespace gradient {
 
 LogicalResult ParameterShiftLowering::matchAndRewrite(func::FuncOp op,
-                                                      PatternRewriter &rewriter) const
-{
+                                                      PatternRewriter &rewriter) const {
     if (!(getQNodeDiffMethod(op) == "parameter-shift" && requiresCustomGradient(op))) {
         return failure();
     }
@@ -53,8 +52,7 @@ LogicalResult ParameterShiftLowering::matchAndRewrite(func::FuncOp op,
     return success();
 }
 
-std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp callee)
-{
+std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp callee) {
     int64_t numShifts = 0;
     int64_t loopLevel = 0;
     int64_t maxLoopDepth = 0;
@@ -62,15 +60,14 @@ std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp
     callee.walk<WalkOrder::PreOrder>([&](Operation *op) {
         if (isa<scf::ForOp>(op)) {
             loopLevel++;
-        }
-        else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-            if (gate.getDiffParams().empty())
+        } else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+            if (gate.getDiffParams().empty()) {
                 return;
+            }
 
             numShifts += gate.getDiffParams().size();
             maxLoopDepth = std::max(loopLevel, maxLoopDepth);
-        }
-        else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
+        } else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
             loopLevel--;
         }
     });

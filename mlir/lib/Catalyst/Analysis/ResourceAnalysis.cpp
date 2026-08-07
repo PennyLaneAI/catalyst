@@ -50,8 +50,7 @@ namespace catalyst {
 // Skipped operations set (mirrors Python _SKIPPED_OPS)
 //===----------------------------------------------------------------------===//
 
-static bool isSkippedOp(Operation *op)
-{
+static bool isSkippedOp(Operation *op) {
     return isa<quantum::ComputationalBasisOp, qref::ComputationalBasisOp, quantum::DeallocOp,
                qref::DeallocOp, quantum::DeallocQubitOp, qref::DeallocQubitOp,
                quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp,
@@ -61,8 +60,7 @@ static bool isSkippedOp(Operation *op)
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.
-static bool isCustomDialectOp(Operation *op)
-{
+static bool isCustomDialectOp(Operation *op) {
     mlir::Dialect *dialect = op->getDialect();
     if (!dialect) {
         return false;
@@ -75,8 +73,7 @@ static bool isCustomDialectOp(Operation *op)
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
 
-ResourceResult ResourceAnalysis::makeEmptyResult() const
-{
+ResourceResult ResourceAnalysis::makeEmptyResult() const {
     ResourceResult result;
     result.extensions.reserve(extensionAnalyses.size());
     for (const auto &analysis : extensionAnalyses) {
@@ -86,8 +83,7 @@ ResourceResult ResourceAnalysis::makeEmptyResult() const
 }
 
 ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
-                                   ArrayRef<ExtensionProvider> extensionProviders)
-{
+                                   ArrayRef<ExtensionProvider> extensionProviders) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -153,8 +149,7 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
 }
 
 ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
-                                   ArrayRef<ExtensionProvider> extensionProviders)
-{
+                                   ArrayRef<ExtensionProvider> extensionProviders) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -172,8 +167,7 @@ ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
     funcResults[funcOp.getName()] = std::move(result);
 }
 
-std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t &counter)
-{
+std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t &counter) {
     // Bump `counter` until the resulting name does not collide with an
     // existing entry. This protects against user functions named e.g.
     // `for_loop_3` shadowing or being shadowed by a lifted body.
@@ -185,8 +179,7 @@ std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t 
     return candidate;
 }
 
-void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint) {
     ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
@@ -213,23 +206,20 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
 }
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
-                                        bool isAdjoint)
-{
+                                        bool isAdjoint) {
     ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
 
     if (auto iters = getEstimatedIterationsHint(whileOp)) {
         bodyResult.multiplyBy(*iters);
-    }
-    else {
+    } else {
         result.hasDynLoop = true;
     }
 
     result.mergeWith(bodyResult);
 }
 
-void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint) {
     result.hasBranches = true;
 
     ResourceResult thenResult = makeEmptyResult();
@@ -265,8 +255,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 }
 
 void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
-                                            bool isAdjoint)
-{
+                                            bool isAdjoint) {
     result.hasBranches = true;
 
     // If branch probabilities are provided, compute the expected (average) resource counts.
@@ -311,8 +300,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         if (first) {
             maxResult = std::move(caseResult);
             first = false;
-        }
-        else {
+        } else {
             maxResult.mergeWith(caseResult, ResourceResult::MergeMethod::Max);
         }
     }
@@ -325,8 +313,8 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     result.mergeWith(maxResult);
 }
 
-void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result,
+                                       bool isAdjoint) {
     for (auto &layerRegion : layerOp->getRegions()) {
         analyzeRegion(layerRegion, result, isAdjoint);
     }
@@ -341,8 +329,7 @@ void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &res
  * @param result The ResourceResult to accumulate counts into.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  */
-void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint) {
     for (Block &block : region) {
         for (Operation &op : block) {
             bool needsCollection = true;
@@ -394,8 +381,8 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @param result The ResourceResult to update with the operation's resource usage.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  */
-void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint) const
-{
+void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
+                                        bool isAdjoint) const {
     // Collect extensions for the operation
     assert(result.extensions.size() == extensionAnalyses.size() &&
            "extension data/collector size mismatch");
@@ -425,8 +412,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
         if (nCtrlQubits == 1) {
             name = "C(" + name + ")";
-        }
-        else if (nCtrlQubits > 1) {
+        } else if (nCtrlQubits > 1) {
             name = std::to_string(nCtrlQubits) + "C(" + name + ")";
         }
 
@@ -485,8 +471,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
  * @param source The ResourceResult to merge into `dest` (unmodified).
  * @param count A scalar to multiply the `source`'s counts by (defaults to 1).
  */
-static void accumulateScaled(ResourceResult &dest, const ResourceResult &source, double count = 1.0)
-{
+static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
+                             double count = 1.0) {
     for (const auto &opEntry : source.operations) {
         auto &innerDst = dest.operations[opEntry.getKey()];
         for (const auto &sizeEntry : opEntry.getValue()) {
@@ -525,8 +511,7 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
  * @return Pointer to the cached flattened result, or nullptr if `funcName`
  *         is external or unknown.
  */
-const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName) const
-{
+const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName) const {
     if (auto it = flattenedCache.find(funcName); it != flattenedCache.end()) {
         return &it->second;
     }

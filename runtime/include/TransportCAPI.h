@@ -76,10 +76,10 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
 int __catalyst__transport__set_message_sizes(CatalystTransportSession *s, uint32_t work_item_idx,
                                             uint64_t in_bytes, uint64_t out_bytes);
 void *__catalyst__transport__request_slot(CatalystTransportSession *s);
-// Copy `bytes` into the round's outbound slot. Fails if `bytes` exceeds what
-// commit_work_item committed.
+// Copy `bytes` into the round's outbound slot and address it to `decoder_id`. Fails
+// if `bytes` exceeds what set_message_sizes committed.
 int __catalyst__transport__stage_payload(CatalystTransportSession *s, const void *src,
-                                           uint64_t bytes);
+                                         uint64_t bytes, uint32_t decoder_id);
 void *__catalyst__transport__reply_slot(CatalystTransportSession *s);
 int __catalyst__transport__post(CatalystTransportSession *s, uint32_t work_item_idx);
 
