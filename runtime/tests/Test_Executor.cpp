@@ -45,9 +45,9 @@ namespace {
 constexpr auto Timeout = 10s;
 constexpr auto PollInterval = 20ms;
 
-// Ask the kernel for a free TCP port by binding one and handing it straight
-// back.
-int freePort() {
+// Bind a loopback socket to a kernel-chosen port, never listening on it. The
+// caller owns the returned descriptor.
+int reservePort(int &Port) {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
     REQUIRE(fd >= 0);
     sockaddr_in addr{};
@@ -57,9 +57,15 @@ int freePort() {
     REQUIRE(::bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == 0);
     socklen_t len = sizeof(addr);
     REQUIRE(::getsockname(fd, reinterpret_cast<sockaddr *>(&addr), &len) == 0);
-    int port = ntohs(addr.sin_port);
-    ::close(fd);
-    return port;
+    Port = ntohs(addr.sin_port);
+    return fd;
+}
+
+// A port the executor can bind. The socket is released before returning.
+int freePort() {
+    int Port = 0;
+    ::close(reservePort(Port));
+    return Port;
 }
 
 // Runs `catalyst-executor --bind 127.0.0.1:<port>` for the lifetime of the
@@ -211,10 +217,16 @@ TEST_CASE("the executor serves one connection after another", "[executor]") {
 }
 
 TEST_CASE("open fails when nothing is listening", "[executor]") {
-    // Nothing is bound here: the port was released before we asked for it.
-    std::string Address = "127.0.0.1:" + std::to_string(freePort());
+    // Hold the port bound for the whole test so nothing else can start
+    // listening on it.
+    int Port = 0;
+    int Held = reservePort(Port);
+    std::string Address = "127.0.0.1:" + std::to_string(Port);
+
     CHECK(catalyst::executor::open(Address.c_str()) == nullptr);
     CHECK(std::strlen(catalyst::executor::last_error()) > 0);
+
+    ::close(Held);
 }
 
 TEST_CASE("a staged asset is stored byte for byte", "[executor]") {
