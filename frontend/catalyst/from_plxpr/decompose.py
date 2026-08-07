@@ -96,6 +96,15 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 }
 
 
+def _resource_metadata(op_rep):
+    """Return decomposition metadata from an Operator or Operator2 resource representation."""
+    if isinstance(op_rep, qp.core.Operator2):
+        return op_rep.wires.num_wires, op_rep.compilable_args.get("pauli_word")
+
+    params = getattr(op_rep, "params", {}) or {}
+    return params.get("num_wires"), params.get("pauli_word")
+
+
 # pylint: disable=too-many-instance-attributes
 class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
@@ -185,9 +194,12 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         # Create decomposition rules for each operation in the solution
         # and compile them to Catalyst JAXPR decomposition rules
         for op, rule in self._decomp_graph_solution.items():
-            # Get number of wires if exists
-            op_params = getattr(op.op, "params", {}) or {}
-            op_num_wires = op_params.get("num_wires", None)
+            # The graph solution represents symbolic operations abstractly. Catalyst handles
+            # these with dedicated MLIR operations rather than Python decomposition rules.
+            if _should_skip_decomp_rule_capture(op.op):
+                continue
+
+            op_num_wires, pauli_word = _resource_metadata(op.op)
             if (
                 o := next(
                     (
@@ -202,6 +214,7 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                 _create_decomposition_rule(
                     rule,
                     op_name=op.op.name,
+                    op_rep=op.op,
                     num_wires=len(o.wires),
                     num_params=num_params,
                     requires_copy=num_wires == -1,
@@ -214,7 +227,6 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                 # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                 # dictionary to get the number of wires.
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
-                pauli_word = op_params.get("pauli_word", None)
                 requires_copy = num_wires == -1
 
                 if op.op.name in ("PauliRot", "PauliMeasure"):
@@ -224,18 +236,12 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                 _create_decomposition_rule(
                     rule,
                     op_name=op.op.name,
+                    op_rep=op.op,
                     num_wires=num_wires,
                     num_params=num_params,
                     requires_copy=requires_copy,
                     pauli_word=pauli_word,
                 )
-            elif _should_skip_decomp_rule_capture(op.op):
-                # Note that the graph-decomposition returns abstracted rules
-                # for Adjoint and Controlled operations, so we skip them here.
-                # These abstracted rules cannot be captured and lowered.
-                # We use MLIR AdjointOp and ControlledOp primitives
-                # to deal with decomposition of symbolic operations at PLxPR.
-                continue
             else:
                 raise ValueError(f"Could not capture {op.op} without the number of wires.")
 
@@ -244,6 +250,7 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
 def _create_decomposition_rule(
     func: Callable,
     op_name: str,
+    op_rep,
     num_wires: int,
     num_params: int,
     requires_copy: bool = False,
@@ -254,6 +261,7 @@ def _create_decomposition_rule(
     Args:
         func (Callable): The decomposition function.
         op_name (str): The name of the operation to decompose.
+        op_rep: The abstract resource representation of the operation.
         num_wires (int): The number of wires the operation acts on.
         num_params (int): The number of parameters the operation takes.
         requires_copy (bool): Whether to create a copy of the function
@@ -271,6 +279,17 @@ def _create_decomposition_rule(
 
         # Skip tailing args or kwargs in the rules
         if name in ("__", "_"):
+            continue
+
+        if isinstance(op_rep, qp.core.Operator2):
+            if name in op_rep.dynamic_args:
+                arg_spec = op_rep.dynamic_args[name]
+                args.append(jax.ShapeDtypeStruct(arg_spec.shape, arg_spec.dtype))
+            elif name in op_rep.wire_args:
+                wire_spec = op_rep.wire_args[name]
+                args.append(qp.math.array([0] * wire_spec.num_wires, like="jax"))
+            elif name not in op_rep.compilable_args:
+                raise ValueError(f"Unknown Operator2 argument {name} in decomposition rule {func}.")
             continue
 
         # TODO: This is a temporary solution until all rules have proper type annotations.
