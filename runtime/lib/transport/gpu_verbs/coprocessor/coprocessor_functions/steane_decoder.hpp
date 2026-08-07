@@ -14,22 +14,18 @@
 
 #pragma once
 #include <cstdint>
+
+#include "SteaneDecoderTable.hpp"
+
 namespace catalyst::transport::gpu_verbs {
 
-constexpr int STEANE_CHECKS = 3;
+using catalyst::transport::common::STEANE_CHECKS;
+using catalyst::transport::common::STEANE_SYNDROME_TO_QUBIT;
 
 /**
- * @brief Syndrome to error qubit index for the [[7,1,3]] Steane code; -1 is no
- * error.
- *
- * Indexed by the 3 checks packed with check 0 as the most significant bit.
- * For compatibility with existing Steane decoder.
- */
-constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1 << STEANE_CHECKS] = {-1, 6, 4, 5, 0, 3, 1, 2};
-
-/**
- * @brief STEANE_SYNDROME_TO_QUBIT packed into a single 32-bit word, 4 bits per
- * entry; 0xF encodes the -1 (no error) sentinel. Packed for reduced memory access.
+ * @brief Pack STEANE_SYNDROME_TO_QUBIT into one 32-bit word (4 bits per entry,
+ * 0xF encoding the -1 no-error sentinel). Cheaper to load on device than the
+ * full 8-entry table.
  */
 constexpr std::uint32_t pack_steane_table() {
     std::uint32_t packed = 0;
@@ -46,9 +42,9 @@ static_assert(STEANE_TABLE_PACKED == 0x2130546FU,
 /**
  * @brief Decode one Steane syndrome to an error qubit index.
  *
- * @param syndrome Ring word holding one byte per check, byte `i` carrying check
- *                 `i` in its low bit (a `memref<?xi1>` lowers to one byte per
- *                 element, so the checks arrive unpacked).
+ * @param syndrome One byte per check, with check `i` in the low bit of byte
+ *                 `i`; matches how a `memref<?xi1>` lowers on the wire (one
+ *                 byte per element), so the checks arrive unpacked.
  * @return The error qubit index, or -1 for no error.
  */
 __device__ inline std::int64_t steane_decode(std::uint64_t syndrome) {
