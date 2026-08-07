@@ -46,3 +46,5 @@ if(CMAKE_HIP_COMPILER)
 else()
     message(STATUS "transport: no HIP compiler -> skipping gpu_verbs")
 endif()
+
+add_subdirectory(local_copy)
