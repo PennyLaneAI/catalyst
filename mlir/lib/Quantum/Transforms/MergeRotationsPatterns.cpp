@@ -42,8 +42,7 @@ static const StringSet<> arbitraryRotationsSet = {"Rot", "CRot"};
 namespace {
 
 // convertOpParamsToValues: helper function for extracting CustomOp parameters as Values
-SmallVector<Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewriter)
-{
+SmallVector<Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewriter) {
     SmallVector<Value> values;
     auto params = op.getParams();
     for (auto param : params) {
@@ -55,8 +54,7 @@ SmallVector<Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewrit
 // getStaticValuesOrNothing: helper function for extracting Rot or CRot parameters as:
 // - doubles, in case they are constant
 // - std::nullopt, otherwise
-std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<Value> values)
-{
+std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<Value> values) {
     assert(values.size() == 3 && "found Rot or CRot operation should have exactly 3 parameters");
     auto staticValues = std::array<std::optional<double>, 3>{};
     for (auto [index, value] : llvm::enumerate(values)) {
@@ -78,8 +76,7 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
 
     // Fixed single rotations and phase shifts can be merged just by adding the angle parameters
     LogicalResult matchAndRewriteFixedRotationOrPhaseShift(OpType op,
-                                                           PatternRewriter &rewriter) const
-    {
+                                                           PatternRewriter &rewriter) const {
         ValueRange inQubits = op.getInQubits();
         auto parentOp = llvm::cast<ParentOpType>(inQubits[0].getDefiningOp());
 
@@ -111,8 +108,7 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
     }
 
     // Arbitrary single rotations require more complex maths to be merged
-    LogicalResult matchAndRewriteArbitraryRotation(OpType op, PatternRewriter &rewriter) const
-    {
+    LogicalResult matchAndRewriteArbitraryRotation(OpType op, PatternRewriter &rewriter) const {
         ValueRange inQubits = op.getInQubits();
         auto parentOp = llvm::cast<ParentOpType>(inQubits[0].getDefiningOp());
 
@@ -162,27 +158,23 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             phiF = phi1;
             thetaF = arith::AddFOp::create(rewriter, loc, theta1, theta2);
             omegaF = omega2;
-        }
-        else if (theta1IsZero && theta2IsZero) {
+        } else if (theta1IsZero && theta2IsZero) {
             phiF = arith::AddFOp::create(rewriter, loc,
                                          arith::AddFOp::create(rewriter, loc, phi1, phi2),
                                          arith::AddFOp::create(rewriter, loc, omega1, omega2));
             thetaF = zeroConst;
             omegaF = zeroConst;
-        }
-        else if (theta1IsZero) {
+        } else if (theta1IsZero) {
             phiF = arith::AddFOp::create(rewriter, loc,
                                          arith::AddFOp::create(rewriter, loc, phi1, phi2), omega1);
             thetaF = theta2;
             omegaF = omega2;
-        }
-        else if (theta2IsZero) {
+        } else if (theta2IsZero) {
             phiF = phi1;
             thetaF = theta1;
             omegaF = arith::AddFOp::create(
                 rewriter, loc, arith::AddFOp::create(rewriter, loc, omega1, omega2), phi2);
-        }
-        else {
+        } else {
             auto halfConst =
                 arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(0.5));
             auto twoConst = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0));
@@ -313,8 +305,7 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         return success();
     }
 
-    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
 
         StringRef opGateName = op.getGateName();
@@ -339,8 +330,7 @@ template <typename ParentOpType, typename OpType>
 struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
     using OpRewritePattern<OpType>::OpRewritePattern;
 
-    SmallVector<int16_t> getNonIdentityIndices(OpType op) const
-    {
+    SmallVector<int16_t> getNonIdentityIndices(OpType op) const {
         SmallVector<int16_t> opNonIdentityIndices;
         for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
             StringRef pauliChar = cast<StringAttr>(pauli).getValue();
@@ -351,8 +341,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         return opNonIdentityIndices;
     }
 
-    void replaceIdentityQubitUses(OpType op, PatternRewriter &rewriter) const
-    {
+    void replaceIdentityQubitUses(OpType op, PatternRewriter &rewriter) const {
         ValueRange opOutQubits = op.getOutQubits();
         ValueRange opInQubits = op.getInQubits();
         for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
@@ -363,8 +352,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         }
     }
 
-    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override {
         // NOTE: a bit unorthodox, but we find the *second* PPR in a pair, since it's easier to
         // look backwards by checking inQubits.getDefiningOp
 
@@ -453,14 +441,12 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
             // remove identity operations
             if (opRotation == -parentOpRotation || std::abs(newAngle) == 1) {
                 mergeOpOutQubits = parentOpInQubits;
-            }
-            else {
+            } else {
                 mergeOpOutQubits = PPRotationOp::create(rewriter, loc, newPauliProduct, newAngle,
                                                         newInQubits, opCondition)
                                        .getOutQubits();
             }
-        }
-        else if constexpr (std::is_same_v<OpType, PPRotationArbitraryOp>) {
+        } else if constexpr (std::is_same_v<OpType, PPRotationArbitraryOp>) {
             Value opRotation = op.getArbitraryAngle();
             Value parentOpRotation = parentOp.getArbitraryAngle();
             auto newAngle =
@@ -484,8 +470,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
 struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
     using OpRewritePattern<MultiRZOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override {
         LLVM_DEBUG(dbgs() << "Simplifying the following operation:\n" << op << "\n");
         auto loc = op.getLoc();
 
@@ -522,8 +507,7 @@ struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
 namespace catalyst {
 namespace quantum {
 
-void populateMergeRotationsPatterns(RewritePatternSet &patterns)
-{
+void populateMergeRotationsPatterns(RewritePatternSet &patterns) {
     patterns.add<MergeRotationsRewritePattern<CustomOp, CustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeMultiRZRewritePattern>(patterns.getContext(), 1);
     patterns.add<MergePPRRewritePattern<PPRotationOp, PPRotationOp>>(patterns.getContext(), 1);

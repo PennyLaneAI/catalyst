@@ -42,8 +42,7 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
     /// We build a map from values mentioned in the source data flow to the values of
     /// the program where quantum control flow is reversed. Most of the time, there is a 1-to-1
     /// correspondence with a notable exception caused by `insert`/`extract` API asymmetry.
-    LogicalResult matchAndRewrite(AdjointOp adjoint, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(AdjointOp adjoint, PatternRewriter &rewriter) const override {
         QuantumCache cache =
             QuantumCache::initialize(adjoint.getRegion(), rewriter, adjoint.getLoc());
 
@@ -88,8 +87,7 @@ namespace quantum {
 struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> {
     using AdjointLoweringPassBase::AdjointLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
         patterns.add<AdjointSingleOpRewritePattern>(patterns.getContext(), 1);
 

@@ -38,11 +38,16 @@ inline constexpr std::uint64_t DEMO_SYNDROME = 0x0123456789ABCDEFull;
 #pragma pack(push, 1)
 struct Payload {
     std::uint64_t value;
-    std::uint32_t seq_num;
-    std::uint32_t pad;
+    std::uint32_t decoder_id; // selects which decoder handles this message
+    std::uint32_t seq_num;    // arrival flag
 };
 #pragma pack(pop)
 static_assert(sizeof(Payload) == 16, "Payload must be exactly 16 B");
+static_assert(offsetof(Payload, seq_num) + sizeof(Payload::seq_num) == sizeof(Payload),
+              "seq_num must be the last field in Payload");
+static_assert(offsetof(Payload, value) == 0,
+              "value must be first so a decoder can read the data from the frame's start");
+static_assert(offsetof(Payload, decoder_id) == 8, "decoder_id is at byte offset 8");
 
 /**
  * @brief Bytes of a Payload the caller and the coprocessor function may use.

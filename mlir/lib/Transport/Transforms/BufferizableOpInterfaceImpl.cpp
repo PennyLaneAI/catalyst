@@ -35,24 +35,20 @@ namespace {
 struct KickOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<KickOpInterface, KickOp> {
     bool bufferizesToMemoryRead(Operation *, OpOperand &,
-                                const bufferization::AnalysisState &) const
-    {
+                                const bufferization::AnalysisState &) const {
         return true;
     }
     bool bufferizesToMemoryWrite(Operation *, OpOperand &,
-                                 const bufferization::AnalysisState &) const
-    {
+                                 const bufferization::AnalysisState &) const {
         return false;
     }
     bufferization::AliasingValueList getAliasingValues(Operation *, OpOperand &,
-                                                       const bufferization::AnalysisState &) const
-    {
+                                                       const bufferization::AnalysisState &) const {
         return {};
     }
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto kickOp = cast<KickOp>(op);
         if (!isa<RankedTensorType>(kickOp.getPayload().getType())) {
             return success(); // already a memref
@@ -87,24 +83,20 @@ struct CollectOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CollectOpInterface, CollectOp> {
     bool bufferizesToAllocation(Operation *, Value) const { return true; }
     bool bufferizesToMemoryRead(Operation *, OpOperand &,
-                                const bufferization::AnalysisState &) const
-    {
+                                const bufferization::AnalysisState &) const {
         return false;
     }
     bool bufferizesToMemoryWrite(Operation *, OpOperand &,
-                                 const bufferization::AnalysisState &) const
-    {
+                                 const bufferization::AnalysisState &) const {
         return false;
     }
     bufferization::AliasingValueList getAliasingValues(Operation *, OpOperand &,
-                                                       const bufferization::AnalysisState &) const
-    {
+                                                       const bufferization::AnalysisState &) const {
         return {};
     }
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto collectOp = cast<CollectOp>(op);
         if (!collectOp.getResult()) {
             return success(); // already dest-passing
@@ -128,8 +120,7 @@ struct CollectOpInterface
 
 } // namespace
 
-void catalyst::transport::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
-{
+void catalyst::transport::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     registry.addExtension(+[](MLIRContext *ctx, TransportDialect *dialect) {
         KickOp::attachInterface<KickOpInterface>(*ctx);
         CollectOp::attachInterface<CollectOpInterface>(*ctx);

@@ -20,8 +20,7 @@
 
 #include "Error.hpp"
 namespace catalyst::transport::common {
-Context::Context(const std::string &dev_name)
-{
+Context::Context(const std::string &dev_name) {
     int n = 0;
     ibv_device **devs = ibv_get_device_list(&n);
     RDMA_CHECK_ERRNO(devs && n > 0, "ibv_get_device_list");
@@ -42,22 +41,19 @@ Context::Context(const std::string &dev_name)
     ibv_free_device_list(devs);
     RDMA_CHECK_ERRNO(ctx_, "ibv_open_device(%s)", dev_name.c_str());
 }
-Context::~Context()
-{
+Context::~Context() {
     if (ctx_) {
         ibv_close_device(ctx_);
     }
 }
 ibv_context *Context::get() const { return ctx_; }
-ibv_port_attr Context::port_attr(std::uint8_t port) const
-{
+ibv_port_attr Context::port_attr(std::uint8_t port) const {
     ibv_port_attr attr{};
     const int rc = ibv_query_port(ctx_, port, &attr);
     RDMA_CHECK(rc == 0, "ibv_query_port(%u) rc=%d (%s)", port, rc, std::strerror(rc));
     return attr;
 }
-ibv_gid Context::gid(std::uint8_t port, int idx) const
-{
+ibv_gid Context::gid(std::uint8_t port, int idx) const {
     ibv_gid gid{};
     const int rc = ibv_query_gid(ctx_, port, idx, &gid);
     RDMA_CHECK(rc == 0, "ibv_query_gid(%u,%d) rc=%d (%s)", port, idx, rc, std::strerror(rc));

@@ -27,8 +27,7 @@ using namespace catalyst::transport::common; // REGION_BYTES, DEMO_SYNDROME
 
 extern "C" int catalyst_gpu_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     // --dev and --gid are required
     std::string dev, peer = "0.0.0.0";
     int gid = -1;
@@ -38,17 +37,13 @@ int main(int argc, char **argv)
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--dev") {
             dev = v;
-        }
-        else if (k == "--gid") {
+        } else if (k == "--gid") {
             gid = std::atoi(v.c_str());
-        }
-        else if (k == "--gpu") {
+        } else if (k == "--gpu") {
             gpu_device = std::atoi(v.c_str());
-        }
-        else if (k == "--peer") {
+        } else if (k == "--peer") {
             peer = v;
-        }
-        else if (k == "--port") {
+        } else if (k == "--port") {
             port = static_cast<std::uint16_t>(std::atoi(v.c_str()));
         }
     }

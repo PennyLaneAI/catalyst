@@ -60,8 +60,7 @@ std::map<int64_t, std::shared_ptr<ExecutorEntry>> g_sessions_by_handle;
 // Monotonic handle allocator. 0 is reserved for the invalid handle.
 int64_t g_next_handle = 1;
 
-AsyncWorker take_async_worker(int64_t token)
-{
+AsyncWorker take_async_worker(int64_t token) {
     std::lock_guard<std::mutex> lk(g_async_mu);
     auto it = g_async_workers.find(token);
     if (it == g_async_workers.end()) {
@@ -72,8 +71,7 @@ AsyncWorker take_async_worker(int64_t token)
     return worker;
 }
 
-void join_session_workers(int64_t session_handle)
-{
+void join_session_workers(int64_t session_handle) {
     std::vector<std::thread> workers;
     {
         std::lock_guard<std::mutex> lk(g_async_mu);
@@ -94,8 +92,7 @@ void join_session_workers(int64_t session_handle)
 }
 
 // DEBUG logs
-bool remote_verbose()
-{
+bool remote_verbose() {
     static const bool v = []() {
         const char *e = std::getenv("CATALYST_REMOTE_VERBOSE");
         return e && *e && *e != '0';
@@ -103,8 +100,7 @@ bool remote_verbose()
     return v;
 }
 
-ExecutorEntry::~ExecutorEntry()
-{
+ExecutorEntry::~ExecutorEntry() {
     join_session_workers(handle);
     if (session) {
         catalyst::executor::close(session);
@@ -120,8 +116,7 @@ ExecutorEntry::~ExecutorEntry()
 // and re-check `session` (it may have been closed in the meantime).
 //
 // Returns nullptr if `session` is 0 or unknown.
-std::shared_ptr<ExecutorEntry> find_entry_by_handle(int64_t session)
-{
+std::shared_ptr<ExecutorEntry> find_entry_by_handle(int64_t session) {
     if (session == 0) {
         return nullptr;
     }
@@ -143,8 +138,7 @@ extern "C" {
  * @param addr The executor endpoint to connect to. Must be non-empty.
  * @return int64_t A non-zero session handle for use with the other executor CAPI calls.
  */
-int64_t __catalyst__executor__open(const char *addr)
-{
+int64_t __catalyst__executor__open(const char *addr) {
     if (!addr || !*addr) {
         RT_FAIL("Empty address");
     }
@@ -154,8 +148,7 @@ int64_t __catalyst__executor__open(const char *addr)
         auto it = g_sessions_by_addr.find(addr);
         if (it != g_sessions_by_addr.end()) {
             entry = it->second;
-        }
-        else {
+        } else {
             entry = std::make_shared<ExecutorEntry>();
             entry->address = addr;
             entry->handle = g_next_handle++;
@@ -202,8 +195,7 @@ int64_t __catalyst__executor__open(const char *addr)
  * @param format The binary format tag: 0 for an object file, 1 for an asset.
  * @return int64_t 0 on success.
  */
-int64_t __catalyst__executor__send_binary(int64_t session, const char *path, uint32_t format)
-{
+int64_t __catalyst__executor__send_binary(int64_t session, const char *path, uint32_t format) {
     auto entry = find_entry_by_handle(session);
     if (!entry) {
         RT_FAIL("Invalid session handle, call __catalyst__executor__open first.");
@@ -264,8 +256,7 @@ int64_t __catalyst__executor__send_binary(int64_t session, const char *path, uin
  */
 int32_t __catalyst__executor__call_wrapper(int64_t session, const char *symbol,
                                            const char *args_buf, size_t args_size, void **out_buf,
-                                           size_t *out_size)
-{
+                                           size_t *out_size) {
     if (out_buf) {
         *out_buf = nullptr;
     }
@@ -296,8 +287,7 @@ int32_t __catalyst__executor__call_wrapper(int64_t session, const char *symbol,
     }
     if (out_buf) {
         *out_buf = buf;
-    }
-    else {
+    } else {
         std::free(buf); // caller didn't want the bytes back
     }
     if (out_size) {
@@ -319,8 +309,7 @@ void __catalyst__executor__free_result(void *buf) { std::free(buf); }
  * @param session The i64 handle of the session to close.
  * @return int64_t 0.
  */
-int64_t __catalyst__executor__close(int64_t session)
-{
+int64_t __catalyst__executor__close(int64_t session) {
     auto entry = find_entry_by_handle(session);
     if (!entry) {
         return 0;
@@ -369,8 +358,7 @@ void __catalyst__executor__launch(int64_t session, const char *entry_symbol, con
                                   size_t num_inputs, void *const *input_descs,
                                   const size_t *input_ranks, const size_t *input_elem_sizes,
                                   size_t num_outputs, void *const *output_descs,
-                                  const size_t *output_ranks, const size_t *output_elem_sizes)
-{
+                                  const size_t *output_ranks, const size_t *output_elem_sizes) {
     auto entry = find_entry_by_handle(session);
     if (!entry) {
         RT_FAIL("Can't find opened session");
@@ -409,8 +397,7 @@ void __catalyst__executor__launch(int64_t session, const char *entry_symbol, con
  * __catalyst__executor__await.
  */
 int64_t __catalyst__executor__launch_async(int64_t session, const char *entry_symbol,
-                                           const char *object)
-{
+                                           const char *object) {
     auto entry = find_entry_by_handle(session);
     if (!entry) {
         RT_FAIL("Can't find opened session");
@@ -460,8 +447,7 @@ int64_t __catalyst__executor__launch_async(int64_t session, const char *entry_sy
  *
  * @param token The token returned by __catalyst__executor__launch_async.
  */
-void __catalyst__executor__await(int64_t token)
-{
+void __catalyst__executor__await(int64_t token) {
     if (remote_verbose()) {
         std::fprintf(stderr, "[remote] await(token=%lld)\n", static_cast<long long>(token));
     }

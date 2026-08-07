@@ -32,8 +32,7 @@ namespace catalyst::transport::gpu_verbs {
  * @brief Throws a `std::runtime_error` describing a failed HIP call.
  */
 inline void _hip_check(hipError_t err, const char *what, const char *file_name, std::size_t line,
-                       const char *function_name)
-{
+                       const char *function_name) {
     if (err == hipSuccess) {
         return;
     }

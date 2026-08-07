@@ -61,8 +61,7 @@ template <class Role> class CpuSessionBase : public Role {
     void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void reap(ibv_cq *cq, int &outstanding, bool drain);
     common::Payload *poll_message_arrival(std::uint64_t cursor, std::stop_token st);
-    common::Payload *send_payload()
-    {
+    common::Payload *send_payload() {
         return reinterpret_cast<common::Payload *>(send_buf_->addr());
     }
 
