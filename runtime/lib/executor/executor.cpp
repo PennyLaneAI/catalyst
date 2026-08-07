@@ -303,6 +303,18 @@ Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
     return Error::success();
 }
 
+// Render an accepted peer address as "host:port" for logging.
+std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len)
+{
+    char Host[NI_MAXHOST];
+    char Port[NI_MAXSERV];
+    if (::getnameinfo(reinterpret_cast<const sockaddr *>(&Peer), Len, Host, sizeof(Host), Port,
+                      sizeof(Port), NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
+        return "<unknown>";
+    }
+    return std::string(Host) + ":" + Port;
+}
+
 // Listener loop
 [[noreturn]] void runServerLoop(int ListenFD, const std::string &Label)
 {
@@ -313,6 +325,8 @@ Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
         sigemptyset(&sa.sa_mask);
         sigaction(SIGCHLD, &sa, nullptr);
     }
+
+    std::fprintf(stderr, "[%s] executor ready, waiting for connections\n", Label.c_str());
 
     for (;;) {
         sockaddr_storage Peer{};
@@ -336,7 +350,6 @@ Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
         if (pid == 0) {
             ::close(ListenFD);
             std::string GLabel = Label + "#" + std::to_string(::getpid());
-            std::fprintf(stderr, "[%s] Accepted connection\n", GLabel.c_str());
 
             // TODO: This is a temporary solution to initialize the catalyst CTX.
             // Done per-connection so each circuit owns its own context.
@@ -359,13 +372,15 @@ Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
                         setupCatalystServer, CSock, CSock));
                 ExitOnErr(Server->waitForDisconnect());
             }
+            catalyst_services::clearAssets();
             std::fprintf(stderr, "[%s] client disconnected, exiting\n", GLabel.c_str());
-            std::fprintf(stderr, "[%s] executor ready, waiting for next connection\n",
-                         Label.c_str());
             ::_exit(0);
         }
 
         ::close(CSock);
+        std::fprintf(stderr,
+                     "[%s] accepted connection from %s on pid %d, waiting for next connection\n",
+                     Label.c_str(), formatPeer(Peer, Len).c_str(), static_cast<int>(pid));
     }
 }
 
