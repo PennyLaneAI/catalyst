@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "pybind11/embed.h"
+#include "pybind11/numpy.h"
+
 #include <cstdint>
 
 #include "catch2/catch_test_macros.hpp"
-
-#include "pybind11/embed.h"
-#include "pybind11/numpy.h"
 
 #include "SteaneDecoderTable.hpp"
 
@@ -27,8 +27,7 @@ namespace {
 
 // pybind11 rather than nanobind: nanobind does not support embedding an
 // interpreter (see Test_OpenQasmDevice.cpp).
-void ensurePythonInterpreter()
-{
+void ensurePythonInterpreter() {
     if (!Py_IsInitialized()) {
         py::initialize_interpreter();
     }
@@ -39,8 +38,7 @@ void ensurePythonInterpreter()
 // Cross-check STEANE_SYNDROME_TO_QUBIT (transport/common/SteaneDecoderTable.hpp)
 // against the frontend's Steane parity check matrix in qec_code_lib.py.
 TEST_CASE("STEANE_SYNDROME_TO_QUBIT decodes the Steane code from qec_code_lib.py",
-          "[steane_decoder][frontend]")
-{
+          "[steane_decoder][frontend]") {
     ensurePythonInterpreter();
 
     py::module_ code_lib =
@@ -51,8 +49,7 @@ TEST_CASE("STEANE_SYNDROME_TO_QUBIT decodes the Steane code from qec_code_lib.py
 
     // _CODE_REGISTRY["Steane"] layout: (n, k, d, x_tanner, z_tanner, ...); Hx == Hz.
     py::tuple steane = registry["Steane"].cast<py::tuple>();
-    auto H_arr =
-        steane[3].cast<py::array_t<int64_t, py::array::c_style | py::array::forcecast>>();
+    auto H_arr = steane[3].cast<py::array_t<int64_t, py::array::c_style | py::array::forcecast>>();
     auto H = H_arr.unchecked<2>();
     const auto n_aux = H.shape(0);
     const auto n_data = H.shape(1);
