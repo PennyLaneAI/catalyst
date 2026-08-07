@@ -39,6 +39,7 @@
  */
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
@@ -131,12 +132,31 @@ int32_t _catalyst_remote_store_asset(std::vector<char> bytes, std::string name)
         return -1;
     }
     size_t wrote = std::fwrite(bytes.data(), 1, bytes.size(), f);
-    std::fclose(f);
+    // fclose flushes the stream, so a failure here can also mean lost bytes.
+    int closeRc = std::fclose(f);
 
     // check if the write size is matched
     if (wrote != bytes.size()) {
-        std::fprintf(stderr, "catalyst-executor: Unmatched write size (wrote=%zu, expected=%zu)\n",
-                     wrote, bytes.size());
+        std::fprintf(stderr,
+                     "catalyst-executor: Unmatched write size for %s (wrote=%zu, expected=%zu)\n",
+                     tmp.c_str(), wrote, bytes.size());
+        fs::remove(tmp, ec);
+        return -1;
+    }
+
+    // check if the flush succeeded
+    if (closeRc != 0) {
+        std::fprintf(stderr, "catalyst-executor: fclose %s failed: %s\n", tmp.c_str(),
+                     std::strerror(errno));
+        fs::remove(tmp, ec);
+        return -1;
+    }
+
+    fs::rename(tmp, dst, ec);
+    if (ec) {
+        std::fprintf(stderr, "catalyst-executor: rename %s -> %s failed: %s\n", tmp.c_str(),
+                     dst.c_str(), ec.message().c_str());
+        fs::remove(tmp, ec);
         return -1;
     }
     return 0;
