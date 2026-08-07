@@ -317,8 +317,8 @@ std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len)
 
 void initializeCatalystRuntime(const std::string &GLabel)
 {
-    auto *initFn = reinterpret_cast<void (*)(uint32_t *)>(
-        ::dlsym(RTLD_DEFAULT, "__catalyst__rt__initialize"));
+    auto *initFn =
+        reinterpret_cast<void (*)(uint32_t *)>(::dlsym(RTLD_DEFAULT, "__catalyst__rt__initialize"));
     if (!initFn) {
         std::fprintf(stderr,
                      "[%s] Warning: __catalyst__rt__initialize not found "
