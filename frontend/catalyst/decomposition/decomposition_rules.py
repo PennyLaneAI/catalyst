@@ -281,8 +281,6 @@ def compile_decomposition_rules(
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
 
-    # TODO: reconcretify abstracted hybrid ops
-
     @qp.qjit(target="mlir", capture=True, skip_decomp_rules=True)
     @qp.qnode(device=device)
     def circuit():
