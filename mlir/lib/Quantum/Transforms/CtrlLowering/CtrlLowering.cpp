@@ -30,8 +30,7 @@ namespace {
 /// Read a segment-sizes attribute from an operation and return it as a SmallVector<int32_t>. The
 /// attribute is expected to be a DenseI32ArrayAttr, and the returned vector contains the sizes of
 /// the operand/result segments in order.
-static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name)
-{
+static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
     auto seg = op->getAttrOfType<DenseI32ArrayAttr>(name);
     return SmallVector<int32_t>(seg.asArrayRef().begin(), seg.asArrayRef().end());
 }
@@ -39,8 +38,7 @@ static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name)
 /// Rebuild a quantum gate with additional control qubits/values appended to whatever controls it
 /// already carries. The new op is inserted at the rewriter's insertion point.
 static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate gate, IRMapping &map,
-                                       ValueRange addCtrlQubits, ValueRange addCtrlValues)
-{
+                                       ValueRange addCtrlQubits, ValueRange addCtrlValues) {
     Operation *op = gate.getOperation();
     ValueRange nonCtrlQubits = gate.getNonCtrlQubitOperands();
     ValueRange oldCtrlQubits = gate.getCtrlQubitOperands();
@@ -99,8 +97,7 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
 
 /// Rebuild a nested `quantum.ctrl` op with the enclosing controls merged in.
 static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping &map,
-                              ValueRange addCtrlQubits, ValueRange addCtrlValues)
-{
+                              ValueRange addCtrlQubits, ValueRange addCtrlValues) {
     Location loc = inner.getLoc();
     Type qubitType = QubitType::get(rewriter.getContext());
 
@@ -161,8 +158,7 @@ static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping
 struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     using OpRewritePattern<CtrlOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
         Block &block = ctrl.getRegion().front();
 
         // Map the region's block arguments (the target qubits/registers) to the ctrl op operands.
@@ -270,8 +266,7 @@ namespace quantum {
 struct CtrlLoweringPass : impl::CtrlLoweringPassBase<CtrlLoweringPass> {
     using CtrlLoweringPassBase::CtrlLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
         patterns.add<CtrlLoweringRewritePattern>(patterns.getContext(), 1);
 

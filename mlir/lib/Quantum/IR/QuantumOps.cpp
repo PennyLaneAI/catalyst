@@ -725,8 +725,7 @@ LogicalResult AdjointOp::verify() {
     return success();
 }
 
-LogicalResult CtrlOp::verify()
-{
+LogicalResult CtrlOp::verify() {
     auto res = this->getRegion().walk([](Operation *op) {
         return isa<MeasurementProcess, MeasureOp>(op) ? WalkResult::interrupt()
                                                       : WalkResult::advance();
