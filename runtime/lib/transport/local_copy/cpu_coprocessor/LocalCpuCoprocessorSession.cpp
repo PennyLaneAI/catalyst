@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "LocalCoprocessorSession.hpp"
+#include "LocalCpuCoprocessorSession.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -37,13 +37,13 @@ std::size_t local_region_bytes(std::size_t payload_bytes) {
 
 } // namespace
 
-int LocalCoprocessorSession::connect(const ConnectInfo &info) {
+int LocalCpuCoprocessorSession::connect(const ConnectInfo &info) {
     pair_ = acquire_endpoint_pair(info);
     pair_->coprocessor = this;
     return 0;
 }
 
-MemRegion LocalCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
+MemRegion LocalCpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     if (kind != MemKind::CpuRam) {
         throw std::runtime_error("local_copy: CPU-only for now; alloc_memory expects CpuRam");
     }
@@ -59,7 +59,7 @@ MemRegion LocalCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) 
     };
 }
 
-PeerRef LocalCoprocessorSession::exchange_keys(const MemRegion &local) {
+PeerRef LocalCpuCoprocessorSession::exchange_keys(const MemRegion &local) {
     local_request_ = local;
     if (pair_) {
         pair_->coprocessor_request = local;
@@ -75,8 +75,8 @@ PeerRef LocalCoprocessorSession::exchange_keys(const MemRegion &local) {
     return peer_reply_;
 }
 
-void LocalCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
-                                                const PeerRef &peer) {
+void LocalCpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
+                                                   const PeerRef &peer) {
     if (desc.data_path != "memcpy") {
         throw std::runtime_error("local_copy: CPU-only coprocessor supports only data_path=memcpy");
     }
@@ -91,21 +91,22 @@ void LocalCoprocessorSession::establish_channel(const ChannelDesc &desc, const M
     }
 }
 
-void LocalCoprocessorSession::start() {}
+void LocalCpuCoprocessorSession::start() {}
 
-int LocalCoprocessorSession::collect(void *const * /*replies*/,
-                                     const std::uint64_t * /*replies_bytes*/, std::size_t /*n*/) {
-    throw std::logic_error("LocalCoprocessorSession::collect not implemented yet");
+int LocalCpuCoprocessorSession::collect(void *const * /*replies*/,
+                                        const std::uint64_t * /*replies_bytes*/,
+                                        std::size_t /*n*/) {
+    throw std::logic_error("LocalCpuCoprocessorSession::collect not implemented yet");
 }
 
-void LocalCoprocessorSession::stop() {}
+void LocalCpuCoprocessorSession::stop() {}
 
-void LocalCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
+void LocalCpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
     fn_ = fn;
     ctx_ = ctx;
 }
 
-int LocalCoprocessorSession::run_once() {
+int LocalCpuCoprocessorSession::run_once() {
     if (!local_request_.addr || local_request_.size < kLocalRequestHeaderBytes) {
         throw std::runtime_error("local_copy: local request region is not established");
     }

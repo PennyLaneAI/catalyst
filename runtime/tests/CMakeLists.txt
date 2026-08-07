@@ -230,7 +230,7 @@ if(ENABLE_TRANSPORT)
     target_sources(runner_tests_transport_local PRIVATE
         Test_TransportLocalCopy.cpp
         ../lib/transport/local_copy/cpu_controller/LocalCpuControllerSession.cpp
-        ../lib/transport/local_copy/cpu_coprocessor/LocalCoprocessorSession.cpp
+        ../lib/transport/local_copy/cpu_coprocessor/LocalCpuCoprocessorSession.cpp
     )
     target_include_directories(runner_tests_transport_local PRIVATE
         ${runtime_includes}
@@ -241,6 +241,22 @@ if(ENABLE_TRANSPORT)
     target_link_libraries(runner_tests_transport_local PRIVATE
         Catch2WithMain
     )
+    if(TRANSPORT_HAS_HIP)
+        target_sources(runner_tests_transport_local PRIVATE
+            Test_TransportLocalCopyGpu.cpp
+            ../lib/transport/local_copy/gpu_coprocessor/LocalGpuCoprocessorSession.cpp
+        )
+        set_source_files_properties(
+            ../lib/transport/local_copy/gpu_coprocessor/LocalGpuCoprocessorSession.cpp
+            PROPERTIES LANGUAGE HIP)
+        target_include_directories(runner_tests_transport_local PRIVATE
+            ${PROJECT_SOURCE_DIR}/lib/transport/local_copy/gpu_coprocessor
+        )
+        target_link_libraries(runner_tests_transport_local PRIVATE
+            catalyst_transport_gpu_coprocessor
+            hip::host
+        )
+    endif()
     catch_discover_tests(runner_tests_transport_local)
 
     if(TRANSPORT_HAS_HIP)

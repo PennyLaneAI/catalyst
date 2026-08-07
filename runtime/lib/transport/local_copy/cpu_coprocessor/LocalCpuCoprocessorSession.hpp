@@ -25,10 +25,10 @@
 
 namespace catalyst::transport::local_copy {
 
-class LocalCoprocessorSession : public CoprocessorSession {
+class LocalCpuCoprocessorSession : public CoprocessorSession, public LocalCoprocessorEndpoint {
   public:
-    explicit LocalCoprocessorSession(std::string = {}) {}
-    ~LocalCoprocessorSession() override = default;
+    explicit LocalCpuCoprocessorSession(std::string = {}) {}
+    ~LocalCpuCoprocessorSession() override = default;
 
     // TransportSession
     int connect(const ConnectInfo &info) override;
@@ -45,7 +45,7 @@ class LocalCoprocessorSession : public CoprocessorSession {
 
     // CPU local peer-memory doorbell: consume the request in local_request_ and write the reply
     // into peer_reply_.
-    int run_once();
+    int run_once() override;
 
   private:
     /// Process-local rendezvous object used to find the paired controller.

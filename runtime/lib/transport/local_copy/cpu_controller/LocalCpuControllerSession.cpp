@@ -20,7 +20,6 @@
 #include <stdexcept>
 
 #include "../LocalMessageLayout.hpp"
-#include "../cpu_coprocessor/LocalCoprocessorSession.hpp"
 
 namespace catalyst::transport::local_copy {
 namespace {
