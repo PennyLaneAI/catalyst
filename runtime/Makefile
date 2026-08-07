@@ -150,6 +150,9 @@ endif
 ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
+ifeq ($(ENABLE_EXECUTOR), ON)
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
+endif
 ifeq ($(PLATFORM),Linux)
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info -q
