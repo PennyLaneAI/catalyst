@@ -219,7 +219,9 @@ llvm::json::Object ResourceResult::toJson() const {
     for (const auto &entry : detailOperations) {
         detailOperationsObject[entry.getKey()] = countToJson(entry.getValue());
     }
-    funcObj["quantum_operations_detailed"] = std::move(detailOperationsObject);
+    if (!detailOperationsObject.empty()) {
+        funcObj["quantum_operations_detailed"] = std::move(detailOperationsObject);
+    }
 
     return funcObj;
 }
