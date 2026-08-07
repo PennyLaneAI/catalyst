@@ -305,8 +305,8 @@ class SCP:
         files = sorted(p for p in bundle.iterdir() if p.is_file() and p.name != "README.md")
         if not files:
             raise RuntimeError(
-                f"no artifacts in {bundle} — pass build=<recipe> to cross-compile the executor + "
-                "runtime libs for the target, or point bundle= at a prebuilt directory."
+                f"no artifacts in {bundle} — cross-compile the executor + runtime libs for the "
+                "target first, and point bundle= at the directory holding them."
             )
         total = sum(f.stat().st_size for f in files)
         logger.info(
@@ -328,8 +328,7 @@ class RemoteLauncher:
         user: str,
         host: str,
         workspace: str,
-        remote_port: int,
-        local_port: int,
+        port: int,
         plugins: list[str],
         env: dict[str, str],
         *,
@@ -340,13 +339,16 @@ class RemoteLauncher:
         """Full ``ssh -L ...`` argv that opens a port-forward and starts ``catalyst-executor`` on
         the remote host.
 
+        ``port`` is used at both ends of the forward: the executor binds it on the remote, and the
+        tunnel listens on it here.
+
         Bare-string values in ``env``/``plugins`` are shell-quoted; wrap in
         :class:`~catalyst.executor.utils.Unquoted` to expand ``$VAR`` on the remote instead.
         """
         use_pw = sudo_password is not None
         remote_cmd = RemoteLauncher._remote_cmd(
             workspace,
-            remote_port,
+            port,
             plugins,
             env,
             sudo=sudo,
@@ -354,7 +356,7 @@ class RemoteLauncher:
             executor_bin=executor_bin,
         )
         logger.debug(f"remote: {remote_cmd}")
-        opts = RemoteLauncher._ssh_opts(local_port, remote_port, use_pw)
+        opts = RemoteLauncher._ssh_opts(port, use_pw)
         return SSHArgv.base(user, host, opts, multiplex=False) + [remote_cmd]
 
     @staticmethod
@@ -379,14 +381,14 @@ class RemoteLauncher:
         )
 
     @staticmethod
-    def _ssh_opts(local_port: int, remote_port: int, use_password: bool) -> list[str]:
+    def _ssh_opts(port: int, use_password: bool) -> list[str]:
         """Local-side ssh options for the port-forward. ``-tt`` on NOPASSWD so SSH close
         SIGHUPs the executor; omitted with a password so ``sudo -S`` sees an unechoed pipe."""
         opts = [
             "-o",
             "ExitOnForwardFailure=yes",
             "-L",
-            f"{local_port}:localhost:{remote_port}",
+            f"{port}:localhost:{port}",
         ]
         if not use_password:
             opts = ["-tt"] + opts

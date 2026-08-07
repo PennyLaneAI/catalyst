@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The :class:`Executor` launches a ``catalyst-executor`` process and exposes its address to ``target(...)``.
+"""The :class:`Executor` launches a ``catalyst-executor`` process and exposes the address it serves.
+
+Compiled programs are dispatched to that address to run out-of-process.
 
 Construction is inert; :meth:`Executor.launch` deploys, :meth:`Executor.stop` tears down, and it
 works as a context manager::
@@ -21,13 +23,13 @@ works as a context manager::
 
     # local subprocess on 127.0.0.1 (no SSH):
     with Executor(local=True, plugins=[...]) as ex:
-        dev = target(qml.device(...), address=ex.address)
+        print(ex.address)               # dispatch compiled programs here
 
     # remote over forwarded SSH:
     ex = Executor(host="10.0.0.9", user="me", plugins=[...]).launch()
-    dev = target(qml.device(...), address=ex.address)   # ... ex.stop() (also at process exit)
+    print(ex.address)                   # ... ex.stop() (also at process exit)
 
-    # attach to one already running/tunnelled (address is required here, there is no default):
+    # attach to an externally managed executor (address required, no default):
     ex = Executor("127.0.0.1:1234").launch()
 
     # persistent remote workspace:
@@ -45,7 +47,7 @@ import platform
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable, Self
+from typing import Callable, Self
 
 from .process import _ExecutorProcess, _LocalProcess, _RemoteProcess
 from .ssh import SCP, RemoteOps
@@ -120,12 +122,10 @@ class ExecutorConfig:
 
     user: str = ""
     port: int | None = None
-    local_port: int | None = None
     workspace: str | None = None
     bundle: str | Path | None = None
     plugins: list[str] | None = None
     copy: bool = False
-    build: Callable[[str | None, Path], Any] | None = None
     ready_timeout: float = 60.0
     sudo: bool = False
     sudo_password: str | None = None
@@ -136,16 +136,16 @@ class ExecutorConfig:
 
 
 class Executor:
-    """A ``catalyst-executor`` process, addressable over TCP. Pass its :attr:`address` to
-    ``target(address=...)``. Construction is inert; :meth:`launch` / :meth:`stop` are idempotent,
-    and ``with Executor(...) as ex:`` launches on entry and stops on exit.
+    """A ``catalyst-executor`` process, addressable over TCP at :attr:`address`. Construction is
+    inert; :meth:`launch` / :meth:`stop` are idempotent, and ``with Executor(...) as ex:``
+    launches on entry and stops on exit.
 
     Three modes:
 
     * ``local=True``: subprocess on ``127.0.0.1`` (no SSH).
     * ``host=<addr>``: remote over forwarded SSH. ``copy=True`` + ``bundle=<dir>`` first scp's
-      the bundle (cross-built via ``build=`` if given).
-    * ``address``: attach to an executor already running or tunnelled there.
+      the bundle.
+    * ``address``: attach to an executor whose lifetime is managed elsewhere.
 
     Exactly one of the three is required; :meth:`launch` raises :class:`ValueError` if none was
     given. ``address`` has no default on purpose — silently attaching to a well-known port would
@@ -160,12 +160,10 @@ class Executor:
         local: bool = False,
         user: str = "",
         port: int | None = None,
-        local_port: int | None = None,
         workspace: str | None = None,
         bundle: str | Path | None = None,
         plugins: list[str] | None = None,
         copy: bool = False,
-        build: Callable[[str | None, Path], Any] | None = None,
         ready_timeout: float = 60.0,
         name: str = "executor",
         sudo: bool = False,
@@ -182,12 +180,10 @@ class Executor:
         self._cfg = ExecutorConfig(
             user=user,
             port=port,
-            local_port=local_port,
             workspace=workspace,
             bundle=bundle,
             plugins=plugins,
             copy=copy,
-            build=build,
             ready_timeout=ready_timeout,
             sudo=sudo,
             sudo_password=sudo_password,
@@ -201,7 +197,7 @@ class Executor:
 
     @property
     def address(self) -> str:
-        """The ``host:port`` for ``target(address=...)``. Raises :class:`RuntimeError` if not launched."""
+        """The ``host:port`` the executor serves on. Raises :class:`RuntimeError` if not launched."""
         if not self._launched:
             raise RuntimeError("Executor not launched; call .launch() or use `with Executor(...)`")
         return self._address
@@ -235,12 +231,8 @@ class Executor:
         return user, host, workspace
 
     def _deploy_bundle(self, user: str, host: str, workspace: str) -> None:
-        """Cross-build (if ``build=``) then :meth:`SCP.deploy` the bundle. ``build`` is called on
-        every deploy, so it must be idempotent."""
-        bundle = Path(self._cfg.bundle)
-        if self._cfg.build is not None:
-            self._cfg.build(self.triple, bundle)
-        SCP.deploy(user, host, bundle, workspace)
+        """:meth:`SCP.deploy` the bundle to the remote workspace."""
+        SCP.deploy(user, host, Path(self._cfg.bundle), workspace)
 
     def _scp_bundle(self, user: str, host: str, workspace: str) -> None:
         """Deploy on launch when ``copy=True`` and ``bundle=`` are set; no-op otherwise."""
@@ -290,7 +282,6 @@ class Executor:
                 host=host,
                 user=user,
                 port=port,
-                local_port=self._cfg.local_port,
                 workspace=workspace,
                 plugins=self._cfg.plugins or [],
                 env=self._cfg.env,

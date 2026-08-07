@@ -290,17 +290,15 @@ class TestLocalProcessSpawn:
 class TestRemoteProcessConstruction:
     """Constructor wiring for :class:`_RemoteProcess`."""
 
-    def test_local_port_defaults_to_remote_port(self):
-        """``local_port`` defaults to the remote ``port`` when not attached."""
-        p = _RemoteProcess(host="h", user="me", port=1373, workspace="~/ws")
-        assert p.local_port == 1373
-        assert p.addr == "127.0.0.1:1373"
+    def test_addr_is_the_local_tunnel_endpoint(self):
+        """``addr`` is loopback on the same port the executor binds remotely.
 
-    def test_local_port_explicit(self):
-        """An attached ``local_port`` takes precedence over the remote port for ``addr``."""
-        p = _RemoteProcess(host="h", user="me", port=1373, local_port=5000, workspace="~/ws")
-        assert p.local_port == 5000
-        assert p.addr == "127.0.0.1:5000"
+        Both ends of the SSH forward use one port number, so there is nothing to reconcile
+        between the tunnel endpoint and the remote bind.
+        """
+        p = _RemoteProcess(host="h", user="me", port=1373, workspace="~/ws")
+        assert p.addr == "127.0.0.1:1373"
+        assert p._bind_port == 1373
 
     def test_defaults(self):
         """Applies default sudo, workspace-cleanup, executor-binary, and ready-tracking values."""

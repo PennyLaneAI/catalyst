@@ -17,7 +17,7 @@ defaults, mode dispatch, attach-mode launch, workspace lifecycle (``setup_worksp
 ``remove_workspace``), and the ``_scp_bundle`` / ``_deploy_bundle`` split. Subprocess-facing
 calls (``SCP.deploy``, ``RemoteOps.rmdir``) are mocked."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -188,21 +188,22 @@ class TestScpBundleGate:
 
 
 class TestDeployBundle:
-    """The build + scp composition inside :meth:`Executor._deploy_bundle`."""
+    """The scp delegation inside :meth:`Executor._deploy_bundle`."""
 
-    def test_calls_build_then_scp_deploy(self, tmp_path):
-        """Calls ``build(triple, bundle)`` then :meth:`SCP.deploy` with the same bundle."""
+    def test_passes_bundle_path_through(self, tmp_path):
+        """Hands the bundle directory to :meth:`SCP.deploy` as a :class:`Path`, unmodified.
+
+        Cross-building is the caller's job, so ``_deploy_bundle`` is a pure ship step.
+        """
         bundle = tmp_path / "b"
         bundle.mkdir()
-        build = MagicMock()
-        ex = Executor(host="h", user="me", bundle=str(bundle), build=build, triple="x86_64")
+        ex = Executor(host="h", user="me", bundle=str(bundle))
         with patch("catalyst.executor.manager.SCP.deploy") as scp_deploy:
             ex._deploy_bundle("me", "h", "ws")
-        build.assert_called_once_with("x86_64", bundle)
         scp_deploy.assert_called_once_with("me", "h", bundle, "ws")
 
-    def test_no_build_still_deploys(self, tmp_path):
-        """No ``build=`` recipe: still deploys the bundle as-is."""
+    def test_deploys_bundle_as_is(self, tmp_path):
+        """Deploys the bundle directory exactly as given."""
         bundle = tmp_path / "b"
         bundle.mkdir()
         ex = Executor(host="h", bundle=str(bundle))

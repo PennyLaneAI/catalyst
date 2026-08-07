@@ -497,7 +497,7 @@ class TestRemoteLauncherSecurityDefaults:
 
     def test_no_sudo_by_default(self):
         """``ssh_argv`` runs the executor as the connecting user unless ``sudo=True``."""
-        argv = RemoteLauncher.ssh_argv("me", "h", "~/ws", 1373, 5000, [], {})
+        argv = RemoteLauncher.ssh_argv("me", "h", "~/ws", 1373, [], {})
         assert "sudo" not in argv[-1]
 
     def test_sudo_is_opt_in(self):
@@ -508,27 +508,27 @@ class TestRemoteLauncherSecurityDefaults:
 class TestRemoteLauncherSshOpts:
     """SSH option assembly for the launcher's transport-level flags."""
 
-    def test_local_forward_present(self):
-        """Emits ``-L local:localhost:remote`` to forward the executor's bind port."""
-        opts = RemoteLauncher._ssh_opts(local_port=5000, remote_port=1373, use_password=False)
+    def test_local_forward_uses_one_port_at_both_ends(self):
+        """Emits ``-L <port>:localhost:<port>`` — the tunnel and the remote bind share a port."""
+        opts = RemoteLauncher._ssh_opts(port=1373, use_password=False)
         assert "-L" in opts
-        assert "5000:localhost:1373" in opts
+        assert "1373:localhost:1373" in opts
 
     def test_exit_on_forward_failure(self):
         """Sets ``ExitOnForwardFailure=yes`` so a forward failure fails the ssh session."""
-        opts = RemoteLauncher._ssh_opts(4, 5, use_password=False)
+        opts = RemoteLauncher._ssh_opts(5, use_password=False)
         assert "ExitOnForwardFailure=yes" in opts
 
     def test_pseudo_terminal_without_password(self):
         """NOPASSWD path uses ``-tt`` so ssh close signals SIGHUP to the executor."""
         # NOPASSWD path uses -tt so SSH close SIGHUPs the executor.
-        opts = RemoteLauncher._ssh_opts(4, 5, use_password=False)
+        opts = RemoteLauncher._ssh_opts(5, use_password=False)
         assert "-tt" in opts
 
     def test_no_pseudo_terminal_with_password(self):
         """Password-sudo path omits ``-tt`` so ``sudo -S`` reads the password from stdin."""
         # sudo -S needs an unechoed pipe on stdin, so we omit -tt.
-        opts = RemoteLauncher._ssh_opts(4, 5, use_password=True)
+        opts = RemoteLauncher._ssh_opts(5, use_password=True)
         assert "-tt" not in opts
 
 
@@ -542,7 +542,6 @@ class TestRemoteLauncherSshArgv:
             "h",
             "~/ws",
             1373,
-            5000,
             plugins=["libx.so"],
             env={"FOO": "bar"},
             sudo=False,
@@ -550,4 +549,4 @@ class TestRemoteLauncherSshArgv:
         assert argv[0] == "ssh"
         assert argv[-1].startswith("cd ")  # last arg is the remote command
         assert "me@h" in argv
-        assert "5000:localhost:1373" in argv
+        assert "1373:localhost:1373" in argv

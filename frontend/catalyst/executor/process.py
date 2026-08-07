@@ -278,8 +278,9 @@ class _LocalProcess(_ExecutorProcess):
 class _RemoteProcess(_ExecutorProcess):
     """``catalyst-executor`` running remotely over a port-forwarded SSH.
 
-    ``.addr`` is the local tunnel endpoint. Closing SSH stops the executor; a port-scoped
-    ``pkill`` runs as a teardown backstop.
+    ``.addr`` is the local tunnel endpoint. Both ends of the forward use the same port number,
+    so ``.addr`` is ``127.0.0.1:<port>``. Closing SSH stops the executor; a port-scoped ``pkill``
+    runs as a teardown backstop.
     """
 
     def __init__(
@@ -288,7 +289,6 @@ class _RemoteProcess(_ExecutorProcess):
         host: str,
         user: str,
         port: int,
-        local_port: int | None = None,
         workspace: str,
         plugins: list[str] | None = None,
         env: dict[str, str] | None = None,
@@ -300,17 +300,15 @@ class _RemoteProcess(_ExecutorProcess):
         name: str = "executor",
         log_path: str | None = None,
     ):
-        local_port = local_port or port
         super().__init__(
             name=name,
-            addr=f"{self.LOCALHOST}:{local_port}",
+            addr=f"{self.LOCALHOST}:{port}",
             bind_port=port,
             ready_timeout=ready_timeout,
             log_path=log_path,
         )
         self.host = host
         self.user = user
-        self.local_port = local_port
         self.workspace = workspace
         self.cleanup_ws = cleanup_ws
         self._plugins = plugins or []
@@ -360,7 +358,6 @@ class _RemoteProcess(_ExecutorProcess):
             self.host,
             self.workspace,
             self._bind_port,
-            self.local_port,
             self._plugins,
             self._env,
             sudo=self.sudo,
