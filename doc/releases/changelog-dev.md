@@ -403,6 +403,12 @@
   [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
   [(#3039)](https://github.com/PennyLaneAI/catalyst/pull/3039)
 
+* `ResourceAnalysis` can now optionally count `DecomposableGate` operations by their full graph
+  operation ID. Decomposition-rule resource generation enables this detailed mode so that resource
+  annotations preserve parameter types, wire counts, static data, and operator UIDs used for graph
+  matching.
+  [(#3102)](https://github.com/PennyLaneAI/catalyst/pull/3102)
+
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
   beneficial when the pass is executed multiple times within the compilation pipeline.
