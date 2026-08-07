@@ -29,8 +29,7 @@ class FdGuard {
     ~FdGuard() { reset(); }
 
     FdGuard(FdGuard &&other) noexcept : fd_(other.release()) {}
-    FdGuard &operator=(FdGuard &&other) noexcept
-    {
+    FdGuard &operator=(FdGuard &&other) noexcept {
         if (this != &other) {
             reset(other.release());
         }
@@ -47,8 +46,7 @@ class FdGuard {
      * @brief Closes the current socket and takes ownership of a new one.
      * @param new_fd The new socket descriptor to manage.
      */
-    void reset(int new_fd = -1) noexcept
-    {
+    void reset(int new_fd = -1) noexcept {
         if (fd_ >= 0) {
             ::close(fd_);
         }

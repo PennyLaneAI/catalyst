@@ -46,8 +46,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 
     using PPMSpecsType = llvm::DenseMap<StringRef, llvm::DenseMap<StringRef, int>>;
 
-    LogicalResult countLogicalQubit(Operation *op, PPMSpecsType &PPMSpecs)
-    {
+    LogicalResult countLogicalQubit(Operation *op, PPMSpecsType &PPMSpecs) {
         uint64_t numQubits = cast<quantum::AllocOp>(op).getNqubitsAttr().value_or(0);
 
         if (numQubits == 0) {
@@ -59,8 +58,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
-    LogicalResult countPPM(pbc::PPMeasurementOp op, PPMSpecsType &PPMSpecs)
-    {
+    LogicalResult countPPM(pbc::PPMeasurementOp op, PPMSpecsType &PPMSpecs) {
         if (isOpInWhileOp(op)) {
             return op->emitOpError("PPM statistics is not available when there are while loops.");
         }
@@ -81,8 +79,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     }
 
     LogicalResult countPPR(pbc::PPRotationOp op, PPMSpecsType &PPMSpecs,
-                           llvm::BumpPtrAllocator &stringAllocator)
-    {
+                           llvm::BumpPtrAllocator &stringAllocator) {
         if (isOpInWhileOp(op)) {
             return op->emitOpError("PBC statistics is not available when there are while loops.");
         }
@@ -120,8 +117,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
     //   depth-0: any commuting PPMs may share a layer, even on overlapping qubits.
     //   depth-1: only PPMs on non-overlapping qubits may share a layer.
     LogicalResult computeFuncDepth(func::FuncOp funcOp, bool onlyDisjointQubit,
-                                   PPMSpecsType &PPMSpecs)
-    {
+                                   PPMSpecsType &PPMSpecs) {
         if (!funcOp.getBody()
                  .walk([&](PBCOpInterface) { return WalkResult::interrupt(); })
                  .wasInterrupted()) {
@@ -141,8 +137,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return success();
     }
 
-    LogicalResult computeAllFuncDepth(bool onlyDisjointQubit, PPMSpecsType &PPMSpecs)
-    {
+    LogicalResult computeAllFuncDepth(bool onlyDisjointQubit, PPMSpecsType &PPMSpecs) {
         WalkResult wr = getOperation()->walk([&](func::FuncOp funcOp) {
             return failed(computeFuncDepth(funcOp, onlyDisjointQubit, PPMSpecs))
                        ? WalkResult::interrupt()
@@ -151,8 +146,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return wr.wasInterrupted() ? failure() : success();
     }
 
-    LogicalResult printSpecs(bool onlyDisjointQubit)
-    {
+    LogicalResult printSpecs(bool onlyDisjointQubit) {
         llvm::BumpPtrAllocator stringAllocator;
         PPMSpecsType PPMSpecs;
 
@@ -202,8 +196,7 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return depthResult;
     }
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         if (failed(printSpecs(onlyDisjointQubit))) {
             signalPassFailure();
         }

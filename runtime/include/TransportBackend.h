@@ -40,16 +40,13 @@ using CatalystTransportCoprocessorFactoryFn =
 // e.g. GENERATE_TRANSPORT_CONTROLLER_FACTORY(CatalystTransportController, make_controller)
 // where `make_controller(const std::string &config) -> ControllerSession*`.
 #define GENERATE_TRANSPORT_CONTROLLER_FACTORY(IDENTIFIER, BUILDER)                                 \
-    extern "C" catalyst::transport::ControllerSession *IDENTIFIER##Factory(const char *config)     \
-    {                                                                                              \
+    extern "C" catalyst::transport::ControllerSession *IDENTIFIER##Factory(const char *config) {   \
         try {                                                                                      \
             return (BUILDER)(config ? std::string(config) : std::string());                        \
-        }                                                                                          \
-        catch (const std::exception &e) {                                                          \
+        } catch (const std::exception &e) {                                                        \
             std::cerr << "[transport] controller factory failed: " << e.what() << "\n";            \
             return nullptr;                                                                        \
-        }                                                                                          \
-        catch (...) {                                                                              \
+        } catch (...) {                                                                            \
             std::cerr << "[transport] controller factory failed: unknown exception\n";             \
             return nullptr;                                                                        \
         }                                                                                          \
@@ -58,16 +55,13 @@ using CatalystTransportCoprocessorFactoryFn =
 // e.g. GENERATE_TRANSPORT_COPROCESSOR_FACTORY(CatalystTransportCoprocessor, make_coprocessor)
 // where `make_coprocessor(const std::string &config) -> CoprocessorSession*`.
 #define GENERATE_TRANSPORT_COPROCESSOR_FACTORY(IDENTIFIER, BUILDER)                                \
-    extern "C" catalyst::transport::CoprocessorSession *IDENTIFIER##Factory(const char *config)    \
-    {                                                                                              \
+    extern "C" catalyst::transport::CoprocessorSession *IDENTIFIER##Factory(const char *config) {  \
         try {                                                                                      \
             return (BUILDER)(config ? std::string(config) : std::string());                        \
-        }                                                                                          \
-        catch (const std::exception &e) {                                                          \
+        } catch (const std::exception &e) {                                                        \
             std::cerr << "[transport] coprocessor factory failed: " << e.what() << "\n";           \
             return nullptr;                                                                        \
-        }                                                                                          \
-        catch (...) {                                                                              \
+        } catch (...) {                                                                            \
             std::cerr << "[transport] coprocessor factory failed: unknown exception\n";            \
             return nullptr;                                                                        \
         }                                                                                          \

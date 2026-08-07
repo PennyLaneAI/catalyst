@@ -73,18 +73,15 @@ template <typename Ext> class ResourceAnalysisExtensionOf : public ResourceAnaly
     static_assert(std::is_base_of_v<ResourceResultExtension, Ext>,
                   "Ext must derive from ResourceResultExtension");
 
-    std::unique_ptr<ResourceResultExtension> makeEmpty() const final
-    {
+    std::unique_ptr<ResourceResultExtension> makeEmpty() const final {
         return std::make_unique<Ext>();
     }
 
-    void collect(mlir::Operation *op, ResourceResultExtension &ext, bool isAdjoint) final
-    {
+    void collect(mlir::Operation *op, ResourceResultExtension &ext, bool isAdjoint) final {
         collect(op, static_cast<Ext &>(ext), isAdjoint);
     }
 
-    void analyze(mlir::Region &region, ResourceResultExtension &ext, bool isAdjoint) final
-    {
+    void analyze(mlir::Region &region, ResourceResultExtension &ext, bool isAdjoint) final {
         analyze(region, static_cast<Ext &>(ext), isAdjoint);
     }
 

@@ -29,8 +29,7 @@ using namespace catalyst::transport;
 using namespace catalyst::transport::cpu_verbs;
 using namespace catalyst::transport::common; // DEMO_SYNDROME, REGION_BYTES
 
-static bool have_rxe()
-{
+static bool have_rxe() {
     int n = 0;
     ibv_device **devs = ibv_get_device_list(&n);
     bool found = false;
@@ -48,8 +47,7 @@ static bool have_rxe()
 // A custom coprocessor function (bitwise-invert) to exercise the set_coprocessor_fn
 // path with a non-null, non-echo function.
 static std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
-                             void * /*ctx*/)
-{
+                             void * /*ctx*/) {
     std::uint64_t v = 0;
     std::memcpy(&v, in, std::min(in_len, sizeof(v)));
     v = ~v;
@@ -60,8 +58,7 @@ static std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std:
 
 TEST_CASE("controller and coprocessor connect: both reach INIT and open the "
           "OOB channel",
-          "[cpu_libibverbs]")
-{
+          "[cpu_libibverbs]") {
     if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
     }
@@ -86,8 +83,7 @@ TEST_CASE("controller and coprocessor connect: both reach INIT and open the "
     REQUIRE(coproc_rc == 0);
 }
 
-TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[cpu_libibverbs]")
-{
+TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[cpu_libibverbs]") {
     if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
     }
@@ -128,8 +124,8 @@ TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[c
     REQUIRE(coproc_peer_size == SIZE);
 }
 
-TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply", "[cpu_libibverbs]")
-{
+TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
+          "[cpu_libibverbs]") {
     if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
     }
@@ -185,8 +181,7 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
 }
 
 TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor",
-          "[cpu_libibverbs]")
-{
+          "[cpu_libibverbs]") {
     if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
     }

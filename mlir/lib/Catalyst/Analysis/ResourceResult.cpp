@@ -35,8 +35,7 @@ namespace catalyst {
 using MergeMethod = ResourceResult::MergeMethod;
 
 /// Helper: select merge function based on method enum.
-template <typename T> static T applyMerge(T a, T b, MergeMethod method)
-{
+template <typename T> static T applyMerge(T a, T b, MergeMethod method) {
     switch (method) {
     case MergeMethod::Max:
         return std::max(a, b);
@@ -49,16 +48,14 @@ template <typename T> static T applyMerge(T a, T b, MergeMethod method)
 }
 
 // Merge a flat StringMap with a single operator[] per key.
-template <typename Map> static void mergeStringMap(Map &dst, const Map &src, MergeMethod method)
-{
+template <typename Map> static void mergeStringMap(Map &dst, const Map &src, MergeMethod method) {
     for (const auto &entry : src) {
         auto &slot = dst[entry.getKey()];
         slot = applyMerge(slot, entry.getValue(), method);
     }
 }
 
-void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
-{
+void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) {
     for (const auto &opEntry : other.operations) {
         auto &innerDst = operations[opEntry.getKey()];
         for (const auto &sizeEntry : opEntry.getValue()) {
@@ -93,8 +90,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     }
 }
 
-void ResourceResult::multiplyBy(double scalar)
-{
+void ResourceResult::multiplyBy(double scalar) {
     for (auto &opEntry : operations) {
         for (auto &sizeEntry : opEntry.getValue()) {
             sizeEntry.second *= scalar;
@@ -122,13 +118,11 @@ void ResourceResult::multiplyBy(double scalar)
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
 // (fractional) count values, but the JSON output always reports the nearest integer.
-static llvm::json::Value countToJson(double count)
-{
+static llvm::json::Value countToJson(double count) {
     return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
 }
 
-llvm::json::Object ResourceResult::toJson() const
-{
+llvm::json::Object ResourceResult::toJson() const {
     llvm::json::Object funcObj;
 
     llvm::json::Object opsObj;
@@ -203,8 +197,7 @@ llvm::json::Object ResourceResult::toJson() const
  * @return DictionaryAttr representing the resource counts
  *
  */
-DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
-{
+DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result) {
     SmallVector<NamedAttribute> entries;
 
     // operations

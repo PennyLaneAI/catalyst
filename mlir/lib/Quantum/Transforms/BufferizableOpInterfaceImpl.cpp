@@ -40,28 +40,24 @@ struct QubitUnitaryOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<QubitUnitaryOpInterface,
                                                                    QubitUnitaryOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto qubitUnitaryOp = cast<QubitUnitaryOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(qubitUnitaryOp.getMatrix().getType());
@@ -84,28 +80,24 @@ struct HermitianOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<HermitianOpInterface,
                                                                    HermitianOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto hermitianOp = cast<HermitianOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(hermitianOp.getMatrix().getType());
@@ -127,28 +119,24 @@ struct HamiltonianOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<HamiltonianOpInterface,
                                                                    HamiltonianOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto hamiltonianOp = cast<HamiltonianOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(hamiltonianOp.getCoeffs().getType());
@@ -170,14 +158,12 @@ struct HamiltonianOpInterface
 struct SampleOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<SampleOpInterface, SampleOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
@@ -185,15 +171,13 @@ struct SampleOpInterface
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto sampleOp = cast<SampleOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(sampleOp.getSamples().getType());
@@ -221,14 +205,12 @@ struct SampleOpInterface
 struct CountsOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<CountsOpInterface, CountsOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
@@ -236,15 +218,13 @@ struct CountsOpInterface
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto countsOp = cast<CountsOp>(op);
         Location loc = op->getLoc();
 
@@ -261,8 +241,7 @@ struct CountsOpInterface
                                                           countsOp.getDynamicShape());
                 allocVal =
                     memref::AllocOp::create(rewriter, loc, resultType, ValueRange{indexCastOp});
-            }
-            else {
+            } else {
                 allocVal = memref::AllocOp::create(rewriter, loc, resultType);
             }
             buffers.push_back(allocVal);
@@ -282,14 +261,12 @@ struct CountsOpInterface
 struct ProbsOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<ProbsOpInterface, ProbsOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
@@ -297,15 +274,13 @@ struct ProbsOpInterface
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto probsOp = cast<ProbsOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(probsOp.getProbabilities().getType());
@@ -317,8 +292,7 @@ struct ProbsOpInterface
             auto indexCastOp = index::CastSOp::create(rewriter, loc, rewriter.getIndexType(),
                                                       probsOp.getDynamicShape());
             buffer = memref::AllocOp::create(rewriter, loc, resultType, ValueRange{indexCastOp});
-        }
-        else {
+        } else {
             buffer = memref::AllocOp::create(rewriter, loc, resultType);
         }
 
@@ -336,14 +310,12 @@ struct ProbsOpInterface
 struct StateOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<StateOpInterface, StateOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
@@ -351,15 +323,13 @@ struct StateOpInterface
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto stateOp = cast<StateOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(stateOp.getState().getType());
@@ -371,8 +341,7 @@ struct StateOpInterface
             auto indexCastOp = index::CastSOp::create(rewriter, loc, rewriter.getIndexType(),
                                                       stateOp.getDynamicShape());
             buffer = memref::AllocOp::create(rewriter, loc, resultType, ValueRange{indexCastOp});
-        }
-        else {
+        } else {
             buffer = memref::AllocOp::create(rewriter, loc, resultType);
         }
 
@@ -390,28 +359,24 @@ struct SetStateOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<SetStateOpInterface,
                                                                    SetStateOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto setStateOp = cast<SetStateOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(setStateOp.getInState().getType());
@@ -433,28 +398,24 @@ struct SetBasisStateOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<SetBasisStateOpInterface,
                                                                    SetBasisStateOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto setBasisStateOp = cast<SetBasisStateOp>(op);
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(setBasisStateOp.getBasisState().getType());
@@ -473,8 +434,7 @@ struct SetBasisStateOpInterface
 
 } // namespace
 
-void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
-{
+void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
         QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
         HermitianOp::attachInterface<HermitianOpInterface>(*ctx);

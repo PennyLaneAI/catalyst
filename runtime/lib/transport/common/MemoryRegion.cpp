@@ -29,9 +29,7 @@ namespace catalyst::transport::common {
  */
 MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
                            MemAccess access)
-    : MemoryRegion(std::move(pd), addr, length, access, nullptr)
-{
-}
+    : MemoryRegion(std::move(pd), addr, length, access, nullptr) {}
 
 /**
  * @brief Register caller-provided memory, keeping `backing` alive for the MR's
@@ -39,8 +37,7 @@ MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std
  */
 MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
                            MemAccess access, std::shared_ptr<void> backing)
-    : pd_(std::move(pd)), backing_buffer_(std::move(backing))
-{
+    : pd_(std::move(pd)), backing_buffer_(std::move(backing)) {
     mr_ = ibv_reg_mr(pd_->get(), addr, length, static_cast<int>(access));
     RDMA_CHECK_ERRNO(mr_, "ibv_reg_mr");
 }
@@ -51,8 +48,7 @@ MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std
  */
 MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, std::uint64_t offset,
                            std::size_t length, std::uint64_t iova, int fd, MemAccess access)
-    : pd_(std::move(pd))
-{
+    : pd_(std::move(pd)) {
     mr_ = ibv_reg_dmabuf_mr(pd_->get(), offset, length, iova, fd, static_cast<int>(access));
     RDMA_CHECK_ERRNO(mr_, "ibv_reg_dmabuf_mr");
 }
@@ -61,8 +57,7 @@ MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, std::uint64_t o
  * @brief Allocate + own an aligned host buffer, then register it.
  */
 MemoryRegion MemoryRegion::alloc_host(std::shared_ptr<ProtectionDomain> pd, std::size_t length,
-                                      std::size_t alignment, MemAccess access)
-{
+                                      std::size_t alignment, MemAccess access) {
     // aligned_alloc requires a power-of-two alignment and a size that is a
     // multiple of it.
     RDMA_CHECK(std::has_single_bit(alignment), "alignment must be a power of two, got %zu",
@@ -74,8 +69,7 @@ MemoryRegion MemoryRegion::alloc_host(std::shared_ptr<ProtectionDomain> pd, std:
     return MemoryRegion(std::move(pd), buf, length, access, std::shared_ptr<void>(buf, std::free));
 }
 
-MemoryRegion::~MemoryRegion()
-{
+MemoryRegion::~MemoryRegion() {
     if (mr_) {
         ibv_dereg_mr(mr_);
     }
@@ -83,12 +77,9 @@ MemoryRegion::~MemoryRegion()
 
 MemoryRegion::MemoryRegion(MemoryRegion &&other) noexcept
     : pd_(std::move(other.pd_)), mr_(std::exchange(other.mr_, nullptr)),
-      backing_buffer_(std::move(other.backing_buffer_))
-{
-}
+      backing_buffer_(std::move(other.backing_buffer_)) {}
 
-MemoryRegion &MemoryRegion::operator=(MemoryRegion &&other) noexcept
-{
+MemoryRegion &MemoryRegion::operator=(MemoryRegion &&other) noexcept {
     if (this != &other) {
         if (mr_) {
             ibv_dereg_mr(mr_); // release our current MR before taking other's

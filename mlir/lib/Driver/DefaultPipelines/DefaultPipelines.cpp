@@ -18,8 +18,7 @@
 
 #include "Driver/DefaultPipelines/DefaultPipelines.h"
 
-NB_MODULE(default_pipelines, m)
-{
+NB_MODULE(default_pipelines, m) {
     m.doc() = "Bindings for Catalyst default pipelines.";
     m.def("get_pipeline_names", &catalyst::driver::getPipelineNames,
           "Returns the list of pipeline names.");
