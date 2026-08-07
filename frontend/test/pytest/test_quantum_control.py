@@ -33,7 +33,7 @@ from pennylane import adjoint as PL_adjoint
 from pennylane import cond
 from pennylane import ctrl as PL_ctrl
 from pennylane import for_loop, qjit, while_loop
-from pennylane.operation import DecompositionUndefinedError, Operation, Operator, Wires
+from pennylane.operation import DecompositionUndefinedError, Operation, Operator, Operator2, Wires
 from pennylane.ops.op_math.controlled import Controlled
 from pennylane.tape import QuantumTape
 
@@ -124,6 +124,10 @@ class TestControlled:
 
     def test_adjoint_qctrl_func_simple(self, backend, capture_mode):
         """Test the quantum control distribution over the group of operations"""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
 
         def circuit(arg, ctrl_fn, adjoint_fn):
             def _func(theta):
@@ -947,20 +951,18 @@ class TestControlledMiscMethods:
         op = C_ctrl(target, control_wires, control_values=control_values, work_wires=work_wires)
 
         data, metadata = op._flatten()
-        assert data[0] is target
-        assert len(data) == 1
+        dynamic_data, wire_data, hybrid_data = data
+        assert dynamic_data == [list(control_values)]
+        assert wire_data == [control_wires, work_wires]
+        assert hybrid_data == [target]
 
-        assert len(metadata) == 4
-        assert metadata[0] == control_wires
-        assert metadata[1] == control_values
-        assert metadata[2] == work_wires
-        assert metadata[3] == work_wire_type
+        assert metadata == (work_wire_type,)
 
         assert hash(metadata)
 
         new_op = type(op)._unflatten(*op._flatten())
         assert qp.equal(op, new_op)
-        assert new_op._name == "C(S)"  # make sure initialization was called
+        assert new_op.name == "C(S)"  # make sure initialization was called
 
     def test_copy(self):
         """Test that a copy of a controlled oeprator can have its parameters updated
@@ -1051,7 +1053,7 @@ class TestControlledMiscMethods:
         assert len(ob) == 1
         assert ob[0].__class__ is base_gen.__class__
 
-        expected = qp.exp(op.generator(), 1j * op.data[0])
+        expected = qp.exp(op.generator(), 1j * op.base.data[0])
         assert qp.math.allclose(
             expected.matrix(wire_order=["a", "b", "c"]), op.matrix(wire_order=["a", "b", "c"])
         )
@@ -1446,20 +1448,20 @@ class TestDecomposition:
             assert qp.equal(actual_op, expected_op)
 
     def test_non_differentiable_one_qubit_special_unitary(self):
-        """Assert that a non-differentiable on qubit special unitary uses the bisect
-        decomposition."""
+        """Assert that a controlled RZ uses the specialized Operator2 decomposition."""
 
         op = C_ctrl(qp.RZ(1.2, wires=0), (1, 2, 3, 4))
         decomp = op.decomposition()
 
-        assert qp.equal(decomp[0], qp.MultiControlledX(wires=(1, 2, 0), work_wires=(3, 4)))
-        assert isinstance(decomp[1], qp.QubitUnitary)
-        assert qp.equal(decomp[2], qp.MultiControlledX(wires=(3, 4, 0), work_wires=(1, 2)))
-        assert isinstance(decomp[3].base, qp.QubitUnitary)
-        assert qp.equal(decomp[4], qp.MultiControlledX(wires=(1, 2, 0), work_wires=(3, 4)))
-        assert isinstance(decomp[5], qp.QubitUnitary)
-        assert qp.equal(decomp[6], qp.MultiControlledX(wires=(3, 4, 0), work_wires=(1, 2)))
-        assert isinstance(decomp[7].base, qp.QubitUnitary)
+        expected = [
+            qp.RZ(0.6, wires=0),
+            qp.MultiControlledX(wires=(1, 2, 3, 4, 0)),
+            qp.RZ(-0.6, wires=0),
+            qp.MultiControlledX(wires=(1, 2, 3, 4, 0)),
+        ]
+        assert all(
+            qp.equal(actual, target) for actual, target in zip(decomp, expected, strict=True)
+        )
 
         decomp_mat = qp.matrix(op.decomposition, wire_order=op.wires)()
         assert qp.math.allclose(op.matrix(), decomp_mat)
@@ -1529,16 +1531,19 @@ class TestDecomposition:
         assert qp.equal(decomp[4], qp.PauliX(2))
 
     @pytest.mark.parametrize(
-        "base_cls, params, base_wires, ctrl_wires, _, expected",
+        "base_cls, params, base_wires, ctrl_wires, custom_ctrl_op, expected",
         custom_ctrl_op_decomps,
     )
     def test_control_on_zero_custom_ops(
-        self, base_cls, params, base_wires, ctrl_wires, _, expected
+        self, base_cls, params, base_wires, ctrl_wires, custom_ctrl_op, expected
     ):
         """Tests that custom ops are not converted when wires are control-on-zero."""
 
         base_op = base_cls(*params, wires=base_wires)
         op = C_ctrl(base_op, control=ctrl_wires, control_values=[False] * len(ctrl_wires))
+
+        if isinstance(base_op, Operator2):
+            expected = [custom_ctrl_op(*params, wires=ctrl_wires + base_wires)]
 
         decomp = op.decomposition()
 
