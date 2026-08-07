@@ -61,3 +61,5 @@ add_custom_target(transport_backends
 if(TRANSPORT_HAS_HIP)
     add_dependencies(transport_backends catalyst_transport_gpu_verbs_coprocessor)
 endif()
+
+add_subdirectory(local_copy)
