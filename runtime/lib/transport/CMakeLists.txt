@@ -26,9 +26,14 @@ set_property(TARGET rt_transport PROPERTY POSITION_INDEPENDENT_CODE ON)
 find_package(Threads REQUIRED)
 find_library(IBVERBS_LIB ibverbs)
 
+add_custom_target(transport_all)
+add_dependencies(transport_all rt_transport)
+
 if(IBVERBS_LIB)
     add_subdirectory(common)
     add_subdirectory(cpu_verbs)
+    add_dependencies(transport_all catalyst_transport_cpu_controller
+                     catalyst_transport_cpu_coprocessor steane_coprocessor)
 
     # GPU coprocessor backend — only when a HIP toolchain is present.
     include(CheckLanguage)
@@ -37,6 +42,7 @@ if(IBVERBS_LIB)
         message(STATUS "transport: HIP found (${CMAKE_HIP_COMPILER}) -> building gpu_verbs")
         set(TRANSPORT_HAS_HIP TRUE CACHE INTERNAL "transport: HIP toolchain available")
         add_subdirectory(gpu_verbs)
+        add_dependencies(transport_all catalyst_transport_gpu_coprocessor)
     else()
         message(STATUS "transport: no HIP compiler -> skipping gpu_verbs")
     endif()

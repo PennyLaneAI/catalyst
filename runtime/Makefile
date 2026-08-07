@@ -57,8 +57,7 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 
 ifeq ($(ENABLE_TRANSPORT), ON)
-	BUILD_TARGETS += rt_transport catalyst_transport_cpu_controller \
-	                 catalyst_transport_cpu_coprocessor steane_coprocessor
+	BUILD_TARGETS += transport_all
 endif
 
 ifeq ($(ENABLE_EXECUTOR), ON)
