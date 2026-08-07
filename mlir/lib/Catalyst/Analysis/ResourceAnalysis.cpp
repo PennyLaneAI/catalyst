@@ -84,7 +84,9 @@ ResourceResult ResourceAnalysis::makeEmptyResult() const {
 }
 
 ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
-                                   ArrayRef<ExtensionProvider> extensionProviders) {
+                                   ArrayRef<ExtensionProvider> extensionProviders,
+                                   bool collectDetailedOperations)
+    : collectDetailedOperations(collectDetailedOperations) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -150,7 +152,9 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
 }
 
 ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
-                                   ArrayRef<ExtensionProvider> extensionProviders) {
+                                   ArrayRef<ExtensionProvider> extensionProviders,
+                                   bool collectDetailedOperations)
+    : collectDetailedOperations(collectDetailedOperations) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -361,7 +365,9 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 
             if (needsCollection) {
                 collectOperation(&op, result, isAdjoint);
-                collectDetailOperation(&op, result, isAdjoint);
+                if (collectDetailedOperations) {
+                    collectDetailOperation(&op, result, isAdjoint);
+                }
             }
         }
     }
