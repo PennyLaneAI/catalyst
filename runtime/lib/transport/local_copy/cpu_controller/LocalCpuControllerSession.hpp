@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "Transport.hpp"
+
 #include "../LocalRegistry.hpp"
 
 namespace catalyst::transport::local_copy {
@@ -36,8 +37,7 @@ class LocalCpuControllerSession : public ControllerSession {
     void establish_channel(const ChannelDesc &desc, const MemRegion &local,
                            const PeerRef &peer) override;
     void start() override;
-    int collect(void *const *replies, const std::uint64_t *replies_bytes,
-                std::size_t n) override;
+    int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
     void stop() override;
     std::uint64_t last_rtt_ns() const override { return rtt_ns_; }
 
@@ -46,8 +46,7 @@ class LocalCpuControllerSession : public ControllerSession {
                           std::uint64_t out_bytes) override;
     int kick(std::uint32_t work_item_idx = 0) override;
     void *data_slot() override;
-    void write_data_slot(const void *src, std::uint64_t bytes,
-                         std::uint32_t decoder_id) override;
+    void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
 
   private:
     /// Process-local rendezvous object used to find the paired coprocessor.

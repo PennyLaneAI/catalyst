@@ -75,9 +75,8 @@ PeerRef LocalCoprocessorSession::exchange_keys(const MemRegion &local) {
     return peer_reply_;
 }
 
-void LocalCoprocessorSession::establish_channel(const ChannelDesc &desc,
-                                                   const MemRegion &local,
-                                                   const PeerRef &peer) {
+void LocalCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
+                                                const PeerRef &peer) {
     if (desc.data_path != "memcpy") {
         throw std::runtime_error("local_copy: CPU-only coprocessor supports only data_path=memcpy");
     }
@@ -95,8 +94,7 @@ void LocalCoprocessorSession::establish_channel(const ChannelDesc &desc,
 void LocalCoprocessorSession::start() {}
 
 int LocalCoprocessorSession::collect(void *const * /*replies*/,
-                                        const std::uint64_t * /*replies_bytes*/,
-                                        std::size_t /*n*/) {
+                                     const std::uint64_t * /*replies_bytes*/, std::size_t /*n*/) {
     throw std::logic_error("LocalCoprocessorSession::collect not implemented yet");
 }
 
@@ -131,8 +129,10 @@ int LocalCoprocessorSession::run_once() {
 
     const void *request = request_base + kLocalRequestHeaderBytes;
 
-    auto *reply_base = reinterpret_cast<std::byte *>(static_cast<std::uintptr_t>(peer_reply_.remote_addr));
-    const std::size_t reply_cap = static_cast<std::size_t>(peer_reply_.size - kLocalReplyHeaderBytes);
+    auto *reply_base =
+        reinterpret_cast<std::byte *>(static_cast<std::uintptr_t>(peer_reply_.remote_addr));
+    const std::size_t reply_cap =
+        static_cast<std::size_t>(peer_reply_.size - kLocalReplyHeaderBytes);
     void *reply = reply_base + kLocalReplyHeaderBytes;
     CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
     const std::size_t written =
