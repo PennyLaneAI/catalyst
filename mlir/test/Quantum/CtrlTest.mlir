@@ -129,6 +129,32 @@ func.func @ctrl_nested(%outer: !quantum.bit, %inner: !quantum.bit, %q: !quantum.
 
 // -----
 
+// CHECK-LABEL: @ctrl_nested_gate_before_after
+func.func @ctrl_nested_gate_before_after(%outer: !quantum.bit, %inner: !quantum.bit, %q: !quantum.bit)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: quantum.custom "Hadamard"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
+  // CHECK: quantum.custom "PauliZ"() %{{.*}} ctrls(%{{.*}}, %{{.*}}) ctrlvals(%{{.*}}, %{{.*}})
+  // CHECK: quantum.custom "T"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
+  %oc, %or:2 = quantum.ctrl(%outer) ctrlvals(%true) (%inner, %q : !quantum.bit, !quantum.bit) : !quantum.bit -> !quantum.bit, !quantum.bit {
+  ^bb0(%argi: !quantum.bit, %argq: !quantum.bit):
+    // gates before the inner ctrl
+    %pre = quantum.custom "Hadamard"() %argq : !quantum.bit
+    %ic, %iq = quantum.ctrl(%argi) ctrlvals(%true) (%pre : !quantum.bit) : !quantum.bit -> !quantum.bit {
+    ^bb1(%iiq: !quantum.bit):
+      %z = quantum.custom "PauliZ"() %iiq : !quantum.bit
+      quantum.yield %z : !quantum.bit
+    }
+    // gate after the inner ctrl
+    %post = quantum.custom "T"() %iq : !quantum.bit
+    quantum.yield %ic, %post : !quantum.bit, !quantum.bit
+  }
+  return %or#0, %or#1, %oc : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
 // A measurement inside a ctrl region is rejected by the verifier.
 func.func @ctrl_measure(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quantum.bit {
   %true = arith.constant true
