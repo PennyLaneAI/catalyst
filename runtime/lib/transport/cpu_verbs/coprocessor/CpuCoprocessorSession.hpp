@@ -42,6 +42,12 @@ class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
 
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
 
+    void set_thread_affinity(int cpu, bool realtime)
+    {
+        pin_cpu_ = cpu;
+        pin_realtime_ = realtime;
+    }
+
   protected:
     bool oob_listens() const override { return true; }
 
@@ -49,6 +55,8 @@ class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
     // The engine loop; runs on engine_.
     void run(std::stop_token st);
 
+    int pin_cpu_ = -1;                  // -1 -> leave affinity alone
+    bool pin_realtime_ = false;
     CoprocessorFn coproc_fn_ = nullptr; // nullptr -> built-in echo
     void *coproc_ctx_ = nullptr;
 
