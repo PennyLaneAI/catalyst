@@ -194,13 +194,8 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         # Create decomposition rules for each operation in the solution
         # and compile them to Catalyst JAXPR decomposition rules
         for op, rule in self._decomp_graph_solution.items():
-            # The graph solution represents symbolic operations abstractly. Catalyst handles
-            # these with dedicated MLIR operations rather than Python decomposition rules.
-            if _should_skip_decomp_rule_capture(op.op):
-                continue
-
             op_num_wires, pauli_word = _resource_metadata(op.op)
-            if (
+            if op.op.name in COMPILER_OPS_FOR_DECOMPOSITION and (
                 o := next(
                     (
                         o
@@ -242,6 +237,13 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                     requires_copy=requires_copy,
                     pauli_word=pauli_word,
                 )
+            elif _should_skip_decomp_rule_capture(op.op):
+                # Note that the graph-decomposition returns abstracted rules
+                # for Adjoint and Controlled operations, so we skip them here.
+                # These abstracted rules cannot be captured and lowered.
+                # We use MLIR AdjointOp and ControlledOp primitives
+                # to deal with decomposition of symbolic operations at PLxPR.
+                continue
             else:
                 raise ValueError(f"Could not capture {op.op} without the number of wires.")
 
