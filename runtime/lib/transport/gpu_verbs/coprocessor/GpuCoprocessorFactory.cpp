@@ -36,7 +36,12 @@ catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string 
     // `gpu` is optional and defaults to device 0
     const int gpu_device =
         catalyst::transport::common::parse_optional_index(config, "gpu", /*fallback=*/0);
-    return new catalyst::transport::gpu_verbs::GpuCoprocessorSession(cfg.dev, cfg.gid, gpu_device);
+    auto *session =
+        new catalyst::transport::gpu_verbs::GpuCoprocessorSession(cfg.dev, cfg.gid, gpu_device);
+    session->set_thread_affinity(
+        catalyst::transport::common::parse_optional_index(config, "cpu_pin", -1),
+        catalyst::transport::common::parse_optional_index(config, "rt", 0) != 0);
+    return session;
 }
 } // namespace
 

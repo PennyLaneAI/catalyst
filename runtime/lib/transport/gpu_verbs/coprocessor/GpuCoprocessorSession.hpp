@@ -54,6 +54,12 @@ class GpuCoprocessorSession : public CoprocessorSession {
     int collect(void *const *outputs, const std::uint64_t *output_bytes, std::size_t n) override;
     void stop() override;
     void set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) override;
+
+    void set_thread_affinity(int cpu, bool realtime)
+    {
+        pin_cpu_ = cpu;
+        pin_realtime_ = realtime;
+    }
     CoprocConvention coprocessor_fn_convention() const override {
         return CoprocConvention::LaunchOnce;
     }
@@ -102,6 +108,8 @@ class GpuCoprocessorSession : public CoprocessorSession {
     // rethrows.
     std::atomic<bool> failed_{false};
     std::exception_ptr error_;
+    int pin_cpu_ = -1; // -1 -> leave affinity alone
+    bool pin_realtime_ = false;
     std::atomic<std::uint64_t> completed_{0};
     std::atomic<std::int64_t> last_word_{0};
     std::jthread engine_;

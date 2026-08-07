@@ -17,6 +17,7 @@
 #include <cstring>
 #include <thread>
 
+#include "RealtimeThread.hpp"
 #include "WireProtocol.hpp"
 
 namespace catalyst::transport::cpu_verbs {
@@ -88,6 +89,7 @@ void CpuCoprocessorSession::stop() {
 // (passthrough). Replies are inline + selectively signaled; the bwd CQ is
 // reaped in batches at signal points.
 void CpuCoprocessorSession::run(std::stop_token st) {
+    pin_thread(pin_cpu_, pin_realtime_);
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); c++) {
         Payload *r = poll_message_arrival(c, st); // the incoming message

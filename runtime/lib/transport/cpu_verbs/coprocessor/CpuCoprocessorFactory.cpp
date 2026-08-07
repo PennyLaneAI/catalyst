@@ -26,8 +26,12 @@
 
 namespace {
 catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string &config) {
-    const auto cfg = catalyst::transport::common::parse_backend_config(config);
-    return new catalyst::transport::cpu_verbs::CpuCoprocessorSession(cfg.dev, cfg.gid);
+    namespace common = catalyst::transport::common;
+    const auto cfg = common::parse_backend_config(config);
+    auto *session = new catalyst::transport::cpu_verbs::CpuCoprocessorSession(cfg.dev, cfg.gid);
+    session->set_thread_affinity(common::parse_optional_index(config, "cpu_pin", -1),
+                                 common::parse_optional_index(config, "rt", 0) != 0);
+    return session;
 }
 } // namespace
 

@@ -90,6 +90,18 @@ uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s);
 void __catalyst__transport__stop(CatalystTransportSession *s);
 void __catalyst__transport__destroy(CatalystTransportSession *s);
 
+// Flags for start_benchmark.
+enum {
+    CATALYST_BENCH_CLEAR_SENTINEL = 1u << 0,
+    CATALYST_BENCH_FORCE_SW_RTT = 1u << 1,
+    CATALYST_BENCH_PROGRESS = 1u << 2,
+};
+
+// Run `iters` rounds back to back and report each round's round-trip time in nanoseconds.
+int __catalyst__transport__start_benchmark(CatalystTransportSession *s, uint32_t iters,
+                                           uint32_t decoder_id, uint32_t flags, uint64_t *samples,
+                                           uint64_t *rounds);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

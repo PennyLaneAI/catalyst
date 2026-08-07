@@ -25,6 +25,7 @@
 #include "Error.hpp"
 #include "GpuLaunchers.hpp"
 #include "Handshake.hpp"
+#include "RealtimeThread.hpp"
 
 #include <unistd.h>
 
@@ -193,6 +194,7 @@ void GpuCoprocessorSession::reap_bwd(int &outstanding, bool drain) {
 // selectively signaled (1 in SIGNAL_EVERY) and the bwd CQ is reaped in batches
 // at those points, so completions stay off the per-shot critical path.
 void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
+    pin_thread(pin_cpu_, pin_realtime_);
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
         const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);

@@ -23,7 +23,7 @@ namespace catalyst::transport {
 /**
  * @brief Memory kind: selects the allocation and registration path.
  */
-enum class MemKind : std::uint8_t {
+enum class MemKind : int {
     CpuRam,
     GpuHbm,
     Ddr,
