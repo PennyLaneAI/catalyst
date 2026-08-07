@@ -35,6 +35,7 @@ from pennylane.wires import AbstractQubit
 # once JAX updates to a compatible MLIR version
 from catalyst.decomposition.decomposition_rules import (
     fetch_all_reachable_decomposition_rules_from_op,
+    inject_new_rules_into_module,
 )
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
@@ -295,10 +296,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
                 static_data={},
             )
 
-            with ir.InsertionPoint(jax_ctx.module_context.module.body):
-                for decomp_rule in decomp_rules:
-                    if decomp_rule:
-                        ir.Operation.parse(decomp_rule).clone()
+            inject_new_rules_into_module(jax_ctx.module_context.module, decomp_rules)
 
         return []
 
@@ -405,10 +403,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             extra_data=extra_data,
         )
 
-        with ir.InsertionPoint(jax_ctx.module_context.module.body):
-            for decomp_rule in decomp_rules:
-                if decomp_rule:
-                    ir.Operation.parse(decomp_rule).clone()
+        inject_new_rules_into_module(jax_ctx.module_context.module, decomp_rules)
 
     return []
 
