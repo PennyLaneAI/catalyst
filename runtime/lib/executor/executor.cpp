@@ -39,6 +39,7 @@
  */
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
@@ -61,6 +62,7 @@
 #include "llvm/ExecutionEngine/Orc/TargetProcess/UnwindInfoManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <netdb.h>
@@ -74,15 +76,13 @@ using namespace llvm::orc;
 namespace catalyst_services {
 // TODO: provide a slab-based alloc.
 // Returns a null ExecutorAddr on OOM (host checks `if (!ret)`).
-ExecutorAddr _catalyst_remote_alloc(uint64_t size)
-{
+ExecutorAddr _catalyst_remote_alloc(uint64_t size) {
     return ExecutorAddr::fromPtr(std::calloc(1, size));
 }
 
 void _catalyst_remote_free(ExecutorAddr addr) { std::free(addr.toPtr<void *>()); }
 
-void _catalyst_remote_invoke(ExecutorAddr fn, std::vector<ExecutorAddr> args)
-{
+void _catalyst_remote_invoke(ExecutorAddr fn, std::vector<ExecutorAddr> args) {
     if (!fn) {
         return;
     }
@@ -94,32 +94,65 @@ void _catalyst_remote_invoke(ExecutorAddr fn, std::vector<ExecutorAddr> args)
     fn.toPtr<pyface_t>()(args[0].toPtr<void *>(), args[1].toPtr<void *>());
 }
 
-int32_t _catalyst_remote_store_asset(std::vector<char> bytes, std::string name)
-{
-    namespace fs = std::filesystem;
-    fs::path dst = fs::temp_directory_path() / "catalyst-assets" / fs::path(name).filename();
+std::filesystem::path assetDir() {
+    return std::filesystem::temp_directory_path() / "catalyst-assets" / std::to_string(::getpid());
+}
+
+void clearAssets() {
     std::error_code ec;
-    fs::create_directories(dst.parent_path(), ec);
+    std::filesystem::remove_all(assetDir(), ec);
+}
+
+int32_t _catalyst_remote_store_asset(std::vector<char> bytes, std::string name) {
+    namespace fs = std::filesystem;
+    fs::path dir = assetDir();
+    fs::path dst = dir / fs::path(name).filename();
+    std::error_code ec;
+    fs::create_directories(dir, ec);
     if (ec) {
-        std::fprintf(stderr, "catalyst-executor: mkdir %s failed: %s\n", dst.parent_path().c_str(),
+        std::fprintf(stderr, "catalyst-executor: mkdir %s failed: %s\n", dir.c_str(),
                      ec.message().c_str());
         return -1;
     }
 
-    // write to file
-    FILE *f = std::fopen(dst.c_str(), "wb");
+    // Write to a unique temporary file and rename it into place, so a later
+    // load can never observe a half-written asset.
+    static std::atomic<uint64_t> tmpCounter{0};
+    fs::path tmp = dst;
+    tmp += ".tmp." + std::to_string(tmpCounter++);
+
+    FILE *f = std::fopen(tmp.c_str(), "wb");
     if (!f) {
-        std::fprintf(stderr, "catalyst-executor: fopen %s failed: %s\n", dst.c_str(),
+        std::fprintf(stderr, "catalyst-executor: fopen %s failed: %s\n", tmp.c_str(),
                      std::strerror(errno));
         return -1;
     }
     size_t wrote = std::fwrite(bytes.data(), 1, bytes.size(), f);
-    std::fclose(f);
+    // fclose flushes the stream, so a failure here can also mean lost bytes.
+    int closeRc = std::fclose(f);
 
     // check if the write size is matched
     if (wrote != bytes.size()) {
-        std::fprintf(stderr, "catalyst-executor: Unmatched write size (wrote=%zu, expected=%zu)\n",
-                     wrote, bytes.size());
+        std::fprintf(stderr,
+                     "catalyst-executor: Unmatched write size for %s (wrote=%zu, expected=%zu)\n",
+                     tmp.c_str(), wrote, bytes.size());
+        fs::remove(tmp, ec);
+        return -1;
+    }
+
+    // check if the flush succeeded
+    if (closeRc != 0) {
+        std::fprintf(stderr, "catalyst-executor: fclose %s failed: %s\n", tmp.c_str(),
+                     std::strerror(errno));
+        fs::remove(tmp, ec);
+        return -1;
+    }
+
+    fs::rename(tmp, dst, ec);
+    if (ec) {
+        std::fprintf(stderr, "catalyst-executor: rename %s -> %s failed: %s\n", tmp.c_str(),
+                     dst.c_str(), ec.message().c_str());
+        fs::remove(tmp, ec);
         return -1;
     }
     return 0;
@@ -130,23 +163,22 @@ int32_t _catalyst_remote_store_asset(std::vector<char> bytes, std::string name)
 extern "C" {
 // This class will be renamed to `WrapperFunctionBuffer` in this PR in the
 // future: https://github.com/llvm/llvm-project/pull/172633
-llvm::orc::shared::CWrapperFunctionResult catalyst_remote_alloc(const char *ArgData, size_t ArgSize)
-{
+llvm::orc::shared::CWrapperFunctionResult catalyst_remote_alloc(const char *ArgData,
+                                                                size_t ArgSize) {
     auto result = shared::WrapperFunction<shared::SPSExecutorAddr(uint64_t)>::handle(
         ArgData, ArgSize, &catalyst_services::_catalyst_remote_alloc);
     return result.release();
 }
 
-llvm::orc::shared::CWrapperFunctionResult catalyst_remote_free(const char *ArgData, size_t ArgSize)
-{
+llvm::orc::shared::CWrapperFunctionResult catalyst_remote_free(const char *ArgData,
+                                                               size_t ArgSize) {
     return shared::WrapperFunction<void(shared::SPSExecutorAddr)>::handle(
                ArgData, ArgSize, &catalyst_services::_catalyst_remote_free)
         .release();
 }
 
 llvm::orc::shared::CWrapperFunctionResult catalyst_remote_invoke(const char *ArgData,
-                                                                 size_t ArgSize)
-{
+                                                                 size_t ArgSize) {
     return shared::WrapperFunction<void(shared::SPSExecutorAddr,
                                         shared::SPSSequence<shared::SPSExecutorAddr>)>::
         handle(ArgData, ArgSize, &catalyst_services::_catalyst_remote_invoke)
@@ -154,8 +186,7 @@ llvm::orc::shared::CWrapperFunctionResult catalyst_remote_invoke(const char *Arg
 }
 
 llvm::orc::shared::CWrapperFunctionResult catalyst_remote_store_asset(const char *ArgData,
-                                                                      size_t ArgSize)
-{
+                                                                      size_t ArgSize) {
     return shared::WrapperFunction<int32_t(shared::SPSSequence<char>, shared::SPSString)>::handle(
                ArgData, ArgSize, &catalyst_services::_catalyst_remote_store_asset)
         .release();
@@ -165,8 +196,7 @@ llvm::orc::shared::CWrapperFunctionResult catalyst_remote_store_asset(const char
 namespace {
 
 // dlopen a .so with RTLD_GLOBAL
-bool load_lib_global(const char *path)
-{
+bool load_lib_global(const char *path) {
     if (!path || !*path) {
         return false;
     }
@@ -182,8 +212,7 @@ bool load_lib_global(const char *path)
 // Bind + listen on Host:PortStr. Returns the listening FD, or -1 on error.
 // Originally adapted from
 // `llvm/tools/llvm-jitlink/llvm-jitlink-executor/llvm-jitlink-executor.cpp`,
-int openListening(const std::string &Host, const std::string &PortStr)
-{
+int openListening(const std::string &Host, const std::string &PortStr) {
     addrinfo Hints{};
     Hints.ai_family = AF_INET;
     Hints.ai_socktype = SOCK_STREAM;
@@ -233,8 +262,7 @@ int openListening(const std::string &Host, const std::string &PortStr)
 }
 
 // Parse "host:port"
-bool parseHostPort(const std::string &Spec, std::string &Host, std::string &Port)
-{
+bool parseHostPort(const std::string &Spec, std::string &Host, std::string &Port) {
     auto Colon = Spec.rfind(':');
     if (Colon == std::string::npos) {
         return false;
@@ -245,8 +273,7 @@ bool parseHostPort(const std::string &Spec, std::string &Host, std::string &Port
 }
 
 // Bootstrap the SimpleRemoteEPCServer with the catalyst service symbols.
-Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
-{
+Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S) {
     S.setDispatcher(std::make_unique<SimpleRemoteEPCServer::ThreadDispatcher>());
 
     S.bootstrapSymbols() = SimpleRemoteEPCServer::defaultBootstrapSymbols();
@@ -266,9 +293,42 @@ Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
     return Error::success();
 }
 
+// Render an accepted peer address as "host:port" for logging.
+std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len) {
+    char Host[NI_MAXHOST];
+    char Port[NI_MAXSERV];
+    if (::getnameinfo(reinterpret_cast<const sockaddr *>(&Peer), Len, Host, sizeof(Host), Port,
+                      sizeof(Port), NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
+        return "<unknown>";
+    }
+    return std::string(Host) + ":" + Port;
+}
+
+template <typename FnT> FnT lookupRuntimeSymbol(const char *Name, const std::string &GLabel) {
+    auto *Fn = reinterpret_cast<FnT>(::dlsym(RTLD_DEFAULT, Name));
+    if (!Fn) {
+        std::fprintf(stderr, "[%s] Warning: %s not found in any loaded plugin\n", GLabel.c_str(),
+                     Name);
+    }
+    return Fn;
+}
+
+void initializeCatalystRuntime(const std::string &GLabel) {
+    auto *initFn = lookupRuntimeSymbol<void (*)(uint32_t *)>("__catalyst__rt__initialize", GLabel);
+    if (initFn) {
+        initFn(nullptr);
+    }
+}
+
+void finalizeCatalystRuntime(const std::string &GLabel) {
+    auto *finalizeFn = lookupRuntimeSymbol<void (*)()>("__catalyst__rt__finalize", GLabel);
+    if (finalizeFn) {
+        finalizeFn();
+    }
+}
+
 // Listener loop
-[[noreturn]] void runServerLoop(int ListenFD, const std::string &Label)
-{
+[[noreturn]] void runServerLoop(int ListenFD, const std::string &Label) {
     {
         struct sigaction sa{};
         sa.sa_handler = SIG_IGN;
@@ -276,6 +336,8 @@ Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
         sigemptyset(&sa.sa_mask);
         sigaction(SIGCHLD, &sa, nullptr);
     }
+
+    std::fprintf(stderr, "[%s] executor ready, waiting for connections\n", Label.c_str());
 
     for (;;) {
         sockaddr_storage Peer{};
@@ -299,20 +361,8 @@ Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
         if (pid == 0) {
             ::close(ListenFD);
             std::string GLabel = Label + "#" + std::to_string(::getpid());
-            std::fprintf(stderr, "[%s] Accepted connection\n", GLabel.c_str());
 
-            // TODO: This is a temporary solution to initialize the catalyst CTX.
-            // Done per-connection so each circuit owns its own context.
-            if (auto *initFn = reinterpret_cast<void (*)(uint32_t *)>(
-                    ::dlsym(RTLD_DEFAULT, "__catalyst__rt__initialize"))) {
-                initFn(nullptr);
-            }
-            else {
-                std::fprintf(stderr,
-                             "[%s] Warning: __catalyst__rt__initialize not found "
-                             "in any loaded plugin\n",
-                             GLabel.c_str());
-            }
+            initializeCatalystRuntime(GLabel);
 
             ExitOnError ExitOnErr;
             ExitOnErr.setBanner("CatalystExecutor[" + GLabel + "]: ");
@@ -322,13 +372,16 @@ Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
                         setupCatalystServer, CSock, CSock));
                 ExitOnErr(Server->waitForDisconnect());
             }
+            finalizeCatalystRuntime(GLabel);
+            catalyst_services::clearAssets();
             std::fprintf(stderr, "[%s] client disconnected, exiting\n", GLabel.c_str());
-            std::fprintf(stderr, "[%s] executor ready, waiting for next connection\n",
-                         Label.c_str());
             ::_exit(0);
         }
 
         ::close(CSock);
+        std::fprintf(stderr,
+                     "[%s] accepted connection from %s on pid %d, waiting for next connection\n",
+                     Label.c_str(), formatPeer(Peer, Len).c_str(), static_cast<int>(pid));
     }
 }
 
@@ -349,8 +402,7 @@ cl::list<std::string> PluginsOpt("plugin", cl::value_desc("path"),
 
 } // namespace
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     cl::HideUnrelatedOptions(ExecutorCat);
     cl::ParseCommandLineOptions(argc, argv,
                                 "Remote ORC v2 EPC executor for catalyst-compiled programs\n");

@@ -62,6 +62,7 @@ endif
 
 ifeq ($(ENABLE_EXECUTOR), ON)
 	BUILD_TARGETS += rt_executor catalyst-executor
+	TEST_TARGETS += runner_tests_executor
 endif
 
 .PHONY: help
@@ -125,6 +126,10 @@ ifeq ($(ENABLE_OQD), ON)
 	# Test the OQD devices C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
+ifeq ($(ENABLE_EXECUTOR), ON)
+	# Test the catalyst-executor server over a loopback connection
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
+endif
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -144,6 +149,9 @@ ifeq ($(ENABLE_OPENQASM), ON)
 endif
 ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
+endif
+ifeq ($(ENABLE_EXECUTOR), ON)
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
 endif
 ifeq ($(PLATFORM),Linux)
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
