@@ -15,22 +15,33 @@
 of quantum operations to reference semantics JAXPR.
 """
 
-# pylint: disable=unused-argument
 from jax._src.lib.mlir import ir
+
+# pylint: disable=unused-argument
+from jax.core import ShapedArray
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
+from pennylane.core.operator.utils import abstractify
 from pennylane.pytrees import unflatten
-
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+from pennylane.typing import AbstractArray
+from pennylane.wires import AbstractQubit
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
 # Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
 # yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
 # once JAX updates to a compatible MLIR version
-# pylint: disable=ungrouped-imports
+from catalyst.decomposition.decomposition_rules import (
+    fetch_all_reachable_decomposition_rules_from_op,
+    inject_new_rules_into_module,
+)
+from catalyst.decomposition.type_utils import (
+    convert_types_to_mlir_strings,
+    format_dynamic_params_for_id,
+)
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
     extract_scalar,
@@ -204,6 +215,11 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
     return qubits, qubit_map
 
 
+@abstractify.register(ShapedArray)
+def _abstractify_jax_array(val):
+    return AbstractArray(val.shape, val.dtype)
+
+
 def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, **kwargs):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -215,6 +231,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     adjoint = kwargs.pop("adjoint")
     n_ctrls = kwargs.pop("n_ctrls")
     wire_lens = kwargs.pop("wire_lens")
+    skip_decomp_rules = kwargs.pop("skip_decomp_rules")
 
     if n_ctrls:
         ctrl_qubits = args[-2 * n_ctrls : -n_ctrls]
@@ -237,6 +254,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
 
     # Lowering to qref.custom
+    # Custom op only has float dynamic args, followed by a single wire argname "wires" at the end
     if _is_custom_op(op_cls, jax_ctx.avals_in[: len(op_cls.dynamic_argnames)]):
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
@@ -256,6 +274,29 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             ctrl_values=ctrl_values,
             adjoint=adjoint,
         )
+
+        if not skip_decomp_rules:
+            dynamic_shape = {
+                dynamic_argname: ["f64"] for dynamic_argname in op_cls.dynamic_argnames
+            }
+            op_id = (
+                op_cls.__name__
+                + format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
+                + "{"
+                + f"wires:{wire_lens[0]}"
+                + "}{}"
+            )
+
+            decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+                op_name=op_cls.__name__,
+                op_id=op_id,
+                dynamic_shape=dynamic_shape,
+                wire_lens={"wires": wire_lens[0]},
+                static_data={},
+            )
+
+            inject_new_rules_into_module(jax_ctx.module_context.module, decomp_rules)
+
         return []
 
     params, forward_args, param_map = _process_params(
@@ -301,6 +342,67 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
         static_data=static_data,
         qubit_map=qubit_map,
     )
+
+    # Collect decomp rules reachable from the current op
+    if not skip_decomp_rules:
+        dynamic_shape = {}
+        for dynamic_argname, param in zip(op_cls.dynamic_argnames, params, strict=True):
+            dynamic_shape[dynamic_argname] = param.type
+        dynamic_shape = convert_types_to_mlir_strings(dynamic_shape)
+
+        repack_wire_argnames = []
+        for wire_argname in op_cls.wire_argnames:
+            if wire_argname not in op_cls.hybrid_argnames:
+                repack_wire_argnames.append(wire_argname)
+        repack_wire_lens = {a: b for a, b in zip(repack_wire_argnames, wire_lens, strict=True)}
+
+        extra_data = {}
+        non_hybrid_wire_len = 0
+        for w in repack_wire_argnames:
+            non_hybrid_wire_len += len(qubit_map[w])  # pylint:disable=unsubscriptable-object
+        hybrid_arg_start_idx = len(params) + non_hybrid_wire_len
+        for hybrid_argname, hybrid_len, hybrid_tree in zip(
+            op_cls.hybrid_argnames, hybrid_lens, hybrid_trees
+        ):
+            replaced_leaves = []
+            for leaf in jax_ctx.avals_in[hybrid_arg_start_idx : hybrid_arg_start_idx + hybrid_len]:
+                if isinstance(leaf, AbstractQubit):
+                    replaced_leaves.append(ShapedArray((), dtype=int))
+                else:
+                    replaced_leaves.append(leaf)
+
+            with Patcher(
+                (AbstractArray, "__hash__", lambda x: id(x)),
+            ):
+                replaced_leaves = abstractify(replaced_leaves)
+                unflattened = unflatten(replaced_leaves, hybrid_tree)
+                unflattened = abstractify(unflattened)
+            extra_data[hybrid_argname] = unflattened
+            hybrid_arg_start_idx += hybrid_len
+
+        op_id = (
+            op_cls.__name__
+            + format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
+            + "{"
+            + ",".join(f"{name}:{shape}" for name, shape in sorted(repack_wire_lens.items()))
+            + "}"
+            + "{"
+            + ",".join(f"{k}:{v}" for k, v in sorted(repack_static_data.items()))
+            + "}"
+        )
+        if uid is not None:
+            op_id = op_id + f"[{str(uid)}]"
+
+        decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            op_name=op_cls.__name__,
+            op_id=op_id,
+            dynamic_shape=dynamic_shape,
+            wire_lens=repack_wire_lens,
+            static_data=repack_static_data,
+            extra_data=extra_data,
+        )
+
+        inject_new_rules_into_module(jax_ctx.module_context.module, decomp_rules)
 
     return []
 

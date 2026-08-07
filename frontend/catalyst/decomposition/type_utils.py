@@ -18,6 +18,7 @@ import copy
 
 import jax.numpy as jnp
 import pennylane as qp
+from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
@@ -33,36 +34,94 @@ _MLIR_DTYPES_TO_PY_DTYPES = {
     "complex<f64>": jnp.complex128,
 }
 
-_PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
+_PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()} | {
+    (ir.IntegerType, 1): "i1",
+    (ir.IntegerType, 8): "i8",
+    (ir.IntegerType, 16): "i16",
+    (ir.IntegerType, 32): "i32",
+    (ir.IntegerType, 64): "i64",
+    ir.F16Type: "f16",
+    ir.F32Type: "f32",
+    ir.F64Type: "f64",
+    (ir.ComplexType, ir.F64Type): "complex<f64>",
+}
 
 
-def _stringify_shaped_type(shape: tuple, dim: int, element_type) -> str:
-    """Return a string representation of the given shaped data type."""
-    if dim + 1 == len(shape):
-        inner_content = _PY_DTYPES_TO_MLIR_DTYPES[element_type]
-    else:
-        inner_content = _stringify_shaped_type(shape, dim + 1, element_type)
-    length = shape[dim]
-    return f"[{','.join([inner_content] * length)}]"
+def get_mlir_tensor_type_map_key(mlir_type):
+    if isinstance(mlir_type, ir.ComplexType):
+        return (type(mlir_type), type(mlir_type.element_type))
+    if isinstance(mlir_type, ir.IntegerType):
+        return (type(mlir_type), mlir_type.width)
+    return type(mlir_type)
 
 
-def mlir_stringify_type(dtype: qp.typing.AbstractArray):
-    """Return a string representation of the given data type."""
-    assert isinstance(
-        dtype, qp.typing.AbstractArray
-    ), f"Expected an AbstractArray to stringify, got {dtype}"
-    element_type = dtype.dtype.type
-    if dtype.shape == ():
-        return f"[{_PY_DTYPES_TO_MLIR_DTYPES[element_type]}]"
-    else:
-        return _stringify_shaped_type(dtype.shape, 0, element_type)
+def convert_shaped_type_to_mlir_string(shaped_type, current_dim=0):
+    """Convert a shape of arbitrary dimension to a string with MLIR type strings for values."""
+    if isinstance(shaped_type, (ShapedArray, qp.typing.AbstractArray)):
+        if current_dim == shaped_type.ndim:
+            return _PY_DTYPES_TO_MLIR_DTYPES[shaped_type.dtype.type]
+
+        return [
+            convert_shaped_type_to_mlir_string(shaped_type, current_dim + 1)
+        ] * shaped_type.shape[current_dim]
+    elif isinstance(shaped_type, ir.RankedTensorType):
+        if current_dim == shaped_type.rank:
+            return _PY_DTYPES_TO_MLIR_DTYPES[get_mlir_tensor_type_map_key(shaped_type.element_type)]
+
+        return [
+            convert_shaped_type_to_mlir_string(shaped_type, current_dim + 1)
+        ] * shaped_type.shape[current_dim]
+
+
+def convert_types_to_mlir_strings(d: dict) -> dict:
+    """Convert the values of a dictionary to MLIR type strings."""
+
+    def handle_item(item):
+        if isinstance(item, type):
+            if item in _PY_DTYPES_TO_MLIR_DTYPES:
+                return _PY_DTYPES_TO_MLIR_DTYPES[item]
+            raise TypeError(
+                f"encountered unknown type {type(item)} of item {item} when converting to mlir strings."
+            )
+        elif type(item) in _PY_DTYPES_TO_MLIR_DTYPES:
+            return _PY_DTYPES_TO_MLIR_DTYPES[type(item)]
+        elif isinstance(item, str):
+            return item
+        elif isinstance(item, (list, tuple)):
+            return [handle_item(i) for i in item]
+        elif isinstance(item, (ShapedArray, qp.typing.AbstractArray)):
+            if item.shape == ():
+                return [_PY_DTYPES_TO_MLIR_DTYPES[item.dtype.type]]
+            return convert_shaped_type_to_mlir_string(item)
+        elif isinstance(item, ir.RankedTensorType):
+            if len(item.shape) == 0:
+                return [_PY_DTYPES_TO_MLIR_DTYPES[get_mlir_tensor_type_map_key(item.element_type)]]
+            return convert_shaped_type_to_mlir_string(item)
+        else:
+            raise TypeError(
+                f"encountered unknown type {type(item)} of item {item} when converting to mlir strings."
+            )
+
+    return {k: handle_item(v) for k, v in d.items()}
+
+
+def format_dynamic_params_for_id(d):
+    """Format a structure for ID, after calling convert_types_to_mlir_string on it."""
+
+    def handle_item(item):
+        if isinstance(item, str):
+            return item
+        elif isinstance(item, list):
+            return "[" + ",".join(handle_item(i) for i in item) + "]"
+
+    return "{" + ",".join(k + ":" + handle_item(v) for k, v in d.items()) + "}"
 
 
 def get_dummy_values_for_arg(arg):
     """
-    Given a container of python or MLIR types, replace the types with corresponding dummy values.
+    Given a dictionary of python or MLIR types, replace the types with corresponding dummy values.
 
-    Each item in the container must be representible as an MLIR tensor with at most one layer of
+    Each item in the dictionary must be representable as an MLIR tensor with at most one layer of
     nesting, i.e. cannot be nested and all elements must be of the same type.
     Ex.
     [[float, float], [int, int, int], [int32, int32, int32, int32]]

@@ -18,6 +18,7 @@ This module provides infrastructure for lowering decomposition rules via python.
 
 # pylint: disable=protected-access,bare-except
 
+from collections import deque
 from functools import partial
 
 import jax.numpy as jnp
@@ -27,12 +28,12 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
+    convert_types_to_mlir_strings,
+    format_dynamic_params_for_id,
     get_dummy_values_for_arg,
-    mlir_stringify_type,
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
 )
-from catalyst.from_plxpr.qref_operator2_primitives import _is_custom_op
 from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
@@ -77,10 +78,7 @@ class GraphOpID:
 
     def parse_dynamic_shape(self) -> dict:
         """Return the dynamic shape as a dictionary of dtypes from the dynamic arg names."""
-        return {
-            argname: mlir_stringify_type(argtype)
-            for argname, argtype in sorted(self.op.dynamic_args.items())
-        }
+        return {argname: argtype for argname, argtype in sorted(self.op.dynamic_args.items())}
 
     def parse_wire_lens(self) -> dict:
         """Return the length of each of the wire args as a dictionary from the wire arg names."""
@@ -131,9 +129,12 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
+    def get_dynamic_shape(self) -> dict:
+        return self.dynamic_shape
+
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
-        return "{" + ",".join(f"{name}:{shape}" for name, shape in self.dynamic_shape.items()) + "}"
+        return format_dynamic_params_for_id(convert_types_to_mlir_strings(self.dynamic_shape))
 
     def get_wire_lens_id_format(self) -> str:
         """Return the wire lengths formatted for GraphOpId."""
@@ -161,6 +162,77 @@ class GraphOpID:
         return ID_string
 
 
+def get_rule_funcs_from_module(module: ir.Module) -> list[ir.Operation]:
+    funcOps = []
+
+    def find_condition(op):
+        if op.name == "func.func":
+            if "target_gate" in op.attributes:
+                old_attr = op.attributes["sym_name"]
+                if not op.attributes["sym_name"].value.strip('"').startswith("__builtin_"):
+                    op.attributes["sym_name"] = ir.StringAttr.get(
+                        "__builtin_" + old_attr.value.strip('"'), context=old_attr.context
+                    )
+                funcOps.append(op)
+                return ir.WalkResult.SKIP
+        return ir.WalkResult.ADVANCE
+
+    module.operation.walk(find_condition)
+    return funcOps
+
+
+def get_rules_from_module_as_list(module: ir.Module) -> list[str]:
+    funcOps = get_rule_funcs_from_module(module)
+    return [str(funcOp) for funcOp in funcOps]
+
+
+def get_rules_from_module(module: ir.Module) -> str:
+    """
+    Parse and modify decomposition rules from a ModuleOp.
+
+    Args:
+        module: an MLIR module object containing a FuncOp named `rule_wrapper` to be extracted
+
+    Returns:
+        str: The string representation of any decomposition rules from `module`, pre-pending the
+             `__builtin_` prefix to their names.
+    """
+    funcOps = get_rule_funcs_from_module(module)
+    return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
+
+
+def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
+    with ir.InsertionPoint(module.body):
+        for decomp_rule in decomp_rules:
+            if not decomp_rule:
+                continue
+
+            decomp_rule_op = ir.Operation.parse(decomp_rule)
+            rule_already_exists = False
+
+            def find_condition(op):
+                nonlocal rule_already_exists
+                if op.name == "func.func":
+                    if "target_gate" in op.attributes:
+                        target_gate = op.attributes["target_gate"]
+                        resources = op.attributes["resources"]
+
+                        current_rule_target_gate = decomp_rule_op.attributes["target_gate"]
+                        current_rule_resources = decomp_rule_op.attributes["resources"]
+                        if (
+                            target_gate == current_rule_target_gate
+                            and resources == current_rule_resources
+                        ):
+                            rule_already_exists = True
+                            return ir.WalkResult.INTERRUPT
+                        return ir.WalkResult.SKIP
+                return ir.WalkResult.ADVANCE
+
+            module.operation.walk(find_condition)
+            if not rule_already_exists:
+                decomp_rule_op.clone()
+
+
 def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
     """Return resource data for all decomposition rules associated to op_name."""
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
@@ -175,6 +247,7 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
         if is_custom_op:
             args = tuple(val for key, val in kwargs.items() if key != "wires")
             kwargs = {"wires": kwargs["wires"]}
+
         resources = rule.compute_resources(*args, **kwargs)
         name_to_resources[rule.name] = resources.gate_counts
         name_to_resource_ids[rule.name] = {
@@ -182,6 +255,15 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
         }
 
     return name_to_resources, name_to_resource_ids, decomp_rules
+
+
+def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
+    kwargs = {}
+    for wire_name, wire_len in wire_lens.items():
+        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
+    for arg_name, arg_shape in dynamic_shape.items():
+        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
+    return kwargs
 
 
 def compile_decomposition_rules(
@@ -198,14 +280,9 @@ def compile_decomposition_rules(
 
     The decomposition rules will be decorated with appropriate resource and target_gate attributes.
     """
-    kwargs = {}
+    kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
-
     device = qp.device("null.qubit", wires=sum(wire_lens.values()))
-    for wire_name, wire_len in wire_lens.items():
-        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
-    for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name, kwargs | static_data | extra_data, is_custom_op
@@ -228,10 +305,7 @@ def compile_decomposition_rules(
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
 
-    @qp.qjit(
-        target="mlir",
-        capture=True,
-    )
+    @qp.qjit(target="mlir", capture=True, skip_decomp_rules=True)
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
@@ -285,3 +359,53 @@ def compile_decomposition_rules_wrapper(
             is_custom_op=is_custom_op,
         )
     )
+
+
+def fetch_all_reachable_decomposition_rules_from_op(
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
+):
+    extra_data = extra_data or {}
+    queue = deque()
+    start = (op_name, dynamic_shape, wire_lens, static_data, extra_data)
+    queue.append(start)
+    visited = [start]
+
+    rules = get_rules_from_module_as_list(
+        compile_decomposition_rules(
+            op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
+        )
+    )
+
+    while len(queue) != 0:
+        this_name, this_dynamic_shape, this_wire_lens, this_static_data, this_extra_data = (
+            queue.popleft()
+        )
+        this_extra_data = this_extra_data or {}
+        this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
+        resources, _, _ = collect_resources_for_op(
+            this_name, this_kwargs | this_static_data | this_extra_data
+        )
+        for _rule_name, resource in resources.items():
+            for op, _count in resource.items():
+                graph_op_id = GraphOpID(op)
+                probe = (
+                    graph_op_id.get_operator_name(),
+                    convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
+                    graph_op_id.wire_lens,
+                    graph_op_id.static_data,
+                    graph_op_id.extra_data,
+                )
+
+                if not probe in visited:
+                    visited.append(probe)
+                    queue.append(probe)
+                    module = compile_decomposition_rules(
+                        probe[0],
+                        graph_op_id.getID(),
+                        probe[1],
+                        probe[2],
+                        probe[3],
+                        probe[4],
+                    )
+                    rules.extend(get_rules_from_module_as_list(module))
+    return rules
