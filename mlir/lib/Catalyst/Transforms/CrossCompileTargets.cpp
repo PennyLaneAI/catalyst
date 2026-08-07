@@ -84,6 +84,29 @@ std::vector<std::string> defaultLoweringPassList() {
     return passes;
 }
 
+std::vector<std::string> backlineLoweringPassList()
+{
+    auto buf = driver::getBufferizationStage();
+    auto llvmPasses = driver::getLLVMDialectLoweringStage();
+    std::vector<std::string> passes;
+    passes.reserve(buf.size() + llvmPasses.size() + 3);
+    passes.insert(passes.end(), buf.begin(), buf.end());
+    passes.push_back("lower-decode-to-transport");
+    for (const auto &passName : llvmPasses) {
+        if (passName == "convert-executor-to-llvm") {
+            continue;
+        }
+        if (passName == "convert-catalyst-to-llvm") {
+            passes.push_back("convert-transport-to-llvm");
+        }
+        if (passName == "convert-quantum-to-llvm") {
+            passes.push_back("convert-qecp-to-llvm");
+        }
+        passes.push_back(passName);
+    }
+    return passes;
+}
+
 // Lower a *local* (non-dispatch) target module. Its cross-compiled object is statically linked into
 // the final binary, so each host-side launch_kernel into it is rewritten to a flat func.call
 // against an external declaration of the entry (resolved at link time by the object's native
@@ -348,6 +371,12 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         moduleOp->setAttr(DLTIDialect::kDataLayoutAttrName,
                           mlir::translateDataLayout(dataLayout, ctx));
 
+        if (auto host = nested->getParentOfType<ModuleOp>()) {
+            if (auto backline = host->getAttr("catalyst.backline")) {
+                moduleOp->setAttr("catalyst.backline", backline);
+            }
+        }
+
         // The entry points are exactly the functions the host calls into this module, named by the
         // surviving launch_kernel call edges. Expose those through the C ABI; privatize the rest so
         // they can be internalized / DCE'd and don't leak as exported symbols.
@@ -380,7 +409,9 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
             pipelineSpec = pipelineAttr.getValue().str();
         }
         if (pipelineSpec.empty()) {
-            pipelineSpec = llvm::join(defaultLoweringPassList(), ",");
+            bool isBackline = moduleOp->hasAttr("catalyst.backline");
+            pipelineSpec = llvm::join(
+                isBackline ? backlineLoweringPassList() : defaultLoweringPassList(), ",");
         }
         PassManager subPM(ctx);
         if (failed(parsePassPipeline(pipelineSpec, subPM))) {

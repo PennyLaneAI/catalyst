@@ -12,6 +12,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
+  through the transport passes.
+  [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
+
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
   operations in question can be annotated with either a `catalyst.estimated_probability` or
@@ -88,6 +92,10 @@
     [(#3073)](https://github.com/PennyLaneAI/catalyst/pull/3073)
     [(#3031)](https://github.com/PennyLaneAI/catalyst/pull/3031)
     [(#3030)](https://github.com/PennyLaneAI/catalyst/pull/3030)
+
+  - The `catalyst-executor` server side is now added to Catalyst that receives objects, maps them
+    and calls them.
+    [(#3088)](https://github.com/PennyLaneAI/catalyst/pull/3088)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
