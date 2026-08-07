@@ -94,22 +94,39 @@ void _catalyst_remote_invoke(ExecutorAddr fn, std::vector<ExecutorAddr> args)
     fn.toPtr<pyface_t>()(args[0].toPtr<void *>(), args[1].toPtr<void *>());
 }
 
+std::filesystem::path assetDir()
+{
+    return std::filesystem::temp_directory_path() / "catalyst-assets" / std::to_string(::getpid());
+}
+
+void clearAssets()
+{
+    std::error_code ec;
+    std::filesystem::remove_all(assetDir(), ec);
+}
+
 int32_t _catalyst_remote_store_asset(std::vector<char> bytes, std::string name)
 {
     namespace fs = std::filesystem;
-    fs::path dst = fs::temp_directory_path() / "catalyst-assets" / fs::path(name).filename();
+    fs::path dir = assetDir();
+    fs::path dst = dir / fs::path(name).filename();
     std::error_code ec;
-    fs::create_directories(dst.parent_path(), ec);
+    fs::create_directories(dir, ec);
     if (ec) {
-        std::fprintf(stderr, "catalyst-executor: mkdir %s failed: %s\n", dst.parent_path().c_str(),
+        std::fprintf(stderr, "catalyst-executor: mkdir %s failed: %s\n", dir.c_str(),
                      ec.message().c_str());
         return -1;
     }
 
-    // write to file
-    FILE *f = std::fopen(dst.c_str(), "wb");
+    // Write to a unique temporary file and rename it into place, so a later
+    // load can never observe a half-written asset.
+    static std::atomic<uint64_t> tmpCounter{0};
+    fs::path tmp = dst;
+    tmp += ".tmp." + std::to_string(tmpCounter++);
+
+    FILE *f = std::fopen(tmp.c_str(), "wb");
     if (!f) {
-        std::fprintf(stderr, "catalyst-executor: fopen %s failed: %s\n", dst.c_str(),
+        std::fprintf(stderr, "catalyst-executor: fopen %s failed: %s\n", tmp.c_str(),
                      std::strerror(errno));
         return -1;
     }
