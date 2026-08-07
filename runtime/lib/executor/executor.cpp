@@ -75,15 +75,13 @@ using namespace llvm::orc;
 namespace catalyst_services {
 // TODO: provide a slab-based alloc.
 // Returns a null ExecutorAddr on OOM (host checks `if (!ret)`).
-ExecutorAddr _catalyst_remote_alloc(uint64_t size)
-{
+ExecutorAddr _catalyst_remote_alloc(uint64_t size) {
     return ExecutorAddr::fromPtr(std::calloc(1, size));
 }
 
 void _catalyst_remote_free(ExecutorAddr addr) { std::free(addr.toPtr<void *>()); }
 
-void _catalyst_remote_invoke(ExecutorAddr fn, std::vector<ExecutorAddr> args)
-{
+void _catalyst_remote_invoke(ExecutorAddr fn, std::vector<ExecutorAddr> args) {
     if (!fn) {
         return;
     }
@@ -95,19 +93,16 @@ void _catalyst_remote_invoke(ExecutorAddr fn, std::vector<ExecutorAddr> args)
     fn.toPtr<pyface_t>()(args[0].toPtr<void *>(), args[1].toPtr<void *>());
 }
 
-std::filesystem::path assetDir()
-{
+std::filesystem::path assetDir() {
     return std::filesystem::temp_directory_path() / "catalyst-assets" / std::to_string(::getpid());
 }
 
-void clearAssets()
-{
+void clearAssets() {
     std::error_code ec;
     std::filesystem::remove_all(assetDir(), ec);
 }
 
-int32_t _catalyst_remote_store_asset(std::vector<char> bytes, std::string name)
-{
+int32_t _catalyst_remote_store_asset(std::vector<char> bytes, std::string name) {
     namespace fs = std::filesystem;
     fs::path dir = assetDir();
     fs::path dst = dir / fs::path(name).filename();
@@ -167,23 +162,22 @@ int32_t _catalyst_remote_store_asset(std::vector<char> bytes, std::string name)
 extern "C" {
 // This class will be renamed to `WrapperFunctionBuffer` in this PR in the
 // future: https://github.com/llvm/llvm-project/pull/172633
-llvm::orc::shared::CWrapperFunctionResult catalyst_remote_alloc(const char *ArgData, size_t ArgSize)
-{
+llvm::orc::shared::CWrapperFunctionResult catalyst_remote_alloc(const char *ArgData,
+                                                                size_t ArgSize) {
     auto result = shared::WrapperFunction<shared::SPSExecutorAddr(uint64_t)>::handle(
         ArgData, ArgSize, &catalyst_services::_catalyst_remote_alloc);
     return result.release();
 }
 
-llvm::orc::shared::CWrapperFunctionResult catalyst_remote_free(const char *ArgData, size_t ArgSize)
-{
+llvm::orc::shared::CWrapperFunctionResult catalyst_remote_free(const char *ArgData,
+                                                               size_t ArgSize) {
     return shared::WrapperFunction<void(shared::SPSExecutorAddr)>::handle(
                ArgData, ArgSize, &catalyst_services::_catalyst_remote_free)
         .release();
 }
 
 llvm::orc::shared::CWrapperFunctionResult catalyst_remote_invoke(const char *ArgData,
-                                                                 size_t ArgSize)
-{
+                                                                 size_t ArgSize) {
     return shared::WrapperFunction<void(shared::SPSExecutorAddr,
                                         shared::SPSSequence<shared::SPSExecutorAddr>)>::
         handle(ArgData, ArgSize, &catalyst_services::_catalyst_remote_invoke)
@@ -191,8 +185,7 @@ llvm::orc::shared::CWrapperFunctionResult catalyst_remote_invoke(const char *Arg
 }
 
 llvm::orc::shared::CWrapperFunctionResult catalyst_remote_store_asset(const char *ArgData,
-                                                                      size_t ArgSize)
-{
+                                                                      size_t ArgSize) {
     return shared::WrapperFunction<int32_t(shared::SPSSequence<char>, shared::SPSString)>::handle(
                ArgData, ArgSize, &catalyst_services::_catalyst_remote_store_asset)
         .release();
@@ -202,8 +195,7 @@ llvm::orc::shared::CWrapperFunctionResult catalyst_remote_store_asset(const char
 namespace {
 
 // dlopen a .so with RTLD_GLOBAL
-bool load_lib_global(const char *path)
-{
+bool load_lib_global(const char *path) {
     if (!path || !*path) {
         return false;
     }
@@ -219,8 +211,7 @@ bool load_lib_global(const char *path)
 // Bind + listen on Host:PortStr. Returns the listening FD, or -1 on error.
 // Originally adapted from
 // `llvm/tools/llvm-jitlink/llvm-jitlink-executor/llvm-jitlink-executor.cpp`,
-int openListening(const std::string &Host, const std::string &PortStr)
-{
+int openListening(const std::string &Host, const std::string &PortStr) {
     addrinfo Hints{};
     Hints.ai_family = AF_INET;
     Hints.ai_socktype = SOCK_STREAM;
@@ -270,8 +261,7 @@ int openListening(const std::string &Host, const std::string &PortStr)
 }
 
 // Parse "host:port"
-bool parseHostPort(const std::string &Spec, std::string &Host, std::string &Port)
-{
+bool parseHostPort(const std::string &Spec, std::string &Host, std::string &Port) {
     auto Colon = Spec.rfind(':');
     if (Colon == std::string::npos) {
         return false;
@@ -282,8 +272,7 @@ bool parseHostPort(const std::string &Spec, std::string &Host, std::string &Port
 }
 
 // Bootstrap the SimpleRemoteEPCServer with the catalyst service symbols.
-Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
-{
+Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S) {
     S.setDispatcher(std::make_unique<SimpleRemoteEPCServer::ThreadDispatcher>());
 
     S.bootstrapSymbols() = SimpleRemoteEPCServer::defaultBootstrapSymbols();
@@ -304,8 +293,7 @@ Error setupCatalystServer(SimpleRemoteEPCServer::Setup &S)
 }
 
 // Render an accepted peer address as "host:port" for logging.
-std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len)
-{
+std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len) {
     char Host[NI_MAXHOST];
     char Port[NI_MAXSERV];
     if (::getnameinfo(reinterpret_cast<const sockaddr *>(&Peer), Len, Host, sizeof(Host), Port,
@@ -315,8 +303,7 @@ std::string formatPeer(const sockaddr_storage &Peer, socklen_t Len)
     return std::string(Host) + ":" + Port;
 }
 
-template <typename FnT> FnT lookupRuntimeSymbol(const char *Name, const std::string &GLabel)
-{
+template <typename FnT> FnT lookupRuntimeSymbol(const char *Name, const std::string &GLabel) {
     auto *Fn = reinterpret_cast<FnT>(::dlsym(RTLD_DEFAULT, Name));
     if (!Fn) {
         std::fprintf(stderr, "[%s] Warning: %s not found in any loaded plugin\n", GLabel.c_str(),
@@ -325,16 +312,14 @@ template <typename FnT> FnT lookupRuntimeSymbol(const char *Name, const std::str
     return Fn;
 }
 
-void initializeCatalystRuntime(const std::string &GLabel)
-{
+void initializeCatalystRuntime(const std::string &GLabel) {
     auto *initFn = lookupRuntimeSymbol<void (*)(uint32_t *)>("__catalyst__rt__initialize", GLabel);
     if (initFn) {
         initFn(nullptr);
     }
 }
 
-void finalizeCatalystRuntime(const std::string &GLabel)
-{
+void finalizeCatalystRuntime(const std::string &GLabel) {
     auto *finalizeFn = lookupRuntimeSymbol<void (*)()>("__catalyst__rt__finalize", GLabel);
     if (finalizeFn) {
         finalizeFn();
@@ -342,8 +327,7 @@ void finalizeCatalystRuntime(const std::string &GLabel)
 }
 
 // Listener loop
-[[noreturn]] void runServerLoop(int ListenFD, const std::string &Label)
-{
+[[noreturn]] void runServerLoop(int ListenFD, const std::string &Label) {
     {
         struct sigaction sa{};
         sa.sa_handler = SIG_IGN;
@@ -417,8 +401,7 @@ cl::list<std::string> PluginsOpt("plugin", cl::value_desc("path"),
 
 } // namespace
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     cl::HideUnrelatedOptions(ExecutorCat);
     cl::ParseCommandLineOptions(argc, argv,
                                 "Remote ORC v2 EPC executor for catalyst-compiled programs\n");
