@@ -340,6 +340,10 @@ class TestCatalyst:
         Tests that the correct gates are applied in reverse in a while loop with a statically
         unknown number of iterations.
         """
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
 
         def func(limit):
             qp.PauliY(wires=0)
@@ -466,6 +470,10 @@ class TestCatalyst:
         Tests the adjoint op with nested and interspersed for/while loops that produce classical
         values in addition to quantum ones
         """
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
 
         def func(theta):
             @for_loop(0, 6, 1)
