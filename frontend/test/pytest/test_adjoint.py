@@ -91,6 +91,11 @@ class TestCatalyst:
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
     def test_adjoint_op(self, theta, val, backend, capture_mode):
         """Ensures that catalyst.adjoint accepts single PennyLane operators classes as argument."""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
+
         device = qp.device(backend, wires=2)
 
         @qjit(capture=capture_mode)
@@ -113,6 +118,10 @@ class TestCatalyst:
     @pytest.mark.parametrize("theta, val", [(np.pi, 0), (-100.0, 2)])
     def test_adjoint_bound_op(self, theta, val, backend, capture_mode):
         """Ensures that catalyst.adjoint accepts single PennyLane operators objects as argument."""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
 
         device = qp.device(backend, wires=3)
 
@@ -138,6 +147,10 @@ class TestCatalyst:
     @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
     def test_adjoint_param_fun(self, w, p, backend, capture_mode):
         """Ensures that catalyst.adjoint accepts parameterized Python functions as arguments."""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
 
         def func(w, theta1, theta2, theta3=1):
             qp.RX(theta1 * np.pi / 2, wires=w)
@@ -240,6 +253,10 @@ class TestCatalyst:
 
     def test_adjoint_multirz(self, backend, capture_mode):
         """Ensures that catalyst.adjoint supports MultiRZ operations."""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
 
         def func():
             qp.PauliX(0)
@@ -353,6 +370,10 @@ class TestCatalyst:
 
     def test_adjoint_while_nested(self, backend, capture_mode):
         """Tests the correct handling of nested while loops."""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
 
         def func(limit, inner_iters):
             @while_loop(lambda carried: carried < limit)

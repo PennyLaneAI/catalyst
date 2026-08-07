@@ -124,6 +124,10 @@ class TestControlled:
 
     def test_adjoint_qctrl_func_simple(self, backend, capture_mode):
         """Test the quantum control distribution over the group of operations"""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
 
         def circuit(arg, ctrl_fn, adjoint_fn):
             def _func(theta):
