@@ -62,6 +62,7 @@
 #include "llvm/ExecutionEngine/Orc/TargetProcess/UnwindInfoManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <netdb.h>
