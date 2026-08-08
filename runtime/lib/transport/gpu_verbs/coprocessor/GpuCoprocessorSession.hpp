@@ -58,6 +58,8 @@ class GpuCoprocessorSession : public CoprocessorSession {
         return CoprocConvention::LaunchOnce;
     }
 
+    MemKind preferred_mem_kind() const override { return MemKind::GpuHbm; }
+
   private:
     void run_coprocessor(std::stop_token st);
     // Fill the reply + post one inline RDMA_WRITE. Returns true if this send

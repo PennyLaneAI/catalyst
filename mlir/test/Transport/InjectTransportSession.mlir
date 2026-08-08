@@ -26,7 +26,7 @@
 // CHECK:         transport.connect %[[S]] {oob_port = 18590 : i16, peer = "127.0.0.1"} : !transport.session<controller>
 // CHECK:         transport.exchange_keys %[[S]] : !transport.session<controller>
 // CHECK:         transport.establish_channel %[[S]] "cpu_verbs" : !transport.session<controller>
-// CHECK:         transport.commit_work_item %[[S]] {{.*}} : !transport.session<controller>
+// CHECK:         transport.set_message_sizes %[[S]] {{.*}} : !transport.session<controller>
 // CHECK:         transport.start %[[S]] : !transport.session<controller>
 
 // CHECK-LABEL: func.func @teardown
@@ -60,7 +60,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "net", co
 // CHECK:         transport.connect %[[S]] {oob_port = 18590 : i16, peer = "127.0.0.1"} : !transport.session<controller>
 // CHECK:         transport.exchange_keys %[[S]] : !transport.session<controller>
 // CHECK:         transport.establish_channel %[[S]] "cpu_verbs" : !transport.session<controller>
-// CHECK:         transport.commit_work_item %[[S]] {{.*}} : !transport.session<controller>
+// CHECK:         transport.set_message_sizes %[[S]] {{.*}} : !transport.session<controller>
 // CHECK:         transport.start %[[S]] : !transport.session<controller>
 
 // CHECK-LABEL: func.func @teardown_transport
@@ -138,7 +138,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "net", co
 // CHECK-DAG:     transport.create {{.*}} -> !transport.session<controller>
 // CHECK-DAG:     transport.create {{.*}} -> !transport.session<coprocessor>
 // CHECK:         transport.connect_async %{{.*}} : !transport.session<coprocessor> -> !transport.token
-// CHECK:         transport.barrier
+// CHECK:         transport.await
 // CHECK:         transport.set_coprocessor_fn %{{.*}} {symbol = "coproc_fn"} : !transport.session<coprocessor>
 // CHECK:         transport.start
 
@@ -303,7 +303,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "net", co
 // CHECK:         %[[TOK:.*]] = transport.connect_async %[[CO]]
 // CHECK:         transport.set_coprocessor_fn %[[CO]]
 // CHECK:         catalyst.launch_kernel @module_ctrl::@setup_transport()
-// CHECK:         transport.barrier %[[TOK]]
+// CHECK:         transport.await %[[TOK]]
 // CHECK:         transport.start %[[CO]]
 
 // The coprocessor is released in the host, the controller in its own module.

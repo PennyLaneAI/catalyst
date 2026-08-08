@@ -27,11 +27,11 @@ func.func @transport_smoketest(%payload: memref<?xi8>, %reply: memref<?xi8>) {
   %t1 = transport.connect_async %co {peer = "127.0.0.1", oob_port = 18590 : i16} : !transport.session<coprocessor> -> !transport.token
   // CHECK: transport.connect %{{.*}} : !transport.session<controller>
   transport.connect %ct {peer = "127.0.0.1", oob_port = 18590 : i16} : !transport.session<controller>
-  // CHECK: transport.barrier %{{.*}} : !transport.token
-  transport.barrier %t1 : !transport.token
+  // CHECK: transport.await %{{.*}} : !transport.token
+  transport.await %t1 : !transport.token
   // CHECK: transport.exchange_keys_async %{{.*}} : !transport.session<coprocessor> -> !transport.token
   %t2 = transport.exchange_keys_async %co : !transport.session<coprocessor> -> !transport.token
-  transport.barrier %t2 : !transport.token
+  transport.await %t2 : !transport.token
   // CHECK: transport.exchange_keys %{{.*}} : !transport.session<controller>
   transport.exchange_keys %ct : !transport.session<controller>
 
@@ -42,8 +42,8 @@ func.func @transport_smoketest(%payload: memref<?xi8>, %reply: memref<?xi8>) {
 
   // CHECK: transport.set_coprocessor_fn %{{.*}} {symbol = "foo"} : !transport.session<coprocessor>
   transport.set_coprocessor_fn %co {symbol = "foo"} : !transport.session<coprocessor>
-  // CHECK: transport.commit_work_item %{{.*}} : !transport.session<controller>
-  transport.commit_work_item %ct {work_item_idx = 0 : i32, in_bytes = 8 : i64, out_bytes = 8 : i64} : !transport.session<controller>
+  // CHECK: transport.set_message_sizes %{{.*}} : !transport.session<controller>
+  transport.set_message_sizes %ct {in_bytes = 8 : i64, out_bytes = 8 : i64} : !transport.session<controller>
 
   transport.start %co : !transport.session<coprocessor>
   transport.start %ct : !transport.session<controller>
@@ -51,8 +51,10 @@ func.func @transport_smoketest(%payload: memref<?xi8>, %reply: memref<?xi8>) {
   // CHECK: transport.get_session : !transport.session<controller>
   %ct2 = transport.get_session : !transport.session<controller>
 
-  // CHECK: transport.kick %{{.*}}, %{{.*}} {work_item_idx = 0 : i32} : !transport.session<controller>, memref<?xi8>
-  transport.kick %ct2, %payload {work_item_idx = 0 : i32} : !transport.session<controller>, memref<?xi8>
+  // CHECK: transport.stage_payload %{{.*}}, %{{.*}} : !transport.session<controller>, memref<?xi8>
+  transport.stage_payload %ct2, %payload : !transport.session<controller>, memref<?xi8>
+  // CHECK: transport.post %{{.*}} : !transport.session<controller>
+  transport.post %ct2 : !transport.session<controller>
   // CHECK: transport.collect %{{.*}}, %{{.*}} : !transport.session<controller>, memref<?xi8>
   transport.collect %ct2, %reply : !transport.session<controller>, memref<?xi8>
   // CHECK: transport.last_rtt_ns %{{.*}} : !transport.session<controller> -> i64

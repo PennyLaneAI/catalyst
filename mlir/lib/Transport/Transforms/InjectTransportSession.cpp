@@ -205,7 +205,7 @@ class SessionEmitter {
     IntegerAttr i16A(int64_t v) { return b.getIntegerAttr(b.getIntegerType(16), v); }
 
     void commit(Value ct) {
-        CommitWorkItemOp::create(b, loc, ct, b.getI32IntegerAttr(ctrl.workItemIdx()),
+        SetMessageSizesOp::create(b, loc, ct, b.getI32IntegerAttr(ctrl.workItemIdx()),
                                  b.getI64IntegerAttr(ctrl.inBytes()),
                                  b.getI64IntegerAttr(ctrl.outBytes()));
     }
@@ -254,7 +254,7 @@ class SessionEmitter {
         Value tok =
             ConnectAsyncOp::create(cb, loc, tokTy, co, coproc.getPeer(), i16A(coproc.oobPort()))
                 .getToken();
-        BarrierOp::create(cb, loc, tok);
+        AwaitOp::create(cb, loc, tok);
         ExchangeKeysOp::create(cb, loc, co);
         EstablishChannelOp::create(cb, loc, co, coproc.dataPathOr(kDefaultDataPath));
         SetCoprocessorFnOp::create(cb, loc, co, coproc.getSymbol());
@@ -312,10 +312,10 @@ class SessionEmitter {
             ConnectAsyncOp::create(b, loc, tokTy, co, coproc.getPeer(), i16A(coproc.oobPort()))
                 .getToken();
         ConnectOp::create(b, loc, ct, coproc.getPeer(), i16A(coproc.oobPort()));
-        BarrierOp::create(b, loc, t1);
+        AwaitOp::create(b, loc, t1);
         Value t2 = ExchangeKeysAsyncOp::create(b, loc, tokTy, co).getToken();
         ExchangeKeysOp::create(b, loc, ct);
-        BarrierOp::create(b, loc, t2);
+        AwaitOp::create(b, loc, t2);
         EstablishChannelOp::create(b, loc, co, coproc.dataPathOr(kDefaultDataPath));
         EstablishChannelOp::create(b, loc, ct, ctrl.dataPathOr(kDefaultDataPath));
         SetCoprocessorFnOp::create(b, loc, co, coproc.getSymbol());
@@ -341,7 +341,7 @@ class SessionEmitter {
 
         // The controller has dialed, so a host-process coprocessor's handshake can complete.
         for (const PendingLocalCoproc &c : pendingLocal) {
-            BarrierOp::create(hb, loc, c.token);
+            AwaitOp::create(hb, loc, c.token);
             ExchangeKeysOp::create(hb, loc, c.session);
             EstablishChannelOp::create(hb, loc, c.session, c.node.dataPathOr(kDefaultDataPath));
             StartOp::create(hb, loc, c.session);

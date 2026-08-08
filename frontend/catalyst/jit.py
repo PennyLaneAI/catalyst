@@ -886,6 +886,22 @@ class QJIT(CatalystCallable):
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
+        # If the device declares a backline placement, serialize it onto the top module.
+        device = getattr(self.user_function, "device", None)
+        backline = getattr(device, "backline", None)
+        if backline is not None:
+            from jax.interpreters.mlir import ir
+
+            from catalyst.backline import backline_attr_text, realize_executors
+
+            # Launch any unlaunched ExecutorSpecs first so serialization is a pure read.
+            realize_executors(backline)
+
+            with mlir_module.context:
+                mlir_module.operation.attributes["catalyst.backline"] = ir.Attribute.parse(
+                    backline_attr_text(backline)
+                )
+
         return mlir_module
 
     @instrument(size_from=1, has_finegrained=True)
