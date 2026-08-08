@@ -96,17 +96,18 @@ class _SessionRegistry:
     nothing leaks when Python exits without an explicit :meth:`Executor.stop`."""
 
     def __init__(self) -> None:
-        self._procs: dict[str, _ExecutorProcess] = {}
+        self._procs: list[_ExecutorProcess] = []
         atexit.register(self._shutdown_all)
 
-    def register(self, name: str, proc: _ExecutorProcess) -> None:
-        self._procs[name] = proc
+    def register(self, proc: _ExecutorProcess) -> None:
+        self._procs.append(proc)
 
-    def unregister(self, name: str) -> None:
-        self._procs.pop(name, None)
+    def unregister(self, proc: _ExecutorProcess) -> None:
+        if proc in self._procs:
+            self._procs.remove(proc)
 
     def _shutdown_all(self) -> None:
-        for proc in list(self._procs.values()):
+        for proc in list(self._procs):
             with contextlib.suppress(Exception):
                 proc.stop()
             proc.teardown_workspace()
@@ -316,7 +317,7 @@ class Executor:
         self._proc = _start_on_free_port(make, self._cfg.port)
         self._address = self._proc.addr
         self._launched = True
-        _sessions.register(self.name, self._proc)
+        _sessions.register(self._proc)
         return self
 
     def stop(self) -> None:
@@ -329,7 +330,7 @@ class Executor:
         with contextlib.suppress(Exception):
             self._proc.stop()
         self._proc.teardown_workspace()
-        _sessions.unregister(self.name)
+        _sessions.unregister(self._proc)
         self._proc = None
 
     def setup_workspace(self) -> Self:
