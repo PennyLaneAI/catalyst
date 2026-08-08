@@ -50,6 +50,8 @@ inline auto acquire_endpoint_pair(const ConnectInfo &info) -> std::shared_ptr<En
     // controller/coprocessor are destroyed.
     static std::unordered_map<std::string, std::weak_ptr<EndpointPair>> pairs;
 
+    // peer and oob_port is used just to create a key for both coproc and
+    // controller to fetch the same EndpointPair
     const std::string key = info.peer + ":" + std::to_string(info.oob_port);
     std::lock_guard<std::mutex> lock(mu);
 

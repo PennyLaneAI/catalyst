@@ -35,11 +35,25 @@ if(IBVERBS_LIB)
     add_dependencies(transport_all catalyst_transport_cpu_controller
                      catalyst_transport_cpu_coprocessor steane_coprocessor)
 
-    # GPU coprocessor backend — only when a HIP toolchain is present.
+    if(DEFINED ENV{ROCM_PATH})
+        list(APPEND CMAKE_PREFIX_PATH "$ENV{ROCM_PATH}")
+    elseif(EXISTS "/opt/rocm")
+        list(APPEND CMAKE_PREFIX_PATH "/opt/rocm")
+    endif()
+
+    # GPU-backed transport pieces — only when a HIP toolchain is present.
     include(CheckLanguage)
     check_language(HIP)
     if(CMAKE_HIP_COMPILER)
         message(STATUS "transport: HIP found (${CMAKE_HIP_COMPILER}) -> building gpu_verbs")
+        enable_language(HIP)
+        if(DEFINED CMAKE_HIP_PLATFORM)
+            set(HIP_PLATFORM "${CMAKE_HIP_PLATFORM}" CACHE STRING "HIP platform" FORCE)
+        endif()
+        find_package(hip REQUIRED)
+        if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
+            find_package(CUDAToolkit REQUIRED)
+        endif()
         set(TRANSPORT_HAS_HIP TRUE CACHE INTERNAL "transport: HIP toolchain available")
         add_subdirectory(gpu_verbs)
         add_dependencies(transport_all catalyst_transport_gpu_coprocessor)

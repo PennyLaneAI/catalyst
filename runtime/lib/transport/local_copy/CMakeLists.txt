@@ -30,5 +30,8 @@ if(TRANSPORT_HAS_HIP)
         catalyst_transport_gpu_coprocessor
         hip::host
     )
+    if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
+        target_link_libraries(local_copy_gpu_impl PUBLIC CUDA::cudart)
+    endif()
     set_property(TARGET local_copy_gpu_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
