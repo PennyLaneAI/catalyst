@@ -28,14 +28,7 @@ import time
 from typing import Self, TextIO
 
 from .ssh import RemoteLauncher, RemoteOps
-from .utils import (
-    ExecutorFlags,
-    ExecutorPaths,
-    OutputPatterns,
-    PortInUse,
-    log_cmd,
-    pdeathsig,
-)
+from .utils import ExecutorFlags, ExecutorPaths, OutputPatterns, PortInUse, log_cmd
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -95,8 +88,9 @@ class _ExecutorProcess:
         env: dict[str, str] | None = None,
         stdin: int | None = None,
     ) -> subprocess.Popen:
-        """Spawn a subprocess with pump-friendly settings: stdout piped, stderr merged, line-buffered
-        text mode, ``PR_SET_PDEATHSIG`` so the child dies with the parent."""
+        """Spawn a subprocess with pump-friendly settings: stdout piped, stderr merged,
+        line-buffered text mode.
+        """
         return subprocess.Popen(
             argv,
             stdin=stdin,
@@ -105,7 +99,6 @@ class _ExecutorProcess:
             text=True,
             bufsize=1,
             env=env,
-            preexec_fn=pdeathsig,
         )
 
     def _say(self, msg: str, level: int = 1) -> None:

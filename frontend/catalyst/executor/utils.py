@@ -20,20 +20,17 @@
 * :class:`ExecutorFlags`: CLI flag constants for ``catalyst-executor``.
 
 Plus stdlib logging (:data:`logger`, :func:`set_verbose`, :func:`verbose_level`, :func:`log_cmd`),
-free helpers (:func:`random_port`, :func:`triple_from_uname`, :data:`pdeathsig`), and domain
-types (:class:`PortInUse`, :class:`Unquoted`).
+free helpers (:func:`random_port`, :func:`triple_from_uname`), and domain types
+(:class:`PortInUse`, :class:`Unquoted`).
 """
 
 from __future__ import annotations
 
-import ctypes
 import getpass
 import logging
 import random
 import re
 import shlex
-import signal
-import sys
 import time
 from pathlib import Path
 from typing import Final
@@ -268,19 +265,3 @@ def triple_from_uname(system: str, machine: str) -> str | None:
     if system == "darwin":
         return f"{'arm64' if arch == 'aarch64' else arch}-apple-darwin"
     return None
-
-
-if sys.platform == "linux":
-    _libc = ctypes.CDLL("libc.so.6", use_errno=True)
-
-    def _set_pdeathsig() -> None:
-        """preexec_fn: kernel SIGTERMs this child when the parent dies, so a host crash
-        doesn't leak the ssh tunnel + executor."""
-        PR_SET_PDEATHSIG = 1  # linux/prctl.h
-        _libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
-
-    pdeathsig = _set_pdeathsig
-else:
-    # PR_SET_PDEATHSIG is Linux-only; on macOS/Windows the executor still runs, it just
-    # won't be auto-killed if the parent dies uncleanly.
-    pdeathsig = None
