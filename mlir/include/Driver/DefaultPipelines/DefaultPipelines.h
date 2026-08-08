@@ -71,9 +71,20 @@ const PipelineList pipelineList{
       "scatter-lowering",
       "hlo-custom-call-lowering",
       "cse",
+      // Sink scalar extractions through small-tensor producers and fuse the
+      // remaining elementwise ops. Traced gate-parameter dataflow (e.g. runtime
+      // Hamiltonian coefficients) otherwise reaches bufferization as thousands
+      // of tiny tensor ops that each become an alloc + copy.
+      "scalarize-tensor-extracts",
+      "func.func(linalg-fuse-elementwise-ops)",
+      "canonicalize",
       "func.func(linalg-detensorize{aggressive-mode})",
       "detensorize-scf",
       "detensorize-function-boundary",
+      // Detensorization is what materializes tensor.extract on the gate-angle
+      // dataflow, so scalarization must run again here to fold the
+      // extract_slice/collapse_shape chains it exposes.
+      "scalarize-tensor-extracts",
       "canonicalize",
       "symbol-dce"}},
     {"gradient-lowering-stage",
