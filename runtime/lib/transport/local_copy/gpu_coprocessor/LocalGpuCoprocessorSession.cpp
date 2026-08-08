@@ -42,8 +42,8 @@ LocalGpuCoprocessorSession::~LocalGpuCoprocessorSession() {
         stop();
     } catch (...) {
     }
-    if (request_ring_host_) {
-        (void)hipHostFree(request_ring_host_);
+    if (request_slot_host_) {
+        (void)hipHostFree(request_slot_host_);
     }
 }
 
@@ -51,18 +51,19 @@ void LocalGpuCoprocessorSession::ensure_gpu_state() {
     if (!gpu_) {
         gpu_ = std::make_unique<gpu_verbs::GpuRuntime>(gpu_device_);
     }
-    if (!request_ring_host_) {
-        HIP_CHECK(hipHostMalloc(reinterpret_cast<void **>(&request_ring_host_),
-                                common::REGION_BYTES, hipHostMallocMapped | hipHostMallocCoherent),
-                  "hipHostMalloc(local gpu request ring)");
-        std::memset(request_ring_host_, 0, common::REGION_BYTES);
-        void *ring_dev = nullptr;
-        HIP_CHECK(hipHostGetDevicePointer(&ring_dev, request_ring_host_, 0),
-                  "hipHostGetDevicePointer(local gpu request ring)");
-        request_ring_dev_ = static_cast<common::PayloadSlot *>(ring_dev);
+    if (!request_slot_host_) {
+        HIP_CHECK(hipHostMalloc(reinterpret_cast<void **>(&request_slot_host_),
+                                sizeof(common::PayloadSlot),
+                                hipHostMallocMapped | hipHostMallocCoherent),
+                  "hipHostMalloc(local gpu request slot)");
+        std::memset(request_slot_host_, 0, sizeof(common::PayloadSlot));
+        void *slot_dev = nullptr;
+        HIP_CHECK(hipHostGetDevicePointer(&slot_dev, request_slot_host_, 0),
+                  "hipHostGetDevicePointer(local gpu request slot)");
+        request_slot_dev_ = static_cast<common::PayloadSlot *>(slot_dev);
     }
     if (!handoff_.host) {
-        handoff_ = gpu_->alloc_handoff(common::K_RING_SLOTS);
+        handoff_ = gpu_->alloc_handoff(1);
     }
 }
 
@@ -170,21 +171,20 @@ int LocalGpuCoprocessorSession::run_once() {
 
     ensure_gpu_state();
 
-    // Reset Payload and Handoff
-    request_ring_host_[0] = common::PayloadSlot{};
+    request_slot_host_[0] = common::PayloadSlot{};
     handoff_.host[0] = gpu_verbs::HandoffSlot{};
     if (handoff_.stop_host) {
         *handoff_.stop_host = 0;
     }
 
-    std::memcpy(&request_ring_host_[0].p.value, request_base + kLocalRequestHeaderBytes,
+    std::memcpy(&request_slot_host_[0].p.value, request_base + kLocalRequestHeaderBytes,
                 common::PAYLOAD_DATA_BYTES);
-    request_ring_host_[0].p.decoder_id = request_hdr->decoder_id;
-    request_ring_host_[0].p.seq_num = 1;
+    request_slot_host_[0].p.decoder_id = request_hdr->decoder_id;
+    request_slot_host_[0].p.seq_num = 1;
 
     CoprocLaunchDesc desc{
-        .ring = request_ring_dev_,
-        .ring_slots = static_cast<std::uint32_t>(common::K_RING_SLOTS),
+        .ring = request_slot_dev_,
+        .ring_slots = 1,
         .handoff = handoff_.dev,
         .stop = handoff_.stop_dev,
         .total = 1,
