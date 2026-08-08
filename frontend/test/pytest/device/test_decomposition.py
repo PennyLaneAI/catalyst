@@ -127,8 +127,11 @@ class TestControlledDecomposition:
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
             return qp.probs()
 
+        with pytest.warns(UserWarning, match="AOT capture of jaxpr failed"):
+            circuit = qjit(f, target="jaxpr")
+
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
-            qjit(f, target="jaxpr")
+            circuit()
 
     def test_no_unitary_support(self):
         """Test that unknown controlled operations without QubitUnitary support raise an error."""
@@ -156,8 +159,11 @@ class TestControlledDecomposition:
             ctrl(UnknownOp(wires=[0, 1]), control=[2, 3])
             return qp.probs()
 
+        with pytest.warns(UserWarning, match="AOT capture of jaxpr failed"):
+            circuit = qjit(f, target="jaxpr")
+
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
-            qjit(f, target="jaxpr")
+            circuit()
 
 
 if __name__ == "__main__":

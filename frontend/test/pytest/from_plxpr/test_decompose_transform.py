@@ -1056,7 +1056,7 @@ class TestPlxPRDecomposition:
 
             qp.cond(angle > 1.2, true_func, false_func)()
 
-        with expectation:
+        with pytest.warns(UserWarning):
 
             @qp.qjit(capture=True)
             @partial(
@@ -1071,6 +1071,8 @@ class TestPlxPRDecomposition:
                 qp.CRX(-7.2, wires=[0, 1])
                 return qp.state()
 
+        with expectation:
+            circuit()
         qp.decomposition.disable_graph()
 
     def test_decomp_inside_subroutine(self):
