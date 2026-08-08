@@ -41,6 +41,7 @@ class CpuControllerSession : public CpuSessionBase<ControllerSession> {
                           std::uint64_t out_bytes) override;
     int kick(std::uint32_t work_item_idx = 0) override;
     void *data_slot() override;
+    void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
 
   protected:
     bool oob_listens() const override { return false; }

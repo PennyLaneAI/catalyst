@@ -30,8 +30,7 @@ using namespace catalyst::transport;
 using namespace catalyst::transport::cpu_verbs;
 using namespace catalyst::transport::common; // REGION_BYTES, DEMO_SYNDROME, Payload
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     std::string role = "coprocessor", dev = "rxe0", peer = "127.0.0.1";
     int gid = 1;
     std::uint16_t port = 18560;
@@ -43,23 +42,17 @@ int main(int argc, char **argv)
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--role") {
             role = v;
-        }
-        else if (k == "--dev") {
+        } else if (k == "--dev") {
             dev = v;
-        }
-        else if (k == "--gid") {
+        } else if (k == "--gid") {
             gid = std::atoi(v.c_str());
-        }
-        else if (k == "--peer") {
+        } else if (k == "--peer") {
             peer = v;
-        }
-        else if (k == "--port") {
+        } else if (k == "--port") {
             port = static_cast<std::uint16_t>(std::atoi(v.c_str()));
-        }
-        else if (k == "--syndrome-bytes") {
+        } else if (k == "--syndrome-bytes") {
             syndrome_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
-        }
-        else if (k == "--correction-bytes") {
+        } else if (k == "--correction-bytes") {
             correction_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         }
     }
@@ -72,8 +65,7 @@ int main(int argc, char **argv)
         auto up = std::make_unique<CpuCoprocessorSession>(dev, gid);
         coproc = up.get();
         s = std::move(up);
-    }
-    else {
+    } else {
         auto up = std::make_unique<CpuControllerSession>(dev, gid);
         controller = up.get();
         s = std::move(up);
@@ -104,14 +96,13 @@ int main(int argc, char **argv)
         std::this_thread::sleep_for(std::chrono::seconds(3)); // serve ~3 s
         coproc->collect(outs, obytes, 1);
         coproc->stop();
-    }
-    else {
+    } else {
         // Controller: commit a work item sized by --syndrome-bytes/--correction-bytes,
-        // write the syndrome into data_slot(), kick one round, collect the correction.
+        // write the syndrome into the outbound slot, kick one round, collect the correction.
         controller->commit_work_item(/*work_item_idx=*/0, syndrome_bytes, correction_bytes);
         controller->start();
         const std::uint64_t syndrome = DEMO_SYNDROME;
-        std::memcpy(controller->data_slot(), &syndrome, sizeof(syndrome));
+        controller->write_data_slot(&syndrome, syndrome_bytes, /*decoder_id=*/0);
         controller->kick(0);
         controller->collect(outs, obytes, 1);
         controller->stop();

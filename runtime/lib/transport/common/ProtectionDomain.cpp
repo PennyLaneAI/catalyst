@@ -19,13 +19,11 @@
 #include "Error.hpp"
 
 namespace catalyst::transport::common {
-ProtectionDomain::ProtectionDomain(std::shared_ptr<Context> ctx) : ctx_(std::move(ctx))
-{
+ProtectionDomain::ProtectionDomain(std::shared_ptr<Context> ctx) : ctx_(std::move(ctx)) {
     pd_ = ibv_alloc_pd(ctx_->get());
-    RDMA_CHECK(pd_, "ibv_alloc_pd");
+    RDMA_CHECK_ERRNO(pd_, "ibv_alloc_pd");
 }
-ProtectionDomain::~ProtectionDomain()
-{
+ProtectionDomain::~ProtectionDomain() {
     if (pd_) {
         ibv_dealloc_pd(pd_);
     }

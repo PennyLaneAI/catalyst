@@ -39,8 +39,7 @@ namespace pbc {
 struct PPRToMBQCPass : public impl::PPRToMBQCPassBase<PPRToMBQCPass> {
     using PPRToMBQCPassBase::PPRToMBQCPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
 

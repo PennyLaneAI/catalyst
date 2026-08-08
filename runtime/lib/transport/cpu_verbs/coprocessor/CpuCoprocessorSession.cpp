@@ -14,7 +14,6 @@
 
 #include "CpuCoprocessorSession.hpp"
 
-#include <algorithm>
 #include <cstring>
 #include <thread>
 
@@ -23,14 +22,12 @@
 namespace catalyst::transport::cpu_verbs {
 using namespace catalyst::transport::common;
 
-void CpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx)
-{
+void CpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
     coproc_fn_ = fn;
     coproc_ctx_ = ctx;
 }
 
-void CpuCoprocessorSession::start()
-{
+void CpuCoprocessorSession::start() {
     stop();
     failed_.store(false, std::memory_order_relaxed);
     error_ = nullptr;
@@ -43,8 +40,7 @@ void CpuCoprocessorSession::start()
     auto body = [this](std::stop_token st) {
         try {
             run(st);
-        }
-        catch (...) {
+        } catch (...) {
             error_ = std::current_exception();
             failed_.store(true, std::memory_order_release);
         }
@@ -53,8 +49,7 @@ void CpuCoprocessorSession::start()
 }
 
 int CpuCoprocessorSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
-                                   std::size_t n)
-{
+                                   std::size_t n) {
     while (completed_.load(std::memory_order_acquire) == 0) {
         if (failed_.load(std::memory_order_acquire)) {
             std::rethrow_exception(error_); // surface the engine's real error
@@ -73,15 +68,15 @@ int CpuCoprocessorSession::collect(void *const *replies, const std::uint64_t *re
     }
     if (n > 0 && replies && replies[0]) {
         const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
-        const std::size_t nb =
-            replies_bytes ? std::min<std::size_t>(replies_bytes[0], sizeof(w)) : sizeof(w);
-        std::memcpy(replies[0], &w, nb);
+        const std::size_t cap = replies_bytes ? replies_bytes[0] : sizeof(w);
+        RDMA_CHECK(cap <= sizeof(w), "reply capacity (%zu) exceeds the %zu B payload", cap,
+                   sizeof(w));
+        std::memcpy(replies[0], &w, cap);
     }
     return 0;
 }
 
-void CpuCoprocessorSession::stop()
-{
+void CpuCoprocessorSession::stop() {
     if (engine_.joinable()) {
         engine_.request_stop();
         engine_.join();
@@ -92,8 +87,7 @@ void CpuCoprocessorSession::stop()
 // buffer in place, then send the result. A null fn is the built-in echo
 // (passthrough). Replies are inline + selectively signaled; the bwd CQ is
 // reaped in batches at signal points.
-void CpuCoprocessorSession::run(std::stop_token st)
-{
+void CpuCoprocessorSession::run(std::stop_token st) {
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); c++) {
         Payload *r = poll_message_arrival(c, st); // the incoming message
@@ -104,11 +98,15 @@ void CpuCoprocessorSession::run(std::stop_token st)
         last_word_.store(r->value, std::memory_order_relaxed);
         completed_.fetch_add(1, std::memory_order_release);
         Payload *send = send_payload();
-        send->value = 0; // deterministic high bytes when the result is shorter
+        send->value = 0;
+        send->decoder_id = r->decoder_id;
         if (coproc_fn_) {
-            coproc_fn_(&r->value, sizeof(r->value), &send->value, sizeof(send->value), coproc_ctx_);
-        }
-        else {
+            const std::size_t nb =
+                coproc_fn_(r, sizeof(Payload), &send->value, PAYLOAD_DATA_BYTES, coproc_ctx_);
+            RDMA_CHECK(nb > 0 && nb <= PAYLOAD_DATA_BYTES,
+                       "coprocessor function wrote %zu bytes, expected 1..%zu", nb,
+                       PAYLOAD_DATA_BYTES);
+        } else {
             send->value = r->value; // built-in echo
         }
         const bool sig = (c % SIGNAL_EVERY == 0);

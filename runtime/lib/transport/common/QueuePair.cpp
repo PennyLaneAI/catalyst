@@ -37,8 +37,7 @@ constexpr std::uint32_t MAX_SGE = 1; // single-SGE descriptors on both queues
 
 QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,
                      std::shared_ptr<CompletionQueue> recv_cq, int max_send_wr, int max_inline)
-    : pd_(std::move(pd)), send_cq_(std::move(send_cq)), recv_cq_(std::move(recv_cq))
-{
+    : pd_(std::move(pd)), send_cq_(std::move(send_cq)), recv_cq_(std::move(recv_cq)) {
     ibv_qp_init_attr a{
         .send_cq = send_cq_->get(),
         .recv_cq = recv_cq_->get(),
@@ -54,11 +53,10 @@ QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<Compl
         .sq_sig_all = 0,
     };
     qp_ = ibv_create_qp(pd_->get(), &a);
-    RDMA_CHECK(qp_, "ibv_create_qp");
+    RDMA_CHECK_ERRNO(qp_, "ibv_create_qp");
 }
 
-QueuePair::~QueuePair()
-{
+QueuePair::~QueuePair() {
     if (qp_) {
         ibv_destroy_qp(qp_);
     }
@@ -68,8 +66,7 @@ ibv_qp *QueuePair::get() const { return qp_; }
 std::uint32_t QueuePair::qpn() const { return qp_->qp_num; }
 QpState QueuePair::state() const { return state_; }
 
-void QueuePair::check_transition(QpState to) const
-{
+void QueuePair::check_transition(QpState to) const {
     if (!is_valid_transition(state_, to)) {
         char m[128];
         std::snprintf(m, sizeof(m), "invalid QP transition %s -> %s", to_string(state_),
@@ -78,16 +75,14 @@ void QueuePair::check_transition(QpState to) const
     }
 }
 
-void QueuePair::modify(QpState to, ibv_qp_attr &attr, int mask, const char *what)
-{
+void QueuePair::modify(QpState to, ibv_qp_attr &attr, int mask, const char *what) {
     check_transition(to);
-    int rc = ibv_modify_qp(qp_, &attr, mask);
+    const int rc = ibv_modify_qp(qp_, &attr, mask);
     RDMA_CHECK(rc == 0, "%s rc=%d (%s)", what, rc, std::strerror(rc));
     state_ = to; // advance only after a successful modify
 }
 
-void QueuePair::to_init(std::uint8_t port)
-{
+void QueuePair::to_init(std::uint8_t port) {
     ibv_qp_attr a{
         .qp_state = IBV_QPS_INIT,
         .qp_access_flags =
@@ -101,8 +96,7 @@ void QueuePair::to_init(std::uint8_t port)
 
 void QueuePair::to_rtr(std::uint32_t dest_qpn, std::uint32_t dest_psn,
                        const std::uint8_t dest_gid[16], int sgid_idx, std::uint8_t port,
-                       std::uint32_t mtu_enum)
-{
+                       std::uint32_t mtu_enum) {
     ibv_qp_attr a{
         .qp_state = IBV_QPS_RTR,
         .path_mtu = static_cast<ibv_mtu>(mtu_enum),
@@ -124,8 +118,7 @@ void QueuePair::to_rtr(std::uint32_t dest_qpn, std::uint32_t dest_psn,
            "modify_to_rtr");
 }
 
-void QueuePair::to_rts(std::uint32_t sq_psn)
-{
+void QueuePair::to_rts(std::uint32_t sq_psn) {
     ibv_qp_attr a{
         .qp_state = IBV_QPS_RTS,
         .sq_psn = sq_psn,

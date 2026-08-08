@@ -20,33 +20,51 @@
 #include <cstdint>
 #include <cstring>
 
+namespace {
+
+constexpr std::size_t STEANE_CHECKS = 3;
+
 /**
- * @brief A hard-coded [[7,1,3]] Steane-code decode, exposed as a CoprocessorFn
- * (see Transport.hpp) — the general "run this on the coprocessor" contract that
- * supersedes the old decoder-plugin ABI.
+ * @brief Syndrome to error qubit index for the [[7,1,3]] Steane code; -1 is no
+ * error. For compatibility with existing Steane decoder.
  *
- * @note The FTQC (Fault-Tolerant Quantum Computing) compilation pipeline
- * dispatches either X-check or Z-check syndromes independently per call, so each
- * call carries a single 3-bit check. This may be unified in future iterations.
+ */
+constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1u << STEANE_CHECKS] = {-1, 6, 4, 5, 0, 3, 1, 2};
+
+} // namespace
+
+/**
+ * @brief A hard-coded [[7,1,3]] Steane-code decode exposed as a CoprocessorFn
  *
- * @param in Pointer to the inbound syndrome measurements.
+ * @param in Syndrome measurements, one byte per check, byte `i` holding check
+ *           `i` in its low bit (a `memref<?xi1>` lowers to one byte per element).
  * @param in_len Length of the inbound syndrome, in bytes.
- * @param out Pointer to the outbound correction buffer.
+ * @param out Buffer for the outbound error qubit index.
  * @param out_cap Capacity of the outbound buffer, in bytes.
  * @param ctx Opaque context (unused).
- * @return Number of bytes written to @p out.
+ * @return Bytes written to @p out, or 0 if the buffers are too small, which the
+ *         caller reports as a failed round.
+ *
+ * @note `in_len` is the payload capacity rather than the syndrome length, which
+ * the wire does not carry; a decoder therefore has to know its own code's check
+ * count.
  */
+// `in` is the request frame; its leading bytes are the syndrome. The frame's
+// decoder_id (a uint32 at byte offset 8) is not read: the [[7,1,3]] Steane code has
+// Hx == Hz, so one table serves both the X and Z checks. A code whose matrices differ
+// would read that field and switch on it here.
 extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len, void *out,
-                                          std::size_t out_cap, void * /*ctx*/)
-{
-    std::uint64_t syndrome = 0;
-    std::memcpy(&syndrome, in, in_len < sizeof(syndrome) ? in_len : sizeof(syndrome));
-    // One 3-bit check (X or Z) per call; the nonzero index selects the single
-    // corrected qubit (0 => no error).
-    const std::uint32_t check = syndrome & 0x7u;
-    const std::uint64_t correction = static_cast<std::uint64_t>(check ? (1u << (check - 1)) : 0u);
-    const std::size_t nb = out_cap < sizeof(correction) ? out_cap : sizeof(correction);
-    std::memset(out, 0, out_cap);
-    std::memcpy(out, &correction, nb);
-    return nb;
+                                          std::size_t out_cap, void * /*ctx*/) {
+    if (in == nullptr || out == nullptr || in_len < STEANE_CHECKS ||
+        out_cap < sizeof(std::int64_t)) {
+        return 0;
+    }
+    const auto *checks = static_cast<const std::uint8_t *>(in);
+    std::uint32_t syndrome = 0;
+    for (std::size_t i = 0; i < STEANE_CHECKS; ++i) {
+        syndrome = (syndrome << 1U) | (checks[i] & 1U);
+    }
+    const std::int64_t err_idx = STEANE_SYNDROME_TO_QUBIT[syndrome];
+    std::memcpy(out, &err_idx, sizeof(err_idx));
+    return sizeof(err_idx);
 }

@@ -35,8 +35,7 @@ namespace pbc {
 #include "PBC/Transforms/Passes.h.inc"
 
 struct PBCTypeConverter : public LLVMTypeConverter {
-    PBCTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
-    {
+    PBCTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx) {
         addConversion([&](quantum::QubitType type) { return convertQubitType(type); });
         addConversion([&](quantum::QuregType type) { return convertQuregType(type); });
         addConversion([&](quantum::ResultType type) { return convertResultType(type); });
@@ -53,8 +52,7 @@ struct PBCTypeConverter : public LLVMTypeConverter {
 struct PBCConversionPass : impl::PBCConversionPassBase<PBCConversionPass> {
     using PBCConversionPassBase::PBCConversionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         PBCTypeConverter typeConverter(context);
 

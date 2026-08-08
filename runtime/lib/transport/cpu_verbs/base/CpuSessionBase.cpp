@@ -44,12 +44,9 @@ constexpr std::size_t PAGE_ALIGN = 4096;
 
 template <class Role>
 CpuSessionBase<Role>::CpuSessionBase(std::string dev, int gid_idx)
-    : dev_name_(std::move(dev)), gid_idx_(gid_idx)
-{
-}
+    : dev_name_(std::move(dev)), gid_idx_(gid_idx) {}
 
-template <class Role> int CpuSessionBase<Role>::connect(const ConnectInfo &info)
-{
+template <class Role> int CpuSessionBase<Role>::connect(const ConnectInfo &info) {
     ctx_ = std::make_shared<Context>(dev_name_);
     pd_ = std::make_shared<ProtectionDomain>(ctx_);
     fwd_cq_ = std::make_shared<CompletionQueue>(ctx_, CQ_DEPTH);
@@ -66,8 +63,7 @@ template <class Role> int CpuSessionBase<Role>::connect(const ConnectInfo &info)
     return 0;
 }
 
-template <class Role> MemRegion CpuSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind)
-{
+template <class Role> MemRegion CpuSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind) {
     RDMA_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
         pd_, size, PAGE_ALIGN, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE));
@@ -81,8 +77,7 @@ template <class Role> MemRegion CpuSessionBase<Role>::alloc_memory(std::size_t s
     };
 }
 
-template <class Role> PeerRef CpuSessionBase<Role>::exchange_keys(const MemRegion &local)
-{
+template <class Role> PeerRef CpuSessionBase<Role>::exchange_keys(const MemRegion &local) {
     HandshakeMsg my{
         .fwd = {.qpn = fwd_qp_->qpn(), .psn = 0},
         .bwd = {.qpn = bwd_qp_->qpn(), .psn = 0},
@@ -100,8 +95,7 @@ template <class Role> PeerRef CpuSessionBase<Role>::exchange_keys(const MemRegio
     if (listen) {
         send_exact(fd, &my, sizeof(my));
         recv_exact(fd, &peer, sizeof(peer));
-    }
-    else {
+    } else {
         recv_exact(fd, &peer, sizeof(peer));
         send_exact(fd, &my, sizeof(my));
     }
@@ -119,10 +113,9 @@ template <class Role> PeerRef CpuSessionBase<Role>::exchange_keys(const MemRegio
 
 template <class Role>
 void CpuSessionBase<Role>::establish_channel(const ChannelDesc &desc, const MemRegion &local,
-                                             const PeerRef &peer)
-{
-    RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu", local.size,
-               REGION_BYTES);
+                                             const PeerRef &peer) {
+    RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
+               static_cast<std::size_t>(local.size), REGION_BYTES);
     desc_ = desc;
     local_ = local;
     peer_ = peer;
@@ -132,11 +125,9 @@ void CpuSessionBase<Role>::establish_channel(const ChannelDesc &desc, const MemR
 
 template <class Role>
 void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
-                                      bool signaled)
-{
+                                      bool signaled) {
     auto *send = send_payload(); // value already written by the caller
     send->seq_num = static_cast<std::uint32_t>(cursor + 1);
-    send->pad = 0;
     ibv_sge sge{
         .addr = reinterpret_cast<std::uint64_t>(send),
         .length = sizeof(Payload), // 16 B on the wire, into slot's first 16 B
@@ -153,15 +144,15 @@ void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inl
         peer_.remote_addr + (cursor & (K_RING_SLOTS - 1)) * sizeof(PayloadSlot);
     wr.wr.rdma.rkey = peer_.rkey;
     ibv_send_wr *bad = nullptr;
-    RDMA_CHECK(ibv_post_send(qp, &wr, &bad) == 0, "ibv_post_send");
+    const int rc = ibv_post_send(qp, &wr, &bad);
+    RDMA_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));
 }
 
 // Non-blocking batch reap of `cq`: take whatever completions are ready (up to
 // REAP_BATCH) and decrement `outstanding`. With drain=true, keep polling until
 // every signaled send has completed (teardown), guarded so a lost CQE can't
 // hang the join.
-template <class Role> void CpuSessionBase<Role>::reap(ibv_cq *cq, int &outstanding, bool drain)
-{
+template <class Role> void CpuSessionBase<Role>::reap(ibv_cq *cq, int &outstanding, bool drain) {
     std::array<ibv_wc, REAP_BATCH> wc{};
     int empty = 0;
     constexpr int DRAIN_MAX_EMPTY = 1000000;
@@ -185,8 +176,7 @@ template <class Role> void CpuSessionBase<Role>::reap(ibv_cq *cq, int &outstandi
 }
 
 template <class Role>
-Payload *CpuSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st)
-{
+Payload *CpuSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st) {
     // Slots are reused (K_RING_SLOTS is a power of two). The ring contains
     // 64 B PayloadSlots; the peer writes the 16 B Payload into each slot's
     // head.

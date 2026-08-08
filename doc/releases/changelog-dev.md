@@ -27,6 +27,9 @@
   session roles over RDMA.
   [(#3062)](https://github.com/PennyLaneAI/catalyst/pull/3062)
 
+* A GPU transport backend is added, which implements the coprocessor session role.
+  [(#3069)](https://github.com/PennyLaneAI/catalyst/pull/3069)
+
 * Catalyst can now cross-compile target nested modules to standalone object files and
   either statically link them into the host program or ship them to an executor for dispatch.
  [(#3033)](https://github.com/PennyLaneAI/catalyst/pull/3033)
@@ -46,9 +49,14 @@
 * A `BufferizableOpInterface` implementation is added for the `Transport` dialect ops.
   [(#3064)](https://github.com/PennyLaneAI/catalyst/pull/3064)
 
-* A `lower-decode-to-transport` pass is added, which replaces each qecp.decode_esm_css with 
+* A `lower-decode-to-transport` pass is added, which replaces each qecp.decode_esm_css with
   a transport kick/collect round over its buffers.
   [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
+
+* An X/Z syndrome decode can now be routed to its own decoder in a backline coprocessor.
+  `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
+  syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
+  [(#3092)](https://github.com/PennyLaneAI/catalyst/pull/3092)
 
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
@@ -73,6 +81,10 @@
     [(#3073)](https://github.com/PennyLaneAI/catalyst/pull/3073)
     [(#3031)](https://github.com/PennyLaneAI/catalyst/pull/3031)
     [(#3030)](https://github.com/PennyLaneAI/catalyst/pull/3030)
+
+  - The `catalyst-executor` server side is now added to Catalyst that receives objects, maps them
+    and calls them.
+    [(#3088)](https://github.com/PennyLaneAI/catalyst/pull/3088)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
@@ -119,6 +131,45 @@
 * The `resource-analysis` pass JSON output now includes `depth` for worst-case PBC layer depth
   (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
+
+* The `resource-analysis` pass now supports pluggable resource metrics through the
+  `ResourceResultExtension`/`ResourceAnalysisExtension` interface and a self-registering global
+  registry. Dialects and plugins can contribute additional per-function resource data
+  (such as PBC circuit depth) without modifying the core analysis.
+
+  A metric is added by defining a value object, an analysis that fills it, and
+  registering that analysis with the global registry:
+  ```cpp
+  // 1. Per-function value object; shows up in the JSON under name().
+  class TCountExtension : public ResourceResultExtension {
+   public:
+    llvm::StringRef name() const override { return "t_count"; }
+    llvm::json::Value toJson() const override { return tCount; }
+    // Accumulated in collect(), so define how it combines and scales.
+    void mergeWith(const ResourceResultExtension &other, MergeMethod method) override {
+      tCount += static_cast<const TCountExtension &>(other).tCount;  // use `method` for max/min
+    }
+    void multiplyBy(double factor) override { tCount *= factor; }
+    double tCount = 0;
+  };
+
+  // 2. Analysis that fills it, one operation at a time.
+  class TCountAnalysis : public ResourceAnalysisExtensionOf<TCountExtension> {
+   public:
+    llvm::StringRef name() const override { return "t_count"; }
+   protected:
+    void collect(mlir::Operation *op, TCountExtension &ext, bool isAdjoint) override {
+      if (isTGate(op)) ext.tCount += 1;
+    }
+  };
+
+  // 3. Self-register from your dialect or plugin (no core changes needed).
+  REGISTER_RESOURCE_ANALYSIS_EXTENSION(std::make_unique<TCountAnalysis>());
+  ```
+  The metric then appears under its `name()` key (`"t_count"`) in each function's JSON
+  output. Override `analyze(Region&, Ext&, bool)` instead of, or alongside, `collect` to
+  compute a metric per region rather than per operation (as `PBCDepthExtension` does).
+  [(#3070)](https://github.com/PennyLaneAI/catalyst/pull/3070)
 
 * `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
   duplicate serialization logic and keeping its output consistent.

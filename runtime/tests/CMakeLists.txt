@@ -224,4 +224,44 @@ if(ENABLE_TRANSPORT)
         cpu_verbs_impl
     )
     catch_discover_tests(runner_tests_transport_cpu)
+
+    if(TRANSPORT_HAS_HIP)
+        add_executable(runner_tests_transport_gpu)
+        target_sources(runner_tests_transport_gpu PRIVATE
+            Test_TransportGpu.cpp
+        )
+        target_link_libraries(runner_tests_transport_gpu PRIVATE
+            Catch2WithMain
+            catalyst_runtime_testing
+            catalyst_transport_gpu_coprocessor
+        )
+        catch_discover_tests(runner_tests_transport_gpu)
+    endif()
+endif()
+
+# Executor test suite: spawns the real catalyst-executor binary and drives it
+# over a loopback TCP connection with the host-side session API.
+if(ENABLE_EXECUTOR)
+    add_executable(runner_tests_executor)
+    target_sources(runner_tests_executor PRIVATE
+        Test_Executor.cpp
+    )
+    target_link_libraries(runner_tests_executor PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        catalyst_executor_session
+    )
+    target_compile_definitions(runner_tests_executor PRIVATE
+        CATALYST_EXECUTOR_PATH="$<TARGET_FILE:catalyst-executor>")
+    add_dependencies(runner_tests_executor catalyst-executor)
+
+    if(NOT APPLE)
+        set_property(TARGET runner_tests_executor APPEND PROPERTY BUILD_RPATH $ORIGIN)
+        set_property(TARGET runner_tests_executor APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
+    else()
+        set_property(TARGET runner_tests_executor APPEND PROPERTY BUILD_RPATH @loader_path)
+        set_property(TARGET runner_tests_executor APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
+    endif()
+
+    catch_discover_tests(runner_tests_executor)
 endif()

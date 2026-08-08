@@ -69,13 +69,18 @@ int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession *s);
 int __catalyst__transport__barrier(int64_t token);
 int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path);
 
-// Coprocessor-only: bind the function run per received message, resolved by runtime symbol name.
+// Coprocessor-only: bind the coprocessor function, resolved by runtime symbol name.
 int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol);
 
 // Controller-only: work items + kick.
 int __catalyst__transport__commit_work_item(CatalystTransportSession *s, uint32_t work_item_idx,
                                             uint64_t in_bytes, uint64_t out_bytes);
 void *__catalyst__transport__data_slot(CatalystTransportSession *s);
+// Copy `bytes` into the round's outbound slot. Fails if `bytes` exceeds what
+// commit_work_item committed.
+int __catalyst__transport__write_data_slot(CatalystTransportSession *s, const void *src,
+                                           uint64_t bytes, uint32_t decoder_id);
+void *__catalyst__transport__reply_slot(CatalystTransportSession *s);
 int __catalyst__transport__kick(CatalystTransportSession *s, uint32_t work_item_idx);
 
 // Run / collect / teardown.

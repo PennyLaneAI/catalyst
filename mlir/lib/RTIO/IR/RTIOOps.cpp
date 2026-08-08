@@ -25,8 +25,7 @@ using namespace catalyst::rtio;
 // RTIO Operations
 //===----------------------------------------------------------------------===//
 
-LogicalResult RTIOSyncOp::verify()
-{
+LogicalResult RTIOSyncOp::verify() {
     // Ensure at least one event is provided
     if (getEvents().empty()) {
         return emitOpError("requires at least one event to synchronize");
@@ -34,8 +33,7 @@ LogicalResult RTIOSyncOp::verify()
     return success();
 }
 
-LogicalResult RTIORPCOp::verify()
-{
+LogicalResult RTIORPCOp::verify() {
     if (getIsAsync() && !getResults().empty()) {
         return emitOpError("async RPC cannot have return values (remove 'async' or results)");
     }

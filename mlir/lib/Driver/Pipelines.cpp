@@ -26,35 +26,30 @@ using namespace mlir;
 namespace catalyst {
 namespace driver {
 
-void parsePassPipeline(const PassNames &passNames, OpPassManager &pm)
-{
+void parsePassPipeline(const PassNames &passNames, OpPassManager &pm) {
     std::string passNamesStr = fmt::format("{}", fmt::join(passNames, ","));
     if (failed(mlir::parsePassPipeline(passNamesStr, pm))) {
         llvm::errs() << fmt::format("Error: analysing {}\n", passNames);
     }
 }
 
-void createQuantumCompilationStage(OpPassManager &pm)
-{
+void createQuantumCompilationStage(OpPassManager &pm) {
     parsePassPipeline(getQuantumCompilationStage(), pm);
 }
 
 void createHLOLoweringStage(OpPassManager &pm) { parsePassPipeline(getHLOLoweringStage(), pm); }
 
-void createGradientLoweringStage(OpPassManager &pm)
-{
+void createGradientLoweringStage(OpPassManager &pm) {
     parsePassPipeline(getGradientLoweringStage(), pm);
 }
 
 void createBufferizationStage(OpPassManager &pm) { parsePassPipeline(getBufferizationStage(), pm); }
 
-void createLLVMDialectLoweringStage(OpPassManager &pm)
-{
+void createLLVMDialectLoweringStage(OpPassManager &pm) {
     parsePassPipeline(getLLVMDialectLoweringStage(), pm);
 }
 
-void createDefaultCatalystPipeline(OpPassManager &pm)
-{
+void createDefaultCatalystPipeline(OpPassManager &pm) {
     createQuantumCompilationStage(pm);
     createHLOLoweringStage(pm);
     createGradientLoweringStage(pm);
@@ -62,48 +57,41 @@ void createDefaultCatalystPipeline(OpPassManager &pm)
     createLLVMDialectLoweringStage(pm);
 }
 
-void registerQuantumCompilationStage()
-{
+void registerQuantumCompilationStage() {
     PassPipelineRegistration<>("quantum-compilation-stage",
                                "Register quantum compilation stage as a pass.",
                                createQuantumCompilationStage);
 }
 
-void registerHLOLoweringStage()
-{
+void registerHLOLoweringStage() {
     PassPipelineRegistration<>("hlo-lowering-stage", "Register HLO lowering stage as a pass.",
                                createHLOLoweringStage);
 }
 
-void registerGradientLoweringStage()
-{
+void registerGradientLoweringStage() {
     PassPipelineRegistration<>("gradient-lowering-stage",
                                "Register gradient lowering stage as a pass.",
                                createGradientLoweringStage);
 }
 
-void registerBufferizationStage()
-{
+void registerBufferizationStage() {
     PassPipelineRegistration<>("bufferization-stage", "Register bufferization stage as a pass.",
                                createBufferizationStage);
 }
 
-void registerLLVMDialectLoweringStage()
-{
+void registerLLVMDialectLoweringStage() {
     PassPipelineRegistration<>("llvm-dialect-lowering-stage",
                                "Register LLVM dialect lowering stage as a pass.",
                                createLLVMDialectLoweringStage);
 }
 
-void registerDefaultCatalystPipeline()
-{
+void registerDefaultCatalystPipeline() {
     PassPipelineRegistration<>("default-catalyst-pipeline",
                                "Register full default catalyst pipeline as a pass.",
                                createDefaultCatalystPipeline);
 }
 
-void registerAllCatalystPipelines()
-{
+void registerAllCatalystPipelines() {
     registerQuantumCompilationStage();
     registerHLOLoweringStage();
     registerGradientLoweringStage();
@@ -112,8 +100,7 @@ void registerAllCatalystPipelines()
     registerDefaultCatalystPipeline();
 }
 
-std::vector<Pipeline> getDefaultPipeline()
-{
+std::vector<Pipeline> getDefaultPipeline() {
     using PipelineFunc = void (*)(mlir::OpPassManager &);
     std::vector<PipelineFunc> pipelineFuncs = {
         &createQuantumCompilationStage, &createHLOLoweringStage, &createGradientLoweringStage,
@@ -137,8 +124,7 @@ std::vector<Pipeline> getDefaultPipeline()
 
 namespace llvm {
 
-raw_ostream &operator<<(raw_ostream &oss, const catalyst::driver::Pipeline &p)
-{
+raw_ostream &operator<<(raw_ostream &oss, const catalyst::driver::Pipeline &p) {
     oss << "Pipeline('" << p.getName() << "', [";
     bool first = true;
     for (const auto &i : p.getPasses()) {
