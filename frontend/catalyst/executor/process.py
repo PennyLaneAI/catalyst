@@ -28,7 +28,13 @@ import time
 from typing import Self, TextIO
 
 from .ssh import RemoteLauncher, RemoteOps
-from .utils import ExecutorFlags, ExecutorPaths, OutputPatterns, PortInUse, log_cmd
+from .utils import (
+    ExecutorFlags,
+    ExecutorPaths,
+    OutputPatterns,
+    PortInUse,
+    log_cmd,
+)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -148,7 +154,7 @@ class _ExecutorProcess:
 
         Raises:
             PortInUse: On port collision (retryable).
-            SystemExit: On other launch failures.
+            RuntimeError: On other launch failures.
         """
         self._open_log()
         self._spawn()
@@ -165,7 +171,7 @@ class _ExecutorProcess:
 
         Raises:
             PortInUse: On port collision.
-            SystemExit: On early exit or timeout. Cleanup is the caller's job.
+            RuntimeError: On early exit or timeout. Cleanup is the caller's job.
         """
         assert self.proc is not None
         t0 = time.monotonic()
@@ -178,7 +184,7 @@ class _ExecutorProcess:
             self._check_port_conflict()
             self._check_failure()
             self._check_early_exit()
-        raise SystemExit(
+        raise RuntimeError(
             f"executor did not become ready within {self.ready_timeout:.0f}s — see the "
             f"[{self.name}] log above (raise ready_timeout= if the host is slow)."
         )
@@ -192,13 +198,13 @@ class _ExecutorProcess:
         """Raise if the executor died before becoming ready.
 
         :class:`PortInUse` if the death was a port collision (re-checked in case the flag landed
-        late), else :class:`SystemExit`. No-op while the child is still running.
+        late), else :class:`RuntimeError`. No-op while the child is still running.
         """
         assert self.proc is not None
         if self.proc.poll() is None:
             return
         self._check_port_conflict()
-        raise SystemExit(
+        raise RuntimeError(
             f"executor exited (code {self.proc.returncode}) before becoming ready — "
             f"see the [{self.name}] log above."
         )
@@ -336,7 +342,7 @@ class _RemoteProcess(_ExecutorProcess):
         """Abort the launch with :meth:`_auth_help`'s hint if an auth prompt was seen."""
         if self._auth_prompt.is_set():
             self._shutdown()
-            raise SystemExit(self._auth_help())
+            raise RuntimeError(self._auth_help())
 
     def _on_ready(self) -> None:
         """Mark the port as ours so :meth:`_teardown_extra` may ``pkill`` it."""

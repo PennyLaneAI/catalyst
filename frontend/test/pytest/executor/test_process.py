@@ -131,13 +131,13 @@ class TestExecutorProcessCheckEarlyExit:
         p.proc.poll.return_value = None
         p._check_early_exit()  # no raise
 
-    def test_dead_process_raises_systemexit(self):
-        """Raises :class:`SystemExit` when the child exited without a port conflict."""
+    def test_dead_process_raises_runtime_error(self):
+        """Raises :class:`RuntimeError` when the child exited without a port conflict."""
         p = _mk_base_proc()
         p.proc = MagicMock()
         p.proc.poll.return_value = 1
         p.proc.returncode = 1
-        with pytest.raises(SystemExit, match="exited"):
+        with pytest.raises(RuntimeError, match="exited"):
             p._check_early_exit()
 
     def test_dead_with_port_conflict_raises_portinuse(self):
@@ -197,11 +197,11 @@ class TestExecutorProcessWaitForReady:
         assert result is p
 
     def test_timeout_raises(self):
-        """Raises :class:`SystemExit` when readiness is not signaled within ``ready_timeout``."""
+        """Raises :class:`RuntimeError` when readiness is not signaled within ``ready_timeout``."""
         p = _mk_base_proc(ready_timeout=0.05)
         p.proc = MagicMock()
         p.proc.poll.return_value = None
-        with pytest.raises(SystemExit, match="did not become ready"):
+        with pytest.raises(RuntimeError, match="did not become ready"):
             p._wait_for_ready(poll_interval=0.02)
 
     def test_port_conflict_raises(self):
@@ -362,11 +362,11 @@ class TestRemoteProcessCheckFailure:
         p._check_failure()  # no raise
 
     def test_flag_raises_with_help(self):
-        """Raises :class:`SystemExit` with kind-specific help text when the auth flag is set."""
+        """Raises :class:`RuntimeError` with kind-specific help text when the auth flag is set."""
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
         p._auth_kind = "ssh"
         p._auth_prompt.set()
-        with pytest.raises(SystemExit, match="ssh-copy-id"):
+        with pytest.raises(RuntimeError, match="ssh-copy-id"):
             p._check_failure()
 
 
@@ -497,3 +497,23 @@ class TestRemoteProcessPipeSudoPassword:
         p.proc.stdin.write.side_effect = BrokenPipeError()
         # Must not raise.
         p._pipe_sudo_password()
+
+
+class TestLaunchFailuresAreOrdinaryExceptions:
+    """Launch failures must be catchable by ``except Exception``.
+
+    These were ``SystemExit``, which derives from ``BaseException``: ``except Exception`` missed
+    it, and left unhandled it terminated the interpreter rather than reporting a failed launch.
+    """
+
+    def test_caught_by_except_exception(self):
+        """A ready-timeout is caught by a plain ``except Exception``."""
+        p = _mk_base_proc(ready_timeout=0.01)
+        p.proc = MagicMock()
+        p.proc.poll.return_value = None
+        try:
+            p._wait_for_ready(poll_interval=0.005)
+        except Exception as e:  # pylint: disable=broad-except
+            assert "did not become ready" in str(e)
+        else:
+            pytest.fail("expected a launch failure")

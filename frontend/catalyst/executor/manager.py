@@ -73,7 +73,7 @@ def _start_on_free_port(
     :attr:`Executor.address` as authoritative.
 
     Raises:
-        SystemExit: If no port bound after all attempts.
+        RuntimeError: If no port bound after all attempts.
     """
     ports_to_try = ([pinned_port] if pinned_port is not None else []) + [
         random_port() for _ in range(max_tries)
@@ -86,7 +86,7 @@ def _start_on_free_port(
         except PortInUse as e:
             last = e
             proc._say(f"port {port} busy, trying another")
-    raise SystemExit(
+    raise RuntimeError(
         f"no free executor port after {len(ports_to_try)} tries ({last}). Pin one with port=."
     )
 
