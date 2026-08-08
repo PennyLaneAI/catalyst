@@ -86,6 +86,10 @@
     and calls them.
     [(#3088)](https://github.com/PennyLaneAI/catalyst/pull/3088)
 
+  - A `catalyst.Executor` is added for deploying and managing the `catalyst-executor` process that
+    cross-compiled objects are dispatched to.
+    [(#3082)](https://github.com/PennyLaneAI/catalyst/pull/3082)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
