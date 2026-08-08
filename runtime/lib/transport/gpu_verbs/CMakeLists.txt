@@ -2,18 +2,6 @@
 # GPU-verbs transport backend                 #
 ###############################################
 
-if(DEFINED ENV{ROCM_PATH})
-    list(APPEND CMAKE_PREFIX_PATH "$ENV{ROCM_PATH}")
-elseif(EXISTS "/opt/rocm")
-    list(APPEND CMAKE_PREFIX_PATH "/opt/rocm")
-endif()
-
-find_package(hip REQUIRED)
-enable_language(HIP)
-if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
-    find_package(CUDAToolkit REQUIRED)
-endif()
-
 add_library(catalyst_transport_gpu_coprocessor SHARED
     coprocessor/GpuCoprocessorSession.cpp
     coprocessor/GpuRuntime.hip
@@ -36,7 +24,7 @@ target_link_libraries(catalyst_transport_gpu_coprocessor
     PUBLIC transport_common
     PRIVATE ${IBVERBS_LIB} Threads::Threads hip::host)
 if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
-    target_link_libraries(catalyst_transport_gpu_coprocessor PRIVATE CUDA::cuda_driver)
+    target_link_libraries(catalyst_transport_gpu_coprocessor PRIVATE CUDA::cuda_driver CUDA::cudart)
 endif()
 set_property(TARGET catalyst_transport_gpu_coprocessor PROPERTY POSITION_INDEPENDENT_CODE ON)
 # HIP kernel handoff store needs optimization even in Debug.
