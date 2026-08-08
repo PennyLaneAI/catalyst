@@ -19,7 +19,7 @@
 #include <cstring>
 #include <stdexcept>
 
-#include "../LocalMessageLayout.hpp"
+#include "LocalWireProtocol.hpp"
 
 namespace catalyst::transport::local_copy {
 namespace {
