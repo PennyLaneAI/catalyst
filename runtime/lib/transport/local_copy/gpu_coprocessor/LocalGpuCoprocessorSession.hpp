@@ -51,8 +51,8 @@ class LocalGpuCoprocessorSession : public CoprocessorSession, public LocalCoproc
     }
 
     // CPU local peer-memory doorbell: consume the request in local_request_, launch one GPU decode,
-    // and write the reply into peer_reply_. Fixed-width GPU launchers currently accept one 8-byte
-    // payload and return one 8-byte correction.
+    // and write the reply into peer_reply_. This local path uses a single request slot and a single
+    // handoff slot, because total=1 never needs a ring buffer.
     int run_once() override;
 
   private:
@@ -73,12 +73,12 @@ class LocalGpuCoprocessorSession : public CoprocessorSession, public LocalCoproc
     int gpu_device_ = 0;
     /// Lazily created HIP runtime wrapper.
     std::unique_ptr<gpu_verbs::GpuRuntime> gpu_;
-    /// Host-visible reply ring the GPU writes into.
+    /// Host-visible reply slot the GPU writes into.
     gpu_verbs::GpuRuntime::Handoff handoff_{};
-    /// Host-mapped request ring shared with the GPU launcher.
-    common::PayloadSlot *request_ring_host_ = nullptr;
-    /// Device alias of request_ring_host_.
-    common::PayloadSlot *request_ring_dev_ = nullptr;
+    /// Host-mapped single request slot shared with the GPU launcher.
+    common::PayloadSlot *request_slot_host_ = nullptr;
+    /// Device alias of request_slot_host_.
+    common::PayloadSlot *request_slot_dev_ = nullptr;
 
     /// Bound launch-once GPU coprocessor function; nullptr means built-in echo.
     CoprocessorLauncherFn launcher_ = nullptr;
