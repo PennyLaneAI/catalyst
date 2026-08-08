@@ -19,9 +19,8 @@
 #include <memory>
 #include <vector>
 
+#include "LocalRegistry.hpp"
 #include "Transport.hpp"
-
-#include "../LocalRegistry.hpp"
 
 namespace catalyst::transport::local_copy {
 

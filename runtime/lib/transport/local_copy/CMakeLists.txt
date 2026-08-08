@@ -24,6 +24,9 @@ if(TRANSPORT_HAS_HIP)
     target_include_directories(local_copy_gpu_impl PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/gpu_coprocessor
+        ${CMAKE_CURRENT_SOURCE_DIR}/../common
+        ${CMAKE_CURRENT_SOURCE_DIR}/../gpu_verbs/coprocessor
+        ${CMAKE_CURRENT_SOURCE_DIR}/../gpu_verbs/coprocessor/coprocessor_functions
         ${runtime_includes}
     )
     target_link_libraries(local_copy_gpu_impl PUBLIC

@@ -19,10 +19,9 @@
 #include <memory>
 #include <vector>
 
+#include "GpuRuntime.hpp"
+#include "LocalRegistry.hpp"
 #include "Transport.hpp"
-
-#include "../../gpu_verbs/coprocessor/GpuRuntime.hpp"
-#include "../LocalRegistry.hpp"
 
 namespace catalyst::transport::common {
 struct PayloadSlot;

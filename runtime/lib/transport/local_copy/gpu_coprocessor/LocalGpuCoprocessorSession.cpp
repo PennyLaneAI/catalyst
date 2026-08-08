@@ -18,10 +18,11 @@
 #include <cstring>
 #include <stdexcept>
 
-#include "../../common/WireProtocol.hpp"
-#include "../../gpu_verbs/coprocessor/HipCheck.hpp"
-#include "../../gpu_verbs/coprocessor/coprocessor_functions/GpuLaunchers.hpp"
-#include "../LocalMessageLayout.hpp"
+#include "GpuLaunchers.hpp"
+#include "HipCheck.hpp"
+#include "LocalWireProtocol.hpp"
+#include "WireProtocol.hpp"
+
 #include <hip/hip_runtime.h>
 
 namespace catalyst::transport::local_copy {
