@@ -458,7 +458,7 @@ class TestRemoteLauncherRemoteCmd:
         """Emits ``cd``, env prefix, plugin args, bind port, and ``chmod`` for a local binary."""
         cmd = RemoteLauncher._remote_cmd(
             "~/ws",
-            1373,
+            9000,
             plugins=["libx.so"],
             env={"FOO": "bar"},
             sudo=False,
@@ -467,7 +467,7 @@ class TestRemoteLauncherRemoteCmd:
         )
         assert "cd " in cmd
         assert "FOO=bar" in cmd
-        assert "--bind=127.0.0.1:1373" in cmd
+        assert "--bind=127.0.0.1:9000" in cmd
         assert "--plugin=$PWD/libx.so" in cmd
         # chmod prefix should be present because we're using the workspace-local binary.
         assert "chmod +x" in cmd
@@ -479,7 +479,7 @@ class TestRemoteLauncherSecurityDefaults:
     def _cmd(self, **overrides):
         kwargs = dict(
             workspace="~/ws",
-            remote_port=1373,
+            remote_port=9000,
             plugins=[],
             env={},
             sudo=False,
@@ -493,11 +493,11 @@ class TestRemoteLauncherSecurityDefaults:
         """The executor runs arbitrary compiled objects, so it must bind loopback only."""
         cmd = self._cmd()
         assert "0.0.0.0" not in cmd
-        assert f"--bind={ExecutorFlags.BIND_HOST}:1373" in cmd
+        assert f"--bind={ExecutorFlags.BIND_HOST}:9000" in cmd
 
     def test_no_sudo_by_default(self):
         """``ssh_argv`` runs the executor as the connecting user unless ``sudo=True``."""
-        argv = RemoteLauncher.ssh_argv("me", "h", "~/ws", 1373, [], {})
+        argv = RemoteLauncher.ssh_argv("me", "h", "~/ws", 9000, [], {})
         assert "sudo" not in argv[-1]
 
     def test_sudo_is_opt_in(self):
@@ -510,9 +510,9 @@ class TestRemoteLauncherSshOpts:
 
     def test_local_forward_uses_one_port_at_both_ends(self):
         """Emits ``-L <port>:localhost:<port>`` — the tunnel and the remote bind share a port."""
-        opts = RemoteLauncher._ssh_opts(port=1373, use_password=False)
+        opts = RemoteLauncher._ssh_opts(port=9000, use_password=False)
         assert "-L" in opts
-        assert "1373:localhost:1373" in opts
+        assert "9000:localhost:9000" in opts
 
     def test_exit_on_forward_failure(self):
         """Sets ``ExitOnForwardFailure=yes`` so a forward failure fails the ssh session."""
@@ -541,7 +541,7 @@ class TestRemoteLauncherSshArgv:
             "me",
             "h",
             "~/ws",
-            1373,
+            9000,
             plugins=["libx.so"],
             env={"FOO": "bar"},
             sudo=False,
@@ -549,4 +549,4 @@ class TestRemoteLauncherSshArgv:
         assert argv[0] == "ssh"
         assert argv[-1].startswith("cd ")  # last arg is the remote command
         assert "me@h" in argv
-        assert "1373:localhost:1373" in argv
+        assert "9000:localhost:9000" in argv

@@ -64,7 +64,7 @@ class TestOutputPatterns:
     @pytest.mark.parametrize(
         "line",
         [
-            "Listening on 127.0.0.1:1373",
+            "Listening on 127.0.0.1:9000",
             "some prefix Listening on host:1234 more",
             "executor ready, waiting for next connection",
         ],

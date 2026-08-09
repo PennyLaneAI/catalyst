@@ -219,13 +219,13 @@ class TestLocalProcessConstruction:
 
     def test_address_composition(self):
         """Composes ``addr`` as ``127.0.0.1:<port>`` from the given port."""
-        p = _LocalProcess(port=1373, executor_bin="/bin/exec")
-        assert p.addr == "127.0.0.1:1373"
-        assert p._bind_port == 1373
+        p = _LocalProcess(port=9000, executor_bin="/bin/exec")
+        assert p.addr == "127.0.0.1:9000"
+        assert p._bind_port == 9000
 
     def test_defaults(self):
         """Applies default plugin list, env mapping, and process name when not supplied."""
-        p = _LocalProcess(port=1373, executor_bin="/bin/exec")
+        p = _LocalProcess(port=9000, executor_bin="/bin/exec")
         assert p._plugins == []
         assert p._env == {}
         assert p.name == "executor"
@@ -237,7 +237,7 @@ class TestLocalProcessSpawn:
     def test_argv_shape(self):
         """Builds argv with binary, ``--bind``, ``--plugin`` entries and forwards env additions."""
         p = _LocalProcess(
-            port=1373,
+            port=9000,
             executor_bin="/tmp/catalyst-executor",
             plugins=["/opt/libx.so"],
             env={"K": "V"},
@@ -253,14 +253,14 @@ class TestLocalProcessSpawn:
         with patch.object(_LocalProcess, "_popen", side_effect=fake_popen):
             p._spawn()
         assert captured["argv"][0] == "/tmp/catalyst-executor"
-        assert "--bind=127.0.0.1:1373" in captured["argv"]
+        assert "--bind=127.0.0.1:9000" in captured["argv"]
         assert "--plugin=/opt/libx.so" in captured["argv"]
         # env extends os.environ, custom key present:
         assert captured["env"]["K"] == "V"
 
     def test_expands_home_in_binary(self):
         """Expands a leading ``~`` in the executor binary path before spawning."""
-        p = _LocalProcess(port=1373, executor_bin="~/bin/exec")
+        p = _LocalProcess(port=9000, executor_bin="~/bin/exec")
         captured = {}
         with patch.object(
             _LocalProcess,
@@ -274,7 +274,7 @@ class TestLocalProcessSpawn:
     def test_env_var_expansion(self, monkeypatch):
         """Expands ``$VAR`` references inside env values against the current environment."""
         monkeypatch.setenv("MY_LIB", "/opt/mylib")
-        p = _LocalProcess(port=1373, executor_bin="/bin/exec", env={"LIB": "$MY_LIB/x"})
+        p = _LocalProcess(port=9000, executor_bin="/bin/exec", env={"LIB": "$MY_LIB/x"})
         captured = {}
         with patch.object(
             _LocalProcess,
@@ -296,9 +296,9 @@ class TestRemoteProcessConstruction:
         Both ends of the SSH forward use one port number, so there is nothing to reconcile
         between the tunnel endpoint and the remote bind.
         """
-        p = _RemoteProcess(host="h", user="me", port=1373, workspace="~/ws")
-        assert p.addr == "127.0.0.1:1373"
-        assert p._bind_port == 1373
+        p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
+        assert p.addr == "127.0.0.1:9000"
+        assert p._bind_port == 9000
 
     def test_defaults(self):
         """Applies default sudo, workspace-cleanup, executor-binary, and ready-tracking values."""
@@ -317,14 +317,14 @@ class TestRemoteProcessLogHeader:
         p = _RemoteProcess(
             host="h",
             user="me",
-            port=1373,
+            port=9000,
             workspace="~/ws",
             plugins=["libx.so", "liby.so"],
             name="worker",
         )
         header = p._log_header()
         assert "worker" in header
-        assert "h:1373" in header
+        assert "h:9000" in header
         assert "~/ws" in header
         assert "libx.so, liby.so" in header
 
@@ -411,7 +411,7 @@ class TestRemoteProcessTeardownExtra:
 
     def test_runs_pkill_when_ready(self):
         """Runs a port-scoped pkill once the remote executor has been ready."""
-        p = _RemoteProcess(host="h", user="me", port=1373, workspace="~/ws")
+        p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
         p._ready_reached = True
         with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
@@ -419,14 +419,14 @@ class TestRemoteProcessTeardownExtra:
         # Pattern should be port-scoped so we can't kill someone else's process, and must match
         # the loopback bind address the remote launch command actually uses.
         pat = pkill.call_args.args[2]
-        assert f"{ExecutorFlags.BIND_HOST}:1373" in pat
+        assert f"{ExecutorFlags.BIND_HOST}:9000" in pat
         assert "0.0.0.0" not in pat
 
     def test_pkill_pattern_matches_the_real_launch_command(self):
         """The teardown pattern is a regex run against the live process list, so it has to match
         the command :meth:`RemoteLauncher._remote_cmd` actually emits.
         """
-        p = _RemoteProcess(host="h", user="me", port=1373, workspace="~/ws")
+        p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
         p._ready_reached = True
         with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
@@ -434,7 +434,7 @@ class TestRemoteProcessTeardownExtra:
 
         launch_cmd = RemoteLauncher._remote_cmd(
             "~/ws",
-            1373,
+            9000,
             plugins=[],
             env={},
             sudo=False,
