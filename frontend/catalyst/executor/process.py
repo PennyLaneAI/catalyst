@@ -316,7 +316,7 @@ class _RemoteProcess(_ExecutorProcess):
         self.sudo_password = sudo_password
         self.executor_bin = executor_bin
         self._auth_prompt = threading.Event()
-        self._auth_kind = ""  # "ssh" or "sudo"; picks the help text
+        self._auth_kind = ""  # "ssh", "setenv" or "sudo"; picks the help text
         self._ready_reached = False  # gates the teardown pkill
 
     def _log_header(self) -> str:
@@ -328,9 +328,11 @@ class _RemoteProcess(_ExecutorProcess):
         )
 
     def _scan_line(self, line: str) -> None:
-        """Flag SSH-password or sudo-failure prompts for :meth:`_check_failure` to bail on."""
+        """Flag SSH-password prompts and sudo refusals for :meth:`_check_failure` to bail on."""
         if OutputPatterns.is_ssh_prompt(line):
             kind = "ssh"
+        elif OutputPatterns.is_sudo_setenv_refusal(line):
+            kind = "setenv"
         elif OutputPatterns.is_sudo_fail(line):
             kind = "sudo"
         else:
@@ -382,11 +384,17 @@ class _RemoteProcess(_ExecutorProcess):
             self.proc.stdin.flush()
 
     def _auth_help(self) -> str:
-        """Fix hint for the detected auth failure."""
+        """Fix hint for the detected failure."""
         if self._auth_kind == "ssh":
             return (
                 f"SSH needs a password. Install your key:\n"
                 f"    ssh-copy-id {self.user}@{self.host}"
+            )
+        if self._auth_kind == "setenv":
+            return (
+                f"Remote sudo refused to preserve env=. Grant SETENV in sudoers, or pass "
+                f"sudo=False:\n"
+                f"    {self.user} ALL=(ALL) NOPASSWD:SETENV: {self.executor_bin}"
             )
         return (
             f"Remote sudo rejected the password. Pass sudo_password= or run interactively.\n"

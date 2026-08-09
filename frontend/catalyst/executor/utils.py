@@ -69,6 +69,10 @@ class OutputPatterns:
     _SUDO_FAIL = re.compile(
         r"Sorry, try again|incorrect password|authentication failure|sudo: \d+ incorrect"
     )
+    # sudo refusing `-E` because the sudoers policy grants no SETENV.
+    _SUDO_SETENV = re.compile(
+        r"you are not allowed to (set the following environment variables|preserve the environment)"
+    )
     # Port collision on the remote bind or the local -L forward.
     _PORT = re.compile(r"Address already in use|Could not request local forwarding")
 
@@ -91,6 +95,11 @@ class OutputPatterns:
     def is_sudo_fail(line: str) -> bool:
         """True if ``line`` is a sudo password rejection."""
         return bool(OutputPatterns._SUDO_FAIL.search(line))
+
+    @staticmethod
+    def is_sudo_setenv_refusal(line: str) -> bool:
+        """True if ``line`` is sudo refusing to carry the environment across (no ``SETENV``)."""
+        return bool(OutputPatterns._SUDO_SETENV.search(line))
 
 
 class ShellText:

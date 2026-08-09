@@ -339,3 +339,23 @@ class TestLogCmd:
         joined = debug.call_args.args[1]
         assert "me@h" in joined
         assert "'cmd with space'" in joined
+
+
+class TestSudoSetenvRefusal:
+    """``sudo -E`` refused by a sudoers policy without SETENV."""
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "sudo: sorry, you are not allowed to set the following environment variables: TEST",
+            "sudo: sorry, you are not allowed to preserve the environment",
+        ],
+    )
+    def test_detected(self, line):
+        """Both wordings sudo uses are recognised."""
+        assert OutputPatterns.is_sudo_setenv_refusal(line)
+
+    @pytest.mark.parametrize("line", ["Sorry, try again.", "sudo: incorrect password", "all good"])
+    def test_not_confused_with_other_lines(self, line):
+        """A password rejection or ordinary output is not a SETENV refusal."""
+        assert not OutputPatterns.is_sudo_setenv_refusal(line)
