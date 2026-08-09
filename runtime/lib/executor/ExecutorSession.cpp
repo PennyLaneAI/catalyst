@@ -236,6 +236,10 @@ Expected<std::unique_ptr<MemoryBuffer>> getFile(const Twine &filename) {
     return createFileError(filename, F.getError());
 }
 
+void discardEPC(Expected<std::unique_ptr<SimpleRemoteEPC>> &EPC) {
+    consumeError(EPC ? (*EPC)->disconnect() : EPC.takeError());
+}
+
 } // namespace
 
 namespace catalyst::executor {
@@ -332,10 +336,7 @@ struct ExecutorSession {
         }
 
         if (timedOut) {
-            // Consume any error the forced socket shutdown produced before reporting the timeout.
-            if (!EPC) {
-                consumeError(EPC.takeError());
-            }
+            discardEPC(EPC);
             return createTCPSocketError("handshake with catalyst-executor timed out after " +
                                         Twine(timeoutSecs) +
                                         "s (is a catalyst-executor actually listening there?). "
@@ -348,7 +349,13 @@ struct ExecutorSession {
         JITTargetMachineBuilder JTMB((*EPC)->getTargetTriple());
         auto DL = JTMB.getDefaultDataLayoutForTarget();
         if (!DL) {
-            return DL.takeError();
+            discardEPC(EPC);
+            return joinErrors(
+                createStringError(llvm::inconvertibleErrorCode(),
+                                  "no data layout for the catalyst-executor's target triple '" +
+                                      (*EPC)->getTargetTriple().str() +
+                                      "'; this runtime may lack the LLVM backend for it"),
+                DL.takeError());
         }
 
         auto ES = std::make_unique<ExecutionSession>(std::move(*EPC));
