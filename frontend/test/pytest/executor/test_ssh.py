@@ -57,16 +57,12 @@ class TestSSHCtlOpts:
         assert opts[0] == "-o"
         assert opts[1] == "ControlMaster=auto"
         assert opts[2] == "-o"
-        assert opts[3].startswith("ControlPath=")
+        assert opts[3] == "ControlPath=/tmp/cm/cm-%C"
         assert opts[4] == "-o"
         assert opts[5] == f"ControlPersist={SSHArgv.CONTROL_PERSIST}"
 
     def test_disabled_when_path_too_long(self):
-        """No flags at all when the control path would overflow ``sun_path``.
-
-        ssh fails every multiplexed op with "unix_listener: path ... too long" rather than
-        degrading, so multiplexing is dropped instead: correctness over the saved handshake.
-        """
+        """No flags at all when the control path would overflow ``sun_path``."""
         assert SSHArgv._ctl_flags(Path("/tmp") / ("x" * 200)) == []
 
     def test_ctl_opts_delegates_to_ctl_flags(self):

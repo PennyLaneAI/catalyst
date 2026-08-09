@@ -54,6 +54,8 @@ class SSHArgv:
 
     # One-shot probe flags: fail fast on missing key (rc 255), short connect timeout.
     PROBE_OPTS: tuple[str, ...] = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+    CONTROL_PATH_MAX = 104
+    CONTROL_PATH_RESERVE = 20
 
     # Bytes available to a ControlPath: ``sun_path`` is 104 on macOS (108 on Linux), and while the
     # master socket is being created ssh appends a random suffix to the resolved path. Exceeding it
@@ -81,22 +83,18 @@ class SSHArgv:
 
         The first op opens a master socket under :meth:`_ctl_dir`; later ops
         (probe/mkdir/scp/pkill) reuse it, skipping the auth handshake. ``%C`` (a hash of
-        ``%l%h%p%r``) keeps the name short. The socket self-expires ``CONTROL_PERSIST`` seconds
-        after its last user. Not applied to the long-lived executor session, whose close SIGHUPs
-        the executor cleanly.
+        ``%l%h%p%r``) keeps the name short. Not applied to the long-lived executor session, whose
+        close SIGHUPs the executor cleanly.
         """
         return SSHArgv._ctl_flags(SSHArgv._ctl_dir())
 
     @staticmethod
     def _ctl_flags(base: Path) -> list[str]:
-        """:meth:`ctl_opts` for a socket dir, split out so the length rule is decidable
+        """:meth:`ctl_opts` for a given socket dir, split out so the length rule is decidable
         without touching the environment or the filesystem.
-
-        Returns no flags when the path would not fit a Unix socket: multiplexing is an
-        optimisation, and one auth handshake per op still works.
         """
         path = f"{base}/cm-%C"
-        # %C expands to a 40-character hash, plus the suffix ssh appends while creating the master.
+        # %C expands to a 40-character hash.
         expanded = len(path) - len("%C") + 40 + SSHArgv.CONTROL_PATH_RESERVE
         if expanded > SSHArgv.CONTROL_PATH_MAX:
             logger.debug(
