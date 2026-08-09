@@ -53,13 +53,21 @@ class TestSSHCtlOpts:
 
     def test_shape(self):
         """``ctl_opts`` emits ``-o`` pairs for ``ControlMaster``, ``ControlPath``, ``ControlPersist``."""
-        opts = SSHArgv.ctl_opts()
+        opts = SSHArgv._ctl_flags(Path("/tmp/cm"))
         assert opts[0] == "-o"
         assert opts[1] == "ControlMaster=auto"
         assert opts[2] == "-o"
-        assert opts[3].startswith("ControlPath=")
+        assert opts[3] == "ControlPath=/tmp/cm/cm-%C"
         assert opts[4] == "-o"
         assert opts[5] == f"ControlPersist={SSHArgv.CONTROL_PERSIST}"
+
+    def test_disabled_when_path_too_long(self):
+        """No flags at all when the control path would overflow ``sun_path``."""
+        assert SSHArgv._ctl_flags(Path("/tmp") / ("x" * 200)) == []
+
+    def test_ctl_opts_delegates_to_ctl_flags(self):
+        """``ctl_opts`` is :meth:`_ctl_flags` applied to the resolved socket dir."""
+        assert SSHArgv.ctl_opts() == SSHArgv._ctl_flags(SSHArgv._ctl_dir())
 
 
 class TestSSHCtlDir:

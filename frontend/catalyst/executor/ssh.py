@@ -54,6 +54,8 @@ class SSHArgv:
 
     # One-shot probe flags: fail fast on missing key (rc 255), short connect timeout.
     PROBE_OPTS: tuple[str, ...] = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+    CONTROL_PATH_MAX = 104
+    CONTROL_PATH_RESERVE = 20
 
     @staticmethod
     def _fallback_ctl_dir() -> Path:
@@ -72,14 +74,33 @@ class SSHArgv:
     def ctl_opts() -> list[str]:
         """``ControlMaster``/``ControlPath``/``ControlPersist`` flags for connection multiplexing.
 
-        The first op opens a master socket; later ops (probe/mkdir/scp/pkill) reuse it. Not
-        applied to the long-lived executor session, whose close SIGHUPs the executor cleanly.
+        The first op opens a master socket under :meth:`_ctl_dir`; later ops
+        (probe/mkdir/scp/pkill) reuse it, skipping the auth handshake. ``%C`` (a hash of
+        ``%l%h%p%r``) keeps the name short. Not applied to the long-lived executor session, whose
+        close SIGHUPs the executor cleanly.
         """
+        return SSHArgv._ctl_flags(SSHArgv._ctl_dir())
+
+    @staticmethod
+    def _ctl_flags(base: Path) -> list[str]:
+        """:meth:`ctl_opts` for a given socket dir, split out so the length rule is decidable
+        without touching the environment or the filesystem.
+        """
+        path = f"{base}/cm-%C"
+        # %C expands to a 40-character hash.
+        expanded = len(path) - len("%C") + 40 + SSHArgv.CONTROL_PATH_RESERVE
+        if expanded > SSHArgv.CONTROL_PATH_MAX:
+            logger.debug(
+                "ControlPath %r would exceed the %d-byte socket limit; disabling multiplexing",
+                path,
+                SSHArgv.CONTROL_PATH_MAX,
+            )
+            return []
         return [
             "-o",
             "ControlMaster=auto",
             "-o",
-            f"ControlPath={SSHArgv._ctl_dir()}/cm-%C",
+            f"ControlPath={path}",
             "-o",
             f"ControlPersist={SSHArgv.CONTROL_PERSIST}",
         ]
