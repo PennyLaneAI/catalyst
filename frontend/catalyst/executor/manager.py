@@ -110,7 +110,8 @@ class _SessionRegistry:
         for proc in list(self._procs):
             with contextlib.suppress(Exception):
                 proc.stop()
-            proc.teardown_workspace()
+            with contextlib.suppress(Exception):
+                proc.teardown_workspace()
         self._procs.clear()
 
 
@@ -329,7 +330,8 @@ class Executor:
             return
         with contextlib.suppress(Exception):
             self._proc.stop()
-        self._proc.teardown_workspace()
+        with contextlib.suppress(Exception):
+            self._proc.teardown_workspace()
         _sessions.unregister(self._proc)
         self._proc = None
 
