@@ -57,13 +57,6 @@ class SSHArgv:
     CONTROL_PATH_MAX = 104
     CONTROL_PATH_RESERVE = 20
 
-    # Bytes available to a ControlPath: ``sun_path`` is 104 on macOS (108 on Linux), and while the
-    # master socket is being created ssh appends a random suffix to the resolved path. Exceeding it
-    # fails every multiplexed op with "unix_listener: path ... too long", so an over-long path
-    # disables multiplexing instead (see :meth:`ctl_opts`).
-    CONTROL_PATH_MAX = 104
-    CONTROL_PATH_RESERVE = 20
-
     @staticmethod
     def _fallback_ctl_dir() -> Path:
         """Control-socket dir when ``$XDG_RUNTIME_DIR`` isn't set."""
