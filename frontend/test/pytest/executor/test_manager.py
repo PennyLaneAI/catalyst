@@ -15,9 +15,9 @@
 """Unit tests for :mod:`catalyst.executor.manager` — the public :class:`Executor`: config
 defaults, mode dispatch, attach-mode launch, workspace lifecycle (``setup_workspace`` /
 ``remove_workspace``), and the ``_scp_bundle`` / ``_deploy_bundle`` split. Subprocess-facing
-calls (``SCP.deploy``, ``SSH.rmdir``) are mocked."""
+calls (``SCP.deploy``, ``RemoteOps.rmdir``) are mocked."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -33,7 +33,7 @@ class TestExecutorConfigDefaults:
         assert c.user == ""
         assert c.port is None
         assert c.copy is False
-        assert c.sudo is True
+        assert c.sudo is False  # root is opt-in: the executor runs arbitrary compiled objects
         assert c.ready_timeout == 60.0
         assert c.verbose == 1
 
@@ -59,6 +59,34 @@ class TestExecutorConstruction:
         ex = Executor(host="10.0.0.9", user="me")
         assert ex.host == "10.0.0.9"
         assert ex._cfg.user == "me"
+
+    def test_no_address_default(self):
+        """``address`` has no default: nothing is assumed about where an executor is serving."""
+        assert Executor()._address is None
+
+
+class TestLaunchRequiresAMode:
+    """:meth:`Executor.launch` refuses to guess a mode."""
+
+    def test_no_mode_raises(self):
+        """Neither ``local=``, ``host=``, nor an address: launch() reports it immediately.
+
+        Defaulting to a well-known address would let a program get all the way to dispatch
+        before failing, with an error pointing at the wrong place.
+        """
+        with pytest.raises(ValueError, match="no mode"):
+            Executor().launch()
+
+    def test_construction_stays_inert(self):
+        """The check happens in launch(), not __init__ — construction never raises."""
+        ex = Executor()  # must not raise
+        assert not ex._launched
+
+    def test_each_mode_satisfies_the_check(self):
+        """Any one of the three modes is enough."""
+        assert Executor("1.2.3.4:5").launch()._launched
+        assert Executor(local=True)._local is True  # launch() would spawn; mode itself is enough
+        assert Executor(host="h").host == "h"
 
 
 class TestExecutorAddress:
@@ -125,10 +153,10 @@ class TestRemoveWorkspace:
         with pytest.raises(ValueError, match="workspace="):
             ex.remove_workspace()
 
-    def test_delegates_to_ssh_rmdir(self):
-        """Delegates to :meth:`SSH.rmdir` and threads through ``force=``."""
+    def test_delegates_to_remote_rmdir(self):
+        """Delegates to :meth:`RemoteOps.rmdir` and threads through ``force=``."""
         ex = Executor(host="h", user="me", workspace="~/ws")
-        with patch("catalyst.executor.manager.SSH.rmdir") as rmdir:
+        with patch("catalyst.executor.manager.RemoteOps.rmdir") as rmdir:
             ex.remove_workspace(force=True)
         rmdir.assert_called_once()
         assert rmdir.call_args.kwargs.get("force") is True
@@ -160,21 +188,22 @@ class TestScpBundleGate:
 
 
 class TestDeployBundle:
-    """The build + scp composition inside :meth:`Executor._deploy_bundle`."""
+    """The scp delegation inside :meth:`Executor._deploy_bundle`."""
 
-    def test_calls_build_then_scp_deploy(self, tmp_path):
-        """Calls ``build(triple, bundle)`` then :meth:`SCP.deploy` with the same bundle."""
+    def test_passes_bundle_path_through(self, tmp_path):
+        """Hands the bundle directory to :meth:`SCP.deploy` as a :class:`Path`, unmodified.
+
+        Cross-building is the caller's job, so ``_deploy_bundle`` is a pure ship step.
+        """
         bundle = tmp_path / "b"
         bundle.mkdir()
-        build = MagicMock()
-        ex = Executor(host="h", user="me", bundle=str(bundle), build=build, triple="x86_64")
+        ex = Executor(host="h", user="me", bundle=str(bundle))
         with patch("catalyst.executor.manager.SCP.deploy") as scp_deploy:
             ex._deploy_bundle("me", "h", "ws")
-        build.assert_called_once_with("x86_64", bundle)
         scp_deploy.assert_called_once_with("me", "h", bundle, "ws")
 
-    def test_no_build_still_deploys(self, tmp_path):
-        """No ``build=`` recipe: still deploys the bundle as-is."""
+    def test_deploys_bundle_as_is(self, tmp_path):
+        """Deploys the bundle directory exactly as given."""
         bundle = tmp_path / "b"
         bundle.mkdir()
         ex = Executor(host="h", bundle=str(bundle))
