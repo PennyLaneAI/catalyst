@@ -164,28 +164,42 @@ class GraphOpID:
         return ID_string
 
 
-def get_rule_funcs_from_module(module: ir.Module) -> list[ir.Operation]:
-    funcOps = []
+def get_rule_strings_from_module(module: ir.Module) -> list[str]:
+    raw_funcOps = []
 
     def find_condition(op):
         if op.name == "func.func":
             if "target_gate" in op.attributes:
-                old_attr = op.attributes["sym_name"]
-                if not op.attributes["sym_name"].value.strip('"').startswith("__builtin_"):
-                    op.attributes["sym_name"] = ir.StringAttr.get(
-                        "__builtin_" + old_attr.value.strip('"'), context=old_attr.context
-                    )
-                funcOps.append(op)
+                raw_funcOps.append(op)
                 return ir.WalkResult.SKIP
         return ir.WalkResult.ADVANCE
 
     module.operation.walk(find_condition)
+
+    # If we simply rename the rule func op in the original module (from the qjit that compiles the
+    # rule), the call op to the rule subroutine from the main qjit function will complain that its
+    # callee doesn't exist.
+    # We have to do a clone, and rename the clone.
+    # And to clone safely, we must set the insertion point to a separate sandbox module
+    funcOps = []
+    ctx = module.context
+    with ctx, ir.Location.unknown(ctx):
+        sandbox_module = ir.Module.create()
+        with ir.InsertionPoint(sandbox_module.body):
+            for op in raw_funcOps:
+                clone = op.clone()
+
+                old_attr = clone.attributes["sym_name"]
+                clean_name = old_attr.value.strip('"')
+
+                if not clean_name.startswith("__builtin_"):
+                    clone.attributes["sym_name"] = ir.StringAttr.get(
+                        "__builtin_" + clean_name, context=ctx
+                    )
+
+                funcOps.append(str(clone))
+
     return funcOps
-
-
-def get_rules_from_module_as_list(module: ir.Module) -> list[str]:
-    funcOps = get_rule_funcs_from_module(module)
-    return [str(funcOp) for funcOp in funcOps]
 
 
 def get_rules_from_module(module: ir.Module) -> str:
@@ -199,7 +213,7 @@ def get_rules_from_module(module: ir.Module) -> str:
         str: The string representation of any decomposition rules from `module`, pre-pending the
              `__builtin_` prefix to their names.
     """
-    funcOps = get_rule_funcs_from_module(module)
+    funcOps = get_rule_strings_from_module(module)
     return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
@@ -378,7 +392,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
     queue.append(start)
     visited = [start]
 
-    rules = get_rules_from_module_as_list(
+    rules = get_rule_strings_from_module(
         compile_decomposition_rules(
             op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
         )
@@ -415,5 +429,5 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         probe[3],
                         probe[4],
                     )
-                    rules.extend(get_rules_from_module_as_list(module))
+                    rules.extend(get_rule_strings_from_module(module))
     return rules

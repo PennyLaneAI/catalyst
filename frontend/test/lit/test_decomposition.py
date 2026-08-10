@@ -16,7 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-# pylint: disable = missing-function-docstring,line-too-long
+# pylint: disable = missing-class-docstring,line-too-long,unused-argument
 
 import pennylane as qp
 from jax import numpy as jnp
@@ -35,7 +35,6 @@ from operator2_dummy_gates import (
     StaticDataMultiReg,
 )
 from pennylane.core import Operator2
-from pennylane.decomposition import add_decomps, local_decomps, register_resources
 from pennylane.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.decomposition_rules import (
@@ -828,11 +827,11 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             def __init__(self, flag, wires):
                 super().__init__(flag, wires)
 
-        @register_resources(lambda flag, wires: {NoParams(Wire[1]): 1})
+        @qp.register_resources(lambda flag, wires: {NoParams(Wire[1]): 1})
         def if_decomp(flag, wires):
             qp.cond(flag[0], NoParams)(wires)
 
-        add_decomps(TestOp, if_decomp)
+        qp.add_decomps(TestOp, if_decomp)
 
         print(
             compile_decomposition_rules_wrapper(
@@ -852,7 +851,7 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             def __init__(self, angle, wires):
                 super().__init__(angle, wires)
 
-        @register_resources(lambda angle, wires: {SingleParamCustomOp(Float[1], Wire[1]): 1})
+        @qp.register_resources(lambda angle, wires: {SingleParamCustomOp(Float[1], Wire[1]): 1})
         def while_decomp(angle, wires):
             @qp.while_loop(lambda angle: angle < jnp.pi)
             def while_body(angle):
@@ -862,7 +861,7 @@ def test_compile_decomposition_rules_wrapper_entry_point():
 
             SingleParamCustomOp(angle, wires)
 
-        add_decomps(WhileOp, while_decomp)
+        qp.add_decomps(WhileOp, while_decomp)
 
         print(
             compile_decomposition_rules_wrapper(
@@ -876,3 +875,112 @@ def test_compile_decomposition_rules_wrapper_entry_point():
 
 
 test_compile_decomposition_rules_wrapper_entry_point()
+
+
+def test_lowering_time_rules():
+    """
+    Test that decomposition rules reachable from an operator are generated when lowering that
+    operator.
+    """
+
+    def test_one_rule():
+        """
+        Simple tests for when there is only one rule.
+        """
+
+        def rule_resource_fn(reg):
+            return {
+                SingleParam(x=Float, reg=Wire[2]): 2,
+                SingleParam(x=Float[2], reg=Wire[2]): 1,
+            }
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+            SingleParam(x=0.2, reg=reg[0:2])
+            SingleParam(x=jnp.array([0.3, 0.4]), reg=reg[0:2])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
+
+            def test_one_gate():
+                """
+                Test when circuit has one gate.
+                """
+
+                @qp.qjit(capture=True, target="mlir")
+                @qp.qnode(qp.device("null.qubit", wires=3))
+                def c():
+                    NoParams(reg=[0, 1])
+                    return qp.state()
+
+                print(c.mlir)
+
+            # CHECK: func.func public @c()
+            # CHECK: qref.operator "NoParams"
+            # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
+            # CHECK-SAME:   resources = {operations = {
+            # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:2}{}" = 1 : i64,
+            # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 2 : i64
+            # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+            test_one_gate()
+
+            def test_multiple_gates_same_id():
+                """
+                Test when circuit has multiple gates of the same Operator 2 class but different ids,
+                multiple rules are generated.
+                """
+
+                @qp.qjit(capture=True, target="mlir")
+                @qp.qnode(qp.device("null.qubit", wires=3))
+                def c():
+                    NoParams(reg=[0, 1])
+                    NoParams(reg=[0, 1])
+                    return qp.state()
+
+                print(c.mlir)
+
+            # CHECK: func.func public @c()
+            # CHECK: qref.operator "NoParams"
+            # CHECK: qref.operator "NoParams"
+            # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
+            # CHECK-SAME:   resources = {operations = {
+            # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:2}{}" = 1 : i64,
+            # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 2 : i64
+            # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+            # CHECK-NOT: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
+            test_multiple_gates_same_id()
+
+            def test_multiple_gates_different_ids():
+                """
+                Test when circuit has multiple gates of the same id, the rule is only injected once.
+                """
+
+                @qp.qjit(capture=True, target="mlir")
+                @qp.qnode(qp.device("null.qubit", wires=3))
+                def c():
+                    NoParams(reg=[0, 1])
+                    NoParams(reg=[0, 1, 2])
+                    return qp.state()
+
+                print(c.mlir)
+
+            # CHECK: func.func public @c()
+            # CHECK: qref.operator "NoParams"
+            # CHECK: qref.operator "NoParams"
+            # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
+            # CHECK-SAME:   resources = {operations = {
+            # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:2}{}" = 1 : i64,
+            # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 2 : i64
+            # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+            # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
+            # CHECK-SAME:   resources = {operations = {
+            # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:2}{}" = 1 : i64,
+            # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 2 : i64
+            # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
+            test_multiple_gates_different_ids()
+
+    test_one_rule()
+
+
+test_lowering_time_rules()
