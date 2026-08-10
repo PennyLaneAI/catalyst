@@ -28,6 +28,7 @@ import logging
 import os
 import shlex
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -58,17 +59,9 @@ class SSHArgv:
     CONTROL_PATH_RESERVE = 20
 
     @staticmethod
-    def _fallback_ctl_dir() -> Path:
-        """Control-socket dir when ``$XDG_RUNTIME_DIR`` isn't set."""
-        return Path.home() / ".cache" / "catalyst" / "ssh-cm"
-
-    @staticmethod
     def _ctl_dir() -> Path:
-        """Control-socket dir under ``$XDG_RUNTIME_DIR``. Defaults to :meth:`_fallback_ctl_dir`."""
-        xdg = os.environ.get("XDG_RUNTIME_DIR")
-        base = Path(xdg) / "catalyst" if xdg else SSHArgv._fallback_ctl_dir()
-        base.mkdir(parents=True, exist_ok=True)
-        return base
+        """Directory to put the control socket in: the system temp dir."""
+        return Path(tempfile.gettempdir())
 
     @staticmethod
     def ctl_opts() -> list[str]:
@@ -86,7 +79,7 @@ class SSHArgv:
         """:meth:`ctl_opts` for a given socket dir, split out so the length rule is decidable
         without touching the environment or the filesystem.
         """
-        path = f"{base}/cm-%C"
+        path = f"{base}/catalyst-cm-{os.getuid()}-%C"
         # %C expands to a 40-character hash.
         expanded = len(path) - len("%C") + 40 + SSHArgv.CONTROL_PATH_RESERVE
         if expanded > SSHArgv.CONTROL_PATH_MAX:
@@ -289,7 +282,7 @@ class SCP:
     an already-authenticated connection."""
 
     @staticmethod
-    def copy(user: str, host: str, files: list[Path], dest: str, *, log: bool = True) -> None:
+    def copy(user: str, host: str, files: list[Path], dest: str) -> None:
         """Copy ``files`` into ``user@host:dest/``. Tries the modern SFTP backend, then retries
         with the legacy protocol (``-O``) on hosts without an SFTP subsystem.
 
@@ -306,8 +299,7 @@ class SCP:
                 *[str(f) for f in files],
                 f"{user}@{host}:{dest}/",
             ]
-            if log:
-                log_cmd(cmd)
+            log_cmd(cmd)
             return subprocess.run(cmd).returncode
 
         if _once(legacy=False) == 0:
