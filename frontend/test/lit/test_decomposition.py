@@ -885,7 +885,8 @@ def test_lowering_time_rules():
 
     def test_one_rule():
         """
-        Simple tests for when there is only one rule.
+        Simple tests for when there is only one rule, i.e. graph looks like
+           A ---> B
         """
 
         def rule_resource_fn(reg):
@@ -905,7 +906,7 @@ def test_lowering_time_rules():
 
             def test_one_gate():
                 """
-                Test when circuit has one gate.
+                Test when circuit has just one gate.
                 """
 
                 @qp.qjit(capture=True, target="mlir")
@@ -927,8 +928,8 @@ def test_lowering_time_rules():
 
             def test_multiple_gates_same_id():
                 """
-                Test when circuit has multiple gates of the same Operator 2 class but different ids,
-                multiple rules are generated.
+                Test that when circuit has multiple gates of the same id, the rule is only injected
+                once.
                 """
 
                 @qp.qjit(capture=True, target="mlir")
@@ -953,7 +954,8 @@ def test_lowering_time_rules():
 
             def test_multiple_gates_different_ids():
                 """
-                Test when circuit has multiple gates of the same id, the rule is only injected once.
+                Test when circuit has multiple gates of the same Operator 2 class but different ids,
+                multiple rules are generated.
                 """
 
                 @qp.qjit(capture=True, target="mlir")
@@ -981,6 +983,103 @@ def test_lowering_time_rules():
             test_multiple_gates_different_ids()
 
     test_one_rule()
+
+    def test_multiple_rules_same_gate():
+        """
+        Tests for when there are multiple distinct rules on the same gate, i.e. graph looks like
+                 +---> B
+                 |
+            A ---+
+                 |
+                 +---> C
+        """
+
+        @qp.register_resources(lambda reg: {SingleParam(x=Float, reg=Wire[2]): 1})
+        def rule1(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+
+        @qp.register_resources(lambda reg: {SingleParam(x=Float[2], reg=Wire[1]): 1})
+        def rule2(reg):
+            SingleParam(x=jnp.array([0.3, 0.4]), reg=reg[0])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule1)
+            qp.add_decomps(NoParams, rule2)
+
+            @qp.qjit(capture=True, target="mlir")
+            @qp.qnode(qp.device("null.qubit", wires=3))
+            def c():
+                NoParams(reg=[0, 1])
+                NoParams(reg=[0, 1])
+                NoParams(reg=[0, 1, 2])
+                return qp.state()
+
+            print(c.mlir)
+
+    # CHECK: func.func public @c()
+    # CHECK: qref.operator "NoParams"
+    # CHECK: qref.operator "NoParams"
+    # CHECK: qref.operator "NoParams"
+    # CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+    # CHECK: func.func private @"__builtin_rule2_NoParams{}{reg:2}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:1}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+    #
+    # CHECK-NOT: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
+    #
+    # CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:3}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
+    # CHECK: func.func private @"__builtin_rule2_NoParams{}{reg:3}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:1}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
+    test_multiple_rules_same_gate()
+
+    def test_multiple_rules_chained():
+        """
+        Tests for when one rule involves another rule, i.e. graph looks like
+           A ---> B ---> C
+        """
+
+        @qp.register_resources(lambda reg: {SingleParam(x=Float, reg=Wire[1]): 1})
+        def rule1(reg):
+            SingleParam(x=0.1, reg=reg[0])
+
+        @qp.register_resources(
+            lambda x, reg: {CompilableData(a="a", b="b", thing="thing", wires=Wire[1]): 1}
+        )
+        def rule2(x, reg):
+            CompilableData(a="a", b="b", thing="thing", wires=reg[0])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule1)
+            qp.add_decomps(SingleParam, rule2)
+
+            @qp.qjit(capture=True, target="mlir")
+            @qp.qnode(qp.device("null.qubit", wires=3))
+            def c():
+                NoParams(reg=[0, 1])
+                return qp.state()
+
+            print(c.mlir)
+
+    # CHECK: func.func public @c()
+    # CHECK: qref.operator "NoParams"
+    # CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "SingleParam{x:[f64]}{reg:1}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+    # CHECK: func.func private @"__builtin_rule2_SingleParam{x:[f64]}{reg:1}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
+    # CHECK-SAME:   target_gate = "SingleParam{x:[f64]}{reg:1}{}"
+    test_multiple_rules_chained()
 
 
 test_lowering_time_rules()
