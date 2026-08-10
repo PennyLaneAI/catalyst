@@ -35,28 +35,6 @@ from catalyst.passes import graph_decomposition
 # pylint: disable=too-many-lines
 
 
-# Helper to skip tests that fail due to PauliRot type annotation issue
-# TODO: Remove this once PennyLane fixes the PauliRot decomposition type annotations
-def skip_if_pauli_rot_issue(test_func):
-    """Wrapper to skip tests that fail due to PauliRot type annotation issues."""
-
-    def wrapper():
-        try:
-            test_func()
-        except (ValueError, IndexError) as e:
-            error_msg = str(e)
-            if (
-                "Unsupported type annotation None for parameter pauli_word" in error_msg
-                or "Unsupported type annotation <class 'str'> for parameter pauli_word" in error_msg
-                or "index is out of bounds for axis" in error_msg
-            ):
-                print(f"# SKIPPED {test_func.__name__}: PauliRot type annotation issue")
-            else:
-                raise
-
-    return wrapper
-
-
 TEST_PATH = os.path.dirname(__file__)
 CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
@@ -790,7 +768,7 @@ def test_decomposition_rule_name_update_multi_qubits():
     print(circuit_15.mlir)
 
 
-skip_if_pauli_rot_issue(test_decomposition_rule_name_update_multi_qubits)()
+test_decomposition_rule_name_update_multi_qubits()
 
 
 def test_decomposition_rule_name_adjoint():
@@ -802,20 +780,26 @@ def test_decomposition_rule_name_adjoint():
         gate_set={"RY", "RX", "CZ", "GlobalPhase", "Adjoint(SingleExcitation)"},
     )
     @qp.qnode(qp.device("lightning.qubit", wires=4))
+    # CHECK-LABEL: module @circuit_16
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
     def circuit_16(x: float):
-        # CHECK: qref.adjoint {
-        # CHECK: qref.adjoint {
-        # CHECK: qref.adjoint {
-        # CHECK: qref.adjoint {
-        qp.adjoint(qp.CNOT)(wires=[0, 1])
-        qp.adjoint(qp.Hadamard)(wires=2)
-        qp.adjoint(qp.RZ)(0.5, wires=3)
-        qp.adjoint(qp.SingleExcitation)(0.1, wires=[0, 1])
+        # CHECK: decompose_gatesets = {{.*}}"Adjoint(SingleExcitation)"
+        # Parameterized single-qubit adjoints are canonicalized by negating the angle.
+        # CHECK: %[[NEG_HALF:.+]] = arith.constant -5.000000e-01 : f64
+        # Self-adjoint operators are canonicalized to their base operator.
+        # CHECK: qref.custom "CNOT"()
+        # CHECK: qref.custom "Hadamard"()
+        # CHECK: qref.custom "RZ"(%[[NEG_HALF]])
+        # Other parameterized adjoints retain the `adj` unit attribute.
+        # CHECK: qref.custom "SingleExcitation"({{%.+}}) {{%.+}}, {{%.+}} adj
+        # CHECK: qref.custom "SingleExcitation"({{%.+}}) {{%.+}}, {{%.+}} adj
+        qp.adjoint(qp.CNOT(wires=[0, 1]))
+        qp.adjoint(qp.Hadamard(wires=2))
+        qp.adjoint(qp.RZ(0.5, wires=3))
+        qp.adjoint(qp.SingleExcitation(0.1, wires=[0, 1]))
         qp.adjoint(qp.SingleExcitation(x, wires=[0, 1]))
         return qp.expval(qp.Z(0))
 
-    # CHECK-DAG: @_single_excitation_decomp(%arg0: !qref.reg<4>, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
     # CHECK-DAG: @_hadamard_to_rz_ry(%arg0: !qref.reg<4>, %arg1: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Hadamard"}
     # CHECK-DAG: @_rz_to_ry_rx(%arg0: !qref.reg<4>, %arg1: tensor<f64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
     # CHECK-DAG: @_rot_to_rz_ry_rz(%arg0: !qref.reg<4>, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
@@ -823,7 +807,7 @@ def test_decomposition_rule_name_adjoint():
     print(circuit_16.mlir)
 
 
-skip_if_pauli_rot_issue(test_decomposition_rule_name_adjoint)()
+test_decomposition_rule_name_adjoint()
 
 
 def test_decompose_lowering_with_other_passes():
@@ -866,7 +850,7 @@ def test_decompose_lowering_with_other_passes():
     print(circuit_19.mlir)
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_other_passes)()
+test_decompose_lowering_with_other_passes()
 
 
 def test_decompose_lowering_multirz():
@@ -898,9 +882,9 @@ def test_decompose_lowering_multirz():
         qp.MultiRZ(x, wires=[1, 0, 2])
         return qp.expval(qp.PauliX(0))
 
-    # CHECK-DAG: @_multi_rz_decomposition_wires_1(%arg0: !qref.reg<3>, %arg1: tensor<1xf64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "MultiRZ"}
-    # CHECK-DAG: @_multi_rz_decomposition_wires_2(%arg0: !qref.reg<3>, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "MultiRZ"}
-    # CHECK-DAG: @_multi_rz_decomposition_wires_3(%arg0: !qref.reg<3>, %arg1: tensor<1xf64>, %arg2: tensor<3xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
+    # CHECK-DAG: @_multi_rz_decomposition_wires_1(%arg0: !qref.reg<3>, %arg1: tensor<f64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "MultiRZ"}
+    # CHECK-DAG: @_multi_rz_decomposition_wires_2(%arg0: !qref.reg<3>, %arg1: tensor<f64>, %arg2: tensor<2xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "MultiRZ"}
+    # CHECK-DAG: @_multi_rz_decomposition_wires_3(%arg0: !qref.reg<3>, %arg1: tensor<f64>, %arg2: tensor<3xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
     # CHECK-DAG: scf.for %arg3 = %c0 to %c2 step %c1
     # CHECK-DAG:   scf.for %arg3 = %c1 to %c3 step %c1
     print(circuit_20.mlir)
@@ -952,7 +936,7 @@ def test_decompose_lowering_with_ordered_passes():
     print(circuit_21.mlir)
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_ordered_passes)()
+test_decompose_lowering_with_ordered_passes()
 
 
 def test_decompose_lowering_alt_decomps():
@@ -991,10 +975,10 @@ def test_decompose_lowering_with_tensorlike():
         qp.RZ(params[2], wires=wires)
 
     @qp.register_resources({qp.RZ: 1, qp.CNOT: 4})
-    def custom_multirz(params: TensorLike, wires: WiresLike):
+    def custom_multirz(theta: TensorLike, wires: WiresLike):
         qp.CNOT(wires=(wires[2], wires[1]))
         qp.CNOT(wires=(wires[1], wires[0]))
-        qp.RZ(params[0], wires=wires[0])
+        qp.RZ(theta, wires=wires[0])
         qp.CNOT(wires=(wires[1], wires[0]))
         qp.CNOT(wires=(wires[2], wires[1]))
 
@@ -1010,13 +994,13 @@ def test_decompose_lowering_with_tensorlike():
         qp.MultiRZ(x + y, wires=[0, 1, 2])
         return qp.expval(qp.PauliZ(0))
 
-    # CHECK-DAG: @custom_multirz_wires_3(%arg0: !qref.reg<3>, %arg1: tensor<1xf64>, %arg2: tensor<3xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
+    # CHECK-DAG: @custom_multirz_wires_3(%arg0: !qref.reg<3>, %arg1: tensor<f64>, %arg2: tensor<3xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
     # CHECK-DAG: @_rz_to_ry_rx(%arg0: !qref.reg<3>, %arg1: tensor<f64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
     # CHECK-DAG: @custom_rot(%arg0: !qref.reg<3>, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     print(circuit_24.mlir)
 
 
-skip_if_pauli_rot_issue(test_decompose_lowering_with_tensorlike)()
+test_decompose_lowering_with_tensorlike()
 
 
 def test_decompose_lowering_params_ordering():
@@ -1079,8 +1063,11 @@ test_decomposition_rule_with_allocation()
 def test_decompose_autograph_multi_blocks():
     """Test the decompose lowering pass with autograph in the program and rule."""
 
-    def _multi_rz_decomposition_resources(num_wires):
+    def _multi_rz_decomposition_resources(  # pylint: disable=unused-argument
+        theta: TensorLike, wires: WiresLike
+    ):
         """Resources required for MultiRZ decomposition."""
+        num_wires = len(wires)
         return {qp.RZ: 1, qp.CNOT: 2 * (num_wires - 1)}
 
     @qp.register_resources(_multi_rz_decomposition_resources)
@@ -1111,7 +1098,7 @@ def test_decompose_autograph_multi_blocks():
 
         return qp.expval(qp.Z(0))
 
-    # CHECK-LABEL: @ag___multi_rz_decomposition_wires_5(%arg0: !qref.reg<5>, %arg1: tensor<1xf64>, %arg2: tensor<5xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
+    # CHECK-LABEL: @ag___multi_rz_decomposition_wires_5(%arg0: !qref.reg<5>, %arg1: tensor<f64>, %arg2: tensor<5xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
     # CHECK: scf.for %arg3 = {{%.+}} to {{%.+}} step {{%.+}} {
     # CHECK: scf.for %arg3 = {{%.+}} to {{%.+}} step {{%.+}} {
     print(circuit_29.mlir)
@@ -1286,10 +1273,10 @@ def test_decompose_work_wires_with_decompose_transform():
     """Test that work wires are correctly lowered and decomposed by the decompose transform."""
 
     @qp.register_resources({qp.X: 1, qp.Z: 1})
-    def my_decomp(wire):
+    def my_decomp(wires):
         with qp.allocate(1) as work_wire:
             qp.X(work_wire)
-            qp.Z(wire)
+            qp.Z(wires)
             qp.X(work_wire)
 
     @qjit(capture=True)
