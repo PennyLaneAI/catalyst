@@ -121,8 +121,7 @@ def _node_dict(node, role: str) -> dict:
 
 
 def _load_coprocessor_fn_libs(placement) -> None:
-    """Load the library providing each in-process (local) coprocessor's CoprocessorFn.
-    """
+    """Load the library providing each in-process (local) coprocessor's CoprocessorFn."""
     import ctypes  # pylint: disable=import-outside-toplevel
 
     for coproc in placement.coprocessors:
