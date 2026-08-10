@@ -67,7 +67,7 @@ int64_t __catalyst__transport__connect_async(CatalystTransportSession *s, const 
 int __catalyst__transport__exchange_keys(CatalystTransportSession *s);
 int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession *s);
 int __catalyst__transport__await(int64_t token);
-int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path);
+int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *transport);
 
 // Coprocessor-only: bind the coprocessor function, resolved by runtime symbol name.
 int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol);

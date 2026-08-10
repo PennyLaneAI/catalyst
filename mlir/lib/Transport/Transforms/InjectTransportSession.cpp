@@ -47,9 +47,6 @@ constexpr llvm::StringRef kRoleAttr = "catalyst.backline_role";
 constexpr llvm::StringRef kControllerRole = "controller";
 constexpr llvm::StringRef kCoprocessorRole = "coprocessor";
 
-// Data path used when a node does not specify one.
-constexpr llvm::StringRef kDefaultDataPath = "cpu_verbs";
-
 // A session and the func that releases it: each is torn down where it was created.
 struct KeyedSession {
     Type role;
@@ -69,7 +66,6 @@ struct RemoteCoproc {
 struct PendingLocalCoproc {
     Value session;
     Value token;
-    NodeAttr node;
 };
 
 // Emits the transport session lifecycle for one backline placement.
@@ -101,11 +97,13 @@ struct PendingLocalCoproc {
 // coprocessors within that kind.
 class SessionEmitter {
   public:
-    SessionEmitter(ModuleOp mod, NodeAttr ctrl, bool remoteController, ModuleOp ctrlMod)
+    SessionEmitter(ModuleOp mod, StringAttr transport, NodeAttr ctrl, bool remoteController,
+                   ModuleOp ctrlMod)
         : ctx(mod.getContext()), loc(mod.getLoc()), mod(mod), ctrl(ctrl),
           remoteController(remoteController), ctrlMod(ctrlMod),
           ctrlTy(SessionType::get(ctx, Role::Controller)),
-          coTy(SessionType::get(ctx, Role::Coprocessor)), tokTy(TokenType::get(ctx)), b(ctx) {
+          coTy(SessionType::get(ctx, Role::Coprocessor)), tokTy(TokenType::get(ctx)),
+          transport(transport.getValue()), b(ctx) {
         // The runtime calls @setup/@teardown around every execution; reuse them if present.
         hostSetup = findOrCreate("setup");
         hostTeardown = findOrCreate("teardown");
@@ -135,7 +133,7 @@ class SessionEmitter {
         Value ct = createSession(b, ctrlTy, ctrl, key);
         ConnectOp::create(b, loc, ct, ctrl.getPeer(), portAttr(ctrl.oobPort()));
         ExchangeKeysOp::create(b, loc, ct);
-        EstablishChannelOp::create(b, loc, ct, ctrl.dataPathOr(kDefaultDataPath));
+        EstablishChannelOp::create(b, loc, ct, b.getStringAttr(transport));
         commit(ct);
         StartOp::create(b, loc, ct);
         keyed.push_back({ctrlTy, key, teardownFn});
@@ -226,7 +224,7 @@ class SessionEmitter {
         Value ctr = createSession(b, ctrlTy, ctrl, key);
         ConnectOp::create(b, loc, ctr, coproc.getPeer(), portAttr(coproc.oobPort()));
         ExchangeKeysOp::create(b, loc, ctr);
-        EstablishChannelOp::create(b, loc, ctr, ctrl.dataPathOr(kDefaultDataPath));
+        EstablishChannelOp::create(b, loc, ctr, b.getStringAttr(transport));
         commit(ctr);
         StartOp::create(b, loc, ctr);
         keyed.push_back({ctrlTy, key, teardownFn});
@@ -258,7 +256,7 @@ class SessionEmitter {
                 .getToken();
         AwaitOp::create(cb, loc, tok);
         ExchangeKeysOp::create(cb, loc, co);
-        EstablishChannelOp::create(cb, loc, co, coproc.dataPathOr(kDefaultDataPath));
+        EstablishChannelOp::create(cb, loc, co, cb.getStringAttr(transport));
         SetCoprocessorFnOp::create(cb, loc, co, coproc.getSymbol());
         StartOp::create(cb, loc, co);
 
@@ -302,7 +300,7 @@ class SessionEmitter {
                                             portAttr(coproc.oobPort()))
                          .getToken();
         SetCoprocessorFnOp::create(hb, loc, lco, coproc.getSymbol());
-        pendingLocal.push_back({lco, ltok, coproc});
+        pendingLocal.push_back({lco, ltok});
         keyed.push_back({coTy, key, hostTeardown});
     }
 
@@ -318,8 +316,8 @@ class SessionEmitter {
         Value t2 = ExchangeKeysAsyncOp::create(b, loc, tokTy, co).getToken();
         ExchangeKeysOp::create(b, loc, ct);
         AwaitOp::create(b, loc, t2);
-        EstablishChannelOp::create(b, loc, co, coproc.dataPathOr(kDefaultDataPath));
-        EstablishChannelOp::create(b, loc, ct, ctrl.dataPathOr(kDefaultDataPath));
+        EstablishChannelOp::create(b, loc, co, b.getStringAttr(transport));
+        EstablishChannelOp::create(b, loc, ct, b.getStringAttr(transport));
         SetCoprocessorFnOp::create(b, loc, co, coproc.getSymbol());
         commit(ct);
         StartOp::create(b, loc, co);
@@ -345,7 +343,7 @@ class SessionEmitter {
         for (const PendingLocalCoproc &c : pendingLocal) {
             AwaitOp::create(hb, loc, c.token);
             ExchangeKeysOp::create(hb, loc, c.session);
-            EstablishChannelOp::create(hb, loc, c.session, c.node.dataPathOr(kDefaultDataPath));
+            EstablishChannelOp::create(hb, loc, c.session, hb.getStringAttr(transport));
             StartOp::create(hb, loc, c.session);
         }
 
@@ -367,6 +365,7 @@ class SessionEmitter {
     Type ctrlTy;
     Type coTy;
     Type tokTy;
+    llvm::StringRef transport;
     func::FuncOp hostSetup;
     func::FuncOp hostTeardown;
     func::FuncOp setupFn;
@@ -417,7 +416,8 @@ struct InjectTransportSessionPass
             }
         }
 
-        SessionEmitter(mod, ctrl, remoteController, ctrlMod).run(coprocs);
+        SessionEmitter(mod, backline.getTransport(), ctrl, remoteController, ctrlMod)
+            .run(coprocs);
     }
 };
 

@@ -114,6 +114,7 @@ template <class Role> PeerRef CpuSessionBase<Role>::exchange_keys(const MemRegio
 template <class Role>
 void CpuSessionBase<Role>::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                              const PeerRef &peer) {
+    RDMA_CHECK(desc.transport == "rdma", "cpu_verbs: only transport \"rdma\" supported");
     RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
                static_cast<std::size_t>(local.size), REGION_BYTES);
     desc_ = desc;

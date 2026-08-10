@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     MemRegion m = s->alloc_memory(REGION_BYTES, MemKind::CpuRam);
     PeerRef p = s->exchange_keys(m);
     ChannelDesc desc{
-        .data_path = "cpu_verbs",
+        .transport = "rdma",
     };
     s->establish_channel(desc, m, p);
 

@@ -194,10 +194,10 @@ struct EstablishChannelLowering : public OpConversionPattern<EstablishChannelOp>
     LogicalResult matchAndRewrite(EstablishChannelOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
-        Value dp = globalStr(rewriter, op.getLoc(), moduleOf(op), "transport_data_path_",
-                             op.getDataPath());
+        Value transport =
+            globalStr(rewriter, op.getLoc(), moduleOf(op), "transport_kind_", op.getTransport());
         emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__establish_channel",
-                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), dp});
+                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), transport});
         rewriter.eraseOp(op);
         return success();
     }

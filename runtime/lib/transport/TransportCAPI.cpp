@@ -299,13 +299,13 @@ std::int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession
 
 int __catalyst__transport__await(std::int64_t token) { return await_token(token); }
 
-int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path) {
+int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *transport) {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
     return guard([&] {
         ChannelDesc desc;
-        desc.data_path = data_path ? data_path : ""; // opaque; the backend interprets it
+        desc.transport = transport ? transport : ""; // opaque; the backend interprets it
         s->sess->establish_channel(desc, s->reply, s->peer);
         return CATALYST_TRANSPORT_OK;
     });

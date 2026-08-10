@@ -34,24 +34,11 @@ if hasattr(qp, "backline"):
     from pennylane.backline import Transport
 
 
-@pytest.fixture(autouse=True)
-def _net_transport():
-    """Register a test-only ``"net"`` transport per test; unregister on teardown."""
-    from pennylane import backline as _bl
-    from pennylane.backline import register_transport
-
-    register_transport("net")(lambda: Transport("net"))
-    try:
-        yield
-    finally:
-        getattr(_bl, "_transports", {}).pop("net", None)
-
 
 def _controller(**kw):
     init = {
         "backend_lib": "backend.so",
         "config": "cfg",
-        "data_path": "cpu_verbs",
         "in_bytes": 3,
         "out_bytes": 8,
     }
@@ -62,9 +49,7 @@ def _controller(**kw):
 
 def _coproc(label, oob_port=18590, fn="coproc_fn", **kw):
     kw.setdefault("remote", False)
-    kw.setdefault(
-        "init_args", {"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"}
-    )
+    kw.setdefault("init_args", {"backend_lib": "backend.so", "config": "cfg"})
     return qp.Coprocessor(
         label=label, comm_host="127.0.0.1", oob_port=oob_port, coprocessor_fn=fn, **kw
     )
@@ -72,30 +57,30 @@ def _coproc(label, oob_port=18590, fn="coproc_fn", **kw):
 
 def test_controller_node_mapping():
     """label -> name; init_args hints forwarded. A controller carries no endpoint of its own."""
-    d = serialize_backline(qp.backline(controller=_controller(), transport="net").placement)
-    assert d["transport"] == "net"
+    d = serialize_backline(qp.backline(controller=_controller(), transport="rdma").placement)
+    assert d["transport"] == "rdma"
     ctrl = d["controller"]
     assert ctrl["name"] == "ctrl"
     assert ctrl["backend_lib"] == "backend.so" and ctrl["config"] == "cfg"
-    assert ctrl["data_path"] == "cpu_verbs" and ctrl["in_bytes"] == 3 and ctrl["out_bytes"] == 8
+    assert ctrl["in_bytes"] == 3 and ctrl["out_bytes"] == 8
     assert "peer" not in ctrl and "oob_port" not in ctrl
 
 
 def test_coprocessor_endpoint_mapping():
     """comm_host/oob_port -> peer/oob_port, and oob_port stays an int."""
-    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
     cop = serialize_backline(dev.placement)["coprocessors"][0]
     assert cop["peer"] == "127.0.0.1"
     assert cop["oob_port"] == 18590 and isinstance(cop["oob_port"], int)
 
 
 def test_controller_only_has_no_coprocessors():
-    d = serialize_backline(qp.backline(controller=_controller(), transport="net").placement)
+    d = serialize_backline(qp.backline(controller=_controller(), transport="rdma").placement)
     assert "coprocessors" not in d
 
 
 def test_single_coprocessor():
-    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
     d = serialize_backline(dev.placement)
     assert len(d["coprocessors"]) == 1
     assert d["coprocessors"][0]["name"] == "cop0"
@@ -116,7 +101,7 @@ def test_in_process_coprocessor_fn_lib_is_loaded(monkeypatch):
 
     fn = qp.CoprocessorFunction("decode_fn", lib_path="/opt/libdecode.so")
     dev = qp.backline(
-        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="net"
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
     )
     realize_executors(dev.placement)
     assert loaded == [("/opt/libdecode.so", ctypes.RTLD_GLOBAL)]
@@ -130,7 +115,7 @@ def test_remote_coprocessor_fn_lib_is_not_loaded_here(monkeypatch):
     dev = qp.backline(
         controller=_controller(),
         coprocessors=[_coproc("cop0", fn=fn, remote=True)],
-        transport="net",
+        transport="rdma",
     )
     realize_executors(dev.placement)
     assert loaded == []
@@ -140,7 +125,7 @@ def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
     """No ``lib_path`` means resolve from what is already loaded, so nothing is opened."""
     loaded = []
     monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
-    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
     realize_executors(dev.placement)
     assert loaded == []
 
@@ -150,7 +135,7 @@ def test_multiple_coprocessors_all_serialized():
     dev = qp.backline(
         controller=_controller(),
         coprocessors=[_coproc("cop0", 18590), _coproc("cop1", 18591)],
-        transport="net",
+        transport="rdma",
     )
     d = serialize_backline(dev.placement)
     assert [c["name"] for c in d["coprocessors"]] == ["cop0", "cop1"]
@@ -158,9 +143,9 @@ def test_multiple_coprocessors_all_serialized():
 
 
 def test_transport_object_serializes_to_name():
-    transport = Transport("net")
+    transport = Transport("rdma")
     d = serialize_backline(qp.backline(controller=_controller(), transport=transport).placement)
-    assert d["transport"] == "net"
+    assert d["transport"] == "rdma"
 
 
 def test_add_transport_passes_places_each_pass():
@@ -191,7 +176,7 @@ def test_backline_pipeline_carries_transport_passes():
 
 def test_backline_qnode_capture_path(use_capture):
     """A backline qnode compiles to MLIR carrying the catalyst.backline attribute."""
-    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
 
     @qjit(target="mlir", capture=True)
     @qp.qnode(dev)
@@ -202,7 +187,7 @@ def test_backline_qnode_capture_path(use_capture):
 
     ir = circuit.mlir
     assert "catalyst.backline" in ir
-    assert 'transport = "net"' in ir
+    assert 'transport = "rdma"' in ir
 
 
 def test_remote_controller_module_tagged_with_role(use_capture):
@@ -215,9 +200,9 @@ def test_remote_controller_module_tagged_with_role(use_capture):
         device=qp.device("null.qubit", wires=2),
         label="ctrl",
         remote=True,
-        init_args={"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"},
+        init_args={"backend_lib": "backend.so", "config": "cfg"},
     )
-    dev = qp.backline(controller=ctrl, transport="net")
+    dev = qp.backline(controller=ctrl, transport="rdma")
 
     @qjit(target="mlir", capture=True)
     @qp.qnode(dev)
@@ -371,7 +356,7 @@ class TestBackendResolution:
             label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", backend="gpu_verbs"
         )
         d = serialize_backline(
-            qp.backline(controller=ctrl, coprocessors=[cop], transport="net").placement
+            qp.backline(controller=ctrl, coprocessors=[cop], transport="rdma").placement
         )
         assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
         assert d["coprocessors"][0]["backend_lib"].endswith("_gpu_verbs_coprocessor.so")
@@ -385,13 +370,13 @@ class TestBackendResolution:
             backend="cpu_verbs",
             init_args={"backend_lib": "/opt/explicit.so"},
         )
-        d = serialize_backline(qp.backline(controller=ctrl, transport="net").placement)
+        d = serialize_backline(qp.backline(controller=ctrl, transport="rdma").placement)
         assert d["controller"]["backend_lib"] == "/opt/explicit.so"
 
     def test_no_backend_leaves_backend_lib_unset(self):
         """Omitting ``backend`` leaves the field to ``init_args`` or the compiler default."""
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl")
-        d = serialize_backline(qp.backline(controller=ctrl, transport="net").placement)
+        d = serialize_backline(qp.backline(controller=ctrl, transport="rdma").placement)
         assert "backend_lib" not in d["controller"]
 
 
@@ -446,7 +431,7 @@ class TestExecutorRealization:
         """``realize_executors`` covers the controller and each coprocessor."""
         ctrl = _controller(executor_options={"address": "ctrl:1"})
         cop = _coproc("cop0", executor_options={"address": "cop:2"})
-        dev = qp.backline(controller=ctrl, coprocessors=[cop], transport="net")
+        dev = qp.backline(controller=ctrl, coprocessors=[cop], transport="rdma")
         realize_executors(dev.placement)
         assert ctrl.executor.address == "ctrl:1"
         assert cop.executor.address == "cop:2"
@@ -457,7 +442,7 @@ class TestExecutorRealization:
             remote=True,
             executor_options={"address": "10.0.0.9:1373", "triple": "aarch64-unknown-linux-gnu"},
         )
-        dev = qp.backline(controller=ctrl, transport="net")
+        dev = qp.backline(controller=ctrl, transport="rdma")
         realize_executors(dev.placement)
         node = serialize_backline(dev.placement)["controller"]
         assert node["address"] == "10.0.0.9:1373"
@@ -466,7 +451,7 @@ class TestExecutorRealization:
     def test_a_high_oob_port_survives_to_the_ir(self, use_capture):
         """A port above 32767 appears as itself, not as a negative number."""
         cop = _coproc("cop0", oob_port=40000)
-        dev = qp.backline(controller=_controller(), coprocessors=[cop], transport="net")
+        dev = qp.backline(controller=_controller(), coprocessors=[cop], transport="rdma")
 
         @qjit(target="mlir", capture=True)
         @qp.qnode(dev)

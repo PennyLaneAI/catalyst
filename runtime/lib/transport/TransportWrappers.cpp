@@ -281,10 +281,10 @@ CatalystWrapperResult __catalyst__transport__establish_channel__wrapper(const ch
                                                                         std::size_t size) {
     Flat in(buf, size);
     auto *session = in.session();
-    const char *data_path = in.str();
+    const char *transport = in.str();
     Out out(I32);
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__establish_channel(session, data_path);
+        *out.slot<std::int32_t>() = __catalyst__transport__establish_channel(session, transport);
     }
     return finish(in, out);
 }

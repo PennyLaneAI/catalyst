@@ -116,7 +116,7 @@ PeerRef GpuCoprocessorSession::exchange_keys(const MemRegion &local) {
 
 void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                               const PeerRef &peer) {
-    RDMA_CHECK(desc.data_path == "cpu_verbs", "gpu_verbs: only data_path \"cpu_verbs\" supported");
+    RDMA_CHECK(desc.transport == "rdma", "gpu_verbs: only transport \"rdma\" supported");
     RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
                static_cast<std::size_t>(local.size), REGION_BYTES);
     desc_ = desc;

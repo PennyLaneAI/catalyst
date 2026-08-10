@@ -26,7 +26,7 @@ from pathlib import Path
 from catalyst.utils.runtime_environment import get_lib_path
 
 # Backend hints forwarded verbatim from a node's ``init_args`` to the attribute node.
-_INIT_KEYS = ("backend_lib", "config", "data_path", "in_bytes", "out_bytes")
+_INIT_KEYS = ("backend_lib", "config", "in_bytes", "out_bytes")
 
 # A transport backend library is named for its backend and role:
 #     libcatalyst_transport_<backend>_<role>.<ext>

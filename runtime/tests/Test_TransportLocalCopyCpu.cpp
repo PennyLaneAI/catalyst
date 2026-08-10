@@ -50,7 +50,7 @@ TEST_CASE("local_copy round-trip echoes through peer memory", "[transport_local_
     MemRegion request = coprocessor.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
     PeerRef peer_reply = coprocessor.exchange_keys(request);
 
-    ChannelDesc desc{.data_path = "memcpy"};
+    ChannelDesc desc{.transport = "local"};
     controller.establish_channel(desc, reply, peer_request);
     coprocessor.establish_channel(desc, request, peer_reply);
 
@@ -85,7 +85,7 @@ TEST_CASE("local_copy uses the bound coprocessor function", "[transport_local_co
     MemRegion request = coprocessor.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
     PeerRef peer_reply = coprocessor.exchange_keys(request);
 
-    ChannelDesc desc{.data_path = "memcpy"};
+    ChannelDesc desc{.transport = "local"};
     controller.establish_channel(desc, reply, peer_request);
     coprocessor.establish_channel(desc, request, peer_reply);
 

@@ -81,13 +81,13 @@ def Transport_AwaitOp : Transport_Op<"await"> {
 }
 
 def Transport_EstablishChannelOp : Transport_Op<"establish_channel"> {
-    let summary = "Arm the data channel for the given data path.";
+    let summary = "Arm the channel for the given transport.";
     let description = [{
-        Prepares the data channel selected by `data_path` for the rounds that follow.
+        Prepares the channel selected by `transport` for the rounds that follow.
         Runs after `exchange_keys` and before `post`/`collect`.
     }];
-    let arguments = (ins Transport_SessionType:$session, StrAttr:$data_path);
-    let assemblyFormat = "$session $data_path attr-dict `:` qualified(type($session))";
+    let arguments = (ins Transport_SessionType:$session, StrAttr:$transport);
+    let assemblyFormat = "$session $transport attr-dict `:` qualified(type($session))";
 }
 
 //===----------------------------------------------------------------------===//

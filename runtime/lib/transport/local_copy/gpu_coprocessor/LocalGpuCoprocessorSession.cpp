@@ -108,9 +108,9 @@ PeerRef LocalGpuCoprocessorSession::exchange_keys(const MemRegion &local) {
 
 void LocalGpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                                    const PeerRef &peer) {
-    if (desc.data_path != "memcpy") {
+    if (desc.transport != "local") {
         throw std::runtime_error(
-            "local_copy: local GPU coprocessor supports only data_path=memcpy");
+            "local_copy: local GPU coprocessor supports only transport=local");
     }
     local_request_ = local;
     peer_reply_ = peer;

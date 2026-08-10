@@ -109,7 +109,6 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         OptionalParameter<"mlir::IntegerAttr">:$oob_port,
         Transport_StrField:$backend_lib,
         Transport_StrField:$config,
-        Transport_StrField:$data_path,
         Transport_StrField:$triple,
         Transport_StrField:$address,
         Transport_StrField:$symbol,
@@ -124,9 +123,6 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
     let extraClassDeclaration = [{
         /// Session registry key: `name` when set and non-empty, else `fallback`.
         mlir::StringAttr keyOr(llvm::StringRef fallback) const;
-
-        /// `data_path` when set, else `dflt`.
-        mlir::StringAttr dataPathOr(llvm::StringRef dflt) const;
 
         /// True only when `remote` is present and set.
         bool isRemote() const;

@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
     MemRegion m = s.alloc_memory(REGION_BYTES, MemKind::GpuHbm);
     PeerRef p = s.exchange_keys(m);
     ChannelDesc desc{
-        .data_path = "cpu_verbs",
+        .transport = "rdma",
     };
     s.establish_channel(desc, m, p);
     s.set_coprocessor_launcher(catalyst_gpu_echo_launcher, nullptr);

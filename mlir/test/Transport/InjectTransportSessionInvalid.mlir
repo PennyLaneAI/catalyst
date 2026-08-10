@@ -18,7 +18,7 @@
 // rejected by the parser instead, being a required parameter.)
 
 // expected-error @below {{coprocessor requires a 'peer'}}
-module attributes {catalyst.backline = #transport.backline<transport = "net", controller = #transport.node<backend_lib = "x">,
+module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x">,
   coprocessors = [#transport.node<backend_lib = "y", symbol = "foo">]>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
@@ -29,8 +29,16 @@ module attributes {catalyst.backline = #transport.backline<transport = "net", co
 // Nor without the symbol naming what to invoke on it.
 
 // expected-error @below {{coprocessor requires a 'symbol'}}
-module attributes {catalyst.backline = #transport.backline<transport = "net", controller = #transport.node<backend_lib = "x">,
+module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x">,
   coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3">]>} {
+  func.func @setup() { quantum.init  return }
+  func.func @teardown() { quantum.finalize  return }
+}
+
+// -----
+
+// expected-error @below {{backline transport must be 'rdma' or 'local'}}
+module attributes {catalyst.backline = #transport.backline<transport = "bogus", controller = #transport.node<backend_lib = "x">>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
 }

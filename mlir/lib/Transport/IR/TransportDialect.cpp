@@ -51,13 +51,6 @@ StringAttr NodeAttr::keyOr(llvm::StringRef fallback) const {
     return StringAttr::get(getContext(), fallback);
 }
 
-StringAttr NodeAttr::dataPathOr(llvm::StringRef dflt) const {
-    if (StringAttr p = getDataPath(); p && !p.getValue().empty()) {
-        return p;
-    }
-    return StringAttr::get(getContext(), dflt);
-}
-
 bool NodeAttr::isRemote() const {
     BoolAttr r = getRemote();
     return r && r.getValue();
@@ -78,6 +71,9 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                                    llvm::ArrayRef<NodeAttr> coprocessors) {
     if (!controller) {
         return emitError() << "backline requires a controller";
+    }
+    if (!transport || (transport.getValue() != "rdma" && transport.getValue() != "local")) {
+        return emitError() << "backline transport must be 'rdma' or 'local'";
     }
     for (NodeAttr c : coprocessors) {
         if (!c) {
