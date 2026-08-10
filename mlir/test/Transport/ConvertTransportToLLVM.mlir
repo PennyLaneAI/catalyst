@@ -32,7 +32,7 @@ func.func @controller(%syndrome: memref<?xi8>, %correction: memref<?xi8>) {
   // CHECK: %[[S:.*]] = llvm.call @__catalyst__transport__create({{.*}}) : (!llvm.ptr, !llvm.ptr, i32, !llvm.ptr) -> !llvm.ptr
   %s = transport.create {backend_lib = "libbackend.so", config = "cfg"} -> !transport.session<controller>
   // CHECK: llvm.call @__catalyst__transport__connect(%[[S]]
-  transport.connect %s {peer = "127.0.0.1", oob_port = 18560 : i16} : !transport.session<controller>
+  transport.connect %s {peer = "127.0.0.1", oob_port = 18560 : i32} : !transport.session<controller>
   // CHECK: llvm.call @__catalyst__transport__exchange_keys(%[[S]])
   transport.exchange_keys %s : !transport.session<controller>
   // CHECK: llvm.call @__catalyst__transport__establish_channel(%[[S]]

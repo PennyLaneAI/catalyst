@@ -24,7 +24,7 @@ func.func @transport_smoketest(%payload: memref<?xi8>, %reply: memref<?xi8>) {
   %co = transport.create {backend_lib = "libbackend.so", config = "cfg"} -> !transport.session<coprocessor>
 
   // CHECK: transport.connect_async %{{.*}} : !transport.session<coprocessor> -> !transport.token
-  %t1 = transport.connect_async %co {peer = "127.0.0.1", oob_port = 18590 : i16} : !transport.session<coprocessor> -> !transport.token
+  %t1 = transport.connect_async %co {peer = "127.0.0.1", oob_port = 18590 : i32} : !transport.session<coprocessor> -> !transport.token
   // CHECK: transport.connect %{{.*}} : !transport.session<controller>
   transport.connect %ct {peer = "127.0.0.1", oob_port = 18590 : i16} : !transport.session<controller>
   // CHECK: transport.await %{{.*}} : !transport.token

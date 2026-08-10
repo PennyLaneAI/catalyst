@@ -46,3 +46,13 @@ if(CMAKE_HIP_COMPILER)
 else()
     message(STATUS "transport: no HIP compiler -> skipping gpu_verbs")
 endif()
+
+add_custom_target(transport_backends
+    DEPENDS
+    catalyst_transport_cpu_verbs_controller
+    catalyst_transport_cpu_verbs_coprocessor
+    steane_coprocessor_cpu
+)
+if(TRANSPORT_HAS_HIP)
+    add_dependencies(transport_backends catalyst_transport_gpu_verbs_coprocessor)
+endif()
