@@ -51,3 +51,13 @@ else()
         "transport: libibverbs not found -> building rt_transport only. The bundled backends "
         "are skipped; install libibverbs-dev / rdma-core to build them.")
 endif()
+
+add_custom_target(transport_backends
+    DEPENDS
+    catalyst_transport_cpu_verbs_controller
+    catalyst_transport_cpu_verbs_coprocessor
+    steane_coprocessor_cpu
+)
+if(TRANSPORT_HAS_HIP)
+    add_dependencies(transport_backends catalyst_transport_gpu_verbs_coprocessor)
+endif()

@@ -891,18 +891,18 @@ class QJIT(CatalystCallable):
         collect_runtime_artifacts(mlir_module, self.compile_options)
         # If the device declares a backline placement, serialize it onto the top module.
         device = getattr(self.user_function, "device", None)
-        backline = getattr(device, "backline", None)
-        if backline is not None:
+        placement = getattr(device, "placement", None)
+        if placement is not None:
             from jax.interpreters.mlir import ir
 
             from catalyst.backline import backline_attr_text, realize_executors
 
-            # Launch any unlaunched ExecutorSpecs first so serialization is a pure read.
-            realize_executors(backline)
+            # Launch any requested-but-unlaunched executors first, so serialization is a pure read.
+            realize_executors(placement)
 
             with mlir_module.context:
                 mlir_module.operation.attributes["catalyst.backline"] = ir.Attribute.parse(
-                    backline_attr_text(backline)
+                    backline_attr_text(placement)
                 )
 
         return mlir_module

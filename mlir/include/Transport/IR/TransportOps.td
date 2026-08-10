@@ -50,7 +50,7 @@ def Transport_CreateOp : Transport_Op<"create"> {
 
 def Transport_ConnectOp : Transport_Op<"connect"> {
     let summary = "Connect to the peer (blocking).";
-    let arguments = (ins Transport_SessionType:$session, StrAttr:$peer, I16Attr:$oob_port);
+    let arguments = (ins Transport_SessionType:$session, StrAttr:$peer, I32Attr:$oob_port);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
 

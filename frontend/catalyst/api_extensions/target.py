@@ -14,14 +14,21 @@
 
 """Tag a PennyLane device with a separate cross-compilation target, optionally remote."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+from pennylane.devices import Device
+
+if TYPE_CHECKING:
+    from catalyst.executor import Executor
 
 _TARGET_ATTR = "_catalyst_target"
 _DISPATCH_ATTR = "_catalyst_dispatch"
 
 
-def _attr(obj, name, default=None):
+def _attr(obj: Any, name: str, default: Any = None) -> Any:
     """None-safe :func:`getattr`."""
     return default if obj is None else getattr(obj, name, default)
 
@@ -51,13 +58,13 @@ class RemoteDispatch:
 
 
 def target(
-    device,
+    device: Device,
     *,
     pipeline: Optional[str] = None,
     triple: Optional[str] = None,
     address: Optional[str] = None,
-    executor=None,
-):
+    executor: Optional[Executor] = None,
+) -> Device:
     """Tag a PennyLane device with a separate cross-compilation target and return it.
 
     Any QNode wrapping the returned device is kept as a separate compilation unit, tagged with a
@@ -92,7 +99,7 @@ def target(
 _BACKLINE_EXECUTOR_ATTR = "_catalyst_backline_executor"
 
 
-def attach_executor(device, executor):
+def attach_executor(device: Device, executor: Executor) -> Device:
     """Attach a launched :class:`catalyst.Executor` to a backline ``device``.
 
     Args:
@@ -106,12 +113,12 @@ def attach_executor(device, executor):
     return device
 
 
-def _get_backline_controller(device):
+def _get_backline_controller(device: Device) -> Any:
     """The controller node of a backline placement attached to ``device``, or ``None``."""
-    return _attr(_attr(device, "backline"), "controller")
+    return _attr(_attr(device, "placement"), "controller")
 
 
-def _get_controller_executors(device):
+def _get_controller_executors(device: Device) -> list[Executor]:
     """Controller dispatch-coord sources, in preference order: the node's own ``executor``, then one attached via :func:`attach_executor`."""
     from catalyst.backline import _realize_executor
 
@@ -121,28 +128,31 @@ def _get_controller_executors(device):
     return [ex for ex in (node_ex, dev_ex) if ex is not None]
 
 
-def _get_backline_triple(device) -> Optional[str]:
-    """Triple for a remote backline controller, sourced from an executor. Defaults to the controller's own."""
+def _get_backline_triple(device: Device) -> Optional[str]:
+    """Triple for a remote backline controller, sourced from its executor.
+
+    Backline nodes carry no triple of their own: the executor determines it, detecting it on the
+    target host when it was not given explicitly.
+    """
     for ex in _get_controller_executors(device):
         if _attr(ex, "triple"):
             return ex.triple
-    return _attr(_get_backline_controller(device), "triple")
+    return None
 
 
-def _get_backline_dispatch_address(device) -> Optional[str]:
-    """Dispatch address for a remote backline controller, sourced from an executor. Defaults to the controller's own ``addr:port``."""
+def _get_backline_dispatch_address(device: Device) -> Optional[str]:
+    """Dispatch address for a remote backline controller, sourced from its executor.
+
+    Only an executor supplies this. It is the executor's dispatch address, distinct from the
+    backline transport's ``comm_host``/``oob_port`` used for controller/coprocessor traffic.
+    """
     for ex in _get_controller_executors(device):
         if _attr(ex, "address"):
             return ex.address
-    ctrl = _get_backline_controller(device)
-    addr = _attr(ctrl, "addr")
-    if not addr:
-        return None
-    port = _attr(ctrl, "port")
-    return f"{addr}:{port}" if port else addr
+    return None
 
 
-def get_target(device) -> Optional[Target]:
+def get_target(device: Device) -> Optional[Target]:
     """Return the cross-compilation :class:`Target` for ``device``, or ``None``.
 
     Args:
@@ -164,7 +174,7 @@ def get_target(device) -> Optional[Target]:
     return Target(pipeline=None, triple=_get_backline_triple(device))
 
 
-def get_backline_role(device) -> Optional[str]:
+def get_backline_role(device: Device) -> Optional[str]:
     """Return the backline role ``device``'s module plays, or ``None``.
 
     Args:
@@ -180,7 +190,7 @@ def get_backline_role(device) -> Optional[str]:
     return None
 
 
-def get_dispatch(device) -> Optional[RemoteDispatch]:
+def get_dispatch(device: Device) -> Optional[RemoteDispatch]:
     """Return the :class:`RemoteDispatch` for ``device``, or ``None``.
 
     Args:

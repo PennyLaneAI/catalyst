@@ -16,13 +16,15 @@
 lifecycle (spawn, output pump, ready/port-conflict detection, teardown) for the base class and
 its local / remote subclasses. ``subprocess.Popen`` is mocked throughout."""
 
+import re
 import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from catalyst.executor.process import _ExecutorProcess, _LocalProcess, _RemoteProcess
-from catalyst.executor.utils import Paths, Patterns, PortInUse
+from catalyst.executor.ssh import RemoteLauncher
+from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, OutputPatterns, PortInUse
 
 
 def _mk_base_proc(**overrides):
@@ -83,27 +85,6 @@ class TestExecutorProcessLog:
         assert p._log_fh is None
 
 
-class TestExecutorProcessPumpFlags:
-    """Pump-side flag transitions driven by :class:`Patterns` matches on output lines."""
-
-    def test_ready_line_sets_flag(self):
-        """A ready-pattern match sets the ``_ready`` event."""
-        p = _mk_base_proc()
-        # Simulate the pump identifying a ready line.
-        line = "Listening on 127.0.0.1:9999"
-        if Patterns.is_ready(line):
-            p._ready.set()
-        assert p._ready.is_set()
-
-    def test_port_conflict_line_sets_flag(self):
-        """A port-conflict-pattern match sets the ``_port_conflict`` event."""
-        p = _mk_base_proc()
-        line = "Address already in use"
-        if Patterns.is_port_conflict(line):
-            p._port_conflict.set()
-        assert p._port_conflict.is_set()
-
-
 class TestExecutorProcessCheckPortConflict:
     """Behavior of :meth:`_check_port_conflict` under the port-conflict flag."""
 
@@ -129,13 +110,13 @@ class TestExecutorProcessCheckEarlyExit:
         p.proc.poll.return_value = None
         p._check_early_exit()  # no raise
 
-    def test_dead_process_raises_systemexit(self):
-        """Raises :class:`SystemExit` when the child exited without a port conflict."""
+    def test_dead_process_raises_runtime_error(self):
+        """Raises :class:`RuntimeError` when the child exited without a port conflict."""
         p = _mk_base_proc()
         p.proc = MagicMock()
         p.proc.poll.return_value = 1
         p.proc.returncode = 1
-        with pytest.raises(SystemExit, match="exited"):
+        with pytest.raises(RuntimeError, match="exited"):
             p._check_early_exit()
 
     def test_dead_with_port_conflict_raises_portinuse(self):
@@ -195,11 +176,11 @@ class TestExecutorProcessWaitForReady:
         assert result is p
 
     def test_timeout_raises(self):
-        """Raises :class:`SystemExit` when readiness is not signaled within ``ready_timeout``."""
+        """Raises :class:`RuntimeError` when readiness is not signaled within ``ready_timeout``."""
         p = _mk_base_proc(ready_timeout=0.05)
         p.proc = MagicMock()
         p.proc.poll.return_value = None
-        with pytest.raises(SystemExit, match="did not become ready"):
+        with pytest.raises(RuntimeError, match="did not become ready"):
             p._wait_for_ready(poll_interval=0.02)
 
     def test_port_conflict_raises(self):
@@ -217,13 +198,13 @@ class TestLocalProcessConstruction:
 
     def test_address_composition(self):
         """Composes ``addr`` as ``127.0.0.1:<port>`` from the given port."""
-        p = _LocalProcess(port=1373, executor_bin="/bin/exec")
-        assert p.addr == "127.0.0.1:1373"
-        assert p._bind_port == 1373
+        p = _LocalProcess(port=9000, executor_bin="/bin/exec")
+        assert p.addr == "127.0.0.1:9000"
+        assert p._bind_port == 9000
 
     def test_defaults(self):
         """Applies default plugin list, env mapping, and process name when not supplied."""
-        p = _LocalProcess(port=1373, executor_bin="/bin/exec")
+        p = _LocalProcess(port=9000, executor_bin="/bin/exec")
         assert p._plugins == []
         assert p._env == {}
         assert p.name == "executor"
@@ -235,7 +216,7 @@ class TestLocalProcessSpawn:
     def test_argv_shape(self):
         """Builds argv with binary, ``--bind``, ``--plugin`` entries and forwards env additions."""
         p = _LocalProcess(
-            port=1373,
+            port=9000,
             executor_bin="/tmp/catalyst-executor",
             plugins=["/opt/libx.so"],
             env={"K": "V"},
@@ -251,14 +232,14 @@ class TestLocalProcessSpawn:
         with patch.object(_LocalProcess, "_popen", side_effect=fake_popen):
             p._spawn()
         assert captured["argv"][0] == "/tmp/catalyst-executor"
-        assert "--bind=127.0.0.1:1373" in captured["argv"]
+        assert "--bind=127.0.0.1:9000" in captured["argv"]
         assert "--plugin=/opt/libx.so" in captured["argv"]
         # env extends os.environ, custom key present:
         assert captured["env"]["K"] == "V"
 
     def test_expands_home_in_binary(self):
         """Expands a leading ``~`` in the executor binary path before spawning."""
-        p = _LocalProcess(port=1373, executor_bin="~/bin/exec")
+        p = _LocalProcess(port=9000, executor_bin="~/bin/exec")
         captured = {}
         with patch.object(
             _LocalProcess,
@@ -272,12 +253,14 @@ class TestLocalProcessSpawn:
     def test_env_var_expansion(self, monkeypatch):
         """Expands ``$VAR`` references inside env values against the current environment."""
         monkeypatch.setenv("MY_LIB", "/opt/mylib")
-        p = _LocalProcess(port=1373, executor_bin="/bin/exec", env={"LIB": "$MY_LIB/x"})
+        p = _LocalProcess(port=9000, executor_bin="/bin/exec", env={"LIB": "$MY_LIB/x"})
         captured = {}
         with patch.object(
             _LocalProcess,
             "_popen",
-            side_effect=lambda argv, **kw: (captured.setdefault("env", kw.get("env")), MagicMock())[1],
+            side_effect=lambda argv, **kw: (captured.setdefault("env", kw.get("env")), MagicMock())[
+                1
+            ],
         ):
             p._spawn()
         assert captured["env"]["LIB"] == "/opt/mylib/x"
@@ -286,24 +269,22 @@ class TestLocalProcessSpawn:
 class TestRemoteProcessConstruction:
     """Constructor wiring for :class:`_RemoteProcess`."""
 
-    def test_local_port_defaults_to_remote_port(self):
-        """``local_port`` defaults to the remote ``port`` when not attached."""
-        p = _RemoteProcess(host="h", user="me", port=1373, workspace="~/ws")
-        assert p.local_port == 1373
-        assert p.addr == "127.0.0.1:1373"
+    def test_addr_is_the_local_tunnel_endpoint(self):
+        """``addr`` is loopback on the same port the executor binds remotely.
 
-    def test_local_port_explicit(self):
-        """An attached ``local_port`` takes precedence over the remote port for ``addr``."""
-        p = _RemoteProcess(host="h", user="me", port=1373, local_port=5000, workspace="~/ws")
-        assert p.local_port == 5000
-        assert p.addr == "127.0.0.1:5000"
+        Both ends of the SSH forward use one port number, so there is nothing to reconcile
+        between the tunnel endpoint and the remote bind.
+        """
+        p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
+        assert p.addr == "127.0.0.1:9000"
+        assert p._bind_port == 9000
 
     def test_defaults(self):
         """Applies default sudo, workspace-cleanup, executor-binary, and ready-tracking values."""
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
-        assert p.sudo is True
+        assert p.sudo is False
         assert p.cleanup_ws is False
-        assert p.executor_bin == f"./{Paths.EXECUTOR_BIN}"
+        assert p.executor_bin == f"./{ExecutorPaths.EXECUTOR_BIN}"
         assert not p._ready_reached
 
 
@@ -315,14 +296,14 @@ class TestRemoteProcessLogHeader:
         p = _RemoteProcess(
             host="h",
             user="me",
-            port=1373,
+            port=9000,
             workspace="~/ws",
             plugins=["libx.so", "liby.so"],
             name="worker",
         )
         header = p._log_header()
         assert "worker" in header
-        assert "h:1373" in header
+        assert "h:9000" in header
         assert "~/ws" in header
         assert "libx.so, liby.so" in header
 
@@ -360,11 +341,11 @@ class TestRemoteProcessCheckFailure:
         p._check_failure()  # no raise
 
     def test_flag_raises_with_help(self):
-        """Raises :class:`SystemExit` with kind-specific help text when the auth flag is set."""
+        """Raises :class:`RuntimeError` with kind-specific help text when the auth flag is set."""
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
         p._auth_kind = "ssh"
         p._auth_prompt.set()
-        with pytest.raises(SystemExit, match="ssh-copy-id"):
+        with pytest.raises(RuntimeError, match="ssh-copy-id"):
             p._check_failure()
 
 
@@ -403,20 +384,43 @@ class TestRemoteProcessTeardownExtra:
     def test_skips_when_not_ready(self):
         """No-op before the ready hook has fired: nothing to pkill remotely."""
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
-        with patch("catalyst.executor.process.SSH.pkill") as pkill:
+        with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
         pkill.assert_not_called()
 
     def test_runs_pkill_when_ready(self):
         """Runs a port-scoped pkill once the remote executor has been ready."""
-        p = _RemoteProcess(host="h", user="me", port=1373, workspace="~/ws")
+        p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
         p._ready_reached = True
-        with patch("catalyst.executor.process.SSH.pkill") as pkill:
+        with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
         pkill.assert_called_once()
-        # Pattern should be port-scoped so we can't kill someone else's process.
+        # Pattern should be port-scoped so we can't kill someone else's process, and must match
+        # the loopback bind address the remote launch command actually uses.
         pat = pkill.call_args.args[2]
-        assert "0.0.0.0:1373" in pat
+        assert f"{ExecutorFlags.BIND_HOST}:9000" in pat
+        assert "0.0.0.0" not in pat
+
+    def test_pkill_pattern_matches_the_real_launch_command(self):
+        """The teardown pattern is a regex run against the live process list, so it has to match
+        the command :meth:`RemoteLauncher._remote_cmd` actually emits.
+        """
+        p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
+        p._ready_reached = True
+        with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
+            p._teardown_extra()
+        pat = pkill.call_args.args[2]
+
+        launch_cmd = RemoteLauncher._remote_cmd(
+            "~/ws",
+            9000,
+            plugins=[],
+            env={},
+            sudo=False,
+            use_password=False,
+            executor_bin=f"./{ExecutorPaths.EXECUTOR_BIN}",
+        )
+        assert re.search(pat, launch_cmd), f"{pat!r} does not match {launch_cmd!r}"
 
 
 class TestRemoteProcessTeardownWorkspace:
@@ -426,7 +430,7 @@ class TestRemoteProcessTeardownWorkspace:
         """Pinned workspace (``cleanup_ws=False``) is never removed."""
         # cleanup_ws=False (pinned) — never remove.
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/mydir", cleanup_ws=False)
-        with patch("catalyst.executor.process.SSH.rmdir") as rmdir:
+        with patch("catalyst.executor.process.RemoteOps.rmdir") as rmdir:
             p.teardown_workspace()
         rmdir.assert_not_called()
 
@@ -434,15 +438,15 @@ class TestRemoteProcessTeardownWorkspace:
         """Directories without the safe workspace prefix are not removed even when cleanup is enabled."""
         # cleanup_ws=True but the basename lacks the safe prefix.
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/mydir", cleanup_ws=True)
-        with patch("catalyst.executor.process.SSH.rmdir") as rmdir:
+        with patch("catalyst.executor.process.RemoteOps.rmdir") as rmdir:
             p.teardown_workspace()
         rmdir.assert_not_called()
 
     def test_auto_dir_with_prefix_removed(self):
         """Auto-generated workspace matching the safe prefix is removed when cleanup is enabled."""
-        ws = f"~/{Paths.WORKSPACE_PREFIX}me-2026-01-01_00-00-00-abc"
+        ws = f"~/{ExecutorPaths.WORKSPACE_PREFIX}me-2026-01-01_00-00-00-abc"
         p = _RemoteProcess(host="h", user="me", port=1, workspace=ws, cleanup_ws=True)
-        with patch("catalyst.executor.process.SSH.rmdir") as rmdir:
+        with patch("catalyst.executor.process.RemoteOps.rmdir") as rmdir:
             p.teardown_workspace()
         rmdir.assert_called_once()
 
@@ -472,3 +476,227 @@ class TestRemoteProcessPipeSudoPassword:
         p.proc.stdin.write.side_effect = BrokenPipeError()
         # Must not raise.
         p._pipe_sudo_password()
+
+
+class TestLaunchFailuresAreOrdinaryExceptions:
+    """Launch failures must be catchable by ``except Exception``.
+
+    ``SystemExit`` would slip past it and terminate the interpreter instead of reporting a
+    failed launch.
+    """
+
+    def test_caught_by_except_exception(self):
+        """A ready-timeout is caught by a plain ``except Exception``."""
+        p = _mk_base_proc(ready_timeout=0.01)
+        p.proc = MagicMock()
+        p.proc.poll.return_value = None
+        try:
+            p._wait_for_ready(poll_interval=0.005)
+        except Exception as e:  # pylint: disable=broad-except
+            assert "did not become ready" in str(e)
+        else:
+            pytest.fail("expected a launch failure")
+
+
+class _FakeStdout:
+    """Line iterator standing in for ``Popen.stdout``."""
+
+    def __init__(self, lines):
+        self._lines = list(lines)
+
+    def __iter__(self):
+        return iter(self._lines)
+
+
+class TestPumpOutput:
+    """The reader thread, which turns executor output into readiness and conflict flags."""
+
+    def _pump(self, cls, lines, **kw):
+        p = cls(**kw)
+        p.proc = MagicMock()
+        p.proc.stdout = _FakeStdout(lines)
+        p._pump_output()
+        return p
+
+    def test_ready_line_releases_the_wait(self):
+        """A ready line sets the flag ``_wait_for_ready`` blocks on."""
+        p = self._pump(
+            _LocalProcess, ["Listening on 127.0.0.1:9000\n"], port=9000, executor_bin="/bin/exec"
+        )
+        assert p._ready.is_set()
+        assert not p._port_conflict.is_set()
+
+    def test_port_conflict_line_is_flagged(self):
+        """A bind failure sets the flag that makes the launch retry on another port."""
+        p = self._pump(
+            _LocalProcess, ["Address already in use\n"], port=9000, executor_bin="/bin/exec"
+        )
+        assert p._port_conflict.is_set()
+
+    def test_lines_are_teed_to_the_log(self, tmp_path):
+        """Executor output lands in the per-launch log, not only on stderr."""
+        log = tmp_path / "x.log"
+        p = _LocalProcess(port=9000, executor_bin="/bin/exec", log_path=str(log))
+        p._open_log()
+        p.proc = MagicMock()
+        p.proc.stdout = _FakeStdout(["hello from the executor\n"])
+        p._pump_output()
+        p._log_fh.close()
+        assert "hello from the executor" in log.read_text()
+
+    def test_scan_line_hook_runs_for_remote(self):
+        """Every line passes through the remote subclass's auth scan."""
+        p = self._pump(
+            _RemoteProcess,
+            ["me@h's password:\n"],
+            host="h",
+            user="me",
+            port=9000,
+            workspace="~/ws",
+        )
+        assert p._auth_prompt.is_set()
+        assert p._auth_kind == "ssh"
+
+
+class TestStart:
+    """Spawn, pump, wait, and clean up on failure, in :meth:`_ExecutorProcess.start`."""
+
+    def test_returns_once_ready(self):
+        """Returns the process once it announces its bind."""
+        p = _LocalProcess(port=9000, executor_bin="/bin/exec", ready_timeout=2.0)
+
+        def fake_spawn():
+            p.proc = MagicMock()
+            p.proc.poll.return_value = None
+            p.proc.stdout = _FakeStdout(["Listening on 127.0.0.1:9000\n"])
+
+        with patch.object(_LocalProcess, "_spawn", side_effect=fake_spawn):
+            assert p.start() is p
+        assert p._ready.is_set()
+
+    def test_failure_shuts_the_child_down_before_propagating(self):
+        """A launch that never becomes ready must not leave the subprocess running."""
+        p = _LocalProcess(port=9000, executor_bin="/bin/exec", ready_timeout=0.05)
+
+        def fake_spawn():
+            p.proc = MagicMock()
+            p.proc.poll.return_value = None
+            p.proc.stdout = _FakeStdout([])  # silent: never becomes ready
+
+        with patch.object(_LocalProcess, "_spawn", side_effect=fake_spawn):
+            with pytest.raises(RuntimeError, match="did not become ready"):
+                p.start()
+        p.proc.terminate.assert_called_once(), "the child was left running"
+
+
+class TestRemoteSpawn:
+    """The ssh argv and the sudo-password stdin path built by :meth:`_RemoteProcess._spawn`."""
+
+    def _spawn(self, **kw):
+        p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws", **kw)
+        captured = {}
+
+        def fake_popen(argv, **kwargs):
+            captured["argv"] = argv
+            captured["stdin"] = kwargs.get("stdin")
+            return MagicMock()
+
+        with patch.object(_RemoteProcess, "_popen", side_effect=fake_popen):
+            p._spawn()
+        return p, captured
+
+    def test_builds_the_tunnelled_ssh_command(self):
+        """argv is an ssh invocation carrying the forward and the remote launch command."""
+        _, cap = self._spawn(plugins=["libx.so"])
+        assert cap["argv"][0] == "ssh"
+        assert "me@h" in cap["argv"]
+        assert "9000:localhost:9000" in cap["argv"]
+        assert cap["argv"][-1].startswith("cd ")
+
+    def test_no_password_closes_stdin(self):
+        """Without a sudo password the child gets no stdin at all."""
+        _, cap = self._spawn()
+        assert cap["stdin"] == subprocess.DEVNULL
+
+    def test_password_is_piped_not_argv(self):
+        """A sudo password goes over stdin, never into argv where ps or the log would show it."""
+        p, cap = self._spawn(sudo=True, sudo_password="hunter2")
+        assert cap["stdin"] == subprocess.PIPE
+        assert not any("hunter2" in a for a in cap["argv"]), "password leaked into argv"
+        p.proc.stdin.write.assert_called_once_with("hunter2\n")
+
+
+class TestRemoteProcessSetenvRefusal:
+    """A sudo SETENV refusal aborts the launch with its own remedy, not the password advice."""
+
+    def _proc(self):
+        return _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws", sudo=True)
+
+    def test_flagged_as_its_own_kind(self):
+        """Kept apart from ``sudo``: that help suggests sudo_password=, which cannot fix a policy."""
+        p = self._proc()
+        p._scan_line("sudo: sorry, you are not allowed to preserve the environment")
+        assert p._auth_prompt.is_set()
+        assert p._auth_kind == "setenv"
+
+    def test_aborts_with_both_remedies(self):
+        """Bails immediately rather than waiting out ready_timeout, naming both ways out."""
+        p = self._proc()
+        p._scan_line("sudo: sorry, you are not allowed to preserve the environment")
+        with pytest.raises(RuntimeError) as exc:
+            p._check_failure()
+        assert "NOPASSWD:SETENV:" in str(exc.value)
+        assert "sudo=False" in str(exc.value)
+
+
+class TestProcessLogAndTeardown:
+    """Log-file handling and the teardown hook, which only run during a real launch."""
+
+    def test_remote_log_gets_a_header(self, tmp_path):
+        """A fresh remote log opens with the host/port/workspace banner."""
+        log = tmp_path / "x.log"
+        p = _RemoteProcess(
+            host="h",
+            user="me",
+            port=9000,
+            workspace="~/ws",
+            plugins=["libx.so"],
+            log_path=str(log),
+            name="worker",
+        )
+        p._open_log()
+        p._log_fh.close()
+        text = log.read_text()
+        assert "worker" in text and "h:9000" in text and "libx.so" in text
+
+    def test_shutdown_closes_the_log(self, tmp_path):
+        """The log handle is released even when there is no child to signal."""
+        p = _mk_base_proc(log_path=str(tmp_path / "x.log"))
+        p._open_log()
+        assert p._log_fh is not None
+        p._shutdown()
+        assert p._log_fh is None, "log handle leaked"
+
+    def test_stop_runs_the_subclass_teardown(self):
+        """Base ``stop`` is shutdown plus the subclass hook."""
+        p = _mk_base_proc()
+        with patch.object(_ExecutorProcess, "_teardown_extra") as extra:
+            p.stop()
+        extra.assert_called_once()
+
+    def test_remote_stop_still_terminates_the_child(self):
+        """The remote override must not forget ``super().stop()``."""
+        p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
+        p.proc = MagicMock()
+        p.proc.poll.return_value = None
+        p.proc.wait.return_value = 0
+        p.stop()
+        p.proc.terminate.assert_called_once()
+
+    def test_popen_merges_stderr_into_stdout(self):
+        """The pump reads a single stream, so the child's stderr has to arrive on stdout."""
+        # Popen as a context manager closes the pipes and reaps the child on exit, so nothing
+        # is left behind even if the assertion fails.
+        with _ExecutorProcess._popen(["sh", "-c", "echo out; echo err >&2"]) as proc:
+            lines = [line.strip() for line in proc.stdout]
+        assert lines == ["out", "err"]

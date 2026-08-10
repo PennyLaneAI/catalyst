@@ -14,11 +14,11 @@
 
 """
 This module provides the :class:`Executor` for deploying and connecting to a ``catalyst-executor``
-server used by ``target(address=...)`` and ``kernel.declare(remote=...)`` to run compiled programs
-out-of-process.
+server, which runs compiled programs out-of-process. Compiled programs are dispatched to the
+address it serves on, either locally or on a remote host.
 """
 
-from .utils import PortInUse
 from .manager import Executor
+from .utils import PortInUse
 
 __all__ = ("Executor", "PortInUse")

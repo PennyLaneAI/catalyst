@@ -15,13 +15,20 @@
 """Unit tests for :mod:`catalyst.executor.manager` — the public :class:`Executor`: config
 defaults, mode dispatch, attach-mode launch, workspace lifecycle (``setup_workspace`` /
 ``remove_workspace``), and the ``_scp_bundle`` / ``_deploy_bundle`` split. Subprocess-facing
-calls (``SCP.deploy``, ``SSH.rmdir``) are mocked."""
+calls (``SCP.deploy``, ``RemoteOps.rmdir``) are mocked."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from catalyst.executor.manager import Executor, ExecutorConfig
+from catalyst.executor.manager import (
+    Executor,
+    ExecutorConfig,
+    _SessionRegistry,
+    _sessions,
+    _start_on_free_port,
+)
+from catalyst.executor.utils import PortInUse
 
 
 class TestExecutorConfigDefaults:
@@ -33,7 +40,7 @@ class TestExecutorConfigDefaults:
         assert c.user == ""
         assert c.port is None
         assert c.copy is False
-        assert c.sudo is True
+        assert c.sudo is False  # root is opt-in: the executor runs arbitrary compiled objects
         assert c.ready_timeout == 60.0
         assert c.verbose == 1
 
@@ -59,6 +66,34 @@ class TestExecutorConstruction:
         ex = Executor(host="10.0.0.9", user="me")
         assert ex.host == "10.0.0.9"
         assert ex._cfg.user == "me"
+
+    def test_no_address_default(self):
+        """``address`` has no default: nothing is assumed about where an executor is serving."""
+        assert Executor()._address is None
+
+
+class TestLaunchRequiresAMode:
+    """:meth:`Executor.launch` refuses to guess a mode."""
+
+    def test_no_mode_raises(self):
+        """Neither ``local=``, ``host=``, nor an address: launch() reports it immediately.
+
+        Defaulting to a well-known address would let a program get all the way to dispatch
+        before failing, with an error pointing at the wrong place.
+        """
+        with pytest.raises(ValueError, match="no mode"):
+            Executor().launch()
+
+    def test_construction_stays_inert(self):
+        """The check happens in launch(), not __init__ — construction never raises."""
+        ex = Executor()  # must not raise
+        assert not ex._launched
+
+    def test_each_mode_satisfies_the_check(self):
+        """Any one of the three modes is enough."""
+        assert Executor("1.2.3.4:5").launch()._launched
+        assert Executor(local=True)._local is True  # launch() would spawn; mode itself is enough
+        assert Executor(host="h").host == "h"
 
 
 class TestExecutorAddress:
@@ -125,10 +160,10 @@ class TestRemoveWorkspace:
         with pytest.raises(ValueError, match="workspace="):
             ex.remove_workspace()
 
-    def test_delegates_to_ssh_rmdir(self):
-        """Delegates to :meth:`SSH.rmdir` and threads through ``force=``."""
+    def test_delegates_to_remote_rmdir(self):
+        """Delegates to :meth:`RemoteOps.rmdir` and threads through ``force=``."""
         ex = Executor(host="h", user="me", workspace="~/ws")
-        with patch("catalyst.executor.manager.SSH.rmdir") as rmdir:
+        with patch("catalyst.executor.manager.RemoteOps.rmdir") as rmdir:
             ex.remove_workspace(force=True)
         rmdir.assert_called_once()
         assert rmdir.call_args.kwargs.get("force") is True
@@ -160,21 +195,22 @@ class TestScpBundleGate:
 
 
 class TestDeployBundle:
-    """The build + scp composition inside :meth:`Executor._deploy_bundle`."""
+    """The scp delegation inside :meth:`Executor._deploy_bundle`."""
 
-    def test_calls_build_then_scp_deploy(self, tmp_path):
-        """Calls ``build(triple, bundle)`` then :meth:`SCP.deploy` with the same bundle."""
+    def test_passes_bundle_path_through(self, tmp_path):
+        """Hands the bundle directory to :meth:`SCP.deploy` as a :class:`Path`, unmodified.
+
+        Cross-building is the caller's job. This only copies.
+        """
         bundle = tmp_path / "b"
         bundle.mkdir()
-        build = MagicMock()
-        ex = Executor(host="h", user="me", bundle=str(bundle), build=build, triple="x86_64")
+        ex = Executor(host="h", user="me", bundle=str(bundle))
         with patch("catalyst.executor.manager.SCP.deploy") as scp_deploy:
             ex._deploy_bundle("me", "h", "ws")
-        build.assert_called_once_with("x86_64", bundle)
         scp_deploy.assert_called_once_with("me", "h", bundle, "ws")
 
-    def test_no_build_still_deploys(self, tmp_path):
-        """No ``build=`` recipe: still deploys the bundle as-is."""
+    def test_deploys_bundle_as_is(self, tmp_path):
+        """Deploys the bundle directory exactly as given."""
         bundle = tmp_path / "b"
         bundle.mkdir()
         ex = Executor(host="h", bundle=str(bundle))
@@ -183,39 +219,25 @@ class TestDeployBundle:
         scp_deploy.assert_called_once()
 
 
-class TestLaunchAttachMode:
-    """Attach-mode short-circuit and idempotence of :meth:`Executor.launch`."""
+class TestAttachModeLifecycle:
+    """Attach mode launches nothing, so its lifecycle is pure bookkeeping."""
 
-    def test_short_circuits_no_subprocess(self):
-        """Attach mode spawns no process; ``address`` remains the constructor value."""
-        # Attach mode: neither local nor host, no _proc created, address preserved.
+    def test_launch_short_circuits(self):
+        """No process is spawned and the given address is preserved."""
         ex = Executor("1.2.3.4:5").launch()
-        assert ex._launched is True
-        assert ex._proc is None
+        assert ex._launched and ex._proc is None
         assert ex.address == "1.2.3.4:5"
 
-    def test_idempotent(self):
-        """Second ``launch()`` is a no-op."""
-        ex = Executor("1.2.3.4:5").launch()
-        ex.launch()
-        assert ex._launched is True
-        assert ex._proc is None
-
-
-class TestStopIdempotent:
-    """Safety of :meth:`Executor.stop` under repeated / no-launch calls."""
-
-    def test_stop_before_launch_ok(self):
-        """Calling ``stop()`` before ``launch()`` is a no-op, not an error."""
+    @pytest.mark.parametrize(
+        "calls", [("launch",), ("launch", "launch"), ("stop",), ("launch", "stop", "stop")]
+    )
+    def test_launch_and_stop_are_idempotent(self, calls):
+        """Any order and repetition of launch/stop is safe, and never spawns."""
         ex = Executor("1.2.3.4:5")
-        ex.stop()
-        assert ex._launched is False
-
-    def test_stop_after_attach_launch_ok(self):
-        """``stop()`` after an attach-mode ``launch()`` clears the launched flag."""
-        ex = Executor("1.2.3.4:5").launch()
-        ex.stop()
-        assert ex._launched is False
+        for c in calls:
+            getattr(ex, c)()
+        assert ex._launched is (calls[-1] == "launch")
+        assert ex._proc is None
 
 
 class TestContextManager:
@@ -237,3 +259,219 @@ class TestRepr:
         assert "name='executor'" in r
         assert "host='h'" in r
         assert "launched=False" in r
+
+
+class _FakeProc:
+    """Stand-in for a :class:`_ExecutorProcess`, recording teardown and optionally failing."""
+
+    def __init__(self, port=0, fail_ports=()):
+        self.addr = f"127.0.0.1:{port}"
+        self._port = port
+        self._fail_ports = fail_ports
+        self.stopped = False
+        self.workspace_torn_down = False
+
+    def start(self):
+        if self._port in self._fail_ports:
+            raise PortInUse(self._port)
+        return self
+
+    def stop(self):
+        self.stopped = True
+
+    def teardown_workspace(self):
+        self.workspace_torn_down = True
+
+    def _say(self, msg, level=1):
+        pass
+
+
+class TestStartOnFreePort:
+    """The port-retry loop behind :meth:`Executor.launch`."""
+
+    def test_returns_the_first_process_that_binds(self):
+        """No retry when the first attempt succeeds."""
+        made = []
+
+        def make(port):
+            made.append(port)
+            return _FakeProc(port)
+
+        proc = _start_on_free_port(make, 9000)
+        assert proc.addr == "127.0.0.1:9000"
+        assert made == [9000], "should not have tried a second port"
+
+    def test_retries_on_a_busy_port(self):
+        """A :class:`PortInUse` moves on to the next candidate, and the ports differ."""
+        made = []
+
+        def make(port):
+            made.append(port)
+            return _FakeProc(port, fail_ports={9000})
+
+        proc = _start_on_free_port(make, 9000)
+        assert made[0] == 9000, "the pinned port is tried first"
+        assert len(made) == 2 and made[1] != 9000, "the retry uses a different port"
+        assert proc.addr == f"127.0.0.1:{made[1]}"
+
+    def test_exhaustion_raises_with_the_last_error(self):
+        """Every candidate busy: reports how many were tried and how to pin one."""
+
+        def make(port):
+            return _FakeProc(port, fail_ports=range(70000))  # everything fails
+
+        with pytest.raises(RuntimeError) as exc:
+            _start_on_free_port(make, 9000, max_tries=2)
+        assert "no free executor port after 3 tries" in str(exc.value)
+        assert "port=" in str(exc.value), "should say how to pin one"
+
+
+class TestSessionRegistry:
+    """Bookkeeping behind the ``atexit`` shutdown hook."""
+
+    def test_shutdown_stops_everything_registered(self):
+        """Both processes are stopped and torn down, despite sharing a name."""
+        reg = _SessionRegistry()
+        a, b = _FakeProc(), _FakeProc()
+        reg.register(a)
+        reg.register(b)
+        reg._shutdown_all()
+        assert (a.stopped, b.stopped) == (True, True)
+        assert (a.workspace_torn_down, b.workspace_torn_down) == (True, True)
+
+    def test_unregister_removes_only_that_process(self):
+        """Unregistering one leaves the other under the hook."""
+        reg = _SessionRegistry()
+        a, b = _FakeProc(), _FakeProc()
+        reg.register(a)
+        reg.register(b)
+        reg.unregister(a)
+        reg._shutdown_all()
+        assert not a.stopped
+        assert b.stopped, "the second executor escaped the atexit hook"
+
+    def test_unregister_tolerates_untracked(self):
+        """Called for something never registered, or already cleared, it is a no-op."""
+        reg = _SessionRegistry()
+        proc = _FakeProc()
+        reg.unregister(proc)
+        reg.register(proc)
+        reg._shutdown_all()
+        reg.unregister(proc)  # the hook already cleared the list
+
+
+class TestDetectTriple:
+    """Target-triple resolution in :meth:`Executor._detect_triple`."""
+
+    def test_explicit_triple_short_circuits(self):
+        """An explicit ``triple=`` is used as-is, with no probe."""
+        with patch("catalyst.executor.manager.RemoteOps.capture") as cap:
+            assert Executor(host="h", triple="aarch64-unknown-linux-gnu").triple == (
+                "aarch64-unknown-linux-gnu"
+            )
+        cap.assert_not_called()
+
+    def test_local_uses_this_machine(self):
+        """``local=True`` reads the host platform rather than going over SSH."""
+        with patch("catalyst.executor.manager.platform.system", return_value="Linux"), patch(
+            "catalyst.executor.manager.platform.machine", return_value="x86_64"
+        ):
+            assert Executor(local=True).triple == "x86_64-unknown-linux-gnu"
+
+    def test_remote_probes_over_ssh(self):
+        """``host=`` maps the remote's ``uname -sm`` onto a triple."""
+        with patch("catalyst.executor.manager.RemoteOps.capture", return_value="Linux aarch64"):
+            assert Executor(host="h", user="me").triple == "aarch64-unknown-linux-gnu"
+
+    def test_failed_probe_is_none(self):
+        """An unreachable host yields ``None``, and the compiler falls back to the host triple."""
+        with patch("catalyst.executor.manager.RemoteOps.capture", return_value=None):
+            assert Executor(host="h").triple is None
+
+    def test_attach_mode_has_no_triple(self):
+        """Nothing to probe when the executor is managed elsewhere."""
+        assert Executor("1.2.3.4:5").triple is None
+
+
+class TestMakers:
+    """The per-attempt process factories behind :meth:`Executor.launch`."""
+
+    def test_local_maker_builds_a_local_process(self):
+        """``local=True`` produces a loopback process carrying the configured plugins and env."""
+        ex = Executor(local=True, plugins=["libx.so"], env={"K": "V"}, executor_bin="/bin/exec")
+        proc = ex._local_maker()(9000)
+        assert proc.addr == "127.0.0.1:9000"
+        assert proc._plugins == ["libx.so"]
+        assert proc._env == {"K": "V"}
+
+    def test_remote_maker_builds_a_remote_process(self):
+        """``host=`` produces a tunnelled process. The one-time sudo resolve runs during setup."""
+        ex = Executor(host="10.0.0.9", user="me", sudo=True, plugins=["libx.so"])
+        with patch(
+            "catalyst.executor.manager.RemoteOps.resolve_sudo", return_value="pw"
+        ) as resolve:
+            make = ex._remote_maker()
+        proc = make(9000)
+        assert (proc.host, proc.user) == ("10.0.0.9", "me")
+        assert proc.sudo_password == "pw"
+        assert proc.addr == "127.0.0.1:9000"
+
+    def test_remote_maker_reuses_one_auth_context_across_retries(self):
+        """Retries must not re-prompt for sudo or re-scp the bundle."""
+        ex = Executor(host="h", user="me", sudo=True)
+        with patch("catalyst.executor.manager.RemoteOps.resolve_sudo", return_value="pw") as r:
+            make = ex._remote_maker()
+            make(9000)
+            make(9001)
+        r.assert_called_once()
+
+
+class TestLaunchAndStop:
+    """The deploy path of :meth:`Executor.launch` and the teardown in :meth:`Executor.stop`."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_registry(self):
+        """``launch()`` appends to a module-global and restore it so a failure cannot leak."""
+        saved = list(_sessions._procs)
+        yield
+        _sessions._procs[:] = saved
+
+    def _launched(self, **kw):
+        ex = Executor(local=True, **kw)
+        proc = _FakeProc(9000)
+        with patch("catalyst.executor.manager._start_on_free_port", return_value=proc):
+            ex.launch()
+        return ex, proc
+
+    def test_launch_adopts_the_bound_address(self):
+        """``address`` comes from the process that actually bound, not from the request."""
+        ex, _ = self._launched()
+        assert ex.address == "127.0.0.1:9000"
+        assert ex._launched
+
+    def test_launch_registers_for_atexit(self):
+        """A launched executor is tracked so it is torn down even without an explicit stop()."""
+        ex, proc = self._launched()
+        assert proc in _sessions._procs
+
+    def test_launch_is_idempotent(self):
+        """A second launch() does not spawn again."""
+        ex, _ = self._launched()
+        with patch("catalyst.executor.manager._start_on_free_port") as start:
+            ex.launch()
+        start.assert_not_called()
+
+    def test_stop_tears_down_and_deregisters(self):
+        """stop() stops the process, removes the workspace, and leaves the registry clean."""
+        ex, proc = self._launched()
+        ex.stop()
+        assert proc.stopped and proc.workspace_torn_down
+        assert proc not in _sessions._procs
+        assert ex._proc is None and not ex._launched
+
+    def test_stop_is_idempotent(self):
+        """A second stop() is a no-op rather than an error."""
+        ex, _ = self._launched()
+        ex.stop()
+        ex.stop()
+        assert ex._proc is None
