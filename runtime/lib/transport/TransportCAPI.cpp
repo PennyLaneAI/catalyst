@@ -87,8 +87,7 @@ template <typename Fn> auto guard(Fn &&fn) -> decltype(fn()) {
     }
 }
 
-const char *collect_error_name(int rc)
-{
+const char *collect_error_name(int rc) {
     switch (rc) {
     case CATALYST_TRANSPORT_ERR_MEMORY:
         return "memory";
@@ -336,8 +335,8 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
 }
 
 int __catalyst__transport__set_message_sizes(CatalystTransportSession *s,
-                                            std::uint32_t work_item_idx, std::uint64_t in_bytes,
-                                            std::uint64_t out_bytes) {
+                                             std::uint32_t work_item_idx, std::uint64_t in_bytes,
+                                             std::uint64_t out_bytes) {
     auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;

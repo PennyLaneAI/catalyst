@@ -34,7 +34,7 @@ namespace {
 
 struct StagePayloadOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<StagePayloadOpInterface,
-                                                                  StagePayloadOp> {
+                                                                   StagePayloadOp> {
     bool bufferizesToMemoryRead(Operation *, OpOperand &,
                                 const bufferization::AnalysisState &) const {
         return true;

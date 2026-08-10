@@ -118,8 +118,7 @@ struct LowerDecodeToTransportPass
             for (Operation *user : correction.getUsers()) {
                 if (isa<memref::DeallocOp>(user)) {
                     frees.push_back(user);
-                }
-                else if (user != anchor && !isa<memref::LoadOp>(user)) {
+                } else if (user != anchor && !isa<memref::LoadOp>(user)) {
                     ownsBuffer = false;
                 }
             }

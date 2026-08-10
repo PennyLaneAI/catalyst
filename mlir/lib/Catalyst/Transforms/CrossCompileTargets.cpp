@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h" // llvm::join
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include <algorithm>
-
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -33,11 +33,11 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/PassInstrumentation.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
@@ -88,8 +88,7 @@ std::vector<std::string> defaultLoweringPassList() {
     return passes;
 }
 
-std::vector<std::string> backlineLoweringPassList()
-{
+std::vector<std::string> backlineLoweringPassList() {
     auto buf = driver::getBufferizationStage();
     auto llvmPasses = driver::getLLVMDialectLoweringStage();
     std::vector<std::string> passes;
@@ -253,27 +252,24 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
 
     struct SubPipelineDumper : public mlir::PassInstrumentation {
         SubPipelineDumper(CrossCompileTargetsPass *owner, std::string dir, bool onlyChanged)
-            : owner(owner), dir(std::move(dir)), onlyChanged(onlyChanged)
-        {
-        }
+            : owner(owner), dir(std::move(dir)), onlyChanged(onlyChanged) {}
 
-        void runBeforePass(mlir::Pass *pass, mlir::Operation *op) override
-        {
+        void runBeforePass(mlir::Pass *pass, mlir::Operation *op) override {
             // Only `changed` needs the before-image, and fingerprinting a module is not free.
             if (onlyChanged) {
                 before.insert_or_assign(pass, mlir::OperationFingerPrint(op));
             }
         }
 
-        void runAfterPass(mlir::Pass *pass, mlir::Operation *op) override
-        {
+        void runAfterPass(mlir::Pass *pass, mlir::Operation *op) override {
             if (onlyChanged) {
                 auto it = before.find(pass);
                 if (it != before.end() && *it->second == mlir::OperationFingerPrint(op)) {
                     return;
                 }
             }
-            owner->dumpMLIR(op, dir, std::to_string(++index) + "_" + pass->getName().str() + ".mlir");
+            owner->dumpMLIR(op, dir,
+                            std::to_string(++index) + "_" + pass->getName().str() + ".mlir");
         }
 
         CrossCompileTargetsPass *owner;

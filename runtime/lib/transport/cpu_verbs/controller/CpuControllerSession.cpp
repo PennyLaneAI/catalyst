@@ -87,8 +87,7 @@ int CpuControllerSession::kick(std::uint32_t /*work_item_idx*/) {
     return 0;
 }
 
-void *CpuControllerSession::reply_slot()
-{
+void *CpuControllerSession::reply_slot() {
     auto *ring = reinterpret_cast<common::PayloadSlot *>(local_.addr);
     return &ring[next_recv_ & (common::K_RING_SLOTS - 1)].p.value;
 }

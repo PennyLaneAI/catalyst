@@ -182,8 +182,8 @@ struct AwaitLowering : public OpConversionPattern<AwaitOp> {
     LogicalResult matchAndRewrite(AwaitOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
-        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__await",
-                 {i64Ty(ctx)}, i32Ty(ctx), {adaptor.getToken()});
+        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__await", {i64Ty(ctx)},
+                 i32Ty(ctx), {adaptor.getToken()});
         rewriter.eraseOp(op);
         return success();
     }
@@ -269,8 +269,7 @@ struct ReplySlotLowering : public OpConversionPattern<ReplySlotOp> {
 struct StagePayloadLowering : public OpConversionPattern<StagePayloadOp> {
     using OpConversionPattern::OpConversionPattern;
     LogicalResult matchAndRewrite(StagePayloadOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         auto memTy = dyn_cast<MemRefType>(op.getPayload().getType());
         if (!memTy) {
@@ -388,8 +387,8 @@ struct ConvertTransportToLLVMPass
         patterns.add<ReplySlotLowering>(tc, ctx);
         patterns.add<CreateLowering, ConnectLowering, ConnectAsyncLowering, ExchangeKeysLowering,
                      ExchangeKeysAsyncLowering, AwaitLowering, EstablishChannelLowering,
-                     SetCoprocessorFnLowering, SetMessageSizesLowering, StagePayloadLowering, PostLowering,
-                     CollectLowering, LastRttLowering, GetSessionLowering>(tc, ctx);
+                     SetCoprocessorFnLowering, SetMessageSizesLowering, StagePayloadLowering,
+                     PostLowering, CollectLowering, LastRttLowering, GetSessionLowering>(tc, ctx);
         patterns.add<VoidSessionLowering<StartOp>>(tc, ctx, "__catalyst__transport__start");
         patterns.add<VoidSessionLowering<StopOp>>(tc, ctx, "__catalyst__transport__stop");
         patterns.add<VoidSessionLowering<DestroyOp>>(tc, ctx, "__catalyst__transport__destroy");

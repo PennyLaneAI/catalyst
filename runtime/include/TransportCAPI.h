@@ -74,7 +74,7 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
 
 // Controller-only: work items + kick.
 int __catalyst__transport__set_message_sizes(CatalystTransportSession *s, uint32_t work_item_idx,
-                                            uint64_t in_bytes, uint64_t out_bytes);
+                                             uint64_t in_bytes, uint64_t out_bytes);
 void *__catalyst__transport__request_slot(CatalystTransportSession *s);
 // Copy `bytes` into the round's outbound slot and address it to `decoder_id`. Fails
 // if `bytes` exceeds what set_message_sizes committed.

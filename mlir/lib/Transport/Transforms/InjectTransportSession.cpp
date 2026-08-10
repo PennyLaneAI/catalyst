@@ -208,8 +208,8 @@ class SessionEmitter {
 
     void commit(Value ct) {
         SetMessageSizesOp::create(b, loc, ct, b.getI32IntegerAttr(ctrl.workItemIdx()),
-                                 b.getI64IntegerAttr(ctrl.inBytes()),
-                                 b.getI64IntegerAttr(ctrl.outBytes()));
+                                  b.getI64IntegerAttr(ctrl.inBytes()),
+                                  b.getI64IntegerAttr(ctrl.outBytes()));
     }
 
     // The return op of a single-block func: new body ops are inserted before it.
