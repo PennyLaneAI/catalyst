@@ -94,16 +94,6 @@ void PhaseAbstraction::insertContributor(const GateBundle &contributor, const Pa
     // }
 }
 
-void PhaseAbstraction::orphanNonTrivialBundles()
-{
-    for (auto &[parity, contributors] : activeBundles) {
-        if (!parity.isTrivial()) {
-            orphanBundles.push_back(std::move(contributors));
-            activeBundles.erase(parity);
-        }
-    }
-}
-
 void PhaseAbstraction::normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPrecond, bool isProjectOutAuxVars)
 {
     llvm::DenseMap<Parity, GateBundle> oldBundles;

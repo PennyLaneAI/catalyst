@@ -52,6 +52,9 @@ struct PhaseAbstraction {
     void addOrphanBundlesWith(const std::vector<GateBundle> &rhsOrphans);
     void insertActiveBundle(const GateBundle &contributor, const Parity &parity);
     void normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPrecond, bool isProjectOutAuxVars=false);
+
+    template <typename Predicate>
+    void orphanBundlesIf(Predicate cond);
 };
 
 template <typename ColOrderRange>
@@ -72,6 +75,17 @@ std::string PhaseAbstraction::toString(ColOrderRange colOrder) const
     return res;
 }
 
+template <typename Predicate>
+void PhaseAbstraction::orphanBundlesIf(Predicate cond)
+{
+    for (auto &[parity, contributors] : activeBundles) {
+        if (cond(parity)) {
+            orphanBundles.push_back(std::move(contributors));
+            activeBundles.erase(parity);
+        }
+    }
+}
+
 inline void PhaseAbstraction::nullifyByPrecond(const AffineRelation& precond, const AffineSchema& paritySchema)
 {    
     normalizeByCond(precond, paritySchema, true);
@@ -86,6 +100,16 @@ inline void PhaseAbstraction::normalizeByPostcond(const AffineRelation& postcond
 inline void PhaseAbstraction::projectOutAuxVars(const AffineRelation& cond)
 {
     normalizeByCond(cond, cond.getSchema(), false, true);
+    orphanBundlesIf([&](const Parity &parity) {
+        return !parity.isTrivialInRange(cond.getSchema().auxVars);
+    });
+}
+
+inline void PhaseAbstraction::orphanNonTrivialBundles()
+{
+    orphanBundlesIf([&](const Parity &parity) {
+        return !parity.isTrivial();
+    });
 }
 
 // in all these normalizations, I should be able to create the constraint matrix and toREF() it, then call reduce function for all parities on this same matrix. won't I?
