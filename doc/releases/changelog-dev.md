@@ -118,6 +118,13 @@
   [(#2998)](https://github.com/PennyLaneAI/catalyst/pull/2998)
   [(#2981)](https://github.com/PennyLaneAI/catalyst/pull/2981)
 
+* Extended program-capture compilation for PennyLane `Operator2` instances. Catalyst now
+  distinguishes gates from operators used as observables, preserves `Operator2` argument metadata
+  when capturing graph-decomposition rules, invokes `Operator2` decomposition rules using their
+  named arguments, and handles native `Operator2` controlled wrappers in `catalyst.ctrl` and device
+  verification.
+  [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
+
 * The `ResourceAnalysis` pass now reports each loop body and each subroutine as its own entry
   instead of folding their gate counts into the caller. Loops with constant bounds appear as `for_loop_<N>`
   with their trip count. Loops with dynamic bounds appear as `dyn_for_loop_<N>` with a stable
