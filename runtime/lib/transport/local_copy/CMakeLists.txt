@@ -14,6 +14,16 @@ target_include_directories(local_copy_cpu_impl PUBLIC
 )
 set_property(TARGET local_copy_cpu_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+add_library(catalyst_transport_local_controller SHARED
+    cpu_controller/LocalCpuControllerFactory.cpp
+)
+target_link_libraries(catalyst_transport_local_controller PRIVATE local_copy_cpu_impl)
+
+add_library(catalyst_transport_local_coprocessor SHARED
+    cpu_coprocessor/LocalCpuCoprocessorFactory.cpp
+)
+target_link_libraries(catalyst_transport_local_coprocessor PRIVATE local_copy_cpu_impl)
+
 if(TRANSPORT_HAS_HIP)
     add_library(local_copy_gpu_impl STATIC
         gpu_coprocessor/LocalGpuCoprocessorSession.cpp
@@ -30,11 +40,16 @@ if(TRANSPORT_HAS_HIP)
         ${runtime_includes}
     )
     target_link_libraries(local_copy_gpu_impl PUBLIC
-        catalyst_transport_gpu_coprocessor
+        catalyst_transport_gpu_verbs_coprocessor
         hip::host
     )
     if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
         target_link_libraries(local_copy_gpu_impl PUBLIC CUDA::cudart)
     endif()
     set_property(TARGET local_copy_gpu_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+    add_library(catalyst_transport_local_gpu_coprocessor SHARED
+        gpu_coprocessor/LocalGpuCoprocessorFactory.cpp
+    )
+    target_link_libraries(catalyst_transport_local_gpu_coprocessor PRIVATE local_copy_gpu_impl)
 endif()
