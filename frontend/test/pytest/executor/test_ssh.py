@@ -16,7 +16,9 @@
 remote ``catalyst-executor`` argv assembler. Subprocess is mocked throughout; these tests do
 not open real SSH connections."""
 
+import os
 import subprocess
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -57,7 +59,7 @@ class TestSSHCtlOpts:
         assert opts[0] == "-o"
         assert opts[1] == "ControlMaster=auto"
         assert opts[2] == "-o"
-        assert opts[3] == "ControlPath=/tmp/cm/cm-%C"
+        assert opts[3] == f"ControlPath=/tmp/cm/catalyst-cm-{os.getuid()}-%C"
         assert opts[4] == "-o"
         assert opts[5] == f"ControlPersist={SSHArgv.CONTROL_PERSIST}"
 
@@ -73,19 +75,16 @@ class TestSSHCtlOpts:
 class TestSSHCtlDir:
     """Resolution of the control-socket directory :meth:`SSHArgv._ctl_dir`."""
 
-    def test_prefers_xdg_runtime_dir(self, tmp_path, monkeypatch):
-        """Uses ``$XDG_RUNTIME_DIR/catalyst`` when the env var is set, creating it if missing."""
-        monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
-        d = SSHArgv._ctl_dir()
-        assert d == tmp_path / "catalyst"
-        assert d.exists()
+    def test_is_the_system_temp_dir(self):
+        """The socket lives in the temp dir, which always exists, so nothing has to be made."""
+        assert SSHArgv._ctl_dir() == Path(tempfile.gettempdir())
 
-    def test_fallback_when_no_xdg(self, monkeypatch):
-        """Falls back to :meth:`SSHArgv._fallback_ctl_dir` when ``XDG_RUNTIME_DIR`` is unset."""
-        monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
-        d = SSHArgv._ctl_dir()
-        # Falls back to ~/.cache/catalyst/ssh-cm.
-        assert d == SSHArgv._fallback_ctl_dir()
+    def test_creates_nothing(self):
+        """Building the flags has no filesystem effect, so a run leaves nothing behind."""
+        base = SSHArgv._ctl_dir()
+        before = set(base.iterdir())
+        SSHArgv.ctl_opts()
+        assert set(base.iterdir()) == before
 
 
 class TestSSHBaseCmd:
