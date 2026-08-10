@@ -1561,8 +1561,7 @@ class TestAdjointConstructorOutsideofQueuing:
 
         assert isinstance(out, Adjoint)
         assert out.base.__class__ is qp.RZ
-        assert out.data == ()
-        assert out.base.data == (1.234,)
+        assert out.base.phi == 1.234
         assert out.wires == qp.wires.Wires(0)
 
     def test_single_op_eager(self):
