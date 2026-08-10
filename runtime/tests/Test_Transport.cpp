@@ -24,6 +24,16 @@ namespace {
 CatalystTransportSession *make(std::int32_t role, const char *key) {
     return __catalyst__transport__create(STUB_BACKEND_PATH, "cfg", role, key);
 }
+
+CatalystTransportSession *make_local_controller(const char *key) {
+    return __catalyst__transport__create(LOCAL_CONTROLLER_BACKEND_PATH, "",
+                                         CATALYST_TRANSPORT_ROLE_CONTROLLER, key);
+}
+
+CatalystTransportSession *make_local_coprocessor(const char *key) {
+    return __catalyst__transport__create(LOCAL_COPROCESSOR_BACKEND_PATH, "",
+                                         CATALYST_TRANSPORT_ROLE_COPROCESSOR, key);
+}
 } // namespace
 
 TEST_CASE("create registers a session resolvable by (role, key)", "[transport]") {
@@ -144,4 +154,37 @@ TEST_CASE("destroy drains outstanding async tokens without a prior barrier", "[t
     REQUIRE(__catalyst__transport__exchange_keys_async(s) != 0);
     __catalyst__transport__destroy(s);
     SUCCEED();
+}
+
+TEST_CASE("local backend plugins round-trip through the transport CAPI", "[transport]") {
+    auto *ct = make_local_controller("local_roundtrip");
+    auto *co = make_local_coprocessor("local_roundtrip");
+    REQUIRE(ct != nullptr);
+    REQUIRE(co != nullptr);
+
+    REQUIRE(__catalyst__transport__connect(ct, "loopback", 19011) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__connect(co, "loopback", 19011) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys(ct) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys(co) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(ct, "local") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(co, "local") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_message_sizes(ct, 0, sizeof(std::uint64_t),
+                                                     sizeof(std::uint64_t)) ==
+            CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_coprocessor_fn(co, "") == CATALYST_TRANSPORT_OK);
+
+    __catalyst__transport__start(ct);
+    __catalyst__transport__start(co);
+
+    const std::uint64_t request = 0x0123456789ABCDEFull;
+    REQUIRE(__catalyst__transport__stage_payload(ct, &request, sizeof(request), 0) ==
+            CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__post(ct, 0) == CATALYST_TRANSPORT_OK);
+
+    std::uint64_t reply = 0;
+    REQUIRE(__catalyst__transport__collect(ct, &reply, sizeof(reply)) == CATALYST_TRANSPORT_OK);
+    CHECK(reply == request);
+
+    __catalyst__transport__destroy(ct);
+    __catalyst__transport__destroy(co);
 }

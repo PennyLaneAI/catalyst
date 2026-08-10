@@ -192,12 +192,16 @@ if(ENABLE_TRANSPORT)
     target_sources(runner_tests_transport PRIVATE Test_Transport.cpp)
     target_link_libraries(runner_tests_transport PRIVATE
         Catch2WithMain
-        catalyst_runtime_testing
         rt_transport
     )
     target_compile_definitions(runner_tests_transport PRIVATE
-        STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>")
-    add_dependencies(runner_tests_transport stub_transport_backend)
+        STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>"
+        LOCAL_CONTROLLER_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_local_controller>"
+        LOCAL_COPROCESSOR_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_local_coprocessor>")
+    add_dependencies(runner_tests_transport
+        stub_transport_backend
+        catalyst_transport_local_controller
+        catalyst_transport_local_coprocessor)
     catch_discover_tests(runner_tests_transport)
 
     # CPU-verbs backend: device-agnostic common primitives (RDMA-backed; SKIP without rxe0).
@@ -208,7 +212,6 @@ if(ENABLE_TRANSPORT)
     )
     target_link_libraries(runner_tests_transport_common PRIVATE
         Catch2WithMain
-        catalyst_runtime_testing
         transport_common
     )
     catch_discover_tests(runner_tests_transport_common)
@@ -220,7 +223,6 @@ if(ENABLE_TRANSPORT)
     )
     target_link_libraries(runner_tests_transport_cpu PRIVATE
         Catch2WithMain
-        catalyst_runtime_testing
         cpu_verbs_impl
     )
     catch_discover_tests(runner_tests_transport_cpu)
@@ -251,7 +253,6 @@ if(ENABLE_TRANSPORT)
         )
         target_link_libraries(runner_tests_transport_gpu PRIVATE
             Catch2WithMain
-            catalyst_runtime_testing
             catalyst_transport_gpu_verbs_coprocessor
         )
         catch_discover_tests(runner_tests_transport_gpu)
