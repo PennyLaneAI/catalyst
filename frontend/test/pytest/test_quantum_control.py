@@ -603,7 +603,7 @@ class TestCatalystOnlyControlled:
         assert result.name == expected.name
         assert qp.equal(result.base, expected.base)
         assert result.control_wires == expected.control_wires
-        assert result.control_values == expected.control_values
+        assert result.control_values.tolist() == expected.control_values.tolist()
         assert result.work_wires == expected.work_wires
 
     def test_control_decomp_trotter(self):
@@ -952,7 +952,7 @@ class TestControlledMiscMethods:
 
         data, metadata = op._flatten()
         dynamic_data, wire_data, hybrid_data = data
-        assert dynamic_data == [list(control_values)]
+        assert dynamic_data[0].tolist() == list(control_values)
         assert wire_data == [control_wires, work_wires]
         assert hybrid_data == [target]
 
@@ -1197,7 +1197,7 @@ class TestControlledSimplify:
         assert isinstance(simplified_op.base, qp.Hadamard)
         assert simplified_op.name == final_op.name
         assert simplified_op.wires == final_op.wires
-        assert simplified_op.data == final_op.data
+        qp.assert_equal(simplified_op, final_op)
         assert simplified_op.arithmetic_depth == final_op.arithmetic_depth
 
 
