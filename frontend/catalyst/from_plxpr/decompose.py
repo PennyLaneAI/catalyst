@@ -96,13 +96,13 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 }
 
 
-def _resource_metadata(op_rep):
-    """Return decomposition metadata from an Operator or Operator2 resource representation."""
+def _resource_num_wires(op_rep):
+    """Return the wire count from an Operator or Operator2 resource representation."""
     if isinstance(op_rep, qp.core.Operator2):
-        return op_rep.wires.num_wires, op_rep.compilable_args.get("pauli_word")
+        return op_rep.wires.num_wires
 
     params = getattr(op_rep, "params", {}) or {}
-    return params.get("num_wires"), params.get("pauli_word")
+    return params.get("num_wires")
 
 
 # pylint: disable=too-many-instance-attributes
@@ -194,27 +194,22 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         # Create decomposition rules for each operation in the solution
         # and compile them to Catalyst JAXPR decomposition rules
         for op, rule in self._decomp_graph_solution.items():
-            op_num_wires, pauli_word = _resource_metadata(op.op)
-            if (
-                op.op.name in COMPILER_OPS_FOR_DECOMPOSITION
-                and (
-                    o := next(
-                        (
-                            o
-                            for o in self._operations
-                            if o.name == op.op.name and len(o.wires) == op_num_wires
-                        ),
-                        None,
-                    )
-                )
-                is not None
-            ):
+            op_num_wires = _resource_num_wires(op.op)
+            captured_op = next(
+                (
+                    candidate
+                    for candidate in self._operations
+                    if candidate.name == op.op.name and len(candidate.wires) == op_num_wires
+                ),
+                None,
+            )
+            if op.op.name in COMPILER_OPS_FOR_DECOMPOSITION and captured_op is not None:
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                 _create_decomposition_rule(
                     rule,
                     op_name=op.op.name,
                     op_rep=op.op,
-                    num_wires=len(o.wires),
+                    num_wires=len(captured_op.wires),
                     num_params=num_params,
                     requires_copy=num_wires == -1,
                 )
@@ -227,8 +222,15 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                 # dictionary to get the number of wires.
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                 requires_copy = num_wires == -1
+                pauli_word = None
 
                 if op.op.name in ("PauliRot", "PauliMeasure"):
+                    params = (
+                        op.op.compilable_args
+                        if isinstance(op.op, qp.core.Operator2)
+                        else op.op.params
+                    )
+                    pauli_word = params["pauli_word"]
                     num_wires = len(pauli_word)
                 elif num_wires == -1 and op_num_wires is not None:
                     num_wires = op_num_wires
