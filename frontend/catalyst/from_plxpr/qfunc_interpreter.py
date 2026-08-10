@@ -134,6 +134,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 op = eqn.primitive.impl(*invals, **eqn.params)
             if isinstance(eqn.outvars[0], jax.core.DropVar):
                 _apply_operator2_gate(self, *invals, **eqn.params)
+                return ()
             return op
         return super().interpret_operation_eqn(eqn)
 
