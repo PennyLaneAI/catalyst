@@ -67,7 +67,8 @@ class AffineRelation : public AffineBase<RelationSchema> {
     [[nodiscard]] AffineRelation compose(const AffineRelation& rhs) const;
     [[nodiscard]] AffineRelation kleeneStar() const;
     [[nodiscard]] AffineTransform solveRelation();
-    [[nodiscard]] Parity reduce(const Parity& par, const AffineSchema& parSchm, bool isAgainstPostcond) const;
+    [[nodiscard]] Parity reduce(const Parity& par, const AffineSchema& parSchm, 
+        bool isAgainstPrecond=false, bool isProjectOutAuxVars=false) const;
     
   private:
     void opPreProcess(const AffineRelation& rhs);

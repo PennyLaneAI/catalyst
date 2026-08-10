@@ -53,7 +53,6 @@ struct RegionSummary {
 inline void RegionSummary::summarizeLoop()
 {
     affineRel.applyKleeneStar();
-    // phases.reSchema(bodySchm, affineRel.getSchema());
 }
 
 inline void RegionSummary::summarizeProc()

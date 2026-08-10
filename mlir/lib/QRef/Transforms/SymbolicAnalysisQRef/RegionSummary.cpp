@@ -23,6 +23,7 @@ RegionSummary::RegionSummary(RegionType type, ProgramAbstraction &circ1, Program
     this->phasesSchm = circ1.getSchema();
     this->phases = std::move(circ1.phases);
     this->affineRel = AffineRelation(std::move(circ1.stateTransform));
+    phases.projectOutAuxVars(affineRel);
     this->type = type;
 
     switch (type) {
@@ -80,11 +81,9 @@ void RegionSummary::nullifyPhasesUnder(const AffineRelation &precondRel)
 
 void RegionSummary::accumulatePhasesInto(PhaseAbstraction &trgtPhases, const TransformSchema &trgtSchm)
 {
-    // phases.reSchema(affineRel.getSchema(), trgtSchm);   // is it necessary? no, bc all phasee are either 0 or orphaned
     trgtPhases += phases;
 
     if (type == RegionType::Conditional) {
-        // falseBranchPhases.reSchema(affineRel.getSchema(), trgtSchm);
         trgtPhases += falseBranchPhases;
     }
 }   // += ops could become more optimized by actually consuming the phases

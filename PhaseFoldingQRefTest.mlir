@@ -1,8 +1,7 @@
+// Stats:
+// S: initial-> 0,  final-> 1. difference-> 1
+// T: initial-> 6,  final-> 1. difference-> -5
 // func.func @test_if_1(%arg0: i1) attributes {quantum.node} {
-//     // Stats:
-//     // S: initial-> 0,  final-> 1. difference-> 1
-//     // T: initial-> 6,  final-> 1. difference-> -5
-
 //     %reg = qref.alloc( 2) : !qref.reg<2>
 //     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
 //     %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
@@ -39,11 +38,10 @@
 //     return
 // }
 
+// Stats:
+// S: initial-> 0,  final-> 2. difference-> 2
+// T: initial-> 7,  final-> 2. difference-> -5
 // func.func @test_if_2(%arg0: i1) attributes {quantum.node} {
-//     // Stats:
-//     // S: initial-> 0,  final-> 2. difference-> 2
-//     // T: initial-> 7,  final-> 2. difference-> -5
-
 //     %reg = qref.alloc( 2) : !qref.reg<2>
 //     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
 //     %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
@@ -87,11 +85,10 @@
 //     return
 // }
 
+// Stats:
+// S: initial-> 0,  final-> 2. difference-> 2
+// T: initial-> 4,  final-> 0. difference-> -4
 // func.func @test_for() attributes {quantum.node} {
-//     // Stats:
-//     // S: initial-> 0,  final-> 2. difference-> 2
-//     // T: initial-> 4,  final-> 0. difference-> -4
-
 //     %start = arith.constant 0 : index
 //     %step = arith.constant 1 : index
 //     %stop = arith.constant 37 : index
@@ -121,12 +118,10 @@
 //     return
 // }
 
-
+// Stats:
+// S: initial-> 0,  final-> 1. difference-> 1
+// T: initial-> 2,  final-> 0. difference-> -2
 // func.func @ex_normal(%arg0: i1) attributes {quantum.node} {
-//     // Stats:
-//     // S: initial-> 0,  final-> 1. difference-> 1
-//     // T: initial-> 2,  final-> 0. difference-> -2
-
 //     %reg = qref.alloc( 2) : !qref.reg<2>
 //     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
 //     %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
@@ -146,11 +141,10 @@
 //     return
 // }
 
+// Stats:
+// S: initial-> 0,  final-> 2. difference-> 2
+// T: initial-> 9,  final-> 4. difference-> -5
 // func.func @test_nested(%arg0: i1) attributes {quantum.node} {
-//     // Stats:
-//     // S: initial-> 0,  final-> 2. difference-> 2
-//     // T: initial-> 9,  final-> 4. difference-> -5
-
 //     %start = arith.constant 0 : index
 //     %step = arith.constant 1 : index
 //     %stop = arith.constant 37 : index
@@ -209,12 +203,10 @@
 //     return
 // }
 
-
+// Stats:
+// S: initial-> 0,  final-> 1. difference-> 1
+// T: initial-> 2,  final-> 0. difference-> -2
 // func.func @test_for_h() attributes {quantum.node} {
-//     // Stats:
-//     // S: initial-> 0,  final-> 1. difference-> 1
-//     // T: initial-> 2,  final-> 0. difference-> -2
-
 //     %start = arith.constant 0 : index
 //     %step = arith.constant 1 : index
 //     %stop = arith.constant 37 : index
@@ -236,6 +228,9 @@
 //     return
 // }
 
+// Stats:
+// S: initial-> 0,  final-> 1. difference-> 1
+// T: initial-> 2,  final-> 0. difference-> -2
 // func.func @test_if_simple(%arg0: i1) attributes {quantum.node} {
 //     %reg = qref.alloc( 2) : !qref.reg<2>
 //     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
@@ -307,7 +302,9 @@
 //     return
 // }
 
-// wrong!
+// correct?!
+// Stats:
+// T: initial-> 3,  final-> 2. difference-> -1
 // func.func @test_loop_nested() attributes {quantum.node} {
 //     %start = arith.constant 0 : index
 //     %step = arith.constant 1 : index
@@ -323,7 +320,7 @@
 //     qref.custom "T"() %q1 : !qref.bit   // l0
 
 //     scf.for %i = %start to %stop step %step {
-//         qref.custom "T"() %q0 : !qref.bit   // l0
+//         qref.custom "T"() %q0 : !qref.bit   // l1      // will be removed
         
 //         scf.for %j = %start to %stop step %step {
 //             qref.custom "PauliX"() %q1 : !qref.bit
@@ -334,12 +331,15 @@
 //         scf.yield
 //     }
 
-//     qref.custom "T"() %q1 : !qref.bit   // l1   // will be removed
+//     qref.custom "T"() %q1 : !qref.bit   // l2
 
 //     qref.dealloc %reg : !qref.reg<2>
 //     return
 // }
 
+// Stats:
+// S: initial-> 0,  final-> 1. difference-> 1
+// T: initial-> 4,  final-> 1. difference-> -3
 // func.func @test_loop_null() attributes {quantum.node} {
 //     %start = arith.constant 0 : index
 //     %step = arith.constant 1 : index
@@ -355,8 +355,8 @@
 //     qref.set_basis_state(%tens01) %q0 : tensor<1xi1>, !qref.bit   
 
 //     scf.for %i = %start to %stop step %step {
-//         qref.custom "T"() %q1 : !qref.bit   // l0
-//         qref.custom "T"() %q0 : !qref.bit   // l0
+//         qref.custom "T"() %q1 : !qref.bit   // l1
+//         qref.custom "T"() %q0 : !qref.bit   // l2   // will be removed
         
 //         scf.yield
 //     }
@@ -367,6 +367,9 @@
 //     return
 // }
 
+// Stats:
+// S: initial-> 0,  final-> 1. difference-> 1
+// T: initial-> 2,  final-> 0. difference-> -2
 // func.func @test_loop_simple() attributes {quantum.node} {
 //     %start = arith.constant 0 : index
 //     %step = arith.constant 1 : index
@@ -376,7 +379,7 @@
 //     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
 //     %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
 
-//     qref.custom "T"() %q0 : !qref.bit   // l0
+//     qref.custom "T"() %q0 : !qref.bit   // l0   // will be removed
 
 //     scf.for %i = %start to %stop step %step {
 //         qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
@@ -390,6 +393,9 @@
 //     return
 // }
 
+// Stats:
+// S: initial-> 0,  final-> 1. difference-> 1
+// T: initial-> 2,  final-> 0. difference-> -2
 // func.func @test_loop_swap() attributes {quantum.node} {
 //     %start = arith.constant 0 : index
 //     %step = arith.constant 1 : index
@@ -417,6 +423,8 @@
 //     return
 // }
 
+// Stats:
+// T: initial-> 2,  final-> 1. difference-> -1
 // func.func @test_reset() attributes {quantum.node} {
 //     %reg = qref.alloc( 1) : !qref.reg<1>
 //     %q0 = qref.get %reg[ 0] : !qref.reg<1> -> !qref.bit
@@ -426,12 +434,15 @@
 //     %tens01 = arith.constant dense<[false]> : tensor<1xi1>
 //     qref.set_basis_state(%tens01) %q0 : tensor<1xi1>, !qref.bit
 
-//     qref.custom "T"() %q0 : !qref.bit   // l0
+//     qref.custom "T"() %q0 : !qref.bit   // l1   // will be removed
 
 //     qref.dealloc %reg : !qref.reg<1>
 //     return
 // }
 
+// Stats:
+// S: initial-> 0,  final-> 2. difference-> 2
+// T: initial-> 4,  final-> 0. difference-> -4
 // func.func @test_temp_anc() attributes {quantum.node} {
 //     %start = arith.constant 0 : index
 //     %step = arith.constant 1 : index
@@ -447,6 +458,7 @@
 //     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
 
 //     scf.for %i = %start to %stop step %step {
+//         // qref.custom "S"() %1 : !qref.bit
 //         qref.custom "T"() %q0 : !qref.bit   // l1   // will be removed
 //         qref.custom "SWAP"() %q0, %q1 : !qref.bit, !qref.bit
 
@@ -467,6 +479,9 @@
 //     return
 // }
 
+// Stats:
+// S: initial-> 0,  final-> 1. difference-> 1
+// T: initial-> 2,  final-> 0. difference-> -2
 // func.func @test_loop() attributes {quantum.node} {
 //     %start = arith.constant 0 : index
 //     %step = arith.constant 1 : index
@@ -496,10 +511,9 @@
 //     return
 // }
 
+// Stats:
+// T: initial-> 2,  final-> 0. difference-> -2
 // module @module_circuit_base {
-//     // Stats:
-//     // T: initial-> 2,  final-> 0. difference-> -2
-
 //   func.func public @circuit_base(%arg0: tensor<f64>) -> tensor<4xf64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
 //     %c0_i64 = arith.constant 0 : i64
 //     %cst = stablehlo.constant dense<1.400000e+00> : tensor<f64>
@@ -539,11 +553,10 @@
 // }
 
 // not captured in feynman
+// Stats:
+// S: initial-> 0,  final-> 1. difference-> 1
+// T: initial-> 5,  final-> 1. difference-> -4
 // func.func @test_reset_in_block(%arg0: i1) attributes {quantum.node} {
-//     // Stats:
-//     // S: initial-> 0,  final-> 1. difference-> 1
-//     // T: initial-> 5,  final-> 1. difference-> -4
-
 //     %reg = qref.alloc( 2) : !qref.reg<2>
 //     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
 //     %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
@@ -556,7 +569,7 @@
 
 //     %2:2 = scf.if %arg0 -> (!qref.bit, !qref.bit) {
 //         qref.custom "T"() %q0 : !qref.bit // l1 // will be removed:
-//         qref.custom "T"() %q1 : !qref.bit // l2
+//         qref.custom "T"() %q1 : !qref.bit // l2 
 //         qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
 //         qref.custom "T"() %q1 : !qref.bit // l3
 
@@ -566,40 +579,8 @@
 //         scf.yield %q0, %q1 : !qref.bit, !qref.bit
 //     }
 
-//     qref.custom "T"() %q0 : !qref.bit // l5 // will be removed:
+//     qref.custom "T"() %q0 : !qref.bit // l4 // will be removed:
 
 //     qref.dealloc %reg : !qref.reg<2>
 //     return
 // }
-
-module @module_circuit_base {
-  func.func public @circuit_base(%arg0: tensor<f64>) -> tensor<4xf64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
-    %c0_i64 = arith.constant 0 : i64
-    %cst = stablehlo.constant dense<1.400000e+00> : tensor<f64>
-    %0 = stablehlo.compare  GT, %arg0, %cst,  FLOAT : (tensor<f64>, tensor<f64>) -> tensor<i1>
-    quantum.device shots(%c0_i64) ["/Users/sara.babaeekhanehsar/Desktop/Home/Coding/Catalyst/catalyst/.venv/lib/python3.14/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib", "LightningSimulator", "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
-    %1 = qref.alloc( 2) : !qref.reg<2>
-    %2 = qref.get %1[ 0] : !qref.reg<2> -> !qref.bit
-    qref.custom "T"() %2 : !qref.bit
-    %extracted = tensor.extract %0[] : tensor<i1>
-    scf.if %extracted {
-      %6 = qref.get %1[ 0] : !qref.reg<2> -> !qref.bit
-      qref.custom "PauliX"() %6 : !qref.bit
-      %7 = qref.get %1[ 1] : !qref.reg<2> -> !qref.bit
-      qref.custom "Hadamard"() %7 : !qref.bit
-    } else {
-      %6 = qref.get %1[ 0] : !qref.reg<2> -> !qref.bit
-      qref.custom "PauliY"() %6 : !qref.bit
-      %7 = qref.get %1[ 1] : !qref.reg<2> -> !qref.bit
-      %extracted_0 = tensor.extract %arg0[] : tensor<f64>
-      qref.custom "RZ"(%extracted_0) %7 : !qref.bit
-    }
-    %3 = qref.get %1[ 0] : !qref.reg<2> -> !qref.bit
-    qref.custom "T"() %3 : !qref.bit
-    %4 = qref.compbasis(qreg %1 : !qref.reg<2>) : !quantum.obs
-    %5 = quantum.probs %4 : tensor<4xf64>
-    qref.dealloc %1 : !qref.reg<2>
-    quantum.device_release
-    return %5 : tensor<4xf64>
-  }
-}

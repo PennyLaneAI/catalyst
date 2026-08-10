@@ -104,13 +104,13 @@ void PhaseAbstraction::orphanNonTrivialBundles()
     }
 }
 
-void PhaseAbstraction::normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPostcond)
+void PhaseAbstraction::normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPrecond, bool isProjectOutAuxVars)
 {
     llvm::DenseMap<Parity, GateBundle> oldBundles;
     std::swap(activeBundles, oldBundles);
 
     for (auto &[parity, contributors] : oldBundles) {
-        Parity reducedPar = cond.reduce(parity, paritySchema, isPostcond);
+        Parity reducedPar = cond.reduce(parity, paritySchema, isPrecond, isProjectOutAuxVars);
                 
         BitLocation affValLoc = cond.getSchema().affVal;
         if (reducedPar.getBitAtLoc(affValLoc)) {
@@ -119,20 +119,4 @@ void PhaseAbstraction::normalizeByCond(const AffineRelation& cond, const AffineS
         }
         insertActiveBundle(contributors, reducedPar);
     }
-}
-
-void PhaseAbstraction::reSchema(const AffineSchema &oldSchm, const AffineSchema &newSchm)
-{
-    llvm::DenseMap<Parity, GateBundle> newActiveBundles;
-    Parity newPar(newSchm.maxBlock());
-
-    for (auto &[oldPar, contributors] : activeBundles) {
-        newPar.reset();
-        newPar.mapBitsFrom(oldPar, oldSchm.preVars, newSchm.preVars);
-        newPar.mapBitsFrom(oldPar, oldSchm.auxVars, newSchm.auxVars);
-        newPar.mapBitFrom(oldPar, oldSchm.affVal, newSchm.affVal);
-
-        newActiveBundles[newPar] = contributors;
-    }
-    activeBundles = std::move(newActiveBundles);
 }

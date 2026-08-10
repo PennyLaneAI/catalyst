@@ -45,13 +45,13 @@ struct PhaseAbstraction {
     void orphanNonTrivialBundles();
     void nullifyByPrecond(const AffineRelation& precond, const AffineSchema& paritySchema);
     void normalizeByPostcond(const AffineRelation& postcond, const AffineSchema& paritySchema);
-    void reSchema(const AffineSchema &oldSchm, const AffineSchema &newSchm);
+    void projectOutAuxVars(const AffineRelation& cond);
 
   private:
     void addActiveBundlesWith(const llvm::DenseMap<Parity, GateBundle> &rhsActives);
     void addOrphanBundlesWith(const std::vector<GateBundle> &rhsOrphans);
     void insertActiveBundle(const GateBundle &contributor, const Parity &parity);
-    void normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPostcond);
+    void normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPrecond, bool isProjectOutAuxVars=false);
 };
 
 template <typename ColOrderRange>
@@ -74,11 +74,18 @@ std::string PhaseAbstraction::toString(ColOrderRange colOrder) const
 
 inline void PhaseAbstraction::nullifyByPrecond(const AffineRelation& precond, const AffineSchema& paritySchema)
 {    
-    normalizeByCond(precond, paritySchema, false);
+    normalizeByCond(precond, paritySchema, true);
     orphanNonTrivialBundles();
 }
 
 inline void PhaseAbstraction::normalizeByPostcond(const AffineRelation& postcond, const AffineSchema& paritySchema)
-{    
-    normalizeByCond(postcond, paritySchema, true);
+{
+    normalizeByCond(postcond, paritySchema, false);
 }
+
+inline void PhaseAbstraction::projectOutAuxVars(const AffineRelation& cond)
+{
+    normalizeByCond(cond, cond.getSchema(), false, true);
+}
+
+// in all these normalizations, I should be able to create the constraint matrix and toREF() it, then call reduce function for all parities on this same matrix. won't I?

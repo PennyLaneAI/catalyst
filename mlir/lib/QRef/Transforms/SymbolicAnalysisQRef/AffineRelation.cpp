@@ -204,9 +204,12 @@ const AffineRelation &AffineRelation::propagateThrough(const AffineRelation& rhs
     assert(rhs.schema.numAuxVars() == 0);
 
     PropagateSchema propagateSchm(std::move(schema), rhs.schema);
-    BinaryMatrix propagateMat = concretizer(propagateSchm);
+    BinaryMatrix propagateMat = (std::move(this->matrix));
 
-    propagateMat.appendRows(this->matrix);
+    propagateMat.appendRows(concretizer(propagateSchm));
+
+    // BinaryMatrix propagateMat = concretizer(propagateSchm);
+    // propagateMat.appendRows(this->matrix);
 
     rhs.embedInto(
         propagateMat, 
@@ -242,11 +245,12 @@ AffineTransform AffineRelation::solveRelation()
     return AffineTransform(std::move(matrix), std::move(solvedSchm));
 }
 
-Parity AffineRelation::reduce(const Parity& par, const AffineSchema& parSchm, bool isAgainstPostcond) const
+Parity AffineRelation::reduce(const Parity& par, const AffineSchema& parSchm, bool isAgainstPrecond, bool isProjectOutAuxVars) const
 {   
     BinaryMatrix redMat = matrix;
     RelationSchema relSchm = schema;
 
+    // is it necessary? would there be any case where the auxVars are not the same?
     const int diffAuxVars = parSchm.numAuxVars() - relSchm.numAuxVars();
     if (diffAuxVars > 0) {
         relSchm.growAuxVars(diffAuxVars);
@@ -256,10 +260,10 @@ Parity AffineRelation::reduce(const Parity& par, const AffineSchema& parSchm, bo
     
     lastRow.extendBitsFor(relSchm.maxBlock());
 
-    lastRow.mapBitsFrom(par, parSchm.preVars, isAgainstPostcond ? relSchm.preVars : relSchm.postVars);
+    lastRow.mapBitsFrom(par, parSchm.preVars, isAgainstPrecond ? relSchm.postVars : relSchm.preVars);
     lastRow.mapBitsFrom(par, parSchm.auxVars, relSchm.auxVars);
     lastRow.mapBitFrom(par, parSchm.affVal, relSchm.affVal);
 
-    redMat.toREF(relSchm.getOrder());   // or RREF?
+    redMat.toREF(isProjectOutAuxVars ? relSchm.getProjOrder(relSchm.auxVars) : relSchm.getOrder());
     return redMat.getRowAt(redMat.getNumRows() - 1);
 }

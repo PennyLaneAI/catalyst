@@ -191,7 +191,11 @@ inline Parity &BinaryMatrix::allocRow()
     return rows.back();
 }
 
-inline void BinaryMatrix::appendRows(const BinaryMatrix &rhs) { rows.insert(rows.end(), rhs.rows.begin(), rhs.rows.end()); }
+inline void BinaryMatrix::appendRows(const BinaryMatrix &rhs) 
+{ 
+    reserveRowsFor(rhs.getNumRows());
+    rows.insert(rows.end(), rhs.rows.begin(), rhs.rows.end()); 
+}
 
 inline void BinaryMatrix::reserveRowsFor(size_t addNumRows) { rows.reserve(rows.size() + addNumRows); }
 

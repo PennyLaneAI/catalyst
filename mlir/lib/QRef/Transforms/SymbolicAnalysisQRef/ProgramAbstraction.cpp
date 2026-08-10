@@ -130,4 +130,6 @@ void ProgramAbstraction::applySummary(RegionSummary &&summary)
 
     summary.accumulatePhasesInto(this->phases, getSchema());
     // llvm::errs() << "\naccumulatedPhases:\n" << phases << "\n";
+
+    // llvm::errs() << "\nfinalAbstraction:\n" << *this << "\n";
 }
