@@ -365,9 +365,7 @@ def _create_decomposition_rule(
 def _should_skip_decomp_rule_capture(op_rep) -> bool:
     """Return True if a decomposition-graph op should not be captured as a JAX rule."""
     op_type = (
-        type(op_rep)
-        if isinstance(op_rep, qp.core.Operator2)
-        else getattr(op_rep, "op_type", None)
+        type(op_rep) if isinstance(op_rep, qp.core.Operator2) else getattr(op_rep, "op_type", None)
     )
     if op_type is not None and issubclass(
         op_type,
