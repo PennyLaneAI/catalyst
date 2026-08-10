@@ -42,3 +42,24 @@ module attributes {catalyst.backline = #transport.backline<transport = "bogus", 
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
 }
+
+// -----
+
+// local_copy is process-local, so a local backline cannot dispatch the controller remotely.
+
+// expected-error @below {{local transport does not support a remote controller}}
+module attributes {catalyst.backline = #transport.backline<transport = "local", controller = #transport.node<backend_lib = "x", remote = true>>} {
+  func.func @setup() { quantum.init  return }
+  func.func @teardown() { quantum.finalize  return }
+}
+
+// -----
+
+// Nor can it dispatch a coprocessor remotely.
+
+// expected-error @below {{local transport does not support remote coprocessors}}
+module attributes {catalyst.backline = #transport.backline<transport = "local", controller = #transport.node<backend_lib = "x">,
+  coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", symbol = "foo", remote = true>]>} {
+  func.func @setup() { quantum.init  return }
+  func.func @teardown() { quantum.finalize  return }
+}

@@ -75,6 +75,9 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
     if (!transport || (transport.getValue() != "rdma" && transport.getValue() != "local")) {
         return emitError() << "backline transport must be 'rdma' or 'local'";
     }
+    if (transport.getValue() == "local" && controller.isRemote()) {
+        return emitError() << "local transport does not support a remote controller";
+    }
     for (NodeAttr c : coprocessors) {
         if (!c) {
             return emitError() << "null coprocessor";
@@ -84,6 +87,9 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
         }
         if (!c.getSymbol() || c.getSymbol().getValue().empty()) {
             return emitError() << "coprocessor requires a 'symbol'";
+        }
+        if (transport.getValue() == "local" && c.isRemote()) {
+            return emitError() << "local transport does not support remote coprocessors";
         }
     }
     return success();
