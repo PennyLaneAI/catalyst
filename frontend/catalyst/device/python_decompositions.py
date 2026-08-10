@@ -52,7 +52,7 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
 
     def rule_to_subroutine(rule):
         def decomp_rule(*params, wires):
-            if isinstance(op_cls, type) and issubclass(op_cls, qp.core.Operator2):
+            if issubclass(op_cls, qp.core.Operator2):
                 arguments = dict(zip(op_cls.dynamic_argnames, params, strict=True))
                 arguments.update(zip(op_cls.wire_argnames, wires, strict=True))
                 arguments.update(static_data)
