@@ -20,6 +20,7 @@ import jax.numpy as jnp
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
+from pennylane import qjit, qnode
 from pennylane.decomposition import add_decomps, local_decomps, register_resources
 from pennylane.typing import Float, Wire
 
@@ -84,6 +85,15 @@ class TestGenericUtilities:
         """Test mlir_stringify_type."""
         assert mlir_stringify_type(dtype) == expected
 
+    def test_wrapper_operator(self):
+        """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
+        # TODO: keep this up to date with an operator that is not migrated, and decomposes to
+        # un-migrated operators.
+        with pytest.warns(match="Failed to get resources"):
+            compile_decomposition_rules_wrapper(
+                "PauliX", 'PauliX{}{"wires":1}{}', {}, {"wires": 1}, {}
+            )
+
 
 class TestPrecompiled:
     """Tests for precompiled decomposition rules."""
@@ -122,9 +132,7 @@ class TestTraceTime:
 
 
 class TestOnDemand:
-    """
-    Test the python wrapper functions used for on-demand, compile-time decomposition rule lowering.
-    """
+    """Test the python wrapper functions used for on-demand, compile-time decomposition rule lowering."""
 
 
 if __name__ == "__main__":

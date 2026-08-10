@@ -18,6 +18,7 @@ This module provides infrastructure for lowering decomposition rules via python.
 
 # pylint: disable=protected-access,bare-except
 
+import warnings
 from functools import partial
 
 import jax.numpy as jnp
@@ -170,16 +171,19 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
     name_to_resource_ids = {}
     name_to_resources = {}
     for rule in decomp_rules:
-        # The `compute_resources` function's signature is the same as the Operator2 signature
-        # for the original op of the rule
-        if is_custom_op:
-            args = tuple(val for key, val in kwargs.items() if key != "wires")
-            kwargs = {"wires": kwargs["wires"]}
-        resources = rule.compute_resources(*args, **kwargs)
-        name_to_resources[rule.name] = resources.gate_counts
-        name_to_resource_ids[rule.name] = {
-            GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
-        }
+        try:
+            # The `compute_resources` function's signature is the same as the Operator2 signature
+            # for the original op of the rule
+            if is_custom_op:
+                args = tuple(val for key, val in kwargs.items() if key != "wires")
+                kwargs = {"wires": kwargs["wires"]}
+            resources = rule.compute_resources(*args, **kwargs)
+            name_to_resources[rule.name] = resources.gate_counts
+            name_to_resource_ids[rule.name] = {
+                GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
+            }
+        except Exception as e:
+            warnings.warn(f"Failed to get resources for the {rule.name} decomposition rule: {e}")
 
     return name_to_resources, name_to_resource_ids, decomp_rules
 
