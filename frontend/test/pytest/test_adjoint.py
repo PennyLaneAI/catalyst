@@ -151,6 +151,10 @@ class TestCatalyst:
             pytest.xfail(
                 "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
             )
+        if capture_mode:
+            pytest.xfail(
+                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+            )
 
         def func(w, theta1, theta2, theta3=1):
             qp.RX(theta1 * np.pi / 2, wires=w)
@@ -343,6 +347,10 @@ class TestCatalyst:
         if backend == "lightning.kokkos":
             pytest.xfail(
                 "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
+        if capture_mode:
+            pytest.xfail(
+                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
             )
 
         def func(limit):
