@@ -1136,5 +1136,64 @@ def test_lowering_time_rules():
     # CHECK-SAME:   target_gate = "SingleParam{x:[f64]}{reg:1}{}"
     test_multiple_rules_chained_and_branch()
 
+    def test_with_cycles():
+        """
+        Tests for when the decomposition rules have cycles, i.e. graph looks like
+              A
+              |
+           +--+--+
+           |     ^
+           v     |
+           B---> C
+        """
+
+        @qp.register_resources(lambda reg: {SingleParam(x=Float, reg=Wire[1]): 1})
+        def ruleAB(reg):
+            SingleParam(x=0.1, reg=reg[0])
+
+        @qp.register_resources(
+            lambda x, reg: {CompilableData(a="a", b="b", thing="thing", wires=Wire[1]): 1}
+        )
+        def ruleBC(x, reg):
+            CompilableData(a="a", b="b", thing="thing", wires=reg[0])
+
+        @qp.register_resources(lambda a, b, thing, wires: {NoParams(reg=Wire[2]): 1})
+        def ruleCA(a, b, thing, wires):
+            NoParams(reg=[0, 1])
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, ruleAB)
+            qp.add_decomps(SingleParam, ruleBC)
+            qp.add_decomps(CompilableData, ruleCA)
+
+            @qp.qjit(capture=True, target="mlir")
+            @qp.qnode(qp.device("null.qubit", wires=3))
+            def c():
+                NoParams(reg=[0, 1])
+                NoParams(reg=[0, 1, 2])
+                return qp.state()
+
+            print(c.mlir)
+
+    # CHECK: func.func public @c()
+    # CHECK: qref.operator "NoParams"
+    # CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:2}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "SingleParam{x:[f64]}{reg:1}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+    # CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[f64]}{reg:1}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
+    # CHECK-SAME:   target_gate = "SingleParam{x:[f64]}{reg:1}{}"
+    # CHECK: func.func private @"__builtin_ruleCA_CompilableData{}{wires:1}{a:a,b:b,thing:thing}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "NoParams{}{reg:2}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:a,b:b,thing:thing}"
+    # CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:3}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "SingleParam{x:[f64]}{reg:1}{}" = 1 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
+    test_with_cycles()
+
 
 test_lowering_time_rules()
