@@ -85,6 +85,10 @@
     [(#3031)](https://github.com/PennyLaneAI/catalyst/pull/3031)
     [(#3030)](https://github.com/PennyLaneAI/catalyst/pull/3030)
 
+  - The `catalyst-executor` server side is now added to Catalyst that receives objects, maps them
+    and calls them.
+    [(#3088)](https://github.com/PennyLaneAI/catalyst/pull/3088)
+
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
 
