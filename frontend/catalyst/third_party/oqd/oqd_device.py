@@ -20,11 +20,12 @@ This module defines the classes that represent an Open Quantum Design (OQD)
 trapped-ion quantum computer device.
 """
 
-from typing import Optional
 import platform
+from typing import Optional
 
 from pennylane import CompilePipeline
 from pennylane.devices import Device, ExecutionConfig
+
 from catalyst.compiler import get_lib_path
 
 BACKENDS = ["default"]

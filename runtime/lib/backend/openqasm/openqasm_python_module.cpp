@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "nanobind/eval.h"
+#include "nanobind/nanobind.h"
+#include "nanobind/stl/string.h"
+
 #include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
-
-#include "nanobind/eval.h"
-#include "nanobind/nanobind.h"
-#include "nanobind/stl/string.h"
 
 const std::string program = R"(
 import numpy as np
@@ -86,8 +86,7 @@ def py_get_results(circuit, braket_device, kwargs, shots):
 )";
 
 extern "C" NB_EXPORT double var(const char *_circuit, const char *_device, size_t shots,
-                                const char *_kwargs)
-{
+                                const char *_kwargs) {
     namespace nb = nanobind;
     nb::gil_scoped_acquire lock;
 
@@ -102,8 +101,7 @@ extern "C" NB_EXPORT double var(const char *_circuit, const char *_device, size_
 }
 
 extern "C" NB_EXPORT double expval(const char *_circuit, const char *_device, size_t shots,
-                                   const char *_kwargs)
-{
+                                   const char *_kwargs) {
     namespace nb = nanobind;
     nb::gil_scoped_acquire lock;
 
@@ -119,8 +117,7 @@ extern "C" NB_EXPORT double expval(const char *_circuit, const char *_device, si
 }
 
 extern "C" NB_EXPORT void samples(const char *_circuit, const char *_device, size_t shots,
-                                  size_t num_qubits, const char *_kwargs, void *_vector)
-{
+                                  size_t num_qubits, const char *_kwargs, void *_vector) {
     namespace nb = nanobind;
     nb::gil_scoped_acquire lock;
 
@@ -144,8 +141,7 @@ extern "C" NB_EXPORT void samples(const char *_circuit, const char *_device, siz
 }
 
 extern "C" NB_EXPORT void probs(const char *_circuit, const char *_device, size_t shots,
-                                size_t num_qubits, const char *_kwargs, void *_vector)
-{
+                                size_t num_qubits, const char *_kwargs, void *_vector) {
     namespace nb = nanobind;
     nb::gil_scoped_acquire lock;
 
@@ -169,8 +165,7 @@ extern "C" NB_EXPORT void probs(const char *_circuit, const char *_device, size_
 }
 
 extern "C" NB_EXPORT char *runCircuit(const char *_circuit, const char *_device, size_t shots,
-                                      const char *_kwargs)
-{
+                                      const char *_kwargs) {
     namespace nb = nanobind;
     nb::gil_scoped_acquire lock;
 

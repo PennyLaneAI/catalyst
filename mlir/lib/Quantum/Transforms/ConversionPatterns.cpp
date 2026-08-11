@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstdint>
 #include <string>
 
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
@@ -33,8 +34,7 @@ namespace catalyst {
 namespace quantum {
 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
-                      ModuleOp mod)
-{
+                      ModuleOp mod) {
     auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
     LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
     if (!glb) {
@@ -48,8 +48,7 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
                                ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
-Value getPauliProductPtr(Location loc, OpBuilder &rewriter, ModuleOp mod, ArrayAttr pauliProduct)
-{
+Value getPauliProductPtr(Location loc, OpBuilder &rewriter, ModuleOp mod, ArrayAttr pauliProduct) {
     std::string pauliWord;
     for (Attribute attr : pauliProduct) {
         pauliWord += cast<StringAttr>(attr).getValue().str();
@@ -61,8 +60,7 @@ Value getPauliProductPtr(Location loc, OpBuilder &rewriter, ModuleOp mod, ArrayA
 
 void createPauliRotCall(Location loc, ConversionPatternRewriter &rewriter, Operation *op,
                         Value pauliWordPtr, Value thetaValue, Value modifiersPtr, Value cond,
-                        ValueRange inQubits)
-{
+                        ValueRange inQubits) {
     MLIRContext *ctx = rewriter.getContext();
     StringRef qirName = "__catalyst__qis__PauliRot";
     Type ptrType = LLVM::LLVMPointerType::get(ctx);
@@ -106,8 +104,7 @@ constexpr int32_t NO_POSTSELECT = -1;
  * @param controlledValues list of controlled values
  */
 Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter *conv, bool adjoint,
-                      ValueRange controlledQubits, ValueRange controlledValues)
-{
+                      ValueRange controlledQubits, ValueRange controlledValues) {
     assert(controlledQubits.size() == controlledValues.size() &&
            "controlled qubits and controlled values have different lengths");
 
@@ -183,8 +180,7 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
     using OpConversionPattern<T>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = this->getContext();
 
         StringRef qirName;
@@ -205,8 +201,7 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
                     cast<IntegerAttr>(op->getAttr("seed")));
                 rewriter.restoreInsertionPoint(ip);
                 seed_val = LLVM::AddressOfOp::create(rewriter, loc, seed_glb);
-            }
-            else {
+            } else {
                 // Set seed argument to nullptr for unseeded runs
                 seed_val = LLVM::ZeroOp::create(rewriter, loc, intPtrType);
             }
@@ -214,8 +209,7 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
                 rewriter, op, qirName, qirSignature);
             SmallVector<Value> operands = {seed_val};
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
-        }
-        else {
+        } else {
             qirName = "__catalyst__rt__finalize";
             Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
             LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
@@ -231,8 +225,7 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(DeviceInitOp op, DeviceInitOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         ModuleOp mod = op->getParentOfType<ModuleOp>();
@@ -268,8 +261,7 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         if (!shots) {
             auto zeroShots = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(0));
             operands.push_back(zeroShots);
-        }
-        else {
+        } else {
             operands.push_back(shots);
         }
 
@@ -289,8 +281,7 @@ struct DeviceReleaseOpPattern : public OpConversionPattern<DeviceReleaseOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(DeviceReleaseOp op, DeviceReleaseOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = this->getContext();
 
         StringRef qirName = "__catalyst__rt__device_release";
@@ -310,8 +301,7 @@ struct NumQubitsOpPattern : public OpConversionPattern<NumQubitsOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(NumQubitsOp op, NumQubitsOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = this->getContext();
 
         StringRef qirName = "__catalyst__rt__num_qubits";
@@ -335,8 +325,7 @@ struct AllocOpPattern : public OpConversionPattern<AllocOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(AllocOp op, AllocOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -363,8 +352,7 @@ struct AllocQubitOpPattern : public OpConversionPattern<AllocQubitOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(AllocQubitOp op, AllocQubitOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
@@ -384,8 +372,7 @@ struct DeallocOpPattern : public OpConversionPattern<DeallocOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(DeallocOp op, DeallocOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
@@ -406,8 +393,7 @@ struct DeallocQubitOpPattern : public OpConversionPattern<DeallocQubitOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(DeallocQubitOp op, DeallocQubitOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
@@ -428,8 +414,7 @@ struct ExtractOpPattern : public OpConversionPattern<ExtractOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ExtractOp op, ExtractOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -460,8 +445,7 @@ struct InsertOpDefaultPattern : public OpConversionPattern<InsertOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(InsertOp op, InsertOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // Unravel use-def chain of quantum register values, converting back to reference semantics.
         rewriter.replaceOp(op, adaptor.getInQreg());
         return success();
@@ -472,8 +456,7 @@ struct InsertOpArrayBackedPattern : public OpConversionPattern<InsertOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(InsertOp op, InsertOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -510,8 +493,7 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CustomOp op, CustomOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
 
@@ -532,8 +514,7 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
             // thus we should add an additional information for number of qubits
             argTypes.insert(argTypes.end(), modifiersPtr.getType());
             argTypes.insert(argTypes.end(), IntegerType::get(ctx, 64));
-        }
-        else {
+        } else {
             argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
                             adaptor.getInQubits().getTypes().end());
             argTypes.insert(argTypes.end(), modifiersPtr.getType());
@@ -553,8 +534,7 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
             args.insert(args.end(), LLVM::ConstantOp::create(
                                         rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
             args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        }
-        else {
+        } else {
             args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
             args.insert(args.end(), modifiersPtr);
         }
@@ -574,8 +554,7 @@ struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(GlobalPhaseOp op, GlobalPhaseOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -603,8 +582,7 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(MultiRZOp op, MultiRZOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -643,8 +621,7 @@ struct PauliRotOpPattern : public OpConversionPattern<PauliRotOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(PauliRotOp op, PauliRotOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         const TypeConverter *conv = getTypeConverter();
         ModuleOp mod = op->getParentOfType<ModuleOp>();
@@ -672,8 +649,7 @@ struct PCPhaseOpPattern : public OpConversionPattern<PCPhaseOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(PCPhaseOp op, PCPhaseOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -683,7 +659,7 @@ struct PCPhaseOpPattern : public OpConversionPattern<PCPhaseOp> {
         std::string qirName = "__catalyst__qis__PCPhase";
         Type qirSignature =
             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
-                                        {Float64Type::get(ctx), Float64Type::get(ctx),
+                                        {Float64Type::get(ctx), IntegerType::get(ctx, 64),
                                          modifiersPtr.getType(), IntegerType::get(ctx, 64)},
                                         /*isVarArg=*/true);
 
@@ -693,7 +669,8 @@ struct PCPhaseOpPattern : public OpConversionPattern<PCPhaseOp> {
         int64_t numQubits = op.getOutQubits().size();
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getTheta());
-        args.insert(args.end(), adaptor.getDim());
+        args.insert(args.end(), LLVM::ConstantOp::create(rewriter, loc,
+                                                         rewriter.getI64IntegerAttr(op.getDim())));
         args.insert(args.end(), modifiersPtr);
         args.insert(args.end(),
                     LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
@@ -714,8 +691,7 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(QubitUnitaryOp op, QubitUnitaryOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -767,8 +743,7 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ComputationalBasisOp op, ComputationalBasisOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // We use a temporary unrealized conversion op to send the SSA values
         // of the compbasis op to the measurement ops
         // This is because as a full dialect conversion pass, we cannot simply
@@ -794,8 +769,7 @@ struct NamedObsOpPattern : public OpConversionPattern<NamedObsOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(NamedObsOp op, NamedObsOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -823,8 +797,7 @@ struct HermitianOpPattern : public OpConversionPattern<HermitianOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(HermitianOp op, HermitianOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -862,8 +835,7 @@ struct TensorOpPattern : public OpConversionPattern<TensorOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(TensorOp op, TensorOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -891,8 +863,7 @@ struct HamiltonianOpPattern : public OpConversionPattern<HamiltonianOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(HamiltonianOp op, HamiltonianOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -933,8 +904,7 @@ struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(MeasureOp op, MeasureOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
@@ -973,8 +943,7 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
 
   protected:
     Value performRewrite(ConversionPatternRewriter &rewriter, Type structType, StringRef qirName,
-                         T op, typename T::Adaptor adaptor) const
-    {
+                         T op, typename T::Adaptor adaptor) const {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
 
@@ -1003,8 +972,7 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
 
         if constexpr (std::is_same_v<T, SampleOp>) {
             LLVM::StoreOp::create(rewriter, loc, adaptor.getInData(), structPtr);
-        }
-        else if constexpr (std::is_same_v<T, CountsOp>) {
+        } else if constexpr (std::is_same_v<T, CountsOp>) {
             auto aStruct = LLVM::UndefOp::create(rewriter, loc, structType);
             auto bStruct = LLVM::InsertValueOp::create(
                 rewriter, loc, aStruct, adaptor.getInEigvals(), SmallVector<int64_t>{0});
@@ -1023,13 +991,13 @@ struct SampleOpPattern : public SampleBasedPattern<SampleOp> {
     using SampleBasedPattern::SampleBasedPattern;
 
     LogicalResult matchAndRewrite(SampleOp op, SampleOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
-        if (!op.isBufferized())
+        if (!op.isBufferized()) {
             return op.emitOpError("op must be bufferized before lowering to LLVM");
+        }
 
         Type matrixType =
             conv->convertType(MemRefType::get({UNKNOWN, UNKNOWN}, Float64Type::get(ctx)));
@@ -1046,13 +1014,13 @@ struct CountsOpPattern : public SampleBasedPattern<CountsOp> {
     using SampleBasedPattern::SampleBasedPattern;
 
     LogicalResult matchAndRewrite(CountsOp op, CountsOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
-        if (!op.isBufferized())
+        if (!op.isBufferized()) {
             return op.emitOpError("op must be bufferized before lowering to LLVM");
+        }
 
         Type vector1Type = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
         Type vector2Type = conv->convertType(MemRefType::get({UNKNOWN}, IntegerType::get(ctx, 64)));
@@ -1070,16 +1038,14 @@ template <typename T> struct StatsBasedPattern : public OpConversionPattern<T> {
     using OpConversionPattern<T>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = this->getContext();
         const TypeConverter *conv = this->getTypeConverter();
 
         StringRef qirName;
         if constexpr (std::is_same_v<T, ExpvalOp>) {
             qirName = "__catalyst__qis__Expval";
-        }
-        else {
+        } else {
             qirName = "__catalyst__qis__Variance";
         }
 
@@ -1099,22 +1065,21 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
     using OpConversionPattern<T>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         const TypeConverter *conv = this->getTypeConverter();
 
-        if (!op.isBufferized())
+        if (!op.isBufferized()) {
             return op.emitOpError("op must be bufferized before lowering to LLVM");
+        }
 
         Type vectorType;
         StringRef qirName;
         if constexpr (std::is_same_v<T, ProbsOp>) {
             vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
             qirName = "__catalyst__qis__Probs";
-        }
-        else {
+        } else {
             vectorType = conv->convertType(
                 MemRefType::get({UNKNOWN}, ComplexType::get(Float64Type::get(ctx))));
             qirName = "__catalyst__qis__State";
@@ -1145,8 +1110,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
                 LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(qubits.size()));
             args.push_back(numQubits);
             args.insert(args.end(), qubits.begin(), qubits.end());
-        }
-        else {
+        } else {
             // __catalyst__qis__State does not support individual qubit measurements yet, so it must
             // be invoked without specific specific qubits (i.e. measure the whole register).
             Value numQubits =
@@ -1165,8 +1129,7 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(SetStateOp op, SetStateOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         bool isVarArg = true;
         MLIRContext *ctx = rewriter.getContext();
         auto i64 = IntegerType::get(ctx, 64);
@@ -1205,8 +1168,7 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(SetBasisStateOp op, SetBasisStateOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         bool isVarArg = true;
         MLIRContext *ctx = rewriter.getContext();
         auto i64 = IntegerType::get(ctx, 64);
@@ -1248,8 +1210,7 @@ namespace catalyst {
 namespace quantum {
 
 void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns,
-                                   bool useArrayBackedRegisters)
-{
+                                   bool useArrayBackedRegisters) {
     patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext());
     patterns.add<RTBasedPattern<FinalizeOp>>(typeConverter, patterns.getContext());
     patterns.add<DeviceInitOpPattern>(typeConverter, patterns.getContext());
@@ -1262,8 +1223,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
     if (useArrayBackedRegisters) {
         patterns.add<InsertOpArrayBackedPattern>(typeConverter, patterns.getContext());
-    }
-    else {
+    } else {
         patterns.add<InsertOpDefaultPattern>(typeConverter, patterns.getContext());
     }
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());

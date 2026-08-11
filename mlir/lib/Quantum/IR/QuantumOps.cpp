@@ -14,21 +14,47 @@
 
 #include "Quantum/IR/QuantumOps.h"
 
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <optional>
+#include <sstream>
+#include <string>
 #include <type_traits>
 #include <vector>
 
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
 
 #include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -49,15 +75,13 @@ static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "
 static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
                                                "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
 
-LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
-{
+LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         auto name = op.getGateName();
         if (hermitianOps.contains(name)) {
             op.setAdjoint(false);
             return success();
-        }
-        else if (rotationsOps.contains(name)) {
+        } else if (rotationsOps.contains(name)) {
             auto params = op.getParams();
             SmallVector<Value> paramsNeg;
             for (auto param : params) {
@@ -76,8 +100,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
     return failure();
 }
 
-LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
-{
+LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
@@ -90,22 +113,20 @@ LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewri
     return failure();
 }
 
-LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter)
-{
+LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter) {
     if (op.getAdjoint()) {
         auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
         rewriter.replaceOpWithNewOp<PCPhaseOp>(
             op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
-            op.getDim(), op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+            op.getDimAttr(), op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
 
         return success();
     };
     return failure();
 }
 
-LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter) {
     if (alloc->use_empty()) {
         rewriter.eraseOp(alloc);
         return success();
@@ -114,8 +135,7 @@ LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewrit
     return failure();
 }
 
-LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter) {
     if (auto alloc = dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
         if (dealloc.getQreg().hasOneUse()) {
             rewriter.eraseOp(dealloc);
@@ -127,8 +147,7 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &
     return failure();
 }
 
-template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
-{
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx) {
     // Prefer using an attribute when the index is constant.
     bool hasNoIdxAttr = !op.getIdxAttr().has_value();
     bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
@@ -143,8 +162,7 @@ template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp o
     return failure();
 }
 
-OpFoldResult ExtractOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult ExtractOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -152,49 +170,109 @@ OpFoldResult ExtractOp::fold(FoldAdaptor adaptor)
     return nullptr;
 }
 
-LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &rewriter)
-{
-    // Handle the pattern: %reg2 = insert %reg1[idx], %qubit -> %q = extract %reg2[idx]
-    // Convert to: %q = %qubit, and replace other uses of %reg2 with %reg1
-    if (auto insert = dyn_cast_if_present<InsertOp>(extract.getQreg().getDefiningOp())) {
+namespace {
+
+// Fold an extract of a qubit written by an insert at the same index:
+//   %reg2 = insert %reg1[i], %q ; %out = extract %reg2[i]  ->  %out = %q
+// Remaining users of %reg2 are forwarded to %reg1.
+struct FoldExtractOfSameIndexInsert : public mlir::OpRewritePattern<ExtractOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(ExtractOp extract,
+                                  mlir::PatternRewriter &rewriter) const override {
+        auto insert = dyn_cast_if_present<InsertOp>(extract.getQreg().getDefiningOp());
+        if (!insert || extract->getBlock() != insert->getBlock()) {
+            return failure();
+        }
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
-
-        bool inSameBlock = extract->getBlock() == insert->getBlock();
-
-        if ((staticallyEqual || dynamicallyEqual) && inSameBlock) {
-            rewriter.replaceOp(extract, insert.getQubit());
-            rewriter.replaceOp(insert, insert.getInQreg());
-            return success();
+        if (!staticallyEqual && !dynamicallyEqual) {
+            return failure();
         }
+        rewriter.replaceOp(extract, insert.getQubit());
+        rewriter.replaceOp(insert, insert.getInQreg());
+        return success();
     }
-    return failure();
-}
+};
 
-LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rewriter)
-{
-    if (auto extract = dyn_cast_if_present<ExtractOp>(insert.getQubit().getDefiningOp())) {
+// Fold an extract/insert round-trip at a single index:
+//   %q = extract %reg[i] ; %reg2 = insert %reg[i], %q  ->  %reg2 = %reg
+struct FoldExtractInsertRoundTrip : public mlir::OpRewritePattern<ExtractOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(ExtractOp extract,
+                                  mlir::PatternRewriter &rewriter) const override {
+        if (!extract.getResult().hasOneUse()) {
+            return failure();
+        }
+        auto insert = dyn_cast<InsertOp>(*extract.getResult().getUsers().begin());
+        if (!insert || insert.getInQreg() != extract.getQreg()) {
+            return failure();
+        }
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
-        bool sameQreg = extract.getQreg() == insert.getInQreg();
-        bool oneUse = extract.getResult().hasOneUse();
-
-        if ((staticallyEqual || dynamicallyEqual) && oneUse && sameQreg) {
-            rewriter.replaceOp(insert, insert.getInQreg());
-            rewriter.eraseOp(extract);
-            return success();
+        if (!staticallyEqual && !dynamicallyEqual) {
+            return failure();
         }
+        rewriter.replaceOp(insert, insert.getInQreg());
+        rewriter.eraseOp(extract);
+        return success();
     }
+};
 
-    return failure();
+// Redirect an extract through an insert at a statically distinct index:
+//   %reg2 = insert %reg1[i], %v ; %q = extract %reg2[j]  (i != j)  ->  %q = extract %reg1[j]
+// The bypassed insert is sunk to just above the earliest remaining user of its result.
+struct RedirectExtractThroughDistinctInsert : public mlir::OpRewritePattern<ExtractOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(ExtractOp extract,
+                                  mlir::PatternRewriter &rewriter) const override {
+        auto insert = dyn_cast_if_present<InsertOp>(extract.getQreg().getDefiningOp());
+        if (!insert || extract->getBlock() != insert->getBlock()) {
+            return failure();
+        }
+        bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
+        bool staticallyDistinct = bothStatic && extract.getIdxAttrAttr() != insert.getIdxAttrAttr();
+        if (!staticallyDistinct) {
+            return failure();
+        }
+        // Read the pre-insert register.
+        rewriter.modifyOpInPlace(extract,
+                                 [&] { extract.getQregMutable().assign(insert.getInQreg()); });
+
+        // Sink the bypassed insert to just above the earliest remaining user of its result.
+        Operation *earliestUser = nullptr;
+        for (Operation *user : insert.getResult().getUsers()) {
+            if (user->getBlock() != insert->getBlock()) {
+                continue;
+            }
+            if (!earliestUser || user->isBeforeInBlock(earliestUser)) {
+                earliestUser = user;
+            }
+        }
+        if (earliestUser && insert->getNextNode() != earliestUser) {
+            rewriter.modifyOpInPlace(insert, [&] { insert->moveBefore(earliestUser); });
+        }
+        return success();
+    }
+};
+
+} // namespace
+
+void ExtractOp::getCanonicalizationPatterns(mlir::RewritePatternSet &patterns,
+                                            mlir::MLIRContext *context) {
+    // Same-index folds run at a higher benefit than the distinct-index redirect.
+    patterns.add<FoldExtractOfSameIndexInsert>(context, /*benefit=*/2);
+    patterns.add<FoldExtractInsertRoundTrip>(context, /*benefit=*/2);
+    patterns.add<RedirectExtractThroughDistinctInsert>(context, /*benefit=*/1);
 }
 
-OpFoldResult InsertOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult InsertOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -206,16 +284,14 @@ OpFoldResult InsertOp::fold(FoldAdaptor adaptor)
 // Quantum op verifiers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult CustomOp::verify()
-{
+LogicalResult CustomOp::verify() {
     if (getInQubits().size() == 0) {
         return emitOpError("expected op to have at least one qubit");
     }
     return success();
 }
 
-LogicalResult OperatorOp::verify()
-{
+LogicalResult OperatorOp::verify() {
     const bool hasQregInput = static_cast<bool>(getInQreg());
     const bool hasQregOutput = static_cast<bool>(getOutQreg());
     const bool hasQregMode = hasQregInput || hasQregOutput;
@@ -224,8 +300,8 @@ LogicalResult OperatorOp::verify()
     const bool hasQubitOutput = !getOutQubits().empty();
     const bool hasQubitMode = hasQubitInput || hasQubitOutput;
 
-    // Exactly one mode must be used: explicit qubits or qreg-based addressing.
-    if (hasQregMode == hasQubitMode) {
+    // At most one mode must be used: explicit qubits or qreg-based addressing.
+    if (hasQregMode && hasQubitMode) {
         return emitOpError() << "must use either qubits or registers, but not both";
     }
 
@@ -315,24 +391,21 @@ LogicalResult OperatorOp::verify()
     return success();
 }
 
-LogicalResult ExtractOp::verify()
-{
+LogicalResult ExtractOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
     }
     return success();
 }
 
-LogicalResult InsertOp::verify()
-{
+LogicalResult InsertOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
     }
     return success();
 }
 
-static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubits)
-{
+static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubits) {
     if (auto compOp = obs.getDefiningOp<ComputationalBasisOp>()) {
         numQubits = compOp.getQubits().size();
         return success();
@@ -340,14 +413,12 @@ static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubit
     if (auto compOp = obs.getDefiningOp<catalyst::qref::ComputationalBasisOp>()) {
         numQubits = compOp.getQubits().size();
         return success();
-    }
-    else if (obs.getDefiningOp<NamedObsOp>() || obs.getDefiningOp<HermitianOp>() ||
-             obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>() ||
-             obs.getDefiningOp<catalyst::qref::NamedObsOp>() ||
-             obs.getDefiningOp<catalyst::qref::HermitianOp>()) {
+    } else if (obs.getDefiningOp<NamedObsOp>() || obs.getDefiningOp<HermitianOp>() ||
+               obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>() ||
+               obs.getDefiningOp<catalyst::qref::NamedObsOp>() ||
+               obs.getDefiningOp<catalyst::qref::HermitianOp>()) {
         return success();
-    }
-    else if (auto mcmObsOp = obs.getDefiningOp<MCMObsOp>()) {
+    } else if (auto mcmObsOp = obs.getDefiningOp<MCMObsOp>()) {
         numQubits = mcmObsOp.getMcms().size();
         return success();
     }
@@ -355,8 +426,7 @@ static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubit
     return failure();
 }
 
-static LogicalResult verifyTensorResult(Type ty, int64_t length)
-{
+static LogicalResult verifyTensorResult(Type ty, int64_t length) {
     ShapedType tensor = cast<ShapedType>(ty);
     if (!tensor.hasStaticShape() || tensor.getShape().size() != 1 ||
         tensor.getShape()[0] != length) {
@@ -366,8 +436,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length)
     return success();
 }
 
-static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1)
-{
+static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1) {
     ShapedType tensor = cast<ShapedType>(ty);
     if (!tensor.hasStaticShape() || tensor.getShape().size() != 2 ||
         tensor.getShape()[0] != length0 || tensor.getShape()[1] != length1) {
@@ -381,8 +450,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 
 static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
 
-LogicalResult PauliRotOp::verify()
-{
+LogicalResult PauliRotOp::verify() {
     size_t pauliWordLength = getPauliProduct().size();
     size_t numQubits = getInQubits().size();
     if (pauliWordLength != numQubits) {
@@ -400,8 +468,7 @@ LogicalResult PauliRotOp::verify()
     return success();
 }
 
-LogicalResult QubitUnitaryOp::verify()
-{
+LogicalResult QubitUnitaryOp::verify() {
     size_t dim = std::pow(2, getInQubits().size());
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
@@ -412,8 +479,7 @@ LogicalResult QubitUnitaryOp::verify()
 
 // ----- measurements
 
-static LogicalResult verifyInQNodeFunction(Operation *op)
-{
+static LogicalResult verifyInQNodeFunction(Operation *op) {
     // strict verification only for quantum kernels
     // detection is a bit tricky until we have a dedicated operation, use heuristics for now
     auto kernelModule = op->getParentOfType<ModuleOp>();
@@ -438,8 +504,7 @@ static LogicalResult verifyInQNodeFunction(Operation *op)
 
 template <typename T>
 static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDynShape,
-                                                 bool hasBufferIn, bool hasOutTensor)
-{
+                                                 bool hasBufferIn, bool hasOutTensor) {
     // `obs` operand must always be present
     if (!hasObs) {
         return (*op)->emitOpError("must take an observable");
@@ -459,14 +524,11 @@ static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDyn
         ShapedType outTensor;
         if constexpr (std::is_same_v<T, ProbsOp>) {
             outTensor = cast<ShapedType>(op->getProbabilities().getType());
-        }
-        else if constexpr (std::is_same_v<T, StateOp>) {
+        } else if constexpr (std::is_same_v<T, StateOp>) {
             outTensor = cast<ShapedType>(op->getState().getType());
-        }
-        else if constexpr (std::is_same_v<T, SampleOp>) {
+        } else if constexpr (std::is_same_v<T, SampleOp>) {
             outTensor = cast<ShapedType>(op->getSamples().getType());
-        }
-        else if constexpr (std::is_same_v<T, CountsOp>) {
+        } else if constexpr (std::is_same_v<T, CountsOp>) {
             outTensor = cast<ShapedType>(op->getCounts().getType());
         }
 
@@ -483,8 +545,7 @@ static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDyn
     return success();
 }
 
-LogicalResult ComputationalBasisOp::verify()
-{
+LogicalResult ComputationalBasisOp::verify() {
     if ((getQubits().size() != 0) && (getQreg() != nullptr)) {
         return emitOpError()
                << "computational basis op cannot simultaneously take in both qubits and quregs";
@@ -493,17 +554,16 @@ LogicalResult ComputationalBasisOp::verify()
     return success();
 }
 
-LogicalResult HermitianOp::verify()
-{
+LogicalResult HermitianOp::verify() {
     size_t dim = std::pow(2, getQubits().size());
-    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim)))
+    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
+    }
 
     return success();
 }
 
-LogicalResult SampleOp::verify()
-{
+LogicalResult SampleOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -526,8 +586,7 @@ LogicalResult SampleOp::verify()
                                                  hasOutTensor);
 }
 
-LogicalResult CountsOp::verify()
-{
+LogicalResult CountsOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -552,17 +611,14 @@ LogicalResult CountsOp::verify()
         getObs().getDefiningOp<qref::NamedObsOp>()) {
         // Any named observable has 2 eigenvalues.
         numEigvals = 2;
-    }
-    else if (getObs().getDefiningOp<quantum::ComputationalBasisOp>() ||
-             getObs().getDefiningOp<qref::ComputationalBasisOp>()) {
+    } else if (getObs().getDefiningOp<quantum::ComputationalBasisOp>() ||
+               getObs().getDefiningOp<qref::ComputationalBasisOp>()) {
         // In the computational basis, the "eigenvalues" are all possible bistrings one can measure.
         numEigvals = std::pow(2, numQubits.value());
-    }
-    else if (getObs().getDefiningOp<MCMObsOp>()) {
+    } else if (getObs().getDefiningOp<MCMObsOp>()) {
         // When counting MCMs, the "eigenvalues" are all possible bistrings one can measure.
         numEigvals = std::pow(2, numQubits.value());
-    }
-    else {
+    } else {
         return emitOpError("cannot determine the number of eigenvalues for general observable");
     }
 
@@ -585,8 +641,7 @@ LogicalResult CountsOp::verify()
     return success();
 }
 
-LogicalResult ProbsOp::verify()
-{
+LogicalResult ProbsOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -608,8 +663,7 @@ LogicalResult ProbsOp::verify()
                                                 hasOutTensor);
 }
 
-LogicalResult StateOp::verify()
-{
+LogicalResult StateOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -631,8 +685,7 @@ LogicalResult StateOp::verify()
                                                 hasOutTensor);
 }
 
-LogicalResult ExpvalOp::verify()
-{
+LogicalResult ExpvalOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -640,8 +693,7 @@ LogicalResult ExpvalOp::verify()
     return success();
 }
 
-LogicalResult VarianceOp::verify()
-{
+LogicalResult VarianceOp::verify() {
     if (failed(verifyInQNodeFunction(getOperation()))) {
         return failure();
     }
@@ -649,8 +701,7 @@ LogicalResult VarianceOp::verify()
     return success();
 }
 
-LogicalResult AdjointOp::verify()
-{
+LogicalResult AdjointOp::verify() {
     auto res =
         this->getRegion().walk([](MeasurementProcess op) { return WalkResult::interrupt(); });
 
@@ -682,13 +733,14 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        ValueRange params, ValueRange in_qubits, ValueRange in_ctrl_qubits,
                        ValueRange in_ctrl_values, ValueRange forward_args, bool adjoint,
                        std::optional<int64_t> UID, DictionaryAttr static_data,
-                       DictionaryAttr param_map, DictionaryAttr qubit_map)
-{
+                       DictionaryAttr param_map, DictionaryAttr qubit_map) {
     SmallVector<Type> resultTypes;
     TypeRange qubitTypes = TypeRange(in_qubits);
     TypeRange ctrlQubitTypes = TypeRange(in_ctrl_qubits);
     resultTypes.append(qubitTypes.begin(), qubitTypes.end());
     resultTypes.append(ctrlQubitTypes.begin(), ctrlQubitTypes.end());
+
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
 
     build(odsBuilder, odsState,
           /*resultTypes=*/resultTypes,
@@ -703,7 +755,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/Value(),
           /*arr_ctrl_values=*/Value(),
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -713,9 +765,10 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        ValueRange params, Value in_qreg, ValueRange arr_qubit_indices,
                        Value arr_ctrl_indices, Value arr_ctrl_values, ValueRange forward_args,
                        bool adjoint, std::optional<int64_t> UID, DictionaryAttr static_data,
-                       DictionaryAttr param_map, DictionaryAttr qubit_map)
-{
+                       DictionaryAttr param_map, DictionaryAttr qubit_map) {
     SmallVector<Type> resultTypes = {in_qreg.getType()};
+
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
 
     build(odsBuilder, odsState,
           /*resultTypes=*/resultTypes,
@@ -730,7 +783,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/arr_ctrl_indices,
           /*arr_ctrl_values=*/arr_ctrl_values,
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -740,31 +793,27 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
 // Quantum op printers/parsers.
 //===----------------------------------------------------------------------===//
 
-static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr)
-{
+static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr) {
     p << "[";
     llvm::interleaveComma(attr.asArrayRef(), p, [&](int64_t value) { p << value; });
     p << "]";
 }
 
-static void printDictionaryWithDenseI64Lists(OpAsmPrinter &p, DictionaryAttr dict)
-{
+static void printDictionaryWithDenseI64Lists(OpAsmPrinter &p, DictionaryAttr dict) {
     p << "{";
     llvm::interleaveComma(dict, p, [&](NamedAttribute namedAttr) {
         p.printKeywordOrString(namedAttr.getName().strref());
         p << " = ";
         if (auto denseArray = dyn_cast<DenseI64ArrayAttr>(namedAttr.getValue())) {
             printDenseI64ArrayAsList(p, denseArray);
-        }
-        else {
+        } else {
             p << namedAttr.getValue();
         }
     });
     p << "}";
 }
 
-void OperatorOp::print(OpAsmPrinter &p)
-{
+void OperatorOp::print(OpAsmPrinter &p) {
     // 1. Template Name
     p << " \"" << getOpName() << "\"";
 
@@ -780,13 +829,14 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 4. Qubits
-    if (!getInQubits().empty()) {
+    if (!getInQreg()) {
         p << " qubits(" << getInQubits() << ")";
     }
 
     // 5. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {"static_data", "param_map", "qubit_map",
-                                          "operandSegmentSizes", "resultSegmentSizes"};
+    SmallVector<StringRef> elidedAttrs = {
+        "static_data",        "param_map", "qubit_map", "operandSegmentSizes",
+        "resultSegmentSizes", "op_name",   "adjoint",   "UID"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
@@ -819,8 +869,7 @@ void OperatorOp::print(OpAsmPrinter &p)
         p.printNewline();
         p << "ctrls(" << getInCtrlQubits() << ") ";
         p << "ctrl_vals(" << getInCtrlValues() << ")";
-    }
-    else if (getArrCtrlIndices()) {
+    } else if (getArrCtrlIndices()) {
         p.printNewline();
         p << "ctrls(" << getArrCtrlIndices() << ": " << getArrCtrlIndices().getType() << ") ";
         p << "ctrl_vals(" << getArrCtrlValues() << ": " << getArrCtrlValues().getType() << ")";
@@ -852,14 +901,12 @@ void OperatorOp::print(OpAsmPrinter &p)
 }
 
 static ParseResult parseOperandTypePair(OpAsmParser &parser,
-                                        OpAsmParser::UnresolvedOperand &operand, Type &type)
-{
+                                        OpAsmParser::UnresolvedOperand &operand, Type &type) {
     return failure(parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type));
 }
 
 static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &builder,
-                                                DictionaryAttr &dict)
-{
+                                                DictionaryAttr &dict) {
     NamedAttrList attrs;
     auto parseDictEntry = [&]() -> ParseResult {
         StringRef key;
@@ -888,8 +935,7 @@ static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &bu
     return success();
 }
 
-ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
-{
+ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
     Builder &builder = parser.getBuilder();
     MLIRContext *ctx = parser.getContext();
 
@@ -898,8 +944,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
     if (parser.parseString(&opName)) {
         return failure();
     }
-    auto &opProperties = result.getOrAddProperties<OperatorOp::Properties>();
-    opProperties.setOpName(opName);
+    result.addAttribute("op_name", builder.getStringAttr(opName));
 
     // 2. Parse variadic params: (%arg0: type, ...)
     SmallVector<OpAsmParser::UnresolvedOperand> params;
@@ -920,7 +965,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 
     // 3. Optional adjoint marker.
     if (succeeded(parser.parseOptionalKeyword("adj"))) {
-        opProperties.setAdjoint(true);
+        result.addAttribute("adjoint", builder.getUnitAttr());
     }
 
     SmallVector<OpAsmParser::UnresolvedOperand> inQubits;
@@ -964,7 +1009,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         if (parser.parseLParen() || parser.parseInteger(uid) || parser.parseRParen()) {
             return failure();
         }
-        opProperties.setUID(uid);
+        result.addAttribute("UID", builder.getI64IntegerAttr(uid));
 
         if (succeeded(parser.parseOptionalKeyword("forward"))) {
             auto parseForwardArgAndType = [&]() -> ParseResult {
@@ -1028,8 +1073,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
             }
             arrCtrlValues = ctrlValues;
             arrCtrlValuesType = ctrlValuesTy;
-        }
-        else {
+        } else {
             auto parseCtrlQubit = [&]() -> ParseResult {
                 OpAsmParser::UnresolvedOperand operand;
                 if (parser.parseOperand(operand)) {
@@ -1136,3 +1180,183 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// Quantum op interface methods.
+//===----------------------------------------------------------------------===//
+
+// CustomOp
+
+std::string CustomOp::getOperatorName() { return getGateName().str(); }
+
+mlir::TypeRange CustomOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> CustomOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr CustomOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// MultiRZOp
+
+std::string MultiRZOp::getOperatorName() { return "MultiRZ"; }
+
+mlir::TypeRange MultiRZOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> MultiRZOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr MultiRZOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// PauliRotOp
+
+std::string PauliRotOp::getOperatorName() { return "PauliRot"; }
+
+mlir::TypeRange PauliRotOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> PauliRotOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr PauliRotOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
+        mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+    return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
+}
+
+// PCPhaseOp
+
+std::string PCPhaseOp::getOperatorName() { return "PCPhase"; }
+
+mlir::TypeRange PCPhaseOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> PCPhaseOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr PCPhaseOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute dimEntry =
+        mlir::NamedAttribute(mlir::StringAttr::get(ctx, "dim"), getDimAttr());
+    return mlir::DictionaryAttr::get(ctx, {dimEntry});
+}
+
+// GlobalPhaseOp
+
+std::string GlobalPhaseOp::getOperatorName() { return "GlobalPhase"; }
+
+mlir::TypeRange GlobalPhaseOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> GlobalPhaseOp::getWireLens() { return {0}; }
+
+mlir::DictionaryAttr GlobalPhaseOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// QubitUnitaryOp
+
+std::string QubitUnitaryOp::getOperatorName() { return "QubitUnitary"; }
+
+mlir::TypeRange QubitUnitaryOp::getDynamicShape() { return getAllParams().getTypes(); }
+
+std::vector<size_t> QubitUnitaryOp::getWireLens() { return {getNonCtrlQubitOperands().size()}; }
+
+mlir::DictionaryAttr QubitUnitaryOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// OperatorOp
+
+std::string OperatorOp::getOperatorName() { return getOpName().str(); }
+
+mlir::TypeRange OperatorOp::getDynamicShape() { return getParams().getTypes(); }
+
+std::vector<size_t> OperatorOp::getWireLens() {
+    if (getInQreg()) {
+        std::vector<size_t> lens;
+        // This assumes static lengths!
+        // If we enable support for dynamic lengths, we need to update this
+        for (mlir::Type indexTensor : getArrQubitIndices().getType()) {
+            for (size_t dim : cast<RankedTensorType>(indexTensor).getShape()) {
+                lens.push_back(size_t(dim));
+            }
+        }
+        return lens;
+    }
+    return {getInQubits().size()};
+}
+
+std::string OperatorOp::getExtraData() {
+    return getUID().has_value() ? std::to_string(getUID().value()) : "";
+}
+// Implement ResourceQuantumOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+llvm::StringRef CustomOp::getResourceName() { return getGateName(); }
+llvm::StringRef SetStateOp::getResourceName() { return "SetState"; }
+llvm::StringRef SetBasisStateOp::getResourceName() { return "SetBasisState"; }
+llvm::StringRef PauliRotOp::getResourceName() { return "PauliRot"; }
+llvm::StringRef GlobalPhaseOp::getResourceName() { return "GlobalPhase"; }
+llvm::StringRef MultiRZOp::getResourceName() { return "MultiRZ"; }
+llvm::StringRef PCPhaseOp::getResourceName() { return "PCPhase"; }
+llvm::StringRef QubitUnitaryOp::getResourceName() { return "QubitUnitary"; }
+llvm::StringRef OperatorOp::getResourceName() { return getOpName(); }
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceMeasurementOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+static llvm::StringRef getObservableName(MLIRContext *ctx, llvm::StringRef baseName,
+                                         Operation *obsOp) {
+    std::string obs;
+    if (!obsOp) {
+        obs = "all wires";
+    } else {
+        obs = llvm::TypeSwitch<Operation *, std::string>(obsOp)
+                  .Case<catalyst::quantum::ComputationalBasisOp,
+                        catalyst::qref::ComputationalBasisOp>([](auto cbOp) {
+                      unsigned n = cbOp.getQubits().size();
+                      return n == 0 ? std::string("all wires") : std::to_string(n) + " wires";
+                  })
+                  .Case<catalyst::quantum::NamedObsOp, catalyst::qref::NamedObsOp>(
+                      [](auto op) { return stringifyNamedObservable(op.getType()).str(); })
+                  .Case<catalyst::quantum::TensorOp>([](auto op) {
+                      return "Prod(num_terms=" + std::to_string(op.getTerms().size()) + ")";
+                  })
+                  .Case<catalyst::quantum::HamiltonianOp>([](auto op) {
+                      return "Hamiltonian(num_terms=" + std::to_string(op.getTerms().size()) + ")";
+                  })
+                  .Default([](Operation *) { return std::string("all wires"); });
+    }
+
+    return StringAttr::get(ctx, (baseName + "(" + obs + ")").str()).getValue();
+}
+
+llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
+uint64_t MeasureOp::getResourceNumQubits() { return 1; }
+uint64_t MeasureOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasureOp::getResourceNumParams() { return 0; }
+
+llvm::StringRef SampleOp::getResourceMeasurementName() {
+    return getObservableName(getContext(), "sample", getObs().getDefiningOp());
+}
+llvm::StringRef CountsOp::getResourceMeasurementName() {
+    return getObservableName(getContext(), "counts", getObs().getDefiningOp());
+}
+llvm::StringRef ExpvalOp::getResourceMeasurementName() {
+    return getObservableName(getContext(), "expval", getObs().getDefiningOp());
+}
+llvm::StringRef VarianceOp::getResourceMeasurementName() {
+    return getObservableName(getContext(), "var", getObs().getDefiningOp());
+}
+llvm::StringRef ProbsOp::getResourceMeasurementName() {
+    return getObservableName(getContext(), "probs", getObs().getDefiningOp());
+}
+llvm::StringRef StateOp::getResourceMeasurementName() {
+    return getObservableName(getContext(), "state", getObs().getDefiningOp());
+}
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceAllocQubitOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+uint64_t AllocOp::getResourceNumAllocQubits() { return getNqubitsAttr().value_or(0); }
+uint64_t AllocQubitOp::getResourceNumAllocQubits() { return 1; }

@@ -272,15 +272,12 @@ class TestWhileLoops:
         error_msg = str(exc_info.value)
         assert "catalyst.while_loop is not supported with PennyLane's capture enabled" in error_msg
 
-    @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture_integration(self):
         """Test that while_loop raises PlxprCaptureCFCompatibilityError when
         capture mode is enabled."""
-        qp.capture.enable()
-
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qp.qjit
+            @qjit(capture=True)
             @qp.qnode(qp.device("lightning.qubit", wires=3))
             def test(n):
                 def condition(x):
@@ -453,16 +450,12 @@ class TestForLoops:
         error_msg = str(exc_info.value)
         assert "catalyst.for_loop is not supported with PennyLane's capture enabled" in error_msg
 
-    @pytest.mark.usefixtures("disable_capture")
     def test_for_loop_raises_compatibility_error_with_capture_integration(self):
         """Test that for_loop raises PlxprCaptureCFCompatibilityError when
         capture mode is enabled."""
-        # Enable capture mode
-        qp.capture.enable()
-
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qp.qjit
+            @qjit(capture=True)
             @qp.qnode(qp.device("lightning.qubit", wires=3))
             def test(n):
                 @for_loop(0, n, 1)

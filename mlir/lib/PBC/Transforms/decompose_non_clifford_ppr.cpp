@@ -37,8 +37,7 @@ struct DecomposeNonCliffordPPRPass
     : public impl::DecomposeNonCliffordPPRPassBase<DecomposeNonCliffordPPRPass> {
     using DecomposeNonCliffordPPRPassBase::DecomposeNonCliffordPPRPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
 
         populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod, avoidYMeasure);

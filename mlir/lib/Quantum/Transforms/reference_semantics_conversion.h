@@ -60,7 +60,8 @@ void handleMeasureInBasis(IRRewriter &builder, mbqc::MeasureInBasisOp vMeasureIn
                           QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTracker &tracker,
                SmallVector<Operation *> &erasureWorklist);
-// void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker);
+void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
+                SmallVector<Operation *> &erasureWorklist);
 void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,
                      QubitValueTracker &tracker);
 void handleNamedObs(IRRewriter &builder, quantum::NamedObsOp vNamedObsOp,
@@ -71,14 +72,16 @@ void handleGraphStatePrep(IRRewriter &builder, mbqc::GraphStatePrepOp vGraphStat
                           QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValueTracker &tracker,
                    SmallVector<Operation *> &erasureWorklist);
-// void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
-// void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
+void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
+              SmallVector<Operation *> &erasureWorklist);
+void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker,
+                  SmallVector<Operation *> &erasureWorklist);
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker,
                SmallVector<Operation *> &erasureWorklist);
 void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker,
                  SmallVector<Operation *> &erasureWorklist);
-// void handleSubroutine(IRRewriter &builder, func::FuncOp f,
-//                       const SetVector<Value> &rValuesUsedBySubroutine);
+void handleSubroutine(IRRewriter &builder, func::FuncOp subroutine,
+                      const SmallVector<IntegerAttr> &qregSizesAtCallsite);
 
 // Main driver
 std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region &r,

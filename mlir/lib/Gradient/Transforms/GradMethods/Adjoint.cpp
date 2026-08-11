@@ -29,8 +29,7 @@
 namespace catalyst {
 namespace gradient {
 
-LogicalResult AdjointLowering::matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const
-{
+LogicalResult AdjointLowering::matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const {
     if (!(getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))) {
         return failure();
     }
@@ -48,8 +47,7 @@ LogicalResult AdjointLowering::matchAndRewrite(func::FuncOp op, PatternRewriter 
 }
 
 func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Location loc,
-                                                  func::FuncOp callee)
-{
+                                                  func::FuncOp callee) {
     // TODO: we do not support multiple return statements (which can happen for unstructured
     // control flow), i.e. our gradient functions will have just one block.
     assert(callee.getBody().hasOneBlock() &&
@@ -62,14 +60,12 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         if (isa<quantum::DeallocOp>(op)) {
             deallocs.push_back(cast<quantum::DeallocOp>(op));
             continue;
-        }
-        else if (isa<quantum::MeasurementProcess>(op)) {
+        } else if (isa<quantum::MeasurementProcess>(op)) {
             if (!isa<quantum::ExpvalOp>(op)) {
                 callee.emitOpError() << "Adjoint gradient is only supported on expval measurements";
                 return callee;
             }
-        }
-        else if (isa<quantum::DeviceReleaseOp>(op)) {
+        } else if (isa<quantum::DeviceReleaseOp>(op)) {
             deviceReleaseOps.push_back(cast<quantum::DeviceReleaseOp>(op));
         }
     }
@@ -135,8 +131,7 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
 }
 
 func::FuncOp AdjointLowering::genQGradFunction(PatternRewriter &rewriter, Location loc,
-                                               func::FuncOp callee)
-{
+                                               func::FuncOp callee) {
 
     func::FuncOp unallocFn = discardAndReturnReg(rewriter, loc, callee);
 

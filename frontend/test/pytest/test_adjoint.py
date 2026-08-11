@@ -55,14 +55,7 @@ class TestCatalyst:
             qp.adjoint(quantum_func)(*args)
             return qp.state()
 
-        capture_enabled = qp.capture.enabled()
-        qp.capture.disable()
-        try:
-            pl_res = pennylane_workflow(*args)
-        finally:
-            if capture_enabled:
-                qp.capture.enable()
-
+        pl_res = pennylane_workflow(*args)
         assert_allclose(catalyst_workflow(*args), pl_res)
 
     def test_adjoint_func(self, backend, capture_mode):
@@ -777,7 +770,7 @@ class TestProperties:
     """Test Adjoint properties."""
 
     def test_data(self):
-        """Test base data can be get and set through Adjoint class."""
+        """Test that Adjoint data is read-only."""
         x = np.array(1.234)
 
         base = qp.RX(x, wires="a")
@@ -785,16 +778,10 @@ class TestProperties:
 
         assert adj.data == (x,)
 
-        # update parameters through adjoint
-        x_new = np.array(2.3456)
-        adj.data = (x_new,)
-        assert base.data == (x_new,)
-        assert adj.data == (x_new,)
-
-        # update base data updates Adjoint data
-        x_new2 = np.array(3.456)
-        base.data = (x_new2,)
-        assert adj.data == (x_new2,)
+        with pytest.raises(
+            AttributeError, match="property 'data' of 'AdjointOperation' object has no setter"
+        ):
+            setattr(adj, "data", (np.array(2.3456),))
 
     def test_has_matrix_true(self):
         """Test `has_matrix` property carries over when base op defines matrix."""
@@ -1101,7 +1088,7 @@ class TestAdjointOperationDiffInfo:
         assert adjoint(op).grad_method == op.grad_method
 
     @pytest.mark.parametrize(
-        "base", (qp.PauliX(0), qp.RX(1.234, wires=0), qp.Rotation(1.234, wires=0))
+        "base", (qp.PauliX(0), qp.RX(1.234, wires=0), qp.Rot(1.234, 0.0, 0.0, wires=0))
     )
     def test_grad_recipe(self, base):
         """Test that the grad_recipe of the Adjoint is the same as the grad_recipe of the base."""

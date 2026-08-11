@@ -76,10 +76,20 @@ set(LIBS
     ion-transforms
     MLIRRTIO
     rtio-transforms
+    MLIRTransport
+    transport-transforms
+    MLIRExecutor
+    executor-transforms
     MLIRCatalystTest
     ${ENZYME_LIB}
     fmt::fmt
 )
+
+###################################
+## Quantum Python Decompositions ##
+###################################
+add_subdirectory(../Quantum/Transforms/QuantumPythonDecompositions
+    ${CMAKE_BINARY_DIR}/QuantumPythonDecompositionsBuild)
 
 add_mlir_library(CatalystCompilerDriver
     Main.cpp
@@ -95,9 +105,12 @@ add_mlir_library(CatalystCompilerDriver
     MLIRSupport
 )
 
+add_dependencies(CatalystCompilerDriver QuantumPythonDecompositions)
+
 #########################################################
 ## importable module with default pipeline definitions ##
 #########################################################
 
 add_subdirectory(DefaultPipelines)
 add_dependencies(CatalystCompilerDriver default_pipelines)
+

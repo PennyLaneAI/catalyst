@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Driver/DefaultPipelines/DefaultPipelines.h"
-
 #include "nanobind/nanobind.h"
 #include "nanobind/stl/string.h"
 #include "nanobind/stl/vector.h"
 
-NB_MODULE(default_pipelines, m)
-{
+#include "Driver/DefaultPipelines/DefaultPipelines.h"
+
+NB_MODULE(default_pipelines, m) {
     m.doc() = "Bindings for Catalyst default pipelines.";
     m.def("get_pipeline_names", &catalyst::driver::getPipelineNames,
           "Returns the list of pipeline names.");
