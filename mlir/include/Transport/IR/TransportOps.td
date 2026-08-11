@@ -56,7 +56,7 @@ def Transport_ConnectOp : Transport_Op<"connect"> {
 
 def Transport_ConnectAsyncOp : Transport_Op<"connect_async"> {
     let summary = "Non-blocking connect; await the token with transport.await.";
-    let arguments = (ins Transport_SessionType:$session, StrAttr:$peer, I16Attr:$oob_port);
+    let arguments = (ins Transport_SessionType:$session, StrAttr:$peer, I32Attr:$oob_port);
     let results = (outs Transport_TokenType:$token);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session)) `->` type($token)";
 }

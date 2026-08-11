@@ -313,7 +313,7 @@ class SessionEmitter {
         Value t1 =
             ConnectAsyncOp::create(b, loc, tokTy, co, coproc.getPeer(), portAttr(coproc.oobPort()))
                 .getToken();
-        ConnectOp::create(b, loc, ct, coproc.getPeer(), i16A(coproc.oobPort()));
+        ConnectOp::create(b, loc, ct, coproc.getPeer(), portAttr(coproc.oobPort()));
         AwaitOp::create(b, loc, t1);
         Value t2 = ExchangeKeysAsyncOp::create(b, loc, tokTy, co).getToken();
         ExchangeKeysOp::create(b, loc, ct);
