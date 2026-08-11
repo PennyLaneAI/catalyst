@@ -476,11 +476,6 @@ class TestDraw:
 
     def test_reshape(self):
         """Test that the visualization works when the parameters are reshaped."""
-        pytest.xfail(
-            "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> instead "
-            "of being cast to f64, breaking downstream xDSL/compiler passes"
-        )
-
         one_dim = jax.numpy.array([1, 0])
         two_dim = jax.numpy.array([[0, 1], [1, 0]])
         eight_dim = jax.numpy.zeros((8, 8))
