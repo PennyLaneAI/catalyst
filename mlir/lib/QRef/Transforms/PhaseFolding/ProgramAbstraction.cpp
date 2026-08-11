@@ -28,13 +28,16 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ProgramAbstraction &p
 /*
     Methods:
 */
-bool ProgramAbstraction::areWiresInBound(llvm::ArrayRef<size_t> wires) const
+bool ProgramAbstraction::areWiresInBound(llvm::ArrayRef<size_t> wires)
 {
     size_t maxWire = 0;
     for (size_t wire : wires) {
         if (wire > maxWire) {
             maxWire = wire;
         }
+    }
+    if (maxWire >= numQubits()) {
+        extendQubitsBy(maxWire - numQubits() + 1);
     }
     return (maxWire < numQubits());
 }

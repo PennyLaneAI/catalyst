@@ -51,7 +51,7 @@ struct ProgramAbstraction {
     void applySummary(RegionSummary &&summary);
 
   private:
-    bool areWiresInBound(llvm::ArrayRef<size_t> wires) const;
+    bool areWiresInBound(llvm::ArrayRef<size_t> wires);
     void applyGateRZ(size_t wire, GateID gateId);
     void applyGateY(size_t wire, GateID gateId);
     void applyGateY_dag(size_t wire, GateID gateId);

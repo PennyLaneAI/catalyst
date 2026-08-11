@@ -5,17 +5,18 @@ file(GLOB SRC
     value_semantics_conversion.cpp
     verify_no_quantum_use_after_free.cpp
 
-    SymbolicAnalysisQRef/Gate.hpp
-    SymbolicAnalysisQRef/GateBundle.cpp
-    SymbolicAnalysisQRef/Parity.cpp
-    SymbolicAnalysisQRef/BinaryMatrix.cpp
-    SymbolicAnalysisQRef/AffineSchema.cpp
-    SymbolicAnalysisQRef/AffineTransform.cpp
-    SymbolicAnalysisQRef/AffineRelation.cpp
-    SymbolicAnalysisQRef/PhaseAbstraction.cpp
-    SymbolicAnalysisQRef/ProgramAbstraction.cpp
-    SymbolicAnalysisQRef/RegionSummary.cpp
+    PhaseFolding/GateBundle.cpp
+    PhaseFolding/Parity.cpp
+    PhaseFolding/BinaryMatrix.cpp
+    PhaseFolding/AffineSchema.cpp
+    PhaseFolding/AffineTransform.cpp
+    PhaseFolding/AffineRelation.cpp
+    PhaseFolding/PhaseAbstraction.cpp
+    PhaseFolding/ProgramAbstraction.cpp
+    PhaseFolding/RegionSummary.cpp
     phase_folding_qref.cpp
+
+    GetOpInfp.hpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
