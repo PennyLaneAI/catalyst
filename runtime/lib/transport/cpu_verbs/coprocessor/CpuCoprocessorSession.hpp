@@ -42,8 +42,7 @@ class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
 
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
 
-    void set_thread_affinity(int cpu, bool realtime)
-    {
+    void set_thread_affinity(int cpu, bool realtime) {
         pin_cpu_ = cpu;
         pin_realtime_ = realtime;
     }
@@ -55,13 +54,12 @@ class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
     // The engine loop; runs on engine_.
     void run(std::stop_token st);
 
-    int pin_cpu_ = -1;                  // -1 -> leave affinity alone
+    int pin_cpu_ = -1; // -1 -> leave affinity alone
     bool pin_realtime_ = false;
     CoprocessorFn coproc_fn_ = nullptr; // nullptr -> built-in echo
     void *coproc_ctx_ = nullptr;
 
-    // failed_ (release) publishes error_; collect() acquire-loads it and
-    // rethrows.
+    // failed_ (release) publishes error_; collect() acquire-loads it and rethrows.
     std::atomic<bool> failed_{false};
     std::exception_ptr error_;
     std::atomic<std::uint64_t> completed_{0};

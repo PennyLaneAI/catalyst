@@ -32,8 +32,7 @@
  * @return Bytes written, or 0 if either buffer is missing.
  */
 extern "C" std::size_t echo_coprocessor(const void *in, std::size_t in_len, void *out,
-                                        std::size_t out_cap, void * /*ctx*/)
-{
+                                        std::size_t out_cap, void * /*ctx*/) {
     if (in == nullptr || out == nullptr || in_len == 0 || out_cap == 0) {
         return 0;
     }

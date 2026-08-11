@@ -23,10 +23,11 @@
 #include <string>
 
 #if defined(__linux__)
+#include <sys/mman.h>
+
 #include <fcntl.h>
 #include <pthread.h>
 #include <sched.h>
-#include <sys/mman.h>
 #include <unistd.h>
 #endif
 
@@ -41,8 +42,7 @@ namespace catalyst::transport::common {
  * @param realtime Request realtime scheduling / locked memory / low latency.
  * @return Short description of what was granted (for logging).
  */
-inline std::string pin_thread(int cpu, bool realtime)
-{
+inline std::string pin_thread(int cpu, bool realtime) {
 #if defined(__linux__)
     std::string got;
     if (cpu >= 0) {
@@ -51,8 +51,7 @@ inline std::string pin_thread(int cpu, bool realtime)
         CPU_SET(cpu, &set);
         if (pthread_setaffinity_np(pthread_self(), sizeof(set), &set) == 0) {
             got += "cpu=" + std::to_string(cpu);
-        }
-        else {
+        } else {
             got += "cpu=unavailable";
         }
     }
