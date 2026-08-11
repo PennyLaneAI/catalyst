@@ -387,12 +387,13 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             + "{"
             + ",".join(f"{name}:{shape}" for name, shape in sorted(repack_wire_lens.items()))
             + "}"
-            + "{"
-            + ",".join(f"{k}:{v}" for k, v in sorted(repack_static_data.items()))
-            + "}"
         )
+        if static_data is not None:
+            op_id += "{" + ",".join(f"{k}:{v}" for k, v in sorted(repack_static_data.items())) + "}"
+        else:
+            op_id += "{}"
         if uid is not None:
-            op_id = op_id + f"[{str(uid)}]"
+            op_id += f"[{str(uid)}]"
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name=op_cls.__name__,
