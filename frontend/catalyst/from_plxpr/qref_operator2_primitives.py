@@ -16,7 +16,6 @@ of quantum operations to reference semantics JAXPR.
 """
 
 # pylint: disable=unused-argument
-from jax import numpy as jnp
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
 from jax.extend.core import Primitive
@@ -394,10 +393,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
         else:
             op_id += "{}"
         if uid is not None:
-            # uid from python hashing could be negative, but on Operator Op UID is I64Attr, which
-            # is signless. This means in the decomp rules' IDs, the uid must be signless too.
-            signless_uid = int(jnp.int64(uid).view(jnp.uint64))
-            op_id += f"[{str(signless_uid)}]"
+            op_id += f"[{str(uid)}]"
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name=op_cls.__name__,
