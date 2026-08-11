@@ -31,8 +31,8 @@
 
 #include "DynamicLibraryLoader.hpp"
 #include "Transport.hpp"
-#include "WireProtocol.hpp"
 #include "TransportBackend.h"
+#include "WireProtocol.hpp"
 
 using catalyst::transport::ChannelDesc;
 using catalyst::transport::ConnectInfo;
@@ -66,8 +66,7 @@ struct CatalystTransportSession {
 
 namespace {
 
-std::uint64_t now_ns()
-{
+std::uint64_t now_ns() {
     timespec ts = {};
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
     return static_cast<std::uint64_t>(ts.tv_sec) * 1000000000ull +
@@ -440,13 +439,11 @@ std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s) {
 
 // The benchmark loop
 // Flags:
-//     CATALYST_BENCH_CLEAR_SENTINEL: Clear the sentinel value in the reply slot.
 //     CATALYST_BENCH_FORCE_SW_RTT: Force the use of the software RTT.
 //     CATALYST_BENCH_PROGRESS: Print progress information.
 int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uint32_t iters,
                                            std::uint32_t decoder_id, std::uint32_t flags,
-                                           std::uint64_t *samples, std::uint64_t *rounds)
-{
+                                           std::uint64_t *samples, std::uint64_t *rounds) {
     if (rounds) {
         *rounds = 0;
     }
@@ -465,7 +462,6 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
     const auto syndrome_bytes = static_cast<std::uint32_t>(s->in_bytes);
     const auto correction_bytes = static_cast<std::uint32_t>(s->out_bytes);
 
-    const bool clear_sentinel = (flags & CATALYST_BENCH_CLEAR_SENTINEL) != 0;
     const bool force_sw_rtt = (flags & CATALYST_BENCH_FORCE_SW_RTT) != 0;
     const bool progress = (flags & CATALYST_BENCH_PROGRESS) != 0;
 
@@ -482,10 +478,6 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
             c->write_data_slot(syndrome.data(), syndrome_bytes, decoder_id);
 
             void *rslot = c->reply_slot();
-            if (clear_sentinel) {
-                *static_cast<volatile std::uint32_t *>(rslot) = 0u;
-            }
-
             std::uint64_t t0 = now_ns();
 
             rc = c->kick(work_item_idx);
@@ -507,8 +499,7 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
                 std::cerr << "[transport] start_benchmark: round " << i << " failed rc=" << rc
                           << " [sent 0x" << std::hex << value << ", reply slot 0x" << reply_value
                           << std::dec << " seq=" << reply_seq << "; work_item=" << work_item_idx
-                          << " in=" << syndrome_bytes << "B out=" << correction_bytes
-                          << "B clear_sentinel=" << clear_sentinel << "]\n";
+                          << " in=" << syndrome_bytes << "B out=" << correction_bytes << "B]\n";
                 break;
             }
 
@@ -531,8 +522,7 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
     });
 }
 
-void __catalyst__transport__start(CatalystTransportSession *s)
-{
+void __catalyst__transport__start(CatalystTransportSession *s) {
     if (s && s->sess) {
         guard([&] { s->sess->start(); });
     }
