@@ -217,15 +217,6 @@ def get_rules_from_module(module: ir.Module) -> str:
     return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
-def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
-    kwargs = {}
-    for wire_name, wire_len in wire_lens.items():
-        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
-    for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
-    return kwargs
-
-
 def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
     with ir.InsertionPoint(module.body):
         for decomp_rule in decomp_rules:
@@ -284,6 +275,15 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
+def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
+    kwargs = {}
+    for wire_name, wire_len in wire_lens.items():
+        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
+    for arg_name, arg_shape in dynamic_shape.items():
+        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
+    return kwargs
+
+
 def compile_decomposition_rules(
     op_name,
     op_id,
@@ -298,13 +298,9 @@ def compile_decomposition_rules(
 
     The decomposition rules will be decorated with appropriate resource and target_gate attributes.
     """
-    kwargs = {}
+    kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
     device = qp.device("null.qubit", wires=sum(wire_lens.values()))
-    for wire_name, wire_len in wire_lens.items():
-        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
-    for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name, kwargs | static_data | extra_data, is_custom_op
