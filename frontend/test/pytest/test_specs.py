@@ -1492,7 +1492,7 @@ def test_abstract_array_inputs():
         loop2()
         return qp.expval(qp.Z(0))
 
-    s = qp.specs(c, level=0)(qp.typing.AbstractArray((3,), float), qp.wires.Wires[3])
+    s = qp.specs(c, level=0)(qp.typing.AbstractArray((3,), float), qp.typing.Wire[3])
     assert s.resources.gate_types["PauliX"] == 3
     assert s.resources.gate_types["RX"] == 3
 
