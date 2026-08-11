@@ -35,12 +35,13 @@ from catalyst.passes import graph_decomposition
 # pylint: disable=too-many-lines
 
 
-TEST_PATH = os.path.dirname(__file__)
-CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
-
-
+# Helper to skip tests that fail due to TemporaryAND lowering issue
+# TODO: Remove this once the issue is fixed
 def skip_if_temporary_and_lowering_issue(test_func):
-    """Skip a lit test only for the known Operator2 ``TemporaryAND`` lowering failure."""
+    """Skip a lit test only for the known Operator2 ``TemporaryAND`` lowering failure. [sc-127439]
+    TemporaryAND cannot be lowered to LLVM IR without being decomposed, so
+    printing mlir_opt for operators that decompose to TemporaryAND will fail.
+    """
 
     def wrapper():
         try:
@@ -61,6 +62,10 @@ def skip_if_temporary_and_lowering_issue(test_func):
                 raise
 
     return wrapper
+
+
+TEST_PATH = os.path.dirname(__file__)
+CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
 def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=frozenset()):
