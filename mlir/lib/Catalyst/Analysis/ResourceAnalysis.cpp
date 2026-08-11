@@ -474,12 +474,19 @@ void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &r
                                                 bool isAdjoint) const {
     if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
         std::string opId = inst.getGraphOpId();
+        // TODO: Use Adjoint function from DecomposableGate
         if (auto resourceOp = dyn_cast<ResourceQuantumOpInterface>(op)) {
             if (isAdjoint ^ resourceOp.getResourceAdjointFlag()) {
                 opId += "[adj]";
             }
         }
         result.detailedOperations[opId] += 1;
+        return;
+    }
+
+    if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
+        result.detailedOperations[inst.getResourceDetailedName()] += 1;
+        return;
     }
 }
 

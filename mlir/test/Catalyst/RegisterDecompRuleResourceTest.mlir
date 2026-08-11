@@ -16,7 +16,8 @@
 
 // Basic decomposition rule
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT[][2]{}" = 1 : i64, "Hadamard[][1]{}" = 1 : i64, "S[][1]{}" = 1 : i64, "T[][1]{}" = 1 : i64}}, target_gate = "basic"
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, 
+// CHECK-SAME: operations = {"CNOT[][2]{}" = 1 : i64, "Hadamard[][1]{}" = 1 : i64, "S[][1]{}" = 1 : i64, "T[][1]{}" = 1 : i64}}, target_gate = "basic"
 func.func @basic_gates() attributes {target_gate="basic"}  {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -35,7 +36,8 @@ func.func @basic_gates() attributes {target_gate="basic"}  {
 
 // Rule with PBC ops
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {}}, target_gate = "pbc"
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, 
+// CHECK-SAME: operations = {"PPM[X]" = 1 : i64, "PPM[Z]" = 1 : i64, "PPR-pi/4[X]" = 1 : i64, "PPR-pi/4[Z]" = 2 : i64, "PPR-pi/8[Z]" = 1 : i64}}, target_gate = "pbc"
 func.func @pbc_operations() attributes {target_gate="pbc"} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -56,7 +58,8 @@ func.func @pbc_operations() attributes {target_gate="pbc"} {
 
 // Rule with measure
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 1 : i64, num_arg_qubits = 0 : i64, num_qubits = 1 : i64, operations = {"Hadamard[][1]{}" = 1 : i64}}, target_gate = "gate"
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 1 : i64, num_arg_qubits = 0 : i64, num_qubits = 1 : i64,
+// CHECK-SAME: operations = {"Hadamard[][1]{}" = 1 : i64, MidCircuitMeasure = 1 : i64}}, target_gate = "gate"
 func.func @rule_mcm() attributes {target_gate="gate"} {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -106,7 +109,8 @@ func.func @rule_with_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {targe
 
 // Rules with branching (take max per op)
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 1 : i64, num_qubits = 1 : i64, operations = {"Hadamard[][1]{}" = 3 : i64, "PauliX[][1]{}" = 2 : i64}}
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 1 : i64, num_qubits = 1 : i64, 
+// CHECK-SAME: operations = {"Hadamard[][1]{}" = 3 : i64, "PauliX[][1]{}" = 2 : i64}}
 func.func @rule_with_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit attributes {target_gate="gate"} {
     %q = scf.if %cond -> !quantum.bit {
         // True branch: 2 Hadamard, 1 PauliX
@@ -177,4 +181,40 @@ func.func @rule_with_parametric_ops(%arg0: !quantum.bit) -> !quantum.bit attribu
                  ctrlvals(%true, %false) : !quantum.bit, !quantum.bit ctrls !quantum.bit, !quantum.bit
 
     return %res_adj#0 : !quantum.bit
+}
+
+// -----
+
+// Reference-semantics PPM includes its Pauli product in the detailed resource name.
+
+// CHECK: operations = {"PPM[X,Z]" = 1 : i64}
+func.func @ref_ppm() attributes {target_gate="ref_ppm"} {
+    %reg = qref.alloc(2) : !qref.reg<2>
+    %q0 = qref.get %reg[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %reg[1] : !qref.reg<2> -> !qref.bit
+    %m = pbc.ref.ppm ["X", "Z"] %q0, %q1 : i1
+    qref.dealloc %reg : !qref.reg<2>
+    return
+}
+
+// -----
+
+// Multiplexed PPM includes both Pauli-product alternatives.
+
+// CHECK: operations = {"PPM[X:Z]" = 1 : i64}
+func.func @select_ppm(%cond: i1, %q: !quantum.bit) attributes {target_gate="select_ppm"} {
+    %m, %out = pbc.select.ppm (%cond ? ["X"] : ["Z"]) %q : i1, !quantum.bit
+    return
+}
+
+// -----
+
+// Fabricate and prepare ops in PBC
+
+// CHECK: operations = {"pbc.fabricate[|M)]" = 1 : i64, "pbc.prepare[|+)]" = 1 : i64, "pbc.prepare[|0)]" = 1 : i64}
+func.func @pbc_init_ops() attributes {target_gate="pbc_init_ops"} {
+    %q0, %q1 = pbc.prepare plus : !quantum.bit, !quantum.bit
+    %q2 = pbc.prepare zero : !quantum.bit
+    %m0, %m1 = pbc.fabricate magic : !quantum.bit, !quantum.bit
+    return
 }
