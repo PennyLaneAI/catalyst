@@ -383,6 +383,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update calls to `GlobalPhase` to no longer use the `wires` argument.
+  [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
+
 * The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
   (previously a dynamic float operand). This allows, among other things, the decomposition graph to
   distinguish pcphase gates with different `dim` values, since they need different decomposition rules.
