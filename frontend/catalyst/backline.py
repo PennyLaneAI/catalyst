@@ -227,16 +227,17 @@ def _launch_executor(label, options):
 
 
 def _realize_executor(node):
-    """Return the node's launched executor, building it from its ``executor_options`` on first use.
+    """Return the node's launched executor, building it on first use."""
+    from pennylane.backline import ExecutorSpec
 
-    A node requests an executor by carrying ``executor_options``, and the launched
-    one is cached back onto the node. ``None`` options mean no executor was requested, while
-    ``{}`` means one with all defaults.
-    """
     executor = getattr(node, "executor", None)
-    if executor is not None:
-        return executor
-    options = getattr(node, "executor_options", None)
+    if executor is not None and not isinstance(executor, ExecutorSpec):
+        return executor  # already launched
+    options = (
+        executor.options
+        if isinstance(executor, ExecutorSpec)
+        else getattr(node, "executor_options", None)
+    )
     if options is None:
         return None
     executor = _launch_executor(getattr(node, "label", None), dict(options))
