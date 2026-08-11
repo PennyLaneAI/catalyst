@@ -19,7 +19,7 @@
 namespace catalyst::transport::common {
 
 // Ring size, identical on both sides; power of two so index is a mask.
-inline constexpr std::size_t K_RING_SLOTS = 8;
+inline constexpr std::size_t K_RING_SLOTS = 256;
 
 // Selective-signalling stride (flow control on the pipelined send paths).
 inline constexpr std::uint32_t SIGNAL_EVERY = 64;
@@ -32,21 +32,25 @@ inline constexpr std::uint32_t SALT = 0xC0DE1515u;
 inline constexpr std::uint64_t DEMO_SYNDROME = 0x0123456789ABCDEFull;
 
 // 32B payload data area.
-inline constexpr std::size_t PAYLOAD_DATA_BYTES = 32;
+inline constexpr std::size_t PAYLOAD_DATA_BYTES = 8;
 
-// 40 B wire frame: PAYLOAD_DATA_BYTES of data, then the 8-byte header.
 // Note: this application payload size is unrelated to the network MTU (the QP's
 // max packet size, negotiated at RTR). The size here is far below any MTU, so
 // each transfer is always a single packet.
+// Payload layout:
+// byte  0                     dec_off   seq_off (4B-aligned)
+// v                              v       v
+// ┌──────────────────────────────┬───────┬──────────┐
+// │      value                   │ dec   │  seq_num │
+// └──────────────────────────────┴───────┴──────────┘
 #pragma pack(push, 1)
 struct Payload {
-    std::uint64_t value;
-    std::uint8_t value_ext[PAYLOAD_DATA_BYTES - sizeof(std::uint64_t)];
+    std::uint64_t value;      // 8B data payload
     std::uint32_t decoder_id; // selects which decoder handles this message
     std::uint32_t seq_num;    // arrival flag
 };
 #pragma pack(pop)
-static_assert(sizeof(Payload) == PAYLOAD_DATA_BYTES + 8, "Payload is the data area plus an 8 B header");
+static_assert(sizeof(Payload) == 16, "Payload must be exactly 16 B");
 static_assert(offsetof(Payload, seq_num) + sizeof(Payload::seq_num) == sizeof(Payload),
               "seq_num must be the last field in Payload");
 static_assert(offsetof(Payload, value) == 0,
