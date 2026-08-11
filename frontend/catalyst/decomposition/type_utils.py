@@ -119,30 +119,28 @@ def format_dynamic_params_for_id(d):
 
 def get_dummy_values_for_arg(arg):
     """
-    Given a dictionary of python or MLIR types, replace the types with corresponding dummy values.
+    Given a container of python or MLIR types, replace the types with corresponding dummy values.
 
-    Each item in the dictionary must be representable as an MLIR tensor with at most one layer of
+    Each item in the container must be representible as an MLIR tensor with at most one layer of
     nesting, i.e. cannot be nested and all elements must be of the same type.
     Ex.
     [[float, float], [int, int, int], [int32, int32, int32, int32]]
     """
+    if isinstance(arg, str):
+        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
+    elif isinstance(arg, (list, tuple)):
+        return jnp.zeros(len(arg), dtype=get_dummy_values_for_arg(arg[0]).dtype)
+    elif isinstance(arg, ShapedArray):
+        return jnp.zeros(arg.shape[0], dtype=arg.dtype)
+    elif isinstance(arg, str):
+        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
+    elif isinstance(arg, (type, jnp.dtype)):
+        try:
+            return jnp.zeros((), jnp.dtype(arg))
+        except TypeError:
+            pass
 
-    def handle_item(item):
-        if isinstance(item, (list, tuple)):
-            return jnp.zeros(len(item), dtype=handle_item(item[0]).dtype)
-        if isinstance(item, ShapedArray):
-            return jnp.zeros(item.shape[0], dtype=item.dtype)
-        elif isinstance(item, str):
-            return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[item])
-        elif isinstance(item, (type, jnp.dtype)):
-            try:
-                return jnp.zeros((), jnp.dtype(item))
-            except TypeError:
-                raise TypeError(
-                    f"Unexpected type in container when creating dummy values: {type(item)}"
-                )
-
-    return {k: handle_item(v) for k, v in dictionary.items()}
+    raise TypeError(f"Unexpected type in container when creating dummy values: {type(arg)}")
 
 
 def replace_abstract_wires_with_concrete_wires(node):
