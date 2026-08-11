@@ -42,7 +42,7 @@ struct ResourceResult {
     // name -> ((numWires, numParams) -> count)
     llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> operations;
 
-    llvm::StringMap<double> detailOperations;
+    llvm::StringMap<double> detailedOperations;
 
     llvm::StringMap<double> measurements;
 
