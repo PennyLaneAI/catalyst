@@ -477,7 +477,8 @@ class TestDraw:
     def test_reshape(self):
         """Test that the visualization works when the parameters are reshaped."""
         pytest.xfail(
-            "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+            "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> instead "
+            "of being cast to f64, breaking downstream xDSL/compiler passes"
         )
 
         one_dim = jax.numpy.array([1, 0])

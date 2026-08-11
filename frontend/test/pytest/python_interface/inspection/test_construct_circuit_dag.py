@@ -616,7 +616,8 @@ class TestIfOp:
         are present"""
         if capture_mode:
             pytest.xfail(
-                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
+                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
             )
 
         dev = qp.device("null.qubit", wires=1)
@@ -689,7 +690,8 @@ class TestIfOp:
         are present but nested in other operations"""
         if capture_mode:
             pytest.xfail(
-                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
+                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
             )
 
         dev = qp.device("null.qubit", wires=1)
@@ -1312,11 +1314,12 @@ class TestCreateDynamicOperatorNodes:
         """Tests that we can use operators like +,-,%"""
         if capture_mode:
             pytest.xfail(
-                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
+                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
             )
         pytest.xfail(
-            "sc-127303: Circuit DAG inspection cannot reconstruct typed Operator2 gates from "
-            "symbolic xDSL parameters"
+            "sc-127303: DAG reconstruction passes symbolic xDSL parameters as strings to typed "
+            "Operator2 gate constructors, which reject string-valued angles"
         )
 
         dev = qp.device("null.qubit", wires=1)
@@ -1721,7 +1724,8 @@ class TestOperatorConnectivity:
         """Tests that connections through conditionals make sense."""
         if capture_mode:
             pytest.xfail(
-                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
+                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
             )
 
         dev = qp.device("null.qubit", wires=1)
@@ -1767,7 +1771,8 @@ class TestOperatorConnectivity:
         """Tests that connections through nested conditionals make sense."""
         if capture_mode:
             pytest.xfail(
-                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
+                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
             )
 
         dev = qp.device("null.qubit", wires=1)
@@ -2154,7 +2159,8 @@ class TestOperatorConnectivity:
         """Tests that complex connectivity can go through a conditional."""
         if capture_mode:
             pytest.xfail(
-                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
+                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
             )
 
         @xdsl_from_qjit

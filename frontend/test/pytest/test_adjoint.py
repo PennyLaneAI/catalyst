@@ -153,7 +153,8 @@ class TestCatalyst:
             )
         if capture_mode:
             pytest.xfail(
-                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
+                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
             )
 
         def func(w, theta1, theta2, theta3=1):
@@ -350,7 +351,8 @@ class TestCatalyst:
             )
         if capture_mode:
             pytest.xfail(
-                "sc-127301: Operator2 integer-valued Float parameters are not lowered correctly"
+                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
+                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
             )
 
         def func(limit):
