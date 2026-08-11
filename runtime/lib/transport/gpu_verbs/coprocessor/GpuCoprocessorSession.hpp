@@ -55,8 +55,7 @@ class GpuCoprocessorSession : public CoprocessorSession {
     void stop() override;
     void set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) override;
 
-    void set_thread_affinity(int cpu, bool realtime)
-    {
+    void set_thread_affinity(int cpu, bool realtime) {
         pin_cpu_ = cpu;
         pin_realtime_ = realtime;
     }
