@@ -15,6 +15,7 @@
 UID generation logic for compiling operators with non-compilable data.
 """
 
+import hashlib
 from functools import singledispatch
 from typing import Any
 
@@ -67,7 +68,13 @@ def generate_uid(
     reduced.append(("static", reduced_static_args))
     reduced.append(("adjoint", adjoint))
     reduced.append(("n_ctrls", n_ctrls))
-    return hash(tuple(reduced))
+
+    encoded_bytes = str(reduced).encode("utf-8")
+    sha_hash = hashlib.sha256(encoded_bytes).hexdigest()
+
+    # hexdigest() returns the hexadecimal hash in string format
+    # Take 16 hexadecimals, since UID on Operator op is I64Attr, which is a 64-bit unsigned
+    return int("0" + sha_hash[:15], 16)
 
 
 @singledispatch
