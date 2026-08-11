@@ -69,6 +69,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
     }
 
     mergeStringMap(measurements, other.measurements, method);
+    mergeStringMap(detailedOperations, other.detailedOperations, method);
     mergeStringMap(classicalInstructions, other.classicalInstructions, method);
     mergeStringMap(functionCalls, other.functionCalls, method);
 
@@ -102,6 +103,10 @@ void ResourceResult::multiplyBy(double scalar) {
     }
 
     for (auto &entry : measurements) {
+        entry.getValue() *= scalar;
+    }
+
+    for (auto &entry : detailedOperations) {
         entry.getValue() *= scalar;
     }
 

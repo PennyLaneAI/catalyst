@@ -106,7 +106,7 @@ func.func @rule_with_loop(%arg0: !quantum.bit) -> !quantum.bit attributes {targe
 
 // Rules with branching (take max per op)
 
-// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 1 : i64, num_qubits = 1 : i64, operations = {}}
+// CHECK: resources = {measurements = {}, num_alloc_qubits = 0 : i64, num_arg_qubits = 1 : i64, num_qubits = 1 : i64, operations = {"Hadamard[][1]{}" = 3 : i64, "PauliX[][1]{}" = 2 : i64}}
 func.func @rule_with_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit attributes {target_gate="gate"} {
     %q = scf.if %cond -> !quantum.bit {
         // True branch: 2 Hadamard, 1 PauliX
@@ -153,7 +153,7 @@ func.func @rule_with_nested_loop(%arg0: !quantum.bit) -> !quantum.bit attributes
 // -----
 
 // Rules with parametric ops
-// CHECK:  operations = {"Rot[f64,f64,f64][2]{}" = 2 : i64}}
+// CHECK:  operations = {"Rot[f64,f64,f64][2]{}" = 1 : i64, "Rot[f64,f64,f64][2]{}[adj]" = 1 : i64}}
 func.func @rule_with_parametric_ops(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate="gate"} {
     %cst_0 = arith.constant 0.1 : f64
     %cst_1 = arith.constant 0.2 : f64
