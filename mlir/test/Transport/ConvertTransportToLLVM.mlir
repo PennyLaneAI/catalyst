@@ -62,7 +62,7 @@ func.func @coprocessor() {
   // CHECK: %[[C:.*]] = llvm.call @__catalyst__transport__create({{.*}}) : (!llvm.ptr, !llvm.ptr, i32, !llvm.ptr) -> !llvm.ptr
   %c = transport.create {backend_lib = "libbackend.so", config = "cfg"} -> !transport.session<coprocessor>
   // CHECK: llvm.call @__catalyst__transport__connect_async(%[[C]]
-  %t = transport.connect_async %c {peer = "127.0.0.1", oob_port = 18560 : i16} : !transport.session<coprocessor> -> !transport.token
+  %t = transport.connect_async %c {peer = "127.0.0.1", oob_port = 18560 : i32} : !transport.session<coprocessor> -> !transport.token
   // CHECK: llvm.call @__catalyst__transport__await
   transport.await %t : !transport.token
   // CHECK: llvm.call @__catalyst__transport__set_coprocessor_fn(%[[C]], %{{.*}}) : (!llvm.ptr, !llvm.ptr) -> i32
