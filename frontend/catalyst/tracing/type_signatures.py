@@ -27,8 +27,7 @@ from jax._src.interpreters.partial_eval import infer_lambda_input_type
 from jax._src.pjit import _flat_axes_specs
 from jax.core import AbstractValue
 from jax.tree_util import tree_flatten, tree_unflatten
-from pennylane.typing import AbstractArray
-from pennylane.wires import AbstractWires
+from pennylane.typing import AbstractArray, AbstractWires
 
 from catalyst.jax_extras import get_aval2
 from catalyst.utils.exceptions import CompileError
