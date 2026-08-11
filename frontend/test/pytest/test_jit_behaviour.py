@@ -870,7 +870,7 @@ class TestDefaultAvailableIR:
 
         @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=4))
-        def c(x: qp.typing.AbstractArray((3,), float), wires: qp.wires.Wires[4]):
+        def c(x: qp.typing.AbstractArray((3,), float), wires: qp.typing.Wire[4]):
             @qp.for_loop(x.shape[0])
             def loop(i):
                 qp.RX(x[i], wires[i])
