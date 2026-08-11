@@ -92,7 +92,6 @@ void __catalyst__transport__destroy(CatalystTransportSession *s);
 
 // Flags for start_benchmark.
 enum {
-    CATALYST_BENCH_CLEAR_SENTINEL = 1u << 0,
     CATALYST_BENCH_FORCE_SW_RTT = 1u << 1,
     CATALYST_BENCH_PROGRESS = 1u << 2,
 };
