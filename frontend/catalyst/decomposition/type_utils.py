@@ -17,6 +17,7 @@
 import copy
 
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
@@ -129,7 +130,9 @@ def get_dummy_values_for_arg(arg):
     if isinstance(arg, str):
         return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
     elif isinstance(arg, (list, tuple)):
-        return jnp.zeros(len(arg), dtype=get_dummy_values_for_arg(arg[0]).dtype)
+        dtype = get_dummy_values_for_arg(arg[0]).dtype
+        # NOTE: numpy is required since jax won't create an array of strings
+        return jnp.zeros(np.array(arg, str).shape, dtype)
     elif isinstance(arg, ShapedArray):
         return jnp.zeros(arg.shape[0], dtype=arg.dtype)
     elif isinstance(arg, str):
