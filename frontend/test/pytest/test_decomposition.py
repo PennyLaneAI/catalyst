@@ -32,7 +32,10 @@ from catalyst.decomposition.precompile_decomposition_rules import (
     get_abstract_args,
     precompile_decomp_rules,
 )
-from catalyst.decomposition.type_utils import get_dummy_values_for_arg, mlir_stringify_type
+from catalyst.decomposition.type_utils import (
+    convert_types_to_mlir_strings,
+    get_dummy_values_for_arg,
+)
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
@@ -63,6 +66,7 @@ class TestGenericUtilities:
             ("i32", "int32", ()),
             (["f64", "f64"], "float64", (2,)),
             (["i1", "i1", "i1"], "bool", (3,)),
+            ([["f64", "f64"], ["f64", "f64"]], "float64", (2, 2)),
         ],
     )
     def test_get_dummy_values_types(self, input, dtype, shape):
@@ -74,16 +78,16 @@ class TestGenericUtilities:
     @pytest.mark.parametrize(
         "dtype, expected",
         [
-            (qp.typing.Float, "[f64]"),
-            (qp.typing.Int, "[i64]"),
-            (qp.typing.Bool, "[i1]"),
-            (qp.typing.Complex, "[complex<f64>]"),
-            (qp.typing.AbstractArray((2,), "int32"), "[i32,i32]"),
+            ({"name": qp.typing.Float}, {"name": ["f64"]}),
+            ({"name": qp.typing.Int}, {"name": ["i64"]}),
+            ({"test": qp.typing.Bool}, {"test": ["i1"]}),
+            ({"r": qp.typing.Complex}, {"r": ["complex<f64>"]}),
+            ({"A": qp.typing.AbstractArray((2,), "int32")}, {"A": ["i32", "i32"]}),
         ],
     )
     def test_mlir_stringify_type(self, dtype, expected):
         """Test mlir_stringify_type."""
-        assert mlir_stringify_type(dtype) == expected
+        assert convert_types_to_mlir_strings(dtype) == expected
 
     def test_wrapper_operator(self):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
