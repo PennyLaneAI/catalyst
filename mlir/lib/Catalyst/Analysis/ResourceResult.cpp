@@ -215,12 +215,12 @@ llvm::json::Object ResourceResult::toJson() const {
     funcObj["extended_fields"] = std::move(extendedFieldObject);
 
     // Detail operations
-    llvm::json::Object detailOperationsObject;
-    for (const auto &entry : detailOperations) {
-        detailOperationsObject[entry.getKey()] = countToJson(entry.getValue());
+    llvm::json::Object detailedOperationsObject;
+    for (const auto &entry : detailedOperations) {
+        detailedOperationsObject[entry.getKey()] = countToJson(entry.getValue());
     }
-    if (!detailOperationsObject.empty()) {
-        funcObj["quantum_operations_detailed"] = std::move(detailOperationsObject);
+    if (!detailedOperationsObject.empty()) {
+        funcObj["quantum_operations_detailed"] = std::move(detailedOperationsObject);
     }
 
     return funcObj;
@@ -248,7 +248,7 @@ DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
 
     // operations
     SmallVector<NamedAttribute> opsEntries;
-    for (const auto &opEntry : result.detailOperations) {
+    for (const auto &opEntry : result.detailedOperations) {
         llvm::StringRef opName = opEntry.getKey();
         int64_t count = static_cast<int64_t>(std::llround(opEntry.getValue()));
         opsEntries.push_back(NamedAttribute(StringAttr::get(ctx, opName),

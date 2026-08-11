@@ -366,7 +366,7 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
             if (needsCollection) {
                 collectOperation(&op, result, isAdjoint);
                 if (collectDetailedOperations) {
-                    collectDetailOperation(&op, result, isAdjoint);
+                    collectDetailedOperation(&op, result, isAdjoint);
                 }
             }
         }
@@ -470,10 +470,10 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
     result.classicalInstructions[op->getName().getStringRef()] += 1;
 }
 
-void ResourceAnalysis::collectDetailOperation(Operation *op, ResourceResult &result,
-                                              bool isAdjoint) const {
+void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
+                                                bool isAdjoint) const {
     if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
-        result.detailOperations[inst.getGraphOpId()] += 1;
+        result.detailedOperations[inst.getGraphOpId()] += 1;
     }
 }
 
@@ -494,8 +494,8 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
             innerDst[sizeEntry.first] += sizeEntry.second * count;
         }
     }
-    for (const auto &opEntry : source.detailOperations) {
-        dest.detailOperations[opEntry.getKey()] += opEntry.getValue() * count;
+    for (const auto &opEntry : source.detailedOperations) {
+        dest.detailedOperations[opEntry.getKey()] += opEntry.getValue() * count;
     }
     for (const auto &m : source.measurements) {
         dest.measurements[m.getKey()] += m.getValue() * count;
