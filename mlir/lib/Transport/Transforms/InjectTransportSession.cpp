@@ -416,8 +416,7 @@ struct InjectTransportSessionPass
             }
         }
 
-        SessionEmitter(mod, backline.getTransport(), ctrl, remoteController, ctrlMod)
-            .run(coprocs);
+        SessionEmitter(mod, backline.getTransport(), ctrl, remoteController, ctrlMod).run(coprocs);
     }
 };
 

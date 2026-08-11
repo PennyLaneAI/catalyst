@@ -168,9 +168,8 @@ TEST_CASE("local backend plugins round-trip through the transport CAPI", "[trans
     REQUIRE(__catalyst__transport__exchange_keys(co) == CATALYST_TRANSPORT_OK);
     REQUIRE(__catalyst__transport__establish_channel(ct, "local") == CATALYST_TRANSPORT_OK);
     REQUIRE(__catalyst__transport__establish_channel(co, "local") == CATALYST_TRANSPORT_OK);
-    REQUIRE(__catalyst__transport__set_message_sizes(ct, 0, sizeof(std::uint64_t),
-                                                     sizeof(std::uint64_t)) ==
-            CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_message_sizes(
+                ct, 0, sizeof(std::uint64_t), sizeof(std::uint64_t)) == CATALYST_TRANSPORT_OK);
     REQUIRE(__catalyst__transport__set_coprocessor_fn(co, "") == CATALYST_TRANSPORT_OK);
 
     __catalyst__transport__start(ct);
