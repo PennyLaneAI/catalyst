@@ -31,7 +31,7 @@ inline constexpr std::uint32_t SALT = 0xC0DE1515u;
 // measurement outcome). Its (echo) decode is what the self-test checks.
 inline constexpr std::uint64_t DEMO_SYNDROME = 0x0123456789ABCDEFull;
 
-// 32B payload data area.
+// 16 B wire frame.
 inline constexpr std::size_t PAYLOAD_DATA_BYTES = 8;
 
 // Note: this application payload size is unrelated to the network MTU (the QP's
