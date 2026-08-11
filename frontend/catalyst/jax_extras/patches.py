@@ -46,8 +46,7 @@ from jax._src.lax.slicing import (
 from jax._src.pjit import _out_type, _pjit_forwarding, jit_p
 from jax._src.sharding_impls import UnspecifiedValue
 from jax.core import AbstractValue, Tracer
-from pennylane.typing import AbstractArray
-from pennylane.wires import AbstractWires
+from pennylane.typing import AbstractArray, AbstractWires
 
 from catalyst.utils.patching import DictPatchWrapper
 
