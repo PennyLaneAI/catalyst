@@ -705,7 +705,7 @@ def test_decomposition_rule_name_update():
     def ry_gp(wires: WiresLike, **__):
         """Decomposition of PauliY gate using RY and GlobalPhase gates."""
         qp.RY(np.pi, wires=wires)
-        qp.GlobalPhase(-np.pi / 2, wires=wires)
+        qp.GlobalPhase(-np.pi / 2)
 
     @qp.qjit(target="mlir", capture=True)
     @partial(
