@@ -57,8 +57,8 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
                 arguments.update(zip(op_cls.wire_argnames, wires, strict=True))
                 arguments.update(static_data)
                 rule(**arguments)
-            else:
-                rule(*params, *wires, **static_data)
+            else:  # !TODO: remove this branch once Op2 migration is complete
+                rule(*params, *wires, **static_data)  # pragma: no cover
 
         # TODO remove this once we have unified lowering, we should be able to set target_gate and
         # stop relying on function names
