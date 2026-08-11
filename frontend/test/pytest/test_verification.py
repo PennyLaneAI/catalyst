@@ -197,7 +197,7 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -233,7 +233,7 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -263,7 +263,7 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -287,7 +287,7 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -323,7 +323,7 @@ class TestHybridOpVerification:
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
                 qjit(f)(1.2)
 
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
 
                 @qjit
                 def cir(x: float):
@@ -347,7 +347,7 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -372,7 +372,7 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -397,7 +397,7 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -443,7 +443,7 @@ class TestHybridOpVerification:
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 qjit(f)(1.2)
 
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
 
                 @qjit
                 def cir(x: float):
@@ -489,7 +489,7 @@ class TestHybridOpVerification:
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 qjit(f)(1.2)
 
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
 
                 @qjit
                 def cir(x: float):
@@ -512,7 +512,7 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -535,7 +535,7 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -783,7 +783,7 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -815,7 +815,7 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -857,7 +857,7 @@ class TestAdjointMethodVerification:
 
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -878,7 +878,7 @@ class TestAdjointMethodVerification:
             adjoint(qp.RX(x, wires=[0]))
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -914,7 +914,7 @@ class TestParameterShiftMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -934,7 +934,7 @@ def test_no_state_returns():
         qp.PauliX(wires=0)
         return qp.state()
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         def cir(x: float):
@@ -952,7 +952,7 @@ def test_no_variance_returns():
         qp.PauliX(wires=0)
         return qp.var(qp.PauliX(0))
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         def cir(x: float):

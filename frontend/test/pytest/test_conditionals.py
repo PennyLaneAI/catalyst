@@ -251,7 +251,7 @@ class TestCond:
 
             return cond_fn()
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
             circuit = qjit(circuit, capture=capture_mode)
 
         with pytest.raises(
@@ -273,14 +273,14 @@ class TestCond:
             return cond_fn()
 
         if capture_mode:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
             with pytest.raises(
                 ValueError, match="false branch must be provided if the true branch"
             ):
                 circuit(True)
         else:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
             with pytest.raises(
                 TypeError,
@@ -304,7 +304,7 @@ class TestCond:
 
         if capture_mode:
             # [sc-97387] improve error message
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 circuit = qjit(circuit, capture=capture_mode)
             with pytest.raises(
                 ValueError,
@@ -313,7 +313,7 @@ class TestCond:
                 circuit(True)
         else:
             m = "Control flow requires a consistent array shape per result across all branches"
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 circuit = qjit(circuit, capture=capture_mode)
             with pytest.raises(
                 TypeError,
@@ -337,7 +337,7 @@ class TestCond:
 
         if capture_mode:
             # [sc-97387] improve error message
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
             with pytest.raises(
                 ValueError,
@@ -346,7 +346,7 @@ class TestCond:
                 circuit(True)
         else:
             m = "Control flow requires a consistent array shape per result across all branches"
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
             with pytest.raises(
                 TypeError,
@@ -558,12 +558,12 @@ class TestCond:
             return cond_fn()
 
         if capture_mode:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 circuit = qjit(circuit, capture=capture_mode)
             with pytest.raises(ValueError, match="Mismatch in number of output variables"):
                 circuit(True)
         else:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 circuit = qjit(circuit, capture=capture_mode)
             with pytest.raises(
                 TypeError,
@@ -621,12 +621,12 @@ class TestCond:
             return res
 
         if capture_mode:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 f_jit = qjit(f, capture=capture_mode)
             with pytest.raises(ValueError, match="false branch must be provided"):
                 f_jit(0)
         else:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 f_jit = qjit(f, capture=capture_mode)
             with pytest.raises(TypeError, match="requires a consistent return structure"):
                 f_jit(0)
@@ -637,14 +637,14 @@ class TestCond:
             return res
 
         if capture_mode:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 g_jit = qjit(g, capture=capture_mode)
             with pytest.raises(
                 ValueError, match="Mismatch in number of output variables in false branch"
             ):
                 g_jit(0)
         else:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 g_jit = qjit(g, capture=capture_mode)
             with pytest.raises(
                 TypeError, match="requires a consistent return structure across all branches"
@@ -657,14 +657,14 @@ class TestCond:
             return res
 
         if capture_mode:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 h_jit = qjit(h, capture=capture_mode)
             with pytest.raises(
                 ValueError, match="Mismatch in number of output variables in elif branch"
             ):
                 h_jit(0)
         else:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 h_jit = qjit(h, capture=capture_mode)
             with pytest.raises(
                 TypeError, match="requires a consistent return structure across all branches"
@@ -849,7 +849,7 @@ class TestClassicalCompilation:
 
             return branch()
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
             arithc2_jit = qjit(arithc2, capture=capture_mode)
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
@@ -866,7 +866,7 @@ class TestClassicalCompilation:
 
             return branch()  # pylint: disable=no-value-for-parameter
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
             arithc1_jit = qjit(arithc1, capture=capture_mode)
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):

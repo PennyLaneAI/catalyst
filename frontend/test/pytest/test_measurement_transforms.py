@@ -599,7 +599,7 @@ class TestMeasurementTransforms:
             qp.RX(theta, 0)
             return qp.sample()
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
             compiled_circuit = qjit(circuit)
 
         with pytest.raises(
@@ -620,7 +620,7 @@ class TestMeasurementTransforms:
             qp.RX(theta, 0)
             return qp.counts()
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
             compiled_circuit = qjit(circuit)
 
         with pytest.raises(

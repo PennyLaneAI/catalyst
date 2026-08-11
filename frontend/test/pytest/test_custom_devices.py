@@ -104,7 +104,7 @@ def test_custom_device_bad_directory():
             """Execution."""
             raise NotImplementedError
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         @qp.qnode(CustomDevice(wires=1))
@@ -137,7 +137,7 @@ def test_custom_device_no_c_interface():
             """Execution."""
             raise NotImplementedError
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         @qp.qnode(CustomDevice(wires=1))

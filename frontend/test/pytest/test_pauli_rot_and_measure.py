@@ -136,7 +136,7 @@ def test_pauli_rot_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit(pipelines=pipe, target="mlir", capture=True)
         def test_pauli_rot_to_ppr_pauli_word_error_workflow():
@@ -159,7 +159,7 @@ def test_pauli_measure_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit(pipelines=pipe, target="mlir", capture=True)
         def test_pauli_measure_to_ppr_pauli_word_error_workflow():

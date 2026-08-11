@@ -260,7 +260,7 @@ def test_folding_type_not_supported():
             circuit, scale_factors=[], folding="bad-folding-type-value"
         )()
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
         qjitted = catalyst.qjit(mitigated_qnode)
 
     with pytest.raises(ValueError, match="Folding type must be"):

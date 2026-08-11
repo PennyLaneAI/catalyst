@@ -83,7 +83,7 @@ class TestSubroutineHOP:
             qp.Hadamard(wires=[0])
 
         msg = "inside subroutine"
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(autograph=False, capture=True)
             def subroutine_test():

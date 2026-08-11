@@ -77,7 +77,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=4)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(capture=capture)
             @measurements_from_samples_pass
@@ -102,7 +102,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(capture=capture)
             @measurements_from_samples_pass
@@ -125,7 +125,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(capture=capture)
             @measurements_from_samples_pass
@@ -149,7 +149,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(capture=capture)
             @measurements_from_samples_pass
@@ -172,7 +172,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(capture=capture)
             @measurements_from_samples_pass
@@ -190,7 +190,7 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(capture=capture)
             @measurements_from_samples_pass

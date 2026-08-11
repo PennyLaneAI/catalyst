@@ -224,7 +224,7 @@ def test_param_shift_on_non_expval(backend):
     def workflow(p: float):
         return qp.jacobian(func, method="auto")(p)
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
         workflow = qjit(workflow)
 
     with pytest.raises(
@@ -247,7 +247,7 @@ def test_adjoint_on_non_expval(backend):
     def workflow(p: float):
         return qp.jacobian(func, method="auto")(p)
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
         workflow = qjit(workflow)
 
     with pytest.raises(DifferentiableCompileError, match="The adjoint method can only be used"):
@@ -1103,7 +1103,7 @@ def test_assert_no_higher_order_without_fd(method, backend):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         # not sure how to get this working with qp.grad TODO
         @qjit
@@ -1124,7 +1124,7 @@ def test_assert_invalid_diff_method():
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         def workflow(x: float):
@@ -1143,7 +1143,7 @@ def test_assert_invalid_h_type():
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         def workflow(x: float):
@@ -1162,7 +1162,7 @@ def test_assert_non_differentiable():
         h = grad("string!", method="fd")
         return h(x)
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
         workflow = qjit(workflow)
 
     with pytest.raises(TypeError, match="'string!' is not a callable object"):
@@ -1878,7 +1878,7 @@ class TestGradientErrors:
             qp.RX(_bool + 1, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -1896,7 +1896,7 @@ class TestGradientErrors:
             qp.RX(y, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -1916,7 +1916,7 @@ class TestGradientErrors:
         def g(x):
             return mitigate_with_zne(f, scale_factors=[1, 3, 5])(x)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
@@ -2301,7 +2301,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 c = 0.5 / jnp.sin(x)
                 return ([[c, 0.0, 2 * x], [-c, 0.0, 0.0]],)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             @grad
@@ -2322,7 +2322,7 @@ class TestParameterShiftVerificationIntegrationTests:
             def grad_recipe(self):
                 return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             @grad
@@ -2344,7 +2344,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 # Only one parameter but two frequencies is an error
                 return (1.0, 1.0)
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             @grad
@@ -2366,7 +2366,7 @@ class TestParameterShiftVerificationIntegrationTests:
                 # Only one parameter but two frequencies is an error
                 return [(2.0,)]
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             @grad

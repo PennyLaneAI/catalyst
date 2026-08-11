@@ -324,7 +324,7 @@ class TestCProgramGeneration:
             """Identity function."""
             return x
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def error_fn(x: float):

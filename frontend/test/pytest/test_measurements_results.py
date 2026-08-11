@@ -1110,7 +1110,7 @@ class TestDensityMatrixMP:
         """Test that tracing density matrix produces an error"""
 
         err_msg = "DensityMatrixMP is not a supported measurement process"
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             @qp.qnode(CustomDevice(wires=1))

@@ -582,13 +582,13 @@ class TestOtherMeasurements:
             return meas_fun(wires=0, **({"all_outcomes": True} if meas_fun is qp.counts else {}))
 
         if capture_mode:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 f = qjit(circuit, capture=capture_mode)
             with pytest.raises(ValueError, match="finite shots are required"):
                 f()
         else:
 
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
                 f = qjit(circuit, capture=capture_mode)
             with pytest.raises(CompileError, match="cannot work with shots=None"):
                 f()

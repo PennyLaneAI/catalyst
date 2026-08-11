@@ -536,7 +536,7 @@ def test_no_capture(backend):
     """
     Test error message when used without capture.
     """
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
@@ -557,7 +557,7 @@ def test_use_after_free(backend):
     Test error message when used after free.
     """
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
@@ -579,7 +579,7 @@ def test_terminal_MP_all_wires(backend):
     Test error message when used with terminal measurements on all wires.
     """
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
@@ -603,7 +603,7 @@ def test_terminal_MP_dynamic_wires(backend):
     Test error message when used with terminal measurements on dynamic wires.
     """
 
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))

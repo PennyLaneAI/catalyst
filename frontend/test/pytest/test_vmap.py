@@ -828,7 +828,7 @@ class TestVectorizeMap:
 
             return g(jnp.ones((n,), dtype=float))
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
             qf = qjit(target="mlir")(f)
 
         with pytest.raises(ValueError, match="Invalid batch size; cannot vmap over a dynamic"):

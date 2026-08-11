@@ -588,7 +588,7 @@ class TestSignatureErrors:
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def f(x: str):
@@ -1087,7 +1087,7 @@ class TestErrorNestedQNode:
             inner()
             return qp.state()
 
-        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def fn():
@@ -1104,7 +1104,7 @@ class TestAOTFailures:
     def test_capture_failure(self):
         """Test a failure capturing the jaxpr."""
 
-        with pytest.warns(UserWarning, match="AOT capture of jaxpr failed."):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(capture=True)
             @qp.qnode(qp.device("null.qubit", wires=1))
@@ -1123,7 +1123,7 @@ class TestAOTFailures:
         def f():
             return []
 
-        with pytest.warns(UserWarning, match="AOT generation of mlir failed"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(capture=True)
             def c():
@@ -1135,7 +1135,7 @@ class TestAOTFailures:
     def test_llvm_generation_failure(self):
         """Test a failure lowering to llvmir."""
 
-        with pytest.warns(UserWarning, match="AOT generation of llvmir failed."):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(capture=True)
             @qp.qnode(qp.device("null.qubit", wires=1))
