@@ -68,7 +68,7 @@ class GraphOpID:
         """Create a new GraphOpId."""
         assert isinstance(
             op, qp.core.Operator2
-        ), "Graph-based decomposition expects an Operator2 instance"
+        ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
         self.op = op
 
         self.operator_name = op.name
@@ -404,26 +404,32 @@ def fetch_all_reachable_decomposition_rules_from_op(
             this_name, this_kwargs | this_static_data | this_extra_data
         )
         for _rule_name, resource in resources.items():
-            for op, _count in resource.items():
-                graph_op_id = GraphOpID(op)
-                probe = (
-                    graph_op_id.get_operator_name(),
-                    convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
-                    graph_op_id.wire_lens,
-                    graph_op_id.static_data,
-                    graph_op_id.extra_data,
-                )
-
-                if not probe in visited:
-                    visited.append(probe)
-                    queue.append(probe)
-                    module = compile_decomposition_rules(
-                        probe[0],
-                        graph_op_id.getID(),
-                        probe[1],
-                        probe[2],
-                        probe[3],
-                        probe[4],
+            try:
+                for op, _count in resource.items():
+                    graph_op_id = GraphOpID(op)
+                    probe = (
+                        graph_op_id.get_operator_name(),
+                        convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
+                        graph_op_id.wire_lens,
+                        graph_op_id.static_data,
+                        graph_op_id.extra_data,
                     )
-                    rules.extend(get_rule_strings_from_module(module))
+
+                    if not probe in visited:
+                        visited.append(probe)
+                        queue.append(probe)
+                        module = compile_decomposition_rules(
+                            probe[0],
+                            graph_op_id.getID(),
+                            probe[1],
+                            probe[2],
+                            probe[3],
+                            probe[4],
+                        )
+                        rules.extend(get_rule_strings_from_module(module))
+            except Exception as e:
+                warnings.warn(
+                    f"Failed to lower the {_rule_name} decomposition rule for {this_name}: {e}"
+                )
+                continue
     return rules
