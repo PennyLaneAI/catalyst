@@ -12,19 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Test that graph-decomposition is able to use compile-time python decompositions
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Hadamard=1.0,MultiRZ=1.0})' %s | FileCheck %s
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=PhaseShift=1.0})' %s | FileCheck %s
-
-
-func.func @circuit() -> !quantum.bit {
-  %reg = quantum.alloc(1): !quantum.reg
-  %0 = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
-
-  // CHECK-NOT: quantum.custom "S"
-  // CHECK: quantum.custom "PhaseShift"
-  %out_qubits = quantum.custom "S"() %0 : !quantum.bit
-  return %out_qubits : !quantum.bit
+func.func @paulirot(%angle: f64, %q1: !quantum.bit, %q2: !quantum.bit) {
+  // CHECK-NOT: quantum.paulirot
+  // CHECK: Hadamard
+  // CHECK: quantum.multirz
+  // CHECK: Hadamard
+  %qout:2 = quantum.paulirot ["Z", "X"](%angle) %q1, %q2 : !quantum.bit, !quantum.bit
+  return
 }
-
-// TODO: add a tests for more complicated operators once they're migrated
