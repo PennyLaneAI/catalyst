@@ -69,6 +69,9 @@
   syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
   [(#3092)](https://github.com/PennyLaneAI/catalyst/pull/3092)
 
+* A backline transport backend via `memcpy` is available.
+  [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
+
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
 
@@ -397,6 +400,10 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
+  the `gpu` label.
+  [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
 
 * The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
   (previously a dynamic float operand). This allows, among other things, the decomposition graph to
