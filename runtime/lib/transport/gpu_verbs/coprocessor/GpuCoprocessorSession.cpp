@@ -167,7 +167,7 @@ bool GpuCoprocessorSession::post_inline(std::uint64_t cursor) {
 // keep polling until every signaled send has completed (teardown), guarded so a
 // lost completion can't hang the join forever.
 void GpuCoprocessorSession::reap_bwd(int &outstanding, bool drain) {
-    std::array<ibv_wc, REAP_BATCH> wc{};
+    std::array<ibv_wc, REAP_BATCH> wc;
     int empty = 0;
     constexpr int DRAIN_MAX_EMPTY = 1000000;
     do {
@@ -200,12 +200,16 @@ void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
         const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
         std::uint32_t index = c & (K_RING_SLOTS - 1);
         volatile std::uint32_t *sptr = &handoff_.host[index].seq;
+        std::uint32_t spins = 0;
         while (*sptr != expect) {
-            if (st.stop_requested()) {
-                reap_bwd(signaled_outstanding, /*drain=*/true);
-                return;
+            if (++spins == STOP_CHECK_SPINS) {
+                spins = 0;
+                if (st.stop_requested()) {
+                    reap_bwd(signaled_outstanding, /*drain=*/true);
+                    return;
+                }
             }
-            std::this_thread::yield();
+            cpu_relax();
         }
         // seq observed -> the kernel published correction+seq together in one
         // 16 B store followed by a single system fence (no fence between the
