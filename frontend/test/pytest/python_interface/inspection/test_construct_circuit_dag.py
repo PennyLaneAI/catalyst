@@ -2128,6 +2128,7 @@ class TestOperatorConnectivity:
 
     def test_complex_connectivity_if_elif_else(self, capture_mode):
         """Tests that complex connectivity can go through a conditional."""
+
         @xdsl_from_qjit
         @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qp.qnode(qp.device("null.qubit", wires=3))
