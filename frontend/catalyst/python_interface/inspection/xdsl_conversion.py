@@ -207,27 +207,27 @@ def _extract_dense_constant_value(op) -> float | int:
     raise NotImplementedError(f"Unexpected attr type in constant: {type(attr)}")
 
 
-def _resolve_tensor_extract(op: TensorExtractOp) -> float | int | str:
-    """Resolve an MCX control value passed as a constant kernel argument."""
-    tensor = op.tensor
-    if not isinstance(tensor.owner, Block) or len(op.indices) != 1:
-        return resolve_constant_params(tensor)
+def _resolve_control_value(ssa: SSAValue) -> float | int | str:
+    """Resolve a control value passed as a constant kernel argument."""
+    op = ssa.owner
+    if not (
+        isinstance(op, TensorExtractOp)
+        and isinstance(op.tensor.owner, Block)
+        and len(op.indices) == 1
+    ):
+        return resolve_constant_params(ssa)
 
+    tensor = op.tensor
     func_op = tensor.owner.parent_op()
-    launch_ops = [
+    launch_op = next(
         candidate
         for candidate in func_op.get_toplevel_object().walk()
         if candidate.name == "catalyst.launch_kernel"
         and SymbolTable.lookup_symbol(candidate, candidate.callee) is func_op
-    ]
-    if len(launch_ops) == 1:
-        caller_tensor = launch_ops[0].operands[tensor.index]
-        attr = getattr(caller_tensor.owner, "properties", {}).get("value")
-        index = resolve_constant_params(op.indices[0])
-        if isinstance(attr, DenseIntOrFPElementsAttr) and isinstance(index, int):
-            return attr.get_values()[index]
-
-    return resolve_constant_params(tensor)
+    )
+    tensor = launch_op.operands[tensor.index]
+    values = tensor.owner.properties["value"].get_values()
+    return values[resolve_constant_params(op.indices[0])]
 
 
 def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
@@ -236,7 +236,7 @@ def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
         qp_op = ops.op_math.adjoint(qp_op)
     ctrls = ssa_to_qp_wires(xdsl_op, control=True)
     if ctrls:
-        cvals = ssa_to_qp_params(xdsl_op, control=True)
+        cvals = _extract(xdsl_op, "in_ctrl_values", _resolve_control_value)
         qp_op = ops.op_math.ctrl(qp_op, control=ctrls, control_values=cvals)
     return qp_op
 
@@ -251,7 +251,7 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
         return arg_name.name_hint
 
     if isinstance(op, TensorExtractOp):
-        return _resolve_tensor_extract(op)
+        return resolve_constant_params(op.tensor)
 
     if not hasattr(op, "name"):
         raise NotImplementedError(f"Cannot resolve parameters for operation: {op}")

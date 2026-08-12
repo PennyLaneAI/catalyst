@@ -89,33 +89,18 @@ def _has_grad_recipe(op):
     return True
 
 
-def _get_parameter_frequencies(op):
-    """Get parameter frequencies through the PennyLane API"""
-    parameter_frequencies = getattr(qp.gradients, "parameter_frequencies", None)
-    if parameter_frequencies is None:  # fallback
-        try:
-            return op.parameter_frequencies
-        except (AttributeError, qp.operation.ParameterFrequenciesUndefinedError):
-            return None
-
-    try:
-        # Frequencies do not depend on which wires an op acts on, but the generic Operator2
-        # inference goes through the eigenvalues of the generator, which is not trace-safe
-        # for dynamic wires. Query the frequencies on static wires instead.
-        static_op = op.map_wires(dict(zip(op.wires, range(len(op.wires)))))
-        return parameter_frequencies(static_op)
-    except qp.operation.ParameterFrequenciesUndefinedError:
-        return None
-
-
 def _has_parameter_frequencies(op):
-    return _get_parameter_frequencies(op) is not None
+    try:
+        qp.gradients.parameter_frequencies(op)
+    except qp.operation.ParameterFrequenciesUndefinedError:
+        return False
+    return True
 
 
 def _are_param_frequencies_same_as_catalyst(op):
     """Check if the parameter frequencies are all close to 1."""
-    op_parameter_frequencies = _get_parameter_frequencies(op)
-    if op_parameter_frequencies is None or len(op_parameter_frequencies) != len(op.data):
+    op_parameter_frequencies = qp.gradients.parameter_frequencies(op)
+    if len(op_parameter_frequencies) != len(op.data):
         return False
 
     valid = True
@@ -128,6 +113,9 @@ def _are_param_frequencies_same_as_catalyst(op):
 
 
 def _paramshift_op_checker(op):
+    if isinstance(op, qp.ControlledPhaseShift):
+        return True
+
     if isinstance(op, qp.QubitUnitary):
         # Cannot take param shift of qubit unitary.
         return False
