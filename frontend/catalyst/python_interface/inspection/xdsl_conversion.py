@@ -33,6 +33,7 @@ from xdsl.dialects.builtin import DenseIntOrFPElementsAttr, IntegerAttr, Integer
 from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import Block, SSAValue
+from xdsl.traits import SymbolTable
 
 from catalyst.compiler import CompileError, _get_catalyst_cli_cmd
 from catalyst.jit import QJIT
@@ -206,6 +207,56 @@ def _extract_dense_constant_value(op) -> float | int:
     raise NotImplementedError(f"Unexpected attr type in constant: {type(attr)}")
 
 
+def _resolve_kernel_argument(ssa: SSAValue) -> SSAValue | None:
+    """Resolve a quantum-kernel block argument to its sole launch operand, when available."""
+    block = ssa.owner
+    if not isinstance(block, Block):
+        return None
+
+    func_op = block.parent_op()
+    if func_op is None or func_op.name != "func.func":
+        return None
+
+    argument_index = ssa.index
+    root = func_op.get_toplevel_object()
+    call_sites = [
+        op
+        for op in root.walk()
+        if op.name == "catalyst.launch_kernel"
+        and (callee := getattr(op, "callee", None)) is not None
+        and SymbolTable.lookup_symbol(op, callee) is func_op
+    ]
+    if len(call_sites) != 1 or argument_index >= len(call_sites[0].operands):
+        return None
+
+    return call_sites[0].operands[argument_index]
+
+
+def _resolve_tensor_extract(op: TensorExtractOp) -> float | int | str:
+    """Resolve a tensor element when a captured constant is passed into a quantum function."""
+    tensor = op.tensor
+    if isinstance(tensor.owner, Block):
+        if (caller_operand := _resolve_kernel_argument(tensor)) is None:
+            return resolve_constant_params(tensor)
+        tensor = caller_operand
+
+    tensor_owner = tensor.owner
+    if isinstance(tensor_owner, Block):
+        return resolve_constant_params(op.tensor)
+
+    attr = getattr(tensor_owner, "properties", {}).get("value")
+    if tensor_owner.name == "stablehlo.constant" and isinstance(attr, DenseIntOrFPElementsAttr):
+        indices = [resolve_constant_params(index) for index in op.indices]
+        shape = _tensor_shape_from_ssa(tensor)
+        if len(indices) == len(shape) and all(isinstance(index, int) for index in indices):
+            flat_index = 0
+            for index, dimension in zip(indices, shape, strict=True):
+                flat_index = flat_index * dimension + index
+            return attr.get_values()[flat_index]
+
+    return resolve_constant_params(op.tensor)
+
+
 def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
     """Apply adjoint and control modifiers to a gate if needed."""
     if xdsl_op.properties.get("adjoint"):
@@ -227,7 +278,7 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
         return arg_name.name_hint
 
     if isinstance(op, TensorExtractOp):
-        return resolve_constant_params(op.tensor)
+        return _resolve_tensor_extract(op)
 
     if not hasattr(op, "name"):
         raise NotImplementedError(f"Cannot resolve parameters for operation: {op}")
