@@ -55,9 +55,8 @@ func.func @ctrl_merge_existing(%ctrl: !quantum.bit, %inner: !quantum.bit, %q: !q
   // CHECK-DAG: %[[FALSE:.*]] = arith.constant false
   %true = arith.constant true
   %false = arith.constant false
-  // outputs (target + the two control-out qubits) are threaded to the returned values.
-  // CHECK: %[[TO:.*]], %[[TIC:.*]], %[[TCC:.*]] = quantum.custom "PauliX"() %[[Q]] ctrls(%[[INNER]], %[[CTRL]]) ctrlvals(%[[TRUE]], %[[FALSE]]) : !quantum.bit ctrls !quantum.bit, !quantum.bit
-  // CHECK: return %[[TIC]], %[[TO]], %[[TCC]]
+  // CHECK: %[[TO:.*]], %[[TCC:.*]]:2 = quantum.custom "PauliX"() %[[Q]] ctrls(%[[INNER]], %[[CTRL]]) ctrlvals(%[[TRUE]], %[[FALSE]]) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+  // CHECK: return %[[TCC]]#0, %[[TO]], %[[TCC]]#1
   %outc, %outq:2 = quantum.ctrl(%ctrl) ctrlvals(%false) (%inner, %q) : !quantum.bit -> !quantum.bit, !quantum.bit {
   ^bb0(%argc: !quantum.bit, %argq: !quantum.bit):
     %xo, %xc = quantum.custom "PauliX"() %argq ctrls(%argc) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
