@@ -109,8 +109,7 @@ TEST_CASE("local_copy uses the bound coprocessor function", "[transport_local_co
 
 // ---- Pairing invariants ------------------------------------------------------
 
-TEST_CASE("local_copy rejects a second controller on the same endpoint",
-          "[transport_local_copy]") {
+TEST_CASE("local_copy rejects a second controller on the same endpoint", "[transport_local_copy]") {
     LocalCpuControllerSession first;
     LocalCpuControllerSession second;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19010};
@@ -156,10 +155,9 @@ TEST_CASE("local_copy rejects a non-zero work_item_idx", "[transport_local_copy]
     ChannelDesc desc{.transport = "memcpy"};
     controller.establish_channel(desc, reply, PeerRef{});
 
-    REQUIRE_THROWS_AS(
-        controller.commit_work_item(/*work_item_idx=*/1, sizeof(std::uint64_t),
-                                    sizeof(std::uint64_t)),
-        std::runtime_error);
+    REQUIRE_THROWS_AS(controller.commit_work_item(/*work_item_idx=*/1, sizeof(std::uint64_t),
+                                                  sizeof(std::uint64_t)),
+                      std::runtime_error);
 
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
     REQUIRE_THROWS_AS(controller.kick(/*work_item_idx=*/1), std::runtime_error);
@@ -173,13 +171,11 @@ TEST_CASE("local_copy rejects a second commit_work_item", "[transport_local_copy
     REQUIRE(coprocessor.connect(ci) == 0);
 
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
-    REQUIRE_THROWS_AS(
-        controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t)),
-        std::runtime_error);
+    REQUIRE_THROWS_AS(controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t)),
+                      std::runtime_error);
 }
 
-TEST_CASE("local_copy collect rejects more than a single reply slot",
-          "[transport_local_copy]") {
+TEST_CASE("local_copy collect rejects more than a single reply slot", "[transport_local_copy]") {
     LocalCpuControllerSession controller;
     LocalCpuCoprocessorSession coprocessor;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19015};
