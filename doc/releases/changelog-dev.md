@@ -327,6 +327,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where `Operator2` operations with integer-valued scalar parameters were incorrectly
+  lowered to `qref.operator` instead of `qref.custom`.
+  [(#3109)](https://github.com/PennyLaneAI/catalyst/pull/3109)
+
 * Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
   the top-level module. Functions inside nested modules, such as kernels called through
   `catalyst.launch_kernel`, are now included in the output.
