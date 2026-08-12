@@ -360,6 +360,44 @@ class TestBackendResolution:
         assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
         assert d["coprocessors"][0]["backend_lib"].endswith("_gpu_verbs_coprocessor.so")
 
+    def test_local_cpu_to_cpu_backend_libs(self, fake_lib_dir):
+        """A CPU controller paired with a CPU coprocessor on the ``local`` backend."""
+        fake_lib_dir(
+            "local/libcatalyst_transport_local_controller.so",
+            "local/libcatalyst_transport_local_coprocessor.so",
+        )
+        ctrl = qp.Controller(
+            device=qp.device("null.qubit", wires=2), label="ctrl", backend="local"
+        )
+        cop = qp.Coprocessor(
+            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", backend="local"
+        )
+        d = serialize_backline(
+            qp.backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
+        )
+        assert d["transport"] == "memcpy"
+        assert d["controller"]["backend_lib"].endswith("_local_controller.so")
+        assert d["coprocessors"][0]["backend_lib"].endswith("_local_coprocessor.so")
+
+    def test_local_cpu_to_gpu_backend_libs(self, fake_lib_dir):
+        """A CPU controller paired with a GPU coprocessor via the ``local_gpu`` backend."""
+        fake_lib_dir(
+            "local/libcatalyst_transport_local_controller.so",
+            "local_gpu/libcatalyst_transport_local_gpu_coprocessor.so",
+        )
+        ctrl = qp.Controller(
+            device=qp.device("null.qubit", wires=2), label="ctrl", backend="local"
+        )
+        cop = qp.Coprocessor(
+            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", backend="local_gpu"
+        )
+        d = serialize_backline(
+            qp.backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
+        )
+        assert d["transport"] == "memcpy"
+        assert d["controller"]["backend_lib"].endswith("_local_controller.so")
+        assert d["coprocessors"][0]["backend_lib"].endswith("_local_gpu_coprocessor.so")
+
     def test_explicit_backend_lib_wins_over_backend(self, fake_lib_dir):
         """An explicit ``init_args["backend_lib"]`` path is not overridden by ``backend``."""
         fake_lib_dir("cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so")
