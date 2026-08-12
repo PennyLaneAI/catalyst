@@ -221,6 +221,105 @@ def _abstractify_jax_array(val):
     return AbstractArray(val.shape, val.dtype)
 
 
+def collect_decomp_rules(
+    module,
+    op_cls,
+    op_type,
+    params=None,
+    wire_lens=None,
+    qubit_map=None,
+    hybrid_lens=None,
+    hybrid_trees=None,
+    repack_static_data=None,
+    uid=None,
+    avals_in=None,
+):
+    """
+    Generate all the decomposition rules registered on the current gate, recursively generating all
+    the rules that are registered on the resource gates of these rules as well.
+    """
+    if op_type == "CustomOp":
+        dynamic_shape = {dynamic_argname: ["f64"] for dynamic_argname in op_cls.dynamic_argnames}
+        op_id = (
+            op_cls.__name__
+            + format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
+            + "{"
+            + f"wires:{wire_lens[0]}"
+            + "}{}"
+        )
+
+        decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            op_name=op_cls.__name__,
+            op_id=op_id,
+            dynamic_shape=dynamic_shape,
+            wire_lens={"wires": wire_lens[0]},
+            static_data={},
+        )
+
+        inject_new_rules_into_module(module, decomp_rules)
+
+    elif op_type == "OperatorOp":
+        dynamic_shape = {}
+        for dynamic_argname, param in zip(op_cls.dynamic_argnames, params, strict=True):
+            dynamic_shape[dynamic_argname] = param.type
+        dynamic_shape = convert_types_to_mlir_strings(dynamic_shape)
+
+        repack_wire_argnames = []
+        for wire_argname in op_cls.wire_argnames:
+            if wire_argname not in op_cls.hybrid_argnames:
+                repack_wire_argnames.append(wire_argname)
+        repack_wire_lens = {a: b for a, b in zip(repack_wire_argnames, wire_lens, strict=True)}
+
+        extra_data = {}
+        non_hybrid_wire_len = 0
+        for w in repack_wire_argnames:
+            non_hybrid_wire_len += len(qubit_map[w])  # pylint:disable=unsubscriptable-object
+        hybrid_arg_start_idx = len(params) + non_hybrid_wire_len
+        for hybrid_argname, hybrid_len, hybrid_tree in zip(
+            op_cls.hybrid_argnames, hybrid_lens, hybrid_trees
+        ):
+            replaced_leaves = []
+            for leaf in avals_in[hybrid_arg_start_idx : hybrid_arg_start_idx + hybrid_len]:
+                if isinstance(leaf, AbstractQubit):
+                    replaced_leaves.append(ShapedArray((), dtype=int))
+                else:
+                    replaced_leaves.append(leaf)
+
+            with Patcher(
+                (AbstractArray, "__hash__", lambda x: id(x)),
+            ):
+                replaced_leaves = abstractify(replaced_leaves)
+                unflattened = unflatten(replaced_leaves, hybrid_tree)
+                unflattened = abstractify(unflattened)
+            extra_data[hybrid_argname] = unflattened
+            hybrid_arg_start_idx += hybrid_len
+
+        op_id = (
+            op_cls.__name__
+            + format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
+            + "{"
+            + ",".join(f"{name}:{shape}" for name, shape in sorted(repack_wire_lens.items()))
+            + "}"
+        )
+        if not (op_cls.hybrid_argnames or op_cls.static_argnames):
+            op_id += "{" + ",".join(f"{k}:{v}" for k, v in sorted(repack_static_data.items())) + "}"
+        else:
+            op_id += "{}"
+        if uid is not None:
+            op_id += f"[{str(uid)}]"
+
+        decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            op_name=op_cls.__name__,
+            op_id=op_id,
+            dynamic_shape=dynamic_shape,
+            wire_lens=repack_wire_lens,
+            static_data=repack_static_data,
+            extra_data=extra_data,
+        )
+
+        inject_new_rules_into_module(module, decomp_rules)
+
+
 def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, **kwargs):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -277,26 +376,12 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
         )
 
         if not skip_decomp_rules:
-            dynamic_shape = {
-                dynamic_argname: ["f64"] for dynamic_argname in op_cls.dynamic_argnames
-            }
-            op_id = (
-                op_cls.__name__
-                + format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
-                + "{"
-                + f"wires:{wire_lens[0]}"
-                + "}{}"
+            collect_decomp_rules(
+                module=jax_ctx.module_context.module,
+                op_cls=op_cls,
+                op_type="CustomOp",
+                wire_lens=wire_lens,
             )
-
-            decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
-                op_name=op_cls.__name__,
-                op_id=op_id,
-                dynamic_shape=dynamic_shape,
-                wire_lens={"wires": wire_lens[0]},
-                static_data={},
-            )
-
-            inject_new_rules_into_module(jax_ctx.module_context.module, decomp_rules)
 
         return []
 
@@ -346,65 +431,19 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
 
     # Collect decomp rules reachable from the current op
     if not skip_decomp_rules:
-        dynamic_shape = {}
-        for dynamic_argname, param in zip(op_cls.dynamic_argnames, params, strict=True):
-            dynamic_shape[dynamic_argname] = param.type
-        dynamic_shape = convert_types_to_mlir_strings(dynamic_shape)
-
-        repack_wire_argnames = []
-        for wire_argname in op_cls.wire_argnames:
-            if wire_argname not in op_cls.hybrid_argnames:
-                repack_wire_argnames.append(wire_argname)
-        repack_wire_lens = {a: b for a, b in zip(repack_wire_argnames, wire_lens, strict=True)}
-
-        extra_data = {}
-        non_hybrid_wire_len = 0
-        for w in repack_wire_argnames:
-            non_hybrid_wire_len += len(qubit_map[w])  # pylint:disable=unsubscriptable-object
-        hybrid_arg_start_idx = len(params) + non_hybrid_wire_len
-        for hybrid_argname, hybrid_len, hybrid_tree in zip(
-            op_cls.hybrid_argnames, hybrid_lens, hybrid_trees
-        ):
-            replaced_leaves = []
-            for leaf in jax_ctx.avals_in[hybrid_arg_start_idx : hybrid_arg_start_idx + hybrid_len]:
-                if isinstance(leaf, AbstractQubit):
-                    replaced_leaves.append(ShapedArray((), dtype=int))
-                else:
-                    replaced_leaves.append(leaf)
-
-            with Patcher(
-                (AbstractArray, "__hash__", lambda x: id(x)),
-            ):
-                replaced_leaves = abstractify(replaced_leaves)
-                unflattened = unflatten(replaced_leaves, hybrid_tree)
-                unflattened = abstractify(unflattened)
-            extra_data[hybrid_argname] = unflattened
-            hybrid_arg_start_idx += hybrid_len
-
-        op_id = (
-            op_cls.__name__
-            + format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
-            + "{"
-            + ",".join(f"{name}:{shape}" for name, shape in sorted(repack_wire_lens.items()))
-            + "}"
+        collect_decomp_rules(
+            module=jax_ctx.module_context.module,
+            op_cls=op_cls,
+            op_type="OperatorOp",
+            params=params,
+            wire_lens=wire_lens,
+            qubit_map=qubit_map,
+            hybrid_lens=hybrid_lens,
+            hybrid_trees=hybrid_trees,
+            repack_static_data=repack_static_data,
+            uid=uid,
+            avals_in=jax_ctx.avals_in,
         )
-        if static_data is not None:
-            op_id += "{" + ",".join(f"{k}:{v}" for k, v in sorted(repack_static_data.items())) + "}"
-        else:
-            op_id += "{}"
-        if uid is not None:
-            op_id += f"[{str(uid)}]"
-
-        decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
-            op_name=op_cls.__name__,
-            op_id=op_id,
-            dynamic_shape=dynamic_shape,
-            wire_lens=repack_wire_lens,
-            static_data=repack_static_data,
-            extra_data=extra_data,
-        )
-
-        inject_new_rules_into_module(jax_ctx.module_context.module, decomp_rules)
 
     return []
 
