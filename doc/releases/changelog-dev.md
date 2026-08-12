@@ -2,6 +2,15 @@
 
 <h3>New features since last release</h3>
 
+* A new `quantum.ctrl` region op and a `ctrl-lowering` pass are added to the Quantum Dialect
+  for controlled subcircuits in Catalyst.
+  Programs can now express an entire controlled quantum region, as opposed to individual
+  operations. The `ctrl-lowering` pass distributes the control wires and control values from
+  the `quantum.ctrl` operation onto the individual gate operations inside the region.
+  [(#3089)](https://github.com/PennyLaneAI/catalyst/pull/3089)
+  [(#3090)](https://github.com/PennyLaneAI/catalyst/pull/3090)
+  [(#3096)](https://github.com/PennyLaneAI/catalyst/pull/3096)
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
@@ -327,6 +336,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where `Operator2` operations with integer-valued scalar parameters were incorrectly
+  lowered to `qref.operator` instead of `qref.custom`.
+  [(#3109)](https://github.com/PennyLaneAI/catalyst/pull/3109)
+
 * Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
   the top-level module. Functions inside nested modules, such as kernels called through
   `catalyst.launch_kernel`, are now included in the output.
@@ -382,6 +395,12 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* Extended internal program-capture support for PennyLane `Operator2` instances. Catalyst now
+  distinguishes gates from operators used as observables.
+  Native `Operator2` controlled wrappers are also handled in `catalyst.ctrl` and
+  device verification.
+  [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
 
 * The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
   (previously a dynamic float operand). This allows, among other things, the decomposition graph to
