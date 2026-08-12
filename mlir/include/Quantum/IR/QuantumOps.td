@@ -980,8 +980,8 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
         region gains the control qubits/values (appended to any controls it already carries),
         and the control qubits are threaded through the region. Structural ops (extract, insert,
         alloc, dealloc) are passed through unchanged, and a nested `quantum.ctrl` region has its
-        controls merged. Measurements, `scf` control flow, and nested `quantum.adjoint` regions
-        inside a `quantum.ctrl` region are rejected.
+        controls merged. Measurements, and `scf` control flow inside a `quantum.ctrl` region
+        are rejected.
     }];
 
     let regions = (region SizedRegion<1>:$region);
