@@ -299,7 +299,6 @@ clean:
 	rm -rf $(MK_DIR)/frontend/mlir_quantum
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
-	rm -rf .benchmarks
 
 clean-all: clean clean-mlir clean-runtime clean-oqc
 clean-catalyst: clean clean-dialects clean-runtime clean-oqc
