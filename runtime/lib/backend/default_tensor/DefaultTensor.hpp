@@ -49,11 +49,9 @@ struct ObsRecord {
 };
 
 struct DefaultTensor final : public QuantumDevice {
-    explicit DefaultTensor(const std::string &kwargs = "{}")
-    {
+    explicit DefaultTensor(const std::string &kwargs = "{}") {
         device_kwargs_ = Catalyst::Runtime::parse_kwargs(kwargs);
-        if (auto it = device_kwargs_.find("max_intermediate_log2");
-            it != device_kwargs_.end()) {
+        if (auto it = device_kwargs_.find("max_intermediate_log2"); it != device_kwargs_.end()) {
             const int bits = std::stoi(it->second);
             RT_FAIL_IF(bits < 1 || bits > 62,
                        "DefaultTensor: max_intermediate_log2 must be in [1, 62]");
@@ -62,8 +60,7 @@ struct DefaultTensor final : public QuantumDevice {
     }
     ~DefaultTensor() override = default;
 
-    auto AllocateQubit() -> QubitIdType override
-    {
+    auto AllocateQubit() -> QubitIdType override {
         const QubitIdType id = next_qubit_id_++;
         const int64_t leg = freshLabel();
         // A brand new qubit is the rank-1 tensor |0> = (1, 0).
@@ -73,8 +70,7 @@ struct DefaultTensor final : public QuantumDevice {
         return id;
     }
 
-    auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override
-    {
+    auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override {
         std::vector<QubitIdType> ids;
         ids.reserve(num_qubits);
         for (size_t i = 0; i < num_qubits; i++) {
@@ -103,8 +99,7 @@ struct DefaultTensor final : public QuantumDevice {
      * Bulk release of every live qubit (i.e. program teardown) is special-cased
      * in ReleaseQubits and costs nothing.
      */
-    void ReleaseQubit(QubitIdType qubit) override
-    {
+    void ReleaseQubit(QubitIdType qubit) override {
         auto it = frontier_.find(qubit);
         RT_FAIL_IF(it == frontier_.end(),
                    "DefaultTensor: releasing an unknown or already-released qubit");
@@ -123,16 +118,14 @@ struct DefaultTensor final : public QuantumDevice {
         // Cap the (now product-state) leg with <0| or <1|, removing it from the
         // network while keeping the remaining state exactly normalised.
         const int64_t leg = frontier_[qubit];
-        nodes_.push_back(Tensor({leg}, {2},
-                                {one ? cd{0.0, 0.0} : cd{1.0, 0.0},
-                                 one ? cd{1.0, 0.0} : cd{0.0, 0.0}}));
+        nodes_.push_back(Tensor(
+            {leg}, {2}, {one ? cd{0.0, 0.0} : cd{1.0, 0.0}, one ? cd{1.0, 0.0} : cd{0.0, 0.0}}));
 
         frontier_.erase(qubit);
         order_.erase(std::remove(order_.begin(), order_.end(), qubit), order_.end());
     }
 
-    void ReleaseQubits(const std::vector<QubitIdType> &qubits) override
-    {
+    void ReleaseQubits(const std::vector<QubitIdType> &qubits) override {
         // Fast path: releasing every live qubit is program teardown. Nothing can
         // observe the state afterwards, so skip the contraction entirely. This
         // matters -- the runtime always ends a program this way, and collapsing
@@ -170,8 +163,7 @@ struct DefaultTensor final : public QuantumDevice {
                         const std::vector<QubitIdType> &wires, bool inverse,
                         const std::vector<QubitIdType> &controlled_wires,
                         const std::vector<bool> &controlled_values,
-                        const std::vector<std::string> &) override
-    {
+                        const std::vector<std::string> &) override {
         RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
                    "DefaultTensor: control wires/values length mismatch");
 
@@ -197,14 +189,12 @@ struct DefaultTensor final : public QuantumDevice {
         applyControlled(m, wires[0], controlled_wires, controlled_values);
     }
 
-    auto Observable(ObsId id, const std::vector<cd> &matrix,
-                    const std::vector<QubitIdType> &wires) -> ObsIdType override
-    {
+    auto Observable(ObsId id, const std::vector<cd> &matrix, const std::vector<QubitIdType> &wires)
+        -> ObsIdType override {
         if (id == Hermitian) {
             RT_FAIL_IF(wires.size() != 1, "DefaultTensor: Hermitian limited to 1 wire");
             RT_FAIL_IF(matrix.size() != 4, "DefaultTensor: Hermitian expects a 2x2 matrix");
-        }
-        else {
+        } else {
             RT_FAIL_IF(wires.size() != 1, "DefaultTensor: named observable acts on 1 wire");
         }
         ObsRecord rec;
@@ -216,8 +206,7 @@ struct DefaultTensor final : public QuantumDevice {
         return static_cast<ObsIdType>(obs_.size() - 1);
     }
 
-    auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override
-    {
+    auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override {
         ObsRecord rec;
         rec.kind = TensorProd;
         rec.terms = obs;
@@ -225,9 +214,8 @@ struct DefaultTensor final : public QuantumDevice {
         return static_cast<ObsIdType>(obs_.size() - 1);
     }
 
-    auto HamiltonianObservable(const std::vector<double> &coeffs,
-                               const std::vector<ObsIdType> &obs) -> ObsIdType override
-    {
+    auto HamiltonianObservable(const std::vector<double> &coeffs, const std::vector<ObsIdType> &obs)
+        -> ObsIdType override {
         RT_FAIL_IF(coeffs.size() != obs.size(),
                    "DefaultTensor: coefficient/observable length mismatch");
         ObsRecord rec;
@@ -238,21 +226,25 @@ struct DefaultTensor final : public QuantumDevice {
         return static_cast<ObsIdType>(obs_.size() - 1);
     }
 
-    auto Expval(ObsIdType key) -> double override
-    {
-        // <psi|O|psi> as a single closed network: no statevector is formed.
-        return expvalSandwich(key, /*squared=*/false);
+    auto Expval(ObsIdType key) -> double override {
+        if (shots_ == 0) {
+            return expvalSandwich(key, /*squared=*/false);
+        }
+        const auto stats = sampledObsMoments(key);
+        return stats.first;
     }
 
-    auto Var(ObsIdType key) -> double override
-    {
-        const double ev = expvalSandwich(key, false);
-        const double ev2 = expvalSandwich(key, true);
-        return ev2 - ev * ev;
+    auto Var(ObsIdType key) -> double override {
+        if (shots_ == 0) {
+            const double ev = expvalSandwich(key, false);
+            const double ev2 = expvalSandwich(key, true);
+            return ev2 - ev * ev;
+        }
+        const auto stats = sampledObsMoments(key);
+        return stats.second;
     }
 
-    void State(DataView<cd, 1> &state) override
-    {
+    void State(DataView<cd, 1> &state) override {
         const auto amps = amplitudes();
         RT_FAIL_IF(state.size() != amps.size(), "DefaultTensor: state buffer size mismatch");
         size_t i = 0;
@@ -263,11 +255,23 @@ struct DefaultTensor final : public QuantumDevice {
 
     void Probs(DataView<double, 1> &probs) override { PartialProbs(probs, activeWires()); }
 
-    void PartialProbs(DataView<double, 1> &probs,
-                      const std::vector<QubitIdType> &wires) override
-    {
-        const auto p = marginal(wires);
+    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override {
+        auto p = marginal(wires);
         RT_FAIL_IF(probs.size() != p.size(), "DefaultTensor: probs buffer size mismatch");
+
+        if (shots_ != 0) {
+            // Estimate from `shots_` draws of the exact marginal.
+            std::vector<double> draws(p.size(), 0.0);
+            for (size_t s = 0; s < shots_; s++) {
+                draws[draw(p)] += 1.0;
+            }
+            const double inv = 1.0 / static_cast<double>(shots_);
+            for (auto &v : draws) {
+                v *= inv;
+            }
+            p = std::move(draws);
+        }
+
         size_t i = 0;
         for (auto &out : probs) {
             out = p[i++];
@@ -277,8 +281,7 @@ struct DefaultTensor final : public QuantumDevice {
     void Sample(DataView<double, 2> &samples) override { PartialSample(samples, activeWires()); }
 
     void PartialSample(DataView<double, 2> &samples,
-                       const std::vector<QubitIdType> &wires) override
-    {
+                       const std::vector<QubitIdType> &wires) override {
         RT_FAIL_IF(shots_ == 0, "DefaultTensor: sampling requires shots > 0");
         const auto p = marginal(wires);
         auto it = samples.begin();
@@ -293,14 +296,12 @@ struct DefaultTensor final : public QuantumDevice {
         }
     }
 
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts) override
-    {
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts) override {
         PartialCounts(eigvals, counts, activeWires());
     }
 
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &wires) override
-    {
+                       const std::vector<QubitIdType> &wires) override {
         RT_FAIL_IF(shots_ == 0, "DefaultTensor: counts requires shots > 0");
         const size_t dim = size_t{1} << wires.size();
         RT_FAIL_IF(eigvals.size() != dim || counts.size() != dim,
@@ -323,8 +324,7 @@ struct DefaultTensor final : public QuantumDevice {
     }
 
     /// Mid-circuit measurement: projects the network and renormalises.
-    auto Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result override
-    {
+    auto Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result override {
         const bool outcome = measureImpl(wire, postselect);
         // The runtime never frees this pointer, so return a static constant
         // rather than malloc'ing (which would leak once per measurement).
@@ -334,29 +334,26 @@ struct DefaultTensor final : public QuantumDevice {
     }
 
   private:
-    std::vector<Tensor> nodes_;                 ///< the tensor network
-    std::map<QubitIdType, int64_t> frontier_;   ///< qubit -> its open index label
-    std::vector<QubitIdType> order_;            ///< allocation order (wire ordering)
+    std::vector<Tensor> nodes_;               ///< the tensor network
+    std::map<QubitIdType, int64_t> frontier_; ///< qubit -> its open index label
+    std::vector<QubitIdType> order_;          ///< allocation order (wire ordering)
     std::vector<ObsRecord> obs_;
-    QubitIdType next_qubit_id_{0};              ///< never reused
+    QubitIdType next_qubit_id_{0}; ///< never reused
     int64_t next_label_{0};
     size_t shots_{0};
     bool last_outcome_{false};
-    size_t max_intermediate_{size_t{1} << 27};  ///< ~134M elements (~2 GiB complex)
+    size_t max_intermediate_{size_t{1} << 27}; ///< ~134M elements (~2 GiB complex)
     std::mt19937 *gen_{nullptr};
     std::mt19937 fallback_gen_{std::random_device{}()};
     std::unordered_map<std::string, std::string> device_kwargs_;
 
-    auto freshLabel() -> int64_t
-    {
-        RT_FAIL_IF(next_label_ >= ExactTN::kPrimeOffset,
-                   "DefaultTensor: exhausted index labels");
+    auto freshLabel() -> int64_t {
+        RT_FAIL_IF(next_label_ >= ExactTN::kPrimeOffset, "DefaultTensor: exhausted index labels");
         return next_label_++;
     }
 
     /// Drop the whole network. Qubit IDs still never get reused.
-    void teardown()
-    {
+    void teardown() {
         nodes_.clear();
         frontier_.clear();
         order_.clear();
@@ -367,14 +364,12 @@ struct DefaultTensor final : public QuantumDevice {
     /// Currently allocated qubits, in allocation order (wire 0 first).
     auto activeWires() const -> std::vector<QubitIdType> { return order_; }
 
-    auto uniform() -> double
-    {
+    auto uniform() -> double {
         std::uniform_real_distribution<double> dist(0.0, 1.0);
         return gen_ ? dist(*gen_) : dist(fallback_gen_);
     }
 
-    auto draw(const std::vector<double> &p) -> size_t
-    {
+    auto draw(const std::vector<double> &p) -> size_t {
         const double r = uniform();
         double acc = 0.0;
         for (size_t i = 0; i < p.size(); i++) {
@@ -389,14 +384,12 @@ struct DefaultTensor final : public QuantumDevice {
     static auto matX() -> std::array<cd, 4> { return {0, 1, 1, 0}; }
     static auto matZ() -> std::array<cd, 4> { return {1, 0, 0, -1}; }
 
-    static auto adjoint(const std::array<cd, 4> &m) -> std::array<cd, 4>
-    {
+    static auto adjoint(const std::array<cd, 4> &m) -> std::array<cd, 4> {
         return {std::conj(m[0]), std::conj(m[2]), std::conj(m[1]), std::conj(m[3])};
     }
 
-    static auto singleQubitMatrix(const std::string &name,
-                                  const std::vector<double> &p) -> std::array<cd, 4>
-    {
+    static auto singleQubitMatrix(const std::string &name, const std::vector<double> &p)
+        -> std::array<cd, 4> {
         const cd I{0.0, 1.0};
         const double s = M_SQRT1_2;
         if (name == "Identity") {
@@ -418,8 +411,7 @@ struct DefaultTensor final : public QuantumDevice {
                    ("DefaultTensor: '" + name + "' requires a rotation parameter").c_str());
         const double t = p[0];
         if (name == "RX") {
-            return {std::cos(t / 2), -I * std::sin(t / 2), -I * std::sin(t / 2),
-                    std::cos(t / 2)};
+            return {std::cos(t / 2), -I * std::sin(t / 2), -I * std::sin(t / 2), std::cos(t / 2)};
         }
         if (name == "RY") {
             return {std::cos(t / 2), -std::sin(t / 2), std::sin(t / 2), std::cos(t / 2)};
@@ -430,8 +422,7 @@ struct DefaultTensor final : public QuantumDevice {
         RT_FAIL(("DefaultTensor: unsupported gate '" + name + "'").c_str());
     }
 
-    static auto observableMatrix(const ObsRecord &rec) -> std::array<cd, 4>
-    {
+    static auto observableMatrix(const ObsRecord &rec) -> std::array<cd, 4> {
         switch (rec.basic_id) {
         case Identity:
             return {1, 0, 0, 1};
@@ -450,8 +441,7 @@ struct DefaultTensor final : public QuantumDevice {
         }
     }
 
-    auto frontierOf(QubitIdType q) -> int64_t
-    {
+    auto frontierOf(QubitIdType q) -> int64_t {
         auto it = frontier_.find(q);
         RT_FAIL_IF(it == frontier_.end(),
                    "DefaultTensor: operation references an unallocated or released qubit");
@@ -467,8 +457,7 @@ struct DefaultTensor final : public QuantumDevice {
      */
     void applyControlled(const std::array<cd, 4> &m, QubitIdType target,
                          const std::vector<QubitIdType> &ctrl_wires,
-                         const std::vector<bool> &ctrl_values)
-    {
+                         const std::vector<bool> &ctrl_values) {
         // Reject duplicate wires early; silently aliasing legs would produce a
         // wrong answer rather than an error.
         std::vector<QubitIdType> all{target};
@@ -523,8 +512,7 @@ struct DefaultTensor final : public QuantumDevice {
                 data[base + 1] = m[1];
                 data[base + 2] = m[2];
                 data[base + 3] = m[3];
-            }
-            else {
+            } else {
                 data[base + 0] = cd{1.0, 0.0}; // identity on the target
                 data[base + 3] = cd{1.0, 0.0};
             }
@@ -543,8 +531,7 @@ struct DefaultTensor final : public QuantumDevice {
      * This is the exponential step, and is only ever reached because some
      * measurement asked for it.
      */
-    auto amplitudes() -> std::vector<cd>
-    {
+    auto amplitudes() -> std::vector<cd> {
         RT_FAIL_IF(frontier_.empty(), "DefaultTensor: no qubits are allocated");
         Tensor full = ExactTN::contractNetwork(nodes_, max_intermediate_);
 
@@ -565,8 +552,7 @@ struct DefaultTensor final : public QuantumDevice {
     }
 
     /// Fold the network into one tensor without changing the state it encodes.
-    void compress()
-    {
+    void compress() {
         if (nodes_.size() <= 1 || frontier_.empty()) {
             return;
         }
@@ -591,8 +577,7 @@ struct DefaultTensor final : public QuantumDevice {
      * k wires costs an intermediate of order 4^k rather than 2^n, so partial
      * probabilities stay affordable on registers far too wide to write down.
      */
-    auto marginal(const std::vector<QubitIdType> &wires) -> std::vector<double>
-    {
+    auto marginal(const std::vector<QubitIdType> &wires) -> std::vector<double> {
         for (QubitIdType w : wires) {
             (void)frontierOf(w); // validate before doing expensive work
         }
@@ -622,8 +607,7 @@ struct DefaultTensor final : public QuantumDevice {
                 const auto it = braLeg.find(lab);
                 if (it != braLeg.end()) {
                     lab = it->second; // stays open: this wire is measured
-                }
-                else if (!isTraced(lab)) {
+                } else if (!isTraced(lab)) {
                     lab += ExactTN::kPrimeOffset; // internal bra label
                 }
                 // else: an open leg of an unrequested wire -> shared with the
@@ -663,8 +647,7 @@ struct DefaultTensor final : public QuantumDevice {
     }
 
     /// True if `label` is the open frontier leg of some currently live qubit.
-    auto isTraced(int64_t label) const -> bool
-    {
+    auto isTraced(int64_t label) const -> bool {
         for (const auto &[q, leg] : frontier_) {
             if (leg == label) {
                 return true;
@@ -680,6 +663,240 @@ struct DefaultTensor final : public QuantumDevice {
         std::vector<Tensor> tensors;
         std::map<QubitIdType, int64_t> front;
     };
+
+    // ######################################################################
+
+    /// One single-wire Hermitian factor of an observable summand.
+    struct ObsFactor {
+        QubitIdType wire;
+        std::array<cd, 4> matrix;
+    };
+
+    /**
+     * @brief Eigendecomposition of a Hermitian 2x2 matrix.
+     *
+     * @return {lambda0, lambda1, U} with U's columns the eigenvectors, so that
+     *         U^dagger rotates the operator into its eigenbasis.
+     */
+    static auto eigh2x2(const std::array<cd, 4> &m)
+        -> std::tuple<double, double, std::array<cd, 4>> {
+        const double a = m[0].real();
+        const double d = m[3].real();
+        const cd b = m[1];
+
+        if (std::abs(b) < 1e-15) {
+            return {a, d, std::array<cd, 4>{1.0, 0.0, 0.0, 1.0}}; // already diagonal
+        }
+
+        const double diff = a - d;
+        const double disc = std::sqrt(diff * diff + 4.0 * std::norm(b));
+        const double l0 = 0.5 * (a + d - disc);
+        const double l1 = 0.5 * (a + d + disc);
+
+        // Eigenvector for eigenvalue l is (b, l - a), normalised.
+        auto column = [&](double l) -> std::pair<cd, cd> {
+            const cd v0 = b;
+            const cd v1 = cd{l - a, 0.0};
+            const double n = std::sqrt(std::norm(v0) + std::norm(v1));
+            return {v0 / n, v1 / n};
+        };
+        const auto c0 = column(l0);
+        const auto c1 = column(l1);
+        // U = [c0 c1], row-major.
+        return {l0, l1, std::array<cd, 4>{c0.first, c1.first, c0.second, c1.second}};
+    }
+
+    /**
+     * @brief Flatten an observable into (coefficient, single-wire factors) summands.
+     */
+    auto flattenObs(ObsIdType key) -> std::vector<std::pair<double, std::vector<ObsFactor>>> {
+        std::vector<Term> terms{Term{1.0, {}, frontier_}};
+        terms = applyObsToTerms(key, terms);
+
+        std::vector<std::pair<double, std::vector<ObsFactor>>> summands;
+        for (const Term &term : terms) {
+            std::vector<ObsFactor> factors;
+            for (const Tensor &t : term.tensors) {
+                RT_FAIL_IF(t.rank() != 2,
+                           "DefaultTensor: shot-based statistics support single-wire "
+                           "observable factors only");
+                QubitIdType found = -1;
+                for (const auto &[q, leg] : term.front) {
+                    if (leg == t.idx[0]) {
+                        found = q;
+                        break;
+                    }
+                }
+                RT_FAIL_IF(found < 0,
+                           "DefaultTensor: could not map an observable factor to a wire");
+                factors.push_back(ObsFactor{found, {t.data[0], t.data[1], t.data[2], t.data[3]}});
+            }
+            summands.emplace_back(term.coeff, std::move(factors));
+        }
+        return summands;
+    }
+
+    /**
+     * @brief Shot-based mean and variance of an observable.
+     *
+     * Every observable this device accepts factorises into single-wire 2x2
+     * Hermitian terms, each with a closed-form eigendecomposition. So:
+     *
+     *   1. flatten the observable into summands of single-wire factors,
+     *   2. diagonalise each factor and rotate those wires into the eigenbasis on
+     *      a scratch copy of the network,
+     *   3. take the exact marginal over the touched wires and sample it,
+     *   4. map each sampled bitstring to the observable's eigenvalue, then
+     *      accumulate the mean and variance.
+     *
+     * Summands that disagree on a shared wire's basis (e.g. X0 + Z0) cannot share
+     * one measurement basis; those are sampled group by group. Catalyst normally
+     * splits non-commuting measurements upstream, so that path is a safety net.
+     *
+     * This mirrors how the Lightning devices produce shot-based statistics and
+     * leaves the analytic (shots=0) path untouched.
+     *
+     * @return {mean, variance} estimated over `shots_` samples.
+     */
+    auto sampledObsMoments(ObsIdType key) -> std::pair<double, double> {
+        RT_FAIL_IF(frontier_.empty(), "DefaultTensor: no qubits are allocated");
+        RT_FAIL_IF(shots_ == 0, "DefaultTensor: shot-based statistics require shots > 0");
+        validateObs(key);
+
+        const auto summands = flattenObs(key);
+
+        // Group summands by the set of wires each one touches, so that summands
+        // sharing a basis are sampled together (and stay correlated, which the
+        // variance depends on).
+        std::map<QubitIdType, std::array<cd, 4>> basis;
+        bool consistent = true;
+        for (const auto &[coeff, factors] : summands) {
+            (void)coeff;
+            for (const ObsFactor &f : factors) {
+                auto it = basis.find(f.wire);
+                if (it == basis.end()) {
+                    basis[f.wire] = f.matrix;
+                } else {
+                    for (size_t i = 0; i < 4; i++) {
+                        if (std::abs(it->second[i] - f.matrix[i]) > 1e-12) {
+                            consistent = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!consistent) {
+            // Sample each summand independently in its own basis and add up.
+            double mean = 0.0;
+            double var = 0.0;
+            for (const auto &[coeff, factors] : summands) {
+                std::vector<std::pair<double, std::vector<ObsFactor>>> single{{coeff, factors}};
+                const auto part = sampleInSharedBasis(single);
+                mean += part.first;
+                var += part.second;
+            }
+            return {mean, var};
+        }
+
+        return sampleInSharedBasis(summands);
+    }
+
+    /**
+     * @brief Sample a set of summands that share one measurement basis.
+     */
+    auto sampleInSharedBasis(const std::vector<std::pair<double, std::vector<ObsFactor>>> &summands)
+        -> std::pair<double, double> {
+        // Constant (identity-only) part contributes deterministically.
+        double constant = 0.0;
+        std::vector<QubitIdType> touched;
+        for (const auto &[coeff, factors] : summands) {
+            if (factors.empty()) {
+                constant += coeff;
+                continue;
+            }
+            for (const ObsFactor &f : factors) {
+                if (std::find(touched.begin(), touched.end(), f.wire) == touched.end()) {
+                    touched.push_back(f.wire);
+                }
+            }
+        }
+        if (touched.empty()) {
+            return {constant, 0.0};
+        }
+        std::sort(touched.begin(), touched.end());
+
+        // Diagonalise each touched wire's factor and remember its eigenvalues.
+        std::map<QubitIdType, std::pair<double, double>> eigvals;
+        std::map<QubitIdType, std::array<cd, 4>> rotation;
+        for (QubitIdType w : touched) {
+            std::array<cd, 4> m{1.0, 0.0, 0.0, 1.0};
+            for (const auto &[coeff, factors] : summands) {
+                (void)coeff;
+                for (const ObsFactor &f : factors) {
+                    if (f.wire == w) {
+                        m = f.matrix;
+                    }
+                }
+            }
+            const auto [l0, l1, u] = eigh2x2(m);
+            eigvals[w] = {l0, l1};
+            // Measuring in the eigenbasis means applying U^dagger before a
+            // computational-basis measurement.
+            rotation[w] = {std::conj(u[0]), std::conj(u[2]), std::conj(u[1]), std::conj(u[3])};
+        }
+
+        // Rotate on a scratch copy so the device state is left untouched: an
+        // expectation value must not disturb the state for later measurements.
+        auto savedNodes = nodes_;
+        auto savedFrontier = frontier_;
+        const int64_t savedLabel = next_label_;
+        for (QubitIdType w : touched) {
+            applyControlled(rotation[w], w, {}, {});
+        }
+        const auto p = marginal(touched);
+        nodes_ = std::move(savedNodes);
+        frontier_ = std::move(savedFrontier);
+        next_label_ = savedLabel;
+
+        // Eigenvalue of the observable for a given outcome bitstring.
+        auto valueOf = [&](size_t outcome) {
+            double total = constant;
+            for (const auto &[coeff, factors] : summands) {
+                if (factors.empty()) {
+                    continue;
+                }
+                double prod = coeff;
+                for (const ObsFactor &f : factors) {
+                    const auto pos = std::distance(
+                        touched.begin(), std::find(touched.begin(), touched.end(), f.wire));
+                    // touched[0] is the most significant bit of `outcome`.
+                    const size_t shift = touched.size() - 1 - static_cast<size_t>(pos);
+                    const bool bit = ((outcome >> shift) & 1ULL) != 0;
+                    prod *= bit ? eigvals[f.wire].second : eigvals[f.wire].first;
+                }
+                total += prod;
+            }
+            return total;
+        };
+
+        double sum = 0.0;
+        double sumSq = 0.0;
+        for (size_t s = 0; s < shots_; s++) {
+            const double v = valueOf(draw(p));
+            sum += v;
+            sumSq += v * v;
+        }
+        const double n = static_cast<double>(shots_);
+        const double mean = sum / n;
+        double var = sumSq / n - mean * mean;
+        if (var < 0.0) {
+            var = 0.0; // clamp round-off
+        }
+        return {mean, var};
+    }
+
+    // ########################################################################
 
     /**
      * @brief Compute <psi|O|psi> (or <psi|O^2|psi>) as one closed network.
@@ -697,8 +914,7 @@ struct DefaultTensor final : public QuantumDevice {
      *
      * No statevector is materialised; the contractor picks the order.
      */
-    auto expvalSandwich(ObsIdType key, bool squared) -> double
-    {
+    auto expvalSandwich(ObsIdType key, bool squared) -> double {
         RT_FAIL_IF(frontier_.empty(), "DefaultTensor: no qubits are allocated");
         validateObs(key);
 
@@ -740,8 +956,7 @@ struct DefaultTensor final : public QuantumDevice {
         return total;
     }
 
-    void validateObs(ObsIdType key) const
-    {
+    void validateObs(ObsIdType key) const {
         RT_FAIL_IF(key < 0 || static_cast<size_t>(key) >= obs_.size(),
                    "DefaultTensor: invalid observable id");
         const ObsRecord &rec = obs_[static_cast<size_t>(key)];
@@ -761,8 +976,7 @@ struct DefaultTensor final : public QuantumDevice {
      * Labels are drawn from the device counter so they can never collide with
      * the ket's existing labels.
      */
-    auto applyObsToTerms(ObsIdType key, const std::vector<Term> &terms) -> std::vector<Term>
-    {
+    auto applyObsToTerms(ObsIdType key, const std::vector<Term> &terms) -> std::vector<Term> {
         const ObsRecord &rec = obs_[static_cast<size_t>(key)];
 
         if (rec.kind == TensorProd) {
@@ -809,8 +1023,7 @@ struct DefaultTensor final : public QuantumDevice {
     }
 
     /// Shared implementation for Measure and ReleaseQubit.
-    auto measureImpl(QubitIdType wire, std::optional<int32_t> postselect) -> bool
-    {
+    auto measureImpl(QubitIdType wire, std::optional<int32_t> postselect) -> bool {
         const int64_t leg = frontierOf(wire);
         const auto p = marginal({wire});
         const double p1 = p[1];
@@ -820,14 +1033,12 @@ struct DefaultTensor final : public QuantumDevice {
             RT_FAIL_IF(postselect.value() != 0 && postselect.value() != 1,
                        "DefaultTensor: postselect must be 0 or 1");
             outcome = (postselect.value() == 1);
-        }
-        else {
+        } else {
             outcome = (uniform() < p1);
         }
 
         const double norm = outcome ? p1 : (1.0 - p1);
-        RT_FAIL_IF(norm <= 0.0,
-                   "DefaultTensor: postselected on a zero-probability outcome");
+        RT_FAIL_IF(norm <= 0.0, "DefaultTensor: postselected on a zero-probability outcome");
 
         // Project: attach |outcome><outcome| / sqrt(norm) to the wire.
         const double inv = 1.0 / std::sqrt(norm);
@@ -835,8 +1046,7 @@ struct DefaultTensor final : public QuantumDevice {
         std::vector<cd> proj(4, cd{0.0, 0.0});
         if (outcome) {
             proj[3] = cd{inv, 0.0}; // |1><1|
-        }
-        else {
+        } else {
             proj[0] = cd{inv, 0.0}; // |0><0|
         }
         nodes_.push_back(Tensor({out, leg}, {2, 2}, std::move(proj)));

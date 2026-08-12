@@ -49,15 +49,14 @@ constexpr int64_t kPrimeOffset = 1LL << 40;
  * @brief A dense tensor with integer-labelled indices.
  */
 struct Tensor {
-    std::vector<int64_t> idx;  ///< index labels, one per rank
-    std::vector<size_t> dim;   ///< dimension of each index
-    std::vector<cd> data;      ///< row-major payload, size == prod(dim)
+    std::vector<int64_t> idx; ///< index labels, one per rank
+    std::vector<size_t> dim;  ///< dimension of each index
+    std::vector<cd> data;     ///< row-major payload, size == prod(dim)
 
     Tensor() = default;
 
     Tensor(std::vector<int64_t> indices, std::vector<size_t> dims, std::vector<cd> values)
-        : idx(std::move(indices)), dim(std::move(dims)), data(std::move(values))
-    {
+        : idx(std::move(indices)), dim(std::move(dims)), data(std::move(values)) {
         RT_FAIL_IF(idx.size() != dim.size(), "TensorNetwork: idx/dim rank mismatch");
         RT_FAIL_IF(data.size() != numel(), "TensorNetwork: data size does not match dims");
     }
@@ -65,8 +64,7 @@ struct Tensor {
     [[nodiscard]] auto rank() const -> size_t { return idx.size(); }
 
     /// Number of elements implied by `dim` (1 for a scalar).
-    [[nodiscard]] auto numel() const -> size_t
-    {
+    [[nodiscard]] auto numel() const -> size_t {
         size_t n = 1;
         for (size_t d : dim) {
             n *= d;
@@ -75,8 +73,7 @@ struct Tensor {
     }
 
     /// Row-major strides: stride[k] = prod(dim[k+1 ...]).
-    [[nodiscard]] auto strides() const -> std::vector<size_t>
-    {
+    [[nodiscard]] auto strides() const -> std::vector<size_t> {
         std::vector<size_t> s(dim.size(), 1);
         for (size_t k = dim.size(); k-- > 0;) {
             s[k] = (k + 1 == dim.size()) ? 1 : s[k + 1] * dim[k + 1];
@@ -85,8 +82,7 @@ struct Tensor {
     }
 
     /// Position of a label, or npos.
-    [[nodiscard]] auto find(int64_t label) const -> size_t
-    {
+    [[nodiscard]] auto find(int64_t label) const -> size_t {
         for (size_t k = 0; k < idx.size(); k++) {
             if (idx[k] == label) {
                 return k;
@@ -95,8 +91,7 @@ struct Tensor {
         return std::numeric_limits<size_t>::max();
     }
 
-    [[nodiscard]] auto has(int64_t label) const -> bool
-    {
+    [[nodiscard]] auto has(int64_t label) const -> bool {
         return find(label) != std::numeric_limits<size_t>::max();
     }
 };
@@ -108,9 +103,8 @@ struct Tensor {
  * of length prod(dims) whose entry j is the flat offset contributed by the j-th
  * combination (first entry varying slowest, i.e. row-major).
  */
-inline auto offsetTable(const std::vector<size_t> &strides,
-                        const std::vector<size_t> &dims) -> std::vector<size_t>
-{
+inline auto offsetTable(const std::vector<size_t> &strides, const std::vector<size_t> &dims)
+    -> std::vector<size_t> {
     size_t total = 1;
     for (size_t d : dims) {
         total *= d;
@@ -136,8 +130,7 @@ inline auto offsetTable(const std::vector<size_t> &strides,
  * Output index order is: A's unshared indices, then B's unshared indices.
  * Cost is O(prod(out) * prod(shared)).
  */
-inline auto contractPair(const Tensor &A, const Tensor &B) -> Tensor
-{
+inline auto contractPair(const Tensor &A, const Tensor &B) -> Tensor {
     const auto sA = A.strides();
     const auto sB = B.strides();
 
@@ -145,8 +138,7 @@ inline auto contractPair(const Tensor &A, const Tensor &B) -> Tensor
     for (size_t k = 0; k < A.rank(); k++) {
         if (B.has(A.idx[k])) {
             posSharedA.push_back(k);
-        }
-        else {
+        } else {
             posOutA.push_back(k);
         }
     }
@@ -222,8 +214,7 @@ inline auto contractPair(const Tensor &A, const Tensor &B) -> Tensor
  * @param maxIntermediate  abort if an intermediate would exceed this many
  *                         elements; 0 disables the guard
  */
-inline auto contractNetwork(std::vector<Tensor> nodes, size_t maxIntermediate = 0) -> Tensor
-{
+inline auto contractNetwork(std::vector<Tensor> nodes, size_t maxIntermediate = 0) -> Tensor {
     RT_FAIL_IF(nodes.empty(), "TensorNetwork: cannot contract an empty network");
 
     while (nodes.size() > 1) {
@@ -240,8 +231,7 @@ inline auto contractNetwork(std::vector<Tensor> nodes, size_t maxIntermediate = 
                 for (size_t k = 0; k < nodes[i].rank(); k++) {
                     if (nodes[j].has(nodes[i].idx[k])) {
                         sharedSize *= static_cast<double>(nodes[i].dim[k]);
-                    }
-                    else {
+                    } else {
                         resultSize *= static_cast<double>(nodes[i].dim[k]);
                     }
                 }
@@ -296,8 +286,7 @@ inline auto contractNetwork(std::vector<Tensor> nodes, size_t maxIntermediate = 
 /**
  * @brief Permute a tensor so its indices appear in the requested label order.
  */
-inline auto permuteTo(const Tensor &T, const std::vector<int64_t> &order) -> Tensor
-{
+inline auto permuteTo(const Tensor &T, const std::vector<int64_t> &order) -> Tensor {
     RT_FAIL_IF(order.size() != T.rank(), "TensorNetwork: permutation rank mismatch");
     if (T.idx == order) {
         return T;

@@ -413,6 +413,204 @@ class TestTensorNetworkBehaviour:
             circuit()
 
 
+class TestShotNoise:
+    """Regression tests: finite shots must produce shot noise.
+
+    The device originally returned analytic probabilities even when a shot count
+    was set, so `probs()` came back exact while `sample()`/`counts()` on the same
+    circuit were noisy -- and results disagreed with every other device for the
+    same program. Lightning branches on `device_shots != 0` in
+    `Probs`/`PartialProbs`/`Expval`/`Var`; this device must too.
+    """
+
+    def test_probs_are_quantised_by_shots(self):
+        """With N shots, every probability must be a multiple of 1/N."""
+        shots = 1000
+
+        @qjit
+        @qp.set_shots(shots)
+        @qp.qnode(tensor_device(2))
+        def circuit():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            return qp.probs()
+
+        p = np.asarray(circuit())
+        counts = p * shots
+        assert np.allclose(
+            counts, np.round(counts), atol=1e-9
+        ), f"probabilities are not multiples of 1/{shots}: {p}"
+        # Unreachable basis states must stay exactly zero.
+        assert p[1] == 0.0 and p[2] == 0.0
+
+    def test_probs_vary_across_runs_with_shots(self):
+        """Repeated shot-based runs must not all return the identical vector."""
+
+        @qjit
+        @qp.set_shots(500)
+        @qp.qnode(tensor_device(2))
+        def circuit():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            return qp.probs()
+
+        seen = {tuple(np.asarray(circuit())) for _ in range(15)}
+        assert len(seen) > 1, "shot-based probs are deterministic; shots are being ignored"
+
+    def test_probs_are_analytic_without_shots(self):
+        """shots=None must still give exact probabilities."""
+
+        @qjit
+        @qp.qnode(tensor_device(2))
+        def circuit():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            return qp.probs()
+
+        assert np.allclose(np.asarray(circuit()), [0.5, 0, 0, 0.5], atol=TOL)
+
+    def test_expval_is_shot_based(self):
+        """A finite shot count must make <Z> noisy but centred on the exact value."""
+        exact = np.cos(0.7)
+
+        def build(shots):
+            @qjit
+            @qp.set_shots(shots)
+            @qp.qnode(tensor_device(1))
+            def circuit():
+                qp.RY(0.7, wires=0)
+                return qp.expval(qp.PauliZ(0))
+
+            return circuit
+
+        vals = {float(build(500)()) for _ in range(12)}
+        assert len(vals) > 1, "shot-based expval is deterministic; shots are being ignored"
+        assert abs(np.mean(list(vals)) - exact) < 0.15
+
+    def test_expval_matches_lightning_statistically(self):
+        """Shot-based expectation values must agree with lightning within noise."""
+
+        def build(dev):
+            @qjit
+            @qp.set_shots(4000)
+            @qp.qnode(dev)
+            def circuit():
+                qp.RY(0.7, wires=0)
+                return qp.expval(qp.PauliZ(0))
+
+            return circuit
+
+        mine = np.mean([float(build(tensor_device(1))()) for _ in range(10)])
+        ref = np.mean([float(build(qp.device("lightning.qubit", wires=1))()) for _ in range(10)])
+        assert abs(mine - ref) < 0.05, f"tn={mine} vs lightning={ref}"
+
+    def test_pauli_x_expval_with_shots_needs_basis_rotation(self):
+        """<X> on |+> is deterministic (+1). Sampling in the computational basis
+        instead of the X eigenbasis would return ~0 here."""
+
+        @qjit
+        @qp.set_shots(2000)
+        @qp.qnode(tensor_device(1))
+        def circuit():
+            qp.Hadamard(0)
+            return qp.expval(qp.PauliX(0))
+
+        assert np.isclose(float(circuit()), 1.0, atol=1e-9)
+
+    def test_mcm_branches_are_both_reachable(self):
+        """A conditional circuit must not always collapse the same way.
+
+        Two devices running this program legitimately return different
+        probability vectors on any single call, because each collapses onto its
+        own random MCM branch. What must hold is that both branches occur.
+
+        NOTE: `qp.capture.enable()` is required for the two-callable
+        `qp.cond(m, if_true, if_false)()` form to register the false branch.
+        Without capture, only the true branch is applied and every run lands on
+        the same outcome -- on lightning.qubit too, so it is a tracing-mode
+        property rather than a device one.
+        """
+        x = 0.1234
+        qp.capture.enable()
+        try:
+
+            @qp.qjit(capture=True)
+            @qp.set_shots(2000)
+            @qp.qnode(tensor_device(3))
+            def circuit(theta):
+                qp.Hadamard(0)
+                qp.RY(theta, wires=0)
+                m = qp.measure(0)
+
+                def ansatz_true():
+                    qp.RX(theta, wires=0)
+
+                def ansatz_false():
+                    qp.RY(theta, wires=0)
+
+                qp.cond(m, ansatz_true, ansatz_false)()
+                qp.CNOT([0, 1])
+                qp.CNOT([1, 2])
+                return qp.probs()
+
+            dominant = set()
+            for _ in range(40):
+                p = np.asarray(circuit(x))
+                assert np.isclose(p.sum(), 1.0, atol=1e-9)
+                # Only |000> and |111> are reachable through the CNOT chain.
+                assert np.allclose(p[1:7], 0.0, atol=1e-12)
+                dominant.add(int(np.argmax(p)))
+        finally:
+            qp.capture.disable()
+
+        assert dominant == {
+            0,
+            7,
+        }, f"expected both MCM branches over 40 runs, saw {sorted(dominant)}"
+
+    def test_mcm_circuit_agrees_with_lightning_statistically(self):
+        """Per-call vectors differ by branch, but the rate at which each branch
+        is taken must match lightning.qubit."""
+        x = 0.1234
+        trials = 200
+
+        def branch_rate(dev):
+            @qp.qjit(capture=True)
+            @qp.set_shots(2000)
+            @qp.qnode(dev)
+            def circuit(theta):
+                qp.Hadamard(0)
+                qp.RY(theta, wires=0)
+                m = qp.measure(0)
+
+                def ansatz_true():
+                    qp.RX(theta, wires=0)
+
+                def ansatz_false():
+                    qp.RY(theta, wires=0)
+
+                qp.cond(m, ansatz_true, ansatz_false)()
+                qp.CNOT([0, 1])
+                qp.CNOT([1, 2])
+                return qp.probs()
+
+            return np.mean(
+                [1.0 if np.argmax(np.asarray(circuit(x))) == 7 else 0.0 for _ in range(trials)]
+            )
+
+        qp.capture.enable()
+        try:
+            frac_mine = branch_rate(tensor_device(3))
+            frac_ref = branch_rate(qp.device("lightning.qubit", wires=3))
+        finally:
+            qp.capture.disable()
+
+        sigma = np.sqrt(0.25 / trials)
+        assert (
+            abs(frac_mine - frac_ref) < 6 * sigma
+        ), f"branch rates differ: tn={frac_mine} lightning={frac_ref}"
+
+
 DIFF_CASES = {
     "ghz3": (lambda p: (qp.Hadamard(0), qp.CNOT([0, 1]), qp.CNOT([1, 2])), qp.probs, 3),
     "layered": (
