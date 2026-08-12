@@ -614,12 +614,6 @@ class TestIfOp:
     def test_nested_conditionals_with_quantum_ops(self, capture_mode):
         """Tests that nested conditionals are unflattend if quantum operations
         are present"""
-        if capture_mode:
-            pytest.xfail(
-                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
-                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
-            )
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -688,12 +682,6 @@ class TestIfOp:
     def test_nested_conditionals_with_nested_quantum_ops(self, capture_mode):
         """Tests that nested conditionals are unflattend if quantum operations
         are present but nested in other operations"""
-        if capture_mode:
-            pytest.xfail(
-                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
-                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
-            )
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1312,11 +1300,6 @@ class TestCreateDynamicOperatorNodes:
 
     def test_visualize_pythonic_operators(self, capture_mode):
         """Tests that we can use operators like +,-,%"""
-        if capture_mode:
-            pytest.xfail(
-                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
-                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
-            )
         pytest.xfail(
             "sc-127303: DAG reconstruction passes symbolic xDSL parameters as strings to typed "
             "Operator2 gate constructors, which reject string-valued angles"
@@ -1722,12 +1705,6 @@ class TestOperatorConnectivity:
 
     def test_static_connection_through_conditional(self, capture_mode):
         """Tests that connections through conditionals make sense."""
-        if capture_mode:
-            pytest.xfail(
-                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
-                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
-            )
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1769,12 +1746,6 @@ class TestOperatorConnectivity:
 
     def test_static_connection_through_nested_conditional(self, capture_mode):
         """Tests that connections through nested conditionals make sense."""
-        if capture_mode:
-            pytest.xfail(
-                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
-                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
-            )
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -2157,12 +2128,6 @@ class TestOperatorConnectivity:
 
     def test_complex_connectivity_if_elif_else(self, capture_mode):
         """Tests that complex connectivity can go through a conditional."""
-        if capture_mode:
-            pytest.xfail(
-                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
-                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
-            )
-
         @xdsl_from_qjit
         @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qp.qnode(qp.device("null.qubit", wires=3))

@@ -151,12 +151,6 @@ class TestCatalyst:
             pytest.xfail(
                 "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
             )
-        if capture_mode:
-            pytest.xfail(
-                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
-                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
-            )
-
         def func(w, theta1, theta2, theta3=1):
             qp.RX(theta1 * np.pi / 2, wires=w)
             qp.RY(theta2 / 2, wires=w)
@@ -349,12 +343,6 @@ class TestCatalyst:
             pytest.xfail(
                 "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
             )
-        if capture_mode:
-            pytest.xfail(
-                "sc-127301: Integer-valued Operator2 rotation parameters remain tensor<i64> "
-                "instead of being cast to f64, breaking downstream xDSL/compiler passes"
-            )
-
         def func(limit):
             qp.PauliY(wires=0)
 

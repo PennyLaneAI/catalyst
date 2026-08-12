@@ -88,7 +88,7 @@ def _is_custom_op(op_cls, avals_in):
         return False
     if op_cls.wire_argnames != ("wires",):
         return False
-    return all(p.shape == () and "float" in p.dtype.name for p in avals_in)
+    return all(p.shape == () and p.dtype.kind in "ifu" for p in avals_in)
 
 
 def _is_qref_qubit(val) -> bool:
