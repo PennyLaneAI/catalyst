@@ -92,6 +92,7 @@ Catalyst
    dev/debugging
    dev/custom_devices
    dev/roadmap
+   dev/het_comp
 
 .. toctree::
    :maxdepth: 2

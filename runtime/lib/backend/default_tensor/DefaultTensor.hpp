@@ -14,45 +14,6 @@
 
 #pragma once
 
-// DefaultTensor: the runtime backend behind PennyLane's `default.tensor` device
-// label, providing EXACT tensor-network simulation with dynamic qubit
-// allocation.
-//
-// Relationship to PennyLane's default.tensor
-// ------------------------------------------
-// `qp.device("default.tensor")` accepts method="mps" or method="tn". This
-// backend implements the semantics of method="tn" ("Exact Tensor Network"):
-// contraction is exact, with no bond-dimension truncation and no SVD anywhere.
-// The MPS method is deliberately NOT implemented here; a qjit-ed program that
-// asks for method="mps" is rejected by the frontend rather than silently
-// executed with different numerics.
-//
-// How it works
-// ------------
-// The state is never stored as a dense statevector. It is kept as a *network*:
-// one rank-1 tensor per allocated qubit, plus one tensor per applied gate. Each
-// qubit has a "frontier" index label -- the open leg representing its current
-// state. Applying a gate appends its tensor and rewires the frontier labels; no
-// contraction happens at that point.
-//
-//   |0>--[H]--*--- frontier(q0)
-//             |
-//   |0>------[X]-- frontier(q1)
-//
-// Contraction is deferred until a measurement actually needs a number. Gate
-// application is therefore O(1), and the exponential cost is paid only for what
-// is observed, over a network the contractor can optimise.
-//
-// Cost is governed by the circuit's treewidth, not its qubit count: structured
-// circuits (chains, ladders, shallow local circuits) stay cheap to very large
-// widths, while dense all-to-all circuits do not. `max_intermediate_log2` caps
-// intermediate size so an infeasible contraction fails loudly instead of
-// exhausting RAM.
-//
-// Gate set: I, X, Y, Z, H, RX, RY, RZ, CNOT, CZ. Arbitrary control wires are
-// supported on every single-qubit gate, so Catalyst can hand controlled forms
-// down directly instead of decomposing them.
-
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -78,7 +39,6 @@ namespace Catalyst::Runtime::Devices {
 using ExactTN::cd;
 using ExactTN::Tensor;
 
-/// Observable record. Catalyst builds observables first, then refers to them by id.
 struct ObsRecord {
     ObsType kind{Basic};
     ObsId basic_id{Identity};
@@ -102,15 +62,6 @@ struct DefaultTensor final : public QuantumDevice {
     }
     ~DefaultTensor() override = default;
 
-    // -----------------------------------------------------------------------
-    // QUBIT MANAGEMENT (dynamic, Lightning-style)
-    //
-    // IDs are handed out monotonically and never reused, so a stale ID is
-    // always detectable rather than silently aliasing a live qubit. Releasing
-    // is O(1) and, critically, does not disturb the IDs of any other qubit.
-    // -----------------------------------------------------------------------
-
-    /// Allocate one fresh qubit in |0>. Safe to call at any point mid-program.
     auto AllocateQubit() -> QubitIdType override
     {
         const QubitIdType id = next_qubit_id_++;
@@ -211,16 +162,10 @@ struct DefaultTensor final : public QuantumDevice {
 
     auto GetNumQubits() const -> size_t override { return frontier_.size(); }
 
-    // -----------------------------------------------------------------------
-    // EXECUTION MANAGEMENT
-    // -----------------------------------------------------------------------
     void SetDeviceShots(size_t shots) override { shots_ = shots; }
     auto GetDeviceShots() const -> size_t override { return shots_; }
     void SetDevicePRNG(std::mt19937 *gen) override { gen_ = gen; }
 
-    // -----------------------------------------------------------------------
-    // QUANTUM OPERATIONS
-    // -----------------------------------------------------------------------
     void NamedOperation(const std::string &name, const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse,
                         const std::vector<QubitIdType> &controlled_wires,
@@ -252,9 +197,6 @@ struct DefaultTensor final : public QuantumDevice {
         applyControlled(m, wires[0], controlled_wires, controlled_values);
     }
 
-    // -----------------------------------------------------------------------
-    // OBSERVABLES
-    // -----------------------------------------------------------------------
     auto Observable(ObsId id, const std::vector<cd> &matrix,
                     const std::vector<QubitIdType> &wires) -> ObsIdType override
     {
@@ -296,9 +238,6 @@ struct DefaultTensor final : public QuantumDevice {
         return static_cast<ObsIdType>(obs_.size() - 1);
     }
 
-    // -----------------------------------------------------------------------
-    // MEASUREMENT PROCESSES
-    // -----------------------------------------------------------------------
     auto Expval(ObsIdType key) -> double override
     {
         // <psi|O|psi> as a single closed network: no statevector is formed.
@@ -395,7 +334,6 @@ struct DefaultTensor final : public QuantumDevice {
     }
 
   private:
-    // ---- state ------------------------------------------------------------
     std::vector<Tensor> nodes_;                 ///< the tensor network
     std::map<QubitIdType, int64_t> frontier_;   ///< qubit -> its open index label
     std::vector<QubitIdType> order_;            ///< allocation order (wire ordering)
@@ -448,7 +386,6 @@ struct DefaultTensor final : public QuantumDevice {
         return p.size() - 1; // guard against floating-point rounding
     }
 
-    // ---- gate matrices ----------------------------------------------------
     static auto matX() -> std::array<cd, 4> { return {0, 1, 1, 0}; }
     static auto matZ() -> std::array<cd, 4> { return {1, 0, 0, -1}; }
 
@@ -493,7 +430,6 @@ struct DefaultTensor final : public QuantumDevice {
         RT_FAIL(("DefaultTensor: unsupported gate '" + name + "'").c_str());
     }
 
-    /// Matrix of a named observable, as a 2x2.
     static auto observableMatrix(const ObsRecord &rec) -> std::array<cd, 4>
     {
         switch (rec.basic_id) {
@@ -514,7 +450,6 @@ struct DefaultTensor final : public QuantumDevice {
         }
     }
 
-    // ---- network construction --------------------------------------------
     auto frontierOf(QubitIdType q) -> int64_t
     {
         auto it = frontier_.find(q);
@@ -602,7 +537,6 @@ struct DefaultTensor final : public QuantumDevice {
         }
     }
 
-    // ---- contraction ------------------------------------------------------
     /**
      * @brief Contract the network to the full amplitude tensor, in wire order.
      *

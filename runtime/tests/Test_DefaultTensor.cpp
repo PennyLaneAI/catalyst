@@ -62,8 +62,6 @@ TEST_CASE("DefaultTensor: Bell state probabilities", "[DefaultTensor]")
 
 TEST_CASE("DefaultTensor: wire 0 is the most significant bit", "[DefaultTensor]")
 {
-    // A device that inverts this passes every self-consistency check while
-    // silently disagreeing with every other PennyLane device.
     DefaultTensor sim{"{}"};
     auto wires = sim.AllocateQubits(2);
     sim.NamedOperation("PauliX", {}, {wires[0]}, false, {}, {}, {});
@@ -128,8 +126,6 @@ TEST_CASE("DefaultTensor: dynamic qubit allocation mid-circuit", "[DefaultTensor
     auto first = sim.AllocateQubits(1);
     sim.NamedOperation("Hadamard", {}, {first[0]}, false, {}, {}, {});
 
-    // Allocate a second qubit *after* gates have already been applied. This is
-    // the path Catalyst's automatic qubit management drives.
     const QubitIdType second = sim.AllocateQubit();
     REQUIRE(sim.GetNumQubits() == 2);
     sim.NamedOperation("CNOT", {}, {first[0], second}, false, {}, {}, {});
@@ -146,8 +142,6 @@ TEST_CASE("DefaultTensor: releasing a qubit keeps the state normalised", "[Defau
     sim.NamedOperation("Hadamard", {}, {wires[0]}, false, {}, {}, {});
     sim.NamedOperation("CNOT", {}, {wires[0], wires[1]}, false, {}, {}, {});
 
-    // Freeing an entangled qubit behaves like an unread measurement: the
-    // survivor collapses to a definite branch, and probabilities still sum to 1.
     sim.ReleaseQubit(wires[1]);
     REQUIRE(sim.GetNumQubits() == 1);
 
@@ -256,7 +250,6 @@ TEST_CASE("DefaultTensor: shots, sampling and counts", "[DefaultTensor]")
     sim.Counts(ev, cv);
 
     CHECK(counts[0] + counts[1] + counts[2] + counts[3] == 1000);
-    // Only |00> and |11> can occur on a Bell state.
     CHECK(counts[1] == 0);
     CHECK(counts[2] == 0);
 }
@@ -288,7 +281,6 @@ TEST_CASE("DefaultTensor: oversized contraction raises instead of exhausting RAM
 
 TEST_CASE("DefaultTensor: device kwargs are parsed", "[DefaultTensor]")
 {
-    // An out-of-range guard must be rejected at construction.
     REQUIRE_THROWS_WITH(DefaultTensor{"{'max_intermediate_log2': 99}"},
                         ContainsSubstring("max_intermediate_log2"));
 }

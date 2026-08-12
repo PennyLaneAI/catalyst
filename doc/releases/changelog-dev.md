@@ -2,6 +2,54 @@
 
 <h3>New features since last release</h3>
 
+* PennyLane's `default.tensor` device is now supported under :func:`~.qjit` via a new runtime
+  backend that performs **exact** tensor-network simulation with dynamic qubit allocation.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
+  The state is held as a tensor network rather than a dense statevector: one tensor per qubit plus
+  one per gate, with contraction deferred until a measurement needs a value. Cost is therefore
+  governed by the circuit's treewidth rather than its qubit count, so structured circuits remain
+  tractable at widths far beyond dense simulation.
+
+  ```py
+  import pennylane as qp
+  from catalyst import qjit
+
+  n = 40
+  dev = qp.device("default.tensor", wires=n, method="tn")
+
+  @qjit
+  @qp.qnode(dev)
+  def circuit():
+      qp.Hadamard(0)
+      for i in range(n - 1):
+          qp.CNOT([i, i + 1])
+      return qp.expval(qp.PauliZ(0) @ qp.PauliZ(n - 1))
+  ```
+
+  ```pycon
+  >>> circuit()
+  1.0
+  ```
+
+  Only the exact `method="tn"` mode is supported. PennyLane's default `method="mps"` truncates the
+  bond dimension, which the runtime backend does not implement, so requesting it raises a
+  `CompileError` rather than silently producing different numerics.
+
+  The backend natively implements `Identity`, `PauliX`, `PauliY`, `PauliZ`, `Hadamard`, `RX`, `RY`,
+  `RZ`, `CNOT` and `CZ` (single-qubit gates accept arbitrary control wires); Catalyst decomposes
+  anything else into this set. Mid-circuit measurements, dynamic qubit allocation via
+  `wires=None`, and `qp.allocate` scratch registers are all supported.
+
+  Because exact contraction can demand an arbitrarily large intermediate tensor, the largest
+  intermediate is capped so that an infeasible contraction raises a catchable error instead of
+  exhausting memory. The cap defaults to `2**27` elements and can be adjusted:
+
+  ```py
+  dev = qp.device("default.tensor", wires=n, method="tn")
+  dev.max_intermediate_log2 = 30
+  ```
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``

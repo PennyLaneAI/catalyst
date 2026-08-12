@@ -108,3 +108,32 @@ Supported backend devices include:
 
     - A device that performs no numerical operations, useful for resource estimation and benchmarking.
       See the `NullQubit documentation <https://pennylane.ai/devices/null-qubit>`__ for more details.
+
+  * - ``default.tensor``
+
+    - An exact tensor-network simulator. The quantum state is stored as a tensor network rather than
+      a dense statevector, and contraction is deferred until a measurement requires a value. Runtime
+      cost is governed by the circuit's treewidth rather than its qubit count, so structured circuits
+      (chains, ladders, shallow local circuits) remain tractable at widths well beyond dense
+      simulation, while densely-entangling circuits do not.
+
+      Only the exact ``method="tn"`` mode is supported under :func:`~.qjit`. PennyLane's default
+      ``method="mps"`` truncates the bond dimension, which this backend does not implement, so
+      requesting it raises a ``CompileError``:
+
+      .. code-block:: python
+
+          dev = qp.device("default.tensor", wires=40, method="tn")
+
+      Exact contraction can demand arbitrarily large intermediate tensors, so the largest
+      intermediate is capped (default ``2**27`` elements). Exceeding the cap raises a catchable
+      error rather than exhausting memory. Adjust it after construction, since PennyLane's
+      ``default.tensor`` validates constructor keywords against a fixed allowlist:
+
+      .. code-block:: python
+
+          dev.max_intermediate_log2 = 30
+
+      Requires the optional ``quimb`` dependency, as PennyLane's ``default.tensor`` does.
+      See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/runtime/lib/backend/default_tensor/default_tensor.toml>`__
+      for natively supported instructions.
