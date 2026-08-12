@@ -32,7 +32,7 @@
   and recorded on the module so the compiler links it. A local call may take a `buf` argument and
   may return nothing (a `void` call is kept for its side effects), neither of which a dispatched
   call allows.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3101)](https://github.com/PennyLaneAI/catalyst/pull/3101)
 
 * A CPU transport backend built on libibverbs is added, which implements the controller and coprocessor
   session roles over RDMA.
