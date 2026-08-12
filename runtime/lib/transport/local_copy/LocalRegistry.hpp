@@ -28,26 +28,33 @@ namespace catalyst::transport::local_copy {
 
 class LocalCpuControllerSession;
 
-// A process-local rendezvous between a controller and its coprocessor. Both sides look up the
-// same EndpointPair by (peer, oob_port) at connect(); the coprocessor registers `run_once` so
-// the controller's kick() can drive the coprocessor synchronously in-process.
+// Same-process rendezvous keyed by (peer, oob_port). The coprocessor binds `run_once`; the
+// controller's kick() drives it inline. `mu` serializes kick against coprocessor teardown.
 struct EndpointPair {
     using RunOnce = std::function<std::size_t(const void *req, std::size_t req_bytes,
                                               std::uint32_t decoder_id, void *reply,
                                               std::size_t reply_cap)>;
 
+    std::mutex mu;
     LocalCpuControllerSession *controller = nullptr;
     RunOnce run_once;
 };
 
 inline auto acquire_endpoint_pair(const ConnectInfo &info) -> std::shared_ptr<EndpointPair> {
     static std::mutex mu;
-    // Process-wide weak_ptr registry so dead pairs can disappear once the respective
-    // controller/coprocessor are destroyed.
     static std::unordered_map<std::string, std::weak_ptr<EndpointPair>> pairs;
 
     const std::string key = info.peer + ":" + std::to_string(info.oob_port);
     std::lock_guard<std::mutex> lock(mu);
+
+    // Prune expired entries so churning keys don't accumulate.
+    for (auto it = pairs.begin(); it != pairs.end();) {
+        if (it->second.expired()) {
+            it = pairs.erase(it);
+        } else {
+            ++it;
+        }
+    }
 
     if (auto it = pairs.find(key); it != pairs.end()) {
         if (auto pair = it->second.lock()) {

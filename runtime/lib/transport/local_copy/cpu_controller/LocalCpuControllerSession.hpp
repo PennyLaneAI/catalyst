@@ -27,7 +27,7 @@ namespace catalyst::transport::local_copy {
 class LocalCpuControllerSession : public ControllerSession {
   public:
     explicit LocalCpuControllerSession(std::string = {}) {}
-    ~LocalCpuControllerSession() override = default;
+    ~LocalCpuControllerSession() override;
 
     // TransportSession
     int connect(const ConnectInfo &info) override;
@@ -48,16 +48,14 @@ class LocalCpuControllerSession : public ControllerSession {
     void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
 
   private:
-    /// Process-local rendezvous with the paired coprocessor.
     std::shared_ptr<EndpointPair> pair_;
 
     /// Reply buffer the paired coprocessor writes into during kick().
     MemRegion local_reply_{};
 
-    /// Owned allocations returned from alloc_memory(); MemRegion is only a view into these.
+    /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
-    /// Request staging filled by data_slot()/write_data_slot() and consumed by kick().
     std::vector<std::byte> request_staging_;
 
     std::uint64_t in_bytes_ = 0;

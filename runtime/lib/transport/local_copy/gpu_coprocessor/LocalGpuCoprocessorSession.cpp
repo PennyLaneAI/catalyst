@@ -37,6 +37,8 @@ LocalGpuCoprocessorSession::~LocalGpuCoprocessorSession() {
         (void)hipHostFree(request_slot_host_);
     }
     if (pair_) {
+        // Wait for any in-flight kick, then unbind so no future call reaches a dying `this`.
+        std::lock_guard<std::mutex> lock(pair_->mu);
         pair_->run_once = nullptr;
     }
 }
@@ -63,6 +65,10 @@ void LocalGpuCoprocessorSession::ensure_gpu_state() {
 
 int LocalGpuCoprocessorSession::connect(const ConnectInfo &info) {
     pair_ = acquire_endpoint_pair(info);
+    if (pair_->run_once) {
+        throw std::runtime_error(
+            "memcpy: another coprocessor is already bound to this endpoint (peer, oob_port)");
+    }
     pair_->run_once = [this](const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
                              void *reply, std::size_t reply_cap) {
         return this->run_once(req, req_bytes, decoder_id, reply, reply_cap);
@@ -73,7 +79,7 @@ int LocalGpuCoprocessorSession::connect(const ConnectInfo &info) {
 MemRegion LocalGpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     if (kind != MemKind::CpuRam) {
         throw std::runtime_error(
-            "local_copy: local GPU coprocessor expects CpuRam request buffers from the controller");
+            "memcpy: local GPU coprocessor expects CpuRam request buffers from the controller");
     }
     caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
                                           : std::unique_ptr<std::byte[]>{});
@@ -94,7 +100,7 @@ void LocalGpuCoprocessorSession::establish_channel(const ChannelDesc &desc,
                                                    const MemRegion & /*local*/,
                                                    const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
-        throw std::runtime_error("local_copy: local GPU coprocessor supports only transport=memcpy");
+        throw std::runtime_error("memcpy: local GPU coprocessor supports only transport=memcpy");
     }
 }
 
@@ -103,7 +109,7 @@ void LocalGpuCoprocessorSession::start() { ensure_gpu_state(); }
 int LocalGpuCoprocessorSession::collect(void *const * /*replies*/,
                                         const std::uint64_t * /*replies_bytes*/,
                                         std::size_t /*n*/) {
-    throw std::logic_error("local_copy: coprocessor collect is not used");
+    throw std::logic_error("memcpy: coprocessor collect is not used");
 }
 
 void LocalGpuCoprocessorSession::stop() {
@@ -121,10 +127,10 @@ std::size_t LocalGpuCoprocessorSession::run_once(const void *req, std::size_t re
                                                  std::uint32_t decoder_id, void *reply,
                                                  std::size_t reply_cap) {
     if (req_bytes != common::PAYLOAD_DATA_BYTES) {
-        throw std::runtime_error("local_copy: local GPU coprocessor expects one 8-byte payload");
+        throw std::runtime_error("memcpy: local GPU coprocessor expects one 8-byte payload");
     }
     if (reply_cap < sizeof(std::int64_t)) {
-        throw std::runtime_error("local_copy: reply buffer too small for GPU correction");
+        throw std::runtime_error("memcpy: reply buffer too small for GPU correction");
     }
 
     ensure_gpu_state();
@@ -149,12 +155,12 @@ std::size_t LocalGpuCoprocessorSession::run_once(const void *req, std::size_t re
     };
     CoprocessorLauncherFn launch = launcher_ ? launcher_ : &gpu_verbs::default_echo_launcher;
     if (launch(&desc, launcher_ctx_) != 0) {
-        throw std::runtime_error("local_copy: GPU coprocessor launcher failed");
+        throw std::runtime_error("memcpy: GPU coprocessor launcher failed");
     }
     gpu_->sync();
 
     if (handoff_.host[0].seq != 1) {
-        throw std::runtime_error("local_copy: GPU coprocessor did not publish a reply");
+        throw std::runtime_error("memcpy: GPU coprocessor did not publish a reply");
     }
 
     const std::int64_t correction = handoff_.host[0].correction;

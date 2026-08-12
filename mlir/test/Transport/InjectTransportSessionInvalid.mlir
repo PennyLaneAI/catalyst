@@ -37,7 +37,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 
 // -----
 
-// expected-error @below {{backline transport must be 'rdma' or 'local'}}
+// expected-error @below {{backline transport must be 'rdma' or 'memcpy'}}
 module attributes {catalyst.backline = #transport.backline<transport = "bogus", controller = #transport.node<backend_lib = "x">>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }

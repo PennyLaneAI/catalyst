@@ -50,19 +50,17 @@ class LocalGpuCoprocessorSession : public CoprocessorSession {
         return CoprocConvention::LaunchOnce;
     }
 
-    // Consume one request, launch one GPU decode, and write the reply into `reply`.
-    // Invoked synchronously from the paired controller's kick(). Uses a single request slot and a
-    // single handoff slot; total=1 never needs a ring.
+    // Called synchronously from the paired controller's kick(); launches one GPU decode and
+    // writes the reply into `reply`. Uses single slots (no ring) since total=1.
     std::size_t run_once(const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
                          void *reply, std::size_t reply_cap);
 
   private:
     void ensure_gpu_state();
 
-    /// Process-local rendezvous with the paired controller.
     std::shared_ptr<EndpointPair> pair_;
 
-    /// Owned allocations returned from alloc_memory(); MemRegion is only a view into these.
+    /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
     int gpu_device_ = 0;

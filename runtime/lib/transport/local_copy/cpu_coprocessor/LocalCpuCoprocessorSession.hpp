@@ -42,16 +42,14 @@ class LocalCpuCoprocessorSession : public CoprocessorSession {
     // CoprocessorSession
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
 
-    // Consume one request and write its reply into `reply`, returning the number of bytes written.
-    // Invoked synchronously from the paired controller's kick().
+    // Called synchronously from the paired controller's kick(); returns bytes written to `reply`.
     std::size_t run_once(const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
                          void *reply, std::size_t reply_cap);
 
   private:
-    /// Process-local rendezvous with the paired controller.
     std::shared_ptr<EndpointPair> pair_;
 
-    /// Owned allocations returned from alloc_memory(); MemRegion is only a view into these.
+    /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
     CoprocessorFn fn_ = nullptr;

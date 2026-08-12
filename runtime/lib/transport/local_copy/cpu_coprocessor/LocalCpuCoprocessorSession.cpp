@@ -33,12 +33,18 @@ std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t o
 
 LocalCpuCoprocessorSession::~LocalCpuCoprocessorSession() {
     if (pair_) {
+        // Wait for any in-flight kick, then unbind so no future call reaches a dying `this`.
+        std::lock_guard<std::mutex> lock(pair_->mu);
         pair_->run_once = nullptr;
     }
 }
 
 int LocalCpuCoprocessorSession::connect(const ConnectInfo &info) {
     pair_ = acquire_endpoint_pair(info);
+    if (pair_->run_once) {
+        throw std::runtime_error(
+            "memcpy: another coprocessor is already bound to this endpoint (peer, oob_port)");
+    }
     pair_->run_once = [this](const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
                              void *reply, std::size_t reply_cap) {
         return this->run_once(req, req_bytes, decoder_id, reply, reply_cap);
@@ -48,7 +54,7 @@ int LocalCpuCoprocessorSession::connect(const ConnectInfo &info) {
 
 MemRegion LocalCpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     if (kind != MemKind::CpuRam) {
-        throw std::runtime_error("local_copy: CPU-only for now; alloc_memory expects CpuRam");
+        throw std::runtime_error("memcpy: CPU-only for now; alloc_memory expects CpuRam");
     }
     caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
                                           : std::unique_ptr<std::byte[]>{});
@@ -69,7 +75,7 @@ void LocalCpuCoprocessorSession::establish_channel(const ChannelDesc &desc,
                                                    const MemRegion & /*local*/,
                                                    const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
-        throw std::runtime_error("local_copy: CPU-only coprocessor supports only transport=memcpy");
+        throw std::runtime_error("memcpy: CPU-only coprocessor supports only transport=memcpy");
     }
 }
 
@@ -78,9 +84,8 @@ void LocalCpuCoprocessorSession::start() {}
 int LocalCpuCoprocessorSession::collect(void *const * /*replies*/,
                                         const std::uint64_t * /*replies_bytes*/,
                                         std::size_t /*n*/) {
-    // The coprocessor's compute is driven synchronously from the controller's kick() via
-    // run_once(); nothing collects on this side.
-    throw std::logic_error("local_copy: coprocessor collect is not used");
+    // Compute is driven inline from the controller's kick(); nothing collects on this side.
+    throw std::logic_error("memcpy: coprocessor collect is not used");
 }
 
 void LocalCpuCoprocessorSession::stop() {}
@@ -96,7 +101,7 @@ std::size_t LocalCpuCoprocessorSession::run_once(const void *req, std::size_t re
     CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
     const std::size_t written = fn(req, req_bytes, reply, reply_cap, ctx_);
     if (written > reply_cap) {
-        throw std::runtime_error("local_copy: coprocessor wrote past reply capacity");
+        throw std::runtime_error("memcpy: coprocessor wrote past reply capacity");
     }
     return written;
 }

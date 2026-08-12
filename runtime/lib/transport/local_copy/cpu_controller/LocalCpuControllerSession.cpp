@@ -29,15 +29,25 @@ std::uint64_t now_ns() {
 
 } // namespace
 
+LocalCpuControllerSession::~LocalCpuControllerSession() {
+    if (pair_ && pair_->controller == this) {
+        pair_->controller = nullptr;
+    }
+}
+
 int LocalCpuControllerSession::connect(const ConnectInfo &info) {
     pair_ = acquire_endpoint_pair(info);
+    if (pair_->controller) {
+        throw std::runtime_error(
+            "memcpy: another controller is already bound to this endpoint (peer, oob_port)");
+    }
     pair_->controller = this;
     return 0;
 }
 
 MemRegion LocalCpuControllerSession::alloc_memory(std::size_t size, MemKind kind) {
     if (kind != MemKind::CpuRam) {
-        throw std::runtime_error("local_copy: CPU-only for now; alloc_memory expects CpuRam");
+        throw std::runtime_error("memcpy: CPU-only for now; alloc_memory expects CpuRam");
     }
     caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
                                           : std::unique_ptr<std::byte[]>{});
@@ -58,7 +68,7 @@ PeerRef LocalCpuControllerSession::exchange_keys(const MemRegion &local) {
 void LocalCpuControllerSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                                   const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
-        throw std::runtime_error("local_copy: CPU-only controller supports only transport=memcpy");
+        throw std::runtime_error("memcpy: CPU-only controller supports only transport=memcpy");
     }
     local_reply_ = local;
 }
@@ -68,15 +78,15 @@ void LocalCpuControllerSession::start() { rtt_ns_ = 0; }
 int LocalCpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                        std::size_t n) {
     if (!local_reply_.addr) {
-        throw std::runtime_error("local_copy: controller reply region is not established");
+        throw std::runtime_error("memcpy: controller reply region is not established");
     }
     if (local_reply_.kind != MemKind::CpuRam) {
-        throw std::runtime_error("local_copy: CPU-only controller expects CpuRam reply region");
+        throw std::runtime_error("memcpy: CPU-only controller expects CpuRam reply region");
     }
 
     const std::uint64_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
     if (reply_bytes_ > cap) {
-        throw std::runtime_error("local_copy: caller reply buffer too small");
+        throw std::runtime_error("memcpy: caller reply buffer too small");
     }
     if (n > 0 && replies && replies[0] && reply_bytes_ != 0) {
         std::memcpy(replies[0], local_reply_.addr, static_cast<std::size_t>(reply_bytes_));
@@ -97,23 +107,31 @@ void LocalCpuControllerSession::commit_work_item(std::uint32_t /*work_item_idx*/
 }
 
 int LocalCpuControllerSession::kick(std::uint32_t /*work_item_idx*/) {
-    if (!pair_ || !pair_->run_once) {
-        throw std::runtime_error("local_copy: no paired coprocessor");
+    if (!pair_) {
+        throw std::runtime_error("memcpy: no paired coprocessor");
     }
     if (!local_reply_.addr) {
-        throw std::runtime_error("local_copy: local reply region is not established");
+        throw std::runtime_error("memcpy: local reply region is not established");
     }
     if (local_reply_.kind != MemKind::CpuRam) {
-        throw std::runtime_error("local_copy: CPU-only controller expects CpuRam reply region");
+        throw std::runtime_error("memcpy: CPU-only controller expects CpuRam reply region");
     }
     if (local_reply_.size < out_bytes_) {
-        throw std::runtime_error("local_copy: local reply region too small for committed output");
+        throw std::runtime_error("memcpy: local reply region too small for committed output");
     }
 
     kick_ns_ = now_ns();
-    const std::size_t written = pair_->run_once(
-        request_staging_.data(), static_cast<std::size_t>(staged_bytes_), decoder_id_,
-        local_reply_.addr, static_cast<std::size_t>(out_bytes_));
+    std::size_t written = 0;
+    {
+        // Held across check and call so teardown can't clear run_once mid-call.
+        std::lock_guard<std::mutex> lock(pair_->mu);
+        if (!pair_->run_once) {
+            throw std::runtime_error("memcpy: no paired coprocessor");
+        }
+        written = pair_->run_once(request_staging_.data(),
+                                  static_cast<std::size_t>(staged_bytes_), decoder_id_,
+                                  local_reply_.addr, static_cast<std::size_t>(out_bytes_));
+    }
     reply_bytes_ = static_cast<std::uint64_t>(written);
     return 0;
 }
@@ -125,10 +143,10 @@ void *LocalCpuControllerSession::data_slot() {
 void LocalCpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
                                                 std::uint32_t decoder_id) {
     if (bytes > in_bytes_) {
-        throw std::runtime_error("local_copy: payload exceeds committed input bytes");
+        throw std::runtime_error("memcpy: payload exceeds committed input bytes");
     }
     if (bytes != 0 && src == nullptr) {
-        throw std::runtime_error("local_copy: null source with non-zero payload size");
+        throw std::runtime_error("memcpy: null source with non-zero payload size");
     }
     if (bytes != 0) {
         std::memcpy(request_staging_.data(), src, static_cast<std::size_t>(bytes));
