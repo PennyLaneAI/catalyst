@@ -25,7 +25,7 @@ func.func @ctrl_scf_if_then_only(%ctrl: !quantum.bit, %q: !quantum.bit, %cond: i
   // CHECK: } else {
   // CHECK:   scf.yield %{{.*}}, %{{.*}} : !quantum.bit, !quantum.bit
   // CHECK: }
-  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %r = scf.if %cond -> !quantum.bit {
       %h = quantum.custom "Hadamard"() %arg0 : !quantum.bit
@@ -49,7 +49,7 @@ func.func @ctrl_scf_if_both_branches(%ctrl: !quantum.bit, %q: !quantum.bit, %con
   // CHECK: } else {
   // CHECK:   quantum.custom "PauliX"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
   // CHECK: }
-  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %r = scf.if %cond -> !quantum.bit {
       %h = quantum.custom "Hadamard"() %arg0 : !quantum.bit
@@ -76,7 +76,7 @@ func.func @ctrl_scf_if_threaded(%ctrl: !quantum.bit, %q: !quantum.bit, %cond: i1
   // CHECK:   scf.yield %[[PRE]], %[[PREC]] : !quantum.bit, !quantum.bit
   // CHECK: }
   // CHECK: quantum.custom "T"() %[[IF]]#0 ctrls(%[[IF]]#1) ctrlvals(%{{.*}})
-  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %s = quantum.custom "S"() %arg0 : !quantum.bit
     %r = scf.if %cond -> !quantum.bit {
@@ -101,7 +101,7 @@ func.func @ctrl_scf_for_basic(%ctrl: !quantum.bit, %q: !quantum.bit, %lb: index,
   // CHECK: scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%{{.*}} = %{{.*}}, %{{.*}} = %{{.*}}) -> (!quantum.bit, !quantum.bit)
   // CHECK:   quantum.custom "Hadamard"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
   // CHECK:   scf.yield %{{.*}}, %{{.*}} : !quantum.bit, !quantum.bit
-  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %r = scf.for %i = %lb to %ub step %step iter_args(%qi = %arg0) -> !quantum.bit {
       %h = quantum.custom "Hadamard"() %qi : !quantum.bit
@@ -122,7 +122,7 @@ func.func @ctrl_scf_for_threaded(%ctrl: !quantum.bit, %q: !quantum.bit, %lb: ind
   // CHECK: %[[SO:.*]], %[[SC:.*]] = quantum.custom "S"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
   // CHECK: %[[F:.*]]:2 = scf.for %{{.*}} iter_args(%{{[^ ]*}} = %[[SO]], %{{[^ ]*}} = %[[SC]]) -> (!quantum.bit, !quantum.bit)
   // CHECK: quantum.custom "T"() %[[F]]#0 ctrls(%[[F]]#1) ctrlvals(%{{.*}})
-  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %s = quantum.custom "S"() %arg0 : !quantum.bit
     %r = scf.for %i = %lb to %ub step %step iter_args(%qi = %s) -> !quantum.bit {
@@ -144,7 +144,7 @@ func.func @ctrl_scf_for_with_if(%ctrl: !quantum.bit, %q: !quantum.bit, %lb: inde
   // CHECK: scf.for %{{.*}} iter_args(%{{.*}} = %{{.*}}, %{{.*}} = %{{.*}}) -> (!quantum.bit, !quantum.bit)
   // CHECK:   scf.if %{{.*}} -> (!quantum.bit, !quantum.bit)
   // CHECK:     quantum.custom "Hadamard"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
-  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %r = scf.for %i = %lb to %ub step %step iter_args(%qi = %arg0) -> !quantum.bit {
       %ri = scf.if %cond -> !quantum.bit {
@@ -174,7 +174,7 @@ func.func @ctrl_scf_while(%ctrl: !quantum.bit, %q: !quantum.bit, %n: i64) -> (!q
   // CHECK:   quantum.custom "Hadamard"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
   // CHECK:   scf.yield %{{.*}}, %{{.*}}, %{{.*}} : i64, !quantum.bit, !quantum.bit
   // CHECK: }
-  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %r:2 = scf.while (%i = %c0, %qi = %arg0) : (i64, !quantum.bit) -> (i64, !quantum.bit) {
       %cond = arith.cmpi slt, %i, %n : i64
@@ -208,7 +208,7 @@ func.func @ctrl_scf_index_switch(%ctrl: !quantum.bit, %q: !quantum.bit, %idx: in
   // CHECK: default {
   // CHECK:   scf.yield %{{.*}}, %{{.*}} : !quantum.bit, !quantum.bit
   // CHECK: }
-  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %r = scf.index_switch %idx -> !quantum.bit
     case 0 {

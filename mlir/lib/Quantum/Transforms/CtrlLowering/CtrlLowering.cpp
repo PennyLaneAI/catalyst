@@ -165,8 +165,7 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
 /// Control an `scf.if` by turning the control qubits into extra results: each branch tracks the
 /// controls through its body and yields them alongside the original results.
 static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRMapping &map,
-                                  SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
-{
+                                  SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues) {
     Type qubitType = QubitType::get(rewriter.getContext());
     unsigned numCtrl = currentCtrlQubits.size();
 
@@ -228,8 +227,7 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
 /// structure (bounds, iteration) stays classical, the control qubits are tracked through the body
 /// each iteration, and the final controls come out as the loop's trailing results.
 static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, IRMapping &map,
-                                   SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues)
-{
+                                   SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues) {
     unsigned numOrig = forOp.getInitArgs().size();
 
     // New init args = the loop's original init args, plus the incoming control qubits.
@@ -286,8 +284,7 @@ static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, 
 /// Control an `scf.while` by adding the control qubits as extra loop-carried values.
 static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whileOp,
                                      IRMapping &map, SmallVector<Value> &currentCtrlQubits,
-                                     ValueRange ctrlValues)
-{
+                                     ValueRange ctrlValues) {
     Type qubitType = QubitType::get(rewriter.getContext());
     unsigned numCtrl = currentCtrlQubits.size();
     unsigned numInit = whileOp.getInits().size();
@@ -372,8 +369,7 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
 /// Control an `scf.index_switch` by turning the control qubits into extra results
 static LogicalResult controlScfIndexSwitch(PatternRewriter &rewriter, scf::IndexSwitchOp switchOp,
                                            IRMapping &map, SmallVector<Value> &currentCtrlQubits,
-                                           ValueRange ctrlValues)
-{
+                                           ValueRange ctrlValues) {
     Type qubitType = QubitType::get(rewriter.getContext());
     unsigned numCtrl = currentCtrlQubits.size();
 
@@ -428,8 +424,7 @@ static LogicalResult controlScfIndexSwitch(PatternRewriter &rewriter, scf::Index
 
 static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block, IRMapping &map,
                                         SmallVector<Value> &currentCtrlQubits,
-                                        ValueRange ctrlValues)
-{
+                                        ValueRange ctrlValues) {
     for (Operation &op : block.without_terminator()) {
         if (isa<MeasurementProcess, MeasureOp>(op)) {
             op.emitError("cannot control a measurement inside a quantum.ctrl region");
