@@ -132,9 +132,16 @@ RUNTIME_MPS = {mp: [] for mp in RUNTIME_MPS}
 # for the following backend devices:
 SUPPORTED_RT_DEVICES = {
     "null.qubit": ("NullQubit", "librtd_null_qubit"),
+    "default.tensor": ("DefaultTensor", "librtd_default_tensor"),
     "braket.aws.qubit": ("OpenQasmDevice", "librtd_openqasm"),
     "braket.local.qubit": ("OpenQasmDevice", "librtd_openqasm"),
 }
+
+# `default.tensor` offers two simulation methods in PennyLane: "mps" (Matrix
+# Product State, which truncates) and "tn" (Exact Tensor Network). The runtime
+# backend implements the exact method only, so a qjit-ed program requesting
+# "mps" must be rejected rather than silently executed with different numerics.
+DEFAULT_TENSOR_SUPPORTED_METHODS = ("tn",)
 
 
 @dataclass
@@ -197,6 +204,36 @@ def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
             )
     elif dname == "OQCDevice":
         device_kwargs["backend"] = device.backend
+    elif dname == "default.tensor":
+        # The runtime backend implements the exact ("tn") method only. Reject the
+        # truncating MPS method instead of quietly producing different numbers.
+        method = getattr(device, "method", None)
+        if method is not None and method not in DEFAULT_TENSOR_SUPPORTED_METHODS:
+            raise CompileError(
+                f"default.tensor method '{method}' is not supported by the Catalyst "
+                f"runtime backend, which performs exact tensor-network contraction. "
+                f"Supported methods: {', '.join(DEFAULT_TENSOR_SUPPORTED_METHODS)}. "
+                f"Use qp.device('default.tensor', wires=..., method='tn')."
+            )
+        # Forward the contraction memory guard if the user set one. This bounds
+        # the largest intermediate the contractor may materialise, turning an
+        # infeasible contraction into a catchable error instead of an OOM kill.
+        #
+        # NOTE: this is read from an attribute rather than a constructor keyword.
+        # PennyLane's DefaultTensor validates **kwargs against a fixed
+        # `_device_options` allowlist and raises TypeError on anything else, so
+        # `qp.device("default.tensor", max_intermediate_log2=...)` is impossible.
+        # Users set it after construction:
+        #     dev = qp.device("default.tensor", wires=n, method="tn")
+        #     dev.max_intermediate_log2 = 30
+        max_intermediate = getattr(device, "max_intermediate_log2", None)
+        if max_intermediate is not None:
+            if not isinstance(max_intermediate, int) or not 1 <= max_intermediate <= 62:
+                raise CompileError(
+                    "default.tensor max_intermediate_log2 must be an integer in [1, 62], "
+                    f"got {max_intermediate!r}"
+                )
+            device_kwargs["max_intermediate_log2"] = max_intermediate
 
     for k, v in getattr(device, "device_kwargs", {}).items():
         if k not in device_kwargs:  # pragma: no branch
