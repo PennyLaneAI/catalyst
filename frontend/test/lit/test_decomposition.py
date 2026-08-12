@@ -323,8 +323,8 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             print(result)
 
     # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
-    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:[-0-9]+]]]" = 1
-    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:[-0-9]+]]]" = 2
+    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:[0-9]+]]]" = 1
+    # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:[0-9]+]]]" = 2
     # CHECK-DAG:   target_gate = "NoParams{}{reg:2}{}"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
@@ -401,8 +401,8 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             print(result)
 
     # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-    # CHECK-DAG: "HybridWires{}{}{}[[[uid_1:[-0-9]+]]]" = 1
-    # CHECK-DAG: "HybridWires{}{}{}[[[uid_2:[-0-9]+]]]" = 2
+    # CHECK-DAG: "HybridWires{}{}{}[[[uid_1:[0-9]+]]]" = 1
+    # CHECK-DAG: "HybridWires{}{}{}[[[uid_2:[0-9]+]]]" = 2
     # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
@@ -493,8 +493,8 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             print(result)
 
     # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-    # CHECK-DAG: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_1:[-0-9]+]]]" = 1
-    # CHECK-DAG: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_2:[-0-9]+]]]" = 2
+    # CHECK-DAG: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_1:[0-9]+]]]" = 1
+    # CHECK-DAG: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_2:[0-9]+]]]" = 2
     # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
@@ -532,9 +532,9 @@ def test_compile_decomposition_rules_wrapper_entry_point():
     # CHECK: func.func private @"rule_HybridOpArg{angle:[f64]}{cwires:1}{}[5678]"
     # CHECK-SAME:   resources = {operations = {
     # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
-    # CHECK-SAME:   "StaticDataMultiReg{theta:[f64]}{reg:1,reg2:2}{}[[[uid_1:[-0-9]+]]]" = 1 : i64
+    # CHECK-SAME:   "StaticDataMultiReg{theta:[f64]}{reg:1,reg2:2}{}[[[uid:[0-9]+]]]" = 1 : i64
     # CHECK-SAME:   target_gate = "HybridOpArg{angle:[f64]}{cwires:1}{}[5678]"
-    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]] : i64, op_name = "StaticDataMultiReg"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid]] : i64, op_name = "StaticDataMultiReg"
     test_from_hybrid_op()
 
     def test_to_hybrid_op_nested():
@@ -581,9 +581,9 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             print(result)
 
     # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-    # CHECK-DAG: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_1:[-0-9]+]]]" = 1
-    # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
-    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
+    # CHECK-SAME: "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid:[0-9]+]]]" = 1
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
+    # CHECK: "qref.operator"({{%.+}}) {UID = [[uid]]
     test_to_hybrid_op_nested()
 
     def test_from_hybrid_op_nested():
@@ -622,9 +622,9 @@ def test_compile_decomposition_rules_wrapper_entry_point():
 
     # CHECK: func.func private @"rule_HybridOpArg{angle:[f64]}{cwires:1}{}[7654]"
     # CHECK-SAME:   resources = {operations = {
-    # CHECK-SAME:   "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_outer:[-0-9]+]]]" = 1 : i64,
+    # CHECK-SAME:   "HybridOpArg{angle:[f64]}{cwires:1}{}[[[uid_outer:[0-9]+]]]" = 1 : i64,
     # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
-    # CHECK-SAME:   "StaticDataMultiReg{theta:[f64]}{reg:1,reg2:2}{}[[[uid_inner:[-0-9]+]]]" = 1 : i64
+    # CHECK-SAME:   "StaticDataMultiReg{theta:[f64]}{reg:1,reg2:2}{}[[[uid_inner:[0-9]+]]]" = 1 : i64
     # CHECK-SAME:   target_gate = "HybridOpArg{angle:[f64]}{cwires:1}{}[7654]"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
@@ -686,7 +686,7 @@ def test_compile_decomposition_rules_wrapper_entry_point():
             print(result)
 
     # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-    # CHECK-DAG: "MultipleFullArgs{angles1:[f64],angles2:[f64,f64]}{reg1:1,reg2:2}{}[[[uid:[-0-9]+]]]" = 2
+    # CHECK-DAG: "MultipleFullArgs{angles1:[f64],angles2:[f64,f64]}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2
     # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid]]
     # CHECK: "qref.operator"({{%.+}}) {UID = [[uid]]
@@ -1295,7 +1295,7 @@ def test_lowering_time_rules():
 
     # CHECK: func.func public @c()
     # CHECK: qref.operator "MultipleFullArgs"
-    # CHECK: UID([[uid:[-0-9]+]])
+    # CHECK: UID([[uid:[0-9]+]])
     # CHECK: func.func private @"__builtin_rule_MultipleFullArgs{angles1:[f64],angles2:[f64]}{reg1:1,reg2:1}{}[[[uid]]]"
     # CHECK-SAME:   resources = {operations = {
     # CHECK-SAME:   "NoParams{}{reg:1}{}" = 2 : i64
