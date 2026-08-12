@@ -29,6 +29,8 @@
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 
+#include "GetOpInfo.hpp"
+
 using namespace mlir;
 using namespace catalyst;
 
@@ -37,7 +39,6 @@ namespace {
 // Structs holding the core conversion logic
 struct QubitValueTracker;
 struct TransientQubitExtractor;
-struct rQubitGetOpInfo;
 struct SubroutineInfo;
 
 // The main converter function

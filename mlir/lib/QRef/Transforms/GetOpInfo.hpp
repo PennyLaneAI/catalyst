@@ -17,6 +17,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/IR/Value.h"
 
+// A struct to store the register and the index of rQubits from a qref.get operation.
+// This struct is intended to be the keys in `llvm::DenseMap`s.
 struct rQubitGetOpInfo {
     mlir::Value reg;
     int64_t idxAttr;

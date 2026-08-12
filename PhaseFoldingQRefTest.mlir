@@ -560,34 +560,34 @@
 // Stats:
 // S: initial-> 0,  final-> 1. difference-> 1
 // T: initial-> 5,  final-> 1. difference-> -4
-// func.func @test_reset_in_block(%arg0: i1) attributes {quantum.node} {
-//     %reg = qref.alloc( 2) : !qref.reg<2>
-//     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
-//     %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
+func.func @test_reset_in_block(%arg0: i1) attributes {quantum.node} {
+    %reg = qref.alloc( 2) : !qref.reg<2>
+    %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
 
-//     %tens01 = arith.constant dense<[true]> : tensor<1xi1>
-//     qref.set_basis_state(%tens01) %q0 : tensor<1xi1>, !qref.bit
+    %tens01 = arith.constant dense<[true]> : tensor<1xi1>
+    qref.set_basis_state(%tens01) %q0 : tensor<1xi1>, !qref.bit
 
-//     qref.custom "T"() %q0 : !qref.bit   // l0
-//     qref.custom "PauliX"() %q0 : !qref.bit
+    qref.custom "T"() %q0 : !qref.bit   // l0
+    qref.custom "PauliX"() %q0 : !qref.bit
 
-//     %2:2 = scf.if %arg0 -> (!qref.bit, !qref.bit) {
-//         qref.custom "T"() %q0 : !qref.bit // l1 // will be removed:
-//         qref.custom "T"() %q1 : !qref.bit // l2 
-//         qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
-//         qref.custom "T"() %q1 : !qref.bit // l3
+    %2:2 = scf.if %arg0 -> (!qref.bit, !qref.bit) {
+        qref.custom "T"() %q0 : !qref.bit // l1 // will be removed:
+        qref.custom "T"() %q1 : !qref.bit // l2 
+        qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+        qref.custom "T"() %q1 : !qref.bit // l3
 
-//         scf.yield %q0, %q1 : !qref.bit, !qref.bit
-//     } 
-//     else {
-//         scf.yield %q0, %q1 : !qref.bit, !qref.bit
-//     }
+        scf.yield %q0, %q1 : !qref.bit, !qref.bit
+    } 
+    else {
+        scf.yield %q0, %q1 : !qref.bit, !qref.bit
+    }
 
-//     qref.custom "T"() %q0 : !qref.bit // l4 // will be removed:
+    qref.custom "T"() %q0 : !qref.bit // l4 // will be removed:
 
-//     qref.dealloc %reg : !qref.reg<2>
-//     return
-// }
+    qref.dealloc %reg : !qref.reg<2>
+    return
+}
 
 
 // module @module_tof_decomp {

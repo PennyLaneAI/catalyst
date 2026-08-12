@@ -93,6 +93,3 @@ static constexpr Gate gateWithName(llvm::StringRef gateName)
     }
     return Gate::U;
 }
-
-static int initialGateCount[PRIMITIV_GATES_COUNT] = {0};
-static int insertedGateCount[PRIMITIV_GATES_COUNT] = {0};

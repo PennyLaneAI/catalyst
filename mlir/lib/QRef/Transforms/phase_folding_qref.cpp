@@ -48,6 +48,34 @@ using namespace catalyst;
 
 namespace {
 
+struct GateStatsHolder {
+    int initialGateCount[PRIMITIV_GATES_COUNT] = {0};
+    int insertedGateCount[PRIMITIV_GATES_COUNT] = {0};
+
+    void updateInitialCount(Gate gate) { initialGateCount[static_cast<size_t>(gate)]++; }
+
+    void updateModifications(Gate gate, int incr) { insertedGateCount[static_cast<size_t>(gate)] += incr; }
+
+    void reportStats()
+    {
+        llvm::outs() << "Stats:\n";
+        for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
+            if (insertedGateCount[i] != 0) {
+                llvm::outs() << GATE_NAME[i] << ": initial-> " << initialGateCount[i]
+                             << ",  final-> " << (initialGateCount[i] + insertedGateCount[i])
+                             << ". difference-> " << insertedGateCount[i] << "\n";
+            }
+        }
+        llvm::outs() << "\n";
+    }
+};
+
+struct PhaseFoldingPlan {
+    ProgramAbstraction mainProgramAbst;
+    std::vector<qref::CustomOp> phaseOps;
+    GateStatsHolder stats;
+};
+
 struct WireTable {
   public:
     size_t size() const { return nextWire; }
@@ -124,22 +152,16 @@ struct WireTable {
     }
 };
 
-struct PhaseFoldingAnalyzer {
+struct PhaseAnalyzer {
   public:
-    PhaseFoldingAnalyzer() = default;
+    PhaseAnalyzer(PhaseFoldingPlan &plan) : plan(plan) {}
 
-    ProgramAbstraction &mainProgramAbstraction() { return mainProgramAbst; }
-    std::vector<qref::CustomOp> &phaseOperations() { return phaseOps; }
-    
   private:
-    ProgramAbstraction mainProgramAbst;
+    PhaseFoldingPlan &plan;
 
-    std::vector<qref::CustomOp> phaseOps;
     GateID gateID = -1;
 
     llvm::StringMap<RegionSummary> procedureSummaries; // keyed by procedure name
-
-    static constexpr std::string_view mainFuncIndicator = "quantum.node";
     
     // --- Helper Functions ---
 
@@ -196,10 +218,10 @@ struct PhaseFoldingAnalyzer {
         Gate gate = extractCliffTGate(customOp);
     
         if (isPhaseGate(gate)) {
-            phaseOps.push_back(customOp);
+            plan.phaseOps.push_back(customOp);
             gateID++;
         }
-        initialGateCount[static_cast<size_t>(gate)]++;
+        plan.stats.updateInitialCount(gate);
     
         progAbst.applyGate(gate, customOp.getAdjointFlag(), wires, gateID);
     }
@@ -288,7 +310,7 @@ struct PhaseFoldingAnalyzer {
     void analyzeOperation(mlir::Operation *op, ProgramAbstraction &currentAbst, WireTable &wireTable) 
     {
         if (!isTrackedDialectOp(op)) {
-            op->emitError("Operation is not a tracked dialect operation: " + op->getName().getStringRef());
+            // op->emitError("Operation is not a tracked dialect operation: " + op->getName().getStringRef());
             return;
         }
         llvm::TypeSwitch<mlir::Operation *, void>(op)
@@ -367,8 +389,8 @@ struct PhaseFoldingAnalyzer {
         analyzeBlock(&funcOp.getBody().front(), funcAbst, wireTable);
 
         // TODO: what if we had multiple qnodes? better way of specifying the main function?
-        if (funcOp->hasAttrOfType<mlir::UnitAttr>(mainFuncIndicator)) {
-            mainProgramAbst = funcAbst; // is it a deep copy?
+        if (funcOp->hasAttrOfType<mlir::UnitAttr>("quantum.node")) {
+            plan.mainProgramAbst = funcAbst; // is it a deep copy?
         }
         procedureSummaries[funcName] = RegionSummary(RegionType::Procedure, funcAbst);
 
@@ -384,48 +406,21 @@ struct PhaseFoldingAnalyzer {
             llvm::outs() << funcName << "\n";
             llvm::outs() << summary << "\n";
         }
-        llvm::outs() << "\nMain Program Abstraction:\n" << mainProgramAbstraction() << "\n\n";
+        llvm::outs() << "\nMain Program Abstraction:\n" << plan.mainProgramAbst << "\n\n";
     }
 };
-}   // namespace
-    
-namespace catalyst {
-namespace qref {
 
-#define GEN_PASS_DECL_PHASEFOLDINGQREFPASS
-#define GEN_PASS_DEF_PHASEFOLDINGQREFPASS
-#include "QRef/Transforms/Passes.h.inc"
+struct PhaseFolder {
+  public:
+    PhaseFolder(PhaseFoldingPlan &plan) : plan(plan) {}
 
-struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFoldingQRefPass> {
-    using impl::PhaseFoldingQRefPassBase<PhaseFoldingQRefPass>::PhaseFoldingQRefPassBase;
+  private:
+    PhaseFoldingPlan &plan;
 
-    // Gate Statistics:
-    void updateStats(Gate gate, int incr) { insertedGateCount[static_cast<size_t>(gate)] += incr; }
+    // --- Rotation Angle Computations ---
 
-    void reportStats()
-    {
-        llvm::outs() << "Stats:\n";
-        for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
-            if (insertedGateCount[i] != 0) {
-                llvm::outs() << GATE_NAME[i] << ": initial-> " << initialGateCount[i]
-                             << ",  final-> " << (initialGateCount[i] + insertedGateCount[i])
-                             << ". difference-> " << insertedGateCount[i] << "\n";
-            }
-        }
-        llvm::outs() << "\n";
-    }  
-
-    // Rotation Angle Computations:
-    double getPhase(qref::CustomOp &op)
-    {
-        double c = (op.getAdjointFlag() ? -1 : 1);
-        double angle = rotAngle(gateWithName(op.getGateName()));
-
-        return ((angle != UNKNOWN_ANGLE ? angle : extractRZAngle(op.getParams())) * c);
-    }
-
-    double extractRZAngle(mlir::ValueRange params)
-    {
+    double extractConstAngle(mlir::ValueRange params)
+    {   //TODO: handle dynamic params
         if (params.empty()) {
             return 0.0;
         }
@@ -435,18 +430,27 @@ struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFolding
             return floatAttr.getValueAsDouble();
         }
         else { // dynamic param
+            // llvm::errs() << "**********FUCK!!!!!!!!!!\n";
             return 0.0;
         }
     }
 
-    double sumAngles(const GateBundle &contributors, std::vector<qref::CustomOp> &phaseOps)
+    double phaseAngle(qref::CustomOp &op)
+    {
+        double c = (op.getAdjointFlag() ? -1 : 1);
+        double angle = rotAngle(gateWithName(op.getGateName()));
+
+        return ((angle != UNKNOWN_ANGLE ? angle : extractConstAngle(op.getParams())) * c);
+    }
+
+    double netBundleAngle(const GateBundle &contributors)
     {
         double sum = 0.0;
         for (GateID id : contributors.zeroAffineGates) {
-            sum += getPhase(phaseOps[id]);
+            sum += phaseAngle(plan.phaseOps[id]);
         }
         for (GateID id : contributors.oneAffineGates) {
-            sum -= getPhase(phaseOps[id]);
+            sum -= phaseAngle(plan.phaseOps[id]);
         }
         return sum;
     }
@@ -456,16 +460,51 @@ struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFolding
         return std::remainder(angle, 2 * PI);
     }
 
-    // IR Modifications:
-    void updateTargetOp(qref::CustomOp &targetOp, double sumAngle)
+    // --- IR Modifications ---
+    
+    void eraseOp(qref::CustomOp &op)
     {
-        double normAngle = normalizeAngle(sumAngle);
+        assert(op.getCtrlQubits().empty() && op.getCtrlValues().empty()); // move to somewhere better
+        plan.stats.updateModifications(gateWithName(op.getGateName()), -1);
+        op.erase();
+        op = {};
+    }
+
+    void replaceOpWith(qref::CustomOp &curOp, Gate newGate, bool isAdjoint, double mergedAngle)
+    {
+        plan.stats.updateModifications(gateWithName(curOp.getGateName()), -1);
+
+        mlir::IRRewriter rewriter(curOp.getContext());
+        rewriter.setInsertionPoint(curOp.getOperation());
+
+        llvm::SmallVector<mlir::Value, 1> params;
+        if (newGate == Gate::RZ) {
+            params.push_back(arith::ConstantOp::create(
+                rewriter, curOp.getLoc(), rewriter.getF64FloatAttr(mergedAngle)));
+        }
+
+        auto newOp = rewriter.replaceOpWithNewOp<qref::CustomOp>(
+            curOp, 
+            /*params=*/ params,
+            /*qubits=*/ curOp.getQubits(), 
+            /*gate_name=*/GATE_NAME[static_cast<size_t>(newGate)], 
+            /*adjoint=*/ isAdjoint,
+            curOp.getCtrlQubits(),
+            curOp.getCtrlValues());
+        curOp = newOp;
+
+        plan.stats.updateModifications(newGate, +1);
+    }
+
+    void foldIntoTarget(qref::CustomOp &targetOp, double mergedAngle)
+    {
+        double normAngle = normalizeAngle(mergedAngle);
         bool isAdjoint = (normAngle < 0.0);
         normAngle = std::abs(normAngle);
         Gate gate = gateWithAngle(normAngle);
 
         if (gate == Gate::I) {
-            killOp(targetOp);
+            eraseOp(targetOp);
         }
         else {
             replaceOpWith(targetOp, gate, isAdjoint, normAngle);
@@ -478,102 +517,83 @@ struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFolding
             replaceOpWith(op, Gate::X, false, 0.0);
         }
         else {
-            killOp(op);
+            eraseOp(op);
         }
     }
 
-    void replaceOpWith(qref::CustomOp &preOp, Gate newGate, bool isAdjoint, double angle)
+    void removeGates(auto gateIDs, std::optional<GateID> skipID = std::nullopt) 
     {
-        updateStats(gateWithName(preOp.getGateName()), -1);
-
-        mlir::IRRewriter rewriter(preOp.getContext());
-        rewriter.setInsertionPoint(preOp.getOperation());
-
-        mlir::ValueRange params;
-        if (newGate == Gate::RZ) {
-            mlir::Value angleVal = arith::ConstantOp::create(rewriter, preOp.getLoc(),
-                                                 rewriter.getF64FloatAttr(angle));
-            params = mlir::ValueRange({angleVal});
+        for (GateID id : gateIDs) {
+            if (id != skipID) {
+                removePhaseOp(plan.phaseOps[id]);
+            }
         }
-
-        rewriter.replaceOpWithNewOp<qref::CustomOp>(
-            preOp, 
-            /*params=*/ params,
-            /*qubits=*/ preOp.getQubits(), 
-            /*gate_name=*/GATE_NAME[static_cast<size_t>(newGate)], 
-            /*adjoint=*/ isAdjoint,
-            preOp.getCtrlQubits(),
-            preOp.getCtrlValues());
-
-        updateStats(newGate, +1);
     }
 
-    void killOp(qref::CustomOp &op)
+    void foldBundle(GateBundle &bundle) 
     {
-        assert(op.getCtrlQubits().empty() &&
-               op.getCtrlValues().empty()); // move to somewhere better
-        updateStats(gateWithName(op.getGateName()), -1);
-        op.erase();
+        if (bundle.gateCount() <= 1)    return;
+
+        double mergedAngle = netBundleAngle(bundle);
+        if (!bundle.isMergeTargetAffineZero()) {
+            mergedAngle = -mergedAngle;
+        }
+                
+        GateID targetOpID = bundle.getMergeTarget();
+        foldIntoTarget(plan.phaseOps[targetOpID], mergedAngle);
+        removeGates(bundle.getAllGates(), targetOpID);
     }
 
-    // Phase-folding Algorithm:
-    void phaseMerge(ProgramAbstraction &progAbst, std::vector<qref::CustomOp> &phaseOps)
+  public:
+    void foldPhases()
     {
-        auto removeGates = [&](auto gates,
-                               std::optional<GateID> skipID = std::nullopt) {
-            for (GateID id : gates) {
-                if (id != skipID) {
-                    removePhaseOp(phaseOps[id]);
-                }
-            }
-        };
-
-        auto tryMergeBundle = [&](GateBundle &bundle) {
-            if (bundle.gateCount() > 1) {
-                double angleSum = sumAngles(bundle, phaseOps);
-                if (!bundle.isMergeTargetAffineZero()) {
-                    angleSum = -angleSum;
-                }
-
-                GateID targetOpID = bundle.getMergeTarget();
-                updateTargetOp(phaseOps[targetOpID], angleSum);
-                removeGates(bundle.getAllGates(), targetOpID);
-            }
-        };
-
-        for (auto &[parity, contributors] : progAbst.phases.activeBundles) {
+        for (auto &[parity, contributors] : plan.mainProgramAbst.phases.activeBundles) {
             if (parity.isTrivial()) {
                 removeGates(contributors.zeroAffineGates);
                 contributors.zeroAffineGates.clear();
             }
-            tryMergeBundle(contributors);
+            foldBundle(contributors);
         }
 
-        for (GateBundle &bundle : progAbst.phases.orphanBundles) {
-            tryMergeBundle(bundle);
+        for (GateBundle &bundle : plan.mainProgramAbst.phases.orphanBundles) {
+            foldBundle(bundle);
         }
     }
+};
+
+}   // namespace
+    
+namespace catalyst {
+namespace qref {
+
+#define GEN_PASS_DECL_PHASEFOLDINGQREFPASS
+#define GEN_PASS_DEF_PHASEFOLDINGQREFPASS
+#include "QRef/Transforms/Passes.h.inc"
+
+struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFoldingQRefPass> {
+    using impl::PhaseFoldingQRefPassBase<PhaseFoldingQRefPass>::PhaseFoldingQRefPassBase;
 
     void runOnOperation() override 
     {  
         llvm::outs() << "Hello phase-folding-QRef world!\n";
 
-        PhaseFoldingAnalyzer analyzer;
+        PhaseFoldingPlan plan;
+
+        PhaseAnalyzer analyzer(plan);
         mlir::ModuleOp rootModule = dyn_cast<mlir::ModuleOp>(getOperation());
 
         for (auto func : rootModule.getOps<mlir::func::FuncOp>()) {
-            // Skip external function declarations (functions without bodies)
             llvm::outs() << "FuncOp:\n" << func << "\n";
             if (!func.isExternal()) {   // only analyze functions with bodies
                 analyzer.analyzeFuncOp(func);
             }
         }
-
         analyzer.dumpSummaries();
 
-        phaseMerge(analyzer.mainProgramAbstraction(), analyzer.phaseOperations());
-
-        reportStats();
+        PhaseFolder folder(plan);
+        folder.foldPhases();
+        
+        plan.stats.reportStats();
     }
 };
 
@@ -581,3 +601,5 @@ struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFolding
 } // namespace catalyst
 
 // each module will have a single qnode, but a program can have multiple modules.
+
+// check gates dynamic value angle param
