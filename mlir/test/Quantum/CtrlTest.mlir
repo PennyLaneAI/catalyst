@@ -47,12 +47,18 @@ func.func @ctrl_two_gates(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bi
 
 // -----
 
-// CHECK-LABEL: @ctrl_merge_existing
+// CHECK-LABEL: @ctrl_merge_existing(
+// CHECK-SAME:  %[[CTRL:[^:]+]]: !quantum.bit, %[[INNER:[^:]+]]: !quantum.bit, %[[Q:[^:]+]]: !quantum.bit
 func.func @ctrl_merge_existing(%ctrl: !quantum.bit, %inner: !quantum.bit, %q: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+  // CHECK-DAG: %[[TRUE:.*]] = arith.constant true
+  // CHECK-DAG: %[[FALSE:.*]] = arith.constant false
   %true = arith.constant true
-  // CHECK: quantum.custom "PauliX"() %{{.*}} ctrls(%{{.*}}, %{{.*}}) ctrlvals(%{{.*}}, %{{.*}}) : !quantum.bit ctrls !quantum.bit, !quantum.bit
-  %outc, %outq:2 = quantum.ctrl(%ctrl) ctrlvals(%true) (%inner, %q) : !quantum.bit -> !quantum.bit, !quantum.bit {
+  %false = arith.constant false
+  // outputs (target + the two control-out qubits) are threaded to the returned values.
+  // CHECK: %[[TO:.*]], %[[TIC:.*]], %[[TCC:.*]] = quantum.custom "PauliX"() %[[Q]] ctrls(%[[INNER]], %[[CTRL]]) ctrlvals(%[[TRUE]], %[[FALSE]]) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+  // CHECK: return %[[TIC]], %[[TO]], %[[TCC]]
+  %outc, %outq:2 = quantum.ctrl(%ctrl) ctrlvals(%false) (%inner, %q) : !quantum.bit -> !quantum.bit, !quantum.bit {
   ^bb0(%argc: !quantum.bit, %argq: !quantum.bit):
     %xo, %xc = quantum.custom "PauliX"() %argq ctrls(%argc) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
     quantum.yield %xc, %xo : !quantum.bit, !quantum.bit
@@ -78,11 +84,14 @@ func.func @ctrl_duplicate(%ctrl: !quantum.bit, %inner: !quantum.bit, %q: !quantu
 
 // -----
 
-// CHECK-LABEL: @ctrl_zero_value
-func.func @ctrl_zero_value(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: @ctrl_zero_value_not_expanded
+func.func @ctrl_zero_value_not_expanded(%ctrl: !quantum.bit, %q: !quantum.bit)
+    -> (!quantum.bit, !quantum.bit) {
   // CHECK: %[[FALSE:.*]] = arith.constant false
   %false = arith.constant false
+  // CHECK-NOT: quantum.custom "PauliX"
   // CHECK: quantum.custom "Hadamard"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%[[FALSE]])
+  // CHECK-NOT: quantum.custom "PauliX"
   %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%false) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %h = quantum.custom "Hadamard"() %arg0 : !quantum.bit
