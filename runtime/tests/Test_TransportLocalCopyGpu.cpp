@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdint>
+#include <stdexcept>
 
 #include "LocalCpuControllerSession.hpp"
 #include "LocalGpuCoprocessorSession.hpp"
@@ -56,4 +57,13 @@ TEST_CASE("local_copy CPU controller can drive the local GPU coprocessor",
     REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
 
     CHECK(reply_word == request_word);
+}
+
+TEST_CASE("local_copy rejects a second local GPU coprocessor on the same endpoint",
+          "[transport_local_copy]") {
+    LocalGpuCoprocessorSession first;
+    LocalGpuCoprocessorSession second;
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19016};
+    REQUIRE(first.connect(ci) == 0);
+    REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);
 }

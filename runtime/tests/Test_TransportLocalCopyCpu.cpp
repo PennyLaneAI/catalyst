@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <stdexcept>
 
 #include "LocalCpuControllerSession.hpp"
 #include "LocalCpuCoprocessorSession.hpp"
@@ -104,4 +105,96 @@ TEST_CASE("local_copy uses the bound coprocessor function", "[transport_local_co
     REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
 
     CHECK(reply_word == ~request_word);
+}
+
+// ---- Pairing invariants ------------------------------------------------------
+
+TEST_CASE("local_copy rejects a second controller on the same endpoint",
+          "[transport_local_copy]") {
+    LocalCpuControllerSession first;
+    LocalCpuControllerSession second;
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19010};
+    REQUIRE(first.connect(ci) == 0);
+    REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);
+}
+
+TEST_CASE("local_copy rejects a second coprocessor on the same endpoint",
+          "[transport_local_copy]") {
+    LocalCpuCoprocessorSession first;
+    LocalCpuCoprocessorSession second;
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19011};
+    REQUIRE(first.connect(ci) == 0);
+    REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);
+}
+
+TEST_CASE("local_copy accepts a rebind after the prior session is destroyed",
+          "[transport_local_copy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19012};
+    {
+        LocalCpuControllerSession ctrl;
+        LocalCpuCoprocessorSession co;
+        REQUIRE(ctrl.connect(ci) == 0);
+        REQUIRE(co.connect(ci) == 0);
+    }
+    LocalCpuControllerSession ctrl2;
+    LocalCpuCoprocessorSession co2;
+    REQUIRE_NOTHROW(ctrl2.connect(ci));
+    REQUIRE_NOTHROW(co2.connect(ci));
+}
+
+// ---- Data-path preconditions -------------------------------------------------
+
+TEST_CASE("local_copy rejects a non-zero work_item_idx", "[transport_local_copy]") {
+    LocalCpuControllerSession controller;
+    LocalCpuCoprocessorSession coprocessor;
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19013};
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    MemRegion reply = controller.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
+    (void)controller.exchange_keys(reply);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, PeerRef{});
+
+    REQUIRE_THROWS_AS(
+        controller.commit_work_item(/*work_item_idx=*/1, sizeof(std::uint64_t),
+                                    sizeof(std::uint64_t)),
+        std::runtime_error);
+
+    controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+    REQUIRE_THROWS_AS(controller.kick(/*work_item_idx=*/1), std::runtime_error);
+}
+
+TEST_CASE("local_copy rejects a second commit_work_item", "[transport_local_copy]") {
+    LocalCpuControllerSession controller;
+    LocalCpuCoprocessorSession coprocessor;
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19014};
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+    REQUIRE_THROWS_AS(
+        controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t)),
+        std::runtime_error);
+}
+
+TEST_CASE("local_copy collect rejects more than a single reply slot",
+          "[transport_local_copy]") {
+    LocalCpuControllerSession controller;
+    LocalCpuCoprocessorSession coprocessor;
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19015};
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    MemRegion reply = controller.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
+    (void)controller.exchange_keys(reply);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, PeerRef{});
+    controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+
+    std::uint64_t r0 = 0;
+    std::uint64_t r1 = 0;
+    void *outs[2] = {&r0, &r1};
+    std::uint64_t out_bytes[2] = {sizeof(r0), sizeof(r1)};
+    REQUIRE_THROWS_AS(controller.collect(outs, out_bytes, 2), std::runtime_error);
 }

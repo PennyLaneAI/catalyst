@@ -1,0 +1,124 @@
+name: Check Catalyst GPU
+
+# Runs the runtime transport tests on a GPU host. Modeled after
+# https://github.com/PennyLaneAI/pennylane/blob/main/.github/workflows/tests-gpu.yml
+# so pull requests are gated by the ``gpu`` label to keep GPU runner time cheap.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled
+  merge_group:
+    types:
+      - checks_requested
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-catalyst-gpu-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  constants:
+    name: Set build matrix
+    uses: ./.github/workflows/constants.yaml
+
+  gpu-transport-tests:
+    name: Runtime transport tests (GPU)
+    needs: [constants]
+    runs-on:
+      - single-gpu-x64
+
+    # Push and merge_group always run; PRs need a non-draft open state and the ``gpu`` label.
+    if: >-
+      ${{
+        github.event_name == 'push' ||
+        github.event_name == 'merge_group' ||
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.draft == false &&
+          contains(github.event.pull_request.labels.*.name, 'gpu') &&
+          github.event.pull_request.state == 'open'
+        )
+      }}
+
+    steps:
+      - name: Update PATH and LD_LIBRARY_PATH for CUDA/ROCm
+        run: |
+          echo "/usr/local/cuda/bin" >> $GITHUB_PATH
+          echo "/opt/rocm/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64:/opt/rocm/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -y -q install ninja-build make cmake clang libibverbs-dev
+          python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
+
+      - name: Cache LLVM source
+        id: cache-llvm-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/llvm-project
+          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone LLVM submodule
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          ref: ${{ needs.constants.outputs.llvm_version }}
+          path: mlir/llvm-project
+
+      - name: Cache LLVM build
+        id: cache-llvm-build
+        uses: actions/cache@v4
+        with:
+          path: llvm-build
+          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-gpu-build
+
+      - name: Build LLVM
+        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+        run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          COMPILER_LAUNCHER="" \
+          make llvm
+
+      - name: Build Catalyst runtime with transport enabled
+        run: |
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          ENABLE_TRANSPORT=ON \
+          make runtime
+
+      - name: Build the local_copy test binary
+        run: |
+          cmake --build "$(pwd)/runtime-build" --target runner_tests_transport_local -j
+
+      - name: Run local_copy transport tests (CPU + GPU coprocessor)
+        run: |
+          "$(pwd)/runtime-build/tests/runner_tests_transport_local"
