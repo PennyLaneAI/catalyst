@@ -99,7 +99,11 @@ def _get_parameter_frequencies(op):
             return None
 
     try:
-        return parameter_frequencies(op)
+        # Frequencies do not depend on which wires an op acts on, but the generic Operator2
+        # inference goes through the eigenvalues of the generator, which is not trace-safe
+        # for dynamic wires. Query the frequencies on static wires instead.
+        static_op = op.map_wires(dict(zip(op.wires, range(len(op.wires)))))
+        return parameter_frequencies(static_op)
     except qp.operation.ParameterFrequenciesUndefinedError:
         return None
 
@@ -124,11 +128,6 @@ def _are_param_frequencies_same_as_catalyst(op):
 
 
 def _paramshift_op_checker(op):
-    if isinstance(op, qp.ControlledPhaseShift):
-        # ControlledPhaseShift has a fixed two-term parameter-shift rule. Its generic
-        # Operator2 frequency inference is not trace-safe when its wires are dynamic.
-        return True
-
     if isinstance(op, qp.QubitUnitary):
         # Cannot take param shift of qubit unitary.
         return False

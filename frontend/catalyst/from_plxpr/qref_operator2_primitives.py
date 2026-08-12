@@ -322,17 +322,7 @@ def _multicontrolledx_lowering(
     control_values, *qubits, ctrl_qubits, ctrl_values, adjoint, work_wire_type
 ):
     """Lower a ``MultiControlledX`` to a controlled PauliX custom operation."""
-    control_values_type = control_values.type
-    if not ir.RankedTensorType.isinstance(control_values_type):
-        raise TypeError("MultiControlledX control_values must be a one-dimensional tensor.")
-
-    shape = ir.RankedTensorType(control_values_type).shape
-    if len(shape) != 1 or shape[0] == ir.ShapedType.get_dynamic_size():
-        raise TypeError("MultiControlledX control_values must have a static one-dimensional shape.")
-
-    num_controls = shape[0]
-    if len(qubits) < num_controls + 1:
-        raise ValueError("MultiControlledX requires one target wire after its control wires.")
+    num_controls = ir.RankedTensorType(control_values.type).shape[0]
 
     mcx_ctrl_values = [
         TensorExtractOp(
