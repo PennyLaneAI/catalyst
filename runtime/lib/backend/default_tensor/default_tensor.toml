@@ -1,0 +1,74 @@
+# Capabilities of the `default.tensor` runtime backend (exact tensor network).
+#
+# This file is discovered by the Catalyst frontend via the name convention in
+# `_load_device_capabilities`: the device short name "default.tensor" has its
+# dots replaced by underscores, giving "default_tensor.toml", looked up under
+# <runtime lib>/../lib/backend/.
+#
+# Only the gates listed here reach the device; Catalyst decomposes everything
+# else into this set beforehand. Keeping the list minimal and honest is the
+# contract -- declaring a gate that NamedOperation cannot handle compiles fine
+# and then fails at runtime.
+schema = 3
+
+# The bare gate set implemented natively by DefaultTensor.hpp.
+#
+# "controllable" is safe on every single-qubit gate because applyControlled()
+# emits one rank-(2c+2) tensor for an arbitrary number of control wires.
+# CNOT and CZ are handled through that same path as controlled X and Z.
+[operators.gates]
+
+Identity = { properties = [                 "invertible"                  ] }
+PauliX   = { properties = [ "controllable", "invertible"                  ] }
+PauliY   = { properties = [ "controllable", "invertible"                  ] }
+PauliZ   = { properties = [ "controllable", "invertible"                  ] }
+Hadamard = { properties = [ "controllable", "invertible"                  ] }
+RX       = { properties = [ "controllable", "invertible"                  ] }
+RY       = { properties = [ "controllable", "invertible"                  ] }
+RZ       = { properties = [ "controllable", "invertible"                  ] }
+CNOT     = { properties = [                 "invertible"                  ] }
+CZ       = { properties = [                 "invertible"                  ] }
+
+# Observables are evaluated by closing a <psi|O|psi> network; no statevector is
+# formed. Composite observables are distributed into independent terms.
+[operators.observables]
+
+Identity          = { }
+PauliX            = { }
+PauliY            = { }
+PauliZ            = { }
+Hadamard          = { }
+Hermitian         = { }
+Prod              = { }
+SProd             = { }
+Sum               = { }
+LinearCombination = { }
+
+[measurement_processes]
+
+ExpectationMP = { }
+VarianceMP    = { }
+ProbabilityMP = { }
+StateMP       = { conditions = [ "analytic"    ] }
+SampleMP      = { conditions = [ "finiteshots" ] }
+CountsMP      = { conditions = [ "finiteshots" ] }
+
+[compilation]
+
+# If the device is compatible with qjit
+qjit_compatible = true
+# If the device requires run time generation of the quantum circuit.
+runtime_code_generation = false
+# The backend implements AllocateQubit/ReleaseQubit, so qubits can be created
+# and destroyed during execution.
+dynamic_qubit_management = true
+# whether the device can support non-commuting measurements together
+# in a single execution
+non_commuting_observables = true
+# Whether simultaneous measurements on overlapping wires is supported.
+overlapping_observables = true
+# SetState / SetBasisState are intentionally not implemented: every qubit starts
+# in |0> and the state is built with gates.
+initial_state_prep = false
+# If the device supports mid-circuit measurements natively
+supported_mcm_methods = [ "device", "one-shot" ]
