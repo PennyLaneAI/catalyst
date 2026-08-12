@@ -8,7 +8,6 @@
   operations. The `ctrl-lowering` pass distributes the control wires and control values from
   the `quantum.ctrl` operation onto the individual gate operations inside the region.
   [(#3089)](https://github.com/PennyLaneAI/catalyst/pull/3089)
-  [(#3089)](https://github.com/PennyLaneAI/catalyst/pull/3089)
   [(#3090)](https://github.com/PennyLaneAI/catalyst/pull/3090)
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
