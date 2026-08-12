@@ -89,23 +89,33 @@ def _has_grad_recipe(op):
     return True
 
 
-def _has_parameter_frequencies(op):
+def _get_parameter_frequencies(op):
+    """Get parameter frequencies through the PennyLane API"""
+    parameter_frequencies = getattr(qp.gradients, "parameter_frequencies", None)
+    if parameter_frequencies is None:  # fallback
+        try:
+            return op.parameter_frequencies
+        except (AttributeError, qp.operation.ParameterFrequenciesUndefinedError):
+            return None
+
     try:
-        if not hasattr(op, "parameter_frequencies"):
-            return False
+        return parameter_frequencies(op)
     except qp.operation.ParameterFrequenciesUndefinedError:
-        return False
-    return True
+        return None
+
+
+def _has_parameter_frequencies(op):
+    return _get_parameter_frequencies(op) is not None
 
 
 def _are_param_frequencies_same_as_catalyst(op):
     """Check if the parameter frequencies are all close to 1."""
-    freqs = op.parameter_frequencies
-    if len(freqs) != len(op.data):
+    op_parameter_frequencies = _get_parameter_frequencies(op)
+    if op_parameter_frequencies is None or len(op_parameter_frequencies) != len(op.data):
         return False
 
     valid = True
-    for freqs in op.parameter_frequencies:
+    for freqs in op_parameter_frequencies:
         if len(freqs) != 1:
             return False
         valid &= np.allclose(freqs[0], 1.0)
@@ -114,10 +124,9 @@ def _are_param_frequencies_same_as_catalyst(op):
 
 
 def _paramshift_op_checker(op):
-
     if isinstance(op, qp.ControlledPhaseShift):
-        # ControlledPhaseShift has a fixed two-term parameter-shift rule. Its Operator2
-        # representation does not expose the legacy parameter_frequencies property below.
+        # ControlledPhaseShift has a fixed two-term parameter-shift rule. Its generic
+        # Operator2 frequency inference is not trace-safe when its wires are dynamic.
         return True
 
     if isinstance(op, qp.QubitUnitary):

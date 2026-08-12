@@ -2151,7 +2151,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_check_param_frequencies_different_length(self):
         """Check exception is raised when frequencies length mismatches parameter length"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(qp.operation.Operation):
             def __init__(self, wires=None):
                 super().__init__(0.0, wires=wires)
 
@@ -2168,7 +2168,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_check_invalid_frequencies(self):
         """Check exception is raised when invalid frequencies are found"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(qp.operation.Operation):
             def __init__(self, wires=None):
                 super().__init__(0.0, wires=wires)
 
@@ -2185,7 +2185,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_undefined_frequencies(self):
         """Test ParameterFrequenciesUndefinedError"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(qp.operation.Operation):
             def __init__(self, wires=None):
                 super().__init__(0.0, wires=wires)
 
