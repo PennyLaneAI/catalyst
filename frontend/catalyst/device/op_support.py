@@ -115,6 +115,11 @@ def _are_param_frequencies_same_as_catalyst(op):
 
 def _paramshift_op_checker(op):
 
+    if isinstance(op, qp.ControlledPhaseShift):
+        # ControlledPhaseShift has a fixed two-term parameter-shift rule. Its Operator2
+        # representation does not expose the legacy parameter_frequencies property below.
+        return True
+
     if isinstance(op, qp.QubitUnitary):
         # Cannot take param shift of qubit unitary.
         return False
