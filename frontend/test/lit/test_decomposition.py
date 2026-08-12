@@ -790,7 +790,7 @@ def test_decomposition_rule_name_update_multi_qubits():
 
     # CHECK-DAG: @_s_phaseshift(%arg0: !qref.reg<4>, %arg1: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "S"}
     # CHECK-DAG: @_phaseshift_to_rz_gp(%arg0: !qref.reg<4>, %arg1: tensor<f64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "PhaseShift"}
-    # CHECK-DAG: @_rz_to_ry_rx(%arg0: !qref.reg<4>, %arg1: tensor<f64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
+    # CHECK-DAG: @_rz_to_{{(ry_rx|rx_cliff)}}(%arg0: !qref.reg<4>, %arg1: tensor<f64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
     # CHECK-DAG: @_rot_to_rz_ry_rz(%arg0: !qref.reg<4>, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     # CHECK-DAG: @_doublexcit(%arg0: !qref.reg<4>, %arg1: tensor<1xf64>, %arg2: tensor<4xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 4 : i64, target_gate = "DoubleExcitation"}
     # CHECK-DAG: @_single_excitation_decomp(%arg0: !qref.reg<4>, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
