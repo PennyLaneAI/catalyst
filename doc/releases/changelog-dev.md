@@ -375,6 +375,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where `Operator2` operations with integer-valued scalar parameters were incorrectly
+  lowered to `qref.operator` instead of `qref.custom`.
+  [(#3109)](https://github.com/PennyLaneAI/catalyst/pull/3109)
+
 * Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
   the top-level module. Functions inside nested modules, such as kernels called through
   `catalyst.launch_kernel`, are now included in the output.
@@ -430,6 +434,12 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* Extended internal program-capture support for PennyLane `Operator2` instances. Catalyst now
+  distinguishes gates from operators used as observables.
+  Native `Operator2` controlled wrappers are also handled in `catalyst.ctrl` and
+  device verification.
+  [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
 
 * The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
   (previously a dynamic float operand). This allows, among other things, the decomposition graph to

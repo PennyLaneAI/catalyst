@@ -305,6 +305,10 @@ class TestDecomposableGates:
 class TestComplexCircuits:
     """Test OQD device OpenAPL generation for more complex quantum circuits."""
 
+    @pytest.mark.xfail(
+        reason="sc-127312: OQD cannot lower Operator2 QFT's dynamic wire indices",
+        strict=True,
+    )
     def test_2qubit_QFT(self, tmp_openapl_file_name):
         """Test OpenAPL generation for a 2-qubit Quantum Fourier Transform circuit."""
         wires = 2
