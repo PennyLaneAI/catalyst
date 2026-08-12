@@ -1137,7 +1137,7 @@ class TestPlxPRDecomposition:
                 name = "_UnknownOp"
 
             def _unknown_resources():
-                return {qp.resource_rep(qp.PauliX): 1}
+                return {qp.PauliX: 1}
 
             @qp.register_resources(_unknown_resources)
             def _unknown_decomp(wires):
