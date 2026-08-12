@@ -2,6 +2,12 @@
 
 <h3>New features since last release</h3>
 
+* A new `quantum.ctrl` region op and a `ctrl-lowering` pass are added to the Quantum Dialect
+  for controlled subcircuits in Catalyst. 
+  [(#3089)](https://github.com/PennyLaneAI/catalyst/pull/3089)
+
+Programs can now express an entire controlled quantum region, as opposed to individual operations. The `ctrl-lowering` pass distributes the control wires and control values from the `quantum.ctrl` operation onto the individual gate operations inside the region.
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
