@@ -75,7 +75,7 @@ class GraphOpID:
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()
-        self.extra_data = self.parse_extra_data()
+        self.extra_data, self.uid = self.parse_extra_data()
 
     def parse_dynamic_shape(self) -> dict:
         """Return the dynamic shape as a dictionary of dtypes from the dynamic arg names."""
@@ -108,7 +108,7 @@ class GraphOpID:
                 hybrid_lens.append(len(leaves))
                 hybrid_trees.append(tree)
                 hybrid_args.extend(leaves)
-            return generate_uid(
+            uid = generate_uid(
                 *tuple(self.op.dynamic_args.values()),  # dynamic args
                 *(None,)
                 * sum(
@@ -123,8 +123,9 @@ class GraphOpID:
                 n_ctrls=0,
                 static_args=self.op.static_args,
             )
+            return self.op.static_args | self.op.hybrid_args, uid
         else:
-            return {}
+            return {}, -1  # uid is always unsigned, so use -1 for invalid uid
 
     def get_operator_name(self) -> str:
         """Return the name of the operator."""
@@ -160,7 +161,8 @@ class GraphOpID:
             + self.get_static_data_id_format()
         )
         if self.extra_data:
-            ID_string += "[" + str(self.extra_data) + "]"
+            assert self.uid >= 0
+            ID_string += "[" + str(self.uid) + "]"
         return ID_string
 
 

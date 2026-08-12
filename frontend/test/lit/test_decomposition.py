@@ -1195,66 +1195,76 @@ def test_lowering_time_rules():
     # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
     test_with_cycles()
 
-    # def test_to_multiple_full_args_op():
-    #     """
-    #     Test that decomposing to an op with multiple names on all arg types works.
-    #     """
+    def test_to_multiple_full_args_op():
+        """
+        Test that decomposing to an op with multiple names on all arg types works.
+        """
 
-    #     def rule_resource_fn(reg):
-    #         return {
-    #             MultipleFullArgs(
-    #                 reg1=Wire[1],
-    #                 reg2=Wire[2],
-    #                 angles1=Float,
-    #                 angles2=Float[2],
-    #                 pytree1=[1],
-    #                 pytree2=[2],
-    #                 op1=SingleParam(x=Float, reg=Wire[1]),
-    #                 op2=SingleParam(x=Int, reg=Wire[1]),
-    #                 hwires1=[Wire[1], Wire[1]],
-    #                 hwires2=[Wire[1]],
-    #             ): 2
-    #         }
+        def rule_resource_fn(reg):
+            return {
+                MultipleFullArgs(
+                    reg1=Wire[1],
+                    reg2=Wire[2],
+                    angles1=Float,
+                    angles2=Float[2],
+                    pytree1=[1],
+                    pytree2=[2],
+                    op1=SingleParam(x=Float, reg=Wire[1]),
+                    op2=SingleParam(x=Int, reg=Wire[1]),
+                    hwires1=[Wire[1], Wire[1]],
+                    hwires2=[Wire[1]],
+                ): 2
+            }
 
-    #     @qp.register_resources(rule_resource_fn)
-    #     def rule(reg):
-    #         MultipleFullArgs(
-    #             reg1=reg[0],
-    #             reg2=reg[1:3],
-    #             angles1=0.1,
-    #             angles2=jnp.array([0.1, 0.2]),
-    #             pytree1=[1],
-    #             pytree2=[2],
-    #             op1=SingleParam(x=0.1, reg=[reg[0]]),
-    #             op2=SingleParam(x=1, reg=[reg[1]]),
-    #             hwires1=[qp.wires.Wires(reg[0]), qp.wires.Wires(reg[1])],
-    #             hwires2=[qp.wires.Wires(reg[2])],
-    #         )
-    #         MultipleFullArgs(
-    #             reg1=reg[2],
-    #             reg2=reg[0:2],
-    #             angles1=1.2,
-    #             angles2=jnp.array([1.1, 1.2]),
-    #             pytree1=[1],
-    #             pytree2=[2],
-    #             op1=SingleParam(x=1.1, reg=[reg[1]]),
-    #             op2=SingleParam(x=2, reg=[reg[2]]),
-    #             hwires1=[qp.wires.Wires(reg[1]), qp.wires.Wires(reg[2])],
-    #             hwires2=[qp.wires.Wires(reg[0])],
-    #         )
+        @qp.register_resources(rule_resource_fn)
+        def rule(reg):
+            MultipleFullArgs(
+                reg1=reg[0],
+                reg2=reg[1:3],
+                angles1=0.1,
+                angles2=jnp.array([0.1, 0.2]),
+                pytree1=[1],
+                pytree2=[2],
+                op1=SingleParam(x=0.1, reg=[reg[0]]),
+                op2=SingleParam(x=1, reg=[reg[1]]),
+                hwires1=[qp.wires.Wires(reg[0]), qp.wires.Wires(reg[1])],
+                hwires2=[qp.wires.Wires(reg[2])],
+            )
+            MultipleFullArgs(
+                reg1=reg[2],
+                reg2=reg[0:2],
+                angles1=1.2,
+                angles2=jnp.array([1.1, 1.2]),
+                pytree1=[1],
+                pytree2=[2],
+                op1=SingleParam(x=1.1, reg=[reg[1]]),
+                op2=SingleParam(x=2, reg=[reg[2]]),
+                hwires1=[qp.wires.Wires(reg[1]), qp.wires.Wires(reg[2])],
+                hwires2=[qp.wires.Wires(reg[0])],
+            )
 
-    #     with qp.decomposition.local_decomps():
-    #         qp.add_decomps(NoParams, rule)
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(NoParams, rule)
 
-    #         @qp.qjit(capture=True, target="mlir")
-    #         @qp.qnode(qp.device("null.qubit", wires=3))
-    #         def c():
-    #             NoParams(reg=[0, 1])
-    #             return qp.state()
+            @qp.qjit(capture=True, target="mlir")
+            @qp.qnode(qp.device("null.qubit", wires=3))
+            def c():
+                NoParams(reg=[0, 1, 2])
+                return qp.state()
 
-    #         print(c.mlir)
+            print(c.mlir)
 
-    # test_to_multiple_full_args_op()
+    # CHECK: func.func public @c()
+    # CHECK: qref.operator "NoParams"
+    # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
+    # CHECK-SAME:   resources = {operations = {
+    # CHECK-SAME:   "MultipleFullArgs{angles1:[f64],angles2:[f64,f64]}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2 : i64
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
+    # CHECK: qref.operator "MultipleFullArgs"
+    # CHECK-NEXT:  UID([[uid]]
+    # CHECK: qref.operator "MultipleFullArgs"
+    # CHECK-NEXT:  UID([[uid]]
+    test_to_multiple_full_args_op()
 
     def test_from_multiple_full_args_op():
         """
