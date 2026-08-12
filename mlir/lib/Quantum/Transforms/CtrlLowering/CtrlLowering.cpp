@@ -158,8 +158,7 @@ static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping
 struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     using OpRewritePattern<CtrlOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
         // Defer (not an error) if the region still contains a nested quantum.adjoint region.
         // Distributing controls needs an op-level body, so the inner region must be reduced first.
         // The pipeline runs (ctrl-lowering, adjoint-lowering) to a fixpoint: adjoint-lowering
