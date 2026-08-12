@@ -193,17 +193,17 @@ func.func @ctrl_measure(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Control flow inside a ctrl region is not supported.
-func.func @ctrl_scf(%ctrl: !quantum.bit, %q: !quantum.bit, %cond: i1) -> !quantum.bit {
+// Region-bearing control flow outside the supported set (scf.if / scf.for / scf.while /
+// scf.index_switch) has no rule for controlling its body, so it is rejected rather than silently
+// left uncontrolled. scf.execute_region stands in for any such op here.
+func.func @ctrl_unsupported_scf(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quantum.bit {
   %true = arith.constant true
   %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
-    // expected-error @+1 {{control flow inside a quantum.ctrl region is not supported}}
-    %r = scf.if %cond -> !quantum.bit {
+    // expected-error @+1 {{unsupported scf operation inside a quantum.ctrl region}}
+    %r = scf.execute_region -> !quantum.bit {
       %h = quantum.custom "Hadamard"() %arg0 : !quantum.bit
       scf.yield %h : !quantum.bit
-    } else {
-      scf.yield %arg0 : !quantum.bit
     }
     quantum.yield %r : !quantum.bit
   }
