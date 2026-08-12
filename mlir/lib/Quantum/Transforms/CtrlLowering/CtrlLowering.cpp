@@ -176,10 +176,9 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
         rewriter.setInsertionPoint(ctrl);
 
         for (Operation &op : block.without_terminator()) {
-            if (isa<MeasurementProcess, MeasureOp>(op)) {
-                op.emitError("cannot control a measurement inside a quantum.ctrl region");
-                return failure();
-            }
+            // Measurements (quantum.measure and MeasurementProcess ops) are already
+            // rejected by the CtrlOp verifier, so they never reach here in a verified
+            // pipeline.
             if (auto gate = dyn_cast<QuantumGate>(op)) {
                 unsigned numOldControls = gate.getCtrlQubitOperands().size();
                 Operation *newOp =
