@@ -33,6 +33,7 @@ from pennylane_lightning.lightning_qubit.lightning_qubit import (
 )
 
 from catalyst import CompileError
+from catalyst.from_plxpr.decompose import _create_decomposition_rule
 from catalyst.jax_primitives import decomposition_rule
 from catalyst.passes import graph_decomposition
 
@@ -54,6 +55,30 @@ def _normalize_gate_types(gate_types):
 
 class TestGraphDecomposition:
     """Test the graph-decomposition built-in transform."""
+
+    def test_operator2_rule_rejects_unknown_argument(self):
+        """Test that Operator2 decomposition rules reject arguments absent from its metadata."""
+
+        class TestOp(qp.core.Operator2):
+            """Minimal Operator2 with one dynamic argument."""
+
+            dynamic_argnames = ("theta",)
+
+            # pylint: disable=useless-parent-delegation
+            def __init__(self, theta, wires):
+                super().__init__(theta, wires)
+
+        def invalid_rule(unexpected, wires):  # pylint: disable=unused-argument
+            qp.RX(0.1, wires)
+
+        with pytest.raises(ValueError, match="Unknown Operator2 argument unexpected"):
+            _create_decomposition_rule(
+                invalid_rule,
+                op_name="TestOp",
+                op_rep=TestOp(0.1, wires=0),
+                num_wires=1,
+                num_params=1,
+            )
 
     @pytest.mark.parametrize("weight", [1, 1.0], ids=["int", "float"])
     def test_gateset_with_weights(self, weight):
@@ -269,10 +294,10 @@ class TestGraphDecomposition:
         """Test that TensorLike parameters in MultiRZ are handled correctly in rules."""
 
         @graph_decomposition(op_type="MultiRZ")
-        def custom_multirz(params: TensorLike, wires: WiresLike, **__):
+        def custom_multirz(theta: TensorLike, wires: WiresLike, **__):
             qp.CNOT(wires=(wires[2], wires[1]))
             qp.CNOT(wires=(wires[1], wires[0]))
-            qp.RZ(params, wires=wires[0])
+            qp.RZ(theta, wires=wires[0])
             qp.CNOT(wires=(wires[1], wires[0]))
             qp.CNOT(wires=(wires[2], wires[1]))
 
@@ -652,10 +677,10 @@ class TestPlxPRDecomposition:
         qp.decomposition.enable_graph()
 
         @qp.register_resources({qp.RZ: 1, qp.CNOT: 4})
-        def custom_multirz(params: TensorLike, wires: WiresLike, **__):
+        def custom_multirz(theta: TensorLike, wires: WiresLike, **__):
             qp.CNOT(wires=(wires[2], wires[1]))
             qp.CNOT(wires=(wires[1], wires[0]))
-            qp.RZ(params, wires=wires[0])
+            qp.RZ(theta, wires=wires[0])
             qp.CNOT(wires=(wires[1], wires[0]))
             qp.CNOT(wires=(wires[2], wires[1]))
 
@@ -1154,7 +1179,7 @@ class TestPlxPRDecomposition:
         """
         qp.decomposition.enable_graph()
 
-        def _resources():
+        def _resources(phi, wires):  # pylint: disable=unused-argument
             return {
                 controlled_resource_rep(
                     qp.BasisEmbedding, {"num_wires": 1}, num_control_wires=1

@@ -119,6 +119,25 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
         super().__init__()
 
+    def interpret_operation_eqn(self, eqn):
+        """Override to handle Operator2 (operator_p) equations.
+
+        For Operator2 ops used as observables (output is not DropVar),
+        return the operator instance without applying it as a gate.
+        For Operator2 ops used as gates (output is DropVar), apply the gate
+        using the Operator2-specific lowering.
+        For legacy ops, delegate to the parent implementation.
+        """
+        if eqn.primitive is operator_p:
+            invals = [self.read(invar) for invar in eqn.invars]
+            with qp.QueuingManager.stop_recording():
+                op = eqn.primitive.impl(*invals, **eqn.params)
+            if isinstance(eqn.outvars[0], jax.core.DropVar):
+                _apply_operator2_gate(self, *invals, **eqn.params)
+                return ()
+            return op
+        return super().interpret_operation_eqn(eqn)
+
     def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
         """Re-bind a pennylane operation as a catalyst instruction.
 
@@ -311,8 +330,7 @@ def _new_hybrid_arg(interp: PLxPRToQuantumJaxprInterpreter, arg) -> list:
 
 
 # pylint: disable=too-many-arguments
-@PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
-def handle_operator(
+def _apply_operator2_gate(
     self,
     *args,
     op_cls,
@@ -324,7 +342,7 @@ def handle_operator(
     n_ctrls,
     **kwargs,
 ):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the operator_p primitive."""
+    """Apply an Operator2 as a gate instruction using qref_operator_p."""
     n_wires = sum(wire_lens)
     wire_inputs = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + n_wires]
     if n_ctrls:
@@ -370,7 +388,6 @@ def handle_operator(
         n_ctrls=n_ctrls,
         **kwargs,
     )
-    return []
 
 
 # pylint: disable=unused-argument, too-many-arguments
