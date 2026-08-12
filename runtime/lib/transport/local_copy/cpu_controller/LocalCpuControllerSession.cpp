@@ -145,9 +145,9 @@ int LocalCpuControllerSession::kick(std::uint32_t work_item_idx) {
         if (!pair_->run_once) {
             throw std::runtime_error("memcpy: no paired coprocessor");
         }
-        written = pair_->run_once(request_staging_.data(),
-                                  static_cast<std::size_t>(staged_bytes_), decoder_id_,
-                                  local_reply_.addr, static_cast<std::size_t>(out_bytes_));
+        written =
+            pair_->run_once(request_staging_.data(), static_cast<std::size_t>(staged_bytes_),
+                            decoder_id_, local_reply_.addr, static_cast<std::size_t>(out_bytes_));
     }
     reply_bytes_ = static_cast<std::uint64_t>(written);
     return 0;

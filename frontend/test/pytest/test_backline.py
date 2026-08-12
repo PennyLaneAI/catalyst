@@ -34,7 +34,6 @@ if hasattr(qp, "backline"):
     from pennylane.backline import Transport
 
 
-
 def _controller(**kw):
     init = {
         "backend_lib": "backend.so",

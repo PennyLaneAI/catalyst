@@ -32,9 +32,9 @@ class LocalCpuControllerSession;
 // controller's kick() drives it inline. `mu` guards `controller` and `run_once` across
 // connect / kick / teardown.
 struct EndpointPair {
-    using RunOnce = std::function<std::size_t(const void *req, std::size_t req_bytes,
-                                              std::uint32_t decoder_id, void *reply,
-                                              std::size_t reply_cap)>;
+    using RunOnce =
+        std::function<std::size_t(const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
+                                  void *reply, std::size_t reply_cap)>;
 
     std::mutex mu;
     LocalCpuControllerSession *controller = nullptr;

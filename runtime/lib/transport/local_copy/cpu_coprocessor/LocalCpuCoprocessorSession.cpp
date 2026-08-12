@@ -68,9 +68,7 @@ MemRegion LocalCpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kin
     };
 }
 
-PeerRef LocalCpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) {
-    return PeerRef{};
-}
+PeerRef LocalCpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) { return PeerRef{}; }
 
 void LocalCpuCoprocessorSession::establish_channel(const ChannelDesc &desc,
                                                    const MemRegion & /*local*/,
