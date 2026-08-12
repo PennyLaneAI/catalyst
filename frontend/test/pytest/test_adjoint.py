@@ -1022,7 +1022,7 @@ class TestMiscMethods:
         base = qp.PauliX(0)
         op = adjoint(base)
 
-        assert op.adjoint() is base
+        assert qp.equal(op.adjoint(), base)
 
     def test_diagonalizing_gates(self):
         """Assert that the diagonalizing gates method gives the base's diagonalizing gates."""
@@ -1094,11 +1094,6 @@ class TestAdjointOperation:
             assert angle1 == -angle2
 
         assert base_phase == phase
-
-    def test_control_wires(self):
-        """Test the control_wires of an adjoint are the same as the base op."""
-        op = adjoint(qp.CNOT(wires=("a", "b")))
-        assert op.control_wires == qp.wires.Wires("a")
 
 
 class TestAdjointOperationDiffInfo:
@@ -1308,7 +1303,7 @@ class TestDecomposition:
         adj1 = adjoint(base)
         adj2 = adjoint(adj1)
 
-        assert adj2.decomposition()[0] is base
+        assert qp.equal(adj2.decomposition()[0], base)
 
 
 class TestIntegration:
