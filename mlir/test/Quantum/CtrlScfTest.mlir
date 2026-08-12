@@ -69,10 +69,11 @@ func.func @ctrl_scf_if_both_branches(%ctrl: !quantum.bit, %q: !quantum.bit, %con
 func.func @ctrl_scf_if_threaded(%ctrl: !quantum.bit, %q: !quantum.bit, %cond: i1)
     -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
-  // The pre-gate control-out feeds the scf.if; the scf.if control-out feeds the post-gate.
   // CHECK: %[[PRE:.*]], %[[PREC:.*]] = quantum.custom "S"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
   // CHECK: %[[IF:.*]]:2 = scf.if %{{.*}} -> (!quantum.bit, !quantum.bit) {
   // CHECK:   quantum.custom "Hadamard"() %[[PRE]] ctrls(%[[PREC]]) ctrlvals(%{{.*}})
+  // CHECK: } else {
+  // CHECK:   scf.yield %[[PRE]], %[[PREC]] : !quantum.bit, !quantum.bit
   // CHECK: }
   // CHECK: quantum.custom "T"() %[[IF]]#0 ctrls(%[[IF]]#1) ctrlvals(%{{.*}})
   %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q : !quantum.bit) : !quantum.bit -> !quantum.bit {
