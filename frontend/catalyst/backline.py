@@ -54,7 +54,14 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
     """Resolve a backend name and node role to the transport library the node should load.
 
     Args:
-        backend: Backend name as given on the node, e.g. ``"cpu_verbs"``.
+        backend: Backend name as given on the node. The in-tree backends are:
+
+            * ``"cpu_verbs"`` - RDMA over InfiniBand; both roles.
+            * ``"gpu_verbs"`` - RDMA over InfiniBand with a GPU coprocessor; coprocessor only.
+            * ``"local"`` - in-process memcpy shim; both roles.
+            * ``"local_gpu"`` - in-process memcpy shim with a GPU coprocessor; coprocessor only.
+
+            Out-of-tree backends supply their own token and library.
         role: ``"controller"`` or ``"coprocessor"``. Each backend ships one library per role.
         remote: Whether the node runs on another machine. A remote node loads the library from the
             bundle deployed alongside it, so it is named by filename only; a local node is given the
@@ -65,8 +72,8 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
 
     Raises:
         ValueError: If no library matches on a local node, naming every directory searched. A
-            backend shipping only one role (``gpu_verbs`` has no controller library) fails here
-            rather than later at ``dlopen``.
+            backend shipping only one role (``gpu_verbs`` and ``local_gpu`` have no controller
+            library) fails here rather than later at ``dlopen``.
     """
     names = [f"libcatalyst_transport_{backend}_{role}.{ext}" for ext in _BACKEND_LIB_EXTS]
     if remote:

@@ -52,6 +52,9 @@ class LocalGpuCoprocessorSession : public CoprocessorSession {
 
     // Called synchronously from the paired controller's kick(); launches one GPU decode and
     // writes the reply into `reply`. Uses single slots (no ring) since total=1.
+    //
+    // Expects `req_bytes == common::PAYLOAD_DATA_BYTES` (8) and `reply_cap >= sizeof(int64_t)`;
+    // the reply is always `sizeof(int64_t)` bytes. Anything else throws.
     std::size_t run_once(const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
                          void *reply, std::size_t reply_cap);
 

@@ -58,6 +58,10 @@ class LocalCpuControllerSession : public ControllerSession {
 
     std::vector<std::byte> request_staging_;
 
+    /// Set on the first commit_work_item(). Subsequent commits are rejected so any pointer a
+    /// prior data_slot() handed out cannot dangle behind a request_staging_ reallocation.
+    bool committed_ = false;
+
     std::uint64_t in_bytes_ = 0;
     std::uint64_t out_bytes_ = 0;
     std::uint64_t staged_bytes_ = 0;

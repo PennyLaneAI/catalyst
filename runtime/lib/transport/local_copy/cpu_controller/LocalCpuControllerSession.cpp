@@ -81,6 +81,9 @@ void LocalCpuControllerSession::start() { rtt_ns_ = 0; }
 
 int LocalCpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                        std::size_t n) {
+    if (n > 1) {
+        throw std::runtime_error("memcpy: only a single reply slot (n<=1) is supported");
+    }
     if (!local_reply_.addr) {
         throw std::runtime_error("memcpy: controller reply region is not established");
     }
@@ -102,15 +105,25 @@ int LocalCpuControllerSession::collect(void *const *replies, const std::uint64_t
 
 void LocalCpuControllerSession::stop() {}
 
-void LocalCpuControllerSession::commit_work_item(std::uint32_t /*work_item_idx*/,
+void LocalCpuControllerSession::commit_work_item(std::uint32_t work_item_idx,
                                                  std::uint64_t in_bytes, std::uint64_t out_bytes) {
+    if (work_item_idx != 0) {
+        throw std::runtime_error("memcpy: only work_item_idx=0 is supported");
+    }
+    if (committed_) {
+        throw std::runtime_error("memcpy: commit_work_item can only be called once per session");
+    }
     in_bytes_ = in_bytes;
     out_bytes_ = out_bytes;
     staged_bytes_ = 0;
     request_staging_.resize(static_cast<std::size_t>(in_bytes_));
+    committed_ = true;
 }
 
-int LocalCpuControllerSession::kick(std::uint32_t /*work_item_idx*/) {
+int LocalCpuControllerSession::kick(std::uint32_t work_item_idx) {
+    if (work_item_idx != 0) {
+        throw std::runtime_error("memcpy: only work_item_idx=0 is supported");
+    }
     if (!pair_) {
         throw std::runtime_error("memcpy: no paired coprocessor");
     }
