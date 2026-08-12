@@ -14,6 +14,9 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -25,23 +28,16 @@ namespace catalyst::transport::local_copy {
 
 class LocalCpuControllerSession;
 
-class LocalCoprocessorEndpoint {
-  public:
-    virtual ~LocalCoprocessorEndpoint() = default;
-    virtual int run_once() = 0;
-};
-
-// Process-local rendezvous: who is paired with whom, plus the two advertised peer-memory
-// regions the request/reply copies target.
+// A process-local rendezvous between a controller and its coprocessor. Both sides look up the
+// same EndpointPair by (peer, oob_port) at connect(); the coprocessor registers `run_once` so
+// the controller's kick() can drive the coprocessor synchronously in-process.
 struct EndpointPair {
+    using RunOnce = std::function<std::size_t(const void *req, std::size_t req_bytes,
+                                              std::uint32_t decoder_id, void *reply,
+                                              std::size_t reply_cap)>;
+
     LocalCpuControllerSession *controller = nullptr;
-    LocalCoprocessorEndpoint *coprocessor = nullptr;
-
-    MemRegion controller_reply{};
-    bool controller_reply_ready = false;
-
-    MemRegion coprocessor_request{};
-    bool coprocessor_request_ready = false;
+    RunOnce run_once;
 };
 
 inline auto acquire_endpoint_pair(const ConnectInfo &info) -> std::shared_ptr<EndpointPair> {
@@ -50,8 +46,6 @@ inline auto acquire_endpoint_pair(const ConnectInfo &info) -> std::shared_ptr<En
     // controller/coprocessor are destroyed.
     static std::unordered_map<std::string, std::weak_ptr<EndpointPair>> pairs;
 
-    // peer and oob_port is used just to create a key for both coproc and
-    // controller to fetch the same EndpointPair
     const std::string key = info.peer + ":" + std::to_string(info.oob_port);
     std::lock_guard<std::mutex> lock(mu);
 

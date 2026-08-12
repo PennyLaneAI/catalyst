@@ -48,32 +48,25 @@ class LocalCpuControllerSession : public ControllerSession {
     void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
 
   private:
-    /// Process-local rendezvous object used to find the paired coprocessor.
+    /// Process-local rendezvous with the paired coprocessor.
     std::shared_ptr<EndpointPair> pair_;
 
-    /// This controller's advertised reply region; the coprocessor writes replies here.
+    /// Reply buffer the paired coprocessor writes into during kick().
     MemRegion local_reply_{};
-    /// The coprocessor's advertised request region; kick() copies requests here.
-    PeerRef peer_request_{};
 
     /// Owned allocations returned from alloc_memory(); MemRegion is only a view into these.
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
-    /// Controller-owned request staging buffer filled by data_slot()/write_data_slot().
+    /// Request staging filled by data_slot()/write_data_slot() and consumed by kick().
     std::vector<std::byte> request_staging_;
 
-    /// Committed request size for the next round.
     std::uint64_t in_bytes_ = 0;
-    /// Committed reply size expected for the next round.
     std::uint64_t out_bytes_ = 0;
-    /// Number of bytes currently staged in request_staging_.
     std::uint64_t staged_bytes_ = 0;
-    /// Decoder selector to attach to the next kicked request.
+    std::uint64_t reply_bytes_ = 0;
     std::uint32_t decoder_id_ = 0;
 
-    /// Timestamp captured at kick() for round-trip timing.
     std::uint64_t kick_ns_ = 0;
-    /// Last measured round-trip time in nanoseconds.
     std::uint64_t rtt_ns_ = 0;
 };
 

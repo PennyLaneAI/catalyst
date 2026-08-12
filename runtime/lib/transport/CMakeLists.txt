@@ -62,8 +62,9 @@ if(IBVERBS_LIB)
     endif()
 else()
     message(STATUS
-        "transport: libibverbs not found -> building rt_transport only. The bundled backends "
-        "are skipped; install libibverbs-dev / rdma-core to build them.")
+        "transport: libibverbs not found -> skipping the RDMA backends (cpu_verbs, gpu_verbs, "
+        "and the shared transport_common); rt_transport and the local_copy backend still build. "
+        "Install libibverbs-dev / rdma-core to get the RDMA backends.")
 endif()
 
 add_custom_target(transport_backends

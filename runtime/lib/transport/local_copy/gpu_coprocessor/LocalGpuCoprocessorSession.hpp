@@ -29,7 +29,7 @@ struct PayloadSlot;
 
 namespace catalyst::transport::local_copy {
 
-class LocalGpuCoprocessorSession : public CoprocessorSession, public LocalCoprocessorEndpoint {
+class LocalGpuCoprocessorSession : public CoprocessorSession {
   public:
     explicit LocalGpuCoprocessorSession(std::string = {}, int gpu_device = 0);
     ~LocalGpuCoprocessorSession() override;
@@ -50,39 +50,28 @@ class LocalGpuCoprocessorSession : public CoprocessorSession, public LocalCoproc
         return CoprocConvention::LaunchOnce;
     }
 
-    // CPU local peer-memory doorbell: consume the request in local_request_, launch one GPU decode,
-    // and write the reply into peer_reply_. This local path uses a single request slot and a single
-    // handoff slot, because total=1 never needs a ring buffer.
-    int run_once() override;
+    // Consume one request, launch one GPU decode, and write the reply into `reply`.
+    // Invoked synchronously from the paired controller's kick(). Uses a single request slot and a
+    // single handoff slot; total=1 never needs a ring.
+    std::size_t run_once(const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
+                         void *reply, std::size_t reply_cap);
 
   private:
     void ensure_gpu_state();
 
-    /// Process-local rendezvous object used to find the paired controller.
+    /// Process-local rendezvous with the paired controller.
     std::shared_ptr<EndpointPair> pair_;
-
-    /// This coprocessor's advertised request region; the controller writes requests here.
-    MemRegion local_request_{};
-    /// The controller's advertised reply region; run_once() writes replies here.
-    PeerRef peer_reply_{};
 
     /// Owned allocations returned from alloc_memory(); MemRegion is only a view into these.
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
-    /// GPU device to run the launcher on.
     int gpu_device_ = 0;
-    /// Lazily created HIP runtime wrapper.
     std::unique_ptr<gpu_verbs::GpuRuntime> gpu_;
-    /// Host-visible reply slot the GPU writes into.
     gpu_verbs::GpuRuntime::Handoff handoff_{};
-    /// Host-mapped single request slot shared with the GPU launcher.
     common::PayloadSlot *request_slot_host_ = nullptr;
-    /// Device alias of request_slot_host_.
     common::PayloadSlot *request_slot_dev_ = nullptr;
 
-    /// Bound launch-once GPU coprocessor function; nullptr means built-in echo.
     CoprocessorLauncherFn launcher_ = nullptr;
-    /// Opaque context passed back to launcher_.
     void *launcher_ctx_ = nullptr;
 };
 

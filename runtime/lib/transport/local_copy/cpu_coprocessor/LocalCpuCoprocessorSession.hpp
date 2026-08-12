@@ -24,14 +24,10 @@
 
 namespace catalyst::transport::local_copy {
 
-class LocalCpuCoprocessorSession : public CoprocessorSession, public LocalCoprocessorEndpoint {
+class LocalCpuCoprocessorSession : public CoprocessorSession {
   public:
     explicit LocalCpuCoprocessorSession(std::string = {}) {}
-    ~LocalCpuCoprocessorSession() override {
-        if (pair_ && pair_->coprocessor == this) {
-            pair_->coprocessor = nullptr;
-        }
-    }
+    ~LocalCpuCoprocessorSession() override;
 
     // TransportSession
     int connect(const ConnectInfo &info) override;
@@ -46,25 +42,19 @@ class LocalCpuCoprocessorSession : public CoprocessorSession, public LocalCoproc
     // CoprocessorSession
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
 
-    // CPU local peer-memory doorbell: consume the request in local_request_ and write the reply
-    // into peer_reply_.
-    int run_once() override;
+    // Consume one request and write its reply into `reply`, returning the number of bytes written.
+    // Invoked synchronously from the paired controller's kick().
+    std::size_t run_once(const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
+                         void *reply, std::size_t reply_cap);
 
   private:
-    /// Process-local rendezvous object used to find the paired controller.
+    /// Process-local rendezvous with the paired controller.
     std::shared_ptr<EndpointPair> pair_;
-
-    /// This coprocessor's advertised request region; the controller writes requests here.
-    MemRegion local_request_{};
-    /// The controller's advertised reply region; run_once() writes replies here.
-    PeerRef peer_reply_{};
 
     /// Owned allocations returned from alloc_memory(); MemRegion is only a view into these.
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
-    /// Bound per-message coprocessor function; nullptr means not bound yet.
     CoprocessorFn fn_ = nullptr;
-    /// Opaque context passed back to fn_.
     void *ctx_ = nullptr;
 };
 

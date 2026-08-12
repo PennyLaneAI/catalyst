@@ -18,8 +18,6 @@
 #include <cstring>
 #include <stdexcept>
 
-#include "LocalWireProtocol.hpp"
-
 namespace catalyst::transport::local_copy {
 namespace {
 
@@ -31,15 +29,20 @@ std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t o
     return n;
 }
 
-std::size_t local_region_bytes(std::size_t payload_bytes) {
-    return payload_bytes + std::max(kLocalRequestHeaderBytes, kLocalReplyHeaderBytes);
-}
-
 } // namespace
+
+LocalCpuCoprocessorSession::~LocalCpuCoprocessorSession() {
+    if (pair_) {
+        pair_->run_once = nullptr;
+    }
+}
 
 int LocalCpuCoprocessorSession::connect(const ConnectInfo &info) {
     pair_ = acquire_endpoint_pair(info);
-    pair_->coprocessor = this;
+    pair_->run_once = [this](const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
+                             void *reply, std::size_t reply_cap) {
+        return this->run_once(req, req_bytes, decoder_id, reply, reply_cap);
+    };
     return 0;
 }
 
@@ -47,47 +50,26 @@ MemRegion LocalCpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kin
     if (kind != MemKind::CpuRam) {
         throw std::runtime_error("local_copy: CPU-only for now; alloc_memory expects CpuRam");
     }
-    const std::size_t alloc_bytes = local_region_bytes(size);
-    caller_memory_regions_.push_back(alloc_bytes ? std::make_unique<std::byte[]>(alloc_bytes)
-                                                 : std::unique_ptr<std::byte[]>{});
+    caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
+                                          : std::unique_ptr<std::byte[]>{});
     return MemRegion{
-        .addr = caller_memory_regions_.empty() ? nullptr : caller_memory_regions_.back().get(),
-        .size = static_cast<std::uint64_t>(alloc_bytes),
+        .addr = size ? caller_memory_regions_.back().get() : nullptr,
+        .size = static_cast<std::uint64_t>(size),
         .lkey = 0,
         .rkey = 0,
         .kind = kind,
     };
 }
 
-PeerRef LocalCpuCoprocessorSession::exchange_keys(const MemRegion &local) {
-    local_request_ = local;
-    if (pair_) {
-        pair_->coprocessor_request = local;
-        pair_->coprocessor_request_ready = true;
-        if (pair_->controller_reply_ready) {
-            peer_reply_ = PeerRef{
-                .rkey = 0,
-                .remote_addr = reinterpret_cast<std::uint64_t>(pair_->controller_reply.addr),
-                .size = pair_->controller_reply.size,
-            };
-        }
-    }
-    return peer_reply_;
+PeerRef LocalCpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) {
+    return PeerRef{};
 }
 
-void LocalCpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
-                                                   const PeerRef &peer) {
+void LocalCpuCoprocessorSession::establish_channel(const ChannelDesc &desc,
+                                                   const MemRegion & /*local*/,
+                                                   const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
         throw std::runtime_error("local_copy: CPU-only coprocessor supports only transport=memcpy");
-    }
-    local_request_ = local;
-    peer_reply_ = peer;
-    if (peer_reply_.remote_addr == 0 && pair_ && pair_->controller_reply_ready) {
-        peer_reply_ = PeerRef{
-            .rkey = 0,
-            .remote_addr = reinterpret_cast<std::uint64_t>(pair_->controller_reply.addr),
-            .size = pair_->controller_reply.size,
-        };
     }
 }
 
@@ -96,7 +78,9 @@ void LocalCpuCoprocessorSession::start() {}
 int LocalCpuCoprocessorSession::collect(void *const * /*replies*/,
                                         const std::uint64_t * /*replies_bytes*/,
                                         std::size_t /*n*/) {
-    throw std::logic_error("LocalCpuCoprocessorSession::collect not implemented yet");
+    // The coprocessor's compute is driven synchronously from the controller's kick() via
+    // run_once(); nothing collects on this side.
+    throw std::logic_error("local_copy: coprocessor collect is not used");
 }
 
 void LocalCpuCoprocessorSession::stop() {}
@@ -106,45 +90,15 @@ void LocalCpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx)
     ctx_ = ctx;
 }
 
-int LocalCpuCoprocessorSession::run_once() {
-    if (!local_request_.addr || local_request_.size < kLocalRequestHeaderBytes) {
-        throw std::runtime_error("local_copy: local request region is not established");
-    }
-    if (peer_reply_.remote_addr == 0 || peer_reply_.size < kLocalReplyHeaderBytes) {
-        throw std::runtime_error("local_copy: peer reply region is not established");
-    }
-
-    if (local_request_.kind != MemKind::CpuRam) {
-        throw std::runtime_error("local_copy: CPU-only coprocessor expects CpuRam request region");
-    }
-    if (pair_->controller_reply.kind != MemKind::CpuRam) {
-        throw std::runtime_error("local_copy: CPU-only coprocessor expects CpuRam reply region");
-    }
-
-    auto *request_base = static_cast<std::byte *>(local_request_.addr);
-    const auto *request_hdr = reinterpret_cast<const LocalRequestHeader *>(request_base);
-    const std::uint64_t request_bytes = request_hdr->bytes;
-    if (request_bytes > local_request_.size - kLocalRequestHeaderBytes) {
-        throw std::runtime_error("local_copy: request exceeds local request region capacity");
-    }
-
-    const void *request = request_base + kLocalRequestHeaderBytes;
-
-    auto *reply_base =
-        reinterpret_cast<std::byte *>(static_cast<std::uintptr_t>(peer_reply_.remote_addr));
-    const std::size_t reply_cap =
-        static_cast<std::size_t>(peer_reply_.size - kLocalReplyHeaderBytes);
-    void *reply = reply_base + kLocalReplyHeaderBytes;
+std::size_t LocalCpuCoprocessorSession::run_once(const void *req, std::size_t req_bytes,
+                                                 std::uint32_t /*decoder_id*/, void *reply,
+                                                 std::size_t reply_cap) {
     CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
-    const std::size_t written =
-        fn(request, static_cast<std::size_t>(request_bytes), reply, reply_cap, ctx_);
+    const std::size_t written = fn(req, req_bytes, reply, reply_cap, ctx_);
     if (written > reply_cap) {
         throw std::runtime_error("local_copy: coprocessor wrote past reply capacity");
     }
-
-    auto *reply_hdr = reinterpret_cast<LocalReplyHeader *>(reply_base);
-    reply_hdr->bytes = static_cast<std::uint64_t>(written);
-    return 0;
+    return written;
 }
 
 } // namespace catalyst::transport::local_copy

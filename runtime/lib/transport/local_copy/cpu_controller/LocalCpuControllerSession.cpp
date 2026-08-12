@@ -14,12 +14,9 @@
 
 #include "LocalCpuControllerSession.hpp"
 
-#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <stdexcept>
-
-#include "LocalWireProtocol.hpp"
 
 namespace catalyst::transport::local_copy {
 namespace {
@@ -28,10 +25,6 @@ std::uint64_t now_ns() {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                           std::chrono::steady_clock::now().time_since_epoch())
                                           .count());
-}
-
-std::size_t local_region_bytes(std::size_t payload_bytes) {
-    return payload_bytes + std::max(kLocalRequestHeaderBytes, kLocalReplyHeaderBytes);
 }
 
 } // namespace
@@ -46,12 +39,11 @@ MemRegion LocalCpuControllerSession::alloc_memory(std::size_t size, MemKind kind
     if (kind != MemKind::CpuRam) {
         throw std::runtime_error("local_copy: CPU-only for now; alloc_memory expects CpuRam");
     }
-    const std::size_t alloc_bytes = local_region_bytes(size);
-    caller_memory_regions_.push_back(alloc_bytes ? std::make_unique<std::byte[]>(alloc_bytes)
-                                                 : std::unique_ptr<std::byte[]>{});
+    caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
+                                          : std::unique_ptr<std::byte[]>{});
     return MemRegion{
-        .addr = caller_memory_regions_.empty() ? nullptr : caller_memory_regions_.back().get(),
-        .size = static_cast<std::uint64_t>(alloc_bytes),
+        .addr = size ? caller_memory_regions_.back().get() : nullptr,
+        .size = static_cast<std::uint64_t>(size),
         .lkey = 0,
         .rkey = 0,
         .kind = kind,
@@ -60,34 +52,15 @@ MemRegion LocalCpuControllerSession::alloc_memory(std::size_t size, MemKind kind
 
 PeerRef LocalCpuControllerSession::exchange_keys(const MemRegion &local) {
     local_reply_ = local;
-    if (pair_) {
-        pair_->controller_reply = local;
-        pair_->controller_reply_ready = true;
-        if (pair_->coprocessor_request_ready) {
-            peer_request_ = PeerRef{
-                .rkey = 0,
-                .remote_addr = reinterpret_cast<std::uint64_t>(pair_->coprocessor_request.addr),
-                .size = pair_->coprocessor_request.size,
-            };
-        }
-    }
-    return peer_request_;
+    return PeerRef{};
 }
 
 void LocalCpuControllerSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
-                                                  const PeerRef &peer) {
+                                                  const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
         throw std::runtime_error("local_copy: CPU-only controller supports only transport=memcpy");
     }
     local_reply_ = local;
-    peer_request_ = peer;
-    if (peer_request_.remote_addr == 0 && pair_ && pair_->coprocessor_request_ready) {
-        peer_request_ = PeerRef{
-            .rkey = 0,
-            .remote_addr = reinterpret_cast<std::uint64_t>(pair_->coprocessor_request.addr),
-            .size = pair_->coprocessor_request.size,
-        };
-    }
 }
 
 void LocalCpuControllerSession::start() { rtt_ns_ = 0; }
@@ -97,28 +70,16 @@ int LocalCpuControllerSession::collect(void *const *replies, const std::uint64_t
     if (!local_reply_.addr) {
         throw std::runtime_error("local_copy: controller reply region is not established");
     }
-
     if (local_reply_.kind != MemKind::CpuRam) {
         throw std::runtime_error("local_copy: CPU-only controller expects CpuRam reply region");
     }
 
-    auto *base = static_cast<std::byte *>(local_reply_.addr);
-    const auto *hdr = reinterpret_cast<const LocalReplyHeader *>(base);
-    const std::uint64_t reply_bytes = hdr->bytes;
     const std::uint64_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
-
-    if (reply_bytes > out_bytes_) {
-        throw std::runtime_error("local_copy: reply exceeds committed output bytes");
-    }
-    if (reply_bytes > cap) {
+    if (reply_bytes_ > cap) {
         throw std::runtime_error("local_copy: caller reply buffer too small");
     }
-    if (reply_bytes > local_reply_.size - kLocalReplyHeaderBytes) {
-        throw std::runtime_error("local_copy: reply exceeds local reply region capacity");
-    }
-    if (n > 0 && replies && replies[0] && reply_bytes != 0) {
-        std::memcpy(replies[0], base + kLocalReplyHeaderBytes,
-                    static_cast<std::size_t>(reply_bytes));
+    if (n > 0 && replies && replies[0] && reply_bytes_ != 0) {
+        std::memcpy(replies[0], local_reply_.addr, static_cast<std::size_t>(reply_bytes_));
     }
 
     rtt_ns_ = now_ns() - kick_ns_;
@@ -136,43 +97,25 @@ void LocalCpuControllerSession::commit_work_item(std::uint32_t /*work_item_idx*/
 }
 
 int LocalCpuControllerSession::kick(std::uint32_t /*work_item_idx*/) {
-    if (!pair_ || !pair_->coprocessor) {
+    if (!pair_ || !pair_->run_once) {
         throw std::runtime_error("local_copy: no paired coprocessor");
     }
-    if (peer_request_.remote_addr == 0) {
-        throw std::runtime_error("local_copy: peer request region is not established");
-    }
-    if (peer_request_.size < kLocalRequestHeaderBytes + staged_bytes_) {
-        throw std::runtime_error("local_copy: peer request region too small for staged payload");
-    }
-    if (!local_reply_.addr || local_reply_.size < kLocalReplyHeaderBytes) {
+    if (!local_reply_.addr) {
         throw std::runtime_error("local_copy: local reply region is not established");
-    }
-
-    if (pair_->coprocessor_request.kind != MemKind::CpuRam) {
-        throw std::runtime_error(
-            "local_copy: CPU-only controller expects CpuRam peer request region");
     }
     if (local_reply_.kind != MemKind::CpuRam) {
         throw std::runtime_error("local_copy: CPU-only controller expects CpuRam reply region");
     }
-
-    auto *reply_base = static_cast<std::byte *>(local_reply_.addr);
-    auto *reply_hdr = reinterpret_cast<LocalReplyHeader *>(reply_base);
-    reply_hdr->bytes = 0;
-
-    auto *base =
-        reinterpret_cast<std::byte *>(static_cast<std::uintptr_t>(peer_request_.remote_addr));
-    auto *hdr = reinterpret_cast<LocalRequestHeader *>(base);
-    hdr->bytes = staged_bytes_;
-    hdr->decoder_id = decoder_id_;
-    if (staged_bytes_ != 0) {
-        std::memcpy(base + kLocalRequestHeaderBytes, request_staging_.data(),
-                    static_cast<std::size_t>(staged_bytes_));
+    if (local_reply_.size < out_bytes_) {
+        throw std::runtime_error("local_copy: local reply region too small for committed output");
     }
 
     kick_ns_ = now_ns();
-    return pair_->coprocessor->run_once();
+    const std::size_t written = pair_->run_once(
+        request_staging_.data(), static_cast<std::size_t>(staged_bytes_), decoder_id_,
+        local_reply_.addr, static_cast<std::size_t>(out_bytes_));
+    reply_bytes_ = static_cast<std::uint64_t>(written);
+    return 0;
 }
 
 void *LocalCpuControllerSession::data_slot() {
