@@ -87,4 +87,24 @@ inline std::string pin_thread(int cpu, bool realtime) {
 #endif
 }
 
+/**
+ * @brief Spin-wait hint.
+ *
+ * Marks a busy-wait so the CPU backs off speculated loads and yields the SMT sibling.
+ */
+inline void cpu_relax() {
+#if defined(__x86_64__) || defined(__i386__)
+    __builtin_ia32_pause();
+#elif defined(__aarch64__)
+    __asm__ __volatile__("yield" ::: "memory");
+#endif
+}
+
+/**
+ * @brief Interval between stop-token polls in a coprocessor's arrival spin.
+ *
+ * The count for how often the arrival spin looks at the stop token.
+ */
+inline constexpr std::uint32_t STOP_CHECK_SPINS = 600'000'000;
+
 } // namespace catalyst::transport::common

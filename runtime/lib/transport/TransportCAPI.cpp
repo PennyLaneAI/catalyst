@@ -459,23 +459,23 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
     // The round's shape is whatever was committed, so it cannot disagree with it.
     const std::uint32_t work_item_idx = s->work_item;
-    const auto syndrome_bytes = static_cast<std::uint32_t>(s->in_bytes);
-    const auto correction_bytes = static_cast<std::uint32_t>(s->out_bytes);
+    const auto outgoing_message_bytes = static_cast<std::uint32_t>(s->in_bytes);
+    const auto reply_bytes = static_cast<std::uint32_t>(s->out_bytes);
 
     const bool force_sw_rtt = (flags & CATALYST_BENCH_FORCE_SW_RTT) != 0;
     const bool progress = (flags & CATALYST_BENCH_PROGRESS) != 0;
 
     return guard([&] {
-        std::vector<std::uint8_t> syndrome(
-            std::max<std::size_t>(syndrome_bytes, sizeof(std::uint64_t)), 0);
+        std::vector<std::uint8_t> outgoing_message(
+            std::max<std::size_t>(outgoing_message_bytes, sizeof(std::uint64_t)), 0);
         std::uint64_t written = 0;
         int rc = CATALYST_TRANSPORT_OK;
 
         for (std::uint32_t i = 0; i < iters; ++i) {
             const std::uint64_t value = static_cast<std::uint64_t>(i) + 1;
-            std::memcpy(syndrome.data(), &value, sizeof(value));
+            std::memcpy(outgoing_message.data(), &value, sizeof(value));
 
-            c->write_data_slot(syndrome.data(), syndrome_bytes, decoder_id);
+            c->write_data_slot(outgoing_message.data(), outgoing_message_bytes, decoder_id);
 
             void *rslot = c->reply_slot();
             std::uint64_t t0 = now_ns();
@@ -483,7 +483,7 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
             rc = c->kick(work_item_idx);
             if (rc == CATALYST_TRANSPORT_OK) {
                 void *replies[1] = {rslot};
-                std::uint64_t replies_bytes[1] = {correction_bytes};
+                std::uint64_t replies_bytes[1] = {reply_bytes};
                 rc = s->sess->collect(replies, replies_bytes, 1);
             }
             std::uint64_t sw_rtt = now_ns() - t0;
@@ -499,7 +499,7 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
                 std::cerr << "[transport] start_benchmark: round " << i << " failed rc=" << rc
                           << " [sent 0x" << std::hex << value << ", reply slot 0x" << reply_value
                           << std::dec << " seq=" << reply_seq << "; work_item=" << work_item_idx
-                          << " in=" << syndrome_bytes << "B out=" << correction_bytes << "B]\n";
+                          << " in=" << outgoing_message_bytes << "B out=" << reply_bytes << "B]\n";
                 break;
             }
 
@@ -508,9 +508,9 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
             if (progress && ((i & 1023) == 0 || i == iters - 1)) {
                 std::uint64_t cval = 0;
-                std::memcpy(&cval, rslot, std::min<std::size_t>(correction_bytes, sizeof(cval)));
+                std::memcpy(&cval, rslot, std::min<std::size_t>(reply_bytes, sizeof(cval)));
                 std::cerr << "[transport] round " << i << " rtt=" << samples[written - 1] << " ns ["
-                          << (hw_rtt ? "hw" : "sw") << "] corr[0:8]=0x" << std::hex << cval
+                          << (hw_rtt ? "hw" : "sw") << "] reply[0:8]=0x" << std::hex << cval
                           << std::dec << "\n";
             }
         }

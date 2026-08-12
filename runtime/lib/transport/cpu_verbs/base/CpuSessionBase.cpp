@@ -18,11 +18,11 @@
 #include <array>
 #include <cstring>
 #include <memory>
-#include <thread>
 #include <utility>
 
 #include "Error.hpp"
 #include "Handshake.hpp"
+#include "RealtimeThread.hpp"
 #include "WireProtocol.hpp"
 
 namespace catalyst::transport::cpu_verbs {
@@ -154,7 +154,7 @@ void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inl
 // every signaled send has completed (teardown), guarded so a lost CQE can't
 // hang the join.
 template <class Role> void CpuSessionBase<Role>::reap(ibv_cq *cq, int &outstanding, bool drain) {
-    std::array<ibv_wc, REAP_BATCH> wc{};
+    std::array<ibv_wc, REAP_BATCH> wc;
     int empty = 0;
     constexpr int DRAIN_MAX_EMPTY = 1000000;
     do {
@@ -188,11 +188,15 @@ Payload *CpuSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::s
     // read from being hoisted ahead.
     std::atomic_ref<std::uint32_t> seq_ref(slot->seq_num);
     const auto expected = static_cast<std::uint32_t>(cursor + 1);
+    std::uint32_t spins = 0;
     while (seq_ref.load(std::memory_order_acquire) != expected) {
-        if (st.stop_requested()) {
-            return nullptr;
+        if (++spins == STOP_CHECK_SPINS) {
+            spins = 0;
+            if (st.stop_requested()) {
+                return nullptr;
+            }
         }
-        std::this_thread::yield();
+        cpu_relax();
     }
     return slot;
 }
