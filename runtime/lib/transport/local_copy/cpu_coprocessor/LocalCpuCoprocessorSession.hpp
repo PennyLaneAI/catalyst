@@ -27,7 +27,11 @@ namespace catalyst::transport::local_copy {
 class LocalCpuCoprocessorSession : public CoprocessorSession, public LocalCoprocessorEndpoint {
   public:
     explicit LocalCpuCoprocessorSession(std::string = {}) {}
-    ~LocalCpuCoprocessorSession() override = default;
+    ~LocalCpuCoprocessorSession() override {
+        if (pair_ && pair_->coprocessor == this) {
+            pair_->coprocessor = nullptr;
+        }
+    }
 
     // TransportSession
     int connect(const ConnectInfo &info) override;
