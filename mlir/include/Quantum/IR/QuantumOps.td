@@ -998,7 +998,7 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
     );
 
     let assemblyFormat = [{
-        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` `(` $args `:` type($args) `)`
+        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` `(` $args `)`
         attr-dict `:` type($out_ctrl_qubits) `->` type($results) $region
     }];
 
