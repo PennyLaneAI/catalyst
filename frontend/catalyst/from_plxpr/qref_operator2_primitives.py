@@ -220,11 +220,13 @@ def _abstractify_jax_array(val):
     return AbstractArray(val.shape, val.dtype)
 
 
+# pylint: disable=too-many-arguments,too-many-branches
 def collect_decomp_rules(
     module,
     op_cls,
     op_type,
     params=None,
+    param_map=None,
     wire_lens=None,
     qubit_map=None,
     hybrid_lens=None,
@@ -259,7 +261,16 @@ def collect_decomp_rules(
 
     elif op_type == "OperatorOp":
         dynamic_shape = {}
-        for dynamic_argname, param in zip(op_cls.dynamic_argnames, params, strict=True):
+
+        indices_to_remove = set()
+        if param_map is not None:
+            for named_attr in param_map:
+                if named_attr.name in op_cls.hybrid_argnames:
+                    for idx in named_attr.attr:
+                        indices_to_remove.add(int(idx))
+        non_hybrid_params = [p for i, p in enumerate(params) if i not in indices_to_remove]
+
+        for dynamic_argname, param in zip(op_cls.dynamic_argnames, non_hybrid_params, strict=True):
             dynamic_shape[dynamic_argname] = param.type
         dynamic_shape = convert_types_to_mlir_strings(dynamic_shape)
 
@@ -271,9 +282,11 @@ def collect_decomp_rules(
 
         extra_data = {}
         non_hybrid_wire_len = 0
-        for w in repack_wire_argnames:
-            non_hybrid_wire_len += len(qubit_map[w])  # pylint:disable=unsubscriptable-object
-        hybrid_arg_start_idx = len(params) + non_hybrid_wire_len
+        if qubit_map is not None:
+            for w in repack_wire_argnames:
+                if w in qubit_map:
+                    non_hybrid_wire_len += len(qubit_map[w])
+        hybrid_arg_start_idx = len(non_hybrid_params) + non_hybrid_wire_len
         for hybrid_argname, hybrid_len, hybrid_tree in zip(
             op_cls.hybrid_argnames, hybrid_lens, hybrid_trees
         ):
@@ -435,6 +448,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             op_cls=op_cls,
             op_type="OperatorOp",
             params=params,
+            param_map=param_map,
             wire_lens=wire_lens,
             qubit_map=qubit_map,
             hybrid_lens=hybrid_lens,
