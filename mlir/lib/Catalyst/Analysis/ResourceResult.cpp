@@ -88,6 +88,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
 
     hasBranches = hasBranches || other.hasBranches;
     hasDynLoop = hasDynLoop || other.hasDynLoop;
+    collectDetailedOperations = collectDetailedOperations || other.collectDetailedOperations;
 
     for (auto [ext, otherExt] : llvm::zip(extensions, other.extensions)) {
         assert(ext->name() == otherExt->name() && "extension names must match");
@@ -224,7 +225,7 @@ llvm::json::Object ResourceResult::toJson() const {
     for (const auto &entry : detailedOperations) {
         detailedOperationsObject[entry.getKey()] = countToJson(entry.getValue());
     }
-    if (!detailedOperationsObject.empty()) {
+    if (collectDetailedOperations) {
         funcObj["quantum_operations_detailed"] = std::move(detailedOperationsObject);
     }
 
@@ -249,8 +250,10 @@ llvm::json::Object ResourceResult::toJson() const {
  *
  */
 DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result) {
-    SmallVector<NamedAttribute> entries;
 
+    assert(result.collectDetailedOperations && "detailedOperations should be collected");
+
+    SmallVector<NamedAttribute> entries;
     // operations
     SmallVector<NamedAttribute> opsEntries;
     for (const auto &opEntry : result.detailedOperations) {

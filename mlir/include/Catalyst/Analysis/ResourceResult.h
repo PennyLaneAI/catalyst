@@ -76,6 +76,10 @@ struct ResourceResult {
     // whether any loop has a trip count that could not be statically resolved
     bool hasDynLoop = false;
 
+    // If this is true, detailedOperations is included during serialization, otherwise it is
+    // omitted.
+    bool collectDetailedOperations = false;
+
     // Set when quantum.device is present: true if {auto_qubit_management} is
     // active (register grows dynamically on quantum.extract/qref.get), false if not.
     // nullopt means no quantum.device in this function.

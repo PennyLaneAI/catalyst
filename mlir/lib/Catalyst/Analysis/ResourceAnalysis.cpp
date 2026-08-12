@@ -366,6 +366,7 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
             if (needsCollection) {
                 collectOperation(&op, result, isAdjoint);
                 if (collectDetailedOperations) {
+                    result.collectDetailedOperations = true;
                     collectDetailedOperation(&op, result, isAdjoint);
                 }
             }
@@ -525,6 +526,8 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
     dest.numAllocQubits += source.numAllocQubits * count;
     dest.hasBranches = dest.hasBranches || source.hasBranches;
     dest.hasDynLoop = dest.hasDynLoop || source.hasDynLoop;
+    dest.collectDetailedOperations =
+        dest.collectDetailedOperations || source.collectDetailedOperations;
 }
 
 /**
