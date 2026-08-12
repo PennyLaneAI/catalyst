@@ -2,13 +2,11 @@
 
 <h3>New features since last release</h3>
 
-* To add Adjoint/Ctrl support to the graph-decomposition system, we need to reduce
-  region-level modifiers to op-level nodes before the solver runs.
-  A new `quantum.ctrl` region op and a `ctrl-lowering` pass are added to the Quantum Dialect
-  for controlled subcircuits in Catalyst. A `Controlled(Op)` produced by the graph-solver
-  (or a ctrl region coming from the frontend) can be reduced to op-level controlled gates
-  before calling into the graph solver.
+* A new `quantum.ctrl` region op and a `ctrl-lowering` pass are added to the Quantum Dialect
+  for controlled subcircuits in Catalyst. 
   [(#3089)](https://github.com/PennyLaneAI/catalyst/pull/3089)
+
+Programs can now express an entire controlled quantum region, as opposed to individual operations. The `ctrl-lowering` pass distributes the control wires and control values from the `quantum.ctrl` operation onto the individual gate operations inside the region.
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
