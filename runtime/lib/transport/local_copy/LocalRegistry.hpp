@@ -29,7 +29,8 @@ namespace catalyst::transport::local_copy {
 class LocalCpuControllerSession;
 
 // Same-process rendezvous keyed by (peer, oob_port). The coprocessor binds `run_once`; the
-// controller's kick() drives it inline. `mu` serializes kick against coprocessor teardown.
+// controller's kick() drives it inline. `mu` guards `controller` and `run_once` across
+// connect / kick / teardown.
 struct EndpointPair {
     using RunOnce = std::function<std::size_t(const void *req, std::size_t req_bytes,
                                               std::uint32_t decoder_id, void *reply,

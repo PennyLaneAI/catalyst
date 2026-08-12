@@ -30,13 +30,17 @@ std::uint64_t now_ns() {
 } // namespace
 
 LocalCpuControllerSession::~LocalCpuControllerSession() {
-    if (pair_ && pair_->controller == this) {
-        pair_->controller = nullptr;
+    if (pair_) {
+        std::lock_guard<std::mutex> lock(pair_->mu);
+        if (pair_->controller == this) {
+            pair_->controller = nullptr;
+        }
     }
 }
 
 int LocalCpuControllerSession::connect(const ConnectInfo &info) {
     pair_ = acquire_endpoint_pair(info);
+    std::lock_guard<std::mutex> lock(pair_->mu);
     if (pair_->controller) {
         throw std::runtime_error(
             "memcpy: another controller is already bound to this endpoint (peer, oob_port)");

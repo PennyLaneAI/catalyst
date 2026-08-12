@@ -65,6 +65,7 @@ void LocalGpuCoprocessorSession::ensure_gpu_state() {
 
 int LocalGpuCoprocessorSession::connect(const ConnectInfo &info) {
     pair_ = acquire_endpoint_pair(info);
+    std::lock_guard<std::mutex> lock(pair_->mu);
     if (pair_->run_once) {
         throw std::runtime_error(
             "memcpy: another coprocessor is already bound to this endpoint (peer, oob_port)");
