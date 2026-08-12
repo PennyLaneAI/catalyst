@@ -45,21 +45,23 @@ module attributes {catalyst.backline = #transport.backline<transport = "bogus", 
 
 // -----
 
-// local_copy is process-local, so a local backline cannot dispatch the controller remotely.
+// memcpy is process-local, so a controller and coprocessor must land on the same node:
+// a local controller cannot pair with a remote coprocessor.
 
-// expected-error @below {{local transport does not support a remote controller}}
-module attributes {catalyst.backline = #transport.backline<transport = "local", controller = #transport.node<backend_lib = "x", remote = true>>} {
+// expected-error @below {{memcpy transport requires controller and coprocessor on the same node}}
+module attributes {catalyst.backline = #transport.backline<transport = "memcpy", controller = #transport.node<backend_lib = "x">,
+  coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", symbol = "foo", remote = true>]>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
 }
 
 // -----
 
-// Nor can it dispatch a coprocessor remotely.
+// ... and symmetrically, a remote controller cannot pair with a local coprocessor.
 
-// expected-error @below {{local transport does not support remote coprocessors}}
-module attributes {catalyst.backline = #transport.backline<transport = "local", controller = #transport.node<backend_lib = "x">,
-  coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", symbol = "foo", remote = true>]>} {
+// expected-error @below {{memcpy transport requires controller and coprocessor on the same node}}
+module attributes {catalyst.backline = #transport.backline<transport = "memcpy", controller = #transport.node<backend_lib = "x", remote = true>,
+  coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", symbol = "foo">]>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
 }

@@ -72,11 +72,8 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
     if (!controller) {
         return emitError() << "backline requires a controller";
     }
-    if (!transport || (transport.getValue() != "rdma" && transport.getValue() != "local")) {
-        return emitError() << "backline transport must be 'rdma' or 'local'";
-    }
-    if (transport.getValue() == "local" && controller.isRemote()) {
-        return emitError() << "local transport does not support a remote controller";
+    if (!transport || (transport.getValue() != "rdma" && transport.getValue() != "memcpy")) {
+        return emitError() << "backline transport must be 'rdma' or 'memcpy'";
     }
     for (NodeAttr c : coprocessors) {
         if (!c) {
@@ -88,8 +85,9 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
         if (!c.getSymbol() || c.getSymbol().getValue().empty()) {
             return emitError() << "coprocessor requires a 'symbol'";
         }
-        if (transport.getValue() == "local" && c.isRemote()) {
-            return emitError() << "local transport does not support remote coprocessors";
+        if (transport.getValue() == "memcpy" && c.isRemote() != controller.isRemote()) {
+            return emitError()
+                   << "memcpy transport requires controller and coprocessor on the same node";
         }
     }
     return success();

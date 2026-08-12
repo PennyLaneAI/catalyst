@@ -37,8 +37,8 @@ func.func @transport_smoketest(%payload: memref<?xi8>, %reply: memref<?xi8>) {
 
   // CHECK: transport.establish_channel %{{.*}} "rdma" : !transport.session<controller>
   transport.establish_channel %ct "rdma" : !transport.session<controller>
-  // CHECK: transport.establish_channel %{{.*}} "local" : !transport.session<coprocessor>
-  transport.establish_channel %co "local" : !transport.session<coprocessor>
+  // CHECK: transport.establish_channel %{{.*}} "memcpy" : !transport.session<coprocessor>
+  transport.establish_channel %co "memcpy" : !transport.session<coprocessor>
 
   // CHECK: transport.set_coprocessor_fn %{{.*}} {symbol = "foo"} : !transport.session<coprocessor>
   transport.set_coprocessor_fn %co {symbol = "foo"} : !transport.session<coprocessor>

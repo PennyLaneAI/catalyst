@@ -37,7 +37,7 @@ TEST_CASE("local_copy CPU controller can drive the local GPU coprocessor",
     MemRegion request = coprocessor.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
     PeerRef peer_reply = coprocessor.exchange_keys(request);
 
-    ChannelDesc desc{.transport = "local"};
+    ChannelDesc desc{.transport = "memcpy"};
     controller.establish_channel(desc, reply, peer_request);
     coprocessor.establish_channel(desc, request, peer_reply);
 

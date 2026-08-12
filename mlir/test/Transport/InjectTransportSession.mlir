@@ -291,13 +291,13 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 
 // -----
 
-// Local backline transport selects the local channel.
+// Memcpy backline transport selects the local channel.
 
 // CHECK-LABEL: func.func @setup
 // CHECK:         quantum.init
-// CHECK-DAG:     transport.establish_channel %{{.*}} "local" : !transport.session<controller>
-// CHECK-DAG:     transport.establish_channel %{{.*}} "local" : !transport.session<coprocessor>
-module attributes {catalyst.backline = #transport.backline<transport = "local", controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18592 : i16, in_bytes = 3 : i64, out_bytes = 8 : i64>,
+// CHECK-DAG:     transport.establish_channel %{{.*}} "memcpy" : !transport.session<controller>
+// CHECK-DAG:     transport.establish_channel %{{.*}} "memcpy" : !transport.session<coprocessor>
+module attributes {catalyst.backline = #transport.backline<transport = "memcpy", controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18592 : i16, in_bytes = 3 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "y", config = "c", peer = "127.0.0.1", oob_port = 18592 : i16, symbol = "coproc_fn", name = "cop0">]>} {
   func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
     %0 = catalyst.launch_kernel @module_circuit::@circuit() : () -> tensor<4xf64>
