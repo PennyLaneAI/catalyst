@@ -27,6 +27,9 @@ target_link_libraries(catalyst_transport_cpu_verbs_coprocessor PRIVATE cpu_verbs
 add_library(steane_coprocessor_cpu SHARED coprocessor/coprocessor_functions/steane_decoder_fn.cpp)
 set_property(TARGET steane_coprocessor_cpu PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+add_library(echo_coprocessor_cpu SHARED coprocessor/coprocessor_functions/echo_coprocessor_fn.cpp)
+set_property(TARGET echo_coprocessor_cpu PROPERTY POSITION_INDEPENDENT_CODE ON)
+
 # Self-contained loopback application for testing
 add_executable(cpu_verbs_selftest cpu_verbs_selftest.cpp)
 target_link_libraries(cpu_verbs_selftest PRIVATE cpu_verbs_impl)

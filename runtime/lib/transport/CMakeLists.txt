@@ -32,8 +32,9 @@ add_dependencies(transport_all rt_transport)
 if(IBVERBS_LIB)
     add_subdirectory(common)
     add_subdirectory(cpu_verbs)
-    add_dependencies(transport_all catalyst_transport_cpu_controller
-                     catalyst_transport_cpu_coprocessor steane_coprocessor)
+    add_dependencies(transport_all catalyst_transport_cpu_verbs_controller
+                     catalyst_transport_cpu_verbs_coprocessor
+                     steane_coprocessor_cpu echo_coprocessor_cpu)
 
     # GPU coprocessor backend — only when a HIP toolchain is present.
     include(CheckLanguage)
@@ -42,7 +43,7 @@ if(IBVERBS_LIB)
         message(STATUS "transport: HIP found (${CMAKE_HIP_COMPILER}) -> building gpu_verbs")
         set(TRANSPORT_HAS_HIP TRUE CACHE INTERNAL "transport: HIP toolchain available")
         add_subdirectory(gpu_verbs)
-        add_dependencies(transport_all catalyst_transport_gpu_coprocessor)
+        add_dependencies(transport_all catalyst_transport_gpu_verbs_coprocessor)
     else()
         message(STATUS "transport: no HIP compiler -> skipping gpu_verbs")
     endif()
@@ -50,14 +51,4 @@ else()
     message(STATUS
         "transport: libibverbs not found -> building rt_transport only. The bundled backends "
         "are skipped; install libibverbs-dev / rdma-core to build them.")
-endif()
-
-add_custom_target(transport_backends
-    DEPENDS
-    catalyst_transport_cpu_verbs_controller
-    catalyst_transport_cpu_verbs_coprocessor
-    steane_coprocessor_cpu
-)
-if(TRANSPORT_HAS_HIP)
-    add_dependencies(transport_backends catalyst_transport_gpu_verbs_coprocessor)
 endif()
