@@ -451,6 +451,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (raw.contains('{') || raw.contains('[')) {
                 llvm::StringRef inner = raw.ends_with(")") ? raw.drop_back(1) : raw;
                 OperatorNode innerNode = parseOperator(inner);
+                node.name = innerNode.name;
+                node.numWires = innerNode.numWires;
+                node.numParams = innerNode.numParams;
                 node.id = original.str();
                 return node;
             }
