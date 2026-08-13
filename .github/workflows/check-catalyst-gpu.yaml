@@ -121,9 +121,6 @@ jobs:
         with:
           path: llvm-build
           key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-gpu-build
-          restore-keys: |
-            ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
-            ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-
 
       - name: Build LLVM
         if: steps.cache-llvm-build.outputs.cache-hit != 'true'
