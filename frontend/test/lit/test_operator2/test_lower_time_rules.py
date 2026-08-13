@@ -25,24 +25,13 @@ import pennylane as qp
 from jax import numpy as jnp
 from operator2_dummy_gates import (
     CompilableData,
-    HybridOpArg,
-    HybridWires,
-    MultiParams,
     MultipleFullArgs,
-    MultipleRegisters,
     NoParams,
-    NoParamsCustomOp,
     SingleParam,
     SingleParamCustomOp,
     StaticData,
-    StaticDataMultiReg,
 )
-from pennylane.core import Operator2
-from pennylane.typing import Complex, Float, Int, Wire
-
-from catalyst.decomposition.decomposition_rules import (
-    compile_decomposition_rules_wrapper,
-)
+from pennylane.typing import Float, Int, Wire
 
 
 def test_one_rule():
