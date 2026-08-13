@@ -418,9 +418,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             OperatorNode node;
             node.numWires = op.getNonCtrlQubitOperands().size();
-            node.adjoint = op.getAdjointFlag();
 
-            node.name = op.getOperatorName();
+            // The modifier is carried in the name (mirroring the id), so the solver needs no
+            // per-modifier field: `Adjoint(RZ)` won't match a base `RZ` gate-set entry.
+            node.name = op.getAdjointFlag() ? ("Adjoint(" + op.getOperatorName() + ")")
+                                            : op.getOperatorName();
             node.id = op.getGraphOpId();
 
             if (auto paramOp =
@@ -442,16 +444,17 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         OperatorNode node;
         llvm::StringRef original = raw;
 
-        // Unwrap "Adjoint(Op)"
+        // Unwrap "Adjoint(Op)". The modifier is kept in both the id and the (coarser) name, so the
+        // solver never needs a modifier flag: a modified operator's name won't match a base
+        // gate-set entry.
         if (raw.consume_front("Adjoint(")) {
-            node.adjoint = true;
             // New graphOpId form "Adjoint(<base-id>)" (the inner carries '{'/'[' brace groups),
             // matching defaultGetGraphOpId's wrapping. The whole string is the id; recurse on the
             // inner base-id to recover name/wires/params.
             if (raw.contains('{') || raw.contains('[')) {
                 llvm::StringRef inner = raw.ends_with(")") ? raw.drop_back(1) : raw;
                 OperatorNode innerNode = parseOperator(inner);
-                node.name = innerNode.name;
+                node.name = "Adjoint(" + innerNode.name + ")";
                 node.numWires = innerNode.numWires;
                 node.numParams = innerNode.numParams;
                 node.id = original.str();
@@ -460,10 +463,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // Legacy form "Adjoint(Name)" optionally followed by a "(w,p)" suffix.
             auto closeIdx = raw.rfind(')');
             if (closeIdx == llvm::StringRef::npos) {
-                node.name = raw.trim().str();
+                node.name = "Adjoint(" + raw.trim().str() + ")";
                 return node;
             }
-            node.name = raw.take_front(closeIdx).trim().str();
+            node.name = "Adjoint(" + raw.take_front(closeIdx).trim().str() + ")";
             raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
         } else if (raw.contains('[') || raw.contains('{')) {
             node.id = raw.str();
