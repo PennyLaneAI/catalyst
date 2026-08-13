@@ -16,6 +16,7 @@
 path/log resolvers, verbosity state, and small free helpers (:func:`random_port`,
 :func:`triple_from_uname`, :func:`log_cmd`)."""
 
+import re
 from unittest.mock import patch
 
 import pytest
@@ -24,38 +25,13 @@ from catalyst.executor.utils import (
     ExecutorFlags,
     ExecutorPaths,
     OutputPatterns,
-    PortInUse,
     ShellText,
-    Unquoted,
     log_cmd,
     random_port,
     set_verbose,
     triple_from_uname,
     verbose_level,
 )
-
-
-class TestPortInUse:
-    """The :class:`PortInUse` exception type."""
-
-    def test_is_exception(self):
-        """Subclasses :class:`Exception`."""
-        assert issubclass(PortInUse, Exception)
-
-
-class TestUnquoted:
-    """The :class:`Unquoted` string marker used for no-quote shell values."""
-
-    def test_is_str_subclass(self):
-        """``Unquoted`` is a :class:`str` subclass whose value equals the wrapped text."""
-        assert issubclass(Unquoted, str)
-        assert Unquoted("$HOME") == "$HOME"
-
-    def test_preserves_content(self):
-        """A ``Unquoted`` instance is both :class:`Unquoted` and :class:`str`."""
-        r = Unquoted("$LIBDIR/x.so")
-        assert isinstance(r, Unquoted)
-        assert isinstance(r, str)
 
 
 class TestOutputPatterns:
@@ -140,7 +116,21 @@ class TestShellText:
         # Metacharacters in the pattern must not break out.
         cmd = ShellText.pkill("evil; rm -rf /")
         assert cmd.startswith("pkill -f ")
-        assert "'evil; rm -rf /'" in cmd
+        assert "'[e]vil; rm -rf /'" in cmd
+
+    def test_pkill_pattern_cannot_match_itself(self):
+        """The first character is bracketed, so the pattern does not match its own command text.
+
+        ``sshd`` runs the remote command through a shell, putting the pattern in that shell's argv;
+        an unbracketed pattern makes ``pkill -f`` kill the shell running it.
+        """
+        cmd = ShellText.pkill("catalyst-executor.*--bind=127.0.0.1:9000")
+        assert "[c]atalyst-executor" in cmd
+        assert re.search(r"catalyst-executor\.\*", cmd) is None
+
+    def test_pkill_leaves_a_non_alphanumeric_first_character_alone(self):
+        """Bracketing only applies to a literal first character, not to regex syntax."""
+        assert ShellText.pkill("^catalyst") == "pkill -f '^catalyst'"
 
     def test_rm_rf_quotes_path(self):
         """``rm_rf`` shell-quotes paths with spaces."""

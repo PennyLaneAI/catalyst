@@ -54,40 +54,66 @@ from .ssh import SCP, RemoteOps
 from .utils import (
     MAX_PORT_TRIES,
     ExecutorPaths,
-    PortInUse,
     random_port,
     set_verbose,
     triple_from_uname,
 )
 
 
+def _teardown_process_and_workspace(proc: _ExecutorProcess) -> None:
+    """Tear down a process that never became the live executor, its generated workspace included.
+    Only a started process is registered for shutdown at exit, so nothing else would reach this
+    one."""
+    with contextlib.suppress(Exception):
+        proc.stop()
+    with contextlib.suppress(Exception):
+        proc.teardown_workspace()
+
+
 def _start_on_free_port(
     make_process: Callable[[int], _ExecutorProcess],
     pinned_port: int | None,
     max_tries: int = MAX_PORT_TRIES,
+    strict: bool = False,
 ) -> _ExecutorProcess:
     """Start a process on a free port. Tries ``pinned_port`` first, then up to ``max_tries``
-    random ports; retries on :class:`PortInUse`.
+    random ports; retries while the executor reports the port already bound.
 
     A pinned port that was busy silently falls back to a random one; treat
-    :attr:`Executor.address` as authoritative.
+    :attr:`Executor.address` as authoritative. ``strict`` (which requires ``pinned_port``) tries
+    that port alone, for an executor whose address was published before it launched.
 
     Raises:
-        RuntimeError: If no port bound after all attempts.
+        RuntimeError: If no port bound after all attempts. Any other launch failure propagates
+            unchanged.
     """
-    ports_to_try = ([pinned_port] if pinned_port is not None else []) + [
-        random_port() for _ in range(max_tries)
-    ]
-    last: PortInUse | None = None
+    if strict:
+        assert pinned_port is not None, "strict needs a pinned port"
+        ports_to_try = [pinned_port]
+    else:
+        ports_to_try = ([pinned_port] if pinned_port is not None else []) + [
+            random_port() for _ in range(max_tries)
+        ]
+    last = ""
+    proc: _ExecutorProcess | None = None
     for port in ports_to_try:
         proc = make_process(port)
         try:
             return proc.start()
-        except PortInUse as e:
-            last = e
-            proc._say(f"port {port} busy, trying another")
+        except BaseException as e:  # BaseException: an interrupted deploy needs teardown too
+            if not proc.port_conflict:
+                _teardown_process_and_workspace(proc)  # another port would fail the same way
+                raise
+            last = str(e)
+            proc._log_message(f"port {port} busy, trying another")
+            with contextlib.suppress(Exception):
+                proc.stop()  # workspace left in place: the next attempt reuses it
+    if proc is not None:
+        _teardown_process_and_workspace(proc)
     raise RuntimeError(
-        f"no free executor port after {len(ports_to_try)} tries ({last}). Pin one with port=."
+        f"pinned executor port {pinned_port} is already in use"
+        if strict
+        else f"no free executor port after {len(ports_to_try)} tries ({last}). Pin one with port=."
     )
 
 
@@ -120,21 +146,58 @@ _sessions = _SessionRegistry()
 
 @dataclass
 class ExecutorConfig:
-    """User-supplied configuration for an :class:`Executor`."""
+    """User-supplied configuration for an :class:`Executor`. The deployment fields apply to a remote
+    executor only; a ``local=True`` one runs in the current directory."""
 
     user: str = ""
+    """SSH account on the remote host. Empty means the local username."""
+
     port: int | None = None
+    """Port the executor binds on the target, and the local end of the tunnel reaching it.
+    ``ssh -L`` uses the number at both ends, so two executors sharing one collide on this machine.
+    ``None`` picks a free one at launch, so the address is only known afterwards."""
+
     workspace: str | None = None
+    """Directory on the target the executor runs in. ``None`` generates a ``catalyst-exec-*`` one
+    per launch and removes it on teardown; a directory named here is left in place."""
+
     bundle: str | Path | None = None
+    """Local directory holding the executor binary and the libraries it needs. Sent to
+    :attr:`workspace` when :attr:`copy` is set, and otherwise unused."""
+
     plugins: list[str] | None = None
+    """Shared libraries the executor ``dlopen``s at startup, in this order. A bare filename resolves
+    against the workspace; ``~`` and absolute paths are taken as given. They share the global
+    namespace, so the first definition of a symbol wins."""
+
     copy: bool = False
+    """Whether to send :attr:`bundle` to the target before starting the executor."""
+
     ready_timeout: float = 60.0
+    """Seconds to wait for the executor to report that it bound its port."""
+
     sudo: bool = False
+    """Run the executor as root, for a target whose devices are not world-accessible."""
+
     sudo_password: str | None = None
+    """Password piped to ``sudo -S``; unneeded with passwordless sudo. Supplying one drops the SSH
+    TTY, so closing the session no longer signals the executor and teardown falls to ``pkill``."""
+
     executor_bin: str | None = None
+    """Command that starts the executor, for wrapping it in something like ``numactl``. Defaults to
+    the workspace binary when the workspace holds one (:attr:`copy`, or a pinned :attr:`workspace`),
+    else the bare name from ``PATH``."""
+
     triple: str | None = None
+    """LLVM target triple to cross-compile this node's code for. ``None`` detects it from the
+    target's ``uname``, which requires reaching the host."""
+
     env: dict[str, str] | None = None
+    """Environment for the executor process. Applied after any privilege change, since ``sudo`` is
+    setuid and the dynamic linker drops ``LD_*`` across it."""
+
     verbose: int = 1
+    """How much launcher narration to log: ``0`` quiet, ``1`` normal, ``2`` per-command detail."""
 
 
 class Executor:
@@ -196,13 +259,42 @@ class Executor:
         )
         self._proc: _ExecutorProcess | None = None
         self._launched = False
+        self._committed = False
 
     @property
     def address(self) -> str:
-        """The ``host:port`` the executor serves on. Raises :class:`RuntimeError` if not launched."""
-        if not self._launched:
+        """The ``host:port`` the executor serves on. Raises :class:`RuntimeError` if it is neither
+        launched nor committed to an address by :meth:`resolve`."""
+        if not (self._launched or self._committed):
             raise RuntimeError("Executor not launched; call .launch() or use `with Executor(...)`")
         return self._address
+
+    def resolve(self) -> Executor | None:
+        """Commit to the address this executor will serve on, without deploying it.
+
+        Compiled programs carry their executor's address, so it has to be known before the executor
+        runs; committing to it here lets the deployment wait until execution. Only possible when the
+        address is predictable: an attached executor already has one, and a deployed one needs
+        ``port=`` pinned, since a free-port search settles the address only at launch.
+
+        Returns:
+            Executor | None: ``self`` if an address could be committed to, ``None`` if it is only
+            knowable by launching and the caller should do that.
+        """
+        if self._launched or self._committed:
+            return self
+        if not (self._local or self.host):  # attached: the address came from the caller
+            if self._address is None:
+                return None  # no mode at all; launch() reports that
+            self._committed = True
+            return self
+        if self._cfg.port is None:
+            return None
+        # Local or remote, a deployed executor is reached on loopback -- directly, or at the ssh
+        # tunnel's local end -- which is the address both process classes report.
+        self._address = f"{_ExecutorProcess.LOCALHOST}:{self._cfg.port}"
+        self._committed = True
+        return self
 
     @cached_property
     def triple(self) -> str | None:
@@ -270,11 +362,13 @@ class Executor:
         sudo_pw = (
             RemoteOps.resolve_sudo(user, host, self._cfg.sudo_password) if self._cfg.sudo else None
         )
+        RemoteOps.mkdir(user, host, workspace)  # the launch command cd's into it
         self._scp_bundle(user, host, workspace)
-        # Copied bundle -> run it from the workspace (./); sudo's secure_path would miss a bare
-        # name. Bare name only when attaching to a remote that has it on PATH.
+        # A copied or pinned workspace holds the binary, so run it from there; sudo's secure_path
+        # would miss a bare name. Bare name only when attaching to a remote that has it on PATH.
+        ws_holds_bin = self._cfg.copy or ws_pinned
         default_bin = (
-            f"./{ExecutorPaths.EXECUTOR_BIN}" if self._cfg.copy else ExecutorPaths.EXECUTOR_BIN
+            f"./{ExecutorPaths.EXECUTOR_BIN}" if ws_holds_bin else ExecutorPaths.EXECUTOR_BIN
         )
         log_path = ExecutorPaths.resolve_log(host, name=self.name)
         ready_timeout = self._cfg.ready_timeout
@@ -315,7 +409,7 @@ class Executor:
             return self
         set_verbose(self._cfg.verbose)
         make = self._local_maker() if self._local else self._remote_maker()
-        self._proc = _start_on_free_port(make, self._cfg.port)
+        self._proc = _start_on_free_port(make, self._cfg.port, strict=self._committed)
         self._address = self._proc.addr
         self._launched = True
         _sessions.register(self._proc)

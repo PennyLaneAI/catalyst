@@ -26,7 +26,7 @@ from unittest.mock import patch
 import pytest
 
 from catalyst.executor.ssh import SCP, RemoteLauncher, RemoteOps, SSHArgv
-from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, Unquoted, set_verbose
+from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, set_verbose
 
 # ---------------------------------------------------------------------------
 # SSHArgv — control socket, argv construction
@@ -417,11 +417,6 @@ class TestRemoteLauncherHelpers:
         """Bare string env values are single-quoted for shell safety."""
         assert RemoteLauncher._env_prefix({"FOO": "bar baz"}) == "FOO='bar baz'"
 
-    def test_env_prefix_leaves_raw_unquoted(self):
-        """:class:`Unquoted` env values pass through without quoting so shell expansion works."""
-        out = RemoteLauncher._env_prefix({"LD_LIBRARY_PATH": Unquoted("$HOME/lib")})
-        assert out == "LD_LIBRARY_PATH=$HOME/lib"
-
     def test_plugin_args_bare_name_pins_to_pwd(self):
         """A bare plugin filename is pinned to ``$PWD`` on the remote."""
         out = RemoteLauncher._plugin_args(["libx.so"])
@@ -431,11 +426,6 @@ class TestRemoteLauncherHelpers:
         """An absolute plugin path is preserved verbatim."""
         out = RemoteLauncher._plugin_args(["/opt/lib/x.so"])
         assert "--plugin=/opt/lib/x.so" in out
-
-    def test_plugin_args_raw_pass_through(self):
-        """:class:`Unquoted` plugin values are emitted without any path prefixing."""
-        out = RemoteLauncher._plugin_args([Unquoted("$LIBDIR/x.so")])
-        assert out == "--plugin=$LIBDIR/x.so"
 
     def test_chmod_prefix_only_for_local_binary(self):
         """``chmod +x`` prefix is emitted only for the workspace-local executor binary."""
