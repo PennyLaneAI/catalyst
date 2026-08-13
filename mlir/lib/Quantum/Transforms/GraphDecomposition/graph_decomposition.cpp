@@ -440,10 +440,21 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
+        llvm::StringRef original = raw;
 
-        // Unwrap "Adjoint(GateName)"
+        // Unwrap "Adjoint(Op)"
         if (raw.consume_front("Adjoint(")) {
             node.adjoint = true;
+            // New graphOpId form "Adjoint(<base-id>)" (the inner carries '{'/'[' brace groups),
+            // matching defaultGetGraphOpId's wrapping. The whole string is the id; recurse on the
+            // inner base-id to recover name/wires/params.
+            if (raw.contains('{') || raw.contains('[')) {
+                llvm::StringRef inner = raw.ends_with(")") ? raw.drop_back(1) : raw;
+                OperatorNode innerNode = parseOperator(inner);
+                node.id = original.str();
+                return node;
+            }
+            // Legacy form "Adjoint(Name)" optionally followed by a "(w,p)" suffix.
             auto closeIdx = raw.rfind(')');
             if (closeIdx == llvm::StringRef::npos) {
                 node.name = raw.trim().str();
