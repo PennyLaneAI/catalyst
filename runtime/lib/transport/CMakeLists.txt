@@ -9,7 +9,7 @@ target_include_directories(rt_transport
     ${runtime_includes}
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/common       # WireProtocol.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/rdma/common  # WireProtocol.hpp
     ${PROJECT_SOURCE_DIR}/lib/backend/common  # DynamicLibraryLoader.hpp
 )
 
@@ -30,8 +30,8 @@ add_custom_target(transport_all)
 add_dependencies(transport_all rt_transport)
 
 if(IBVERBS_LIB)
-    add_subdirectory(common)
-    add_subdirectory(cpu_verbs)
+    add_subdirectory(rdma/common)
+    add_subdirectory(rdma/cpu_verbs)
     add_dependencies(transport_all catalyst_transport_cpu_verbs_controller
                      catalyst_transport_cpu_verbs_coprocessor steane_coprocessor_cpu)
 
@@ -55,7 +55,7 @@ if(IBVERBS_LIB)
             find_package(CUDAToolkit REQUIRED)
         endif()
         set(TRANSPORT_HAS_HIP TRUE CACHE INTERNAL "transport: HIP toolchain available")
-        add_subdirectory(gpu_verbs)
+        add_subdirectory(rdma/gpu_verbs)
         add_dependencies(transport_all catalyst_transport_gpu_verbs_coprocessor)
     else()
         message(STATUS "transport: no HIP compiler -> skipping gpu_verbs")

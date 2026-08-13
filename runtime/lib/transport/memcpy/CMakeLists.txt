@@ -10,7 +10,7 @@ target_include_directories(memcpy_cpu_impl PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu_controller
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu_coprocessor
-    ${CMAKE_CURRENT_SOURCE_DIR}/../common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../rdma/common
     ${runtime_includes}
 )
 set_property(TARGET memcpy_cpu_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -35,9 +35,9 @@ if(TRANSPORT_HAS_HIP)
     target_include_directories(memcpy_gpu_impl PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/gpu_coprocessor
-        ${CMAKE_CURRENT_SOURCE_DIR}/../common
-        ${CMAKE_CURRENT_SOURCE_DIR}/../gpu_verbs/coprocessor
-        ${CMAKE_CURRENT_SOURCE_DIR}/../gpu_verbs/coprocessor/coprocessor_functions
+        ${CMAKE_CURRENT_SOURCE_DIR}/../rdma/common
+        ${CMAKE_CURRENT_SOURCE_DIR}/../rdma/gpu_verbs/coprocessor
+        ${CMAKE_CURRENT_SOURCE_DIR}/../rdma/gpu_verbs/coprocessor/coprocessor_functions
         ${runtime_includes}
     )
     target_link_libraries(memcpy_gpu_impl PUBLIC
