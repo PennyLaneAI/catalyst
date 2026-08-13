@@ -474,14 +474,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
 void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
                                                 bool isAdjoint) const {
     if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
-        std::string opId = inst.getGraphOpId();
-        // TODO: Use Adjoint function from DecomposableGate
-        if (auto resourceOp = dyn_cast<ResourceQuantumOpInterface>(op)) {
-            if (isAdjoint ^ resourceOp.getResourceAdjointFlag()) {
-                opId += "[adj]";
-            }
-        }
-        result.detailedOperations[opId] += 1;
+        // Keep the canonical graph ID unchanged so it matches decomposition rules. 
+        // Adjoint and control details will appear here once getGraphOpId() encodes them.
+        result.detailedOperations[inst.getGraphOpId()] += 1;
         return;
     }
 

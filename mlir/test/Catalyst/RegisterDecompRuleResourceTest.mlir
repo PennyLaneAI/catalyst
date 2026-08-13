@@ -157,7 +157,7 @@ func.func @rule_with_nested_loop(%arg0: !quantum.bit) -> !quantum.bit attributes
 // -----
 
 // Rules with parametric ops
-// CHECK:  operations = {"Rot[f64,f64,f64][2]{}" = 1 : i64, "Rot[f64,f64,f64][2]{}[adj]" = 1 : i64}}
+// CHECK:  operations = {"Rot[f64,f64,f64][2]{}" = 2 : i64}
 func.func @rule_with_parametric_ops(%arg0: !quantum.bit) -> !quantum.bit attributes {target_gate="gate"} {
     %cst_0 = arith.constant 0.1 : f64
     %cst_1 = arith.constant 0.2 : f64
