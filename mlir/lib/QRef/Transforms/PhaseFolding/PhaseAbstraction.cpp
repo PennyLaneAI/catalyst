@@ -123,6 +123,27 @@ void PhaseAbstraction::projectOutAuxVars(const AffineRelation& cond)
     });
 }
 
+std::string PhaseAbstraction::toString(const AffineSchema& schema) const
+{
+    std::string res = "";
+    for (const auto &[parity, contributors] : activeBundles) {
+
+        std::string pre = parity.toStringWithOrder(schema.preVars);
+        std::string aux = parity.toStringWithOrder(schema.auxVars);
+
+        res += (pre + " " + aux + " -> " + contributors.toString() + "\n");
+    }
+    
+    if (!orphanBundles.empty()) {
+        res += "Unsat -> ";
+        for (const GateBundle &contributors : orphanBundles) {
+            res += contributors.toString() + ", ";
+        }
+        res += "\n";
+    }
+    return res;
+}
+
 /*
     Print:
 */

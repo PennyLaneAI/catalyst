@@ -53,6 +53,11 @@ class AffineRelation : public AffineBase<RelationSchema> {
     
     // Prints
     [[nodiscard]] std::string toString() const;
+    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AffineRelation &affRelation)
+    {
+        os << affRelation.toString();
+        return os;
+    }
 
     // Checks & Inspections
     [[nodiscard]] bool isTrivial();

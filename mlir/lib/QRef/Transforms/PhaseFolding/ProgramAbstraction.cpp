@@ -142,7 +142,7 @@ namespace catalyst::phase_folding {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ProgramAbstraction &progAbs)
 {
-    os << ".Phase abstraction:\n" << progAbs.phases.toString(progAbs.getSchema().getOrder());
+    os << ".Phase abstraction:\n" << progAbs.phases.toString(progAbs.getSchema());
     os << ".Affine transformation:\n" << progAbs.stateTransform;
     return os;
 }

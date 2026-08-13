@@ -18,6 +18,7 @@
 
 #include <cassert>
 #include <cmath> // std::abs
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -69,6 +70,191 @@ struct GateStatsHolder {
             }
         }
         os << "\n";
+    }
+};
+
+struct AbstractionTracer {
+    struct ContextScope {
+        AbstractionTracer *tracer;
+        llvm::StringRef label;
+
+        ContextScope(AbstractionTracer *tracer, llvm::StringRef label)
+            : tracer(tracer), label(label)
+        {
+            if (tracer) {
+                tracer->enter(label);
+            }
+        }
+
+        ~ContextScope()
+        {
+            if (tracer) {
+                tracer->exit(label);
+            }
+        }
+
+        ContextScope(const ContextScope &) = delete;
+        ContextScope &operator=(const ContextScope &) = delete;
+    };
+
+    struct StepContext {
+        unsigned subStep = 0;
+    };
+
+    std::unique_ptr<llvm::raw_fd_ostream> os;
+    unsigned rootStep = 0;
+    llvm::SmallVector<unsigned, 8> stepPath;
+    llvm::SmallVector<StepContext, 8> stepContexts;
+
+    explicit AbstractionTracer(llvm::StringRef path)
+    {
+        std::error_code ec;
+        auto stream = std::make_unique<llvm::raw_fd_ostream>(path, ec);
+        if (!ec) {
+            os = std::move(stream);
+        }
+    }
+
+    explicit operator bool() const { return os != nullptr; }
+
+    [[nodiscard]] ContextScope context(llvm::StringRef label)
+    {
+        return ContextScope(this, label);
+    }
+
+    void logAfterGate(qref::CustomOp &op, llvm::ArrayRef<size_t> wires,
+                      const ProgramAbstraction &abst)
+    {
+        logStep(
+            [&](llvm::raw_ostream &out) {
+                out << "gate " << op.getGateName() << " on ";
+                if (wires.size() == 1) {
+                    out << "wire " << wires.front();
+                } else {
+                    out << "wires ";
+                    for (size_t i = 0; i < wires.size(); ++i) {
+                        if (i > 0) {
+                            out << ", ";
+                        }
+                        out << wires[i];
+                    }
+                }
+            },
+            [&] {
+                op.getLoc().print(*os);
+                *os << '\n';
+                writeValue(abst);
+            });
+    }
+
+    void logBranchExit(llvm::StringRef branch, const ProgramAbstraction &abst)
+    {
+        logStep([&](llvm::raw_ostream &out) { out << branch << " branch-exit"; },
+                [&] { writeValue(abst); });
+    }
+
+    void logRegionSummary(llvm::StringRef region, const RegionSummary &summary)
+    {
+        logStep([&](llvm::raw_ostream &out) { out << region << " region-summary"; },
+                [&] { writeValue(summary); });
+    }
+
+    void logAfterSummaryApplied(llvm::StringRef region, const ProgramAbstraction &parent)
+    {
+        logStep([&](llvm::raw_ostream &out) { out << region << " parent-after-merge"; },
+                [&] { writeValue(parent); });
+    }
+
+  private:
+    void enter(llvm::StringRef label)
+    {
+        if (!os) {
+            return;
+        }
+        unsigned anchor = stepContexts.empty() ? nextRootStep() : nextSubStep();
+        stepPath.push_back(anchor);
+        stepContexts.emplace_back();
+
+        *os << "\n--- step ";
+        writeStepNumber(*os);
+        *os << " [enter " << label << "] ---\n";
+    }
+
+    void exit(llvm::StringRef label)
+    {
+        if (!os || stepContexts.empty()) {
+            return;
+        }
+        *os << "\n--- step ";
+        writeStepNumber(*os, nextSubStep());
+        *os << " [exit " << label << "] ---\n";
+
+        stepContexts.pop_back();
+        stepPath.pop_back();
+    }
+
+    unsigned nextRootStep() { return ++rootStep; }
+
+    unsigned nextSubStep()
+    {
+        assert(!stepContexts.empty());
+        return ++stepContexts.back().subStep;
+    }
+
+    void writeStepNumber(llvm::raw_ostream &out, unsigned subStep = 0) const
+    {
+        if (stepPath.empty()) {
+            out << subStep;
+            return;
+        }
+        for (size_t i = 0; i < stepPath.size(); ++i) {
+            if (i > 0) {
+                out << '.';
+            }
+            out << stepPath[i];
+        }
+        if (subStep > 0) {
+            out << '.' << subStep;
+        }
+    }
+
+    void logStep(llvm::StringRef tag, llvm::function_ref<void()> body)
+    {
+        if (!os) {
+            return;
+        }
+        *os << "\n--- step ";
+        if (stepContexts.empty()) {
+            *os << nextRootStep();
+        } else {
+            writeStepNumber(*os, nextSubStep());
+        }
+        *os << " [" << tag << "] ---\n";
+        body();
+    }
+
+    void logStep(llvm::function_ref<void(llvm::raw_ostream &)> tagWriter,
+                 llvm::function_ref<void()> body)
+    {
+        if (!os) {
+            return;
+        }
+        *os << "\n--- step ";
+        if (stepContexts.empty()) {
+            *os << nextRootStep();
+        } else {
+            writeStepNumber(*os, nextSubStep());
+        }
+        *os << " [";
+        tagWriter(*os);
+        *os << "] ---\n";
+        body();
+    }
+
+    template <typename T>
+    void writeValue(const T &value)
+    {
+        *os << value << '\n';
     }
 };
 
@@ -165,10 +351,12 @@ struct WireTable {
 
 struct PhaseAnalyzer {
   public:
-    PhaseAnalyzer(PhaseFoldingPlan &plan) : plan(plan) {}
+    PhaseAnalyzer(PhaseFoldingPlan &plan, AbstractionTracer *tracer = nullptr) 
+        : plan(plan), tracer(tracer) {}
 
   private:
     PhaseFoldingPlan &plan;
+    AbstractionTracer *tracer;
 
     GateID gateID = -1;
 
@@ -235,6 +423,10 @@ struct PhaseAnalyzer {
         plan.stats.updateInitialCount(gate);
     
         progAbst.applyGate(gate, customOp.getAdjointFlag(), wires, gateID);
+
+        if (tracer) {
+            tracer->logAfterGate(customOp, wires, progAbst);
+        }
     }
 
     void initQubitsState(qref::SetBasisStateOp basisOp, ProgramAbstraction &progAbst, WireTable &wireTable)
@@ -269,35 +461,56 @@ struct PhaseAnalyzer {
 
     // --- Control Flow Handlers ---
 
+    void mergeRegionIntoParent(llvm::StringRef regionLabel, RegionSummary summary,
+                               ProgramAbstraction &parentAbst)
+    {
+        if (tracer) {
+            tracer->logRegionSummary(regionLabel, summary);
+        }
+        parentAbst.applySummary(std::move(summary));
+        if (tracer) {
+            tracer->logAfterSummaryApplied(regionLabel, parentAbst);
+        }
+    }
+
     void handleIfOp(mlir::scf::IfOp ifOp, ProgramAbstraction &parentAbst, WireTable &wireTable) 
     {
+        AbstractionTracer::ContextScope traceScope(tracer, "scf.if");
+
         ProgramAbstraction thenAbst(parentAbst.numQubits());
         ProgramAbstraction elseAbst(parentAbst.numQubits());
 
         analyzeBlock(&ifOp.getThenRegion().front(), thenAbst, wireTable);
-        
+        if (tracer) {
+            tracer->logBranchExit("then", thenAbst);
+        }
+
         if (!ifOp.getElseRegion().empty()) {
             analyzeBlock(&ifOp.getElseRegion().front(), elseAbst, wireTable);
+            if (tracer) {
+                tracer->logBranchExit("else", elseAbst);
+            }
         }
 
         // llvm::outs() << "thenAbst: " << thenAbst << "\n";
         // llvm::outs() << "elseAbst: " << elseAbst << "\n";
         // llvm::outs() << "parentAbst: " << parentAbst << "\n";
         RegionSummary branchSummary(RegionType::Conditional, thenAbst, &elseAbst);
-        // llvm::outs() << "branchSummary: " << branchSummary << "\n";
-        parentAbst.applySummary(std::move(branchSummary));
-        // llvm::outs() << "parentAbst after applySummary: " << parentAbst << "\n";
+        mergeRegionIntoParent("scf.if", std::move(branchSummary), parentAbst);
     }
 
     void handleForOp(mlir::scf::ForOp forOp, ProgramAbstraction &parentAbst, WireTable &wireTable) 
     {
-        ProgramAbstraction loopAbst(parentAbst.numQubits());
+        AbstractionTracer::ContextScope traceScope(tracer, "scf.for");
 
+        ProgramAbstraction loopAbst(parentAbst.numQubits());
         analyzeBlock(&forOp.getBodyRegion().front(), loopAbst, wireTable);
+        if (tracer) {
+            tracer->logBranchExit("body", loopAbst);
+        }
 
         RegionSummary loopSummary(RegionType::Loop, loopAbst);
-
-        parentAbst.applySummary(std::move(loopSummary));
+        mergeRegionIntoParent("scf.for", std::move(loopSummary), parentAbst);
     }
 
     void handleCallOp(mlir::func::CallOp callOp, ProgramAbstraction &parentAbst, WireTable &wireTable) 
@@ -335,7 +548,7 @@ struct PhaseAnalyzer {
             })
             .Case<mlir::func::CallOp>([&](mlir::func::CallOp callOp) {
                 llvm::outs() << "CallOp:    " << callOp << "\n";
-                handleCallOp(callOp, currentAbst, wireTable);
+                // handleCallOp(callOp, currentAbst, wireTable);
             })
             .Case<qref::CustomOp>([&](qref::CustomOp customOp) {
                 llvm::outs() << "CustomOp:  " << customOp << "\n";
@@ -570,6 +783,8 @@ struct PhaseFolder {
     }
 };
 
+
+
 }   // namespace
     
 namespace catalyst {
@@ -586,10 +801,17 @@ struct PhaseFoldingPass : public impl::PhaseFoldingPassBase<PhaseFoldingPass> {
     {  
         llvm::outs() << "Hello phase-folding world!\n";
 
-        PhaseFoldingPlan plan;
-        PhaseAnalyzer analyzer(plan);
-
         mlir::ModuleOp rootModule = dyn_cast<mlir::ModuleOp>(getOperation());
+
+        std::unique_ptr<AbstractionTracer> tracer;
+        if (trace_abstraction) {
+            std::string moduleName = rootModule.getName() ? rootModule.getName()->str() : "unnamed";
+            tracer = std::make_unique<AbstractionTracer>(
+                "phase_folding_trace_" + moduleName + ".txt");
+        }
+
+        PhaseFoldingPlan plan;
+        PhaseAnalyzer analyzer(plan, tracer.get());
         for (auto func : rootModule.getOps<mlir::func::FuncOp>()) {
             llvm::outs() << "FuncOp:\n" << func << "\n";
             if (!func.isExternal()) {   // only analyze functions with bodies
@@ -603,7 +825,7 @@ struct PhaseFoldingPass : public impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         // analyzer.dumpSummaries();
         // plan.stats.reportStats();
 
-        if (report) {
+        if (report_stats) {
             std::string moduleName = rootModule.getName() ? rootModule.getName()->str() : "unnamed";
             plan.writeReport("phase_folding_report_" + moduleName + ".txt");
         }
@@ -616,3 +838,7 @@ struct PhaseFoldingPass : public impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 // each module will have a single qnode, but a program can have multiple modules.
 
 // test with tof
+
+// if seeing allocOp, change the state to |0>
+// if seeing state preparation, change to x
+    // can state preparation be called in the middle of the circuit?

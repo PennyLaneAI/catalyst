@@ -32,6 +32,11 @@ class AffineTransform : public AffineBase<TransformSchema> {
     
     // Prints
     [[nodiscard]] std::string toString() const;
+    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AffineTransform &affTransform)
+    {
+        os << affTransform.toString();
+        return os;
+    }
 
     // Methods
     void extendQubitsBy(size_t addQubitNum);

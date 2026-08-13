@@ -35,8 +35,6 @@ BitLocation BitLocation::operator++(int)
     return p;
 }
 
-
-
 /*
     Constructors:
 */

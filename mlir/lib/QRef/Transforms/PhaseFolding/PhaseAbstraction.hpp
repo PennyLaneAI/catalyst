@@ -41,8 +41,9 @@ struct PhaseAbstraction {
     PhaseAbstraction operator+(const PhaseAbstraction &rhs) const;
 
     friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const PhaseAbstraction &pp);
-    template <typename ColOrderRange>
-    std::string toString(ColOrderRange colOrder) const;
+    // template <typename ColOrderRange>
+    // std::string toString(ColOrderRange colOrder) const;
+    std::string toString(const AffineSchema& schema) const;
 
     // Methods
     void insertContributor(const GateBundle &contributor, const Parity &parity);
@@ -61,23 +62,24 @@ struct PhaseAbstraction {
     void orphanBundlesIf(Predicate cond);
 };
 
-template <typename ColOrderRange>
-std::string PhaseAbstraction::toString(ColOrderRange colOrder) const
-{
-    std::string res = "";
-    for (const auto &[parity, contributors] : activeBundles) {
-        res += (parity.toStringWithOrder(colOrder) + " -> " + contributors.toString() + "\n");
-    }
+// template <typename ColOrderRange>
+// std::string PhaseAbstraction::toString(ColOrderRange colOrder) const
+// {
+//     std::string res = "";
+//     for (const auto &[parity, contributors] : activeBundles) {
+//         res += (parity.toStringWithOrder(colOrder) + " -> " + contributors.toString() + "\n");
+//     }
     
-    if (!orphanBundles.empty()) {
-        res += "Unsat -> ";
-        for (const GateBundle &contributors : orphanBundles) {
-            res += contributors.toString() + ", ";
-        }
-        res += "\n";
-    }
-    return res;
-}
+//     if (!orphanBundles.empty()) {
+//         res += "Unsat -> ";
+//         for (const GateBundle &contributors : orphanBundles) {
+//             res += contributors.toString() + ", ";
+//         }
+//         res += "\n";
+//     }
+//     return res;
+// }
+
 
 template <typename Predicate>
 void PhaseAbstraction::orphanBundlesIf(Predicate cond)

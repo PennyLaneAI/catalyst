@@ -28,7 +28,7 @@ std::string AffineTransform::toString() const
         std::string aux = matrix.getRowAt(i).toStringWithOrder(schema.auxVars);
         bool affVal = matrix.getRowAt(i).getBitAtLoc(schema.affVal);
 
-        res += (pre + aux + std::to_string(affVal)) + "\n";
+        res += (pre + " " + aux + " | " + std::to_string(affVal)) + "\n";
     }
     return res;
 }

@@ -43,11 +43,18 @@ def PhaseFoldingPass : Pass<"phase-folding"> {
 
     let options = [
         Option<
-            /*C++ var name=*/"report",
-            /*CLI arg name=*/"report",
+            /*C++ var name=*/"report_stats",
+            /*CLI arg name=*/"report-stats",
             /*type=*/"bool",
             /*default=*/"false",
-            "Print gate modification statistics and program abstraction to stderr after folding.">,
+            "Print gate modification statistics to stderr after folding.">,
+
+        Option<
+            /*C++ var name=*/"trace_abstraction",
+            /*CLI arg name=*/"trace-abstraction",
+            /*type=*/"bool",
+            /*default=*/"false",
+            "Print program abstraction evolution to a trace file during phase analysis.">,
     ];
 }
 

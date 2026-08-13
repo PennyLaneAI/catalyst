@@ -1936,7 +1936,7 @@ graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
 )
 
-def phase_folding(report: bool = False):
+def phase_folding(report_stats: bool = False, trace_abstraction: bool = False):
     r"""Apply phase-folding to reduce T-count on hybrid quantum-classical programs.
 
     This schedules a small pass pipeline:
@@ -1956,8 +1956,10 @@ def phase_folding(report: bool = False):
         ``"QuantumCompilationStage"`` stage via :func:`~.get_compilation_stage`.
 
     Args:
-        report (bool): If ``True``, print gate statistics and the program
-            abstraction after folding. Defaults to ``False``.
+        report_stats (bool): If ``True``, write gate statistics and the final
+            program abstraction to a report file after folding. Defaults to ``False``.
+        trace_abstraction (bool): If ``True``, write the program abstraction
+            after each analyzed operation to a trace file. Defaults to ``False``.
 
     Returns:
         Callable: A decorator for a QNode.
@@ -1971,7 +1973,7 @@ def phase_folding(report: bool = False):
         from catalyst.passes import phase_folding
 
         @qjit
-        @phase_folding(report=True)
+        @phase_folding(report_stats=True, trace_abstraction=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit(x: float):
             qp.RZ(x, 0)
@@ -1984,7 +1986,10 @@ def phase_folding(report: bool = False):
         {
             "convert-to-reference-semantics": {},
             "cse": {},
-            "phase-folding": {"report": report},
+            "phase-folding": {
+                "report_stats": report_stats, 
+                "trace_abstraction": trace_abstraction
+            },
             "convert-to-value-semantics": {},
         }
     )

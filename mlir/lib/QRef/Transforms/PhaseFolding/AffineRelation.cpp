@@ -79,7 +79,7 @@ std::string AffineRelation::toString() const
         std::string aux = matrix.getRowAt(i).toStringWithOrder(schema.auxVars);
         bool affVal = matrix.getRowAt(i).getBitAtLoc(schema.affVal);
 
-        res += (post + pre + aux + std::to_string(affVal)) + "\n";
+        res += (post + " " + pre + " " + aux + " | " + std::to_string(affVal)) + "\n";
     }
     return res;
 }

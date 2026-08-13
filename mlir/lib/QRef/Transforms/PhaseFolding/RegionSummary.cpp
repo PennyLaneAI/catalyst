@@ -96,11 +96,9 @@ namespace catalyst::phase_folding {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const RegionSummary &sum)
 {
-    auto colOrd = sum.affineRel.getSchema().getOrder();
-
-    os << ".Phase abstraction:\n" << sum.phases.toString(colOrd);
+    os << ".Phase abstraction:\n" << sum.phases.toString(sum.affineRel.getSchema());
     if (sum.type == RegionType::Conditional) {
-        os << "--\n" << sum.falseBranchPhases.toString(colOrd);
+        os << "--\n" << sum.falseBranchPhases.toString(sum.affineRel.getSchema());
     }
     os << ".Affine relation:\n" << sum.affineRel;
     return os;
