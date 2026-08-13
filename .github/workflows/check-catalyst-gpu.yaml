@@ -7,6 +7,14 @@ name: Check Catalyst GPU
 on:
   push:
     branches: [ main ]
+    paths:
+      - "runtime/lib/transport/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - ".github/workflows/check-catalyst-gpu.yaml"
   pull_request:
     types:
       - opened
@@ -14,6 +22,14 @@ on:
       - synchronize
       - ready_for_review
       - labeled
+    paths:
+      - "runtime/lib/transport/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - ".github/workflows/check-catalyst-gpu.yaml"
   merge_group:
     types:
       - checks_requested
@@ -105,6 +121,9 @@ jobs:
         with:
           path: llvm-build
           key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-gpu-build
+          restore-keys: |
+            ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
+            ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-
 
       - name: Build LLVM
         if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -116,9 +135,15 @@ jobs:
           ENABLE_LLD=OFF \
           make llvm
 
+      - name: Set up ccache for the runtime rebuild
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.workflow }}-${{ runner.os }}-runtime
+          max-size: "500M"
+
       - name: Build Catalyst runtime with transport enabled
         run: |
-          COMPILER_LAUNCHER="" \
+          COMPILER_LAUNCHER=ccache \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
