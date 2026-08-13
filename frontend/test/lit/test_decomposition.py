@@ -1376,5 +1376,51 @@ def test_lowering_time_rules():
     # CHECK: qref.operator "NoParams"
     test_from_custom_op()
 
+    def test_multirz():
+        """
+        Test that decomposing qp.MultiRZ works.
+        """
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def c():
+            qp.MultiRZ(theta=0.1, wires=[0, 1])
+            qp.MultiRZ(theta=0.2, wires=[2])
+            return qp.state()
+
+        print(c.mlir)
+
+    # CHECK: func.func public @c()
+    # CHECK: qref.multirz({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
+    # CHECK: qref.multirz({{%.+}}) {{%.+}} : !qref.bit
+    # CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:2}{}"
+    # CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:2}{}"
+    # CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:1}{}"
+    # CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:1}{}"
+    test_multirz()
+
+    def test_paulirot():
+        """
+        Test that decomposing qp.PauliRot works.
+        """
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def c():
+            qp.PauliRot(theta=0.1, pauli_word="XX", wires=[0, 1])
+            qp.PauliRot(theta=0.2, pauli_word="Z", wires=[2])
+            return qp.state()
+
+        print(c.mlir)
+
+    # CHECK: func.func public @c()
+    # CHECK: qref.paulirot ["X", "X"]({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
+    # CHECK: qref.paulirot ["Z"]({{%.+}}) {{%.+}} : !qref.bit
+    # CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
+    # CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
+    # CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
+    # CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
+    test_paulirot()
+
 
 test_lowering_time_rules()
