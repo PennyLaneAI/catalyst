@@ -19,6 +19,8 @@
 
 #include "llvm/Support/raw_ostream.h"
 
+namespace catalyst::phase_folding {
+
 struct ProgramAbstraction;
 
 enum class RegionType { Conditional, Loop, Procedure };
@@ -50,18 +52,6 @@ struct RegionSummary {
     void summarizeProc();
 };
 
-inline void RegionSummary::summarizeLoop()
-{
-    affineRel.applyKleeneStar();
-}
-
-inline void RegionSummary::summarizeProc()
-{
-    llvm::errs() << "summarizeProc...\n";
-    affineRel.projectOutAuxVars();
-    // llvm::errs() << "affineRel:\n" << affineRel << "\n";
-    phases.orphanNonTrivialBundles();
-    // llvm::errs() << "phases:\n" << phases << "\n";
-}
-
 // I'm thinking of keeping all phases, and nullifying at the and of all nested blocks. think about multiple blocks?
+
+} // namespace catalyst::phase_folding

@@ -36,17 +36,6 @@ file(GLOB SRC
     reference_semantics_conversion.cpp
     split_non_commuting.cpp
     split_to_single_terms.cpp
-    # SymbolicAnalysisQVal/Gate.hpp
-    # SymbolicAnalysisQVal/GateBundle.cpp
-    # SymbolicAnalysisQVal/Parity.cpp
-    # SymbolicAnalysisQVal/BinaryMatrix.cpp
-    # SymbolicAnalysisQVal/AffineSchema.cpp
-    # SymbolicAnalysisQVal/AffineTransform.cpp
-    # SymbolicAnalysisQVal/AffineRelation.cpp
-    # SymbolicAnalysisQVal/PhaseAbstraction.cpp
-    # SymbolicAnalysisQVal/ProgramAbstraction.cpp
-    # SymbolicAnalysisQVal/RegionSummary.cpp
-    # phase_folding.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

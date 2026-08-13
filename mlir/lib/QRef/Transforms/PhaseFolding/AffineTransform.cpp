@@ -14,6 +14,8 @@
 
 #include "AffineTransform.hpp"
 
+using namespace catalyst::phase_folding;
+
 /*
     Print:
 */

@@ -14,6 +14,8 @@
 
 #include "GateBundle.hpp"
 
+using namespace catalyst::phase_folding;
+
 /*
     Operators:
 */
@@ -33,29 +35,6 @@ GateBundle GateBundle::operator+(const GateBundle &rhs) const
     GateBundle res = *this;
     res += rhs;
     return res;
-}
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const std::vector<GateID> &gates)
-{
-    os << ": (";
-    for (size_t i = 0; i < gates.size(); i++) {
-        if (i > 0) {
-            os << ", ";
-        }
-        os << gates[i];
-    }
-    os << ")";
-    return os;
-}
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GateBundle &bundle)
-{
-    os << '[';
-    os << "0" << bundle.zeroAffineGates;
-    os << " __ ";
-    os << "1" << bundle.oneAffineGates;
-    os << ']';
-    return os;
 }
 
 std::string GateBundle::toString() const
@@ -86,3 +65,31 @@ GateID GateBundle::getMergeTarget() const
     }
     return -1;
 }
+
+/*
+    Print:
+*/
+namespace catalyst::phase_folding {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const std::vector<GateID> &gates)
+{
+    os << ": (";
+    for (size_t i = 0; i < gates.size(); i++) {
+        if (i > 0) {
+            os << ", ";
+        }
+        os << gates[i];
+    }
+    os << ")";
+    return os;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GateBundle &bundle)
+{
+    os << '[';
+    os << "0" << bundle.zeroAffineGates;
+    os << " __ ";
+    os << "1" << bundle.oneAffineGates;
+    os << ']';
+    return os;
+}
+} // namespace catalyst::phase_folding

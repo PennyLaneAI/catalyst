@@ -24,7 +24,10 @@
 #include <cassert>
 #include <optional>
 
+namespace catalyst::phase_folding {
+
 struct RegionSummary;
+class AffineRelation;
 
 struct ProgramAbstraction {
     PhaseAbstraction phases;
@@ -73,7 +76,4 @@ inline void ProgramAbstraction::prepareQubit(size_t wire, bool basisState)
     stateTransform.prepareQubit(wire, basisState);
 }
 
-inline void ProgramAbstraction::normalizePhasesUnder(const AffineRelation &postcondRel)
-{
-    phases.normalizeByPostcond(postcondRel, getSchema());
-}
+} // namespace catalyst::phase_folding

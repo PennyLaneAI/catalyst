@@ -21,6 +21,8 @@
 #include "llvm/ADT/STLExtras.h" // llvm::concat<>
 #include "llvm/Support/raw_ostream.h"
 
+namespace catalyst::phase_folding {
+
 using GateID = int; // index of Operation pointers vector! (It's Loc in feynman and l in thesis)
 
 struct GateBundle {
@@ -58,3 +60,5 @@ inline void GateBundle::flipGatesAffineValues()
 {
     std::swap(zeroAffineGates, oneAffineGates);
 }
+
+} // namespace catalyst::phase_folding

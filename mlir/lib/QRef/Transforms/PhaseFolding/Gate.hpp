@@ -17,6 +17,8 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/MathExtras.h"
 
+namespace catalyst::phase_folding {
+
 enum class Gate { I, H, X, Y, Z, S, T, RZ, CNOT, SWAP, U, GP };
 
 inline static constexpr size_t PRIMITIV_GATES_COUNT = 12;
@@ -93,3 +95,5 @@ static constexpr Gate gateWithName(llvm::StringRef gateName)
     }
     return Gate::U;
 }
+
+} // namespace catalyst::phase_folding

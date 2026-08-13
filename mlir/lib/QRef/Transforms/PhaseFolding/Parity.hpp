@@ -26,6 +26,8 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
+namespace catalyst::phase_folding {
+
 struct BitLocation {
     size_t block;
     size_t bit;
@@ -224,20 +226,22 @@ inline void Parity::mapBitFrom(const Parity& srcPar, BitLocation srcLoc, BitLoca
     }
 }
 
+} // namespace catalyst::phase_folding
+
 namespace llvm {
-template <> struct DenseMapInfo<Parity> {
-    static inline Parity getEmptyKey() { return Parity(Parity::State::Empty); }
+template <> struct DenseMapInfo<catalyst::phase_folding::Parity> {
+    static inline catalyst::phase_folding::Parity getEmptyKey() { return catalyst::phase_folding::Parity(catalyst::phase_folding::Parity::State::Empty); }
 
-    static inline Parity getTombstoneKey() { return Parity(Parity::State::Tombstone); }
+    static inline catalyst::phase_folding::Parity getTombstoneKey() { return catalyst::phase_folding::Parity(catalyst::phase_folding::Parity::State::Tombstone); }
 
-    static unsigned getHashValue(const Parity &val)
+    static unsigned getHashValue(const catalyst::phase_folding::Parity &val)
     {
-        if (val.state != Parity::State::Valid) {
+        if (val.state != catalyst::phase_folding::Parity::State::Valid) {
             return 0;
         }
         return static_cast<unsigned>(llvm::hash_combine_range(val.bits.begin(), val.bits.end()));
     }
 
-    static bool isEqual(const Parity &lhs, const Parity &rhs) { return lhs == rhs; }
+    static bool isEqual(const catalyst::phase_folding::Parity &lhs, const catalyst::phase_folding::Parity &rhs) { return lhs == rhs; }
 };
 } // namespace llvm

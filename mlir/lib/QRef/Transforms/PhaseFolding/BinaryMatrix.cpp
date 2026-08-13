@@ -14,6 +14,8 @@
 
 #include "BinaryMatrix.hpp"
 
+using namespace catalyst::phase_folding;
+
 /*
     Static Factories:
 */
@@ -28,17 +30,6 @@ BinaryMatrix BinaryMatrix::Identity(size_t numRows, std::optional<size_t> numBlo
         curRow.mkBasis(++loc, blocks);
     }
     return mat;
-}
-
-/*
-    Operators:
-*/
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BinaryMatrix &mat)
-{
-    for (auto it = mat.rows.begin(); it != mat.rows.end(); ++it) {
-        os << *it << '\n';
-    }
-    return os;
 }
 
 /*
@@ -97,3 +88,16 @@ size_t BinaryMatrix::firstTrivialRow() const
         return row.isTrivial(); 
     });
 }
+
+/*
+    Print:
+*/
+namespace catalyst::phase_folding {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BinaryMatrix &mat)
+{
+    for (auto it = mat.rows.begin(); it != mat.rows.end(); ++it) {
+        os << *it << '\n';
+    }
+    return os;
+}
+} // namespace catalyst::phase_folding

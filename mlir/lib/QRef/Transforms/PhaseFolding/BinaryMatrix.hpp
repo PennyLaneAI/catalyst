@@ -23,6 +23,8 @@
 
 #include "Parity.hpp"
 
+namespace catalyst::phase_folding {
+
 class BinaryMatrix {
 
 public:
@@ -239,3 +241,5 @@ inline void BinaryMatrix::dropTopRows(size_t numRows) { rows.erase(rows.begin(),
 inline void BinaryMatrix::keepTopRows(size_t numRows) { rows.resize(numRows); }
 
 inline void BinaryMatrix::dropTrivialRows() { keepTopRows(firstTrivialRow()); }
+
+} // namespace catalyst::phase_folding

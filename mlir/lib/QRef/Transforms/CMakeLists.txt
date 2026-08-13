@@ -14,9 +14,9 @@ file(GLOB SRC
     PhaseFolding/PhaseAbstraction.cpp
     PhaseFolding/ProgramAbstraction.cpp
     PhaseFolding/RegionSummary.cpp
-    phase_folding_qref.cpp
+    phase_folding.cpp
 
-    GetOpInfp.hpp
+    GetOpInfo.hpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

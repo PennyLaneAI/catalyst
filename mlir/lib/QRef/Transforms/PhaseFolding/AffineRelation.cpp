@@ -14,6 +14,8 @@
 
 #include "AffineRelation.hpp"
 
+using namespace catalyst::phase_folding;
+
 /*
     Static Factories
 */

@@ -17,6 +17,8 @@
 #include "BinaryMatrix.hpp"
 #include "AffineSchema.hpp"
 
+namespace catalyst::phase_folding {
+
 template <typename SchemaT>
 class AffineBase {
   public:
@@ -137,3 +139,5 @@ void AffineBase<SchemaT>::applySchema(SchemaT newSchm)
     }
     schema = std::move(newSchm);
 }
+
+} // namespace catalyst::phase_folding

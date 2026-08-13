@@ -15,6 +15,8 @@
 #include "RegionSummary.hpp"
 #include "ProgramAbstraction.hpp"
 
+using namespace catalyst::phase_folding;
+
 /*
     Constructors:
 */
@@ -52,19 +54,18 @@ void RegionSummary::summarizeCond(ProgramAbstraction *elseBody)
     affineRel.joinWith(elseRel);
 }
 
-/*
-    Print:
-*/
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const RegionSummary &sum)
+void RegionSummary::summarizeLoop()
 {
-    auto colOrd = sum.affineRel.getSchema().getOrder();
+    affineRel.applyKleeneStar();
+}
 
-    os << ".Phase abstraction:\n" << sum.phases.toString(colOrd);
-    if (sum.type == RegionType::Conditional) {
-        os << "--\n" << sum.falseBranchPhases.toString(colOrd);
-    }
-    os << ".Affine relation:\n" << sum.affineRel;
-    return os;
+void RegionSummary::summarizeProc()
+{
+    llvm::errs() << "summarizeProc...\n";
+    affineRel.projectOutAuxVars();
+    // llvm::errs() << "affineRel:\n" << affineRel << "\n";
+    phases.orphanNonTrivialBundles();
+    // llvm::errs() << "phases:\n" << phases << "\n";
 }
 
 /*
@@ -87,3 +88,21 @@ void RegionSummary::accumulatePhasesInto(PhaseAbstraction &trgtPhases, const Tra
         trgtPhases += falseBranchPhases;
     }
 }   // += ops could become more optimized by actually consuming the phases
+
+/*
+    Print:
+*/
+namespace catalyst::phase_folding {
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const RegionSummary &sum)
+{
+    auto colOrd = sum.affineRel.getSchema().getOrder();
+
+    os << ".Phase abstraction:\n" << sum.phases.toString(colOrd);
+    if (sum.type == RegionType::Conditional) {
+        os << "--\n" << sum.falseBranchPhases.toString(colOrd);
+    }
+    os << ".Affine relation:\n" << sum.affineRel;
+    return os;
+}
+} // namespace catalyst::phase_folding

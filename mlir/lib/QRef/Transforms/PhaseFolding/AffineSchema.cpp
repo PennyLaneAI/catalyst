@@ -14,7 +14,39 @@
 
 #include "AffineSchema.hpp"
 
-// Operators
+using namespace catalyst::phase_folding;
+
+IdxList AffineSchema::getFreeLocs(size_t n) const
+{
+    IdxList locs;
+    locs.reserve(n);
+
+    size_t k = std::min(n, recycledLocs.size());
+    locs.insert(locs.end(), recycledLocs.end() - k, recycledLocs.end());
+    recycledLocs.resize(recycledLocs.size() - k);
+
+    for (int i = n - k; i > 0; --i) {
+        locs.push_back(++maxLoc);
+    }
+        
+    return locs;
+}
+
+BitLocation AffineSchema::getFreeLoc() const
+{
+    if (!recycledLocs.empty()) {
+        BitLocation loc = recycledLocs.back();
+        recycledLocs.pop_back();
+        return loc;
+    }
+    return ++maxLoc;
+}
+
+/*
+    Print:
+*/
+namespace catalyst::phase_folding {
+
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AffineSchema &schema)
 {
     os << " PreVars: " << schema.preVars << "\n";
@@ -55,29 +87,4 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const CompositionSchema &cm
     os << relSchm;
     return os;
 }
-
-IdxList AffineSchema::getFreeLocs(size_t n) const
-{
-    IdxList locs;
-    locs.reserve(n);
-
-    size_t k = std::min(n, recycledLocs.size());
-    locs.insert(locs.end(), recycledLocs.end() - k, recycledLocs.end());
-    recycledLocs.resize(recycledLocs.size() - k);
-
-    for (int i = n - k; i > 0; --i) {
-        locs.push_back(++maxLoc);
-    }
-        
-    return locs;
-}
-
-BitLocation AffineSchema::getFreeLoc() const
-{
-    if (!recycledLocs.empty()) {
-        BitLocation loc = recycledLocs.back();
-        recycledLocs.pop_back();
-        return loc;
-    }
-    return ++maxLoc;
-}
+} // namespace catalyst::phase_folding

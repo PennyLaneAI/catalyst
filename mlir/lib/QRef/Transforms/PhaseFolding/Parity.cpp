@@ -16,6 +16,8 @@
 
 #include "llvm/ADT/Hashing.h"
 
+using namespace catalyst::phase_folding;
+
 BitLocation BitLocation::operator++()
 {
     bit++;
@@ -33,37 +35,7 @@ BitLocation BitLocation::operator++(int)
     return p;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BitLocation &bitLoc)
-{
-    os << "(" << bitLoc.block << ", " << bitLoc.bit << ")";
-    return os;
-}
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const IdxList &idxMap)
-{
-    os << "[";
-    for (size_t i = 0; i < idxMap.size(); ++i) {
-        os << idxMap[i];
-        if (i < idxMap.size() - 1) {
-            os << ", ";
-        }
-    }
-    os << "]";
-    return os;
-}
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, IdxView idxView)
-{
-    os << "[";
-    for (size_t i = 0; i < idxView.size(); ++i) {
-        os << idxView[i];
-        if (i < idxView.size() - 1) {
-            os << ", ";
-        }
-    }
-    os << "]";
-    return os;
-}
 
 /*
     Constructors:
@@ -110,12 +82,6 @@ Parity Parity::operator+(const Parity &rhs) const
     Parity res = *this;
     res += rhs;
     return res;
-}
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const Parity &par)
-{
-    os << par.toString();
-    return os;
 }
 
 std::string Parity::toString() const
@@ -215,3 +181,47 @@ bool Parity::isEquivalentWithFromBlock(const Parity &rhs, size_t fstBlock) const
     }
     return true;
 }
+
+/*
+    Print:
+*/
+namespace catalyst::phase_folding {
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BitLocation &bitLoc)
+{
+    os << "(" << bitLoc.block << ", " << bitLoc.bit << ")";
+    return os;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const IdxList &idxMap)
+{
+    os << "[";
+    for (size_t i = 0; i < idxMap.size(); ++i) {
+        os << idxMap[i];
+        if (i < idxMap.size() - 1) {
+            os << ", ";
+        }
+    }
+    os << "]";
+    return os;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, IdxView idxView)
+{
+    os << "[";
+    for (size_t i = 0; i < idxView.size(); ++i) {
+        os << idxView[i];
+        if (i < idxView.size() - 1) {
+            os << ", ";
+        }
+    }
+    os << "]";
+    return os;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const Parity &par)
+{
+    os << par.toString();
+    return os;
+}
+} // namespace catalyst::phase_folding

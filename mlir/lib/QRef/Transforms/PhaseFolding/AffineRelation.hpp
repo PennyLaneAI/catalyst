@@ -19,6 +19,8 @@
 
 #include "llvm/ADT/ArrayRef.h"
 
+namespace catalyst::phase_folding {
+
 class AffineRelation : public AffineBase<RelationSchema> {
   public:
     // Constructors
@@ -129,3 +131,5 @@ inline AffineRelation AffineRelation::compose(const AffineRelation& rhs) const
     AffineRelation res = *this;
     return res.composeWith(rhs);
 }
+
+} // namespace catalyst::phase_folding

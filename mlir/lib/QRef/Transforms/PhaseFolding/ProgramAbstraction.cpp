@@ -14,16 +14,9 @@
 
 #include "ProgramAbstraction.hpp"
 #include "RegionSummary.hpp"
+#include "AffineRelation.hpp"
 
-/*
-    Print:
-*/
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ProgramAbstraction &progAbs)
-{
-    os << ".Phase abstraction:\n" << progAbs.phases.toString(progAbs.getSchema().getOrder());
-    os << ".Affine transformation:\n" << progAbs.stateTransform;
-    return os;
-}
+using namespace catalyst::phase_folding;
 
 /*
     Methods:
@@ -136,3 +129,21 @@ void ProgramAbstraction::applySummary(RegionSummary &&summary)
 
     // llvm::errs() << "\nfinalAbstraction:\n" << *this << "\n";
 }
+
+inline void ProgramAbstraction::normalizePhasesUnder(const AffineRelation &postcondRel)
+{
+    phases.normalizeByPostcond(postcondRel, getSchema());
+}
+
+/*
+    Print:
+*/
+namespace catalyst::phase_folding {
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ProgramAbstraction &progAbs)
+{
+    os << ".Phase abstraction:\n" << progAbs.phases.toString(progAbs.getSchema().getOrder());
+    os << ".Affine transformation:\n" << progAbs.stateTransform;
+    return os;
+}
+} // namespace catalyst::phase_folding

@@ -14,10 +14,11 @@
 
 // This algorithm is taken from https://arxiv.org/pdf/1303.2042
 
-#define DEBUG_TYPE "phase_folding_qref"
+#define DEBUG_TYPE "phase_folding"
 
 #include <cassert>
 #include <cmath> // std::abs
+#include <string>
 #include <vector>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -45,6 +46,7 @@
 using namespace llvm;
 using namespace mlir;
 using namespace catalyst;
+using namespace catalyst::phase_folding;
 
 namespace {
 
@@ -56,17 +58,17 @@ struct GateStatsHolder {
 
     void updateModifications(Gate gate, int incr) { insertedGateCount[static_cast<size_t>(gate)] += incr; }
 
-    void reportStats()
+    void reportStats(llvm::raw_ostream &os = llvm::outs()) const
     {
-        llvm::outs() << "Stats:\n";
+        os << "Stats:\n";
         for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
             if (insertedGateCount[i] != 0) {
-                llvm::outs() << GATE_NAME[i] << ": initial-> " << initialGateCount[i]
+                os << GATE_NAME[i] << ": initial-> " << initialGateCount[i]
                              << ",  final-> " << (initialGateCount[i] + insertedGateCount[i])
                              << ". difference-> " << insertedGateCount[i] << "\n";
             }
         }
-        llvm::outs() << "\n";
+        os << "\n";
     }
 };
 
@@ -74,6 +76,15 @@ struct PhaseFoldingPlan {
     ProgramAbstraction mainProgramAbst;
     std::vector<qref::CustomOp> phaseOps;
     GateStatsHolder stats;
+
+    void writeReport(StringRef path) {
+        std::error_code ec;
+        llvm::raw_fd_ostream os(path, ec);
+        if (ec) return;
+        
+        stats.reportStats(os);
+        os << "\nMain Program Abstraction:\n" << mainProgramAbst << "\n\n";
+    }
 };
 
 struct WireTable {
@@ -399,14 +410,13 @@ struct PhaseAnalyzer {
         // }
     }
 
-    void dumpSummaries()
+    void dumpSummaries(llvm::raw_ostream &os = llvm::outs())
     {
-        llvm::outs() << "\nAll Summaries:\n";
+        os << "\nAll Summaries:\n";
         for (auto &[funcName, summary] : procedureSummaries) {
-            llvm::outs() << funcName << "\n";
-            llvm::outs() << summary << "\n";
+            os << funcName << "\n";
+            os << summary << "\n";
         }
-        llvm::outs() << "\nMain Program Abstraction:\n" << plan.mainProgramAbst << "\n\n";
     }
 };
 
@@ -420,7 +430,7 @@ struct PhaseFolder {
     // --- Rotation Angle Computations ---
 
     double extractConstAngle(mlir::ValueRange params)
-    {   //TODO: handle dynamic params
+    {
         if (params.empty()) {
             return 0.0;
         }
@@ -430,7 +440,6 @@ struct PhaseFolder {
             return floatAttr.getValueAsDouble();
         }
         else { // dynamic param
-            // llvm::errs() << "**********FUCK!!!!!!!!!!\n";
             return 0.0;
         }
     }
@@ -566,34 +575,37 @@ struct PhaseFolder {
 namespace catalyst {
 namespace qref {
 
-#define GEN_PASS_DECL_PHASEFOLDINGQREFPASS
-#define GEN_PASS_DEF_PHASEFOLDINGQREFPASS
+#define GEN_PASS_DECL_PHASEFOLDINGPASS
+#define GEN_PASS_DEF_PHASEFOLDINGPASS
 #include "QRef/Transforms/Passes.h.inc"
 
-struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFoldingQRefPass> {
-    using impl::PhaseFoldingQRefPassBase<PhaseFoldingQRefPass>::PhaseFoldingQRefPassBase;
+struct PhaseFoldingPass : public impl::PhaseFoldingPassBase<PhaseFoldingPass> {
+    using impl::PhaseFoldingPassBase<PhaseFoldingPass>::PhaseFoldingPassBase;
 
     void runOnOperation() override 
     {  
-        llvm::outs() << "Hello phase-folding-QRef world!\n";
+        llvm::outs() << "Hello phase-folding world!\n";
 
         PhaseFoldingPlan plan;
-
         PhaseAnalyzer analyzer(plan);
-        mlir::ModuleOp rootModule = dyn_cast<mlir::ModuleOp>(getOperation());
 
+        mlir::ModuleOp rootModule = dyn_cast<mlir::ModuleOp>(getOperation());
         for (auto func : rootModule.getOps<mlir::func::FuncOp>()) {
             llvm::outs() << "FuncOp:\n" << func << "\n";
             if (!func.isExternal()) {   // only analyze functions with bodies
                 analyzer.analyzeFuncOp(func);
             }
         }
-        analyzer.dumpSummaries();
-
+    
         PhaseFolder folder(plan);
         folder.foldPhases();
-        
-        plan.stats.reportStats();
+
+        // analyzer.dumpSummaries();
+        // plan.stats.reportStats();
+
+        // Modules may have an optional sym_name (Catalyst sets this, e.g. "circ1").
+        std::string moduleName = rootModule.getName() ? rootModule.getName()->str() : "unnamed";
+        plan.writeReport("phase_folding_report_" + moduleName + ".txt");
     }
 };
 
@@ -602,4 +614,5 @@ struct PhaseFoldingQRefPass : public impl::PhaseFoldingQRefPassBase<PhaseFolding
 
 // each module will have a single qnode, but a program can have multiple modules.
 
-// check gates dynamic value angle param
+// add option to pass
+// make the whole pipeline automated, no need to specify requirements explicitly from python

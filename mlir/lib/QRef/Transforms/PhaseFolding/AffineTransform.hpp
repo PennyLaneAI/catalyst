@@ -18,6 +18,8 @@
 
 #include "llvm/ADT/ArrayRef.h"
 
+namespace catalyst::phase_folding {
+
 class AffineTransform : public AffineBase<TransformSchema> {
   public:
     // Constructors
@@ -60,3 +62,5 @@ inline void AffineTransform::applyGateH(size_t wire)
 {   
     matrix.setRowToBasis(wire, schema.allocAuxVar());
 }
+
+} // namespace catalyst::phase_folding

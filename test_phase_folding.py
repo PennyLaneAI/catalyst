@@ -9,10 +9,10 @@ clifford_rz_gates = clifford_gates | {"T", "RZ", "GlobalPhase"}
 @qjit(autograph=True, keep_intermediate=2, capture=True, verbose=True)
 @qp.transform(pass_name="convert-to-value-semantics")
 @qp.transform(pass_name="phase-folding-qref")
-# @qp.transform(pass_name="cse")
+@qp.transform(pass_name="cse")
 @qp.transform(pass_name="convert-to-reference-semantics")
-# @qp.transform(pass_name="symbol-dce")
-# @qp.transforms.decompose(gate_set=clifford_rz_gates)
+@qp.transform(pass_name="symbol-dce")
+@qp.transforms.decompose(gate_set=clifford_rz_gates)
 @qp.qnode(device=qp.device("lightning.qubit", wires=3))
 def circ1(x: float):
     # qp.Toffoli(wires=[0,1,2])

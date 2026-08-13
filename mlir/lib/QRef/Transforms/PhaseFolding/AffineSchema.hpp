@@ -19,6 +19,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
+namespace catalyst::phase_folding {
+
 template <typename Derived>
 struct OrderedSchema {
     auto getOrder() const {
@@ -373,3 +375,5 @@ void AffineSchema::recycleLocs(ColOrderRange locs) const
         llvm::append_range(recycledLocs, locs);
     }
 } // pass size
+
+} // namespace catalyst::phase_folding

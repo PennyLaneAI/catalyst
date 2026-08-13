@@ -13,6 +13,10 @@
 // limitations under the License.
 
 #include "PhaseAbstraction.hpp"
+#include "AffineRelation.hpp"
+#include "AffineSchema.hpp"
+
+using namespace catalyst::phase_folding;
 
 /*
     Operators:
@@ -31,22 +35,8 @@ PhaseAbstraction PhaseAbstraction::operator+(const PhaseAbstraction &rhs) const
     return res;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const PhaseAbstraction &pp)
-{
-    for (const auto &[parity, contributors] : pp.activeBundles) {
-        os << parity << " -> " << contributors << "\n";
-    }
-    if (!pp.orphanBundles.empty()) {
-        os << "Unsats ->\n";
-        for (const GateBundle &contributors : pp.orphanBundles) {
-            os << contributors << "\n";
-        }
-    }
-    return os;
-}
-
 /*
-    Methods:
+    Insertion:
 */
 void PhaseAbstraction::addOrphanBundlesWith(const std::vector<GateBundle> &rhsOrphans)
 {
@@ -94,6 +84,9 @@ void PhaseAbstraction::insertContributor(const GateBundle &contributor, const Pa
     // }
 }
 
+/*
+    Normalization:
+*/
 void PhaseAbstraction::normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPrecond, bool isProjectOutAuxVars)
 {
     llvm::DenseMap<Parity, GateBundle> oldBundles;
@@ -110,3 +103,42 @@ void PhaseAbstraction::normalizeByCond(const AffineRelation& cond, const AffineS
         insertActiveBundle(contributors, reducedPar);
     }
 }
+
+void PhaseAbstraction::nullifyByPrecond(const AffineRelation& precond, const AffineSchema& paritySchema)
+{    
+    normalizeByCond(precond, paritySchema, true);
+    orphanNonTrivialBundles();
+}
+
+void PhaseAbstraction::normalizeByPostcond(const AffineRelation& postcond, const AffineSchema& paritySchema)
+{
+    normalizeByCond(postcond, paritySchema, false);
+}
+
+void PhaseAbstraction::projectOutAuxVars(const AffineRelation& cond)
+{
+    normalizeByCond(cond, cond.getSchema(), false, true);
+    orphanBundlesIf([&](const Parity &parity) {
+        return !parity.isTrivialInRange(cond.getSchema().auxVars);
+    });
+}
+
+/*
+    Print:
+*/
+namespace catalyst::phase_folding {
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const PhaseAbstraction &pp)
+{
+    for (const auto &[parity, contributors] : pp.activeBundles) {
+        os << parity << " -> " << contributors << "\n";
+    }
+    if (!pp.orphanBundles.empty()) {
+        os << "Unsats ->\n";
+        for (const GateBundle &contributors : pp.orphanBundles) {
+            os << contributors << "\n";
+        }
+    }
+    return os;
+}
+} // namespace catalyst::phase_folding
