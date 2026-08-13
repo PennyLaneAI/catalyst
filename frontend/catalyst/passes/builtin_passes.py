@@ -1936,6 +1936,59 @@ graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
 )
 
+def phase_folding(report: bool = False):
+    r"""Apply phase-folding to reduce T-count on hybrid quantum-classical programs.
+
+    This schedules a small pass pipeline:
+
+    1. ``convert-to-reference-semantics`` — value → QRef reference form
+    2. ``cse`` — cleanup
+    3. ``phase-folding`` — the optimization
+    4. ``convert-to-value-semantics`` — reference → value form
+
+    .. note::
+
+        Unlike PennyLane :doc:`circuit transformations <introduction/compiling_circuits>`,
+        the QNode itself will not be changed or transformed by applying this
+        decorator.
+
+        To inspect the optimized circuit, view the MLIR after the
+        ``"QuantumCompilationStage"`` stage via :func:`~.get_compilation_stage`.
+
+    Args:
+        report (bool): If ``True``, print gate statistics and the program
+            abstraction after folding. Defaults to ``False``.
+
+    Returns:
+        Callable: A decorator for a QNode.
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qp
+        from catalyst import qjit
+        from catalyst.passes import phase_folding
+
+        @qjit
+        @phase_folding(report=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
+        def circuit(x: float):
+            qp.RZ(x, 0)
+            qp.X(0)
+            return qp.probs()
+    """
+    from catalyst.passes.pass_api import pipeline
+
+    return pipeline(
+        {
+            "convert-to-reference-semantics": {},
+            "cse": {},
+            "phase-folding": {"report": report},
+            "convert-to-value-semantics": {},
+        }
+    )
+
 __all__ = [
     "cancel_inverses",
     "combine_global_phases",
@@ -1956,4 +2009,5 @@ __all__ = [
     "decompose_arbitrary_ppr",
     "graph_decomposition",
     "diagonalize_measurements",
+    "phase_folding",
 ]

@@ -34,7 +34,21 @@ def VerifyNoQuantumUseAfterFreePass : Pass<"verify-no-quantum-use-after-free"> {
 def PhaseFoldingPass : Pass<"phase-folding"> {
     let summary = "Perform phase-folding optimization on hybrid quantum-classical programs to reduce T-count.";
 
-    // let constructor = "catalyst::createMyHelloWorldPass()";
+    let dependentDialects = [
+        "catalyst::qref::QRefDialect",
+        "mlir::scf::SCFDialect",
+        "mlir::func::FuncDialect",
+        "mlir::arith::ArithDialect",
+    ];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"report",
+            /*CLI arg name=*/"report",
+            /*type=*/"bool",
+            /*default=*/"false",
+            "Print gate modification statistics and program abstraction to stderr after folding.">,
+    ];
 }
 
 

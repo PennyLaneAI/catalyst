@@ -603,9 +603,10 @@ struct PhaseFoldingPass : public impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         // analyzer.dumpSummaries();
         // plan.stats.reportStats();
 
-        // Modules may have an optional sym_name (Catalyst sets this, e.g. "circ1").
-        std::string moduleName = rootModule.getName() ? rootModule.getName()->str() : "unnamed";
-        plan.writeReport("phase_folding_report_" + moduleName + ".txt");
+        if (report) {
+            std::string moduleName = rootModule.getName() ? rootModule.getName()->str() : "unnamed";
+            plan.writeReport("phase_folding_report_" + moduleName + ".txt");
+        }
     }
 };
 
@@ -614,5 +615,4 @@ struct PhaseFoldingPass : public impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 
 // each module will have a single qnode, but a program can have multiple modules.
 
-// add option to pass
-// make the whole pipeline automated, no need to specify requirements explicitly from python
+// test with tof
