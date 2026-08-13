@@ -18,6 +18,8 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "WireProtocol.hpp"
+
 namespace catalyst::transport::local_copy {
 namespace {
 
@@ -77,7 +79,10 @@ void LocalCpuControllerSession::establish_channel(const ChannelDesc &desc, const
     local_reply_ = local;
 }
 
-void LocalCpuControllerSession::start() { rtt_ns_ = 0; }
+void LocalCpuControllerSession::start() {
+    rtt_ns_ = 0;
+    next_send_ = 0;
+}
 
 int LocalCpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                        std::size_t n) {
@@ -129,6 +134,19 @@ int LocalCpuControllerSession::kick(std::uint32_t work_item_idx) {
     }
 
     kick_ns_ = now_ns();
+
+    // Synthesize a wire-shaped Payload so `in` looks the same as it does over cpu_verbs:
+    // value bytes at offset 0, decoder_id at PAYLOAD_DATA_BYTES, then seq_num.
+    common::Payload frame{};
+    if (staged_bytes_ != 0) {
+        std::memcpy(&frame.value, request_staging_.data(),
+                    std::min<std::size_t>(static_cast<std::size_t>(staged_bytes_),
+                                          common::PAYLOAD_DATA_BYTES));
+    }
+    frame.decoder_id = decoder_id_;
+    frame.seq_num = static_cast<std::uint32_t>(next_send_ + 1);
+    ++next_send_;
+
     std::size_t reply_bytes = 0;
     {
         // Held across check and call so teardown can't clear process_message mid-call.
@@ -136,9 +154,8 @@ int LocalCpuControllerSession::kick(std::uint32_t work_item_idx) {
         if (!link_->process_message) {
             throw std::runtime_error("memcpy: no paired coprocessor");
         }
-        reply_bytes = link_->process_message(
-            request_staging_.data(), static_cast<std::size_t>(staged_bytes_), decoder_id_,
-            local_reply_.addr, static_cast<std::size_t>(out_bytes_));
+        reply_bytes = link_->process_message(&frame, sizeof(frame), local_reply_.addr,
+                                             static_cast<std::size_t>(out_bytes_));
     }
     reply_bytes_ = static_cast<std::uint64_t>(reply_bytes);
     return 0;

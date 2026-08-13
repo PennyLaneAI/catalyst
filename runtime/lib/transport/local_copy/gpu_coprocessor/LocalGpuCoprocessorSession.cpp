@@ -70,9 +70,9 @@ int LocalGpuCoprocessorSession::connect(const ConnectInfo &info) {
         throw std::runtime_error(
             "memcpy: another coprocessor is already bound to this endpoint (peer, oob_port)");
     }
-    link_->process_message = [this](const void *in, std::size_t in_len, std::uint32_t decoder_id,
-                                    void *out, std::size_t out_cap) {
-        return this->process_message(in, in_len, decoder_id, out, out_cap);
+    link_->process_message = [this](const void *in, std::size_t in_len, void *out,
+                                    std::size_t out_cap) {
+        return this->process_message(in, in_len, out, out_cap);
     };
     return 0;
 }
@@ -123,10 +123,9 @@ void LocalGpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn 
 }
 
 std::size_t LocalGpuCoprocessorSession::process_message(const void *in, std::size_t in_len,
-                                                        std::uint32_t decoder_id, void *out,
-                                                        std::size_t out_cap) {
-    if (in_len != common::PAYLOAD_DATA_BYTES) {
-        throw std::runtime_error("memcpy: local GPU coprocessor expects one 8-byte payload");
+                                                        void *out, std::size_t out_cap) {
+    if (in_len != sizeof(common::Payload)) {
+        throw std::runtime_error("memcpy: local GPU coprocessor expects one wire-shaped Payload");
     }
     if (out_cap < sizeof(std::int64_t)) {
         throw std::runtime_error("memcpy: reply buffer too small for GPU correction");
@@ -140,9 +139,7 @@ std::size_t LocalGpuCoprocessorSession::process_message(const void *in, std::siz
         *handoff_.stop_host = 0;
     }
 
-    std::memcpy(&request_slot_host_[0].p.value, in, common::PAYLOAD_DATA_BYTES);
-    request_slot_host_[0].p.decoder_id = decoder_id;
-    request_slot_host_[0].p.seq_num = 1;
+    std::memcpy(&request_slot_host_[0].p, in, sizeof(common::Payload));
 
     CoprocLaunchDesc desc{
         .ring = request_slot_dev_,

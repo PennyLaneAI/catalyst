@@ -32,14 +32,15 @@ class LocalCpuControllerSession;
 // the controller's kick() drives it inline. `mu` guards `controller` and `process_message`
 // across connect / kick / teardown.
 struct MemcpyLink {
-    // Invoked once per controller kick(). Reads `in_len` bytes from `in`, writes at most
-    // `out_cap` bytes into `out` (a controller-owned destination sized `out_cap`), and
-    // returns the number of bytes actually written. A return value greater than `out_cap`
-    // means the fn overran the caller's buffer. Parameter names mirror `CoprocessorFn`
-    // (Transport.hpp) so a straight forward is unambiguous.
-    using ProcessMessage =
-        std::function<std::size_t(const void *in, std::size_t in_len, std::uint32_t decoder_id,
-                                  void *out, std::size_t out_cap)>;
+    // Invoked once per controller kick(). Reads `in_len` bytes from `in` (a wire-shaped
+    // `common::Payload` frame synthesized by the controller: value bytes at offset 0,
+    // decoder_id at offset PAYLOAD_DATA_BYTES, seq_num right after), writes at most
+    // `out_cap` bytes into `out`, and returns the number of bytes actually written. A
+    // return value greater than `out_cap` means the fn overran the caller's buffer.
+    // Signature mirrors `CoprocessorFn` (Transport.hpp) minus the `ctx` slot; decoder_id
+    // travels inside `in` as it does over cpu_verbs.
+    using ProcessMessage = std::function<std::size_t(const void *in, std::size_t in_len, void *out,
+                                                     std::size_t out_cap)>;
 
     std::mutex mu;
     LocalCpuControllerSession *controller = nullptr;

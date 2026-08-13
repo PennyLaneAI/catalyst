@@ -43,8 +43,7 @@ class LocalCpuCoprocessorSession : public CoprocessorSession {
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
 
     // Called synchronously from the paired controller's kick(); returns bytes written to `out`.
-    std::size_t process_message(const void *in, std::size_t in_len, std::uint32_t decoder_id,
-                                void *out, std::size_t out_cap);
+    std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
     std::shared_ptr<MemcpyLink> link_;

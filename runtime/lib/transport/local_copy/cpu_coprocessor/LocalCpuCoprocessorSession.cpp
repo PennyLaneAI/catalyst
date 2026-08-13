@@ -46,9 +46,9 @@ int LocalCpuCoprocessorSession::connect(const ConnectInfo &info) {
         throw std::runtime_error(
             "memcpy: another coprocessor is already bound to this endpoint (peer, oob_port)");
     }
-    link_->process_message = [this](const void *in, std::size_t in_len, std::uint32_t decoder_id,
-                                    void *out, std::size_t out_cap) {
-        return this->process_message(in, in_len, decoder_id, out, out_cap);
+    link_->process_message = [this](const void *in, std::size_t in_len, void *out,
+                                    std::size_t out_cap) {
+        return this->process_message(in, in_len, out, out_cap);
     };
     return 0;
 }
@@ -95,10 +95,9 @@ void LocalCpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx)
 }
 
 std::size_t LocalCpuCoprocessorSession::process_message(const void *in, std::size_t in_len,
-                                                        std::uint32_t /*decoder_id*/, void *out,
-                                                        std::size_t out_cap) {
-    // decoder_id is a separate arg here (cpu_verbs bakes it into `in` at offset 8);
-    // a decoder that dispatches on the id would need `in` reframed the same way.
+                                                        void *out, std::size_t out_cap) {
+    // `in` is a wire-shaped Payload (matching cpu_verbs); decoder_id sits at offset 8
+    // for any decoder that needs to dispatch on it.
     CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
     const std::size_t out_bytes = fn(in, in_len, out, out_cap, ctx_);
     if (out_bytes > out_cap) {

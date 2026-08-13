@@ -70,6 +70,10 @@ class LocalCpuControllerSession : public ControllerSession {
 
     std::uint64_t kick_ns_ = 0;
     std::uint64_t rtt_ns_ = 0;
+
+    // Per-session round counter driving `Payload::seq_num`. Matches cpu_verbs's `next_send_`:
+    // the first kick sends seq_num=1, the second sends 2, etc. Reset on start().
+    std::uint64_t next_send_ = 0;
 };
 
 } // namespace catalyst::transport::local_copy
