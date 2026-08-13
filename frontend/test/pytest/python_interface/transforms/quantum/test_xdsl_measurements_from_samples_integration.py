@@ -188,6 +188,10 @@ class TestIntegrationUsefulErrors:
 class TestIntegrationWithOtherPasses:
     """Tests the integration of the xDSL-basd MeasurementsFromSamplesPass with other key passes"""
 
+    @pytest.mark.xfail(
+        reason="flaky decomps tie breaking. Require https://github.com/PennyLaneAI/pennylane/pull/9945",
+        strict=False,
+    )
     def test_integrate_with_decompose(self, capture, run_filecheck_qjit):
         """Test that the measurements_from_samples pass works correctly when used in combination
         with the decompose pass."""
