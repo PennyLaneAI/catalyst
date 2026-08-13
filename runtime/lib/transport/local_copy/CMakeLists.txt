@@ -10,6 +10,7 @@ target_include_directories(local_copy_cpu_impl PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu_controller
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu_coprocessor
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
     ${runtime_includes}
 )
 set_property(TARGET local_copy_cpu_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
