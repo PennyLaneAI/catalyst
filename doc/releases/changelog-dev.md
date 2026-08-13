@@ -21,6 +21,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Adds the ability to use `pennylane.typing.AbstractArray` and `pennylane.wires.AbstractWires` as type hints for
+  AOT compilation and as arguments to `pennylane.specs` calculations.
+  [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
+
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
   operations in question can be annotated with either a `catalyst.estimated_probability` or
