@@ -161,8 +161,7 @@ std::string defaultGetGraphOpId(Operation *op) {
     ss.flush();
 
     // Fold the adjoint modifier into the identity so that `Op` and `Adjoint(Op)` are distinct
-    // graph nodes over one key space. The wrapping mirrors ResourceAnalysis's `Adjoint(name)`
-    // convention (see ResourceAnalysis.cpp) so the solver and the resource model agree on the id.
+    // graph nodes over one key space.
     if (op->hasAttr("adjoint")) {
         return "Adjoint(" + out + ")";
     }
