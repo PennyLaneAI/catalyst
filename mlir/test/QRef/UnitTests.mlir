@@ -253,6 +253,22 @@ func.func @test_adjoint_multiple_args(%r: !qref.reg<2>, %q: !qref.bit)
 
 // -----
 
+func.func @test_ctrl_op(%q0: !qref.bit, %q1: !qref.bit, %r: !qref.reg<2>)
+{
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+    qref.ctrl (%q0, %q1) ctrlvals (%true, %false){
+    ^bb0():
+        %target0 = qref.get %r[0] : !qref.reg<2> -> !qref.bit
+        %target1 = qref.get %r[1] : !qref.reg<2> -> !qref.bit
+        qref.custom "Hadamard"() %target0 : !qref.bit
+        qref.custom "CNOT"() %target0, %target1 : !qref.bit, !qref.bit
+    }
+    return
+}
+
+// -----
+
 func.func @test_computational_basis_op(%q0: !qref.bit, %q1: !qref.bit, %r: !qref.reg<5>)
 {
     %obs_q = qref.compbasis qubits %q0, %q1 : !quantum.obs

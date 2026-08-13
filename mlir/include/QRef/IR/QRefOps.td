@@ -740,7 +740,7 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
         `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` attr-dict-with-keyword $region
     }];
 
-    // let hasVerifier = 1;
+    let hasVerifier = 1;
 }
 
 // -----

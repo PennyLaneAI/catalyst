@@ -346,6 +346,29 @@ LogicalResult AdjointOp::verify() {
     return success();
 }
 
+LogicalResult CtrlOp::verify() {
+    auto res = this->getRegion().walk([](Operation *op) {
+        return isa<quantum::MeasurementProcess, MeasureOp>(op) ? WalkResult::interrupt()
+                                                               : WalkResult::advance();
+    });
+
+    if (res.wasInterrupted()) {
+        return emitOpError("quantum measurements are not allowed in the ctrl regions");
+    }
+
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != 0) {
+        return emitOpError("qref.ctrl op must have no arguments on its block");
+    }
+
+    if (this->getInCtrlValues().size() != this->getInCtrlQubits().size()) {
+        return emitOpError("Ctrl op number of control values must be the same as the number of "
+                           "control qubits");
+    }
+
+    return success();
+}
+
 LogicalResult ComputationalBasisOp::verify() {
     if ((getQubits().size() != 0) && (getQreg() != nullptr)) {
         return emitOpError()
