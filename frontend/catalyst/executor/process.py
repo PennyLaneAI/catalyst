@@ -32,7 +32,6 @@ from .utils import (
     ExecutorFlags,
     ExecutorPaths,
     OutputPatterns,
-    PortInUse,
     log_cmd,
 )
 
@@ -94,8 +93,11 @@ class _ExecutorProcess:
         env: dict[str, str] | None = None,
         stdin: int | None = None,
     ) -> subprocess.Popen:
-        """Spawn a subprocess with pump-friendly settings: stdout piped, stderr merged,
-        line-buffered text mode.
+        """Spawn a subprocess with line-buffered merged output for :meth:`_watch_output` to read.
+
+        Given a session of its own so a ^C at the terminal is not delivered to it. An ssh client
+        killed by that signal drops its port-forward without closing the remote side, leaving the
+        executor running; this way the interrupt raises here, where teardown happens.
         """
         return subprocess.Popen(
             argv,
@@ -105,9 +107,10 @@ class _ExecutorProcess:
             text=True,
             bufsize=1,
             env=env,
+            start_new_session=True,
         )
 
-    def _say(self, msg: str, level: int = 1) -> None:
+    def _log_message(self, msg: str, level: int = 1) -> None:
         """Log a launcher narrative line, prefixed by ``<name>:`` when non-default; teed to the log."""
         line = msg if self.name == "executor" else f"{self.name}: {msg}"
         (logger.debug if level >= 2 else logger.info)(line)
@@ -127,15 +130,15 @@ class _ExecutorProcess:
         try:
             self._log_fh = open(self.log_path, "a")
         except OSError as e:
-            self._say(f"could not open log {self.log_path}: {e} (continuing without it)")
+            self._log_message(f"could not open log {self.log_path}: {e} (continuing without it)")
             return
         header = self._log_header()
         if header:
             self._log_fh.write(header)
             self._log_fh.flush()
-        self._say(f"teeing output -> {self.log_path}")
+        self._log_message(f"teeing output -> {self.log_path}")
 
-    def _pump_output(self) -> None:
+    def _watch_output(self) -> None:
         """Echo executor stdout live, tee to the log, and flag readiness / port conflicts.
         Runs in a daemon thread."""
         assert self.proc and self.proc.stdout
@@ -153,13 +156,13 @@ class _ExecutorProcess:
         """Spawn the executor and block until it binds.
 
         Raises:
-            PortInUse: On port collision (retryable).
-            RuntimeError: On other launch failures.
+            RuntimeError: On any launch failure. :attr:`port_conflict` tells a retryable port
+                collision from the rest.
         """
         self._open_log()
         self._spawn()
         assert self.proc is not None, "_spawn() must set self.proc"
-        threading.Thread(target=self._pump_output, daemon=True).start()
+        threading.Thread(target=self._watch_output, daemon=True).start()
         try:
             return self._wait_for_ready()
         except BaseException:
@@ -170,8 +173,7 @@ class _ExecutorProcess:
         """Block up to ``ready_timeout`` for readiness or a failure signal.
 
         Raises:
-            PortInUse: On port collision.
-            RuntimeError: On early exit or timeout. Cleanup is the caller's job.
+            RuntimeError: On port collision, early exit, or timeout. Cleanup is the caller's job.
         """
         assert self.proc is not None
         t0 = time.monotonic()
@@ -179,7 +181,7 @@ class _ExecutorProcess:
         while time.monotonic() < deadline:
             if self._ready.wait(timeout=poll_interval):
                 self._on_ready()
-                self._say(f"ready in {time.monotonic() - t0:.1f}s — address {self.addr}")
+                self._log_message(f"ready in {time.monotonic() - t0:.1f}s — address {self.addr}")
                 return self
             self._check_port_conflict()
             self._check_failure()
@@ -189,16 +191,21 @@ class _ExecutorProcess:
             f"[{self.name}] log above (raise ready_timeout= if the host is slow)."
         )
 
+    @property
+    def port_conflict(self) -> bool:
+        """Whether the executor reported its port already bound — the one retryable failure."""
+        return self._port_conflict.is_set()
+
     def _check_port_conflict(self) -> None:
-        """Raise :class:`PortInUse` if the pump thread flagged a port bind failure."""
-        if self._port_conflict.is_set():
-            raise PortInUse(self._bind_port)
+        """Raise if the watcher thread flagged a port bind failure."""
+        if self.port_conflict:
+            raise RuntimeError(f"port {self._bind_port} is already in use")
 
     def _check_early_exit(self) -> None:
         """Raise if the executor died before becoming ready.
 
-        :class:`PortInUse` if the death was a port collision (re-checked in case the flag landed
-        late), else :class:`RuntimeError`. No-op while the child is still running.
+        Re-checks the port-conflict flag first, in case it landed late. No-op while the child is
+        still running.
         """
         assert self.proc is not None
         if self.proc.poll() is None:
@@ -212,7 +219,7 @@ class _ExecutorProcess:
     def _shutdown(self, wait_time: float = 10) -> None:
         """Close the log and terminate the subprocess; SIGKILL if it doesn't exit within
         ``wait_time`` seconds. Idempotent."""
-        fh, self._log_fh = self._log_fh, None  # stop the pump teeing, then close
+        fh, self._log_fh = self._log_fh, None  # stop the watcher teeing, then close
         if fh is not None:
             with contextlib.suppress(Exception):
                 fh.close()
@@ -270,7 +277,7 @@ class _LocalProcess(_ExecutorProcess):
         proc_env = dict(os.environ)
         for key, value in self._env.items():
             proc_env[key] = os.path.expandvars(value)
-        self._say(f"starting local executor on {self.addr}")
+        self._log_message(f"starting local executor on {self.addr}")
         self.proc = self._popen(argv, env=proc_env)
 
 
@@ -317,7 +324,6 @@ class _RemoteProcess(_ExecutorProcess):
         self.executor_bin = executor_bin
         self._auth_prompt = threading.Event()
         self._auth_kind = ""  # "ssh", "setenv" or "sudo"; picks the help text
-        self._ready_reached = False  # gates the teardown pkill
 
     def _log_header(self) -> str:
         """Log-file banner (host, port, workspace, timestamp, plugins)."""
@@ -346,10 +352,6 @@ class _RemoteProcess(_ExecutorProcess):
             self._shutdown()
             raise RuntimeError(self._auth_help())
 
-    def _on_ready(self) -> None:
-        """Mark the port as ours so :meth:`_teardown_extra` may ``pkill`` it."""
-        self._ready_reached = True
-
     def _spawn(self) -> None:
         """Open the SSH port-forward and start the remote executor via :meth:`RemoteLauncher.ssh_argv`.
         Pipes the sudo password on stdin when given."""
@@ -365,7 +367,7 @@ class _RemoteProcess(_ExecutorProcess):
             sudo_password=self.sudo_password,
             executor_bin=self.executor_bin,
         )
-        self._say(
+        self._log_message(
             f"starting executor on {self.host}:{self._bind_port} "
             f"(tunnel {self.addr} -> remote:{self._bind_port})"
         )
@@ -375,7 +377,7 @@ class _RemoteProcess(_ExecutorProcess):
 
     def _pipe_sudo_password(self) -> None:
         """Feed :attr:`sudo_password` into the child's stdin. No-op without one; write errors are
-        swallowed (the pump thread surfaces auth failures separately)."""
+        swallowed (the watcher thread surfaces auth failures separately)."""
         if self.sudo_password is None:
             return
         assert self.proc is not None and self.proc.stdin is not None
@@ -402,13 +404,19 @@ class _RemoteProcess(_ExecutorProcess):
         )
 
     def _teardown_extra(self) -> None:
-        """Port-scoped ``pkill`` backstop for our executor. Skipped before we bound the port so
-        someone else's process there is never wrongly killed."""
-        if not self._ready_reached:
+        """Port-scoped ``pkill`` backstop for our executor.
+
+        Skipped when nothing was spawned, and when the port turned out to be taken -- the executor
+        answering there is someone else's. Anything we did spawn is fair game even if it never
+        reported ready, which is the window a ^C during a deploy falls into.
+        """
+        if self.proc is None or self.port_conflict:
             return
+        # The port is followed by a non-digit rather than end-of-string, since --plugin= args come
+        # after --bind=; without it, port 2000 also matches an executor serving on 20001.
         pat = (
             f"{ExecutorPaths.EXECUTOR_BIN}.*"
-            f"{ExecutorFlags.BIND_FLAG}{ExecutorFlags.BIND_HOST}:{self._bind_port}"
+            f"{ExecutorFlags.BIND_FLAG}{ExecutorFlags.BIND_HOST}:{self._bind_port}([^0-9]|$)"
         )
         RemoteOps.pkill(
             self.user,
@@ -424,10 +432,10 @@ class _RemoteProcess(_ExecutorProcess):
         basename = self.workspace.rsplit("/", 1)[-1]
         if not self.cleanup_ws or not basename.startswith(ExecutorPaths.WORKSPACE_PREFIX):
             return
-        self._say(f"removing remote workspace {self.workspace}", level=2)
+        self._log_message(f"removing remote workspace {self.workspace}", level=2)
         RemoteOps.rmdir(self.user, self.host, self.workspace)  # force=False: silent teardown
 
     def stop(self) -> None:
         """Stop the remote executor and close the SSH tunnel. Idempotent."""
-        self._say("stopping executor + closing tunnel")
+        self._log_message("stopping executor + closing tunnel")
         super().stop()

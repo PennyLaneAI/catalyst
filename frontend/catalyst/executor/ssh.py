@@ -19,6 +19,13 @@
   named verbs (``pkill``, ``mkdir``, ``rmdir``) and sudo probing.
 * :class:`SCP`: ``scp`` wrapper that shares :class:`SSHArgv`'s multiplexed control socket.
 * :class:`RemoteLauncher`: builds the remote ``catalyst-executor`` launch command.
+
+.. warning::
+
+    Experimental, and not intended for production use. This module shells out to ``ssh`` and
+    ``scp``, may run the remote executor under ``sudo``, and deploys files into a workspace on the
+    target host. It is built for driving development hardware on a trusted network, and makes no
+    attempt at the isolation or auditing that running untrusted code would call for.
 """
 
 from __future__ import annotations
@@ -32,7 +39,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from .utils import ExecutorFlags, ExecutorPaths, ShellText, Unquoted, log_cmd, verbose_level
+from .utils import ExecutorFlags, ExecutorPaths, ShellText, log_cmd, verbose_level
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -353,10 +360,7 @@ class RemoteLauncher:
         the remote host.
 
         ``port`` is used at both ends of the forward: the executor binds it on the remote, and the
-        tunnel listens on it here.
-
-        Bare-string values in ``env``/``plugins`` are shell-quoted; wrap in
-        :class:`~catalyst.executor.utils.Unquoted` to expand ``$VAR`` on the remote instead.
+        tunnel listens on it here. ``env`` and ``plugins`` values are shell-quoted.
         """
         use_pw = sudo_password is not None
         remote_cmd = RemoteLauncher._remote_cmd(
@@ -383,12 +387,13 @@ class RemoteLauncher:
         use_password: bool,
         executor_bin: str,
     ) -> str:
-        """Remote shell command: ``cd`` into workspace, export env, exec the executor."""
+        """Remote shell command: ``cd`` into workspace, exec the executor with ``env`` applied."""
+        env_prefix = RemoteLauncher._env_prefix(env)
         return (
             f"cd {ShellText.path(workspace)} "
             f"&& {RemoteLauncher._chmod_prefix(executor_bin)}"
-            f"{RemoteLauncher._env_prefix(env)} "
             f"{RemoteLauncher._exec_prefix(sudo, use_password)} "
+            f"{f'env {env_prefix} ' if env_prefix else ''}"
             f"{executor_bin} {ExecutorFlags.BIND_FLAG}{ExecutorFlags.BIND_HOST}:{remote_port} "
             f"{RemoteLauncher._plugin_args(plugins)}"
         )
@@ -409,12 +414,8 @@ class RemoteLauncher:
 
     @staticmethod
     def _env_prefix(env: dict[str, str]) -> str:
-        """``K=V K=V ...`` prefix. :class:`Unquoted` values expand on the remote; bare strings are quoted."""
-
-        def q(v: str) -> str:
-            return v if isinstance(v, Unquoted) else shlex.quote(v)
-
-        return " ".join(f"{k}={q(v)}" for k, v in env.items())
+        """``K=V K=V ...`` prefix, with the values shell-quoted."""
+        return " ".join(f"{k}={shlex.quote(v)}" for k, v in env.items())
 
     @staticmethod
     def _plugin_args(plugins: list[str]) -> str:
@@ -423,8 +424,6 @@ class RemoteLauncher:
 
         def arg(p: str) -> str:
             flag = ExecutorFlags.PLUGIN_FLAG
-            if isinstance(p, Unquoted):
-                return f"{flag}{p}"
             if "/" not in p and not p.startswith("~"):
                 return f"{flag}$PWD/{shlex.quote(p)}"
             return f"{flag}{ShellText.path(p)}"
@@ -434,9 +433,10 @@ class RemoteLauncher:
     @staticmethod
     def _chmod_prefix(executor_bin: str) -> str:
         """``chmod +x`` for a workspace-local binary (scp drops the +x bit); empty otherwise."""
-        if executor_bin != f"./{ExecutorPaths.EXECUTOR_BIN}":
+        local_bin = f"./{ExecutorPaths.EXECUTOR_BIN}"
+        if local_bin not in executor_bin:
             return ""
-        return f"chmod +x ./{ExecutorPaths.EXECUTOR_BIN} 2>/dev/null; "
+        return f"chmod +x {local_bin} 2>/dev/null; "
 
     @staticmethod
     def _exec_prefix(sudo: bool, use_password: bool) -> str:
