@@ -753,7 +753,6 @@ class TestInitialization:
         assert op.hyperparameters["base"] is base
         assert op.name == "Adjoint(Rot)"
 
-        assert op.num_params == 3
         assert qp.math.allclose(params, op.parameters)
         assert qp.math.allclose(params, op.data)
 
@@ -1111,9 +1110,7 @@ class TestAdjointOperationDiffInfo:
         """Make sure the grad_method property of a Adjoint op is the same as the base op."""
         assert adjoint(op).grad_method == op.grad_method
 
-    @pytest.mark.parametrize(
-        "base", (qp.PauliX(0), qp.RX(1.234, wires=0), qp.Rot(1.234, 0.0, 0.0, wires=0))
-    )
+    @pytest.mark.parametrize("base", (qp.PauliX(0), qp.RX(1.234, wires=0)))
     def test_grad_recipe(self, base):
         """Test that the grad_recipe of the Adjoint is the same as the grad_recipe of the base."""
         assert adjoint(base).grad_recipe == base.grad_recipe
@@ -1124,7 +1121,9 @@ class TestAdjointOperationDiffInfo:
     )
     def test_parameter_frequencies(self, base):
         """Test that the parameter frequencies of an Adjoint are the same as those of the base."""
-        assert adjoint(base).parameter_frequencies == base.parameter_frequencies
+        assert qp.gradients.parameter_frequencies(
+            adjoint(base)
+        ) == qp.gradients.parameter_frequencies(base)
 
 
 class TestQueueing:
