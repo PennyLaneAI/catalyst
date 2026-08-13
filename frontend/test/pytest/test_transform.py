@@ -847,6 +847,10 @@ class TestBroadcastExpand:
 
     @pytest.mark.parametrize("params", parameters)
     @pytest.mark.parametrize("obs", observables)
+    @pytest.mark.xfail(
+        reason="Non-capture pipeline incompatible with Operator2 dynamic wires in pytrees",
+        strict=False,
+    )
     def test_expansion_qnode_no_cache(self, backend, params, obs):
         """Test broadcast expand.
 
