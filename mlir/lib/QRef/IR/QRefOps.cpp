@@ -361,7 +361,7 @@ LogicalResult CtrlOp::verify() {
         return emitOpError("qref.ctrl op must have no arguments on its block");
     }
 
-    if (this->getInCtrlValues().size() != this->getInCtrlQubits().size()) {
+    if (this->getCtrlValues().size() != this->getCtrlQubits().size()) {
         return emitOpError("Ctrl op number of control values must be the same as the number of "
                            "control qubits");
     }

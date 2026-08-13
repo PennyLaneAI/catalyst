@@ -732,12 +732,12 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
     let regions = (region SizedRegion<1>:$region);
 
     let arguments = (ins
-        Variadic<QubitRefType>:$in_ctrl_qubits,
-        Variadic<I1>:$in_ctrl_values
+        Variadic<QubitRefType>:$ctrl_qubits,
+        Variadic<I1>:$ctrl_values
     );
 
     let assemblyFormat = [{
-        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` attr-dict-with-keyword $region
+        `(` $ctrl_qubits `)` `ctrlvals` `(` $ctrl_values `)` attr-dict-with-keyword $region
     }];
 
     let hasVerifier = 1;
