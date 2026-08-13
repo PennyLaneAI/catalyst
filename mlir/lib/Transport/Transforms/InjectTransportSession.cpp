@@ -110,6 +110,9 @@ class SessionEmitter {
         hostSetup = findOrCreate("setup");
         hostTeardown = findOrCreate("teardown");
         // A remote controller's ops go into its target module, which @setup/@teardown launch.
+        if (remoteController) {
+            setTargetFromNode(ctrlMod, ctrl);
+        }
         setupFn = remoteController ? makeVoidFunc("setup_transport", ctrlMod) : hostSetup;
         teardownFn = remoteController ? makeVoidFunc("teardown_transport", ctrlMod) : hostTeardown;
         b.setInsertionPoint(terminatorOf(setupFn));
@@ -232,6 +235,20 @@ class SessionEmitter {
         keyed.push_back({ctrlTy, key, teardownFn});
     }
 
+    // Fill a node's nested module in with the triple it is cross-compiled to and the address it is
+    // dispatched to, both taken from its entry in the placement.
+    void setTargetFromNode(ModuleOp nested, NodeAttr node) {
+        OpBuilder b(ctx);
+        nested->setAttr(
+            "catalyst.target",
+            b.getDictionaryAttr({NamedAttribute(b.getStringAttr("triple"), node.getTriple())}));
+        if (auto addr = node.getAddress(); !addr.getValue().empty()) {
+            nested->setAttr(
+                "catalyst.dispatch",
+                b.getDictionaryAttr({NamedAttribute(b.getStringAttr("address"), addr)}));
+        }
+    }
+
     // A remote coprocessor's target module, cross-compiled to its triple and dispatched by the
     // host, returned as the serve/stop launch targets the host orchestration drives.
     RemoteCoproc emitCoprocModule(NodeAttr coproc, StringAttr key, const std::string &sfx) {
@@ -239,15 +256,8 @@ class SessionEmitter {
         mmb.setInsertionPointToEnd(mod.getBody());
         std::string coprocModName = ("module_coproc" + sfx);
         auto coprocMod = ModuleOp::create(mmb, loc, StringRef(coprocModName));
-        coprocMod->setAttr("catalyst.target",
-                           mmb.getDictionaryAttr(
-                               {NamedAttribute(mmb.getStringAttr("triple"), coproc.getTriple())}));
         coprocMod->setAttr(kRoleAttr, mmb.getStringAttr(kCoprocessorRole));
-        if (auto addr = coproc.getAddress(); !addr.getValue().empty()) {
-            coprocMod->setAttr(
-                "catalyst.dispatch",
-                mmb.getDictionaryAttr({NamedAttribute(mmb.getStringAttr("address"), addr)}));
-        }
+        setTargetFromNode(coprocMod, coproc);
 
         func::FuncOp serveFn = makeVoidFunc("coproc_serve" + sfx, coprocMod);
         OpBuilder cb(ctx);

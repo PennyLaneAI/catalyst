@@ -246,9 +246,9 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
     assert isinstance(callable_, qp.QNode), "This function expects qnodes"
 
     name = "module_" + callable_.__name__
-    target = get_target(callable_.device)
-    dispatch = get_dispatch(callable_.device)
     backline_role = get_backline_role(callable_.device)
+    target = None if backline_role else get_target(callable_.device)
+    dispatch = None if backline_role else get_dispatch(callable_.device)
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         if target is not None:
