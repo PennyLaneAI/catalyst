@@ -287,7 +287,7 @@ class TestPreprocessHybridOp:
 
     @pytest.mark.xfail(
         reason="Legacy preprocessing cannot decompose Operator2 Hadamard subclasses",
-        raises=TypeError,  # no mlir since CompileError silenced
+        raises=CompileError,
     )
     def test_decomposition_of_cond_circuit(self):
         """Test that unsupported operators nested in Cond are decompsed, and the
@@ -314,7 +314,10 @@ class TestPreprocessHybridOp:
             return qp.state()
 
         # mlir contains expected gate names, and not the unsupported gate names
-        mlir = qjit(circuit, target="mlir").mlir
+        qjc = qjit(circuit, target="mlir")
+        # force creation of mlir
+        _ = qjc(0.5)
+        mlir = qjc.mlir
         assert "RX" in mlir
         assert "CNOT" in mlir
         assert "PhaseShift" in mlir
