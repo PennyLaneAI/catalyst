@@ -87,9 +87,12 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
+        bool isAdjoint = op.getOperation()->hasAttr("adjoint");
 
-        // Only decompose the op if it is not in the target gate set
-        if (targetGateSet.contains(gateName)) {
+        // Only decompose the op if it is not in the target gate set. An adjoint op is never treated
+        // as a native gate-set member by its base name: Adjoint(Op) is a distinct gate though that
+        // must reach the gate_set through its own custom rule.
+        if (!isAdjoint && targetGateSet.contains(gateName)) {
             return failure();
         }
 
