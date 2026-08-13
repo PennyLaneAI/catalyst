@@ -17,9 +17,9 @@ There are 5 special operators that do not lower to CustomOp or OperatorOp in MLI
 to their own operations:
 - MultiRZ
 - PauliRot
-- GlobalPhase
-- PCPhase
-- QubitUnitary
+- GlobalPhase (TODO: migration to Operator2 not done yet)
+- PCPhase (TODO: migration to Operator2 not done yet)
+- QubitUnitary (TODO: migration to Operator2 not done yet)
 """
 
 # RUN: %PYTHON %s | FileCheck %s
@@ -64,6 +64,9 @@ def test_paulirot():
     def c():
         qp.PauliRot(theta=0.1, pauli_word="XX", wires=[0, 1])
         qp.PauliRot(theta=0.2, pauli_word="Z", wires=[2])
+        # TODO: decomposition rule of Y PauliRot involves RX, which has not been migrated to
+        # Operator2 yet
+        # qp.PauliRot(theta=0.2, pauli_word="YZX", wires=[0, 1, 2])
         return qp.state()
 
     print(c.mlir)
