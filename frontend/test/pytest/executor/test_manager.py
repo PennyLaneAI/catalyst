@@ -28,7 +28,7 @@ from catalyst.executor.manager import (
     _sessions,
     _start_on_free_port,
 )
-from catalyst.executor.utils import PortInUse
+from catalyst.executor.utils import ExecutorPaths
 
 
 class TestExecutorConfigDefaults:
@@ -110,6 +110,34 @@ class TestExecutorAddress:
         # Attach-only mode (neither local nor host) short-circuits launch(), no subprocess.
         ex = Executor("1.2.3.4:5").launch()
         assert ex.address == "1.2.3.4:5"
+
+
+class TestResolve:
+    """Address commitment ahead of deployment via :meth:`Executor.resolve`."""
+
+    def test_attached_address_resolves(self):
+        """An attached executor already has its address, so ``.address`` reads before launching."""
+        ex = Executor("1.2.3.4:5")
+        assert ex.resolve() is ex
+        assert ex.address == "1.2.3.4:5"
+
+    def test_no_mode_does_not_resolve(self):
+        """Nothing to commit to without a mode; ``launch()`` is left to report that."""
+        ex = Executor()
+        assert ex.resolve() is None
+        with pytest.raises(RuntimeError, match="not launched"):
+            _ = ex.address
+
+    @pytest.mark.parametrize("kwargs", [{"local": True}, {"host": "h"}])
+    def test_pinned_port_resolves_to_loopback(self, kwargs):
+        """A pinned port fixes the address: loopback for a local run, the tunnel end for a remote."""
+        ex = Executor(port=9123, **kwargs)
+        assert ex.resolve() is ex
+        assert ex.address == "127.0.0.1:9123"
+
+    def test_unpinned_port_does_not_resolve(self):
+        """Without a pinned port the address is only settled by the free-port search at launch."""
+        assert Executor(host="h").resolve() is None
 
 
 class TestSetupWorkspace:
@@ -270,10 +298,12 @@ class _FakeProc:
         self._fail_ports = fail_ports
         self.stopped = False
         self.workspace_torn_down = False
+        self.port_conflict = False
 
     def start(self):
         if self._port in self._fail_ports:
-            raise PortInUse(self._port)
+            self.port_conflict = True
+            raise RuntimeError(f"port {self._port} is already in use")
         return self
 
     def stop(self):
@@ -282,7 +312,7 @@ class _FakeProc:
     def teardown_workspace(self):
         self.workspace_torn_down = True
 
-    def _say(self, msg, level=1):
+    def _log_message(self, msg, level=1):
         pass
 
 
@@ -302,7 +332,7 @@ class TestStartOnFreePort:
         assert made == [9000], "should not have tried a second port"
 
     def test_retries_on_a_busy_port(self):
-        """A :class:`PortInUse` moves on to the next candidate, and the ports differ."""
+        """A busy port moves on to the next candidate, and the ports differ."""
         made = []
 
         def make(port):
@@ -324,6 +354,48 @@ class TestStartOnFreePort:
             _start_on_free_port(make, 9000, max_tries=2)
         assert "no free executor port after 3 tries" in str(exc.value)
         assert "port=" in str(exc.value), "should say how to pin one"
+
+    def test_strict_tries_the_pinned_port_only(self):
+        """``strict``: a busy pinned port is an error, since the address is already published."""
+        procs = []
+
+        def make(port):
+            procs.append(_FakeProc(port, fail_ports={9000}))
+            return procs[-1]
+
+        with pytest.raises(RuntimeError, match="pinned executor port 9000 is already in use"):
+            _start_on_free_port(make, 9000, strict=True)
+        assert len(procs) == 1, "must not fall back to another port"
+        assert procs[0].workspace_torn_down, "a launch that never bound leaves nothing behind"
+
+    def test_a_non_port_failure_is_not_retried(self):
+        """Only a reported port conflict is retryable: another port fails the same way."""
+        made = []
+
+        def exited():
+            raise RuntimeError("executor exited")
+
+        def make(port):
+            made.append(port)
+            proc = _FakeProc(port)
+            proc.start = exited
+            return proc
+
+        with pytest.raises(RuntimeError, match="executor exited"):
+            _start_on_free_port(make, 9000)
+        assert made == [9000], "a broken executor must not be tried on six more ports"
+
+    def test_an_interrupted_launch_tears_down_its_process(self):
+        """A ^C partway through a launch must not leave the executor or its workspace behind."""
+        proc = _FakeProc(9000)
+
+        def interrupted():
+            raise KeyboardInterrupt
+
+        proc.start = interrupted
+        with pytest.raises(KeyboardInterrupt):
+            _start_on_free_port(lambda port: proc, 9000)
+        assert proc.stopped and proc.workspace_torn_down
 
 
 class TestSessionRegistry:
@@ -409,7 +481,7 @@ class TestMakers:
         ex = Executor(host="10.0.0.9", user="me", sudo=True, plugins=["libx.so"])
         with patch(
             "catalyst.executor.manager.RemoteOps.resolve_sudo", return_value="pw"
-        ) as resolve:
+        ) as resolve, patch("catalyst.executor.manager.RemoteOps.mkdir"):
             make = ex._remote_maker()
         proc = make(9000)
         assert (proc.host, proc.user) == ("10.0.0.9", "me")
@@ -417,13 +489,30 @@ class TestMakers:
         assert proc.addr == "127.0.0.1:9000"
 
     def test_remote_maker_reuses_one_auth_context_across_retries(self):
-        """Retries must not re-prompt for sudo or re-scp the bundle."""
+        """Retries must not re-prompt for sudo, re-scp the bundle, or re-create the workspace."""
         ex = Executor(host="h", user="me", sudo=True)
-        with patch("catalyst.executor.manager.RemoteOps.resolve_sudo", return_value="pw") as r:
+        with patch(
+            "catalyst.executor.manager.RemoteOps.resolve_sudo", return_value="pw"
+        ) as r, patch("catalyst.executor.manager.RemoteOps.mkdir") as mkdir:
             make = ex._remote_maker()
             make(9000)
             make(9001)
         r.assert_called_once()
+        mkdir.assert_called_once()
+
+    def test_remote_maker_creates_the_workspace_when_nothing_is_copied(self):
+        """A launch that copies nothing still needs the workspace: the launch command cd's into it."""
+        ex = Executor(host="h", user="me")
+        with patch("catalyst.executor.manager.RemoteOps.mkdir") as mkdir:
+            ex._remote_maker()
+        mkdir.assert_called_once()
+
+    def test_remote_maker_runs_a_pinned_workspace_binary_from_the_workspace(self):
+        """A pinned workspace holds the binary from an earlier ``setup_workspace``, so run it as ./."""
+        ex = Executor(host="h", user="me", workspace="~/cat-ws")
+        with patch("catalyst.executor.manager.RemoteOps.mkdir"):
+            proc = ex._remote_maker()(9000)
+        assert proc.executor_bin == f"./{ExecutorPaths.EXECUTOR_BIN}"
 
 
 class TestLaunchAndStop:
@@ -453,6 +542,18 @@ class TestLaunchAndStop:
         """A launched executor is tracked so it is torn down even without an explicit stop()."""
         ex, proc = self._launched()
         assert proc in _sessions._procs
+
+    @pytest.mark.parametrize("resolved", [True, False])
+    def test_launch_pins_the_port_only_when_resolved(self, resolved):
+        """A resolved address is already published, so its port is binding; unresolved, the
+        free-port search stays in play."""
+        ex = Executor(local=True, port=9123)
+        if resolved:
+            ex.resolve()
+        with patch("catalyst.executor.manager._start_on_free_port") as start:
+            start.return_value = _FakeProc(9123)
+            ex.launch()
+        assert start.call_args.kwargs["strict"] is resolved
 
     def test_launch_is_idempotent(self):
         """A second launch() does not spawn again."""

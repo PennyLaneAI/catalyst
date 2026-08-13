@@ -19,9 +19,8 @@
 * :class:`ShellText`: POSIX shell fragments and path quoting.
 * :class:`ExecutorFlags`: CLI flag constants for ``catalyst-executor``.
 
-Plus stdlib logging (:data:`logger`, :func:`set_verbose`, :func:`verbose_level`, :func:`log_cmd`),
-free helpers (:func:`random_port`, :func:`triple_from_uname`), and domain types
-(:class:`PortInUse`, :class:`Unquoted`).
+Plus stdlib logging (:data:`logger`, :func:`set_verbose`, :func:`verbose_level`, :func:`log_cmd`)
+and free helpers (:func:`random_port`, :func:`triple_from_uname`).
 """
 
 from __future__ import annotations
@@ -39,22 +38,6 @@ from catalyst.utils.runtime_environment import get_lib_path
 
 # Random fallback ports to try on a bind collision.
 MAX_PORT_TRIES = 6
-
-
-class PortInUse(Exception):
-    """The chosen executor port was already taken."""
-
-
-class Unquoted(str):
-    """Marker for a string that must not be shell-quoted when embedded into a remote command.
-
-    Use for :attr:`~catalyst.Executor.env` values or plugin paths that need ``$VAR`` to expand
-    on the remote. Bare :class:`str` values are shell-quoted.
-
-    Example::
-
-        Executor(host="h", env={"LD_LIBRARY_PATH": Unquoted("$HOME/lib")}, plugins=[Unquoted("$LIBDIR/x.so")])
-    """
 
 
 class OutputPatterns:
@@ -126,7 +109,13 @@ class ShellText:
 
     @staticmethod
     def pkill(pat: str) -> str:
-        """``pkill -f <pat>``. ``pat`` is shell-quoted."""
+        """``pkill -f <pat>``. ``pat`` is shell-quoted.
+
+        The first character is wrapped in a bracket expression, which matches the same text while
+        making the pattern unable to match itself.
+        """
+        if pat[:1].isalnum():
+            pat = f"[{pat[0]}]{pat[1:]}"
         return f"pkill -f {shlex.quote(pat)}"
 
     @staticmethod

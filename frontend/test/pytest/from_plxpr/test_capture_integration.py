@@ -250,6 +250,11 @@ class TestCapture:
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
     def test_adjoint(self, backend, theta, val):
         """Test the integration for a circuit with adjoint."""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
+
         device = qp.device(backend, wires=2)
 
         # Capture enabled
