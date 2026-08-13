@@ -116,29 +116,16 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
-      - name: Cache LLVM build
-        id: cache-llvm-build
-        uses: actions/cache@v4
-        with:
-          path: llvm-build
-          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-gpu-build
-
-      - name: Build LLVM
-        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-        run: |
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          COMPILER_LAUNCHER="" \
-          ENABLE_LLD=OFF \
-          make llvm
-
       - name: Set up ccache for the runtime rebuild
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ github.workflow }}-${{ runner.os }}-runtime
           max-size: "500M"
 
+      # The runtime configure + build only needs LLVM source headers (MLIR_INCLUDE_DIRS
+      # -> mlir/llvm-project/mlir/include, header-only via rt_capi). No built-LLVM
+      # artifacts are consumed as long as ENABLE_EXECUTOR stays OFF, which it does here.
+      # LLVM_BUILD_DIR points at a non-existent path on purpose; nothing reads from it.
       - name: Build Catalyst runtime with transport enabled
         run: |
           COMPILER_LAUNCHER=ccache \
