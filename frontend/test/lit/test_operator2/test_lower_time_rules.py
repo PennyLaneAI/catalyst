@@ -468,12 +468,16 @@ def test_from_multiple_full_args_op():
 
 
 # CHECK: func.func public @c()
-# CHECK: qref.operator "MultipleFullArgs"
-# CHECK: UID([[uid:[0-9]+]])
-# CHECK: func.func private @"__builtin_rule_MultipleFullArgs{angles1:[f64],angles2:[f64]}{reg1:1,reg2:1}{}[[[uid]]]"
+# CHECK: qref.operator "MultipleFullArgs"({{%.+}}: tensor<f64>, {{%.+}}: tensor<f64>)
+# CHECK-SAME:   qubits({{%.}}, {{%.}}, {{%.}}, {{%.}}, {{%.}}, {{%.}}, {{%.}})
+# CHECK:   UID([[uid:[0-9]+]]) forward({{%.+}}: tensor<f64>, {{%.+}}: tensor<i64>)
+# CHECK:   param_map = {angles1 = [0], angles2 = [1]}
+# CHECK-SAME:  qubit_map = {hwires1 = [4, 5], hwires2 = [6], op1 = [2], op2 = [3], reg1 = [0], reg2 = [1]}
+#
+# CHECK: func.func private @"__builtin_rule_MultipleFullArgs{angles1:[[f64]],angles2:[[f64]]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}[[[uid]]]"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 2 : i64
-# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:[f64],angles2:[f64]}{reg1:1,reg2:1}{}[[[uid]]]"
+# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:[[f64]],angles2:[[f64]]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
 test_from_multiple_full_args_op()
 
 

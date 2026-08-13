@@ -306,7 +306,7 @@ def collect_decomp_rules(
 
     else:
         # Operator Op
-        dynamic_shape = {}
+        non_hybrid_dynamic_shape = {}
 
         indices_to_remove = set()
         if param_map is not None:
@@ -317,19 +317,21 @@ def collect_decomp_rules(
         non_hybrid_params = [p for i, p in enumerate(params) if i not in indices_to_remove]
 
         for dynamic_argname, param in zip(op_cls.dynamic_argnames, non_hybrid_params, strict=True):
-            dynamic_shape[dynamic_argname] = param.type
-        dynamic_shape = convert_types_to_mlir_strings(dynamic_shape)
+            non_hybrid_dynamic_shape[dynamic_argname] = param.type
+        non_hybrid_dynamic_shape = convert_types_to_mlir_strings(non_hybrid_dynamic_shape)
 
-        repack_wire_argnames = []
+        non_hybrid_wire_argnames = []
         for wire_argname in op_cls.wire_argnames:
             if wire_argname not in op_cls.hybrid_argnames:
-                repack_wire_argnames.append(wire_argname)
-        repack_wire_lens = {a: b for a, b in zip(repack_wire_argnames, wire_lens, strict=True)}
+                non_hybrid_wire_argnames.append(wire_argname)
+        non_hybrid_wire_lens = {
+            a: b for a, b in zip(non_hybrid_wire_argnames, wire_lens, strict=True)
+        }
 
         extra_data = {}
         non_hybrid_wire_len = 0
         if qubit_map is not None:
-            for w in repack_wire_argnames:
+            for w in non_hybrid_wire_argnames:
                 if w in qubit_map:
                     non_hybrid_wire_len += len(qubit_map[w])
         hybrid_arg_start_idx = len(non_hybrid_params) + non_hybrid_wire_len
@@ -352,11 +354,24 @@ def collect_decomp_rules(
             extra_data[hybrid_argname] = unflattened
             hybrid_arg_start_idx += hybrid_len
 
+        with_hybrid_dynamic_shape = {}
+        if param_map is not None:
+            for named_attr in param_map:
+                with_hybrid_dynamic_shape[named_attr.name] = [
+                    params[idx].type for idx in named_attr.attr
+                ]
+            with_hybrid_dynamic_shape = convert_types_to_mlir_strings(with_hybrid_dynamic_shape)
+
+        with_hybrid_wire_lens = {}
+        if qubit_map is not None:
+            for wire_attr in qubit_map:
+                with_hybrid_wire_lens[wire_attr.name] = len(wire_attr.attr)
+
         op_id = (
             op_cls.__name__
-            + format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
+            + format_dynamic_params_for_id(dict(sorted(with_hybrid_dynamic_shape.items())))
             + "{"
-            + ",".join(f"{name}:{shape}" for name, shape in sorted(repack_wire_lens.items()))
+            + ",".join(f"{name}:{shape}" for name, shape in sorted(with_hybrid_wire_lens.items()))
             + "}"
         )
         if not (op_cls.hybrid_argnames or op_cls.static_argnames):
@@ -369,8 +384,8 @@ def collect_decomp_rules(
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name=op_cls.__name__,
             op_id=op_id,
-            dynamic_shape=dynamic_shape,
-            wire_lens=repack_wire_lens,
+            dynamic_shape=non_hybrid_dynamic_shape,
+            wire_lens=non_hybrid_wire_lens,
             static_data=repack_static_data,
             extra_data=extra_data,
         )
