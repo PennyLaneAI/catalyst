@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Plugin entry point for the local-copy controller backend. The runtime dlopen's
+// Plugin entry point for the memcpy controller backend. The runtime dlopen's
 // this .so and resolves CatalystTransportControllerFactory (see TransportBackend.h).
 
 #include <string>
@@ -22,7 +22,7 @@
 
 namespace {
 catalyst::transport::ControllerSession *make_local_controller(const std::string &config) {
-    return new catalyst::transport::local_copy::LocalCpuControllerSession(config);
+    return new catalyst::transport::memcpy::LocalCpuControllerSession(config);
 }
 } // namespace
 

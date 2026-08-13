@@ -27,7 +27,7 @@ namespace catalyst::transport::common {
 struct PayloadSlot;
 }
 
-namespace catalyst::transport::local_copy {
+namespace catalyst::transport::memcpy {
 
 class LocalGpuCoprocessorSession : public CoprocessorSession {
   public:
@@ -76,4 +76,4 @@ class LocalGpuCoprocessorSession : public CoprocessorSession {
     void *launcher_ctx_ = nullptr;
 };
 
-} // namespace catalyst::transport::local_copy
+} // namespace catalyst::transport::memcpy

@@ -22,7 +22,7 @@
 #include "LocalRegistry.hpp"
 #include "Transport.hpp"
 
-namespace catalyst::transport::local_copy {
+namespace catalyst::transport::memcpy {
 
 class LocalCpuCoprocessorSession : public CoprocessorSession {
   public:
@@ -42,7 +42,7 @@ class LocalCpuCoprocessorSession : public CoprocessorSession {
     // CoprocessorSession
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
 
-    // Called synchronously from the paired controller's kick(); returns bytes written to `out`.
+    // Invoked inline from the controller's kick(). See MemcpyLink::ProcessMessage.
     std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
@@ -55,4 +55,4 @@ class LocalCpuCoprocessorSession : public CoprocessorSession {
     void *ctx_ = nullptr;
 };
 
-} // namespace catalyst::transport::local_copy
+} // namespace catalyst::transport::memcpy

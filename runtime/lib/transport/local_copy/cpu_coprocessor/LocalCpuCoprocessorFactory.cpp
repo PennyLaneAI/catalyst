@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Plugin entry point for the local-copy CPU coprocessor backend. The runtime dlopen's
+// Plugin entry point for the memcpy CPU coprocessor backend. The runtime dlopen's
 // this .so and resolves CatalystTransportCoprocessorFactory (see TransportBackend.h).
 
 #include <string>
@@ -22,7 +22,7 @@
 
 namespace {
 catalyst::transport::CoprocessorSession *make_local_cpu_coprocessor(const std::string &config) {
-    return new catalyst::transport::local_copy::LocalCpuCoprocessorSession(config);
+    return new catalyst::transport::memcpy::LocalCpuCoprocessorSession(config);
 }
 } // namespace
 

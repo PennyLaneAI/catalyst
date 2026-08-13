@@ -22,7 +22,7 @@
 #include "LocalRegistry.hpp"
 #include "Transport.hpp"
 
-namespace catalyst::transport::local_copy {
+namespace catalyst::transport::memcpy {
 
 class LocalCpuControllerSession : public ControllerSession {
   public:
@@ -76,4 +76,4 @@ class LocalCpuControllerSession : public ControllerSession {
     std::uint64_t next_send_ = 0;
 };
 
-} // namespace catalyst::transport::local_copy
+} // namespace catalyst::transport::memcpy

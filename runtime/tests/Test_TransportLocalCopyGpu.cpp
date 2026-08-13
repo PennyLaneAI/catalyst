@@ -21,10 +21,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 using namespace catalyst::transport;
-using namespace catalyst::transport::local_copy;
+using namespace catalyst::transport::memcpy;
 
-TEST_CASE("local_copy CPU controller can drive the local GPU coprocessor",
-          "[transport_local_copy]") {
+TEST_CASE("memcpy CPU controller can drive the local GPU coprocessor",
+          "[transport_memcpy]") {
     LocalCpuControllerSession controller;
     LocalGpuCoprocessorSession coprocessor;
 
@@ -59,8 +59,8 @@ TEST_CASE("local_copy CPU controller can drive the local GPU coprocessor",
     CHECK(reply_word == request_word);
 }
 
-TEST_CASE("local_copy rejects a second local GPU coprocessor on the same endpoint",
-          "[transport_local_copy]") {
+TEST_CASE("memcpy rejects a second local GPU coprocessor on the same endpoint",
+          "[transport_memcpy]") {
     LocalGpuCoprocessorSession first;
     LocalGpuCoprocessorSession second;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19016};

@@ -23,7 +23,7 @@
 
 #include <hip/hip_runtime.h>
 
-namespace catalyst::transport::local_copy {
+namespace catalyst::transport::memcpy {
 
 LocalGpuCoprocessorSession::LocalGpuCoprocessorSession(std::string /*unused*/, int gpu_device)
     : gpu_device_(gpu_device) {}
@@ -164,4 +164,4 @@ std::size_t LocalGpuCoprocessorSession::process_message(const void *in, std::siz
     return sizeof(correction);
 }
 
-} // namespace catalyst::transport::local_copy
+} // namespace catalyst::transport::memcpy

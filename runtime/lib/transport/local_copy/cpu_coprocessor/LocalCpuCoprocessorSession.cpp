@@ -18,7 +18,7 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace catalyst::transport::local_copy {
+namespace catalyst::transport::memcpy {
 namespace {
 
 std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
@@ -106,4 +106,4 @@ std::size_t LocalCpuCoprocessorSession::process_message(const void *in, std::siz
     return out_bytes;
 }
 
-} // namespace catalyst::transport::local_copy
+} // namespace catalyst::transport::memcpy

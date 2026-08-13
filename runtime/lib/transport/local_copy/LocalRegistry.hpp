@@ -24,7 +24,7 @@
 
 #include "Transport.hpp"
 
-namespace catalyst::transport::local_copy {
+namespace catalyst::transport::memcpy {
 
 class LocalCpuControllerSession;
 
@@ -74,4 +74,4 @@ inline auto acquire_memcpy_link(const ConnectInfo &info) -> std::shared_ptr<Memc
     return link;
 }
 
-} // namespace catalyst::transport::local_copy
+} // namespace catalyst::transport::memcpy

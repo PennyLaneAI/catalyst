@@ -23,7 +23,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 using namespace catalyst::transport;
-using namespace catalyst::transport::local_copy;
+using namespace catalyst::transport::memcpy;
 
 namespace {
 std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
@@ -37,7 +37,7 @@ std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t
 }
 } // namespace
 
-TEST_CASE("local_copy round-trip echoes through peer memory", "[transport_local_copy]") {
+TEST_CASE("memcpy round-trip echoes through peer memory", "[transport_memcpy]") {
     LocalCpuControllerSession controller;
     LocalCpuCoprocessorSession coprocessor;
 
@@ -72,7 +72,7 @@ TEST_CASE("local_copy round-trip echoes through peer memory", "[transport_local_
     CHECK(reply_word == request_word);
 }
 
-TEST_CASE("local_copy uses the bound coprocessor function", "[transport_local_copy]") {
+TEST_CASE("memcpy uses the bound coprocessor function", "[transport_memcpy]") {
     LocalCpuControllerSession controller;
     LocalCpuCoprocessorSession coprocessor;
 
@@ -109,7 +109,7 @@ TEST_CASE("local_copy uses the bound coprocessor function", "[transport_local_co
 
 // ---- Pairing invariants ------------------------------------------------------
 
-TEST_CASE("local_copy rejects a second controller on the same endpoint", "[transport_local_copy]") {
+TEST_CASE("memcpy rejects a second controller on the same endpoint", "[transport_memcpy]") {
     LocalCpuControllerSession first;
     LocalCpuControllerSession second;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19010};
@@ -117,8 +117,8 @@ TEST_CASE("local_copy rejects a second controller on the same endpoint", "[trans
     REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);
 }
 
-TEST_CASE("local_copy rejects a second coprocessor on the same endpoint",
-          "[transport_local_copy]") {
+TEST_CASE("memcpy rejects a second coprocessor on the same endpoint",
+          "[transport_memcpy]") {
     LocalCpuCoprocessorSession first;
     LocalCpuCoprocessorSession second;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19011};
@@ -126,8 +126,8 @@ TEST_CASE("local_copy rejects a second coprocessor on the same endpoint",
     REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);
 }
 
-TEST_CASE("local_copy accepts a rebind after the prior session is destroyed",
-          "[transport_local_copy]") {
+TEST_CASE("memcpy accepts a rebind after the prior session is destroyed",
+          "[transport_memcpy]") {
     ConnectInfo ci{.peer = "loopback", .oob_port = 19012};
     {
         LocalCpuControllerSession ctrl;
@@ -143,7 +143,7 @@ TEST_CASE("local_copy accepts a rebind after the prior session is destroyed",
 
 // ---- Data-path preconditions -------------------------------------------------
 
-TEST_CASE("local_copy rejects a non-zero work_item_idx", "[transport_local_copy]") {
+TEST_CASE("memcpy rejects a non-zero work_item_idx", "[transport_memcpy]") {
     LocalCpuControllerSession controller;
     LocalCpuCoprocessorSession coprocessor;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19013};
@@ -163,7 +163,7 @@ TEST_CASE("local_copy rejects a non-zero work_item_idx", "[transport_local_copy]
     REQUIRE_THROWS_AS(controller.kick(/*work_item_idx=*/1), std::runtime_error);
 }
 
-TEST_CASE("local_copy rejects a second commit_work_item", "[transport_local_copy]") {
+TEST_CASE("memcpy rejects a second commit_work_item", "[transport_memcpy]") {
     LocalCpuControllerSession controller;
     LocalCpuCoprocessorSession coprocessor;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19014};
@@ -175,7 +175,7 @@ TEST_CASE("local_copy rejects a second commit_work_item", "[transport_local_copy
                       std::runtime_error);
 }
 
-TEST_CASE("local_copy collect rejects more than a single reply slot", "[transport_local_copy]") {
+TEST_CASE("memcpy collect rejects more than a single reply slot", "[transport_memcpy]") {
     LocalCpuControllerSession controller;
     LocalCpuCoprocessorSession coprocessor;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19015};

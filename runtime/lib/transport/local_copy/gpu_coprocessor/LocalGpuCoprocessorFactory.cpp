@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Plugin entry point for the local-copy GPU coprocessor backend. The runtime dlopen's
+// Plugin entry point for the memcpy GPU coprocessor backend. The runtime dlopen's
 // this .so and resolves CatalystTransportCoprocessorFactory (see TransportBackend.h).
 
 #include <string>
@@ -25,7 +25,7 @@ namespace {
 catalyst::transport::CoprocessorSession *make_local_gpu_coprocessor(const std::string &config) {
     const int gpu_device =
         catalyst::transport::common::parse_optional_index(config, "gpu", /*fallback=*/0);
-    return new catalyst::transport::local_copy::LocalGpuCoprocessorSession(config, gpu_device);
+    return new catalyst::transport::memcpy::LocalGpuCoprocessorSession(config, gpu_device);
 }
 } // namespace
 

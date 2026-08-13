@@ -20,7 +20,7 @@
 
 #include "WireProtocol.hpp"
 
-namespace catalyst::transport::local_copy {
+namespace catalyst::transport::memcpy {
 namespace {
 
 std::uint64_t now_ns() {
@@ -180,4 +180,4 @@ void LocalCpuControllerSession::write_data_slot(const void *src, std::uint64_t b
     decoder_id_ = decoder_id;
 }
 
-} // namespace catalyst::transport::local_copy
+} // namespace catalyst::transport::memcpy
