@@ -972,8 +972,8 @@ def test_decompose_lowering_alt_decomps():
     """Test the decompose lowering pass with alternative decompositions."""
 
     @qp.register_resources({qp.RY: 1})
-    def custom_rot_cheap(params, wires: WiresLike):
-        qp.RY(params[1], wires=wires)
+    def custom_rot_cheap(phi, theta, omega, wires: WiresLike):  # pylint: disable=unused-argument
+        qp.RY(theta, wires=wires)
 
     @qp.qjit(target="mlir", capture=True)
     @partial(
@@ -986,7 +986,7 @@ def test_decompose_lowering_alt_decomps():
         qp.Rot(x, y, x + y, wires=1)
         return qp.expval(qp.PauliZ(0))
 
-    # CHECK-DAG: @custom_rot_cheap(%arg0: !qref.reg<3>, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # CHECK-DAG: @custom_rot_cheap(%arg0: !qref.reg<3>, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     print(circuit_23.mlir)
 
 
@@ -998,10 +998,10 @@ def test_decompose_lowering_with_tensorlike():
     using TensorLike parameters."""
 
     @qp.register_resources({qp.RZ: 2, qp.RY: 1})
-    def custom_rot(params: TensorLike, wires: WiresLike):
-        qp.RZ(params[0], wires=wires)
-        qp.RY(params[1], wires=wires)
-        qp.RZ(params[2], wires=wires)
+    def custom_rot(phi: TensorLike, theta: TensorLike, omega: TensorLike, wires: WiresLike):
+        qp.RZ(phi, wires=wires)
+        qp.RY(theta, wires=wires)
+        qp.RZ(omega, wires=wires)
 
     @qp.register_resources({qp.RZ: 1, qp.CNOT: 4})
     def custom_multirz(theta: TensorLike, wires: WiresLike):
@@ -1025,7 +1025,7 @@ def test_decompose_lowering_with_tensorlike():
 
     # CHECK-DAG: @custom_multirz_wires_3(%arg0: !qref.reg<3>, %arg1: tensor<f64>, %arg2: tensor<3xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 3 : i64, target_gate = "MultiRZ"}
     # CHECK-DAG: @_rz_to_ry_rx(%arg0: !qref.reg<3>, %arg1: tensor<f64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
-    # CHECK-DAG: @custom_rot(%arg0: !qref.reg<3>, %arg1: tensor<3xf64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
+    # CHECK-DAG: @custom_rot(%arg0: !qref.reg<3>, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     print(circuit_24.mlir)
 
 
