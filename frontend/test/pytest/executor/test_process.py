@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Unit tests for :mod:`catalyst.executor.process` — the ``catalyst-executor`` subprocess
-lifecycle (spawn, output pump, ready/port-conflict detection, teardown) for the base class and
+lifecycle (spawn, output watching, ready/port-conflict detection, teardown) for the base class and
 its local / remote subclasses. ``subprocess.Popen`` is mocked throughout."""
 
 import re
@@ -24,7 +24,7 @@ import pytest
 
 from catalyst.executor.process import _ExecutorProcess, _LocalProcess, _RemoteProcess
 from catalyst.executor.ssh import RemoteLauncher
-from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, OutputPatterns, PortInUse
+from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, OutputPatterns
 
 
 def _mk_base_proc(**overrides):
@@ -89,10 +89,11 @@ class TestExecutorProcessCheckPortConflict:
     """Behavior of :meth:`_check_port_conflict` under the port-conflict flag."""
 
     def test_raises_when_flag_set(self):
-        """Raises :class:`PortInUse` when the port-conflict flag is set."""
+        """Raises when the port-conflict flag is set."""
         p = _mk_base_proc()
         p._port_conflict.set()
-        with pytest.raises(PortInUse):
+        assert p.port_conflict
+        with pytest.raises(RuntimeError, match="already in use"):
             p._check_port_conflict()
 
     def test_noop_when_flag_unset(self):
@@ -119,13 +120,13 @@ class TestExecutorProcessCheckEarlyExit:
         with pytest.raises(RuntimeError, match="exited"):
             p._check_early_exit()
 
-    def test_dead_with_port_conflict_raises_portinuse(self):
-        """:class:`PortInUse` takes precedence when both dead-process and port-conflict apply."""
+    def test_dead_with_port_conflict_reports_the_conflict(self):
+        """A dead process that hit a port conflict reports the conflict, not the exit."""
         p = _mk_base_proc()
         p.proc = MagicMock()
         p.proc.poll.return_value = 1
         p._port_conflict.set()
-        with pytest.raises(PortInUse):
+        with pytest.raises(RuntimeError, match="already in use"):
             p._check_early_exit()
 
 
@@ -184,12 +185,12 @@ class TestExecutorProcessWaitForReady:
             p._wait_for_ready(poll_interval=0.02)
 
     def test_port_conflict_raises(self):
-        """Raises :class:`PortInUse` when the port-conflict flag is set during polling."""
+        """Raises when the port-conflict flag is set during polling."""
         p = _mk_base_proc(ready_timeout=0.5)
         p.proc = MagicMock()
         p.proc.poll.return_value = None
         p._port_conflict.set()
-        with pytest.raises(PortInUse):
+        with pytest.raises(RuntimeError, match="already in use"):
             p._wait_for_ready(poll_interval=0.02)
 
 
@@ -280,12 +281,12 @@ class TestRemoteProcessConstruction:
         assert p._bind_port == 9000
 
     def test_defaults(self):
-        """Applies default sudo, workspace-cleanup, executor-binary, and ready-tracking values."""
+        """Applies default sudo, workspace-cleanup and executor-binary values."""
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
         assert p.sudo is False
         assert p.cleanup_ws is False
         assert p.executor_bin == f"./{ExecutorPaths.EXECUTOR_BIN}"
-        assert not p._ready_reached
+        assert p.proc is None
 
 
 class TestRemoteProcessLogHeader:
@@ -367,31 +368,30 @@ class TestRemoteProcessAuthHelp:
         assert "sudo_password=" in msg
 
 
-class TestRemoteProcessOnReady:
-    """State transition triggered by :meth:`_on_ready`."""
-
-    def test_sets_ready_reached(self):
-        """Sets the ``_ready_reached`` flag when the ready hook fires."""
-        p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
-        assert not p._ready_reached
-        p._on_ready()
-        assert p._ready_reached
-
-
 class TestRemoteProcessTeardownExtra:
     """Remote ``pkill`` invocation from :meth:`_teardown_extra`."""
 
-    def test_skips_when_not_ready(self):
-        """No-op before the ready hook has fired: nothing to pkill remotely."""
+    def test_skips_when_nothing_was_spawned(self):
+        """No-op with no process of ours on the far end: there is nothing to pkill."""
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
         with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
         pkill.assert_not_called()
 
-    def test_runs_pkill_when_ready(self):
-        """Runs a port-scoped pkill once the remote executor has been ready."""
+    def test_skips_when_the_port_was_someone_elses(self):
+        """No-op after a port conflict: the executor answering there belongs to another launch."""
         p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
-        p._ready_reached = True
+        p.proc = MagicMock()
+        p._port_conflict.set()
+        with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
+            p._teardown_extra()
+        pkill.assert_not_called()
+
+    def test_runs_pkill_for_a_process_that_never_reported_ready(self):
+        """Runs a port-scoped pkill for anything spawned, ready or not: a ^C partway through a
+        deploy lands in that window and leaves an executor holding the port."""
+        p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
+        p.proc = MagicMock()
         with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
         pkill.assert_called_once()
@@ -406,7 +406,7 @@ class TestRemoteProcessTeardownExtra:
         the command :meth:`RemoteLauncher._remote_cmd` actually emits.
         """
         p = _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws")
-        p._ready_reached = True
+        p.proc = MagicMock()
         with patch("catalyst.executor.process.RemoteOps.pkill") as pkill:
             p._teardown_extra()
         pat = pkill.call_args.args[2]
@@ -508,14 +508,14 @@ class _FakeStdout:
         return iter(self._lines)
 
 
-class TestPumpOutput:
+class TestWatchOutput:
     """The reader thread, which turns executor output into readiness and conflict flags."""
 
     def _pump(self, cls, lines, **kw):
         p = cls(**kw)
         p.proc = MagicMock()
         p.proc.stdout = _FakeStdout(lines)
-        p._pump_output()
+        p._watch_output()
         return p
 
     def test_ready_line_releases_the_wait(self):
@@ -540,7 +540,7 @@ class TestPumpOutput:
         p._open_log()
         p.proc = MagicMock()
         p.proc.stdout = _FakeStdout(["hello from the executor\n"])
-        p._pump_output()
+        p._watch_output()
         p._log_fh.close()
         assert "hello from the executor" in log.read_text()
 

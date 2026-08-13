@@ -19,6 +19,5 @@ address it serves on, either locally or on a remote host.
 """
 
 from .manager import Executor
-from .utils import PortInUse
 
-__all__ = ("Executor", "PortInUse")
+__all__ = ("Executor",)
