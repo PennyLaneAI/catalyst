@@ -19,15 +19,20 @@
 #include <memory>
 #include <vector>
 
-#include "LocalRegistry.hpp"
+#include "GpuRuntime.hpp"
+#include "MemcpyLink.hpp"
 #include "Transport.hpp"
+
+namespace catalyst::transport::common {
+struct PayloadSlot;
+}
 
 namespace catalyst::transport::memcpy {
 
-class LocalCpuCoprocessorSession : public CoprocessorSession {
+class GpuCoprocessorSession : public CoprocessorSession {
   public:
-    explicit LocalCpuCoprocessorSession(std::string = {}) {}
-    ~LocalCpuCoprocessorSession() override;
+    explicit GpuCoprocessorSession(std::string = {}, int gpu_device = 0);
+    ~GpuCoprocessorSession() override;
 
     // TransportSession
     int connect(const ConnectInfo &info) override;
@@ -40,19 +45,35 @@ class LocalCpuCoprocessorSession : public CoprocessorSession {
     void stop() override;
 
     // CoprocessorSession
-    void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
+    void set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) override;
+    CoprocConvention coprocessor_fn_convention() const override {
+        return CoprocConvention::LaunchOnce;
+    }
 
-    // Invoked inline from the controller's kick(). See MemcpyLink::ProcessMessage.
+    // Called synchronously from the paired controller's kick(); launches one GPU decode and
+    // writes the reply into `out`. Uses single slots (no ring) since total=1.
+    //
+    // Expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame) and
+    // `out_cap >= sizeof(int64_t)`; the reply is always `sizeof(int64_t)` bytes.
+    // Anything else throws.
     std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
+    void ensure_gpu_state();
+
     std::shared_ptr<MemcpyLink> link_;
 
     /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
-    CoprocessorFn fn_ = nullptr;
-    void *ctx_ = nullptr;
+    int gpu_device_ = 0;
+    std::unique_ptr<gpu_verbs::GpuRuntime> gpu_;
+    gpu_verbs::GpuRuntime::Handoff handoff_{};
+    common::PayloadSlot *request_slot_host_ = nullptr;
+    common::PayloadSlot *request_slot_dev_ = nullptr;
+
+    CoprocessorLauncherFn launcher_ = nullptr;
+    void *launcher_ctx_ = nullptr;
 };
 
 } // namespace catalyst::transport::memcpy

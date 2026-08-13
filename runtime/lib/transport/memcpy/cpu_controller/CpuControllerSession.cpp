@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "LocalCpuControllerSession.hpp"
+#include "CpuControllerSession.hpp"
 
 #include <chrono>
 #include <cstring>
@@ -31,7 +31,7 @@ std::uint64_t now_ns() {
 
 } // namespace
 
-LocalCpuControllerSession::~LocalCpuControllerSession() {
+CpuControllerSession::~CpuControllerSession() {
     if (link_) {
         std::lock_guard<std::mutex> lock(link_->mu);
         if (link_->controller == this) {
@@ -40,7 +40,7 @@ LocalCpuControllerSession::~LocalCpuControllerSession() {
     }
 }
 
-int LocalCpuControllerSession::connect(const ConnectInfo &info) {
+int CpuControllerSession::connect(const ConnectInfo &info) {
     link_ = acquire_memcpy_link(info);
     std::lock_guard<std::mutex> lock(link_->mu);
     if (link_->controller) {
@@ -51,7 +51,7 @@ int LocalCpuControllerSession::connect(const ConnectInfo &info) {
     return 0;
 }
 
-MemRegion LocalCpuControllerSession::alloc_memory(std::size_t size, MemKind kind) {
+MemRegion CpuControllerSession::alloc_memory(std::size_t size, MemKind kind) {
     if (kind != MemKind::CpuRam) {
         throw std::runtime_error("memcpy: CPU-only for now; alloc_memory expects CpuRam");
     }
@@ -66,26 +66,26 @@ MemRegion LocalCpuControllerSession::alloc_memory(std::size_t size, MemKind kind
     };
 }
 
-PeerRef LocalCpuControllerSession::exchange_keys(const MemRegion &local) {
+PeerRef CpuControllerSession::exchange_keys(const MemRegion &local) {
     local_reply_ = local;
     return PeerRef{};
 }
 
-void LocalCpuControllerSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
-                                                  const PeerRef & /*peer*/) {
+void CpuControllerSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
+                                             const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
         throw std::runtime_error("memcpy: CPU-only controller supports only transport=memcpy");
     }
     local_reply_ = local;
 }
 
-void LocalCpuControllerSession::start() {
+void CpuControllerSession::start() {
     rtt_ns_ = 0;
     next_send_ = 0;
 }
 
-int LocalCpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
-                                       std::size_t n) {
+int CpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
+                                  std::size_t n) {
     if (n > 1) {
         throw std::runtime_error("memcpy: only a single reply slot (n<=1) is supported");
     }
@@ -105,10 +105,10 @@ int LocalCpuControllerSession::collect(void *const *replies, const std::uint64_t
     return 0;
 }
 
-void LocalCpuControllerSession::stop() {}
+void CpuControllerSession::stop() {}
 
-void LocalCpuControllerSession::commit_work_item(std::uint32_t work_item_idx,
-                                                 std::uint64_t in_bytes, std::uint64_t out_bytes) {
+void CpuControllerSession::commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
+                                            std::uint64_t out_bytes) {
     if (work_item_idx != 0) {
         throw std::runtime_error("memcpy: only work_item_idx=0 is supported");
     }
@@ -122,7 +122,7 @@ void LocalCpuControllerSession::commit_work_item(std::uint32_t work_item_idx,
     committed_ = true;
 }
 
-int LocalCpuControllerSession::kick(std::uint32_t work_item_idx) {
+int CpuControllerSession::kick(std::uint32_t work_item_idx) {
     if (work_item_idx != 0) {
         throw std::runtime_error("memcpy: only work_item_idx=0 is supported");
     }
@@ -161,12 +161,12 @@ int LocalCpuControllerSession::kick(std::uint32_t work_item_idx) {
     return 0;
 }
 
-void *LocalCpuControllerSession::data_slot() {
+void *CpuControllerSession::data_slot() {
     return request_staging_.empty() ? nullptr : request_staging_.data();
 }
 
-void LocalCpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
-                                                std::uint32_t decoder_id) {
+void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
+                                           std::uint32_t decoder_id) {
     if (bytes > in_bytes_) {
         throw std::runtime_error("memcpy: payload exceeds committed input bytes");
     }

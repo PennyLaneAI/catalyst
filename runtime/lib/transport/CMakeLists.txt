@@ -63,7 +63,7 @@ if(IBVERBS_LIB)
 else()
     message(STATUS
         "transport: libibverbs not found -> skipping the RDMA backends (cpu_verbs, gpu_verbs, "
-        "and the shared transport_common); rt_transport and the local_copy backend still build. "
+        "and the shared transport_common); rt_transport and the memcpy backend still build. "
         "Install libibverbs-dev / rdma-core to get the RDMA backends.")
 endif()
 
@@ -77,9 +77,9 @@ if(TRANSPORT_HAS_HIP)
     add_dependencies(transport_backends catalyst_transport_gpu_verbs_coprocessor)
 endif()
 
-add_subdirectory(local_copy)
-add_dependencies(transport_all catalyst_transport_local_controller
-                 catalyst_transport_local_coprocessor)
+add_subdirectory(memcpy)
+add_dependencies(transport_all catalyst_transport_memcpy_controller
+                 catalyst_transport_memcpy_coprocessor)
 if(TRANSPORT_HAS_HIP)
-    add_dependencies(transport_all catalyst_transport_local_gpu_coprocessor)
+    add_dependencies(transport_all catalyst_transport_memcpy_gpu_coprocessor)
 endif()

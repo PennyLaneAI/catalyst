@@ -15,18 +15,17 @@
 #include <cstdint>
 #include <stdexcept>
 
-#include "LocalCpuControllerSession.hpp"
-#include "LocalGpuCoprocessorSession.hpp"
+#include "CpuControllerSession.hpp"
+#include "GpuCoprocessorSession.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::memcpy;
 
-TEST_CASE("memcpy CPU controller can drive the local GPU coprocessor",
-          "[transport_memcpy]") {
-    LocalCpuControllerSession controller;
-    LocalGpuCoprocessorSession coprocessor;
+TEST_CASE("memcpy CPU controller can drive the local GPU coprocessor", "[transport_memcpy]") {
+    CpuControllerSession controller;
+    GpuCoprocessorSession coprocessor;
 
     ConnectInfo ci{.peer = "loopback", .oob_port = 19003};
     REQUIRE(controller.connect(ci) == 0);
@@ -61,8 +60,8 @@ TEST_CASE("memcpy CPU controller can drive the local GPU coprocessor",
 
 TEST_CASE("memcpy rejects a second local GPU coprocessor on the same endpoint",
           "[transport_memcpy]") {
-    LocalGpuCoprocessorSession first;
-    LocalGpuCoprocessorSession second;
+    GpuCoprocessorSession first;
+    GpuCoprocessorSession second;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19016};
     REQUIRE(first.connect(ci) == 0);
     REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);

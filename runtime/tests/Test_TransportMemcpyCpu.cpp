@@ -17,8 +17,8 @@
 #include <cstring>
 #include <stdexcept>
 
-#include "LocalCpuControllerSession.hpp"
-#include "LocalCpuCoprocessorSession.hpp"
+#include "CpuControllerSession.hpp"
+#include "CpuCoprocessorSession.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -38,8 +38,8 @@ std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t
 } // namespace
 
 TEST_CASE("memcpy round-trip echoes through peer memory", "[transport_memcpy]") {
-    LocalCpuControllerSession controller;
-    LocalCpuCoprocessorSession coprocessor;
+    CpuControllerSession controller;
+    CpuCoprocessorSession coprocessor;
 
     ConnectInfo ci{.peer = "loopback", .oob_port = 19001};
     REQUIRE(controller.connect(ci) == 0);
@@ -73,8 +73,8 @@ TEST_CASE("memcpy round-trip echoes through peer memory", "[transport_memcpy]") 
 }
 
 TEST_CASE("memcpy uses the bound coprocessor function", "[transport_memcpy]") {
-    LocalCpuControllerSession controller;
-    LocalCpuCoprocessorSession coprocessor;
+    CpuControllerSession controller;
+    CpuCoprocessorSession coprocessor;
 
     ConnectInfo ci{.peer = "loopback", .oob_port = 19002};
     REQUIRE(controller.connect(ci) == 0);
@@ -110,33 +110,31 @@ TEST_CASE("memcpy uses the bound coprocessor function", "[transport_memcpy]") {
 // ---- Pairing invariants ------------------------------------------------------
 
 TEST_CASE("memcpy rejects a second controller on the same endpoint", "[transport_memcpy]") {
-    LocalCpuControllerSession first;
-    LocalCpuControllerSession second;
+    CpuControllerSession first;
+    CpuControllerSession second;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19010};
     REQUIRE(first.connect(ci) == 0);
     REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);
 }
 
-TEST_CASE("memcpy rejects a second coprocessor on the same endpoint",
-          "[transport_memcpy]") {
-    LocalCpuCoprocessorSession first;
-    LocalCpuCoprocessorSession second;
+TEST_CASE("memcpy rejects a second coprocessor on the same endpoint", "[transport_memcpy]") {
+    CpuCoprocessorSession first;
+    CpuCoprocessorSession second;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19011};
     REQUIRE(first.connect(ci) == 0);
     REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);
 }
 
-TEST_CASE("memcpy accepts a rebind after the prior session is destroyed",
-          "[transport_memcpy]") {
+TEST_CASE("memcpy accepts a rebind after the prior session is destroyed", "[transport_memcpy]") {
     ConnectInfo ci{.peer = "loopback", .oob_port = 19012};
     {
-        LocalCpuControllerSession ctrl;
-        LocalCpuCoprocessorSession co;
+        CpuControllerSession ctrl;
+        CpuCoprocessorSession co;
         REQUIRE(ctrl.connect(ci) == 0);
         REQUIRE(co.connect(ci) == 0);
     }
-    LocalCpuControllerSession ctrl2;
-    LocalCpuCoprocessorSession co2;
+    CpuControllerSession ctrl2;
+    CpuCoprocessorSession co2;
     REQUIRE_NOTHROW(ctrl2.connect(ci));
     REQUIRE_NOTHROW(co2.connect(ci));
 }
@@ -144,8 +142,8 @@ TEST_CASE("memcpy accepts a rebind after the prior session is destroyed",
 // ---- Data-path preconditions -------------------------------------------------
 
 TEST_CASE("memcpy rejects a non-zero work_item_idx", "[transport_memcpy]") {
-    LocalCpuControllerSession controller;
-    LocalCpuCoprocessorSession coprocessor;
+    CpuControllerSession controller;
+    CpuCoprocessorSession coprocessor;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19013};
     REQUIRE(controller.connect(ci) == 0);
     REQUIRE(coprocessor.connect(ci) == 0);
@@ -164,8 +162,8 @@ TEST_CASE("memcpy rejects a non-zero work_item_idx", "[transport_memcpy]") {
 }
 
 TEST_CASE("memcpy rejects a second commit_work_item", "[transport_memcpy]") {
-    LocalCpuControllerSession controller;
-    LocalCpuCoprocessorSession coprocessor;
+    CpuControllerSession controller;
+    CpuCoprocessorSession coprocessor;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19014};
     REQUIRE(controller.connect(ci) == 0);
     REQUIRE(coprocessor.connect(ci) == 0);
@@ -176,8 +174,8 @@ TEST_CASE("memcpy rejects a second commit_work_item", "[transport_memcpy]") {
 }
 
 TEST_CASE("memcpy collect rejects more than a single reply slot", "[transport_memcpy]") {
-    LocalCpuControllerSession controller;
-    LocalCpuCoprocessorSession coprocessor;
+    CpuControllerSession controller;
+    CpuCoprocessorSession coprocessor;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19015};
     REQUIRE(controller.connect(ci) == 0);
     REQUIRE(coprocessor.connect(ci) == 0);

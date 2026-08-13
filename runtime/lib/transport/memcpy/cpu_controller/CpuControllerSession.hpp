@@ -19,20 +19,15 @@
 #include <memory>
 #include <vector>
 
-#include "GpuRuntime.hpp"
-#include "LocalRegistry.hpp"
+#include "MemcpyLink.hpp"
 #include "Transport.hpp"
-
-namespace catalyst::transport::common {
-struct PayloadSlot;
-}
 
 namespace catalyst::transport::memcpy {
 
-class LocalGpuCoprocessorSession : public CoprocessorSession {
+class CpuControllerSession : public ControllerSession {
   public:
-    explicit LocalGpuCoprocessorSession(std::string = {}, int gpu_device = 0);
-    ~LocalGpuCoprocessorSession() override;
+    explicit CpuControllerSession(std::string = {}) {}
+    ~CpuControllerSession() override;
 
     // TransportSession
     int connect(const ConnectInfo &info) override;
@@ -43,37 +38,42 @@ class LocalGpuCoprocessorSession : public CoprocessorSession {
     void start() override;
     int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
     void stop() override;
+    std::uint64_t last_rtt_ns() const override { return rtt_ns_; }
 
-    // CoprocessorSession
-    void set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) override;
-    CoprocConvention coprocessor_fn_convention() const override {
-        return CoprocConvention::LaunchOnce;
-    }
-
-    // Called synchronously from the paired controller's kick(); launches one GPU decode and
-    // writes the reply into `out`. Uses single slots (no ring) since total=1.
-    //
-    // Expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame) and
-    // `out_cap >= sizeof(int64_t)`; the reply is always `sizeof(int64_t)` bytes.
-    // Anything else throws.
-    std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
+    // ControllerSession
+    void commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
+                          std::uint64_t out_bytes) override;
+    int kick(std::uint32_t work_item_idx = 0) override;
+    void *data_slot() override;
+    void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
 
   private:
-    void ensure_gpu_state();
-
     std::shared_ptr<MemcpyLink> link_;
+
+    /// Reply buffer the paired coprocessor writes into during kick().
+    MemRegion local_reply_{};
 
     /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
-    int gpu_device_ = 0;
-    std::unique_ptr<gpu_verbs::GpuRuntime> gpu_;
-    gpu_verbs::GpuRuntime::Handoff handoff_{};
-    common::PayloadSlot *request_slot_host_ = nullptr;
-    common::PayloadSlot *request_slot_dev_ = nullptr;
+    std::vector<std::byte> request_staging_;
 
-    CoprocessorLauncherFn launcher_ = nullptr;
-    void *launcher_ctx_ = nullptr;
+    /// Set on the first commit_work_item(). Subsequent commits are rejected so any pointer a
+    /// prior data_slot() handed out cannot dangle behind a request_staging_ reallocation.
+    bool committed_ = false;
+
+    std::uint64_t in_bytes_ = 0;
+    std::uint64_t out_bytes_ = 0;
+    std::uint64_t staged_bytes_ = 0;
+    std::uint64_t reply_bytes_ = 0;
+    std::uint32_t decoder_id_ = 0;
+
+    std::uint64_t kick_ns_ = 0;
+    std::uint64_t rtt_ns_ = 0;
+
+    // Per-session round counter driving `Payload::seq_num`. Matches cpu_verbs's `next_send_`:
+    // the first kick sends seq_num=1, the second sends 2, etc. Reset on start().
+    std::uint64_t next_send_ = 0;
 };
 
 } // namespace catalyst::transport::memcpy

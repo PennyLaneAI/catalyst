@@ -17,12 +17,12 @@
 
 #include <string>
 
-#include "LocalCpuControllerSession.hpp"
+#include "CpuControllerSession.hpp"
 #include "TransportBackend.h"
 
 namespace {
 catalyst::transport::ControllerSession *make_local_controller(const std::string &config) {
-    return new catalyst::transport::memcpy::LocalCpuControllerSession(config);
+    return new catalyst::transport::memcpy::CpuControllerSession(config);
 }
 } // namespace
 

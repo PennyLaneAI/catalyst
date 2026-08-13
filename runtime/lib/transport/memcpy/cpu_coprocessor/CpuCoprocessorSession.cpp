@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "LocalCpuCoprocessorSession.hpp"
+#include "CpuCoprocessorSession.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -31,7 +31,7 @@ std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t o
 
 } // namespace
 
-LocalCpuCoprocessorSession::~LocalCpuCoprocessorSession() {
+CpuCoprocessorSession::~CpuCoprocessorSession() {
     if (link_) {
         // Wait for any in-flight kick, then unbind so no future call reaches a dying `this`.
         std::lock_guard<std::mutex> lock(link_->mu);
@@ -39,7 +39,7 @@ LocalCpuCoprocessorSession::~LocalCpuCoprocessorSession() {
     }
 }
 
-int LocalCpuCoprocessorSession::connect(const ConnectInfo &info) {
+int CpuCoprocessorSession::connect(const ConnectInfo &info) {
     link_ = acquire_memcpy_link(info);
     std::lock_guard<std::mutex> lock(link_->mu);
     if (link_->process_message) {
@@ -53,7 +53,7 @@ int LocalCpuCoprocessorSession::connect(const ConnectInfo &info) {
     return 0;
 }
 
-MemRegion LocalCpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
+MemRegion CpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     if (kind != MemKind::CpuRam) {
         throw std::runtime_error("memcpy: CPU-only for now; alloc_memory expects CpuRam");
     }
@@ -68,34 +68,32 @@ MemRegion LocalCpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kin
     };
 }
 
-PeerRef LocalCpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) { return PeerRef{}; }
+PeerRef CpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) { return PeerRef{}; }
 
-void LocalCpuCoprocessorSession::establish_channel(const ChannelDesc &desc,
-                                                   const MemRegion & /*local*/,
-                                                   const PeerRef & /*peer*/) {
+void CpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion & /*local*/,
+                                              const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
         throw std::runtime_error("memcpy: CPU-only coprocessor supports only transport=memcpy");
     }
 }
 
-void LocalCpuCoprocessorSession::start() {}
+void CpuCoprocessorSession::start() {}
 
-int LocalCpuCoprocessorSession::collect(void *const * /*replies*/,
-                                        const std::uint64_t * /*replies_bytes*/,
-                                        std::size_t /*n*/) {
+int CpuCoprocessorSession::collect(void *const * /*replies*/,
+                                   const std::uint64_t * /*replies_bytes*/, std::size_t /*n*/) {
     // Compute is driven inline from the controller's kick(); nothing collects on this side.
     throw std::logic_error("memcpy: coprocessor collect is not used");
 }
 
-void LocalCpuCoprocessorSession::stop() {}
+void CpuCoprocessorSession::stop() {}
 
-void LocalCpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
+void CpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
     fn_ = fn;
     ctx_ = ctx;
 }
 
-std::size_t LocalCpuCoprocessorSession::process_message(const void *in, std::size_t in_len,
-                                                        void *out, std::size_t out_cap) {
+std::size_t CpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
+                                                   std::size_t out_cap) {
     // `in` is a wire-shaped Payload (matching cpu_verbs); decoder_id sits at offset 8
     // for any decoder that needs to dispatch on it.
     CoprocessorFn fn = fn_ ? fn_ : &echo_fn;

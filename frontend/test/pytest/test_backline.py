@@ -147,6 +147,13 @@ def test_transport_object_serializes_to_name():
     assert d["transport"] == "rdma"
 
 
+def test_transport_memcpy_object_serializes_to_name():
+    """The in-process ``memcpy`` transport carries through the Transport enum verbatim."""
+    transport = Transport("memcpy")
+    d = serialize_backline(qp.backline(controller=_controller(), transport=transport).placement)
+    assert d["transport"] == "memcpy"
+
+
 def test_add_transport_passes_places_each_pass():
     """add_transport_passes inserts each pass into its stage; transport lowers before catalyst."""
     stages = add_transport_passes(
@@ -187,6 +194,24 @@ def test_backline_qnode_capture_path(use_capture):
     ir = circuit.mlir
     assert "catalyst.backline" in ir
     assert 'transport = "rdma"' in ir
+
+
+def test_backline_qnode_capture_path_memcpy(use_capture):
+    """A backline qnode with the in-process ``memcpy`` transport compiles to MLIR carrying
+    ``transport = "memcpy"``.
+    """
+    dev = qp.backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="memcpy")
+
+    @qjit(target="mlir", capture=True)
+    @qp.qnode(dev)
+    def circuit():
+        qp.Hadamard(0)
+        qp.CNOT([0, 1])
+        return qp.probs()
+
+    ir = circuit.mlir
+    assert "catalyst.backline" in ir
+    assert 'transport = "memcpy"' in ir
 
 
 def test_remote_controller_module_tagged_with_role(use_capture):
@@ -360,43 +385,43 @@ class TestBackendResolution:
         assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
         assert d["coprocessors"][0]["backend_lib"].endswith("_gpu_verbs_coprocessor.so")
 
-    def test_local_cpu_to_cpu_backend_libs(self, fake_lib_dir):
-        """A CPU controller paired with a CPU coprocessor on the ``local`` backend."""
+    def test_memcpy_cpu_to_cpu_backend_libs(self, fake_lib_dir):
+        """A CPU controller paired with a CPU coprocessor on the ``memcpy`` backend."""
         fake_lib_dir(
-            "local/libcatalyst_transport_local_controller.so",
-            "local/libcatalyst_transport_local_coprocessor.so",
+            "memcpy/libcatalyst_transport_memcpy_controller.so",
+            "memcpy/libcatalyst_transport_memcpy_coprocessor.so",
         )
         ctrl = qp.Controller(
-            device=qp.device("null.qubit", wires=2), label="ctrl", backend="local"
+            device=qp.device("null.qubit", wires=2), label="ctrl", backend="memcpy"
         )
         cop = qp.Coprocessor(
-            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", backend="local"
+            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", backend="memcpy"
         )
         d = serialize_backline(
             qp.backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
         )
         assert d["transport"] == "memcpy"
-        assert d["controller"]["backend_lib"].endswith("_local_controller.so")
-        assert d["coprocessors"][0]["backend_lib"].endswith("_local_coprocessor.so")
+        assert d["controller"]["backend_lib"].endswith("_memcpy_controller.so")
+        assert d["coprocessors"][0]["backend_lib"].endswith("_memcpy_coprocessor.so")
 
-    def test_local_cpu_to_gpu_backend_libs(self, fake_lib_dir):
-        """A CPU controller paired with a GPU coprocessor via the ``local_gpu`` backend."""
+    def test_memcpy_cpu_to_gpu_backend_libs(self, fake_lib_dir):
+        """A CPU controller paired with a GPU coprocessor via the ``memcpy_gpu`` backend."""
         fake_lib_dir(
-            "local/libcatalyst_transport_local_controller.so",
-            "local_gpu/libcatalyst_transport_local_gpu_coprocessor.so",
+            "memcpy/libcatalyst_transport_memcpy_controller.so",
+            "memcpy_gpu/libcatalyst_transport_memcpy_gpu_coprocessor.so",
         )
         ctrl = qp.Controller(
-            device=qp.device("null.qubit", wires=2), label="ctrl", backend="local"
+            device=qp.device("null.qubit", wires=2), label="ctrl", backend="memcpy"
         )
         cop = qp.Coprocessor(
-            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", backend="local_gpu"
+            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", backend="memcpy_gpu"
         )
         d = serialize_backline(
             qp.backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
         )
         assert d["transport"] == "memcpy"
-        assert d["controller"]["backend_lib"].endswith("_local_controller.so")
-        assert d["coprocessors"][0]["backend_lib"].endswith("_local_gpu_coprocessor.so")
+        assert d["controller"]["backend_lib"].endswith("_memcpy_controller.so")
+        assert d["coprocessors"][0]["backend_lib"].endswith("_memcpy_gpu_coprocessor.so")
 
     def test_explicit_backend_lib_wins_over_backend(self, fake_lib_dir):
         """An explicit ``init_args["backend_lib"]`` path is not overridden by ``backend``."""

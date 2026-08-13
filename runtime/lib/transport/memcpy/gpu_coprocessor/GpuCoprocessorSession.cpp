@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "LocalGpuCoprocessorSession.hpp"
+#include "GpuCoprocessorSession.hpp"
 
 #include <cstring>
 #include <stdexcept>
@@ -25,10 +25,10 @@
 
 namespace catalyst::transport::memcpy {
 
-LocalGpuCoprocessorSession::LocalGpuCoprocessorSession(std::string /*unused*/, int gpu_device)
+GpuCoprocessorSession::GpuCoprocessorSession(std::string /*unused*/, int gpu_device)
     : gpu_device_(gpu_device) {}
 
-LocalGpuCoprocessorSession::~LocalGpuCoprocessorSession() {
+GpuCoprocessorSession::~GpuCoprocessorSession() {
     try {
         stop();
     } catch (...) {
@@ -43,7 +43,7 @@ LocalGpuCoprocessorSession::~LocalGpuCoprocessorSession() {
     }
 }
 
-void LocalGpuCoprocessorSession::ensure_gpu_state() {
+void GpuCoprocessorSession::ensure_gpu_state() {
     if (!gpu_) {
         gpu_ = std::make_unique<gpu_verbs::GpuRuntime>(gpu_device_);
     }
@@ -63,7 +63,7 @@ void LocalGpuCoprocessorSession::ensure_gpu_state() {
     }
 }
 
-int LocalGpuCoprocessorSession::connect(const ConnectInfo &info) {
+int GpuCoprocessorSession::connect(const ConnectInfo &info) {
     link_ = acquire_memcpy_link(info);
     std::lock_guard<std::mutex> lock(link_->mu);
     if (link_->process_message) {
@@ -77,7 +77,7 @@ int LocalGpuCoprocessorSession::connect(const ConnectInfo &info) {
     return 0;
 }
 
-MemRegion LocalGpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
+MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     if (kind != MemKind::CpuRam) {
         throw std::runtime_error(
             "memcpy: local GPU coprocessor expects CpuRam request buffers from the controller");
@@ -93,37 +93,35 @@ MemRegion LocalGpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kin
     };
 }
 
-PeerRef LocalGpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) { return PeerRef{}; }
+PeerRef GpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) { return PeerRef{}; }
 
-void LocalGpuCoprocessorSession::establish_channel(const ChannelDesc &desc,
-                                                   const MemRegion & /*local*/,
-                                                   const PeerRef & /*peer*/) {
+void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion & /*local*/,
+                                              const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
         throw std::runtime_error("memcpy: local GPU coprocessor supports only transport=memcpy");
     }
 }
 
-void LocalGpuCoprocessorSession::start() { ensure_gpu_state(); }
+void GpuCoprocessorSession::start() { ensure_gpu_state(); }
 
-int LocalGpuCoprocessorSession::collect(void *const * /*replies*/,
-                                        const std::uint64_t * /*replies_bytes*/,
-                                        std::size_t /*n*/) {
+int GpuCoprocessorSession::collect(void *const * /*replies*/,
+                                   const std::uint64_t * /*replies_bytes*/, std::size_t /*n*/) {
     throw std::logic_error("memcpy: coprocessor collect is not used");
 }
 
-void LocalGpuCoprocessorSession::stop() {
+void GpuCoprocessorSession::stop() {
     if (gpu_) {
         gpu_->sync();
     }
 }
 
-void LocalGpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) {
+void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) {
     launcher_ = fn;
     launcher_ctx_ = ctx;
 }
 
-std::size_t LocalGpuCoprocessorSession::process_message(const void *in, std::size_t in_len,
-                                                        void *out, std::size_t out_cap) {
+std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
+                                                   std::size_t out_cap) {
     if (in_len != sizeof(common::Payload)) {
         throw std::runtime_error("memcpy: local GPU coprocessor expects one wire-shaped Payload");
     }

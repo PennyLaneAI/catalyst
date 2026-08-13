@@ -19,15 +19,15 @@
 #include <memory>
 #include <vector>
 
-#include "LocalRegistry.hpp"
+#include "MemcpyLink.hpp"
 #include "Transport.hpp"
 
 namespace catalyst::transport::memcpy {
 
-class LocalCpuControllerSession : public ControllerSession {
+class CpuCoprocessorSession : public CoprocessorSession {
   public:
-    explicit LocalCpuControllerSession(std::string = {}) {}
-    ~LocalCpuControllerSession() override;
+    explicit CpuCoprocessorSession(std::string = {}) {}
+    ~CpuCoprocessorSession() override;
 
     // TransportSession
     int connect(const ConnectInfo &info) override;
@@ -38,42 +38,21 @@ class LocalCpuControllerSession : public ControllerSession {
     void start() override;
     int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
     void stop() override;
-    std::uint64_t last_rtt_ns() const override { return rtt_ns_; }
 
-    // ControllerSession
-    void commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
-                          std::uint64_t out_bytes) override;
-    int kick(std::uint32_t work_item_idx = 0) override;
-    void *data_slot() override;
-    void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
+    // CoprocessorSession
+    void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
+
+    // Invoked inline from the controller's kick(). See MemcpyLink::ProcessMessage.
+    std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
     std::shared_ptr<MemcpyLink> link_;
 
-    /// Reply buffer the paired coprocessor writes into during kick().
-    MemRegion local_reply_{};
-
     /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
-    std::vector<std::byte> request_staging_;
-
-    /// Set on the first commit_work_item(). Subsequent commits are rejected so any pointer a
-    /// prior data_slot() handed out cannot dangle behind a request_staging_ reallocation.
-    bool committed_ = false;
-
-    std::uint64_t in_bytes_ = 0;
-    std::uint64_t out_bytes_ = 0;
-    std::uint64_t staged_bytes_ = 0;
-    std::uint64_t reply_bytes_ = 0;
-    std::uint32_t decoder_id_ = 0;
-
-    std::uint64_t kick_ns_ = 0;
-    std::uint64_t rtt_ns_ = 0;
-
-    // Per-session round counter driving `Payload::seq_num`. Matches cpu_verbs's `next_send_`:
-    // the first kick sends seq_num=1, the second sends 2, etc. Reset on start().
-    std::uint64_t next_send_ = 0;
+    CoprocessorFn fn_ = nullptr;
+    void *ctx_ = nullptr;
 };
 
 } // namespace catalyst::transport::memcpy

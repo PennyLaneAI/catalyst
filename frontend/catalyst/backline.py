@@ -58,8 +58,8 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
 
             * ``"cpu_verbs"`` - RDMA over InfiniBand; both roles.
             * ``"gpu_verbs"`` - RDMA over InfiniBand with a GPU coprocessor; coprocessor only.
-            * ``"local"`` - in-process memcpy shim; both roles.
-            * ``"local_gpu"`` - in-process memcpy shim with a GPU coprocessor; coprocessor only.
+            * ``"memcpy"`` - in-process shim; both roles.
+            * ``"memcpy_gpu"`` - in-process shim with a GPU coprocessor; coprocessor only.
 
             Out-of-tree backends supply their own token and library.
         role: ``"controller"`` or ``"coprocessor"``. Each backend ships one library per role.

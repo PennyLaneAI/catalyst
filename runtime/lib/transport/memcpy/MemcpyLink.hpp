@@ -26,7 +26,7 @@
 
 namespace catalyst::transport::memcpy {
 
-class LocalCpuControllerSession;
+class CpuControllerSession;
 
 // In-process memcpy link keyed by (peer, oob_port). The coprocessor binds `process_message`;
 // the controller's kick() drives it inline. `mu` guards `controller` and `process_message`
@@ -43,7 +43,7 @@ struct MemcpyLink {
                                                      std::size_t out_cap)>;
 
     std::mutex mu;
-    LocalCpuControllerSession *controller = nullptr;
+    CpuControllerSession *controller = nullptr;
     ProcessMessage process_message;
 };
 

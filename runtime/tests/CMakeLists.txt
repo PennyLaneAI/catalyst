@@ -196,12 +196,12 @@ if(ENABLE_TRANSPORT)
     )
     target_compile_definitions(runner_tests_transport PRIVATE
         STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>"
-        LOCAL_CONTROLLER_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_local_controller>"
-        LOCAL_COPROCESSOR_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_local_coprocessor>")
+        MEMCPY_CONTROLLER_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_memcpy_controller>"
+        MEMCPY_COPROCESSOR_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_memcpy_coprocessor>")
     add_dependencies(runner_tests_transport
         stub_transport_backend
-        catalyst_transport_local_controller
-        catalyst_transport_local_coprocessor)
+        catalyst_transport_memcpy_controller
+        catalyst_transport_memcpy_coprocessor)
     catch_discover_tests(runner_tests_transport)
 
     # CPU-verbs backend: device-agnostic common primitives (RDMA-backed; SKIP without rxe0).
@@ -227,24 +227,24 @@ if(ENABLE_TRANSPORT)
     )
     catch_discover_tests(runner_tests_transport_cpu)
 
-    # Local peer-memory backend: in-process request/reply copies via memcpy.
-    add_executable(runner_tests_transport_local)
-    target_sources(runner_tests_transport_local PRIVATE
-        Test_TransportLocalCopyCpu.cpp
+    # Memcpy backend: in-process request/reply copies via memcpy.
+    add_executable(runner_tests_transport_memcpy)
+    target_sources(runner_tests_transport_memcpy PRIVATE
+        Test_TransportMemcpyCpu.cpp
     )
-    target_link_libraries(runner_tests_transport_local PRIVATE
+    target_link_libraries(runner_tests_transport_memcpy PRIVATE
         Catch2WithMain
-        local_copy_cpu_impl
+        memcpy_cpu_impl
     )
     if(TRANSPORT_HAS_HIP)
-        target_sources(runner_tests_transport_local PRIVATE
-            Test_TransportLocalCopyGpu.cpp
+        target_sources(runner_tests_transport_memcpy PRIVATE
+            Test_TransportMemcpyGpu.cpp
         )
-        target_link_libraries(runner_tests_transport_local PRIVATE
-            local_copy_gpu_impl
+        target_link_libraries(runner_tests_transport_memcpy PRIVATE
+            memcpy_gpu_impl
         )
     endif()
-    catch_discover_tests(runner_tests_transport_local)
+    catch_discover_tests(runner_tests_transport_memcpy)
 
     if(TRANSPORT_HAS_HIP)
         add_executable(runner_tests_transport_gpu)

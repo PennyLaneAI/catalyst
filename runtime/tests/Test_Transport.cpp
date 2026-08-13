@@ -25,13 +25,13 @@ CatalystTransportSession *make(std::int32_t role, const char *key) {
     return __catalyst__transport__create(STUB_BACKEND_PATH, "cfg", role, key);
 }
 
-CatalystTransportSession *make_local_controller(const char *key) {
-    return __catalyst__transport__create(LOCAL_CONTROLLER_BACKEND_PATH, "",
+CatalystTransportSession *make_memcpy_controller(const char *key) {
+    return __catalyst__transport__create(MEMCPY_CONTROLLER_BACKEND_PATH, "",
                                          CATALYST_TRANSPORT_ROLE_CONTROLLER, key);
 }
 
-CatalystTransportSession *make_local_coprocessor(const char *key) {
-    return __catalyst__transport__create(LOCAL_COPROCESSOR_BACKEND_PATH, "",
+CatalystTransportSession *make_memcpy_coprocessor(const char *key) {
+    return __catalyst__transport__create(MEMCPY_COPROCESSOR_BACKEND_PATH, "",
                                          CATALYST_TRANSPORT_ROLE_COPROCESSOR, key);
 }
 } // namespace
@@ -156,9 +156,9 @@ TEST_CASE("destroy drains outstanding async tokens without a prior barrier", "[t
     SUCCEED();
 }
 
-TEST_CASE("local backend plugins round-trip through the transport CAPI", "[transport]") {
-    auto *ct = make_local_controller("local_roundtrip");
-    auto *co = make_local_coprocessor("local_roundtrip");
+TEST_CASE("memcpy backend plugins round-trip through the transport CAPI", "[transport]") {
+    auto *ct = make_memcpy_controller("memcpy_roundtrip");
+    auto *co = make_memcpy_coprocessor("memcpy_roundtrip");
     REQUIRE(ct != nullptr);
     REQUIRE(co != nullptr);
 
@@ -166,8 +166,8 @@ TEST_CASE("local backend plugins round-trip through the transport CAPI", "[trans
     REQUIRE(__catalyst__transport__connect(co, "loopback", 19011) == CATALYST_TRANSPORT_OK);
     REQUIRE(__catalyst__transport__exchange_keys(ct) == CATALYST_TRANSPORT_OK);
     REQUIRE(__catalyst__transport__exchange_keys(co) == CATALYST_TRANSPORT_OK);
-    REQUIRE(__catalyst__transport__establish_channel(ct, "local") == CATALYST_TRANSPORT_OK);
-    REQUIRE(__catalyst__transport__establish_channel(co, "local") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(ct, "memcpy") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(co, "memcpy") == CATALYST_TRANSPORT_OK);
     REQUIRE(__catalyst__transport__set_message_sizes(
                 ct, 0, sizeof(std::uint64_t), sizeof(std::uint64_t)) == CATALYST_TRANSPORT_OK);
     REQUIRE(__catalyst__transport__set_coprocessor_fn(co, "") == CATALYST_TRANSPORT_OK);
