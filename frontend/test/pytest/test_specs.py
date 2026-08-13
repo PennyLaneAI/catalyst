@@ -1493,8 +1493,8 @@ def test_abstract_array_inputs():
         return qp.expval(qp.Z(0))
 
     s = qp.specs(c, level=0)(qp.typing.AbstractArray((3,), float), qp.typing.Wire[3])
-    assert s.resources.gate_types["PauliX"] == 3
-    assert s.resources.gate_types["RX"] == 3
+    assert s.resources.quantum_operations["PauliX"] == 3
+    assert s.resources.quantum_operations["RX"] == 3
 
 
 if __name__ == "__main__":
