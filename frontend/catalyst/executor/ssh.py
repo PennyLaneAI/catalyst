@@ -60,7 +60,8 @@ class SSHArgv:
         "ServerAliveCountMax=4",
     )
 
-    # One-shot probe flags: fail fast on missing key (rc 255), short connect timeout.
+    # One-shot probe flags: fail fast on a missing key, short connect timeout. ssh reports its own
+    # failures as exit code 255, which is how they are told apart from the remote command's status.
     PROBE_OPTS: tuple[str, ...] = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
     CONTROL_PATH_MAX = 104
     CONTROL_PATH_RESERVE = 20
