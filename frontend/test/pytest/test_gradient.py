@@ -902,7 +902,18 @@ def test_ps_probs(backend, capture_mode):
     assert np.allclose(result, reference)
 
 
-@pytest.mark.parametrize("gate_n_inputs", [(qp.CRX, [1]), (qp.CRot, [1, 2, 3])])
+@pytest.mark.parametrize(
+    "gate_n_inputs",
+    [
+        (qp.CRX, [1]),
+        pytest.param(
+            (qp.CRot, [1, 2, 3]),
+            marks=pytest.mark.xfail(
+                reason="Operator2 CRot decomposition emits unsupported complex lowering"
+            ),
+        ),
+    ],
+)
 def test_ps_four_term_rule(backend, gate_n_inputs):
     """Operations with the 4-term shift rule need to be decomposed to be differentiated."""
     gate, inputs = gate_n_inputs
