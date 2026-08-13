@@ -36,10 +36,10 @@ LocalGpuCoprocessorSession::~LocalGpuCoprocessorSession() {
     if (request_slot_host_) {
         (void)hipHostFree(request_slot_host_);
     }
-    if (pair_) {
+    if (link_) {
         // Wait for any in-flight kick, then unbind so no future call reaches a dying `this`.
-        std::lock_guard<std::mutex> lock(pair_->mu);
-        pair_->run_once = nullptr;
+        std::lock_guard<std::mutex> lock(link_->mu);
+        link_->process_message = nullptr;
     }
 }
 
@@ -64,15 +64,15 @@ void LocalGpuCoprocessorSession::ensure_gpu_state() {
 }
 
 int LocalGpuCoprocessorSession::connect(const ConnectInfo &info) {
-    pair_ = acquire_endpoint_pair(info);
-    std::lock_guard<std::mutex> lock(pair_->mu);
-    if (pair_->run_once) {
+    link_ = acquire_memcpy_link(info);
+    std::lock_guard<std::mutex> lock(link_->mu);
+    if (link_->process_message) {
         throw std::runtime_error(
             "memcpy: another coprocessor is already bound to this endpoint (peer, oob_port)");
     }
-    pair_->run_once = [this](const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
-                             void *reply, std::size_t reply_cap) {
-        return this->run_once(req, req_bytes, decoder_id, reply, reply_cap);
+    link_->process_message = [this](const void *in, std::size_t in_len, std::uint32_t decoder_id,
+                                    void *out, std::size_t out_cap) {
+        return this->process_message(in, in_len, decoder_id, out, out_cap);
     };
     return 0;
 }
@@ -122,13 +122,13 @@ void LocalGpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn 
     launcher_ctx_ = ctx;
 }
 
-std::size_t LocalGpuCoprocessorSession::run_once(const void *req, std::size_t req_bytes,
-                                                 std::uint32_t decoder_id, void *reply,
-                                                 std::size_t reply_cap) {
-    if (req_bytes != common::PAYLOAD_DATA_BYTES) {
+std::size_t LocalGpuCoprocessorSession::process_message(const void *in, std::size_t in_len,
+                                                        std::uint32_t decoder_id, void *out,
+                                                        std::size_t out_cap) {
+    if (in_len != common::PAYLOAD_DATA_BYTES) {
         throw std::runtime_error("memcpy: local GPU coprocessor expects one 8-byte payload");
     }
-    if (reply_cap < sizeof(std::int64_t)) {
+    if (out_cap < sizeof(std::int64_t)) {
         throw std::runtime_error("memcpy: reply buffer too small for GPU correction");
     }
 
@@ -140,7 +140,7 @@ std::size_t LocalGpuCoprocessorSession::run_once(const void *req, std::size_t re
         *handoff_.stop_host = 0;
     }
 
-    std::memcpy(&request_slot_host_[0].p.value, req, common::PAYLOAD_DATA_BYTES);
+    std::memcpy(&request_slot_host_[0].p.value, in, common::PAYLOAD_DATA_BYTES);
     request_slot_host_[0].p.decoder_id = decoder_id;
     request_slot_host_[0].p.seq_num = 1;
 
@@ -163,7 +163,7 @@ std::size_t LocalGpuCoprocessorSession::run_once(const void *req, std::size_t re
     }
 
     const std::int64_t correction = handoff_.host[0].correction;
-    std::memcpy(reply, &correction, sizeof(correction));
+    std::memcpy(out, &correction, sizeof(correction));
     return sizeof(correction);
 }
 

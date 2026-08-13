@@ -32,23 +32,23 @@ std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t o
 } // namespace
 
 LocalCpuCoprocessorSession::~LocalCpuCoprocessorSession() {
-    if (pair_) {
+    if (link_) {
         // Wait for any in-flight kick, then unbind so no future call reaches a dying `this`.
-        std::lock_guard<std::mutex> lock(pair_->mu);
-        pair_->run_once = nullptr;
+        std::lock_guard<std::mutex> lock(link_->mu);
+        link_->process_message = nullptr;
     }
 }
 
 int LocalCpuCoprocessorSession::connect(const ConnectInfo &info) {
-    pair_ = acquire_endpoint_pair(info);
-    std::lock_guard<std::mutex> lock(pair_->mu);
-    if (pair_->run_once) {
+    link_ = acquire_memcpy_link(info);
+    std::lock_guard<std::mutex> lock(link_->mu);
+    if (link_->process_message) {
         throw std::runtime_error(
             "memcpy: another coprocessor is already bound to this endpoint (peer, oob_port)");
     }
-    pair_->run_once = [this](const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
-                             void *reply, std::size_t reply_cap) {
-        return this->run_once(req, req_bytes, decoder_id, reply, reply_cap);
+    link_->process_message = [this](const void *in, std::size_t in_len, std::uint32_t decoder_id,
+                                    void *out, std::size_t out_cap) {
+        return this->process_message(in, in_len, decoder_id, out, out_cap);
     };
     return 0;
 }
@@ -94,15 +94,17 @@ void LocalCpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx)
     ctx_ = ctx;
 }
 
-std::size_t LocalCpuCoprocessorSession::run_once(const void *req, std::size_t req_bytes,
-                                                 std::uint32_t /*decoder_id*/, void *reply,
-                                                 std::size_t reply_cap) {
+std::size_t LocalCpuCoprocessorSession::process_message(const void *in, std::size_t in_len,
+                                                        std::uint32_t /*decoder_id*/, void *out,
+                                                        std::size_t out_cap) {
+    // decoder_id is a separate arg here (cpu_verbs bakes it into `in` at offset 8);
+    // a decoder that dispatches on the id would need `in` reframed the same way.
     CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
-    const std::size_t written = fn(req, req_bytes, reply, reply_cap, ctx_);
-    if (written > reply_cap) {
+    const std::size_t out_bytes = fn(in, in_len, out, out_cap, ctx_);
+    if (out_bytes > out_cap) {
         throw std::runtime_error("memcpy: coprocessor wrote past reply capacity");
     }
-    return written;
+    return out_bytes;
 }
 
 } // namespace catalyst::transport::local_copy

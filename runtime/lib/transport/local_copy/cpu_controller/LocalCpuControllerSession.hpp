@@ -48,7 +48,7 @@ class LocalCpuControllerSession : public ControllerSession {
     void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
 
   private:
-    std::shared_ptr<EndpointPair> pair_;
+    std::shared_ptr<MemcpyLink> link_;
 
     /// Reply buffer the paired coprocessor writes into during kick().
     MemRegion local_reply_{};

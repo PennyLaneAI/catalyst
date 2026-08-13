@@ -30,22 +30,22 @@ std::uint64_t now_ns() {
 } // namespace
 
 LocalCpuControllerSession::~LocalCpuControllerSession() {
-    if (pair_) {
-        std::lock_guard<std::mutex> lock(pair_->mu);
-        if (pair_->controller == this) {
-            pair_->controller = nullptr;
+    if (link_) {
+        std::lock_guard<std::mutex> lock(link_->mu);
+        if (link_->controller == this) {
+            link_->controller = nullptr;
         }
     }
 }
 
 int LocalCpuControllerSession::connect(const ConnectInfo &info) {
-    pair_ = acquire_endpoint_pair(info);
-    std::lock_guard<std::mutex> lock(pair_->mu);
-    if (pair_->controller) {
+    link_ = acquire_memcpy_link(info);
+    std::lock_guard<std::mutex> lock(link_->mu);
+    if (link_->controller) {
         throw std::runtime_error(
             "memcpy: another controller is already bound to this endpoint (peer, oob_port)");
     }
-    pair_->controller = this;
+    link_->controller = this;
     return 0;
 }
 
@@ -87,9 +87,6 @@ int LocalCpuControllerSession::collect(void *const *replies, const std::uint64_t
     if (!local_reply_.addr) {
         throw std::runtime_error("memcpy: controller reply region is not established");
     }
-    if (local_reply_.kind != MemKind::CpuRam) {
-        throw std::runtime_error("memcpy: CPU-only controller expects CpuRam reply region");
-    }
 
     const std::uint64_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
     if (reply_bytes_ > cap) {
@@ -124,32 +121,26 @@ int LocalCpuControllerSession::kick(std::uint32_t work_item_idx) {
     if (work_item_idx != 0) {
         throw std::runtime_error("memcpy: only work_item_idx=0 is supported");
     }
-    if (!pair_) {
+    if (!link_) {
         throw std::runtime_error("memcpy: no paired coprocessor");
-    }
-    if (!local_reply_.addr) {
-        throw std::runtime_error("memcpy: local reply region is not established");
-    }
-    if (local_reply_.kind != MemKind::CpuRam) {
-        throw std::runtime_error("memcpy: CPU-only controller expects CpuRam reply region");
     }
     if (local_reply_.size < out_bytes_) {
         throw std::runtime_error("memcpy: local reply region too small for committed output");
     }
 
     kick_ns_ = now_ns();
-    std::size_t written = 0;
+    std::size_t reply_bytes = 0;
     {
-        // Held across check and call so teardown can't clear run_once mid-call.
-        std::lock_guard<std::mutex> lock(pair_->mu);
-        if (!pair_->run_once) {
+        // Held across check and call so teardown can't clear process_message mid-call.
+        std::lock_guard<std::mutex> lock(link_->mu);
+        if (!link_->process_message) {
             throw std::runtime_error("memcpy: no paired coprocessor");
         }
-        written =
-            pair_->run_once(request_staging_.data(), static_cast<std::size_t>(staged_bytes_),
-                            decoder_id_, local_reply_.addr, static_cast<std::size_t>(out_bytes_));
+        reply_bytes = link_->process_message(
+            request_staging_.data(), static_cast<std::size_t>(staged_bytes_), decoder_id_,
+            local_reply_.addr, static_cast<std::size_t>(out_bytes_));
     }
-    reply_bytes_ = static_cast<std::uint64_t>(written);
+    reply_bytes_ = static_cast<std::uint64_t>(reply_bytes);
     return 0;
 }
 

@@ -28,44 +28,49 @@ namespace catalyst::transport::local_copy {
 
 class LocalCpuControllerSession;
 
-// Same-process rendezvous keyed by (peer, oob_port). The coprocessor binds `run_once`; the
-// controller's kick() drives it inline. `mu` guards `controller` and `run_once` across
-// connect / kick / teardown.
-struct EndpointPair {
-    using RunOnce =
-        std::function<std::size_t(const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
-                                  void *reply, std::size_t reply_cap)>;
+// In-process memcpy link keyed by (peer, oob_port). The coprocessor binds `process_message`;
+// the controller's kick() drives it inline. `mu` guards `controller` and `process_message`
+// across connect / kick / teardown.
+struct MemcpyLink {
+    // Invoked once per controller kick(). Reads `in_len` bytes from `in`, writes at most
+    // `out_cap` bytes into `out` (a controller-owned destination sized `out_cap`), and
+    // returns the number of bytes actually written. A return value greater than `out_cap`
+    // means the fn overran the caller's buffer. Parameter names mirror `CoprocessorFn`
+    // (Transport.hpp) so a straight forward is unambiguous.
+    using ProcessMessage =
+        std::function<std::size_t(const void *in, std::size_t in_len, std::uint32_t decoder_id,
+                                  void *out, std::size_t out_cap)>;
 
     std::mutex mu;
     LocalCpuControllerSession *controller = nullptr;
-    RunOnce run_once;
+    ProcessMessage process_message;
 };
 
-inline auto acquire_endpoint_pair(const ConnectInfo &info) -> std::shared_ptr<EndpointPair> {
+inline auto acquire_memcpy_link(const ConnectInfo &info) -> std::shared_ptr<MemcpyLink> {
     static std::mutex mu;
-    static std::unordered_map<std::string, std::weak_ptr<EndpointPair>> pairs;
+    static std::unordered_map<std::string, std::weak_ptr<MemcpyLink>> links;
 
     const std::string key = info.peer + ":" + std::to_string(info.oob_port);
     std::lock_guard<std::mutex> lock(mu);
 
     // Prune expired entries so churning keys don't accumulate.
-    for (auto it = pairs.begin(); it != pairs.end();) {
+    for (auto it = links.begin(); it != links.end();) {
         if (it->second.expired()) {
-            it = pairs.erase(it);
+            it = links.erase(it);
         } else {
             ++it;
         }
     }
 
-    if (auto it = pairs.find(key); it != pairs.end()) {
-        if (auto pair = it->second.lock()) {
-            return pair;
+    if (auto it = links.find(key); it != links.end()) {
+        if (auto link = it->second.lock()) {
+            return link;
         }
     }
 
-    auto pair = std::make_shared<EndpointPair>();
-    pairs[key] = pair;
-    return pair;
+    auto link = std::make_shared<MemcpyLink>();
+    links[key] = link;
+    return link;
 }
 
 } // namespace catalyst::transport::local_copy

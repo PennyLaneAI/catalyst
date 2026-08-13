@@ -51,17 +51,17 @@ class LocalGpuCoprocessorSession : public CoprocessorSession {
     }
 
     // Called synchronously from the paired controller's kick(); launches one GPU decode and
-    // writes the reply into `reply`. Uses single slots (no ring) since total=1.
+    // writes the reply into `out`. Uses single slots (no ring) since total=1.
     //
-    // Expects `req_bytes == common::PAYLOAD_DATA_BYTES` (8) and `reply_cap >= sizeof(int64_t)`;
+    // Expects `in_len == common::PAYLOAD_DATA_BYTES` (8) and `out_cap >= sizeof(int64_t)`;
     // the reply is always `sizeof(int64_t)` bytes. Anything else throws.
-    std::size_t run_once(const void *req, std::size_t req_bytes, std::uint32_t decoder_id,
-                         void *reply, std::size_t reply_cap);
+    std::size_t process_message(const void *in, std::size_t in_len, std::uint32_t decoder_id,
+                                void *out, std::size_t out_cap);
 
   private:
     void ensure_gpu_state();
 
-    std::shared_ptr<EndpointPair> pair_;
+    std::shared_ptr<MemcpyLink> link_;
 
     /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
