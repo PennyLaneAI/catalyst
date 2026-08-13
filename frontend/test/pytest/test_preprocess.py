@@ -287,7 +287,7 @@ class TestPreprocessHybridOp:
 
     @pytest.mark.xfail(
         reason="Legacy preprocessing cannot decompose Operator2 Hadamard subclasses",
-        raises=CompileError,
+        raises=TypeError,  # no mlir since CompileError silenced
     )
     def test_decomposition_of_cond_circuit(self):
         """Test that unsupported operators nested in Cond are decompsed, and the
