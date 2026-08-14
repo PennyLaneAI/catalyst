@@ -31,7 +31,12 @@ EMPTY_PROPERTIES = OperatorProperties()
 
 def get_base_operation_name(op: Operator) -> str:
     """Get the base operation name, handling controlled and adjoint operations."""
-    if type(op) in (qp.ops.Controlled, qp.ops.ControlledOp) or isinstance(op, qp.ops.Adjoint):
+    if type(op) in (
+        qp.ops.Controlled,
+        qp.ops.ControlledOp,
+        qp.ops.Controlled2,
+        qp.ops.ControlledOp2,
+    ) or isinstance(op, qp.ops.Adjoint):
         return op.base.name
     return op.name
 
@@ -120,7 +125,12 @@ def _paramshift_op_checker(op):
         # Cannot take param shift of qubit unitary.
         return False
 
-    if type(op) in (qp.ops.Controlled, qp.ops.ControlledOp):
+    if type(op) in (
+        qp.ops.Controlled,
+        qp.ops.ControlledOp,
+        qp.ops.Controlled2,
+        qp.ops.ControlledOp2,
+    ):
         # Cannot take param shift of controlled ops.
         # It will always be at least a four term shift rule.
         return False

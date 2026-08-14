@@ -163,7 +163,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 control_values=control_values,
                 control_wires=control_wires,
             )
-        if type(op) in {qp.ops.Controlled, qp.ops.ControlledOp}:
+        if type(op) in {qp.ops.Controlled, qp.ops.ControlledOp, qp.ops.ControlledOp2}:
             return self.interpret_operation(
                 op.base,
                 is_adjoint=is_adjoint,
