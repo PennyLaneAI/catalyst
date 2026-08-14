@@ -19,16 +19,34 @@
 
 #include "MemcpyLink.hpp"
 
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
+#include "BackendConfig.hpp"
+
 namespace catalyst::transport::memcpy {
 
-auto acquire_memcpy_link(const ConnectInfo &info) -> std::shared_ptr<MemcpyLink> {
+auto parse_pair_key(std::string_view config) -> std::string {
+    std::string out;
+    common::backendconfig::for_each_config_kv(config, [&](std::string_view k, std::string_view v) {
+        if (k == "pair") {
+            out.assign(v);
+        }
+    });
+    return out;
+}
+
+auto acquire_memcpy_link(std::string_view pair_key) -> std::shared_ptr<MemcpyLink> {
+    if (pair_key.empty()) {
+        throw std::runtime_error(
+            "memcpy: missing session pair key in backend config (expected 'pair=<key>')");
+    }
+
     static std::mutex mu;
     static std::unordered_map<std::string, std::weak_ptr<MemcpyLink>> links;
 
-    const std::string key = info.peer + ":" + std::to_string(info.oob_port);
+    const std::string key(pair_key);
     std::lock_guard<std::mutex> lock(mu);
 
     // Prune expired entries so churning keys don't accumulate.

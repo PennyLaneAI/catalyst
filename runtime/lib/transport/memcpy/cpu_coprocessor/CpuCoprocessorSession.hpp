@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "MemcpyLink.hpp"
@@ -26,7 +27,8 @@ namespace catalyst::transport::memcpy {
 
 class CpuCoprocessorSession : public CoprocessorSession {
   public:
-    explicit CpuCoprocessorSession(std::string = {}) {}
+    explicit CpuCoprocessorSession(const std::string &config = {})
+        : pair_key_(parse_pair_key(config)) {}
     ~CpuCoprocessorSession() override;
 
     // TransportSession
@@ -46,6 +48,7 @@ class CpuCoprocessorSession : public CoprocessorSession {
     std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
+    std::string pair_key_;
     std::shared_ptr<MemcpyLink> link_;
 
     /// Owns the buffers backing MemRegions handed out by alloc_memory().

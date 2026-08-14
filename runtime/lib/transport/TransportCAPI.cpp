@@ -229,15 +229,26 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
         }
         auto h = std::make_unique<CatalystTransportSession>();
         h->backend = std::make_unique<DynamicLibraryLoader>(backend_lib);
-        const char *cfg = config ? config : "";
+        // Fold the session key (unique per controller/coprocessor pair, as emitted by
+        // inject-transport-session in MLIR) into the config as `pair=<key>` so backends that
+        // need to pair endpoints in-process (e.g. memcpy) share one identifier for both
+        // sides. This is transparent to backends that don't parse `pair`.
+        std::string cfg = config ? config : "";
+        if (key && *key) {
+            if (!cfg.empty()) {
+                cfg += ";";
+            }
+            cfg += "pair=";
+            cfg += key;
+        }
         if (role == CATALYST_TRANSPORT_ROLE_COPROCESSOR) {
             auto *factory = h->backend->getSymbol<CatalystTransportCoprocessorFactoryFn *>(
                 CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL);
-            h->sess = factory(cfg);
+            h->sess = factory(cfg.c_str());
         } else {
             auto *factory = h->backend->getSymbol<CatalystTransportControllerFactoryFn *>(
                 CATALYST_TRANSPORT_CONTROLLER_FACTORY_SYMBOL);
-            h->sess = factory(cfg);
+            h->sess = factory(cfg.c_str());
         }
         if (!h->sess) {
             std::cerr << "[transport] backend factory returned null for config: " << cfg << "\n";

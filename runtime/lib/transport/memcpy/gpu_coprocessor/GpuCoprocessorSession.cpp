@@ -25,8 +25,8 @@
 
 namespace catalyst::transport::memcpy {
 
-GpuCoprocessorSession::GpuCoprocessorSession(std::string /*unused*/, int gpu_device)
-    : gpu_device_(gpu_device) {}
+GpuCoprocessorSession::GpuCoprocessorSession(const std::string &config, int gpu_device)
+    : pair_key_(parse_pair_key(config)), gpu_device_(gpu_device) {}
 
 GpuCoprocessorSession::~GpuCoprocessorSession() {
     try {
@@ -63,17 +63,20 @@ void GpuCoprocessorSession::ensure_gpu_state() {
     }
 }
 
-int GpuCoprocessorSession::connect(const ConnectInfo &info) {
-    link_ = acquire_memcpy_link(info);
-    std::lock_guard<std::mutex> lock(link_->mu);
-    if (link_->process_message) {
-        throw std::runtime_error(
-            "memcpy: another coprocessor is already bound to this endpoint (peer, oob_port)");
+int GpuCoprocessorSession::connect(const ConnectInfo & /*info*/) {
+    // Only bind `link_` after the duplicate-binding check succeeds. Otherwise the destructor of
+    // a rejected second coprocessor would clear the incumbent's binding on the way out.
+    auto candidate = acquire_memcpy_link(pair_key_);
+    std::lock_guard<std::mutex> lock(candidate->mu);
+    if (candidate->process_message) {
+        throw std::runtime_error("memcpy: another coprocessor is already bound to session pair '" +
+                                 pair_key_ + "'");
     }
-    link_->process_message = [this](const void *in, std::size_t in_len, void *out,
-                                    std::size_t out_cap) {
+    candidate->process_message = [this](const void *in, std::size_t in_len, void *out,
+                                        std::size_t out_cap) {
         return this->process_message(in, in_len, out, out_cap);
     };
+    link_ = std::move(candidate);
     return 0;
 }
 

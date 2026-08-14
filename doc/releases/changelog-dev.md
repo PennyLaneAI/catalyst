@@ -78,7 +78,7 @@
   syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
   [(#3092)](https://github.com/PennyLaneAI/catalyst/pull/3092)
 
-* A backline transport backend via `memcpy` is available.
+* CPU & GPU backline transport backends via `memcpy` are added.
   [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
 
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to

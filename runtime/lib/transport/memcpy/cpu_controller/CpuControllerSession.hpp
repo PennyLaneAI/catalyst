@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "MemcpyLink.hpp"
@@ -26,7 +27,8 @@ namespace catalyst::transport::memcpy {
 
 class CpuControllerSession : public ControllerSession {
   public:
-    explicit CpuControllerSession(std::string = {}) {}
+    explicit CpuControllerSession(const std::string &config = {})
+        : pair_key_(parse_pair_key(config)) {}
     ~CpuControllerSession() override;
 
     // TransportSession
@@ -48,6 +50,7 @@ class CpuControllerSession : public ControllerSession {
     void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
 
   private:
+    std::string pair_key_;
     std::shared_ptr<MemcpyLink> link_;
 
     /// Reply buffer the paired coprocessor writes into during kick().

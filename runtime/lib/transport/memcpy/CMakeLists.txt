@@ -44,7 +44,11 @@ add_library(catalyst_transport_memcpy_coprocessor SHARED
 target_link_libraries(catalyst_transport_memcpy_coprocessor PRIVATE memcpy_cpu_impl)
 _memcpy_set_plugin_rpath(catalyst_transport_memcpy_coprocessor)
 
-if(TRANSPORT_HAS_HIP)
+# memcpy_gpu reuses shared GPU plumbing (GpuRuntime, HipCheck, GpuLaunchers) that currently
+# lives under rdma/gpu_verbs/coprocessor/. So today it can only build when both a HIP toolchain
+# and libibverbs are present (the latter guards gpu_verbs itself). Extracting the shared GPU
+# code into a common library is a follow-up that would let memcpy_gpu build with HIP alone.
+if(TRANSPORT_HAS_HIP AND TARGET catalyst_transport_gpu_verbs_coprocessor)
     add_library(memcpy_gpu_impl STATIC
         gpu_coprocessor/GpuCoprocessorSession.cpp
     )

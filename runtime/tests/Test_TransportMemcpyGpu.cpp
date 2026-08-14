@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <string>
 
 #include "CpuControllerSession.hpp"
 #include "GpuCoprocessorSession.hpp"
@@ -23,11 +24,15 @@
 using namespace catalyst::transport;
 using namespace catalyst::transport::memcpy;
 
-TEST_CASE("memcpy CPU controller can drive the local GPU coprocessor", "[transport_memcpy]") {
-    CpuControllerSession controller;
-    GpuCoprocessorSession coprocessor;
+namespace {
+std::string pair_cfg(std::uint16_t port) { return "pair=p" + std::to_string(port); }
+} // namespace
 
+TEST_CASE("memcpy CPU controller can drive the local GPU coprocessor", "[transport_memcpy]") {
     ConnectInfo ci{.peer = "loopback", .oob_port = 19003};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    GpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+
     REQUIRE(controller.connect(ci) == 0);
     REQUIRE(coprocessor.connect(ci) == 0);
 
@@ -58,11 +63,10 @@ TEST_CASE("memcpy CPU controller can drive the local GPU coprocessor", "[transpo
     CHECK(reply_word == request_word);
 }
 
-TEST_CASE("memcpy rejects a second local GPU coprocessor on the same endpoint",
-          "[transport_memcpy]") {
-    GpuCoprocessorSession first;
-    GpuCoprocessorSession second;
+TEST_CASE("memcpy rejects a second local GPU coprocessor on the same pair", "[transport_memcpy]") {
     ConnectInfo ci{.peer = "loopback", .oob_port = 19016};
+    GpuCoprocessorSession first(pair_cfg(ci.oob_port));
+    GpuCoprocessorSession second(pair_cfg(ci.oob_port));
     REQUIRE(first.connect(ci) == 0);
     REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);
 }

@@ -40,12 +40,12 @@ CpuControllerSession::~CpuControllerSession() {
     }
 }
 
-int CpuControllerSession::connect(const ConnectInfo &info) {
-    link_ = acquire_memcpy_link(info);
+int CpuControllerSession::connect(const ConnectInfo & /*info*/) {
+    link_ = acquire_memcpy_link(pair_key_);
     std::lock_guard<std::mutex> lock(link_->mu);
     if (link_->controller) {
-        throw std::runtime_error(
-            "memcpy: another controller is already bound to this endpoint (peer, oob_port)");
+        throw std::runtime_error("memcpy: another controller is already bound to session pair '" +
+                                 pair_key_ + "'");
     }
     link_->controller = this;
     return 0;
@@ -111,6 +111,12 @@ void CpuControllerSession::commit_work_item(std::uint32_t work_item_idx, std::ui
                                             std::uint64_t out_bytes) {
     if (work_item_idx != 0) {
         throw std::runtime_error("memcpy: only work_item_idx=0 is supported");
+    }
+    // The wire carries an 8-byte payload; anything larger would be silently truncated in kick().
+    // Match the RDMA backend's contract (rdma/cpu_verbs/.../CpuControllerSession.cpp) rather than
+    // accepting and dropping bytes.
+    if (in_bytes > common::PAYLOAD_DATA_BYTES || out_bytes > common::PAYLOAD_DATA_BYTES) {
+        throw std::runtime_error("memcpy: in/out_bytes exceeds the 8 B payload data area");
     }
     if (committed_) {
         throw std::runtime_error("memcpy: commit_work_item can only be called once per session");
