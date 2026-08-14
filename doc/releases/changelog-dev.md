@@ -21,6 +21,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* A failure during AOT compilation is now downgraded to a warning and logged.
+  [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
+
+* Adds the ability to use `pennylane.typing.AbstractArray` and `pennylane.wires.AbstractWires` as type hints for
+  AOT compilation and as arguments to `pennylane.specs` calculations.
+  [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
+
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
   operations in question can be annotated with either a `catalyst.estimated_probability` or
@@ -94,6 +101,10 @@
   - The `catalyst-executor` server side is now added to Catalyst that receives objects, maps them
     and calls them.
     [(#3088)](https://github.com/PennyLaneAI/catalyst/pull/3088)
+
+  - A `catalyst.Executor` is added for deploying and managing the `catalyst-executor` process that
+    cross-compiled objects are dispatched to.
+    [(#3082)](https://github.com/PennyLaneAI/catalyst/pull/3082)
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
