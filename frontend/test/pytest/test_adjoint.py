@@ -1306,7 +1306,7 @@ class TestDecomposition:
         adj1 = adjoint(base)
         adj2 = adjoint(adj1)
 
-        assert qp.equal(adj2.decomposition()[0], base)
+        qp.assert_equal(adj2.decomposition()[0], base)
 
 
 class TestIntegration:
