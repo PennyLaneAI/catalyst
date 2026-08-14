@@ -32,10 +32,8 @@ from __future__ import annotations
 
 import getpass
 import logging
-import os
 import shlex
 import subprocess
-import tempfile
 import time
 from pathlib import Path
 
@@ -66,28 +64,46 @@ class SSHArgv:
     CONTROL_PATH_MAX = 104
     CONTROL_PATH_RESERVE = 20
 
+    # Per-user directory for control sockets, relative to the user's home. Anyone able to reach a
+    # control socket can open sessions on its remote host without authenticating, the master having
+    # done so already, so the directory it sits in is what protects it.
+    CONTROL_DIR = Path(".catalyst") / "cm"
+
     @staticmethod
-    def _ctl_dir() -> Path:
-        """Directory to put the control socket in: the system temp dir."""
-        return Path(tempfile.gettempdir())
+    def _private_dir(home: Path | None = None) -> Path | None:
+        """:data:`CONTROL_DIR` under ``home``, created ``0700``, or ``None`` if it cannot be.
+
+        Args:
+            home: Directory to place it under, defaulting to the user's own. Taken as an argument so
+                that creating it and locking it down is checkable against a real directory.
+        """
+        path = (home or Path.home()) / SSHArgv.CONTROL_DIR
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            path.chmod(0o700)  # mkdir's mode is masked by umask, so set it outright
+        except OSError as exc:
+            logger.debug("control-socket dir %s unusable (%s); falling back", path, exc)
+            return None
+        return path
 
     @staticmethod
     def ctl_opts() -> list[str]:
         """``ControlMaster``/``ControlPath``/``ControlPersist`` flags for connection multiplexing.
 
-        The first op opens a master socket under :meth:`_ctl_dir`; later ops
+        The first op opens a master socket under :meth:`_private_dir`; later ops
         (probe/mkdir/scp/pkill) reuse it, skipping the auth handshake. ``%C`` (a hash of
         ``%l%h%p%r``) keeps the name short. Not applied to the long-lived executor session, whose
         close SIGHUPs the executor cleanly.
         """
-        return SSHArgv._ctl_flags(SSHArgv._ctl_dir())
+        private = SSHArgv._private_dir()
+        return SSHArgv._ctl_flags(private) if private is not None else []
 
     @staticmethod
     def _ctl_flags(base: Path) -> list[str]:
         """:meth:`ctl_opts` for a given socket dir, split out so the length rule is decidable
         without touching the environment or the filesystem.
         """
-        path = f"{base}/catalyst-cm-{os.getuid()}-%C"
+        path = f"{base}/%C"
         # %C expands to a 40-character hash.
         expanded = len(path) - len("%C") + 40 + SSHArgv.CONTROL_PATH_RESERVE
         if expanded > SSHArgv.CONTROL_PATH_MAX:
