@@ -46,20 +46,20 @@ def _controller(**kw):
     if kw.pop("remote", False):
         kw.setdefault("executor", SimpleNamespace(address=None, triple=None))
     kw.setdefault("init_args", init)
-    return qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl", **kw)
+    return qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", **kw)
 
 
-def _coproc(label, oob_port=18590, fn="coproc_fn", **kw):
+def _coproc(name, oob_port=18590, fn="coproc_fn", **kw):
     if kw.pop("remote", False):
         kw.setdefault("executor", SimpleNamespace(address=None, triple=None))
     kw.setdefault("init_args", {"backend_lib": "backend.so", "config": "cfg"})
     return qp.Coprocessor(
-        label=label, comm_host="127.0.0.1", oob_port=oob_port, coprocessor_fn=fn, **kw
+        name=name, comm_host="127.0.0.1", oob_port=oob_port, coprocessor_fn=fn, **kw
     )
 
 
 def test_controller_node_mapping():
-    """label -> name; init_args hints forwarded. A controller carries no endpoint of its own."""
+    """The node name and init arguments are forwarded; controllers carry no endpoint."""
     d = serialize_backline(qp.Backline(controller=_controller(), transport="rdma").placement)
     assert d["transport"] == "rdma"
     ctrl = d["controller"]
@@ -237,7 +237,7 @@ def test_remote_controller_module_tagged_with_role(use_capture):
     """
     ctrl = qp.Controller(
         device=qp.device("null.qubit", wires=2),
-        label="ctrl",
+        name="ctrl",
         executor=SimpleNamespace(address=None, triple=None),
         init_args={"backend_lib": "backend.so", "config": "cfg"},
     )
@@ -420,9 +420,9 @@ class TestBackendResolution:
             "rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so",
             "rdma/gpu_verbs/libcatalyst_transport_gpu_verbs_coprocessor.so",
         )
-        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl", hardware="cpu")
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", hardware="gpu"
+            name="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", hardware="gpu"
         )
         d = serialize_backline(
             qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma").placement
@@ -436,9 +436,9 @@ class TestBackendResolution:
             "memcpy/libcatalyst_transport_memcpy_controller.so",
             "memcpy/libcatalyst_transport_memcpy_coprocessor.so",
         )
-        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl", hardware="cpu")
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", hardware="cpu"
+            name="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", hardware="cpu"
         )
         d = serialize_backline(
             qp.Backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
@@ -453,9 +453,9 @@ class TestBackendResolution:
             "memcpy/libcatalyst_transport_memcpy_controller.so",
             "memcpy/libcatalyst_transport_memcpy_gpu_coprocessor.so",
         )
-        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl", hardware="cpu")
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", hardware="gpu"
+            name="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", hardware="gpu"
         )
         d = serialize_backline(
             qp.Backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
@@ -468,7 +468,7 @@ class TestBackendResolution:
         """An explicit backend library supports out-of-tree transport/hardware combinations."""
         ctrl = qp.Controller(
             device=qp.device("null.qubit", wires=2),
-            label="ctrl",
+            name="ctrl",
             hardware="fpga",
             init_args={"backend_lib": "/opt/explicit.so"},
         )
@@ -480,7 +480,7 @@ class TestBackendResolution:
     def test_default_cpu_hardware_selects_backend(self, fake_lib_dir):
         """Omitting hardware selects the CPU backend."""
         fake_lib_dir("rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so")
-        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl")
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl")
         d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
         assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
 
@@ -516,8 +516,8 @@ class TestExecutorRealization:
         node = _controller(executor_options={"address": "10.0.0.9:1373"})
         assert _realize_executor(node) is _realize_executor(node)
 
-    def test_label_seeds_the_executor_name(self):
-        """The node's label names the executor, which uses it for its logs."""
+    def test_node_name_seeds_the_executor_name(self):
+        """The node's name names the executor."""
         node = _controller(executor_options={"address": "10.0.0.9:1373"})
         assert _realize_executor(node).name == "ctrl"
 
@@ -558,7 +558,7 @@ class TestExecutorRealization:
         )
         monkeypatch.setattr(
             "catalyst.backline._launch_executor",
-            lambda _label, options: captured.update(options) or launched,
+            lambda _name, options: captured.update(options) or launched,
         )
         node = _controller(executor_options={"host": "controller", "plugins": ["libcustom.so"]})
 

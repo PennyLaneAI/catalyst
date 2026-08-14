@@ -125,8 +125,8 @@ def _node_dict(node, role: str, transport: str) -> dict:
             the concrete backend. An explicit ``init_args["backend_lib"]`` path takes precedence.
     """
     d: dict = {"remote": bool(node.remote)}
-    if node.label is not None:
-        d["name"] = node.label
+    if node.name is not None:
+        d["name"] = node.name
     comm_host = getattr(node, "comm_host", None)
     if comm_host is not None:
         d["peer"] = comm_host
@@ -258,7 +258,7 @@ def backline_attr_text(placement) -> str:
     return "#transport.backline<" + ", ".join(parts) + ">"
 
 
-def _launch_executor(label, options):
+def _launch_executor(name, options):
     """Build and launch a ``catalyst.Executor`` from a node's executor options.
 
     The executor determines its own target triple, detecting it on the target host when the options
@@ -266,7 +266,7 @@ def _launch_executor(label, options):
     """
     from catalyst.executor import Executor
 
-    options.setdefault("name", label or "executor")
+    options.setdefault("name", name or "executor")
     return Executor(**options).launch()
 
 
@@ -283,6 +283,6 @@ def _realize_executor(node, role=None):
         plugins = list(options.get("plugins") or ())
         plugins.extend(plugin for plugin in _required_plugins(node, role) if plugin not in plugins)
         options["plugins"] = plugins
-    executor = _launch_executor(getattr(node, "label", None), options)
+    executor = _launch_executor(getattr(node, "name", None), options)
     object.__setattr__(node, "executor", executor)  # cache on the (frozen) node
     return executor
