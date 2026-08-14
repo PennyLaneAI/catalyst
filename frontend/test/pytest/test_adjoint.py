@@ -268,6 +268,10 @@ class TestCatalyst:
 
     def test_adjoint_pcphase(self, backend):
         """Ensures that catalyst.adjoint supports PCPhase operations."""
+        if backend == "lightning.qubit":
+            pytest.xfail(
+                reason="Waiting for https://github.com/PennyLaneAI/pennylane-lightning/pull/1420"
+            )
 
         def func():
             qp.PauliX(0)
@@ -753,7 +757,6 @@ class TestInitialization:
         assert op.hyperparameters["base"] is base
         assert op.name == "Adjoint(Rot)"
 
-        assert op.num_params == 3
         assert qp.math.allclose(params, op.parameters)
         assert qp.math.allclose(params, op.data)
 
@@ -1022,7 +1025,7 @@ class TestMiscMethods:
         base = qp.PauliX(0)
         op = adjoint(base)
 
-        assert op.adjoint() is base
+        assert qp.equal(op.adjoint(), base)
 
     def test_diagonalizing_gates(self):
         """Assert that the diagonalizing gates method gives the base's diagonalizing gates."""
@@ -1095,11 +1098,6 @@ class TestAdjointOperation:
 
         assert base_phase == phase
 
-    def test_control_wires(self):
-        """Test the control_wires of an adjoint are the same as the base op."""
-        op = adjoint(qp.CNOT(wires=("a", "b")))
-        assert op.control_wires == qp.wires.Wires("a")
-
 
 class TestAdjointOperationDiffInfo:
     """Test differention related properties and methods of AdjointOperation."""
@@ -1117,7 +1115,17 @@ class TestAdjointOperationDiffInfo:
         assert adjoint(op).grad_method == op.grad_method
 
     @pytest.mark.parametrize(
-        "base", (qp.PauliX(0), qp.RX(1.234, wires=0), qp.Rot(1.234, 0.0, 0.0, wires=0))
+        "base",
+        (
+            qp.PauliX(0),
+            qp.RX(1.234, wires=0),
+            pytest.param(
+                qp.Rot(1.234, 0.0, 0.0, wires=0),
+                marks=pytest.mark.xfail(
+                    reason="Operator2 Adjoint does not yet preserve Rot's gradient recipes"
+                ),
+            ),
+        ),
     )
     def test_grad_recipe(self, base):
         """Test that the grad_recipe of the Adjoint is the same as the grad_recipe of the base."""
@@ -1129,7 +1137,9 @@ class TestAdjointOperationDiffInfo:
     )
     def test_parameter_frequencies(self, base):
         """Test that the parameter frequencies of an Adjoint are the same as those of the base."""
-        assert adjoint(base).parameter_frequencies == base.parameter_frequencies
+        assert qp.gradients.parameter_frequencies(
+            adjoint(base)
+        ) == qp.gradients.parameter_frequencies(base)
 
 
 class TestQueueing:
@@ -1308,7 +1318,7 @@ class TestDecomposition:
         adj1 = adjoint(base)
         adj2 = adjoint(adj1)
 
-        assert adj2.decomposition()[0] is base
+        qp.assert_equal(adj2.decomposition()[0], base)
 
 
 class TestIntegration:

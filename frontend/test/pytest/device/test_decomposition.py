@@ -75,7 +75,10 @@ class TestGateAliases:
         decomp = catalyst_decomposer(gate, capabilities)
 
         assert len(decomp) == 1
-        assert type(decomp[0]) is qp.ops.ControlledOp
+        expected_type = (
+            qp.ops.ControlledOp2 if isinstance(gate, qp.ops.Controlled2) else qp.ops.ControlledOp
+        )
+        assert type(decomp[0]) is expected_type
         assert type(decomp[0].base) is base
 
 
