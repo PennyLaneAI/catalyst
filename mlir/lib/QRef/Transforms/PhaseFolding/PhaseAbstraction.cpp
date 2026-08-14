@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "PhaseAbstraction.hpp"
+
 #include "AffineRelation.hpp"
 #include "AffineSchema.hpp"
 
@@ -21,15 +22,13 @@ using namespace catalyst::phase_folding;
 /*
     Operators:
 */
-PhaseAbstraction &PhaseAbstraction::operator+=(const PhaseAbstraction &rhs)
-{
+PhaseAbstraction &PhaseAbstraction::operator+=(const PhaseAbstraction &rhs) {
     addActiveBundlesWith(rhs.activeBundles);
     addOrphanBundlesWith(rhs.orphanBundles);
     return *this;
 }
 
-PhaseAbstraction PhaseAbstraction::operator+(const PhaseAbstraction &rhs) const
-{
+PhaseAbstraction PhaseAbstraction::operator+(const PhaseAbstraction &rhs) const {
     PhaseAbstraction res = *this;
     res += rhs;
     return res;
@@ -38,38 +37,35 @@ PhaseAbstraction PhaseAbstraction::operator+(const PhaseAbstraction &rhs) const
 /*
     Insertion:
 */
-void PhaseAbstraction::addOrphanBundlesWith(const std::vector<GateBundle> &rhsOrphans)
-{
+void PhaseAbstraction::addOrphanBundlesWith(const std::vector<GateBundle> &rhsOrphans) {
     orphanBundles.reserve(orphanBundles.size() + rhsOrphans.size());
     orphanBundles.insert(orphanBundles.end(), rhsOrphans.begin(), rhsOrphans.end());
 }
 
-void PhaseAbstraction::addActiveBundlesWith(const llvm::DenseMap<Parity, GateBundle> &rhsActives)
-{
-    if (activeBundles.empty())  activeBundles.reserve(rhsActives.size());
-    
+void PhaseAbstraction::addActiveBundlesWith(const llvm::DenseMap<Parity, GateBundle> &rhsActives) {
+    if (activeBundles.empty()) {
+        activeBundles.reserve(rhsActives.size());
+    }
+
     for (const auto &[parity, contributors] : rhsActives) {
         insertActiveBundle(contributors, parity);
     }
 }
 
-void PhaseAbstraction::insertActiveBundle(const GateBundle &contributor, const Parity &parity)
-{
+void PhaseAbstraction::insertActiveBundle(const GateBundle &contributor, const Parity &parity) {
     auto it = activeBundles.find(parity);
     if (it != activeBundles.end()) {
         it->second += contributor;
-    }
-    else {
+    } else {
         activeBundles[parity] = contributor;
     }
 }
 
-void PhaseAbstraction::insertContributor(const GateBundle &contributor, const Parity &parity)
-{
+void PhaseAbstraction::insertContributor(const GateBundle &contributor, const Parity &parity) {
     // if (parity.isUnsat(schema.affVal)) {
     //     orphanBundles.push_back(contributor);
     // } else {
-       insertActiveBundle(contributor, parity);
+    insertActiveBundle(contributor, parity);
     // }
 
     // BitLocation affValLoc = schema.affVal;
@@ -87,14 +83,14 @@ void PhaseAbstraction::insertContributor(const GateBundle &contributor, const Pa
 /*
     Normalization:
 */
-void PhaseAbstraction::normalizeByCond(const AffineRelation& cond, const AffineSchema& paritySchema, bool isPrecond, bool isProjectOutAuxVars)
-{
+void PhaseAbstraction::normalizeByCond(const AffineRelation &cond, const AffineSchema &paritySchema,
+                                       bool isPrecond, bool isProjectOutAuxVars) {
     llvm::DenseMap<Parity, GateBundle> oldBundles;
     std::swap(activeBundles, oldBundles);
 
     for (auto &[parity, contributors] : oldBundles) {
         Parity reducedPar = cond.reduce(parity, paritySchema, isPrecond, isProjectOutAuxVars);
-                
+
         BitLocation affValLoc = cond.getSchema().affVal;
         if (reducedPar.getBitAtLoc(affValLoc)) {
             reducedPar.clearBitAtLoc(affValLoc);
@@ -104,27 +100,24 @@ void PhaseAbstraction::normalizeByCond(const AffineRelation& cond, const AffineS
     }
 }
 
-void PhaseAbstraction::nullifyByPrecond(const AffineRelation& precond, const AffineSchema& paritySchema)
-{    
+void PhaseAbstraction::nullifyByPrecond(const AffineRelation &precond,
+                                        const AffineSchema &paritySchema) {
     normalizeByCond(precond, paritySchema, true);
     orphanNonTrivialBundles();
 }
 
-void PhaseAbstraction::normalizeByPostcond(const AffineRelation& postcond, const AffineSchema& paritySchema)
-{
+void PhaseAbstraction::normalizeByPostcond(const AffineRelation &postcond,
+                                           const AffineSchema &paritySchema) {
     normalizeByCond(postcond, paritySchema, false);
 }
 
-void PhaseAbstraction::projectOutAuxVars(const AffineRelation& cond)
-{
+void PhaseAbstraction::projectOutAuxVars(const AffineRelation &cond) {
     normalizeByCond(cond, cond.getSchema(), false, true);
-    orphanBundlesIf([&](const Parity &parity) {
-        return !parity.isTrivialInRange(cond.getSchema().auxVars);
-    });
+    orphanBundlesIf(
+        [&](const Parity &parity) { return !parity.isTrivialInRange(cond.getSchema().auxVars); });
 }
 
-std::string PhaseAbstraction::toString(const AffineSchema& schema) const
-{
+std::string PhaseAbstraction::toString(const AffineSchema &schema) const {
     std::string res = "";
     for (const auto &[parity, contributors] : activeBundles) {
 
@@ -133,7 +126,7 @@ std::string PhaseAbstraction::toString(const AffineSchema& schema) const
 
         res += (pre + " " + aux + " -> " + contributors.toString() + "\n");
     }
-    
+
     if (!orphanBundles.empty()) {
         res += "Unsat -> ";
         for (const GateBundle &contributors : orphanBundles) {
@@ -149,8 +142,7 @@ std::string PhaseAbstraction::toString(const AffineSchema& schema) const
 */
 namespace catalyst::phase_folding {
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const PhaseAbstraction &pp)
-{
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const PhaseAbstraction &pp) {
     for (const auto &[parity, contributors] : pp.activeBundles) {
         os << parity << " -> " << contributors << "\n";
     }

@@ -14,15 +14,15 @@
 
 #pragma once
 
-#include "PhaseAbstraction.hpp"
-#include "AffineTransform.hpp"
-#include "Gate.hpp"
-
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/ADT/ArrayRef.h"
-
 #include <cassert>
 #include <optional>
+
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include "AffineTransform.hpp"
+#include "Gate.hpp"
+#include "PhaseAbstraction.hpp"
 
 namespace catalyst::phase_folding {
 
@@ -31,13 +31,13 @@ class AffineRelation;
 
 struct ProgramAbstraction {
     PhaseAbstraction phases;
-    AffineTransform stateTransform; // row i (starting from 0) corresponds to qubit i, but col i doesn't!
+    AffineTransform
+        stateTransform; // row i (starting from 0) corresponds to qubit i, but col i doesn't!
 
     // Constructors
     ProgramAbstraction() = default;
-    ProgramAbstraction(size_t numQubits) :
-        phases(PhaseAbstraction()), stateTransform(AffineTransform(numQubits))
-    {}
+    ProgramAbstraction(size_t numQubits)
+        : phases(PhaseAbstraction()), stateTransform(AffineTransform(numQubits)) {}
 
     // Operators
     friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ProgramAbstraction &progAbs);
@@ -65,13 +65,11 @@ inline size_t ProgramAbstraction::numQubits() const { return stateTransform.numQ
 
 inline TransformSchema ProgramAbstraction::getSchema() const { return stateTransform.getSchema(); }
 
-inline void ProgramAbstraction::extendQubitsBy(size_t addQubitNum)
-{
+inline void ProgramAbstraction::extendQubitsBy(size_t addQubitNum) {
     stateTransform.extendQubitsBy(addQubitNum);
 }
 
-inline void ProgramAbstraction::prepareQubit(size_t wire, bool basisState)
-{
+inline void ProgramAbstraction::prepareQubit(size_t wire, bool basisState) {
     assert(wire < numQubits()); // or +-1?
     stateTransform.prepareQubit(wire, basisState);
 }

@@ -14,10 +14,10 @@
 
 #pragma once
 
+#include "llvm/Support/raw_ostream.h"
+
 #include "AffineRelation.hpp"
 #include "PhaseAbstraction.hpp"
-
-#include "llvm/Support/raw_ostream.h"
 
 namespace catalyst::phase_folding {
 
@@ -28,7 +28,7 @@ enum class RegionType { Conditional, Loop, Procedure };
 struct RegionSummary {
     PhaseAbstraction phases;
     TransformSchema phasesSchm;
-    
+
     PhaseAbstraction falseBranchPhases; // for Conditional
     TransformSchema falseBranchPhasesSchm;
 
@@ -38,7 +38,7 @@ struct RegionSummary {
     // Constructors
     RegionSummary() = default;
     RegionSummary(RegionType type, ProgramAbstraction &circ1, ProgramAbstraction *circ2 = nullptr);
-    
+
     // Operators
     friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const RegionSummary &sum);
 
@@ -52,6 +52,7 @@ struct RegionSummary {
     void summarizeProc();
 };
 
-// I'm thinking of keeping all phases, and nullifying at the and of all nested blocks. think about multiple blocks?
+// I'm thinking of keeping all phases, and nullifying at the and of all nested blocks. think about
+// multiple blocks?
 
 } // namespace catalyst::phase_folding

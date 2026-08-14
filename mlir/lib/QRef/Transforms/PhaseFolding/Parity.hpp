@@ -14,16 +14,16 @@
 
 #pragma once
 
+#include <cassert>
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
-#include <optional>
-#include <cassert>
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace catalyst::phase_folding {
@@ -46,15 +46,17 @@ struct BitLocation {
     BitLocation operator++(int);
 
     friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BitLocation &bitLoc);
-    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const std::vector<BitLocation> &idxList);
-    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, llvm::ArrayRef<BitLocation> idxView);
+    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                         const std::vector<BitLocation> &idxList);
+    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                         llvm::ArrayRef<BitLocation> idxView);
 
     static size_t requiredBlockNum(size_t varNum);
 
     [[nodiscard]] size_t toPos() const;
 };
 
-inline constexpr BitLocation BitLocation::AFFINE_VALUE{0, 0};    // it's LSB. for MSB would be varNum.
+inline constexpr BitLocation BitLocation::AFFINE_VALUE{0, 0}; // it's LSB. for MSB would be varNum.
 
 inline size_t BitLocation::toPos() const { return block * BLOCK_SIZE + bit; }
 inline size_t BitLocation::requiredBlockNum(size_t varNum) { return (varNum / BLOCK_SIZE) + 1; }
@@ -81,7 +83,7 @@ class Parity {
 
     friend struct std::hash<Parity>;
     friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const Parity &par);
-    
+
     template <typename ColOrderRange>
     [[nodiscard]] std::string toStringWithOrder(ColOrderRange order) const;
     [[nodiscard]] std::string toString() const;
@@ -92,10 +94,10 @@ class Parity {
     [[nodiscard]] bool getBitAtPos(size_t pos) const;
 
     // Setters
-    void reset(std::optional<size_t> newNumBlocks=1);
+    void reset(std::optional<size_t> newNumBlocks = 1);
     void mkBasis(BitLocation oneLoc, size_t numBlocks);
-    void mkTrivial(std::optional<size_t> newNumBlocks=1);
-    void mkUnsat(BitLocation affVal, std::optional<size_t> newNumBlocks=1);
+    void mkTrivial(std::optional<size_t> newNumBlocks = 1);
+    void mkUnsat(BitLocation affVal, std::optional<size_t> newNumBlocks = 1);
     void assignBitAtLoc(BitLocation ind, bool value);
     void assignBitAtPos(size_t pos, bool value);
     void setBitAtLoc(BitLocation ind);
@@ -113,8 +115,8 @@ class Parity {
     // Methods:
     void extendBitsFor(size_t newMaxBlock);
     template <typename ColOrderRange>
-    void mapBitsFrom(const Parity& srcPar, ColOrderRange srcLocs, ColOrderRange trgtLocs);
-    void mapBitFrom(const Parity& srcPar, BitLocation srcLoc, BitLocation trgtLoc);
+    void mapBitsFrom(const Parity &srcPar, ColOrderRange srcLocs, ColOrderRange trgtLocs);
+    void mapBitFrom(const Parity &srcPar, BitLocation srcLoc, BitLocation trgtLoc);
 
   private:
     llvm::SmallVector<uint64_t, 8> bits;
@@ -130,9 +132,7 @@ class Parity {
     bool isEquivalentWithFromBlock(const Parity &rhs, size_t fstBlock) const;
 };
 
-template <typename ColOrderRange>
-std::string Parity::toStringWithOrder(ColOrderRange order) const
-{
+template <typename ColOrderRange> std::string Parity::toStringWithOrder(ColOrderRange order) const {
     std::string res = "";
     for (BitLocation loc : order) {
         res += (getBitAtLoc(loc) ? '1' : '0');
@@ -141,16 +141,14 @@ std::string Parity::toStringWithOrder(ColOrderRange order) const
 }
 
 template <typename ColOrderRange>
-void Parity::mapBitsFrom(const Parity& srcPar, ColOrderRange srcLocs, ColOrderRange trgtLocs)
-{
-    for (auto srcIt = srcLocs.begin(), trgtIt = trgtLocs.begin(); srcIt != srcLocs.end(); ++srcIt, ++trgtIt) {
+void Parity::mapBitsFrom(const Parity &srcPar, ColOrderRange srcLocs, ColOrderRange trgtLocs) {
+    for (auto srcIt = srcLocs.begin(), trgtIt = trgtLocs.begin(); srcIt != srcLocs.end();
+         ++srcIt, ++trgtIt) {
         mapBitFrom(srcPar, *srcIt, *trgtIt);
     }
 } // inefficient
 
-template <typename ColOrderRange>
-bool Parity::isTrivialInRange(ColOrderRange checkedRange) const 
-{
+template <typename ColOrderRange> bool Parity::isTrivialInRange(ColOrderRange checkedRange) const {
     for (BitLocation loc : checkedRange) {
         if (getBitAtLoc(loc)) {
             return false;
@@ -159,68 +157,63 @@ bool Parity::isTrivialInRange(ColOrderRange checkedRange) const
     return true;
 } // inefficient
 
-inline Parity Parity::Trivial(size_t varNum)
-{
+inline Parity Parity::Trivial(size_t varNum) {
     return Parity(BitLocation::requiredBlockNum(varNum));
 }
 
-inline Parity Parity::Unsat(size_t varNum)
-{
+inline Parity Parity::Unsat(size_t varNum) {
     return eVec(BitLocation::requiredBlockNum(varNum), BitLocation(0, 0));
 }
 
 // Getters:
 inline const llvm::SmallVector<uint64_t, 8> &Parity::getBits() const { return bits; }
 
-inline bool Parity::getBitAtLoc(BitLocation loc) const
-{
+inline bool Parity::getBitAtLoc(BitLocation loc) const {
     return (loc.block < bits.size()) ? (bits[loc.block] & (1ULL << loc.bit)) : 0;
 }
 
 inline bool Parity::getBitAtPos(size_t pos) const { return getBitAtLoc(BitLocation(pos)); }
 
 // Setters:
-inline void Parity::mkBasis(BitLocation oneLoc, size_t numBlocks)
-{
+inline void Parity::mkBasis(BitLocation oneLoc, size_t numBlocks) {
     reset(numBlocks);
     setBitAtLoc(oneLoc);
 }
 
-inline void Parity::mkTrivial(std::optional<size_t> newNumBlocks)
-{
-    reset(newNumBlocks);
-}
+inline void Parity::mkTrivial(std::optional<size_t> newNumBlocks) { reset(newNumBlocks); }
 
-inline void Parity::mkUnsat(BitLocation affVal, std::optional<size_t> newNumBlocks)
-{
+inline void Parity::mkUnsat(BitLocation affVal, std::optional<size_t> newNumBlocks) {
     mkBasis(affVal, newNumBlocks.value_or(1));
 }
 
-inline void Parity::reset(std::optional<size_t> newNumBlocks) { bits.assign(newNumBlocks.value(), 0); }
+inline void Parity::reset(std::optional<size_t> newNumBlocks) {
+    bits.assign(newNumBlocks.value(), 0);
+}
 
-inline void Parity::assignBitAtPos(size_t pos, bool value) { assignBitAtLoc(BitLocation(pos), value); }
+inline void Parity::assignBitAtPos(size_t pos, bool value) {
+    assignBitAtLoc(BitLocation(pos), value);
+}
 
 inline void Parity::setBitAtPos(size_t pos) { setBitAtLoc(BitLocation(pos)); }
 
 // Checks & Inspections
 inline bool Parity::isTrivial() const { return isTrivialFromBlock(0); }
 
-inline bool Parity::isTrivialFromBlock(size_t fstBlock) const
-{
+inline bool Parity::isTrivialFromBlock(size_t fstBlock) const {
     return isTrivialInBlocks(fstBlock, bits.size());
 }
 
-inline bool Parity::isUnsat(BitLocation affValLoc) const
-{
+inline bool Parity::isUnsat(BitLocation affValLoc) const {
     assert(affValLoc.block < bits.size());
-    return (bits[affValLoc.block] != 1 << affValLoc.bit) ? false : isTrivialInBlocks(0, affValLoc.block) && isTrivialFromBlock(affValLoc.block + 1);
+    return (bits[affValLoc.block] != 1 << affValLoc.bit)
+               ? false
+               : isTrivialInBlocks(0, affValLoc.block) && isTrivialFromBlock(affValLoc.block + 1);
 } // currently unsat is 0..01, but we can change it to empty bits.
 
 inline bool Parity::isIdenticalWith(const Parity &rhs) const { return bits == rhs.bits; }
 
 // Methods:
-inline void Parity::mapBitFrom(const Parity& srcPar, BitLocation srcLoc, BitLocation trgtLoc)
-{
+inline void Parity::mapBitFrom(const Parity &srcPar, BitLocation srcLoc, BitLocation trgtLoc) {
     if (srcPar.getBitAtLoc(srcLoc)) {
         setBitAtLoc(trgtLoc);
     }
@@ -230,18 +223,24 @@ inline void Parity::mapBitFrom(const Parity& srcPar, BitLocation srcLoc, BitLoca
 
 namespace llvm {
 template <> struct DenseMapInfo<catalyst::phase_folding::Parity> {
-    static inline catalyst::phase_folding::Parity getEmptyKey() { return catalyst::phase_folding::Parity(catalyst::phase_folding::Parity::State::Empty); }
+    static inline catalyst::phase_folding::Parity getEmptyKey() {
+        return catalyst::phase_folding::Parity(catalyst::phase_folding::Parity::State::Empty);
+    }
 
-    static inline catalyst::phase_folding::Parity getTombstoneKey() { return catalyst::phase_folding::Parity(catalyst::phase_folding::Parity::State::Tombstone); }
+    static inline catalyst::phase_folding::Parity getTombstoneKey() {
+        return catalyst::phase_folding::Parity(catalyst::phase_folding::Parity::State::Tombstone);
+    }
 
-    static unsigned getHashValue(const catalyst::phase_folding::Parity &val)
-    {
+    static unsigned getHashValue(const catalyst::phase_folding::Parity &val) {
         if (val.state != catalyst::phase_folding::Parity::State::Valid) {
             return 0;
         }
         return static_cast<unsigned>(llvm::hash_combine_range(val.bits.begin(), val.bits.end()));
     }
 
-    static bool isEqual(const catalyst::phase_folding::Parity &lhs, const catalyst::phase_folding::Parity &rhs) { return lhs == rhs; }
+    static bool isEqual(const catalyst::phase_folding::Parity &lhs,
+                        const catalyst::phase_folding::Parity &rhs) {
+        return lhs == rhs;
+    }
 };
 } // namespace llvm

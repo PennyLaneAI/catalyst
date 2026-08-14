@@ -47,18 +47,16 @@ struct GateBundle {
     void flipGatesAffineValues();
 };
 
-inline size_t GateBundle::gateCount() const { return zeroAffineGates.size() + oneAffineGates.size(); }
+inline size_t GateBundle::gateCount() const {
+    return zeroAffineGates.size() + oneAffineGates.size();
+}
 
-inline auto GateBundle::getAllGates()
-{
+inline auto GateBundle::getAllGates() {
     return llvm::concat<GateID>(zeroAffineGates, oneAffineGates);
 }
 
 inline bool GateBundle::isMergeTargetAffineZero() const { return !zeroAffineGates.empty(); }
 
-inline void GateBundle::flipGatesAffineValues()
-{
-    std::swap(zeroAffineGates, oneAffineGates);
-}
+inline void GateBundle::flipGatesAffineValues() { std::swap(zeroAffineGates, oneAffineGates); }
 
 } // namespace catalyst::phase_folding

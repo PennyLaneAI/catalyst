@@ -1,11 +1,11 @@
 import pennylane as qp
+
 from catalyst import cond, for_loop
-from catalyst.passes import graph_decomposition
-from catalyst.passes import phase_folding
+from catalyst.passes import graph_decomposition, phase_folding
 
 # @qp.qjit(autograph=True, keep_intermediate=2, capture=False)
 # @qp.transform(pass_name="convert-to-value-semantics")
-# @qp.transform(pass_name="phase-folding-qref")
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # @qp.transform(pass_name="convert-to-reference-semantics")
 # # Clifford + Rz
 # # @qp.decompose(gates=[qp.X, qp.Y, qp.Z, qp.RZ, qp.CNOT])
@@ -44,7 +44,7 @@ from catalyst.passes import phase_folding
 @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 def circuit_ex425():
     qp.StatePrep([0, 1], wires=1)
-    qp.BasisState(1, wires=1)   # becomes dynamic, so not yet
+    qp.BasisState(1, wires=1)  # becomes dynamic, so not yet
     qp.T(1)
     qp.CNOT([0, 1])
     qp.T(0)
@@ -64,18 +64,18 @@ def circuit_ex425():
 
 # @qp.qjit(autograph=True, keep_intermediate=2, capture=False)
 # @qp.transform(pass_name="convert-to-value-semantics")
-# @qp.transform(pass_name="phase-folding-qref")
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # @qp.transform(pass_name="convert-to-reference-semantics")
 # @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 # def circuit_if_aff_val(x: float):
 #     qp.T(0)
 
-    # if x > 1.4:
-    #     qp.X(0)
-    #     qp.Hadamard(wires=1)
-    # else:
-    #     qp.Y(0)
-    #     qp.RZ(x, wires=1)
+# if x > 1.4:
+#     qp.X(0)
+#     qp.Hadamard(wires=1)
+# else:
+#     qp.Y(0)
+#     qp.RZ(x, wires=1)
 
 #     qp.T(0)
 
@@ -83,7 +83,7 @@ def circuit_ex425():
 
 # @qp.qjit(autograph=True, keep_intermediate=2, capture=False)
 # @qp.transform(pass_name="convert-to-value-semantics")
-# @qp.transform(pass_name="phase-folding-qref")
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # @qp.transform(pass_name="convert-to-reference-semantics")
 # @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 # def circuit_if_simple(x: float):
@@ -91,14 +91,14 @@ def circuit_ex425():
 
 #     if x > 1.4:
 #         qp.CNOT([0, 1])
-    
+
 #     qp.T(0)
 
 #     return qp.probs()
 
 # @qp.qjit(autograph=True, keep_intermediate=2, capture=False)
 # @qp.transform(pass_name="convert-to-value-semantics")
-# @qp.transform(pass_name="phase-folding-qref")
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # @qp.transform(pass_name="convert-to-reference-semantics")
 # @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 # def circuit_loop_block(x: float):
@@ -107,7 +107,7 @@ def circuit_ex425():
 
 #     for i in range(10):
 #         qp.T(0)
-    
+
 #     qp.Hadamard(0)
 #     qp.T(0)
 
@@ -115,7 +115,7 @@ def circuit_ex425():
 
 # @qp.qjit(autograph=True, keep_intermediate=2, capture=False)
 # @qp.transform(pass_name="convert-to-value-semantics")
-# @qp.transform(pass_name="phase-folding-qref")
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # @qp.transform(pass_name="convert-to-reference-semantics")
 # @qp.qnode(device=qp.device("lightning.qubit", wires=3))
 # def circuit_loop_cycle(x: float):
@@ -125,14 +125,14 @@ def circuit_ex425():
 #     for i in range(10):
 #         qp.SWAP([0, 1])
 #         qp.SWAP([1, 2])
-    
+
 #     qp.T(1)
 
 #     return qp.probs()
 
 # @qp.qjit(autograph=True, keep_intermediate=2, capture=False)
 # @qp.transform(pass_name="convert-to-value-semantics")
-# @qp.transform(pass_name="phase-folding-qref")
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # @qp.transform(pass_name="convert-to-reference-semantics")
 # @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 # def circuit_loop_h(x: float):
@@ -140,7 +140,7 @@ def circuit_ex425():
 
 #     for i in range(10):
 #         qp.Hadamard(0)
-    
+
 #     qp.T(1)
 
 #     return qp.probs()
@@ -155,7 +155,7 @@ def circuit_ex425():
 
 # @qp.qjit(autograph=True, keep_intermediate=2, capture=False)
 # # @qp.transform(pass_name="convert-to-value-semantics")
-# # @qp.transform(pass_name="phase-folding-qref")
+# # @phase_folding(report_stats=True, trace_abstraction=True)
 # # @qp.transform(pass_name="convert-to-reference-semantics")
 # @graph_decomposition(gate_set=[qp.H, qp.X, qp.Z, qp.Y, qp.S, qp.CNOT, qp.SWAP, qp.T, qp.RZ])
 # @qp.qnode(device=qp.device("lightning.qubit", wires=3))

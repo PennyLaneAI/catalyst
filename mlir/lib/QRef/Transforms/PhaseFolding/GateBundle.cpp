@@ -19,30 +19,31 @@ using namespace catalyst::phase_folding;
 /*
     Operators:
 */
-GateBundle &GateBundle::operator+=(const GateBundle &rhs)
-{
+GateBundle &GateBundle::operator+=(const GateBundle &rhs) {
     zeroAffineGates.reserve(zeroAffineGates.size() + rhs.zeroAffineGates.size());
-    zeroAffineGates.insert(zeroAffineGates.end(), rhs.zeroAffineGates.begin(), rhs.zeroAffineGates.end());
-    
+    zeroAffineGates.insert(zeroAffineGates.end(), rhs.zeroAffineGates.begin(),
+                           rhs.zeroAffineGates.end());
+
     oneAffineGates.reserve(oneAffineGates.size() + rhs.oneAffineGates.size());
-    oneAffineGates.insert(oneAffineGates.end(), rhs.oneAffineGates.begin(), rhs.oneAffineGates.end());
+    oneAffineGates.insert(oneAffineGates.end(), rhs.oneAffineGates.begin(),
+                          rhs.oneAffineGates.end());
 
     return *this;
 }
 
-GateBundle GateBundle::operator+(const GateBundle &rhs) const
-{
+GateBundle GateBundle::operator+(const GateBundle &rhs) const {
     GateBundle res = *this;
     res += rhs;
     return res;
 }
 
-std::string GateBundle::toString() const
-{
+std::string GateBundle::toString() const {
     auto gatesToString = [](const std::vector<GateID> &gates) -> std::string {
         std::string res = ": (";
         for (size_t i = 0; i < gates.size(); ++i) {
-            if (i > 0)  res += ", ";
+            if (i > 0) {
+                res += ", ";
+            }
             res += std::to_string(gates[i]);
         }
         res += ")";
@@ -55,8 +56,7 @@ std::string GateBundle::toString() const
 /*
     Methods:
 */
-GateID GateBundle::getMergeTarget() const
-{
+GateID GateBundle::getMergeTarget() const {
     if (!zeroAffineGates.empty()) {
         return zeroAffineGates[0];
     }
@@ -70,8 +70,7 @@ GateID GateBundle::getMergeTarget() const
     Print:
 */
 namespace catalyst::phase_folding {
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const std::vector<GateID> &gates)
-{
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const std::vector<GateID> &gates) {
     os << ": (";
     for (size_t i = 0; i < gates.size(); i++) {
         if (i > 0) {
@@ -83,8 +82,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const std::vector<GateID> &
     return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GateBundle &bundle)
-{
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GateBundle &bundle) {
     os << '[';
     os << "0" << bundle.zeroAffineGates;
     os << " __ ";

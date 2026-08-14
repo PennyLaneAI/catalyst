@@ -1,4 +1,5 @@
 import pennylane as qp
+
 from catalyst import qjit
 from catalyst.passes import phase_folding
 
@@ -6,7 +7,8 @@ pauli_gates = {"PauliX", "PauliY", "PauliZ", "Identity"}
 clifford_gates = pauli_gates | {"S", "Hadamard", "CNOT", "SWAP"}
 clifford_rz_gates = clifford_gates | {"T", "RZ", "GlobalPhase"}
 
-def CCZ(a:int, b:int, c:int):
+
+def CCZ(a: int, b: int, c: int):
     qp.T(a)
     qp.T(b)
     qp.T(c)
@@ -23,13 +25,15 @@ def CCZ(a:int, b:int, c:int):
     qp.CNOT([a, b])
     return
 
-def CCX(a:int, b:int, c:int):
+
+def CCX(a: int, b: int, c: int):
     qp.H(c)
     CCZ(a, b, c)
     qp.H(c)
     return
 
-def Toffoli(a:int, b:int, c:int):
+
+def Toffoli(a: int, b: int, c: int):
     qp.T(a)
     qp.T(b)
     qp.H(c)
@@ -55,24 +59,25 @@ def Toffoli(a:int, b:int, c:int):
 
     return
 
-@qjit(autograph=True, keep_intermediate=2, capture=True)
-@phase_folding(report_stats=True, trace_abstraction=True)
-# @qp.transforms.decompose(gate_set=clifford_rz_gates)
-@qp.qnode(device=qp.device("lightning.qubit", wires=3))
-def circ1(x: float):
-    # Toffoli(0, 1, 2)
 
-    qp.RZ(1.2, 0)
-    if x > 1.4:
-        qp.X(0)
-        qp.H(1)
-    else:
-        qp.Y(0)
-        qp.RZ(0.3, 1)
-    qp.RZ(2.3, 0)
-    
-    # Toffoli(2, 1, 0)
-    return qp.probs()
+# @qjit(autograph=True, keep_intermediate=2, capture=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
+# # @qp.transforms.decompose(gate_set=clifford_rz_gates)
+# @qp.qnode(device=qp.device("lightning.qubit", wires=3))
+# def circ1(x: float):
+#     # Toffoli(0, 1, 2)
+
+#     qp.RZ(1.2, 0)
+#     if x > 1.4:
+#         qp.X(0)
+#         qp.H(1)
+#     else:
+#         qp.Y(0)
+#         qp.RZ(0.3, 1)
+#     qp.RZ(2.3, 0)
+
+#     # Toffoli(2, 1, 0)
+#     return qp.probs()
 
 
 # @qjit(autograph=True, keep_intermediate=2, capture=True)
@@ -89,7 +94,7 @@ def circ1(x: float):
 #     return qp.probs()
 
 # @qjit(autograph=True, keep_intermediate=2, capture=True)
-# @phase_folding(report=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # # @qp.transforms.decompose(gate_set=clifford_rz_gates)
 # @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 # def loop_block(x: int):
@@ -104,7 +109,7 @@ def circ1(x: float):
 #     return qp.probs()
 
 # @qjit(autograph=True, keep_intermediate=2, capture=True)
-# @phase_folding(report=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # # @qp.transforms.decompose(gate_set=clifford_rz_gates)
 # @qp.qnode(device=qp.device("lightning.qubit", wires=3))
 # def loop_cycle(x: int):
@@ -118,7 +123,7 @@ def circ1(x: float):
 #     return qp.probs()
 
 # @qjit(autograph=True, keep_intermediate=2, capture=True)
-# @phase_folding(report=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # # @qp.transforms.decompose(gate_set=clifford_rz_gates)
 # @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 # def loop_h(x: int):
@@ -148,11 +153,11 @@ def circ1(x: float):
 #     return qp.probs()
 
 # @qjit(autograph=True, keep_intermediate=2, capture=True)
-# @phase_folding(report=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # # @qp.transforms.decompose(gate_set=clifford_rz_gates)
 # @qp.qnode(device=qp.device("lightning.qubit", wires=3))
 # def loop_nonlinear(x: int):
-#     qp.StatePrep([1, 0], wires=2)
+#     # qp.StatePrep([1, 0], wires=2)
 #     qp.X(0)
 #     CCX(0, 1, 2)
 #     qp.T(2)
@@ -165,12 +170,10 @@ def circ1(x: float):
 #     qp.adjoint(qp.T(2))
 #     CCX(0, 1, 2)
 #     qp.X(0)
-#     return qp.probs()
-
-
+#     return qp.state()
 
 # # @qjit(autograph=True, keep_intermediate=2, capture=True)
-# # @phase_folding(report=True)
+# # @phase_folding(report_stats=True, trace_abstraction=True)
 # # @qp.transforms.decompose(gate_set=clifford_rz_gates)
 # # @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 # # def loop_null(x: int):
@@ -187,7 +190,7 @@ def circ1(x: float):
 # #     return qp.probs()
 
 # @qjit(autograph=True, keep_intermediate=2, capture=True)
-# @phase_folding(report=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # # @qp.transforms.decompose(gate_set=clifford_rz_gates)
 # @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 # def loop_simple(x: int):
@@ -200,7 +203,7 @@ def circ1(x: float):
 #     return qp.probs()
 
 # @qjit(autograph=True, keep_intermediate=2, capture=True)
-# @phase_folding(report=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # # @qp.transforms.decompose(gate_set=clifford_rz_gates)
 # @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 # def loop_swap(x: int):
@@ -217,7 +220,7 @@ def circ1(x: float):
 #     return qp.probs()
 
 # # @qjit(autograph=True, keep_intermediate=2, capture=True)
-# # @phase_folding(report=True)
+# # @phase_folding(report_stats=True, trace_abstraction=True)
 # # @qp.transforms.decompose(gate_set=clifford_rz_gates)
 # # @qp.qnode(device=qp.device("lightning.qubit", wires=1))
 # # def reset_simple():
@@ -228,7 +231,7 @@ def circ1(x: float):
 # #     return qp.probs()
 
 # @qjit(autograph=True, keep_intermediate=2, capture=True)
-# @phase_folding(report=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
 # @qp.qnode(device=qp.device("lightning.qubit", wires=3))
 # def rus(x: int):
 #     qp.H(0)
@@ -256,31 +259,63 @@ def circ1(x: float):
 # print(circ1(1.5))
 
 # # try with another simple program with Toffoli gates.
-# # this decomposition, doesn't work over control flow.
-# # try defining if with those ugly cond ops.
 
 
-# @qjit(autograph=True, keep_intermediate=2, capture=True)
-# # @qp.transform(pass_name="phase-folding")
-# @phase_folding(report=True)
-# @qp.qnode(device=qp.device("lightning.qubit", wires=2))
-# def test_state_prep(x: float):
-#     # qp.StatePrep([0, 1], wires=1)
-#     # qp.BasisState(1, wires=1)   # becomes dynamic, so not yet
-#     qp.BasisState(0, wires=1)
-#     qp.T(1)
-#     qp.CNOT([0, 1])
-#     qp.T(0)
-#     qp.T(1)
+@qjit(autograph=True, keep_intermediate=2, capture=False)
+# @phase_folding(report_stats=True, trace_abstraction=True)
+@qp.transform(pass_name="convert-to-value-semantics")
+@qp.transform(pass_name="convert-to-reference-semantics")
+@qp.qnode(device=qp.device("null.qubit", wires=257))
+def grover_pf(x: int):
+    n = 7
+    a = 2**n
+    trgt = 2 * a
 
-#     # if x > 1.4:
-#     #     qp.X(0)
-#     #     qp.H(1)
-#     # else:
-#     #     qp.Y(0)
-#     #     qp.RZ(0.3, 1)
-#     # qp.RZ(2.3, 0)
+    print(n)
+    print(a)
+    print(trgt)
+    qp.X(trgt)
 
-#     return qp.probs()
+    for i in range(x):
+        # Superposition
+        for j in range(a):
+            qp.H(j)
 
-# add the option to trace the model throughout the analyses
+        # Oracle
+        CCX(0, 1, a)
+        for j in range(a - 4):
+            CCX(j + 2, a + j, a + j + 1)
+        qp.H(trgt)
+        CCX(a - 1, a + a - 3, trgt)
+        qp.H(trgt)
+        for j in range(a - 4):
+            CCX(j + 2, a + j, a + j + 1)
+        CCX(0, 1, a)
+
+        # Diffusion
+        for j in range(a):
+            qp.H(j)
+            qp.X(j)
+        CCX(0, 1, a)
+        for j in range(a - 4):
+            CCX(j + 2, a + j, a + j + 1)
+        qp.H(a - 1)
+        CCX(a - 2, a + a - 4, a - 1)
+        qp.H(a - 1)
+        for j in range(a - 4):
+            CCX(j + 2, a + j, a + j + 1)
+        CCX(0, 1, a)
+        for j in range(a):
+            qp.H(j)
+            qp.X(j)
+
+    return
+
+
+# a = rus_pf(10)
+# b = rus_qjit(10)
+# print(a)
+# print(b)
+# print(a == b)
+
+print(grover_pf(10))

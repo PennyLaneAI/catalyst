@@ -1,9 +1,9 @@
 import jax
 import pennylane as qp
-from catalyst import qjit
-from catalyst.passes import graph_decomposition
-from catalyst.jax_primitives import decomposition_rule
 
+from catalyst import qjit
+from catalyst.jax_primitives import decomposition_rule
+from catalyst.passes import graph_decomposition
 
 # @decomposition_rule(op_type=qp.Toffoli)
 # def decompose_toffoli(wires):
@@ -31,7 +31,6 @@ from catalyst.jax_primitives import decomposition_rule
 #     return qp.probs()
 
 # circuit_decomp(1.5)
-
 
 
 # @qp.qjit(autograph=True, keep_intermediate=2, capture=False)
@@ -76,6 +75,7 @@ def f1(x: float, wires):
         qp.H(wires[1])
     return
 
+
 @qjit(autograph=True, keep_intermediate=2, capture=True)
 @qp.transform(pass_name="convert-to-value-semantics")
 # @qp.transform(pass_name="phase-folding-qref")
@@ -85,7 +85,7 @@ def f1(x: float, wires):
 @qp.transforms.decompose(gate_set=clifford_rz_gates)
 @qp.qnode(device=qp.device("lightning.qubit", wires=3))
 def circ1(x: float):
-    qp.Toffoli(wires=[0,1,2])
+    qp.Toffoli(wires=[0, 1, 2])
     # if x > 1.4:
     #     qp.X(0)
     # else:

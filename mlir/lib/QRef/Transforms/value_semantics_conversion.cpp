@@ -1805,7 +1805,8 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
 
 //     static unsigned getHashValue(const rQubitGetOpInfo &val) {
 //         return hash_combine(hash_value(val.reg.getAsOpaquePointer()), val.idxAttr,
-//                             val.idx ? static_cast<size_t>(hash_value(val.idx.getAsOpaquePointer()))
+//                             val.idx ?
+//                             static_cast<size_t>(hash_value(val.idx.getAsOpaquePointer()))
 //                                     : 0);
 //     }
 

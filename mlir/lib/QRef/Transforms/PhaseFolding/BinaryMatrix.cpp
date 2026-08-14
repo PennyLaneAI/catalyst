@@ -19,14 +19,13 @@ using namespace catalyst::phase_folding;
 /*
     Static Factories:
 */
-BinaryMatrix BinaryMatrix::Identity(size_t numRows, std::optional<size_t> numBlocks)
-{
+BinaryMatrix BinaryMatrix::Identity(size_t numRows, std::optional<size_t> numBlocks) {
     size_t blocks = numBlocks.value_or(BitLocation::requiredBlockNum(numRows));
     BinaryMatrix mat(numRows);
     BitLocation loc(0, 0);
 
     for (size_t i = 0; i < numRows; ++i) {
-        Parity& curRow = mat.allocRow();
+        Parity &curRow = mat.allocRow();
         curRow.mkBasis(++loc, blocks);
     }
     return mat;
@@ -35,8 +34,7 @@ BinaryMatrix BinaryMatrix::Identity(size_t numRows, std::optional<size_t> numBlo
 /*
     Methods:
 */
-void BinaryMatrix::extendRowsFor(IdxView newVars, size_t maxBlock)
-{
+void BinaryMatrix::extendRowsFor(IdxView newVars, size_t maxBlock) {
     rows.reserve(getNumRows() + newVars.size());
     for (size_t i = 0; i < newVars.size(); ++i) {
         Parity &newRow = allocRow();
@@ -44,57 +42,59 @@ void BinaryMatrix::extendRowsFor(IdxView newVars, size_t maxBlock)
     }
 }
 
-bool BinaryMatrix::establishPivotAt(size_t pvtRow, BitLocation pvtCol)
-{
+std::pair<bool, size_t> BinaryMatrix::establishPivotAt(size_t pvtRow, BitLocation pvtCol,
+                                                       size_t trackingRow) {
     if (getRowAt(pvtRow).getBitAtLoc(pvtCol)) {
-        return true;
+        return {true, trackingRow};
     }
 
     const size_t rowNum = getNumRows();
     for (size_t i = pvtRow + 1; i < rowNum; ++i) {
         if (getRowAt(i).getBitAtLoc(pvtCol)) {
+
+            if (trackingRow != UNDIFINED_ROW) {
+                if (trackingRow == i) {
+                    trackingRow = pvtRow;
+                } else if (trackingRow == pvtRow) {
+                    trackingRow = i;
+                }
+            }
+
             swapRows(pvtRow, i);
-            return true;
+            return {true, trackingRow};
         }
     }
-    return false;
+    return {false, trackingRow};
 }
 
-void BinaryMatrix::forwardElimWrtPivot(size_t pvtRow, BitLocation pvtCol)
-{
+void BinaryMatrix::forwardElimWrtPivot(size_t pvtRow, BitLocation pvtCol) {
     const size_t rowNum = getNumRows();
     for (size_t i = pvtRow + 1; i < rowNum; ++i) {
         rowReduceWrtPivot(i, pvtRow, pvtCol);
     }
 }
 
-void BinaryMatrix::backwardElimWrtPivot(size_t pvtRow, BitLocation pvtCol)
-{
+void BinaryMatrix::backwardElimWrtPivot(size_t pvtRow, BitLocation pvtCol) {
     for (int i = pvtRow - 1; i >= 0; --i) {
         rowReduceWrtPivot(i, pvtRow, pvtCol);
     }
 }
 
-void BinaryMatrix::rowReduceWrtPivot(size_t row, size_t pvtRow, BitLocation pvtCol)
-{
+void BinaryMatrix::rowReduceWrtPivot(size_t row, size_t pvtRow, BitLocation pvtCol) {
     if (getRowAt(row).getBitAtLoc(pvtCol)) {
         addRowToRow(pvtRow, row);
     }
 }
 
-size_t BinaryMatrix::firstTrivialRow() const
-{
-    return findFirstRowIf([](const Parity& row) { 
-        return row.isTrivial(); 
-    });
+size_t BinaryMatrix::firstTrivialRow() const {
+    return findFirstRowIf([](const Parity &row) { return row.isTrivial(); });
 }
 
 /*
     Print:
 */
 namespace catalyst::phase_folding {
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BinaryMatrix &mat)
-{
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BinaryMatrix &mat) {
     for (auto it = mat.rows.begin(); it != mat.rows.end(); ++it) {
         os << *it << '\n';
     }

@@ -1936,6 +1936,7 @@ graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
 )
 
+
 def phase_folding(report_stats: bool = False, trace_abstraction: bool = False):
     r"""Apply phase-folding to reduce T-count on hybrid quantum-classical programs.
 
@@ -1986,13 +1987,11 @@ def phase_folding(report_stats: bool = False, trace_abstraction: bool = False):
         {
             "convert-to-reference-semantics": {},
             "cse": {},
-            "phase-folding": {
-                "report_stats": report_stats, 
-                "trace_abstraction": trace_abstraction
-            },
+            "phase-folding": {"report_stats": report_stats, "trace_abstraction": trace_abstraction},
             "convert-to-value-semantics": {},
         }
     )
+
 
 __all__ = [
     "cancel_inverses",

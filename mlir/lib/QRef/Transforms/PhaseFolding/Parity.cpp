@@ -18,8 +18,7 @@
 
 using namespace catalyst::phase_folding;
 
-BitLocation BitLocation::operator++()
-{
+BitLocation BitLocation::operator++() {
     bit++;
     if (bit == BLOCK_SIZE) {
         bit = 0;
@@ -28,8 +27,7 @@ BitLocation BitLocation::operator++()
     return *this;
 }
 
-BitLocation BitLocation::operator++(int)
-{
+BitLocation BitLocation::operator++(int) {
     BitLocation p = *this;
     ++(*this);
     return p;
@@ -38,8 +36,7 @@ BitLocation BitLocation::operator++(int)
 /*
     Constructors:
 */
-Parity Parity::eVec(size_t blockNum, BitLocation oneLoc)
-{
+Parity Parity::eVec(size_t blockNum, BitLocation oneLoc) {
     assert(oneLoc.block <= blockNum);
 
     Parity res = Parity(blockNum);
@@ -50,8 +47,7 @@ Parity Parity::eVec(size_t blockNum, BitLocation oneLoc)
 /*
     Operators:
 */
-bool Parity::operator==(const Parity &rhs) const
-{
+bool Parity::operator==(const Parity &rhs) const {
     if (state != rhs.state) {
         return false;
     }
@@ -61,8 +57,7 @@ bool Parity::operator==(const Parity &rhs) const
     return isEquivalentWithFromBlock(rhs, 0);
 }
 
-Parity &Parity::operator+=(const Parity &rhs)
-{
+Parity &Parity::operator+=(const Parity &rhs) {
     size_t minBlockNum = std::min(bits.size(), rhs.bits.size());
 
     for (size_t i = 0; i < minBlockNum; ++i) {
@@ -75,15 +70,13 @@ Parity &Parity::operator+=(const Parity &rhs)
     return *this;
 }
 
-Parity Parity::operator+(const Parity &rhs) const
-{
+Parity Parity::operator+(const Parity &rhs) const {
     Parity res = *this;
     res += rhs;
     return res;
 }
 
-std::string Parity::toString() const
-{
+std::string Parity::toString() const {
     std::string res = "";
     for (size_t i = 0; i < bits.size(); ++i) {
         for (size_t j = 0; j < BitLocation::BLOCK_SIZE; j++) {
@@ -96,18 +89,16 @@ std::string Parity::toString() const
 /*
     Setters:
 */
-void Parity::assignBitAtLoc(BitLocation loc, bool value)
-{
+void Parity::assignBitAtLoc(BitLocation loc, bool value) {
     if (loc.block >= bits.size()) {
-        bits.resize(loc.block + 1, 0);        
+        bits.resize(loc.block + 1, 0);
     }
-    
+
     uint64_t mask = 1ULL << loc.bit;
     bits[loc.block] = (bits[loc.block] & ~mask) | (static_cast<uint64_t>(value) << loc.bit);
 }
 
-void Parity::setBitAtLoc(BitLocation loc)
-{
+void Parity::setBitAtLoc(BitLocation loc) {
     if (loc.block >= bits.size()) {
         bits.resize(loc.block + 1, 0);
     }
@@ -115,8 +106,7 @@ void Parity::setBitAtLoc(BitLocation loc)
     bits[loc.block] |= (1ULL << loc.bit);
 }
 
-void Parity::clearBitAtLoc(BitLocation loc)
-{
+void Parity::clearBitAtLoc(BitLocation loc) {
     if (loc.block >= bits.size()) {
         bits.resize(loc.block + 1, 0);
         return;
@@ -125,8 +115,7 @@ void Parity::clearBitAtLoc(BitLocation loc)
     bits[loc.block] &= ~(1ULL << loc.bit);
 }
 
-void Parity::flipBitAtLoc(BitLocation loc)
-{
+void Parity::flipBitAtLoc(BitLocation loc) {
     if (loc.block >= bits.size()) {
         bits.resize(loc.block + 1, 0);
     }
@@ -137,8 +126,7 @@ void Parity::flipBitAtLoc(BitLocation loc)
 /*
     Methods:
 */
-void Parity::extendBitsFor(size_t newMaxBlock)
-{
+void Parity::extendBitsFor(size_t newMaxBlock) {
     const size_t newBlockNum = newMaxBlock + 1;
     if (bits.size() < newBlockNum) {
         bits.resize(newBlockNum, 0);
@@ -146,10 +134,9 @@ void Parity::extendBitsFor(size_t newMaxBlock)
 }
 /*
     Checks:
-*/ 
+*/
 
-bool Parity::isTrivialInBlocks(size_t fstBlock, size_t lstBlock) const
-{
+bool Parity::isTrivialInBlocks(size_t fstBlock, size_t lstBlock) const {
     for (size_t i = fstBlock; i < lstBlock; ++i) {
         if (bits[i] != 0) {
             return false;
@@ -160,8 +147,7 @@ bool Parity::isTrivialInBlocks(size_t fstBlock, size_t lstBlock) const
 
 // check if they are the same up to adding some 0 bits in the end.
 // (so they can be considered equal if we had added some path or new vaiables and now their 0)
-bool Parity::isEquivalentWithFromBlock(const Parity &rhs, size_t fstBlock) const
-{
+bool Parity::isEquivalentWithFromBlock(const Parity &rhs, size_t fstBlock) const {
     size_t minBlockNum = std::min(bits.size(), rhs.bits.size());
 
     for (size_t i = fstBlock; i < minBlockNum; ++i) {
@@ -185,14 +171,12 @@ bool Parity::isEquivalentWithFromBlock(const Parity &rhs, size_t fstBlock) const
 */
 namespace catalyst::phase_folding {
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BitLocation &bitLoc)
-{
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const BitLocation &bitLoc) {
     os << "(" << bitLoc.block << ", " << bitLoc.bit << ")";
     return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const IdxList &idxMap)
-{
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const IdxList &idxMap) {
     os << "[";
     for (size_t i = 0; i < idxMap.size(); ++i) {
         os << idxMap[i];
@@ -204,8 +188,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const IdxList &idxMap)
     return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, IdxView idxView)
-{
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, IdxView idxView) {
     os << "[";
     for (size_t i = 0; i < idxView.size(); ++i) {
         os << idxView[i];
@@ -217,8 +200,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, IdxView idxView)
     return os;
 }
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const Parity &par)
-{
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const Parity &par) {
     os << par.toString();
     return os;
 }

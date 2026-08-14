@@ -47,13 +47,13 @@ from catalyst.passes.builtin_passes import (
     merge_ppr_ppm,
     merge_rotations,
     parity_synth,
+    phase_folding,
     ppm_compilation,
     ppm_specs,
     ppr_to_mbqc,
     ppr_to_ppm,
     reduce_t_depth,
     to_ppr,
-    phase_folding,
 )
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
 

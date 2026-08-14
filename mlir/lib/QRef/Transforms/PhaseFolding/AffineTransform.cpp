@@ -19,8 +19,7 @@ using namespace catalyst::phase_folding;
 /*
     Print:
 */
-std::string AffineTransform::toString() const
-{
+std::string AffineTransform::toString() const {
     std::string res = "";
 
     for (size_t i = 0; i < matrix.getNumRows(); ++i) {
@@ -36,14 +35,12 @@ std::string AffineTransform::toString() const
 /*
     Methods:
 */
-void AffineTransform::extendQubitsBy(size_t addQubitNum)
-{
+void AffineTransform::extendQubitsBy(size_t addQubitNum) {
     IdxView newVars = schema.allocPreVars(addQubitNum);
     matrix.extendRowsFor(newVars, schema.maxBlock());
 }
 
-void AffineTransform::prepareQubit(size_t wire, bool basisState)
-{
+void AffineTransform::prepareQubit(size_t wire, bool basisState) {
     matrix.resetRow(wire, schema.affVal.block);
     if (basisState == 1) {
         matrix.getRowMutableAt(wire).setBitAtLoc(schema.affVal);
@@ -51,8 +48,7 @@ void AffineTransform::prepareQubit(size_t wire, bool basisState)
 }
 
 // uninterpreted gates.
-void AffineTransform::applyGateU(llvm::ArrayRef<size_t> wires)
-{
+void AffineTransform::applyGateU(llvm::ArrayRef<size_t> wires) {
     const size_t n = wires.size();
     IdxView auxVarLocs = schema.allocAuxVars(n);
 

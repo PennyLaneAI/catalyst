@@ -23,10 +23,11 @@ struct rQubitGetOpInfo {
     mlir::Value reg;
     int64_t idxAttr;
     mlir::Value idx;
-    
+
     rQubitGetOpInfo(mlir::Value _reg, mlir::Value _idx) : reg(_reg), idxAttr(-1), idx(_idx) {}
 
-    rQubitGetOpInfo(mlir::Value _reg, int64_t _idxAttr) : reg(_reg), idxAttr(_idxAttr), idx(nullptr) {}
+    rQubitGetOpInfo(mlir::Value _reg, int64_t _idxAttr)
+        : reg(_reg), idxAttr(_idxAttr), idx(nullptr) {}
 
     bool operator==(const rQubitGetOpInfo &other) const {
         return reg == other.reg && idxAttr == other.idxAttr && idx == other.idx;
@@ -35,24 +36,24 @@ struct rQubitGetOpInfo {
 
 namespace llvm {
 
-    // Boilerplate to enable using `rQubitGetOpInfo` as DenseMap keys.
-    template <> struct DenseMapInfo<rQubitGetOpInfo> {
-        static inline rQubitGetOpInfo getEmptyKey() {
-            return rQubitGetOpInfo(DenseMapInfo<mlir::Value>::getEmptyKey(), -1);
-        }
-    
-        static inline rQubitGetOpInfo getTombstoneKey() {
-            return rQubitGetOpInfo(DenseMapInfo<mlir::Value>::getTombstoneKey(), -2);
-        }
-    
-        static unsigned getHashValue(const rQubitGetOpInfo &val) {
-            return hash_combine(hash_value(val.reg.getAsOpaquePointer()), val.idxAttr,
-                                val.idx ? static_cast<size_t>(hash_value(val.idx.getAsOpaquePointer()))
-                                        : 0);
-        }
-    
-        static bool isEqual(const rQubitGetOpInfo &lhs, const rQubitGetOpInfo &rhs) {
-            return lhs == rhs;
-        }
-    };
+// Boilerplate to enable using `rQubitGetOpInfo` as DenseMap keys.
+template <> struct DenseMapInfo<rQubitGetOpInfo> {
+    static inline rQubitGetOpInfo getEmptyKey() {
+        return rQubitGetOpInfo(DenseMapInfo<mlir::Value>::getEmptyKey(), -1);
+    }
+
+    static inline rQubitGetOpInfo getTombstoneKey() {
+        return rQubitGetOpInfo(DenseMapInfo<mlir::Value>::getTombstoneKey(), -2);
+    }
+
+    static unsigned getHashValue(const rQubitGetOpInfo &val) {
+        return hash_combine(hash_value(val.reg.getAsOpaquePointer()), val.idxAttr,
+                            val.idx ? static_cast<size_t>(hash_value(val.idx.getAsOpaquePointer()))
+                                    : 0);
+    }
+
+    static bool isEqual(const rQubitGetOpInfo &lhs, const rQubitGetOpInfo &rhs) {
+        return lhs == rhs;
+    }
+};
 } // namespace llvm

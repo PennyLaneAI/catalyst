@@ -24,8 +24,7 @@ enum class Gate { I, H, X, Y, Z, S, T, RZ, CNOT, SWAP, U, GP };
 inline static constexpr size_t PRIMITIV_GATES_COUNT = 12;
 
 inline static constexpr size_t DYNAMIC_ARITY = 3;
-static constexpr size_t arity(Gate gate)
-{
+static constexpr size_t arity(Gate gate) {
     switch (gate) {
     case Gate::GP:
         return 0;
@@ -42,8 +41,7 @@ static constexpr size_t arity(Gate gate)
 
 inline static constexpr double PI = llvm::numbers::pi;
 inline static constexpr double UNKNOWN_ANGLE = -1.0;
-static constexpr double rotAngle(Gate gate)
-{
+static constexpr double rotAngle(Gate gate) {
     switch (gate) {
     case Gate::Z:
     case Gate::Y:
@@ -59,8 +57,7 @@ static constexpr double rotAngle(Gate gate)
     };
 }
 
-static constexpr Gate gateWithAngle(double angle)
-{
+static constexpr Gate gateWithAngle(double angle) {
     if (angle == 0.0) {
         return Gate::I;
     }
@@ -76,8 +73,7 @@ static constexpr Gate gateWithAngle(double angle)
     return Gate::RZ;
 }
 
-static constexpr bool isPhaseGate(Gate gate)
-{
+static constexpr bool isPhaseGate(Gate gate) {
     return ((gate == Gate::RZ) || (gate == Gate::T) || (gate == Gate::S) || (gate == Gate::Z) ||
             (gate == Gate::Y));
 }
@@ -86,8 +82,7 @@ inline static constexpr llvm::StringLiteral GATE_NAME[] = {
     "Identity", "Hadamard", "PauliX", "PauliY", "PauliZ", "S",
     "T",        "RZ",       "CNOT",   "SWAP",   "_",      "GlobalPhase"};
 
-static constexpr Gate gateWithName(llvm::StringRef gateName)
-{
+static constexpr Gate gateWithName(llvm::StringRef gateName) {
     for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
         if ((GATE_NAME[i] == gateName)) {
             return static_cast<Gate>(i);

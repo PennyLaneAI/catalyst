@@ -14,9 +14,9 @@
 
 #pragma once
 
-#include "AffineBase.hpp"
-
 #include "llvm/ADT/ArrayRef.h"
+
+#include "AffineBase.hpp"
 
 namespace catalyst::phase_folding {
 
@@ -24,16 +24,16 @@ class AffineTransform : public AffineBase<TransformSchema> {
   public:
     // Constructors
     AffineTransform() = default;
-    AffineTransform(BinaryMatrix matrix, TransformSchema schema) :
-        AffineBase<TransformSchema>(std::move(matrix), std::move(schema)) 
-    {}
-    explicit AffineTransform(size_t numQubits) : 
-        AffineTransform(BinaryMatrix::Identity(numQubits), TransformSchema(numQubits)) {} // Identity matrix by default
-    
+    AffineTransform(BinaryMatrix matrix, TransformSchema schema)
+        : AffineBase<TransformSchema>(std::move(matrix), std::move(schema)) {}
+    explicit AffineTransform(size_t numQubits)
+        : AffineTransform(BinaryMatrix::Identity(numQubits), TransformSchema(numQubits)) {
+    } // Identity matrix by default
+
     // Prints
     [[nodiscard]] std::string toString() const;
-    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AffineTransform &affTransform)
-    {
+    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                         const AffineTransform &affTransform) {
         os << affTransform.toString();
         return os;
     }
@@ -48,23 +48,19 @@ class AffineTransform : public AffineBase<TransformSchema> {
     void applyGateU(llvm::ArrayRef<size_t> wires);
 };
 
-inline void AffineTransform::applyGateX(size_t wire) 
-{
+inline void AffineTransform::applyGateX(size_t wire) {
     matrix.flipBitAtRowAtLoc(wire, schema.affVal);
 }
 
-inline void AffineTransform::applyGateCNOT(size_t controlWire, size_t targetWire)
-{
+inline void AffineTransform::applyGateCNOT(size_t controlWire, size_t targetWire) {
     matrix.addRowToRow(controlWire, targetWire);
 }
 
-inline void AffineTransform::applyGateSWAP(size_t wire1, size_t wire2)
-{
+inline void AffineTransform::applyGateSWAP(size_t wire1, size_t wire2) {
     matrix.swapRows(wire1, wire2);
 }
 
-inline void AffineTransform::applyGateH(size_t wire)
-{   
+inline void AffineTransform::applyGateH(size_t wire) {
     matrix.setRowToBasis(wire, schema.allocAuxVar());
 }
 

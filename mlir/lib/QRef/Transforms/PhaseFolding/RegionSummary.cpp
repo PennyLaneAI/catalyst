@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "RegionSummary.hpp"
+
 #include "ProgramAbstraction.hpp"
 
 using namespace catalyst::phase_folding;
@@ -20,8 +21,8 @@ using namespace catalyst::phase_folding;
 /*
     Constructors:
 */
-RegionSummary::RegionSummary(RegionType type, ProgramAbstraction &circ1, ProgramAbstraction *circ2)
-{
+RegionSummary::RegionSummary(RegionType type, ProgramAbstraction &circ1,
+                             ProgramAbstraction *circ2) {
     this->phasesSchm = circ1.getSchema();
     this->phases = std::move(circ1.phases);
     this->affineRel = AffineRelation(std::move(circ1.stateTransform));
@@ -41,8 +42,7 @@ RegionSummary::RegionSummary(RegionType type, ProgramAbstraction &circ1, Program
     }
 }
 
-void RegionSummary::summarizeCond(ProgramAbstraction *elseBody)
-{
+void RegionSummary::summarizeCond(ProgramAbstraction *elseBody) {
     AffineRelation elseRel;
     if (elseBody) {
         this->falseBranchPhasesSchm = elseBody->getSchema();
@@ -54,13 +54,9 @@ void RegionSummary::summarizeCond(ProgramAbstraction *elseBody)
     affineRel.joinWith(elseRel);
 }
 
-void RegionSummary::summarizeLoop()
-{
-    affineRel.applyKleeneStar();
-}
+void RegionSummary::summarizeLoop() { affineRel.applyKleeneStar(); }
 
-void RegionSummary::summarizeProc()
-{
+void RegionSummary::summarizeProc() {
     llvm::errs() << "summarizeProc...\n";
     affineRel.projectOutAuxVars();
     // llvm::errs() << "affineRel:\n" << affineRel << "\n";
@@ -71,8 +67,7 @@ void RegionSummary::summarizeProc()
 /*
     Methods:
 */
-void RegionSummary::nullifyPhasesUnder(const AffineRelation &precondRel)
-{
+void RegionSummary::nullifyPhasesUnder(const AffineRelation &precondRel) {
     phases.nullifyByPrecond(precondRel, phasesSchm);
 
     if (type == RegionType::Conditional) {
@@ -80,22 +75,21 @@ void RegionSummary::nullifyPhasesUnder(const AffineRelation &precondRel)
     }
 }
 
-void RegionSummary::accumulatePhasesInto(PhaseAbstraction &trgtPhases, const TransformSchema &trgtSchm)
-{
+void RegionSummary::accumulatePhasesInto(PhaseAbstraction &trgtPhases,
+                                         const TransformSchema &trgtSchm) {
     trgtPhases += phases;
 
     if (type == RegionType::Conditional) {
         trgtPhases += falseBranchPhases;
     }
-}   // += ops could become more optimized by actually consuming the phases
+} // += ops could become more optimized by actually consuming the phases
 
 /*
     Print:
 */
 namespace catalyst::phase_folding {
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const RegionSummary &sum)
-{
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const RegionSummary &sum) {
     os << ".Phase abstraction:\n" << sum.phases.toString(sum.affineRel.getSchema());
     if (sum.type == RegionType::Conditional) {
         os << "--\n" << sum.falseBranchPhases.toString(sum.affineRel.getSchema());

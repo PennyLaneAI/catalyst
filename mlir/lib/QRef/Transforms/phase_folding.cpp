@@ -835,10 +835,6 @@ struct PhaseFoldingPass : public impl::PhaseFoldingPassBase<PhaseFoldingPass> {
 } // namespace qref
 } // namespace catalyst
 
-// each module will have a single qnode, but a program can have multiple modules.
-
-// test with tof
-
 // if seeing allocOp, change the state to |0>
 // if seeing state preparation, change to x
     // can state preparation be called in the middle of the circuit?
