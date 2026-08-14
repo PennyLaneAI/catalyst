@@ -141,6 +141,10 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
     }
 
     std::memcpy(&request_slot_host_[0].p, in, sizeof(common::Payload));
+    // Each local GPU launch processes exactly one request (desc.total = 1), so the
+    // persistent kernel always waits for seq_num == 1 in slot 0. Normalize the
+    // request frame here instead of forwarding the controller's cross-round seq.
+    request_slot_host_[0].p.seq_num = 1;
 
     CoprocLaunchDesc desc{
         .ring = request_slot_dev_,
