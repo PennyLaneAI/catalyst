@@ -118,6 +118,7 @@ def _are_param_frequencies_same_as_catalyst(op):
 
 
 def _paramshift_op_checker(op):
+    #  sc-127798: otherwise test_ps_qft[capture=False-lightning.qubit-1.0] failed with TracerBoolConversionError
     if isinstance(op, qp.ControlledPhaseShift):
         return True
 
