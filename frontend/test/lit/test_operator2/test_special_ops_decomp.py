@@ -36,21 +36,21 @@ def test_multirz():
 
     @qp.qjit(capture=True, target="mlir")
     @qp.qnode(qp.device("null.qubit", wires=3))
-    def c():
+    def multirz():
         qp.MultiRZ(theta=0.1, wires=[0, 1])
         qp.MultiRZ(theta=0.2, wires=[2])
         return qp.state()
 
-    print(c.mlir)
+    print(multirz.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK: func.func public @multirz()
 # CHECK: qref.multirz({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.multirz({{%.+}}) {{%.+}} : !qref.bit
-# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:2}{}"
-# CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:2}{}"
-# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:1}{}"
-# CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:1}{}"
+# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:{{\[f64\]}}}{wires:2}{}"
+# CHECK-SAME:   target_gate = "MultiRZ{theta:{{\[f64\]}}}{wires:2}{}"
+# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:{{\[f64\]}}}{wires:1}{}"
+# CHECK-SAME:   target_gate = "MultiRZ{theta:{{\[f64\]}}}{wires:1}{}"
 test_multirz()
 
 
@@ -61,7 +61,7 @@ def test_paulirot():
 
     @qp.qjit(capture=True, target="mlir")
     @qp.qnode(qp.device("null.qubit", wires=3))
-    def c():
+    def paulirot():
         qp.PauliRot(theta=0.1, pauli_word="XX", wires=[0, 1])
         qp.PauliRot(theta=0.2, pauli_word="Z", wires=[2])
         # TODO: decomposition rule of Y PauliRot involves RX, which has not been migrated to
@@ -69,14 +69,14 @@ def test_paulirot():
         # qp.PauliRot(theta=0.2, pauli_word="YZX", wires=[0, 1, 2])
         return qp.state()
 
-    print(c.mlir)
+    print(paulirot.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK: func.func public @paulirot()
 # CHECK: qref.paulirot ["X", "X"]({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.paulirot ["Z"]({{%.+}}) {{%.+}} : !qref.bit
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:{{\[f64\]}}}{wires:2}{pauli_word:XX}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:{{\[f64\]}}}{wires:2}{pauli_word:XX}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:{{\[f64\]}}}{wires:1}{pauli_word:Z}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:{{\[f64\]}}}{wires:1}{pauli_word:Z}"
 test_paulirot()

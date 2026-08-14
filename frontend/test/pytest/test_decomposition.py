@@ -20,14 +20,29 @@ import jax.numpy as jnp
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
+from operator2_dummy_gates import (
+    CompilableData,
+    HybridOpArg,
+    HybridWires,
+    MultiParams,
+    MultipleRegisters,
+    MultiRZ,
+    NoParams,
+    NoParamsCustomOp,
+    PauliRot,
+    SingleParam,
+    StaticData,
+)
 from pennylane import qjit, qnode
 from pennylane.decomposition import add_decomps, local_decomps, register_resources
-from pennylane.typing import Float, Wire
+from pennylane.typing import Bool, Complex, Float, Int, Wire
+from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.decomposition_rules import (
     compile_decomposition_rules_wrapper,
 )
+from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.precompile_decomposition_rules import (
     get_abstract_args,
     precompile_decomp_rules,
@@ -89,10 +104,46 @@ class TestGenericUtilities:
         """Test mlir_stringify_type."""
         assert convert_types_to_mlir_strings(dtype) == expected
 
+    @pytest.mark.parametrize(
+        "op, id",
+        [
+            (NoParams(Wires(0)), "NoParams{}{reg:1}{}"),
+            (NoParamsCustomOp(Wires([0, 1])), "NoParamsCustomOp{}{wires:2}{}"),
+            (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[[f64]]}{reg:2}{}"),
+            (
+                CompilableData(True, 3.14, "string", Wires([0, 1])),
+                "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+            ),
+            (
+                MultipleRegisters(Wires([0, 1, 2]), Wires([3, 4])),
+                "MultipleRegisters{}{reg1:3,reg2:2}{}",
+            ),
+            (
+                MultiParams(Wires([0, 2, 3]), Complex, Int, Float[2]),
+                "MultiParams{a:[[complex<f64>]],b:[[i64]],c:[[f64,f64]]}{reg:3}",
+            ),
+            (MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{phi:[[f64]]}{wires:4}{}"),
+            (
+                PauliRot(Float, "XYZ", Wires([1, 2, 3])),
+                "PauliRot{phi:[[f64]]}{wires:3}{pauli_word:XYZ}",
+            ),
+            (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
+            (HybridWires(Wires([0, 1, 2])), "HybridWires{}{}{}["),  # NOTE: open brace to match uid
+            (
+                HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
+                "HybridOpArg{angle:[[f64]]}{cwires:2}{}[",  # NOTE: open brace to match uid
+            ),
+        ],
+    )
+    def test_GraphOpId(self, op, id):
+        """Test that GraphOpIds are generated correctly by the frontend."""
+        # NOTE: use startswith to match ops with uids/extra_data
+        assert GraphOpID(op).getID().startswith(id)
+
     def test_wrapper_operator(self):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
         # TODO: keep this up to date with an operator that is not migrated, and decomposes to
-        # un-migrated operators.
+        # un-migrated operators until migration is complete.
         with pytest.warns(match="Failed to get resources"):
             compile_decomposition_rules_wrapper(
                 "PauliX", 'PauliX{}{"wires":1}{}', {}, {"wires": 1}, {}

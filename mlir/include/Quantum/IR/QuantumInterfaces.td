@@ -182,7 +182,9 @@ def DifferentiableGate : OpInterface<"DifferentiableGate", [ParametrizedGate]> {
 
 def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
     let description = [{
-        This interface provides a generic way to query decomposition data from a quantum operation. An operation must implement this interface in order to compatible with the `graph-decomposition` pass. Note that implementing this interface does not guarantee that an operation will decomposed successfully, only that it will be registered with the graph.
+        This interface provides a generic way to query decomposition data from a quantum operation.
+        An operation must implement this interface in order to compatible with the `graph-decomposition` pass.
+        Note that implementing this interface does not guarantee that an operation will decomposed successfully, only that it will be registered with the graph.
     }];
 
     let cppNamespace = "::catalyst::quantum";

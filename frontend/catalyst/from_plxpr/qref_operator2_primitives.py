@@ -171,6 +171,8 @@ def _process_params(
         args_idx += hsize
 
     param_map = get_mlir_attribute_from_pyval(param_map) if param_map else None
+    for param in params:
+        assert isinstance(param.type, ir.RankedTensorType)
     return params, forward_params, param_map
 
 
