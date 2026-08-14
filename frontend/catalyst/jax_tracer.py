@@ -911,7 +911,7 @@ def trace_quantum_operations(
             # We will revisit this once we have a better solution for
             # supporting general PL operations in Catalyst.
             params = op.parameters
-            pcphase_dim = op.hyperparameters["dimension"][0] if isinstance(op, qp.PCPhase) else None
+            pcphase_dim = op.compilable_args["dim"] if isinstance(op, qp.PCPhase) else None
 
             qubits2 = qinst_p.bind(
                 *[*qubits, *params, *controlled_qubits, *controlled_values],
