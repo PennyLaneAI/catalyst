@@ -215,6 +215,28 @@ class TestTraceTime:
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
 
+    def test_adjoint_gate_captures_base_and_adjoint(self):
+        """Lowering the Adjoint of a gate captures the rules registered against both the plain gate
+        and its adjoint."""
+        from operator2_dummy_gates import NoParams
+
+        base_rule, adj_rule = self._base_and_adjoint_rules()
+        with local_decomps():
+            add_decomps(NoParams, base_rule)
+            add_decomps("Adjoint(NoParams)", adj_rule)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                qp.adjoint(NoParams(reg=[0, 1]))
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'qref.operator "NoParams"() adj' in mlir
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+
     def test_no_adjoint_rule_registered(self):
         """When no Adjoint(Op) rule is registered, only the base rule is lowered (default)."""
         from operator2_dummy_gates import NoParams
@@ -233,7 +255,6 @@ class TestTraceTime:
 
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert "Adjoint(" not in mlir
-
 
 
 class TestOnDemand:
