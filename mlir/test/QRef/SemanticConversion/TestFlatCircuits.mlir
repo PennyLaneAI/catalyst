@@ -573,9 +573,14 @@ func.func @test_ctrl_op() attributes {quantum.node}
         // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[HADAMARD]], %arg1 : !quantum.bit, !quantum.bit
         // CHECK: quantum.yield [[CNOT]]#0, [[CNOT]]#1 : !quantum.bit, !quantum.bit
     }
-    // CHECK: [[insert_ctrl:%.+]] = quantum.insert [[ctrl_reg]][ 0], [[out_ctrl_qubit]] : !quantum.reg, !quantum.bit
-    // CHECK: [[insert0:%.+]] = quantum.insert [[target_reg]][ 0], [[out_qubits]]#0 : !quantum.reg, !quantum.bit
-    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[out_qubits]]#1 : !quantum.reg, !quantum.bit
+
+    // CHECK: [[out:%.+]]:3 = quantum.custom "3gate"() [[out_ctrl_qubit]], [[out_qubits]]#0, [[out_qubits]]#1
+    %q0 = qref.get %r[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %r[1] : !qref.reg<2> -> !qref.bit
+    qref.custom "3gate"() %ctrl_bit, %q0, %q1 : !qref.bit, !qref.bit, !qref.bit
+    // CHECK: [[insert_ctrl:%.+]] = quantum.insert [[ctrl_reg]][ 0], [[out]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert0:%.+]] = quantum.insert [[target_reg]][ 0], [[out]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[out]]#2 : !quantum.reg, !quantum.bit
 
     // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
     // CHECK: quantum.dealloc [[insert_ctrl]] : !quantum.reg
