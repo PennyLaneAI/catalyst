@@ -171,7 +171,49 @@ class TestPrecompiled:
 
 
 class TestTraceTime:
-    """Placeholder for future tests of trace-time decomposition rule lowering."""
+    """Tests of trace-time decomposition rule lowering."""
+
+    @staticmethod
+    def _base_and_adjoint_rules():
+        from operator2_dummy_gates import SingleParam
+
+        def base_resource_fn(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 1}
+
+        @register_resources(base_resource_fn)
+        def base_rule(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+
+        def adj_resource_fn(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 2}
+
+        @register_resources(adj_resource_fn)
+        def adj_rule(reg):
+            SingleParam(x=0.2, reg=reg[0:2])
+            SingleParam(x=0.3, reg=reg[0:2])
+
+        return base_rule, adj_rule
+
+    def test_plain_gate_captures_base_and_adjoint(self):
+        """Lowering a plain gate captures the rules registered against both the gate
+        and its adjoint."""
+        from operator2_dummy_gates import NoParams
+
+        base_rule, adj_rule = self._base_and_adjoint_rules()
+        with local_decomps():
+            add_decomps(NoParams, base_rule)
+            add_decomps("Adjoint(NoParams)", adj_rule)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                NoParams(reg=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
 
 
 class TestOnDemand:
