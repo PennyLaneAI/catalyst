@@ -116,6 +116,12 @@ def _node_dict(node, role: str) -> dict:
     if executor is not None and getattr(executor, "address", None):
         d["address"] = executor.address
     init = node.init_args or {}
+    if unknown := sorted(set(init) - set(_INIT_KEYS)):
+        raise CompileError(
+            f"backline node has unrecognized init_args {unknown}; the recognized keys are "
+            f"{list(_INIT_KEYS)}. Settings the backend itself interprets go in 'config', as a "
+            f"'key=value;...' string."
+        )
     d.update({k: init[k] for k in _INIT_KEYS if k in init})
     return d
 
