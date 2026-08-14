@@ -593,6 +593,43 @@ func.func @test_ctrl_op() attributes {quantum.node}
 // -----
 
 
+// CHECK-LABEL: test_ctrl_op_single_qubit_alloc
+func.func @test_ctrl_op_single_qubit_alloc() attributes {quantum.node}
+{
+    // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
+    %true = llvm.mlir.constant (1 : i1) :i1
+
+    // CHECK: [[ctrl_bit:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[target_bit:%.+]] = quantum.alloc_qb : !quantum.bit
+    %ctrl_bit = qref.alloc_qb : !qref.bit
+    %target_bit = qref.alloc_qb : !qref.bit
+
+
+    // CHECK: [[out_ctrl_bit:%.+]], [[out_target_bit:%.+]] = quantum.ctrl([[ctrl_bit]]) ctrlvals([[true]])
+    // CHECK-SAME:   ([[target_bit]]) : !quantum.bit -> !quantum.bit {
+    // CHECK: ^bb0(%arg0: !quantum.bit):
+    qref.ctrl (%ctrl_bit) ctrlvals (%true){
+    ^bb0():
+        qref.custom "Hadamard"() %target_bit : !qref.bit
+
+        // CHECK: [[HADAMARD:%.+]] = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        // CHECK: quantum.yield [[HADAMARD]] : !quantum.bit
+    }
+
+    // CHECK: [[out:%.+]]:2 = quantum.custom "2gate"() [[out_ctrl_bit]], [[out_target_bit]]
+    qref.custom "2gate"() %ctrl_bit, %target_bit : !qref.bit, !qref.bit
+
+    // CHECK: quantum.dealloc_qb [[out]]#0 : !quantum.bit
+    // CHECK: quantum.dealloc_qb [[out]]#1 : !quantum.bit
+    qref.dealloc_qb %ctrl_bit : !qref.bit
+    qref.dealloc_qb %target_bit : !qref.bit
+    return
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_operator_qubits
 func.func @test_operator_qubits(%arg0: f64, %cv: i1, %fwd: i64) attributes {quantum.node} {
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
