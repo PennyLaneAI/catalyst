@@ -228,16 +228,10 @@ def _launch_executor(label, options):
 
 def _realize_executor(node):
     """Return the node's launched executor, building it on first use."""
-    from pennylane.backline import ExecutorSpec
-
     executor = getattr(node, "executor", None)
-    if executor is not None and not isinstance(executor, ExecutorSpec):
+    if executor is not None:
         return executor  # already launched
-    options = (
-        executor.options
-        if isinstance(executor, ExecutorSpec)
-        else getattr(node, "executor_options", None)
-    )
+    options = getattr(node, "executor_options", None)
     if options is None:
         return None
     executor = _launch_executor(getattr(node, "label", None), dict(options))
