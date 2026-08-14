@@ -915,7 +915,10 @@ def test_ps_probs(backend, capture_mode):
         pytest.param(
             (qp.CRot, [1, 2, 3]),
             marks=pytest.mark.xfail(
-                reason="Operator2 CRot decomposition emits unsupported complex lowering"
+                reason=(
+                    "MemrefToLLVMWithTBAAPass cannot legalize the complex<f64> "
+                    "memref.load generated from the CRot decomposition [sc-127749]"
+                )
             ),
         ),
     ],
