@@ -28,7 +28,7 @@
 // CHECK:         memref.load %[[REP]]
 // CHECK-NOT:     memref.dealloc
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18590 : i16>,
+  controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18590 : i16, in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @qec_circuit(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<3xi1>) -> index {
     %c0 = arith.constant 0 : index
@@ -49,7 +49,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
 // CHECK:         qecp.decode_esm_css
 // CHECK-NOT:     {{[^#]}}transport.
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18590 : i16>>} {
+  controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18590 : i16, in_bytes = 8 : i64, out_bytes = 8 : i64>>} {
   func.func @controller_only(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<?xi1>, %erridx: memref<?xindex>) {
     qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<?xindex>) : memref<?xi1>
     return
@@ -79,7 +79,7 @@ module {
 // CHECK:         qecp.decode_esm_css
 // CHECK-NOT:     {{[^#]}}transport.
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", config = "c">,
+  controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @not_bufferized(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: tensor<2xi1>) -> tensor<1xindex> {
     %erridx = qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm : tensor<2xi1> -> tensor<1xindex>
@@ -95,7 +95,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
 // CHECK:         transport.get_session {key = "cop0"} : !transport.session<controller>
 // CHECK:         transport.get_session {key = "cop1"} : !transport.session<controller>
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", config = "c">,
+  controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">,
                   #transport.node<backend_lib = "x", config = "c", name = "cop1", peer = "10.0.0.2", symbol = "decode">]>} {
   func.func @qec_circuit(%tanner: !qecp.tanner_graph<8, 6, i32>,
@@ -116,7 +116,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
 // CHECK-NOT:     transport.reply_slot
 // CHECK:         transport.collect %{{.*}}, %arg2 : !transport.session<controller>, memref<1xindex>
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", config = "c">,
+  controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @qec_circuit_out_param(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<3xi1>,
                                    %erridx: memref<1xindex>) {
@@ -136,7 +136,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
 // CHECK:         %[[SZ:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
 // CHECK:         transport.stage_payload %[[SZ]], %{{.*}} {decoder_id = 1 : i32}
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", config = "c">,
+  controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @qec_cycle_css(%tannerX: !qecp.tanner_graph<8, 6, i32>,
                            %tannerZ: !qecp.tanner_graph<8, 6, i32>,
@@ -157,7 +157,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
 // CHECK-NOT:     transport.reply_slot
 // CHECK:         transport.collect %{{.*}}, %{{.*}} : !transport.session<controller>, memref<?xindex>
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", config = "c">,
+  controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @qec_circuit_dynamic(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<?xi1>, %erridx: memref<?xindex>) {
     qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<?xindex>) : memref<?xi1>
@@ -174,7 +174,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
 // CHECK:         transport.stage_payload
 // CHECK-NOT:     decoder_id
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", config = "c">,
+  controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @untagged(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<?xi1>, %erridx: memref<?xindex>) {
     qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%erridx : memref<?xindex>) : memref<?xi1>

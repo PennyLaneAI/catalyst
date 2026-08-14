@@ -58,12 +58,9 @@ bool NodeAttr::isRemote() const {
 
 static int64_t intOr(IntegerAttr field, int64_t dflt) { return field ? field.getInt() : dflt; }
 
-// Default per-message payload width, matching the current backend's defaults.
-constexpr int64_t kDefaultMessageBytes = 8;
-
 int64_t NodeAttr::oobPort() const { return intOr(getOobPort(), 0); }
-int64_t NodeAttr::inBytes() const { return intOr(getInBytes(), kDefaultMessageBytes); }
-int64_t NodeAttr::outBytes() const { return intOr(getOutBytes(), kDefaultMessageBytes); }
+int64_t NodeAttr::inBytes() const { return getInBytes().getInt(); }
+int64_t NodeAttr::outBytes() const { return getOutBytes().getInt(); }
 int64_t NodeAttr::workItemIdx() const { return intOr(getWorkItemIdx(), 0); }
 
 LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
@@ -102,6 +99,9 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                        << c.getAddress().getValue() << "')";
             }
         }
+    }
+    if (!controller.getInBytes() || !controller.getOutBytes()) {
+        return emitError() << "controller requires 'in_bytes' and 'out_bytes'";
     }
     return success();
 }
