@@ -91,7 +91,7 @@ def _has_grad_recipe(op):
 
 def _has_parameter_frequencies(op):
     try:
-        qp.gradients.parameter_frequencies(op)
+        _ = qp.gradients.parameter_frequencies(op)
     except qp.operation.ParameterFrequenciesUndefinedError:
         return False
     return True
