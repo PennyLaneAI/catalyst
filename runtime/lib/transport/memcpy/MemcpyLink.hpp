@@ -19,8 +19,6 @@
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <string>
-#include <unordered_map>
 
 #include "Transport.hpp"
 
@@ -47,31 +45,11 @@ struct MemcpyLink {
     ProcessMessage process_message;
 };
 
-inline auto acquire_memcpy_link(const ConnectInfo &info) -> std::shared_ptr<MemcpyLink> {
-    static std::mutex mu;
-    static std::unordered_map<std::string, std::weak_ptr<MemcpyLink>> links;
-
-    const std::string key = info.peer + ":" + std::to_string(info.oob_port);
-    std::lock_guard<std::mutex> lock(mu);
-
-    // Prune expired entries so churning keys don't accumulate.
-    for (auto it = links.begin(); it != links.end();) {
-        if (it->second.expired()) {
-            it = links.erase(it);
-        } else {
-            ++it;
-        }
-    }
-
-    if (auto it = links.find(key); it != links.end()) {
-        if (auto link = it->second.lock()) {
-            return link;
-        }
-    }
-
-    auto link = std::make_shared<MemcpyLink>();
-    links[key] = link;
-    return link;
-}
+// The registry backing `acquire_memcpy_link` lives in the dedicated
+// `libcatalyst_transport_memcpy_registry.so` so every memcpy plugin loaded into the process
+// sees the same (peer, oob_port) → MemcpyLink map. Compiling this function inline (per-plugin
+// TU) would give each dlopen'd plugin its own private copy of the static map, and controller +
+// coprocessor plugins would fail to pair.
+auto acquire_memcpy_link(const ConnectInfo &info) -> std::shared_ptr<MemcpyLink>;
 
 } // namespace catalyst::transport::memcpy
