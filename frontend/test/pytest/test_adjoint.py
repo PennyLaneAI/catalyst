@@ -1114,7 +1114,19 @@ class TestAdjointOperationDiffInfo:
         """Make sure the grad_method property of a Adjoint op is the same as the base op."""
         assert adjoint(op).grad_method == op.grad_method
 
-    @pytest.mark.parametrize("base", (qp.PauliX(0), qp.RX(1.234, wires=0)))
+    @pytest.mark.parametrize(
+        "base",
+        (
+            qp.PauliX(0),
+            qp.RX(1.234, wires=0),
+            pytest.param(
+                qp.Rot(1.234, 0.0, 0.0, wires=0),
+                marks=pytest.mark.xfail(
+                    reason="Operator2 Adjoint does not yet preserve Rot's gradient recipes"
+                ),
+            ),
+        ),
+    )
     def test_grad_recipe(self, base):
         """Test that the grad_recipe of the Adjoint is the same as the grad_recipe of the base."""
         assert adjoint(base).grad_recipe == base.grad_recipe
