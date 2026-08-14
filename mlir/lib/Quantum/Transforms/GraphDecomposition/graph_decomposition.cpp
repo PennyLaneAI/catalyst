@@ -460,8 +460,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 node.id = original.str();
                 return node;
             }
-            // Legacy form "Adjoint(Name)" optionally followed by a "(w,p)" suffix.
-            auto closeIdx = raw.rfind(')');
+            // FIXME: Currently, the legacy pipeline form "Adjoint(Name)" optionally followed by
+            // a "(w,p)" suffix (e.g. the "Adjoint(T)(1,0)" keys buildResourceDict emits).
+            // To fix this, Add the following find check to find the first ')' closes the base
+            // name and then a trailing "(w,p)" is parsed by the suffix handler below.
+            auto closeIdx = raw.find(')');
             if (closeIdx == llvm::StringRef::npos) {
                 node.name = "Adjoint(" + raw.trim().str() + ")";
                 return node;
