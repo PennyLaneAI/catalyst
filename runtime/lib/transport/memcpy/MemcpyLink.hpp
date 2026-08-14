@@ -19,8 +19,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <string>
-#include <unordered_map>
+#include <string_view>
 
 #include "Transport.hpp"
 
@@ -28,9 +27,10 @@ namespace catalyst::transport::memcpy {
 
 class CpuControllerSession;
 
-// In-process memcpy link keyed by (peer, oob_port). The coprocessor binds `process_message`;
-// the controller's kick() drives it inline. `mu` guards `controller` and `process_message`
-// across connect / kick / teardown.
+// In-process memcpy link keyed by the session pair key (computed once per controller/coprocessor
+// pair by inject-transport-session, plumbed through the CAPI as `pair=<key>` in the backend
+// config). The coprocessor binds `process_message`; the controller's kick() drives it inline.
+// `mu` guards `controller` and `process_message` across connect / kick / teardown.
 struct MemcpyLink {
     // Invoked once per controller kick(). Reads `in_len` bytes from `in` (a wire-shaped
     // `common::Payload` frame synthesized by the controller: value bytes at offset 0,
@@ -47,31 +47,15 @@ struct MemcpyLink {
     ProcessMessage process_message;
 };
 
-inline auto acquire_memcpy_link(const ConnectInfo &info) -> std::shared_ptr<MemcpyLink> {
-    static std::mutex mu;
-    static std::unordered_map<std::string, std::weak_ptr<MemcpyLink>> links;
+// The registry backing `acquire_memcpy_link` lives in the shared `libmemcpy_cpu_impl.so`
+// so every memcpy plugin loaded into the process sees the same pair-key → MemcpyLink map.
+// Compiling this function inline (per-plugin TU) would give each dlopen'd plugin its own
+// private copy of the static map, and controller + coprocessor plugins would fail to pair.
+auto acquire_memcpy_link(std::string_view pair_key) -> std::shared_ptr<MemcpyLink>;
 
-    const std::string key = info.peer + ":" + std::to_string(info.oob_port);
-    std::lock_guard<std::mutex> lock(mu);
-
-    // Prune expired entries so churning keys don't accumulate.
-    for (auto it = links.begin(); it != links.end();) {
-        if (it->second.expired()) {
-            it = links.erase(it);
-        } else {
-            ++it;
-        }
-    }
-
-    if (auto it = links.find(key); it != links.end()) {
-        if (auto link = it->second.lock()) {
-            return link;
-        }
-    }
-
-    auto link = std::make_shared<MemcpyLink>();
-    links[key] = link;
-    return link;
-}
+// Extract the value of `pair=<key>` from a backend config string ("k1=v1;k2=v2;..."). The
+// CAPI folds the session's compiler-emitted pair key into config on every create; this helper
+// reads it back on the backend side.
+auto parse_pair_key(std::string_view config) -> std::string;
 
 } // namespace catalyst::transport::memcpy

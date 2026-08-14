@@ -39,23 +39,26 @@ CpuCoprocessorSession::~CpuCoprocessorSession() {
     }
 }
 
-int CpuCoprocessorSession::connect(const ConnectInfo &info) {
-    link_ = acquire_memcpy_link(info);
-    std::lock_guard<std::mutex> lock(link_->mu);
-    if (link_->process_message) {
-        throw std::runtime_error(
-            "memcpy: another coprocessor is already bound to this endpoint (peer, oob_port)");
+int CpuCoprocessorSession::connect(const ConnectInfo & /*info*/) {
+    // Only bind `link_` after the duplicate-binding check succeeds. If we assigned it up front
+    // and threw, the destructor would clear the incumbent coprocessor's binding on the way out.
+    auto candidate = acquire_memcpy_link(pair_key_);
+    std::lock_guard<std::mutex> lock(candidate->mu);
+    if (candidate->process_message) {
+        throw std::runtime_error("memcpy: another coprocessor is already bound to session pair '" +
+                                 pair_key_ + "'");
     }
-    link_->process_message = [this](const void *in, std::size_t in_len, void *out,
-                                    std::size_t out_cap) {
+    candidate->process_message = [this](const void *in, std::size_t in_len, void *out,
+                                        std::size_t out_cap) {
         return this->process_message(in, in_len, out, out_cap);
     };
+    link_ = std::move(candidate);
     return 0;
 }
 
 MemRegion CpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     if (kind != MemKind::CpuRam) {
-        throw std::runtime_error("memcpy: CPU-only for now; alloc_memory expects CpuRam");
+        throw std::runtime_error("CPU device can only allocate CpuRam");
     }
     caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
                                           : std::unique_ptr<std::byte[]>{});

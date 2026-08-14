@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "GpuRuntime.hpp"
@@ -31,7 +32,7 @@ namespace catalyst::transport::memcpy {
 
 class GpuCoprocessorSession : public CoprocessorSession {
   public:
-    explicit GpuCoprocessorSession(std::string = {}, int gpu_device = 0);
+    explicit GpuCoprocessorSession(const std::string &config = {}, int gpu_device = 0);
     ~GpuCoprocessorSession() override;
 
     // TransportSession
@@ -61,6 +62,7 @@ class GpuCoprocessorSession : public CoprocessorSession {
   private:
     void ensure_gpu_state();
 
+    std::string pair_key_;
     std::shared_ptr<MemcpyLink> link_;
 
     /// Owns the buffers backing MemRegions handed out by alloc_memory().
