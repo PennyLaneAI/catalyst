@@ -85,14 +85,14 @@ struct OperatorNodeHash {
 
 /**
  * @brief This represents the weighted target gateset for the graph decomposition problem.
+ *
+ * @note A modified operator should carry its modifier in the name (e.g. `Adjoint(RZ)`),
+ * mirroring its id, so it never matches a base gate-set entry (`RZ`) and must
+ * reach the gate set through its own rule.
  */
 struct WeightedGateset {
     std::unordered_map<std::string, double> ops;
 
-    // Membership is a plain lookup on the operator's name. A modified operator carries its modifier
-    // in the name (e.g. `Adjoint(RZ)`), mirroring its id, so it never matches a base gate-set entry
-    // (`RZ`) and must reach the gate set through its own rule -- correct for gates like `T`, whose
-    // adjoint is a distinct primitive. The solver stays free of any per-modifier field.
     [[nodiscard]] bool contains(const OperatorNode &op) const {
         return ops.find(op.name) != ops.end();
     }

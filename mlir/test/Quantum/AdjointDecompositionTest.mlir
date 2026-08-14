@@ -20,7 +20,6 @@
 // CHECK-LABEL: func.func @self_adjoint(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit
 func.func @self_adjoint(%q: !quantum.bit) -> !quantum.bit {
-  // The adjoint is consumed: a plain Hadamard remains (note the absence of `adj` before the `:`).
   // CHECK: %[[O:.*]] = quantum.custom "Hadamard"() %[[Q]] : !quantum.bit
   // CHECK: return %[[O]]
   %out = quantum.custom "Hadamard"() %q adj : !quantum.bit
@@ -35,39 +34,27 @@ func.func private @adj_h(%q: !quantum.bit) -> !quantum.bit
 
 // -----
 
-/// Adjoint(Op) is a DISTINCT node from Op: with both a base rule (on the plain id) and an adjoint
-/// rule (on the Adjoint(...) id) present, each op takes its own rule. This is what the folded
-/// graph-op-id adds; without it the two would collide on one key!
+/// An adjoint op must NOT fall back to a plain base-name rule.
 ///
-// CHECK-LABEL: func.func @distinct_from_base(
-// CHECK-SAME:  %[[Q0:.*]]: !quantum.bit, %[[Q1:.*]]: !quantum.bit
-func.func @distinct_from_base(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
-  // plain H takes the base rule -> PauliX
-  // CHECK: %[[A:.*]] = quantum.custom "PauliX"() %[[Q0]] : !quantum.bit
-  %a = quantum.custom "Hadamard"() %q0 : !quantum.bit
-  // Adjoint(H) takes the adjoint rule -> PauliZ (NOT the base PauliX rule)
-  // CHECK: %[[B:.*]] = quantum.custom "PauliZ"() %[[Q1]] : !quantum.bit
-  %b = quantum.custom "Hadamard"() %q1 adj : !quantum.bit
-  // CHECK: return %[[A]], %[[B]]
-  return %a, %b : !quantum.bit, !quantum.bit
+// CHECK-LABEL: func.func @no_base_rule_fallback(
+// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
+func.func @no_base_rule_fallback(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
+  // CHECK: %[[O:.*]] = quantum.custom "RX"(%[[T]]) %[[Q]] adj : !quantum.bit
+  // CHECK-NOT: PauliX
+  // CHECK: return %[[O]]
+  %out = quantum.custom "RX"(%theta) %q adj : !quantum.bit
+  return %out : !quantum.bit
 }
 
-func.func private @base_h(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Hadamard{}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+func.func private @plain_rx(%theta: f64, %q: !quantum.bit) -> !quantum.bit
+    attributes {target_gate = "RX", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "PauliX"() %q : !quantum.bit
-  return %o : !quantum.bit
-}
-
-func.func private @adj_h2(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(Hadamard{}{wires:1}{})", llvm.linkage = #llvm.linkage<internal>} {
-  %o = quantum.custom "PauliZ"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
 // -----
 
-/// Parametric adjoint of a basis gate: Adjoint(RZ)(theta) -> RZ(-theta). The negation lives in the
-/// rule body (the pass just inlines it).
+/// Parametric adjoint of a basis gate: Adjoint(RZ)(theta) -> RZ(-theta).
 ///
 // CHECK-LABEL: func.func @parametric_negation(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
@@ -88,8 +75,37 @@ func.func private @adj_rz(%theta: f64, %q: !quantum.bit) -> !quantum.bit
 
 // -----
 
-/// Non-self-adjoint discrete gate: S is not its own inverse, so Adjoint(S) needs an explicit rule
-/// (here S^dagger = PhaseShift(-pi/2)).
+/// Adjoint(Op) is a DISTINCT node from Op: with both a base rule (on the plain id) and an adjoint
+/// rule (on the Adjoint(...) id) present, each op takes its own rule.
+///
+// CHECK-LABEL: func.func @distinct_from_base(
+// CHECK-SAME:  %[[Q0:.*]]: !quantum.bit, %[[Q1:.*]]: !quantum.bit
+func.func @distinct_from_base(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+  // plain H takes the base rule -> PauliX
+  // CHECK: %[[A:.*]] = quantum.custom "PauliX"() %[[Q0]] : !quantum.bit
+  %a = quantum.custom "Hadamard"() %q0 : !quantum.bit
+  // Adjoint(H) takes the adjoint rule -> PauliZ
+  // CHECK: %[[B:.*]] = quantum.custom "PauliZ"() %[[Q1]] : !quantum.bit
+  %b = quantum.custom "Hadamard"() %q1 adj : !quantum.bit
+  // CHECK: return %[[A]], %[[B]]
+  return %a, %b : !quantum.bit, !quantum.bit
+}
+
+func.func private @base_h(%q: !quantum.bit) -> !quantum.bit
+    attributes {target_gate = "Hadamard{}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+  %o = quantum.custom "PauliX"() %q : !quantum.bit
+  return %o : !quantum.bit
+}
+
+func.func private @adj_h2(%q: !quantum.bit) -> !quantum.bit
+    attributes {target_gate = "Adjoint(Hadamard{}{wires:1}{})", llvm.linkage = #llvm.linkage<internal>} {
+  %o = quantum.custom "PauliZ"() %q : !quantum.bit
+  return %o : !quantum.bit
+}
+
+// -----
+
+/// Non-self-adjoint discrete gate: S is not its own inverse, so Adjoint(S) needs an explicit rule.
 ///
 // CHECK-LABEL: func.func @non_self_adjoint(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit
@@ -146,9 +162,7 @@ func.func private @adj_t(%q: !quantum.bit) -> !quantum.bit
 
 // -----
 
-/// A decomposition of a NON-adjoint gate can itself emit adjoint gates. MyGate -> H, Adjoint(T), H;
-/// the produced Adjoint(T) is then resolved by its own rule. This is the "decomposition that
-/// produces adjoint ops" case: an Adjoint(T) node appears even though no adjoint was at the top.
+/// A decomposition of a NON-adjoint gate can itself emit adjoint gates.
 ///
 // CHECK-LABEL: func.func @decomp_produces_adjoint(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit
@@ -174,28 +188,5 @@ func.func private @adj_t2(%q: !quantum.bit) -> !quantum.bit
     attributes {target_gate = "Adjoint(T{}{wires:1}{})", llvm.linkage = #llvm.linkage<internal>} {
   %angle = arith.constant -0.78539816339744828 : f64
   %o = quantum.custom "PhaseShift"(%angle) %q : !quantum.bit
-  return %o : !quantum.bit
-}
-
-// -----
-
-/// Guard: an adjoint op must NOT fall back to a plain base-name rule. With only a plain "RX" rule
-/// present (no Adjoint(RX) rule), Adjoint(RX) is left untouched rather than silently taking the
-/// non-adjoint decomposition.
-///
-// CHECK-LABEL: func.func @no_base_rule_fallback(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
-func.func @no_base_rule_fallback(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
-  // The op is unchanged: still an adjoint RX, NOT the PauliX the plain-RX rule would have produced.
-  // CHECK: %[[O:.*]] = quantum.custom "RX"(%[[T]]) %[[Q]] adj : !quantum.bit
-  // CHECK-NOT: PauliX
-  // CHECK: return %[[O]]
-  %out = quantum.custom "RX"(%theta) %q adj : !quantum.bit
-  return %out : !quantum.bit
-}
-
-func.func private @plain_rx(%theta: f64, %q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "RX", llvm.linkage = #llvm.linkage<internal>} {
-  %o = quantum.custom "PauliX"() %q : !quantum.bit
   return %o : !quantum.bit
 }

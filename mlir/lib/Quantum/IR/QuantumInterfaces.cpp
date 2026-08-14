@@ -160,8 +160,9 @@ std::string defaultGetGraphOpId(Operation *op) {
     }
     ss.flush();
 
-    // Fold the adjoint modifier into the identity so that `Op` and `Adjoint(Op)` are distinct
-    // graph nodes over one key space.
+    // Fold the adjoint modifier into the identity so that `Op` and `Adjoint(Op)`
+    // are distinct in the graphOpId. Note that the modifier is now carried in
+    // the name, so the graph-solver never needs a modifier attribute.
     if (op->hasAttr("adjoint")) {
         return "Adjoint(" + out + ")";
     }
