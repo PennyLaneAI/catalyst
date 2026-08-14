@@ -53,7 +53,7 @@ int CpuControllerSession::connect(const ConnectInfo &info) {
 
 MemRegion CpuControllerSession::alloc_memory(std::size_t size, MemKind kind) {
     if (kind != MemKind::CpuRam) {
-        throw std::runtime_error("memcpy: CPU-only for now; alloc_memory expects CpuRam");
+        throw std::runtime_error("CPU device can only allocate CpuRam");
     }
     caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
                                           : std::unique_ptr<std::byte[]>{});
