@@ -425,6 +425,40 @@ def fetch_all_reachable_decomposition_rules_from_op(
         )
         this_extra_data = this_extra_data or {}
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
+        # Explore ops reachable through the rules of both this op and its adjoint:
+        for explore_name, _ in _op_variants(this_name, ""):
+            resources, _, _ = collect_resources_for_op(
+                explore_name, this_kwargs | this_static_data | this_extra_data
+            )
+            for _rule_name, resource in resources.items():
+                try:
+                    for op, _count in resource.items():
+                        graph_op_id = GraphOpID(op)
+                        probe = (
+                            graph_op_id.get_operator_name(),
+                            convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
+                            graph_op_id.wire_lens,
+                            graph_op_id.static_data,
+                            graph_op_id.extra_data,
+                        )
+
+                        if not probe in visited:
+                            visited.append(probe)
+                            queue.append(probe)
+                            rules.extend(
+                                compile_variants(
+                                    probe[0],
+                                    graph_op_id.getID(),
+                                    probe[1],
+                                    probe[2],
+                                    probe[3],
+                                    probe[4],
+                                )
+                            )
+                except Exception as e:
+                    warnings.warn(
+                        f"Failed to lower the {_rule_name} decomposition rule for {this_name}: {e}"
+                    )
                 continue
     return rules
 
