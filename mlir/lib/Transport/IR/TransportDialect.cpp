@@ -89,14 +89,12 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
             }
             // Both remote: they also have to sit on the same executor. Memcpy is in-process, so
             // "same node" for remote sessions means "same catalyst-executor address".
-            if (c.isRemote() &&
-                c.getAddress() && controller.getAddress() &&
+            if (c.isRemote() && c.getAddress() && controller.getAddress() &&
                 c.getAddress().getValue() != controller.getAddress().getValue()) {
-                return emitError()
-                       << "memcpy transport with remote nodes requires controller and "
-                          "coprocessor on the same executor address (got '"
-                       << controller.getAddress().getValue() << "' vs '"
-                       << c.getAddress().getValue() << "')";
+                return emitError() << "memcpy transport with remote nodes requires controller and "
+                                      "coprocessor on the same executor address (got '"
+                                   << controller.getAddress().getValue() << "' vs '"
+                                   << c.getAddress().getValue() << "')";
             }
         }
     }
