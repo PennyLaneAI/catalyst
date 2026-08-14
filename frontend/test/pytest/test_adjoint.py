@@ -268,6 +268,10 @@ class TestCatalyst:
 
     def test_adjoint_pcphase(self, backend):
         """Ensures that catalyst.adjoint supports PCPhase operations."""
+        if backend == "lightning.qubit":
+            pytest.xfail(
+                reason="Waiting for https://github.com/PennyLaneAI/pennylane-lightning/pull/1420"
+            )
 
         def func():
             qp.PauliX(0)
