@@ -110,7 +110,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 // CHECK:      func.func @teardown() {
 // CHECK-NEXT:   quantum.finalize
 // CHECK-NEXT:   return
-module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true>>} {
+module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true, in_bytes = 8 : i64, out_bytes = 8 : i64>>} {
   func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
     %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
     return %0 : tensor<4xf64>
@@ -335,7 +335,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "memcpy",
 // CHECK:         transport.destroy %{{.*}} : !transport.session<coprocessor>
 // CHECK:         catalyst.launch_kernel @module_ctrl::@teardown_transport()
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", remote = true, address = "h:1">,
+  controller = #transport.node<backend_lib = "x", remote = true, address = "h:1", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", oob_port = 18560 : i16, symbol = "foo", name = "cop0">]>} {
   func.func public @jit_circuit() attributes {llvm.emit_c_interface} {
     catalyst.launch_kernel @module_ctrl::@circuit() : () -> ()
@@ -365,7 +365,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
 // CHECK-NEXT:    catalyst.launch_kernel @module_coproc::@coproc_stop()
 // CHECK:         transport.destroy %{{.*}} : !transport.session<controller>
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x">,
+  controller = #transport.node<backend_lib = "x", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", oob_port = 18560 : i16, symbol = "foo", name = "cop0", remote = true, address = "h:2", triple = "x86_64-unknown-linux-gnu">]>} {
   func.func public @jit_circuit() attributes {llvm.emit_c_interface} {
     return

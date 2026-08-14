@@ -40,11 +40,11 @@ def _controller(**kw):
     init = {
         "backend_lib": "backend.so",
         "config": "cfg",
-        "in_bytes": 3,
-        "out_bytes": 8,
     }
     if kw.pop("remote", False):
         kw.setdefault("executor", SimpleNamespace(address=None, triple=None))
+    kw.setdefault("in_bytes", 3)
+    kw.setdefault("out_bytes", 8)
     kw.setdefault("init_args", init)
     return qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", **kw)
 
@@ -69,15 +69,15 @@ def test_controller_node_mapping():
     assert "peer" not in ctrl and "oob_port" not in ctrl
 
 
-def test_message_sizes_can_use_compiler_defaults():
-    """Omitted message sizes are left for the transport dialect's 8-byte defaults."""
+def test_default_message_sizes_are_serialized():
+    """PennyLane's message-size defaults are explicit in the transport configuration."""
     controller = qp.Controller(init_args={"backend_lib": "backend.so"})
     node = serialize_backline(qp.Backline(controller=controller, transport="rdma").placement)[
         "controller"
     ]
 
-    assert "in_bytes" not in node
-    assert "out_bytes" not in node
+    assert node["in_bytes"] == 8
+    assert node["out_bytes"] == 8
 
 
 def test_coprocessor_endpoint_mapping():

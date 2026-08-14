@@ -65,3 +65,13 @@ module attributes {catalyst.backline = #transport.backline<transport = "memcpy",
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
 }
+
+// -----
+
+// Message sizes are resolved by the frontend and must be explicit in the compiler configuration.
+
+// expected-error @below {{controller requires 'in_bytes' and 'out_bytes'}}
+module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x">>} {
+  func.func @setup() { quantum.init  return }
+  func.func @teardown() { quantum.finalize  return }
+}

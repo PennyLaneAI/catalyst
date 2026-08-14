@@ -127,7 +127,7 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         /// True only when `remote` is present and set.
         bool isRemote() const;
 
-        /// Integer fields, with the defaults applied.
+        /// Integer field accessors.
         int64_t oobPort() const;
         int64_t inBytes() const;
         int64_t outBytes() const;

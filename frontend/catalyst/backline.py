@@ -27,7 +27,7 @@ from catalyst.device.qjit_device import extract_backend_info
 from catalyst.utils.runtime_environment import get_lib_path
 
 # Backend hints forwarded verbatim from a node's ``init_args`` to the attribute node.
-_INIT_KEYS = ("backend_lib", "config", "in_bytes", "out_bytes")
+_INIT_KEYS = ("backend_lib", "config")
 
 # Concrete runtime backends are a Catalyst implementation detail. PennyLane describes only the
 # transport protocol and the hardware on which each node runs.
@@ -127,6 +127,9 @@ def _node_dict(node, role: str, transport: str) -> dict:
     d: dict = {"remote": bool(node.remote)}
     if node.name is not None:
         d["name"] = node.name
+    if role == "controller":
+        d["in_bytes"] = node.in_bytes
+        d["out_bytes"] = node.out_bytes
     comm_host = getattr(node, "comm_host", None)
     if comm_host is not None:
         d["peer"] = comm_host
