@@ -263,3 +263,57 @@ def grover_5(x: int):
         diffusion()
 
     return
+
+@qjit(autograph=False, keep_intermediate=0, capture=False)
+@phase_folding(report_stats=True, trace_abstraction=False)
+# @qp.transform(pass_name="convert-to-value-semantics")
+# @qp.transform(pass_name="convert-to-reference-semantics")
+@qp.qnode(device=qp.device("null.qubit", wires=65))
+def grover_pf_5_loopless():
+    n = 5
+    a = 2**n
+    trgt = 2 * a
+    x = 1
+
+    print(n)
+    print(a)
+    print(trgt)
+    qp.X(trgt)
+
+    @loop
+    for i in range(x):
+        # Superposition
+        for j in range(a):
+            qp.H(j)
+
+        # Oracle
+        CCX(0, 1, a)
+        for j in range(a - 4):
+            CCX(j + 2, a + j, a + j + 1)
+        qp.H(trgt)
+        CCX(a - 1, a + a - 3, trgt)
+        qp.H(trgt)
+        for j in range(a - 4):
+            CCX(j + 2, a + j, a + j + 1)
+        CCX(0, 1, a)
+
+        # Diffusion
+        for j in range(a):
+            qp.H(j)
+            qp.X(j)
+        CCX(0, 1, a)
+        for j in range(a - 4):
+            CCX(j + 2, a + j, a + j + 1)
+        qp.H(a - 1)
+        CCX(a - 2, a + a - 4, a - 1)
+        qp.H(a - 1)
+        for j in range(a - 4):
+            CCX(j + 2, a + j, a + j + 1)
+        CCX(0, 1, a)
+        for j in range(a):
+            qp.H(j)
+            qp.X(j)
+
+    return
+
+# print(qp.spec(grover_pf)())

@@ -188,3 +188,22 @@ def circuit_ex425():
 
 # print("=== Generated MLIR ===")
 # print(circuit.mlir)
+
+# @qjit(autograph=True, keep_intermediate=2, capture=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
+# # @qp.transforms.decompose(gate_set=clifford_rz_gates)
+# @qp.qnode(device=qp.device("lightning.qubit", wires=3))
+# def circ1(x: float):
+#     # Toffoli(0, 1, 2)
+
+#     qp.RZ(1.2, 0)
+#     if x > 1.4:
+#         qp.X(0)
+#         qp.H(1)
+#     else:
+#         qp.Y(0)
+#         qp.RZ(0.3, 1)
+#     qp.RZ(2.3, 0)
+
+#     # Toffoli(2, 1, 0)
+#     return qp.probs()

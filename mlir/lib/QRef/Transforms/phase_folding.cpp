@@ -63,7 +63,7 @@ struct GateStatsHolder {
     {
         os << "Stats:\n";
         for (size_t i = 0; i < PRIMITIV_GATES_COUNT; i++) {
-            if (insertedGateCount[i] != 0) {
+            if (initialGateCount[i] != 0 || insertedGateCount[i] != 0) {
                 os << GATE_NAME[i] << ": initial-> " << initialGateCount[i]
                              << ",  final-> " << (initialGateCount[i] + insertedGateCount[i])
                              << ". difference-> " << insertedGateCount[i] << "\n";
