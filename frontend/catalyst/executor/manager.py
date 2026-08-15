@@ -356,7 +356,7 @@ class Executor:
 
     def _remote_maker(self) -> Callable[[int], _ExecutorProcess]:
         """``make(port) -> _RemoteProcess`` closure. Runs the one-time prep (sudo resolve, scp)
-        so port retries reuse the same auth context — no re-prompt, no re-scp."""
+        so port retries reuse the same auth context with no re-prompt or re-scp."""
         user, host, workspace = self._remote_target()
         ws_pinned = self._cfg.workspace is not None  # pinned dirs are left in place on teardown
         sudo_pw = (
