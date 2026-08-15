@@ -246,19 +246,11 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
     assert isinstance(callable_, qp.QNode), "This function expects qnodes"
 
     name = "module_" + callable_.__name__
-    backline_role = get_backline_role(callable_.device)
-    target = None if backline_role else get_target(callable_.device)
-    dispatch = None if backline_role else get_dispatch(callable_.device)
+    device_attrs = module_attributes(callable_.device)
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
-        if target is not None:
-            fields = {k: v for k, v in dataclasses.asdict(target).items() if v is not None}
-            module.operation.attributes["catalyst.target"] = get_mlir_attribute_from_pyval(fields)
-        if dispatch is not None:
-            fields = {k: v for k, v in dataclasses.asdict(dispatch).items() if v is not None}
-            module.operation.attributes["catalyst.dispatch"] = get_mlir_attribute_from_pyval(fields)
-        if backline_role is not None:
-            module.operation.attributes["catalyst.backline_role"] = ir.StringAttr.get(backline_role)
+        for attr_name, value in device_attrs.items():
+            module.operation.attributes[attr_name] = get_mlir_attribute_from_pyval(value)
         transform_module_lowering(ctx, pipelines)
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines)
