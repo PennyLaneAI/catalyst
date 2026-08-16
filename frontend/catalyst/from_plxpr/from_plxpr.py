@@ -37,6 +37,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_dealloc_p,
 )
+from catalyst.backline import device_pass_pipeline
 from catalyst.jax_extras import deduce_avals, make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
@@ -307,7 +308,10 @@ def handle_qnode(
         gateset = [to_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
         gateset = list(sorted(gateset))  # consistent ordering for testing
         setattr(qnode, "decompose_gatesets", [gateset])
-    pipelines = (("main", tuple(self._pass_pipeline)),)
+    # The device may require passes of its own, e.g. a backline placement naming a QEC code implies
+    # implicit encoding applied to it. Therefore we append the pass pipeline with the qec lowering 
+    # psses.
+    pipelines = (("main", tuple(self._pass_pipeline) + device_pass_pipeline(qnode.device)),)
     if not self._skip_preprocess:
         device_preprocessing_pipeline = create_device_preprocessing_pipeline(
             qnode.device, execution_config, shots, warn=self._preprocess_warn

@@ -14,7 +14,6 @@
 """This module contains some helper functions for translating JAX primitives to MLIR."""
 
 import copy
-import dataclasses
 import functools
 
 import pennylane as qp
@@ -27,7 +26,7 @@ from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, Name
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 from pennylane.transforms.core import BoundTransform
 
-from catalyst.api_extensions.target import get_backline_role, get_dispatch, get_target
+from catalyst.backline import module_attributes
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.passes import PassPlugin
 
