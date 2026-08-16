@@ -35,7 +35,12 @@ from jax.tree_util import tree_flatten, tree_unflatten
 
 import catalyst
 from catalyst.autograph import run_autograph
-from catalyst.backline import attach_backline_attr, configure, dispatching, find_placement
+from catalyst.backline import (
+    attach_backline_attr,
+    configure,
+    find_placement,
+    launch_executors,
+)
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
@@ -974,8 +979,9 @@ class QJIT(CatalystCallable):
         Returns:
             Any: results of the execution arranged into the original function's output PyTrees
         """
-        with dispatching(self._placement):
-            results = self.compiled_function(*args, **kwargs)
+        # Deploy the executors the program dispatches to specified by the placement.
+        launch_executors(self._placement)
+        results = self.compiled_function(*args, **kwargs)
 
         # TODO: Move this to the compiled function object.
         return tree_unflatten(self.out_treedef, results)
