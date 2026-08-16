@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "TransportABI.h"
 #include "TransportCAPI.h"
@@ -173,6 +174,43 @@ CatalystWrapperResult finish(const Flat &in, Out &out) {
     return out.release();
 }
 
+CatalystWrapperResult finish_status(const Flat &in, Out &out, std::int32_t status,
+                                    const char *operation) {
+    if (!in.ok() || !out) {
+        return finish(in, out);
+    }
+    if (status != CATALYST_TRANSPORT_OK) {
+        std::string message = "transport: " + std::string(operation) + " failed (status " +
+                              std::to_string(status) + ")";
+        return wrapper_error(message.c_str());
+    }
+    return out.release();
+}
+
+CatalystWrapperResult finish_session(const Flat &in, Out &out, std::uintptr_t session,
+                                     const char *operation) {
+    if (!in.ok() || !out) {
+        return finish(in, out);
+    }
+    if (session == 0) {
+        std::string message = "transport: " + std::string(operation) + " failed (null session)";
+        return wrapper_error(message.c_str());
+    }
+    return out.release();
+}
+
+CatalystWrapperResult finish_token(const Flat &in, Out &out, std::int64_t token,
+                                   const char *operation) {
+    if (!in.ok() || !out) {
+        return finish(in, out);
+    }
+    if (token == 0) {
+        std::string message = "transport: " + std::string(operation) + " failed (invalid token)";
+        return wrapper_error(message.c_str());
+    }
+    return out.release();
+}
+
 constexpr std::size_t I32 = sizeof(std::int32_t);
 constexpr std::size_t I64 = sizeof(std::int64_t);
 constexpr std::size_t U64 = sizeof(std::uint64_t);
@@ -192,11 +230,13 @@ CatalystWrapperResult __catalyst__transport__create__wrapper(const char *buf, st
     auto role = in.get<std::int32_t>();
     const char *key = in.str();
     Out out(U64);
+    std::uintptr_t session = 0;
     if (in.ok() && out) {
-        *out.slot<std::uint64_t>() = reinterpret_cast<std::uintptr_t>(
+        session = reinterpret_cast<std::uintptr_t>(
             __catalyst__transport__create(library, config, role, key));
+        *out.slot<std::uint64_t>() = session;
     }
-    return finish(in, out);
+    return finish_session(in, out, session, "create");
 }
 
 CatalystWrapperResult __catalyst__transport__get_session__wrapper(const char *buf,
@@ -205,11 +245,12 @@ CatalystWrapperResult __catalyst__transport__get_session__wrapper(const char *bu
     auto role = in.get<std::int32_t>();
     const char *key = in.str();
     Out out(U64);
+    std::uintptr_t session = 0;
     if (in.ok() && out) {
-        *out.slot<std::uint64_t>() =
-            reinterpret_cast<std::uintptr_t>(__catalyst__transport__get_session(role, key));
+        session = reinterpret_cast<std::uintptr_t>(__catalyst__transport__get_session(role, key));
+        *out.slot<std::uint64_t>() = session;
     }
-    return finish(in, out);
+    return finish_session(in, out, session, "get_session");
 }
 
 //===----------------------------------------------------------------------===//
@@ -222,10 +263,12 @@ CatalystWrapperResult __catalyst__transport__connect__wrapper(const char *buf, s
     const char *peer = in.str();
     auto port = in.get<std::uint16_t>();
     Out out(I32);
+    std::int32_t status = CATALYST_TRANSPORT_OK;
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__connect(session, peer, port);
+        status = __catalyst__transport__connect(session, peer, port);
+        *out.slot<std::int32_t>() = status;
     }
-    return finish(in, out);
+    return finish_status(in, out, status, "connect");
 }
 
 CatalystWrapperResult __catalyst__transport__connect_async__wrapper(const char *buf,
@@ -235,10 +278,12 @@ CatalystWrapperResult __catalyst__transport__connect_async__wrapper(const char *
     const char *peer = in.str();
     auto port = in.get<std::uint16_t>();
     Out out(I64);
+    std::int64_t token = 0;
     if (in.ok() && out) {
-        *out.slot<std::int64_t>() = __catalyst__transport__connect_async(session, peer, port);
+        token = __catalyst__transport__connect_async(session, peer, port);
+        *out.slot<std::int64_t>() = token;
     }
-    return finish(in, out);
+    return finish_token(in, out, token, "connect_async");
 }
 
 CatalystWrapperResult __catalyst__transport__exchange_keys_async__wrapper(const char *buf,
@@ -246,20 +291,24 @@ CatalystWrapperResult __catalyst__transport__exchange_keys_async__wrapper(const 
     Flat in(buf, size);
     auto *session = in.session();
     Out out(I64);
+    std::int64_t token = 0;
     if (in.ok() && out) {
-        *out.slot<std::int64_t>() = __catalyst__transport__exchange_keys_async(session);
+        token = __catalyst__transport__exchange_keys_async(session);
+        *out.slot<std::int64_t>() = token;
     }
-    return finish(in, out);
+    return finish_token(in, out, token, "exchange_keys_async");
 }
 
 CatalystWrapperResult __catalyst__transport__await__wrapper(const char *buf, std::size_t size) {
     Flat in(buf, size);
     auto token = in.get<std::int64_t>();
     Out out(I32);
+    std::int32_t status = CATALYST_TRANSPORT_OK;
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__await(token);
+        status = __catalyst__transport__await(token);
+        *out.slot<std::int32_t>() = status;
     }
-    return finish(in, out);
+    return finish_status(in, out, status, "await");
 }
 
 CatalystWrapperResult __catalyst__transport__exchange_keys__wrapper(const char *buf,
@@ -267,10 +316,12 @@ CatalystWrapperResult __catalyst__transport__exchange_keys__wrapper(const char *
     Flat in(buf, size);
     auto *session = in.session();
     Out out(I32);
+    std::int32_t status = CATALYST_TRANSPORT_OK;
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__exchange_keys(session);
+        status = __catalyst__transport__exchange_keys(session);
+        *out.slot<std::int32_t>() = status;
     }
-    return finish(in, out);
+    return finish_status(in, out, status, "exchange_keys");
 }
 
 //===----------------------------------------------------------------------===//
@@ -283,10 +334,12 @@ CatalystWrapperResult __catalyst__transport__establish_channel__wrapper(const ch
     auto *session = in.session();
     const char *transport = in.str();
     Out out(I32);
+    std::int32_t status = CATALYST_TRANSPORT_OK;
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__establish_channel(session, transport);
+        status = __catalyst__transport__establish_channel(session, transport);
+        *out.slot<std::int32_t>() = status;
     }
-    return finish(in, out);
+    return finish_status(in, out, status, "establish_channel");
 }
 
 CatalystWrapperResult __catalyst__transport__set_coprocessor_fn__wrapper(const char *buf,
@@ -295,10 +348,12 @@ CatalystWrapperResult __catalyst__transport__set_coprocessor_fn__wrapper(const c
     auto *session = in.session();
     const char *symbol = in.str();
     Out out(I32);
+    std::int32_t status = CATALYST_TRANSPORT_OK;
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__set_coprocessor_fn(session, symbol);
+        status = __catalyst__transport__set_coprocessor_fn(session, symbol);
+        *out.slot<std::int32_t>() = status;
     }
-    return finish(in, out);
+    return finish_status(in, out, status, "set_coprocessor_fn");
 }
 
 CatalystWrapperResult __catalyst__transport__set_message_sizes__wrapper(const char *buf,
@@ -309,11 +364,12 @@ CatalystWrapperResult __catalyst__transport__set_message_sizes__wrapper(const ch
     auto in_bytes = in.get<std::uint64_t>();
     auto out_bytes = in.get<std::uint64_t>();
     Out out(I32);
+    std::int32_t status = CATALYST_TRANSPORT_OK;
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() =
-            __catalyst__transport__set_message_sizes(session, work_item, in_bytes, out_bytes);
+        status = __catalyst__transport__set_message_sizes(session, work_item, in_bytes, out_bytes);
+        *out.slot<std::int32_t>() = status;
     }
-    return finish(in, out);
+    return finish_status(in, out, status, "set_message_sizes");
 }
 
 //===----------------------------------------------------------------------===//
@@ -329,14 +385,16 @@ CatalystWrapperResult __catalyst__transport__start_benchmark__wrapper(const char
     auto flags = in.get<std::uint32_t>();
 
     Out out(I32 + static_cast<std::size_t>(iters) * U64 + U64);
+    std::int32_t status = CATALYST_TRANSPORT_OK;
     if (in.ok() && out) {
-        std::int32_t *status = out.slot<std::int32_t>();
+        std::int32_t *status_slot = out.slot<std::int32_t>();
         auto *samples = static_cast<std::uint64_t *>(out.reserve(iters * U64));
         auto *rounds = out.slot<std::uint64_t>();
-        *status = __catalyst__transport__start_benchmark(session, iters, decoder_id, flags, samples,
-                                                         rounds);
+        status = __catalyst__transport__start_benchmark(session, iters, decoder_id, flags, samples,
+                                                        rounds);
+        *status_slot = status;
     }
-    return finish(in, out);
+    return finish_status(in, out, status, "start_benchmark");
 }
 
 //===----------------------------------------------------------------------===//

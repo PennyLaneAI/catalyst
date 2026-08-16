@@ -14,13 +14,44 @@
 
 // Unit tests for the transport CAPI session registry and per-call behavior
 
+#include <algorithm>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
 
 #include "catch2/catch_test_macros.hpp"
 
+#include "TransportABI.h"
 #include "TransportCAPI.h"
 
+extern "C" {
+CatalystWrapperResult __catalyst__transport__get_session__wrapper(const char *, std::size_t);
+CatalystWrapperResult __catalyst__transport__connect__wrapper(const char *, std::size_t);
+CatalystWrapperResult __catalyst__transport__connect_async__wrapper(const char *, std::size_t);
+}
+
 namespace {
+template <typename T> void append(std::vector<char> &buf, T value) {
+    const std::size_t offset = buf.size();
+    buf.resize(offset + sizeof(T));
+    std::memcpy(buf.data() + offset, &value, sizeof(T));
+}
+
+void append_string(std::vector<char> &buf, const char *value) {
+    const std::size_t offset = buf.size();
+    buf.resize(offset + CATALYST_TRANSPORT_STR_BYTES, '\0');
+    std::memcpy(buf.data() + offset, value,
+                std::min(std::strlen(value), std::size_t{CATALYST_TRANSPORT_STR_BYTES - 1}));
+}
+
+std::string take_wrapper_error(CatalystWrapperResult result) {
+    std::string message = result.data.value_ptr ? result.data.value_ptr : "";
+    std::free(result.data.value_ptr);
+    return message;
+}
+
 CatalystTransportSession *make(std::int32_t role, const char *key) {
     return __catalyst__transport__create(STUB_BACKEND_PATH, "cfg", role, key);
 }
@@ -35,6 +66,43 @@ CatalystTransportSession *make_memcpy_coprocessor(const char *key) {
                                          CATALYST_TRANSPORT_ROLE_COPROCESSOR, key);
 }
 } // namespace
+
+TEST_CASE("dispatched wrappers return named transport errors", "[transport]") {
+    SECTION("null session lookup") {
+        std::vector<char> args;
+        append(args, std::int32_t{CATALYST_TRANSPORT_ROLE_CONTROLLER});
+        append_string(args, "missing");
+
+        CatalystWrapperResult result =
+            __catalyst__transport__get_session__wrapper(args.data(), args.size());
+        REQUIRE(result.size == 0);
+        CHECK(take_wrapper_error(result) == "transport: get_session failed (null session)");
+    }
+
+    SECTION("failed status") {
+        std::vector<char> args;
+        append(args, std::uint64_t{0});
+        append_string(args, "127.0.0.1");
+        append(args, std::uint16_t{0});
+
+        CatalystWrapperResult result =
+            __catalyst__transport__connect__wrapper(args.data(), args.size());
+        REQUIRE(result.size == 0);
+        CHECK(take_wrapper_error(result) == "transport: connect failed (status -1)");
+    }
+
+    SECTION("invalid async token") {
+        std::vector<char> args;
+        append(args, std::uint64_t{0});
+        append_string(args, "127.0.0.1");
+        append(args, std::uint16_t{0});
+
+        CatalystWrapperResult result =
+            __catalyst__transport__connect_async__wrapper(args.data(), args.size());
+        REQUIRE(result.size == 0);
+        CHECK(take_wrapper_error(result) == "transport: connect_async failed (invalid token)");
+    }
+}
 
 TEST_CASE("create registers a session resolvable by (role, key)", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "reg_ctrl");
