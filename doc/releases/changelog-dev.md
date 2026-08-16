@@ -27,6 +27,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Add checking of the pointer and status code from `runtime_call`.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
   through the transport passes.
   [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
