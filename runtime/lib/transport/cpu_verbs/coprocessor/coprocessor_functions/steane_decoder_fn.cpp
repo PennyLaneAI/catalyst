@@ -20,18 +20,7 @@
 #include <cstdint>
 #include <cstring>
 
-namespace {
-
-constexpr std::size_t STEANE_CHECKS = 3;
-
-/**
- * @brief Syndrome to error qubit index for the [[7,1,3]] Steane code; -1 is no
- * error. For compatibility with existing Steane decoder.
- *
- */
-constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1u << STEANE_CHECKS] = {-1, 6, 4, 5, 0, 3, 1, 2};
-
-} // namespace
+#include "SteaneDecoderTable.hpp"
 
 /**
  * @brief A hard-coded [[7,1,3]] Steane-code decode exposed as a CoprocessorFn
@@ -55,13 +44,16 @@ constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1u << STEANE_CHECKS] = {-1, 6, 4
 // would read that field and switch on it here.
 extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len, void *out,
                                           std::size_t out_cap, void * /*ctx*/) {
-    if (in == nullptr || out == nullptr || in_len < STEANE_CHECKS ||
+    using catalyst::transport::common::STEANE_CHECKS;
+    using catalyst::transport::common::STEANE_SYNDROME_TO_QUBIT;
+
+    if (in == nullptr || out == nullptr || in_len < static_cast<std::size_t>(STEANE_CHECKS) ||
         out_cap < sizeof(std::int64_t)) {
         return 0;
     }
     const auto *checks = static_cast<const std::uint8_t *>(in);
     std::uint32_t syndrome = 0;
-    for (std::size_t i = 0; i < STEANE_CHECKS; ++i) {
+    for (int i = 0; i < STEANE_CHECKS; ++i) {
         syndrome = (syndrome << 1U) | (checks[i] & 1U);
     }
     const std::int64_t err_idx = STEANE_SYNDROME_TO_QUBIT[syndrome];
