@@ -113,7 +113,7 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         Transport_StrField:$triple,
         Transport_StrField:$address,
         Transport_StrField:$symbol,
-        OptionalParameter<"mlir::BoolAttr">:$remote,
+        OptionalParameter<"mlir::BoolAttr">:$out_of_process,
         OptionalParameter<"mlir::IntegerAttr">:$in_bytes,
         OptionalParameter<"mlir::IntegerAttr">:$out_bytes,
         OptionalParameter<"mlir::IntegerAttr">:$work_item_idx
@@ -128,8 +128,9 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         /// `data_path` when set, else `dflt`.
         mlir::StringAttr dataPathOr(llvm::StringRef dflt) const;
 
-        /// True only when `remote` is present and set.
-        bool isRemote() const;
+        /// Whether this node's code is dispatched to an executor rather than run in the
+        /// compiling process.
+        bool isOutOfProcess() const;
 
         /// Integer fields, with the defaults applied.
         int64_t oobPort() const;
