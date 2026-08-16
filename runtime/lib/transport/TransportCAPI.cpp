@@ -30,7 +30,6 @@
 #include <vector>
 
 #include "DynamicLibraryLoader.hpp"
-#include "Exception.hpp"
 #include "Transport.hpp"
 #include "TransportBackend.h"
 #include "WireProtocol.hpp"
@@ -220,24 +219,6 @@ void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *sym
 } // namespace
 
 extern "C" {
-
-void __catalyst__transport__check(int rc, const char *what) {
-    if (rc == ::CATALYST_TRANSPORT_OK) {
-        return;
-    }
-    const std::string msg = std::string{"[transport] "} + ((what != nullptr) ? what : "call") +
-                            " failed (" + collect_error_name(rc) + ")";
-    RT_FAIL(msg.c_str());
-}
-
-void __catalyst__transport__check_session(CatalystTransportSession *s, const char *what) {
-    if (s != nullptr) {
-        return;
-    }
-    const std::string msg =
-        std::string{"[transport] "} + ((what != nullptr) ? what : "session") + ": null session";
-    RT_FAIL(msg.c_str());
-}
 
 CatalystTransportSession *__catalyst__transport__create(const char *backend_lib, const char *config,
                                                         std::int32_t role, const char *key) {
@@ -452,8 +433,7 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply,
         return s->sess->collect(replies, replies_bytes, 1);
     });
     if (rc != CATALYST_TRANSPORT_OK) {
-        // C callers see the return code. Compiled adapters call __catalyst__transport__check so a
-        // failed round cannot be consumed as a valid reply. Log here so the C path is not silent.
+        // Keep direct C callers from failing silently. Generated code checks this status itself.
         std::cerr << "[transport] collect failed (rc=" << rc << ": " << collect_error_name(rc)
                   << "); the reply buffer was not written\n";
     }

@@ -19,6 +19,7 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -88,27 +89,43 @@ Value globalStr(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod,
                                ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
+Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64_t v) {
+    return LLVM::ConstantOp::create(rewriter, loc, ty, rewriter.getIntegerAttr(ty, v));
+}
+
 void emitCheckedStatus(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod,
                        StringRef name, ArrayRef<Type> paramTys, ValueRange args, StringRef what) {
     auto *ctx = rewriter.getContext();
     Value rc = emitCall(rewriter, loc, mod, name, paramTys, i32Ty(ctx), args);
-    Value msg = globalStr(rewriter, loc, mod, "transport_check_", what);
-    emitCall(rewriter, loc, mod, "__catalyst__transport__check", {i32Ty(ctx), ptrTy(ctx)}, Type(),
-             {rc, msg});
+    Value zero = constInt(rewriter, loc, i32Ty(ctx), 0);
+    Value failed = LLVM::ICmpOp::create(rewriter, loc, LLVM::ICmpPredicate::ne, rc, zero);
+    std::string error = "[transport] " + what.str() + " failed";
+    Value msg = globalStr(rewriter, loc, mod, "transport_error_", error);
+    auto failFn = LLVM::lookupOrCreateFn(rewriter, mod, "__catalyst__rt__fail_cstr", {ptrTy(ctx)},
+                                         LLVM::LLVMVoidType::get(ctx));
+    assert(succeeded(failFn) && "failed to declare runtime failure function");
+    scf::IfOp::create(rewriter, loc, failed, [&](OpBuilder &builder, Location nestedLoc) {
+        LLVM::CallOp::create(builder, nestedLoc, *failFn, ValueRange{msg});
+        scf::YieldOp::create(builder, nestedLoc);
+    });
 }
 
 Value emitCheckedSession(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod,
                          StringRef name, ArrayRef<Type> paramTys, ValueRange args, StringRef what) {
     auto *ctx = rewriter.getContext();
     Value s = emitCall(rewriter, loc, mod, name, paramTys, ptrTy(ctx), args);
-    Value msg = globalStr(rewriter, loc, mod, "transport_session_", what);
-    emitCall(rewriter, loc, mod, "__catalyst__transport__check_session", {ptrTy(ctx), ptrTy(ctx)},
-             Type(), {s, msg});
+    Value null = LLVM::ZeroOp::create(rewriter, loc, ptrTy(ctx));
+    Value failed = LLVM::ICmpOp::create(rewriter, loc, LLVM::ICmpPredicate::eq, s, null);
+    std::string error = "[transport] " + what.str() + ": null session";
+    Value msg = globalStr(rewriter, loc, mod, "transport_error_", error);
+    auto failFn = LLVM::lookupOrCreateFn(rewriter, mod, "__catalyst__rt__fail_cstr", {ptrTy(ctx)},
+                                         LLVM::LLVMVoidType::get(ctx));
+    assert(succeeded(failFn) && "failed to declare runtime failure function");
+    scf::IfOp::create(rewriter, loc, failed, [&](OpBuilder &builder, Location nestedLoc) {
+        LLVM::CallOp::create(builder, nestedLoc, *failFn, ValueRange{msg});
+        scf::YieldOp::create(builder, nestedLoc);
+    });
     return s;
-}
-
-Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64_t v) {
-    return LLVM::ConstantOp::create(rewriter, loc, ty, rewriter.getIntegerAttr(ty, v));
 }
 
 // From a lowered 1-D memref descriptor (an LLVM struct), extract the aligned data
@@ -419,6 +436,7 @@ struct ConvertTransportToLLVMPass
 
         ConversionTarget target(*ctx);
         target.addLegalDialect<LLVM::LLVMDialect>();
+        target.addLegalDialect<scf::SCFDialect>();
         target.addIllegalDialect<TransportDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {

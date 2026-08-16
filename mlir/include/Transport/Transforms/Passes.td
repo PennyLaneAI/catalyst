@@ -25,7 +25,8 @@ def ConvertTransportToLLVMPass : Pass<"convert-transport-to-llvm", "mlir::Module
     }];
 
     let dependentDialects = [
-        "mlir::LLVM::LLVMDialect"
+        "mlir::LLVM::LLVMDialect",
+        "mlir::scf::SCFDialect"
     ];
 }
 
