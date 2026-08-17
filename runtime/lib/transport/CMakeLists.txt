@@ -73,11 +73,13 @@ if(IBVERBS_LIB)
     add_dependencies(transport_all
         catalyst_transport_cpu_verbs_controller
         catalyst_transport_cpu_verbs_coprocessor
-        steane_coprocessor_cpu)
+        steane_coprocessor_cpu
+        echo_coprocessor_cpu)
     add_dependencies(transport_backends
         catalyst_transport_cpu_verbs_controller
         catalyst_transport_cpu_verbs_coprocessor
-        steane_coprocessor_cpu)
+        steane_coprocessor_cpu
+        echo_coprocessor_cpu)
 
     if(TRANSPORT_HAS_HIP)
         add_subdirectory(rdma/gpu_verbs)

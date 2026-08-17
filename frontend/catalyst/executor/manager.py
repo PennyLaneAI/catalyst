@@ -22,7 +22,7 @@ works as a context manager::
     from catalyst import Executor
 
     # local subprocess on 127.0.0.1 (no SSH):
-    with Executor(local=True, plugins=[...]) as ex:
+    with Executor(plugins=[...]) as ex:
         print(ex.address)               # dispatch compiled programs here
 
     # remote over forwarded SSH:
@@ -33,7 +33,7 @@ works as a context manager::
     ex = Executor("127.0.0.1:1234").launch()
 
     # persistent remote workspace:
-    Executor(host="10.0.0.9", workspace="~/cat-ws", bundle="...").setup_workspace()
+    Executor(host="10.0.0.9", workspace="~/cat-ws", deploy=["..."]).setup_workspace()
     Executor(host="10.0.0.9", workspace="~/cat-ws").launch()
     Executor(host="10.0.0.9", workspace="~/cat-ws").remove_workspace()
 """
@@ -147,7 +147,7 @@ _sessions = _SessionRegistry()
 @dataclass
 class ExecutorConfig:
     """User-supplied configuration for an :class:`Executor`. The deployment fields apply to a remote
-    executor only; a ``local=True`` one runs in the current directory."""
+    executor only; a local subprocess runs in the current directory."""
 
     user: str = ""
     """SSH account on the remote host. Empty means the local username."""
@@ -161,17 +161,10 @@ class ExecutorConfig:
     """Directory on the target the executor runs in. ``None`` generates a ``catalyst-exec-*`` one
     per launch and removes it on teardown; a directory named here is left in place."""
 
-    bundle: str | Path | None = None
-    """Local directory holding the executor binary and the libraries it needs. Sent to
-    :attr:`workspace` when :attr:`copy` is set, and otherwise unused."""
-
     plugins: list[str] | None = None
     """Shared libraries the executor ``dlopen``s at startup, in this order. A bare filename resolves
     against the workspace; ``~`` and absolute paths are taken as given. They share the global
     namespace, so the first definition of a symbol wins."""
-
-    copy: bool = False
-    """Whether to send :attr:`bundle` to the target before starting the executor."""
 
     ready_timeout: float = 60.0
     """Seconds to wait for the executor to report that it bound its port."""
@@ -199,6 +192,11 @@ class ExecutorConfig:
     verbose: int = 1
     """How much launcher narration to log: ``0`` quiet, ``1`` normal, ``2`` per-command detail."""
 
+    deploy: list[str | Path] | None = None
+    """What to place in the workspace before the executor starts: directories, files, or both.
+    A directory contributes the files inside it, which is how a cross-built set of artifacts
+    travels; a file is copied as itself."""
+
 
 class Executor:
     """A ``catalyst-executor`` process, addressable over TCP at :attr:`address`. Construction is
@@ -207,14 +205,10 @@ class Executor:
 
     Three modes:
 
-    * ``local=True``: subprocess on ``127.0.0.1`` (no SSH).
-    * ``host=<addr>``: remote over forwarded SSH. ``copy=True`` + ``bundle=<dir>`` first scp's
-      the bundle.
+    * ``host=<addr>``: remote over forwarded SSH. ``deploy=[...]`` first scp's those
+      directories and files into the workspace.
     * ``address``: attach to an executor whose lifetime is managed elsewhere.
-
-    Exactly one of the three is required; :meth:`launch` raises :class:`ValueError` if none was
-    given. ``address`` has no default on purpose — silently attaching to a well-known port would
-    turn "nothing is listening there" into a failure at dispatch time, far from its cause.
+    * neither: subprocess on ``127.0.0.1`` (no SSH).
     """
 
     def __init__(
@@ -222,13 +216,11 @@ class Executor:
         address: str | None = None,
         *,
         host: str | None = None,
-        local: bool = False,
         user: str = "",
         port: int | None = None,
         workspace: str | None = None,
-        bundle: str | Path | None = None,
         plugins: list[str] | None = None,
-        copy: bool = False,
+        deploy: list[str | Path] | None = None,
         ready_timeout: float = 60.0,
         name: str = "executor",
         sudo: bool = False,
@@ -240,15 +232,14 @@ class Executor:
     ):
         self.host = host
         self.name = name
-        self._local = local
         self._address = address
+        self._local = not (host or address)
         self._cfg = ExecutorConfig(
             user=user,
             port=port,
             workspace=workspace,
-            bundle=bundle,
             plugins=plugins,
-            copy=copy,
+            deploy=deploy,
             ready_timeout=ready_timeout,
             sudo=sudo,
             sudo_password=sudo_password,
@@ -284,8 +275,6 @@ class Executor:
         if self._launched or self._committed:
             return self
         if not (self._local or self.host):  # attached: the address came from the caller
-            if self._address is None:
-                return None  # no mode at all; launch() reports that
             self._committed = True
             return self
         if self._cfg.port is None:
@@ -303,7 +292,7 @@ class Executor:
         return self._cfg.triple if self._cfg.triple is not None else self._detect_triple()
 
     def _detect_triple(self) -> str | None:
-        """Auto-detect the LLVM triple via ``uname``: local for ``local=True``, remote over SSH
+        """Auto-detect the LLVM triple via ``uname``: local for a subprocess, remote over SSH
         for ``host=``. Returns ``None`` in attach-only mode or if the remote probe fails."""
         if self._local:
             return triple_from_uname(platform.system(), platform.machine())
@@ -324,15 +313,12 @@ class Executor:
         workspace = self._cfg.workspace or ExecutorPaths.default_workspace()
         return user, host, workspace
 
-    def _deploy_bundle(self, user: str, host: str, workspace: str) -> None:
-        """:meth:`SCP.deploy` the bundle to the remote workspace."""
-        SCP.deploy(user, host, Path(self._cfg.bundle), workspace)
-
-    def _scp_bundle(self, user: str, host: str, workspace: str) -> None:
-        """Deploy on launch when ``copy=True`` and ``bundle=`` are set; no-op otherwise."""
-        if not (self._cfg.copy and self._cfg.bundle):
-            return
-        self._deploy_bundle(user, host, workspace)
+    def _deploy_sources(self, user: str, host: str, workspace: str) -> None:
+        """:meth:`SCP.deploy` everything :attr:`ExecutorConfig.deploy` names; no-op if it names
+        nothing."""
+        sources = [Path(src) for src in (self._cfg.deploy or [])]
+        if sources:
+            SCP.deploy(user, host, sources, workspace)
 
     def _local_maker(self) -> Callable[[int], _ExecutorProcess]:
         """``make(port) -> _LocalProcess`` closure. Config-derived values are captured once so
@@ -356,17 +342,17 @@ class Executor:
 
     def _remote_maker(self) -> Callable[[int], _ExecutorProcess]:
         """``make(port) -> _RemoteProcess`` closure. Runs the one-time prep (sudo resolve, scp)
-        so port retries reuse the same auth context — no re-prompt, no re-scp."""
+        so port retries reuse the same auth context with no re-prompt or re-scp."""
         user, host, workspace = self._remote_target()
         ws_pinned = self._cfg.workspace is not None  # pinned dirs are left in place on teardown
         sudo_pw = (
             RemoteOps.resolve_sudo(user, host, self._cfg.sudo_password) if self._cfg.sudo else None
         )
         RemoteOps.mkdir(user, host, workspace)  # the launch command cd's into it
-        self._scp_bundle(user, host, workspace)
+        self._deploy_sources(user, host, workspace)
         # A copied or pinned workspace holds the binary, so run it from there; sudo's secure_path
         # would miss a bare name. Bare name only when attaching to a remote that has it on PATH.
-        ws_holds_bin = self._cfg.copy or ws_pinned
+        ws_holds_bin = bool(self._cfg.deploy) or ws_pinned
         default_bin = (
             f"./{ExecutorPaths.EXECUTOR_BIN}" if ws_holds_bin else ExecutorPaths.EXECUTOR_BIN
         )
@@ -399,12 +385,6 @@ class Executor:
             return self
         # Attach-only mode: nothing to deploy, just carry the address the caller supplied.
         if not (self._local or self.host):
-            if self._address is None:
-                raise ValueError(
-                    "Executor has no mode: pass local=True to run it as a local subprocess, "
-                    "host=<addr> to deploy it over SSH, or an address to attach to one that is "
-                    "already serving."
-                )
             self._launched = True
             return self
         set_verbose(self._cfg.verbose)
@@ -432,23 +412,23 @@ class Executor:
     def setup_workspace(self) -> Self:
         """Remote only. Deploy the bundle to a persistent workspace without starting the executor.
 
-        Requires ``host``, pinned ``workspace=``, and ``bundle=``. Idempotent; a later
+        Requires ``host``, pinned ``workspace=``, and ``deploy=``. Idempotent; a later
         :meth:`launch` (or a fresh ``Executor(..., workspace=<same>)``) reuses it. Delete via
         :meth:`remove_workspace`.
 
         Raises:
-            ValueError: If ``host``, ``workspace``, or ``bundle`` is missing.
+            ValueError: If ``host``, ``workspace``, or ``deploy`` is missing.
         """
         if not self.host:
             raise ValueError("setup_workspace() requires host=")
         if self._cfg.workspace is None:
             raise ValueError("setup_workspace() requires a pinned workspace=")
-        if not self._cfg.bundle:
-            raise ValueError("setup_workspace() requires bundle=")
+        if not self._cfg.deploy:
+            raise ValueError("setup_workspace() requires deploy=")
         set_verbose(self._cfg.verbose)
         user, host, workspace = self._remote_target()
-        self._deploy_bundle(user, host, workspace)
-        self._cfg.copy = False  # bundle deployed; launch() on this instance won't re-copy
+        self._deploy_sources(user, host, workspace)
+        self._cfg.deploy = []  # already placed; launch() on this instance won't copy again
         return self
 
     def remove_workspace(self, force: bool = False) -> None:

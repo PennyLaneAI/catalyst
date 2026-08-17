@@ -61,7 +61,6 @@ class _ExecutorProcess:
         self._ready = threading.Event()
         self._port_conflict = threading.Event()
 
-    # --- subclass hooks --------------------------------------------------------------------------
     def _spawn(self) -> None:
         """Build the command and set ``self.proc``."""
         raise NotImplementedError

@@ -14,22 +14,28 @@
 """Unit tests for the backline frontend: serialize_backline and the pipeline helpers."""
 
 from types import SimpleNamespace
+import os
+from unittest import mock
 
 import pennylane as qp
 import pytest
 from pennylane.backline import Transport
 
-from catalyst import qjit
+from catalyst import Executor, qjit
 from catalyst.backline import (
     _backend_for,
+    _TRANSPORT_PASSES,
+    _insert_passes,
+    _qec_pass_specs,
     _realize_executor,
     _required_plugins,
     _resolve_backend_lib,
-    add_transport_passes,
-    backline_pipeline,
-    realize_executors,
+    device_pass_pipeline,
+    launch_executors,
+    placement_pipeline,
     serialize_backline,
 )
+from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.skipif(
     not hasattr(qp, "backline"), reason="pennylane.backline UI not available"
@@ -67,6 +73,7 @@ def test_controller_node_mapping():
     assert ctrl["backend_lib"] == "backend.so" and ctrl["config"] == "cfg"
     assert ctrl["in_bytes"] == 3 and ctrl["out_bytes"] == 8
     assert "peer" not in ctrl and "oob_port" not in ctrl
+    assert "coprocessors" not in d  # omitted, not an empty list
 
 
 def test_default_message_sizes_are_serialized():
@@ -117,12 +124,12 @@ def test_in_process_coprocessor_fn_lib_is_loaded(monkeypatch):
     dev = qp.Backline(
         controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
     )
-    realize_executors(dev.placement)
+    launch_executors(dev.placement)
     assert loaded == [("/opt/libdecode.so", ctypes.RTLD_GLOBAL)]
 
 
-def test_remote_coprocessor_fn_lib_is_not_loaded_here(monkeypatch):
-    """A remote coprocessor's library belongs on its own machine; its executor loads it there."""
+def test_out_of_process_coprocessor_fn_lib_is_not_loaded_here(monkeypatch):
+    """A dispatched coprocessor's executor loads the library itself, in the process that needs it."""
     loaded = []
     monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
     fn = qp.CoprocessorFunction("decode_fn", lib_path="/opt/libdecode.so")
@@ -131,7 +138,7 @@ def test_remote_coprocessor_fn_lib_is_not_loaded_here(monkeypatch):
         coprocessors=[_coproc("cop0", fn=fn, remote=True)],
         transport="rdma",
     )
-    realize_executors(dev.placement)
+    launch_executors(dev.placement)
     assert loaded == []
 
 
@@ -142,6 +149,24 @@ def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
     dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
     realize_executors(dev.placement)
     assert loaded == []
+
+
+def test_unlaunched_executor_names_the_node_it_came_from():
+    """An executor with no address fails with the node named."""
+    from catalyst import Executor  # pylint: disable=import-outside-toplevel
+
+    ctrl = _controller(executor=Executor(host="10.0.0.9", user="me"))
+    dev = qp.Backline(controller=ctrl, transport="net")
+    with pytest.raises(CompileError, match="cannot say where it serves.*not launched"):
+        serialize_backline(dev.placement)
+
+
+def test_unrecognized_init_args_are_rejected():
+    """An init_args key the attribute has no parameter for fails here, naming the ones it does."""
+    ctrl = _controller(init_args={"config": "cfg", "in_byte": 8})
+    dev = qp.Backline(controller=ctrl, transport="net")
+    with pytest.raises(CompileError, match=r"unrecognized init_args \['in_byte'\]"):
+        serialize_backline(dev.placement)
 
 
 def test_multiple_coprocessors_all_serialized():
@@ -169,14 +194,15 @@ def test_transport_memcpy_object_serializes_to_name():
     assert d["transport"] == "memcpy"
 
 
-def test_add_transport_passes_places_each_pass():
-    """add_transport_passes inserts each pass into its stage; transport lowers before catalyst."""
-    stages = add_transport_passes(
+def test_transport_passes_are_placed_in_each_stage():
+    """Each transport pass lands in its own stage, and transport lowers before catalyst."""
+    stages = _insert_passes(
         [
             ("QuantumCompilationStage", []),
             ("BufferizationStage", []),
             ("MLIRToLLVMDialectConversion", ["convert-catalyst-to-llvm"]),
-        ]
+        ],
+        _TRANSPORT_PASSES,
     )
     d = dict(stages)
     assert d["QuantumCompilationStage"] == ["inject-transport-session"]
@@ -187,12 +213,42 @@ def test_add_transport_passes_places_each_pass():
     ]
 
 
-def test_backline_pipeline_carries_transport_passes():
-    """backline_pipeline is the default pipeline with the transport passes wired in."""
-    stages = dict(backline_pipeline())
-    assert "inject-transport-session" in stages["QuantumCompilationStage"]
-    assert "lower-decode-to-transport" in stages["BufferizationStage"]
-    assert "convert-transport-to-llvm" in stages["MLIRToLLVMDialectConversion"]
+def test_device_pass_pipeline_is_empty_for_a_device_that_needs_nothing():
+    """A device that declares no encoding contributes no passes."""
+    assert device_pass_pipeline(qp.device("null.qubit", wires=2)) == ()
+    assert device_pass_pipeline(qp.Backline(controller=_controller(), transport="net")) == ()
+
+
+def test_device_pass_pipeline_requests_the_encoding_chain():
+    """A placement naming a code asks for the whole chain, in application order."""
+    dev = qp.Backline(controller=_controller(), transport="net", qec_code="steane")
+    assert [t.pass_name for t in device_pass_pipeline(dev)] == [
+        name for name, _ in _qec_pass_specs("steane")
+    ]
+
+
+@pytest.mark.parametrize(
+    "qec_code, wants_qec", [(None, False), ("steane", True)], ids=["unencoded", "steane"]
+)
+def test_placement_pipeline_returns_the_stages(qec_code, wants_qec):
+    """``configure`` adds the transport passes always and the QEC lowering only when asked."""
+    dev = qp.Backline(controller=_controller(), transport="net", qec_code=qec_code)
+    # Both reference passes are present, since each insertion anchors to one of them.
+    stages = placement_pipeline(
+        dev.placement,
+        [
+            ("QuantumCompilationStage", []),
+            ("BufferizationStage", []),
+            (
+                "MLIRToLLVMDialectConversion",
+                ["convert-quantum-to-llvm", "convert-catalyst-to-llvm"],
+            ),
+        ],
+    )
+    assert stages is not None
+    d = dict(stages)
+    assert "inject-transport-session" in d["QuantumCompilationStage"]
+    assert ("convert-qecp-to-llvm" in d["MLIRToLLVMDialectConversion"]) is wants_qec
 
 
 def test_backline_qnode_capture_path(use_capture):
@@ -229,12 +285,12 @@ def test_backline_qnode_capture_path_memcpy(use_capture):
     assert 'transport = "memcpy"' in ir
 
 
-def test_remote_controller_module_tagged_with_role(use_capture):
-    """A remote controller's module carries catalyst.backline_role.
-
+def test_placement_behind_a_wrapper_is_found(use_capture):
+    """A placement reaches the module even when qjit was applied to a wrapper, not the QNode.
     The transport passes locate it by role rather than by matching a triple or address, which now
-    come only from the node's executor.
-    """
+    come only from the node's executor."""
+    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+
     ctrl = qp.Controller(
         device=qp.device("null.qubit", wires=2),
         name="ctrl",
@@ -243,13 +299,132 @@ def test_remote_controller_module_tagged_with_role(use_capture):
     )
     dev = qp.Backline(controller=ctrl, transport="rdma")
 
-    @qjit(target="mlir", capture=True)
     @qp.qnode(dev)
     def circuit():
         qp.Hadamard(0)
         return qp.probs()
 
-    assert 'catalyst.backline_role = "controller"' in circuit.mlir
+    @qjit(target="mlir", capture=True)
+    def workflow():
+        return 2.0 * circuit()
+
+    ir = workflow.mlir
+    assert "module @workflow" in ir  # the wrapper is the root module
+    assert "catalyst.backline" in ir
+    assert 'transport = "net"' in ir
+    assert 'symbol = "coproc_fn"' in ir  # the whole placement, coprocessor included
+
+
+def test_qec_pass_names_match_the_transforms_that_provide_them():
+    """The scheduled names must match the passes' own, since they are written out literally."""
+    from catalyst.python_interface.transforms.qecl import (
+        convert_quantum_to_qecl_pass,
+        inject_noise_to_qecl_pass,
+    )
+    from catalyst.python_interface.transforms.qecp import (
+        convert_qecl_to_qecp_pass,
+        convert_qecp_to_quantum_pass,
+    )
+
+    scheduled = [name for name, _ in _qec_pass_specs("steane")]
+    assert scheduled == [
+        convert_quantum_to_qecl_pass.pass_name,
+        "symbol-dce",  # a built-in MLIR pass, with no transform of its own
+        inject_noise_to_qecl_pass.pass_name,
+        convert_qecl_to_qecp_pass.pass_name,
+        convert_qecp_to_quantum_pass.pass_name,
+    ]
+
+
+def test_qec_encoding_reaches_a_qnode_behind_a_wrapper(use_capture):
+    """A placement's qec_code encodes the QNode even when qjit was applied to a wrapper."""
+    dev = qp.Backline(
+        controller=_controller(),
+        coprocessors=[_coproc("cop0")],
+        transport="net",
+        qec_code="steane",
+    )
+
+    @qp.qnode(dev)
+    def circuit():
+        qp.Hadamard(0)
+        return qp.probs()
+
+    @qjit(target="mlir", capture=True)
+    def workflow():
+        return 2.0 * circuit()
+
+    ir = workflow.mlir
+    for name, _ in _qec_pass_specs("steane"):
+        assert name in ir, f"{name} missing from the scheduled pipeline"
+
+
+def test_remote_controller_behind_a_wrapper_is_still_tagged(use_capture):
+    """A remote controller called through a wrapper still gets its module tagged by role."""
+    ctrl = qp.Controller(
+        device=qp.device("null.qubit", wires=2),
+        label="ctrl",
+        remote=True,
+        executor_options={"address": "ctrl:1"},
+        init_args={"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"},
+    )
+    dev = qp.Backline(controller=ctrl, transport="net")
+
+    @qp.qnode(dev)
+    def circuit():
+        qp.Hadamard(0)
+        return qp.probs()
+
+    @qjit(target="mlir", capture=True)
+    def workflow():
+        return 2.0 * circuit()
+
+    assert 'catalyst.backline_role = "controller"' in workflow.mlir
+
+
+def test_two_qnodes_over_one_placement_are_accepted(use_capture):
+    """Two QNodes sharing a device carry one placement between them, not one each."""
+    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+
+    @qp.qnode(dev)
+    def circuit_a():
+        qp.Hadamard(0)
+        return qp.probs()
+
+    @qp.qnode(dev)
+    def circuit_b():
+        qp.CNOT([0, 1])
+        return qp.probs()
+
+    @qjit(target="mlir", capture=True)
+    def workflow():
+        return circuit_a() + circuit_b()
+
+    ir = workflow.mlir
+    assert "module @workflow" in ir
+    assert ir.count("catalyst.backline = #transport.backline") == 1
+
+
+def test_two_placements_in_one_program_are_rejected(use_capture):
+    """A compiled program carries one placement, so two distinct ones cannot be expressed."""
+    dev_a = qp.Backline(controller=_controller(), transport="net")
+    dev_b = qp.Backline(controller=_controller(), transport="net")
+
+    @qp.qnode(dev_a)
+    def circuit_a():
+        qp.Hadamard(0)
+        return qp.probs()
+
+    @qp.qnode(dev_b)
+    def circuit_b():
+        qp.Hadamard(0)
+        return qp.probs()
+
+    with pytest.raises(CompileError, match="2 different backline placements"):
+
+        @qjit(target="mlir", capture=True)
+        def workflow():
+            return circuit_a() + circuit_b()
 
 
 @pytest.fixture
@@ -484,6 +659,19 @@ class TestBackendResolution:
         d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
         assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
 
+    def test_no_backend_leaves_backend_lib_unset(self, no_launch):
+        """Omitting ``backend`` leaves the field to ``init_args`` or the compiler default."""
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl")
+        d = serialize_backline(qp.Backline(controller=ctrl, transport="net").placement)
+        assert "backend_lib" not in d["controller"]
+
+
+@pytest.fixture
+def no_launch():
+    """Keep ``_realize_executor`` from deploying."""
+    with mock.patch.object(Executor, "launch", autospec=True) as launch:
+        yield launch
+
 
 class TestExecutorRealization:
     """``executor_options`` on a node becomes a launched ``catalyst.Executor``.
@@ -518,6 +706,119 @@ class TestExecutorRealization:
 
     def test_node_name_seeds_the_executor_name(self):
         """The node's name names the executor."""
+
+    @pytest.mark.parametrize("options", [{}, {"triple": "aarch64-unknown-linux-gnu"}])
+    def test_options_naming_no_location_run_on_this_machine(self, options):
+        """Options naming neither a host nor an address ask for a subprocess here."""
+        node = _controller(executor_options=options)
+        with mock.patch.object(Executor, "launch", autospec=True) as launch:
+            ex = _realize_executor(node)
+        assert node.remote is False
+        assert ex.host is None
+        launch.assert_called_once()  # a free-port search settles its address only once it is up
+
+    def test_a_remote_node_without_an_executor_is_rejected(self):
+        """Another machine is reached by dispatching to an executor deployed there."""
+        node = _controller(remote=True)
+        with pytest.raises(CompileError, match="remote but was given no executor"):
+            _realize_executor(node)
+
+    def test_an_ssh_executor_on_a_node_that_is_not_remote_is_rejected(self):
+        """``host`` deploys over ssh, so the node's libraries come from that machine, not this one."""
+        node = _controller(executor_options={"host": "192.0.2.10", "port": 7810})
+        with pytest.raises(CompileError, match="not remote but its executor is deployed to host"):
+            _realize_executor(node)
+
+    def test_a_remote_node_whose_executor_names_no_machine_is_rejected(self):
+        """Options naming neither host nor address ask for a subprocess of this process."""
+        node = _controller(remote=True, executor_options={"port": 7810})
+        with pytest.raises(CompileError, match="neither a 'host' .* nor an 'address'"):
+            _realize_executor(node)
+
+    def test_a_controllers_device_runtime_is_implied(self):
+        """A controller dispatches a QNode, so it needs its device's runtime, which the compiled
+        program would otherwise name by the compiling host's own absolute path. A remote node names
+        it by filename, the deployed bundle supplying the file."""
+        node = _controller(remote=True, executor_options={"host": "192.0.2.10", "port": 7810})
+        _realize_executor(node)
+        assert node.executor._cfg.plugins == [  # pylint: disable=protected-access
+            "librtd_null_qubit.so",
+        ]
+
+    def test_a_dispatched_coprocessor_carries_its_function_library(self, tmp_path):
+        """A decoder built for this run is not in the target's bundle, so it travels and is opened."""
+        lib = tmp_path / "libdecoder.so"
+        lib.write_bytes(b"\x7fELF")
+        fn = qp.CoprocessorFunction("_persistent_decoder_kernel_abc", lib_path=str(lib))
+        node = _coproc(
+            "cop0", fn=fn, remote=True, executor_options={"host": "192.0.2.11", "port": 7813}
+        )
+        with mock.patch.object(Executor, "launch", autospec=True):
+            _realize_executor(node)
+        cfg = node.executor._cfg  # pylint: disable=protected-access
+        assert cfg.plugins[-1] == "libdecoder.so"  # by filename: resolves against the workspace
+        assert cfg.deploy == [str(lib)]  # and the file is carried there
+
+    def test_a_coprocessor_on_this_machine_deploys_nothing(self, no_launch):
+        """Its library is already reachable, so the full path is enough and nothing travels."""
+        fn = qp.CoprocessorFunction("fn", lib_path="/opt/libdecode.so")
+        node = _coproc("cop0", fn=fn, executor_options={})
+        _realize_executor(node)
+        cfg = node.executor._cfg  # pylint: disable=protected-access
+        assert cfg.plugins[-1] == "/opt/libdecode.so"
+        assert not cfg.deploy
+
+    def test_a_coprocessor_gets_no_device_runtime(self, no_launch):
+        """Only a controller dispatches a QNode, so only it needs a device runtime."""
+        node = _coproc("cop0", remote=True, executor_options={"host": "h", "port": 7812})
+        _realize_executor(node)
+        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        assert plugins == []
+
+    def test_plugins_the_node_named_keep_their_place(self, no_launch):
+        """Only the missing ones are appended, so an explicit ordering still wins."""
+        node = _controller(
+            remote=True,
+            executor_options={"host": "h", "port": 1, "plugins": ["libsteane.so", "librt_capi.so"]},
+        )
+        _realize_executor(node)
+        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        assert plugins[:2] == ["libsteane.so", "librt_capi.so"]  # untouched, not duplicated
+        assert plugins.count("librt_capi.so") == 1
+        assert plugins[-1] == "librtd_null_qubit.so"
+
+    def test_a_node_on_this_machine_gets_full_library_paths(self, no_launch):
+        """Its libraries come from this installation, so a filename alone would not resolve."""
+        node = _controller(executor_options={})
+        _realize_executor(node)
+        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        assert all(p.startswith("/") for p in plugins)
+        assert [p.rsplit("/", 1)[-1] for p in plugins][-1] == "librtd_null_qubit.so"
+
+    def test_an_attached_executor_is_taken_at_the_nodes_word(self):
+        """An ``address`` may name either machine, so ``remote`` is not second-guessed for it."""
+        for remote in (True, False):
+            node = _controller(remote=remote, executor_options={"address": "10.0.0.9:1373"})
+            assert _realize_executor(node).address == "10.0.0.9:1373"
+
+    def test_a_host_without_a_port_is_rejected(self):
+        """An ssh deployment must pin its port, so compiling never has to reach the host."""
+        node = _controller(remote=True, executor_options={"host": "192.0.2.10", "user": "me"})
+        with pytest.raises(CompileError, match=r"host='192\.0\.2\.10' without a port"):
+            _realize_executor(node)
+
+    def test_a_host_with_a_port_defers_its_deployment(self):
+        """A pinned port makes the address predictable, so compiling costs no ssh."""
+        node = _controller(
+            remote=True, executor_options={"host": "192.0.2.10", "user": "me", "port": 7810}
+        )
+        with mock.patch.object(Executor, "launch", autospec=True) as launch:
+            ex = _realize_executor(node)
+        assert ex.address == "127.0.0.1:7810"  # the local end of the ssh tunnel
+        launch.assert_not_called()
+
+    def test_label_seeds_the_executor_name(self):
+        """The node's label names the executor, which uses it for its logs."""
         node = _controller(executor_options={"address": "10.0.0.9:1373"})
         assert _realize_executor(node).name == "ctrl"
 
@@ -527,6 +828,9 @@ class TestExecutorRealization:
         class _Ex:
             address = "attached:1"
             triple = "x86_64-unknown-linux-gnu"
+
+            def launch(self):
+                return self
 
         ex = _Ex()
         node = _controller(executor=ex, executor_options={"address": "ignored:2"})
@@ -575,6 +879,25 @@ class TestExecutorRealization:
         cop = _coproc("cop0", executor_options={"address": "cop:2"})
         dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma")
         realize_executors(dev.placement)
+        assert ctrl.executor.address == "ctrl:1"
+        assert cop.executor.address == "cop:2"
+
+    def test_an_executor_missing_the_shape_is_rejected(self):
+        """An object that cannot say where it serves, or be launched, is refused while compiling."""
+
+        class _NoLaunch:
+            address = "attached:1"
+
+        node = _controller(executor=_NoLaunch())
+        with pytest.raises(CompileError, match=r"missing \['launch'\]"):
+            _realize_executor(node)
+
+    def test_launch_executors_walks_every_node(self):
+        """``launch_executors`` covers the controller and each coprocessor."""
+        ctrl = _controller(executor_options={"address": "ctrl:1"})
+        cop = _coproc("cop0", executor_options={"address": "cop:2"})
+        dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="net")
+        launch_executors(dev.placement)
         assert ctrl.executor.address == "ctrl:1"
         assert cop.executor.address == "cop:2"
 

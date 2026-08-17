@@ -314,7 +314,10 @@ class TestPreprocessHybridOp:
             return qp.state()
 
         # mlir contains expected gate names, and not the unsupported gate names
-        mlir = qjit(circuit, target="mlir").mlir
+        qjc = qjit(circuit, target="mlir")
+        # force creation of mlir
+        _ = qjc(0.5)
+        mlir = qjc.mlir
         assert "RX" in mlir
         assert "CNOT" in mlir
         assert "PhaseShift" in mlir

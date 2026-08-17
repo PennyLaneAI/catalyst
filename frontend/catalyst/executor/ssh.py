@@ -32,10 +32,9 @@ from __future__ import annotations
 
 import getpass
 import logging
-import os
 import shlex
 import subprocess
-import tempfile
+import sys
 import time
 from pathlib import Path
 
@@ -60,33 +59,52 @@ class SSHArgv:
         "ServerAliveCountMax=4",
     )
 
-    # One-shot probe flags: fail fast on missing key (rc 255), short connect timeout.
+    # One-shot probe flags: fail fast on a missing key, short connect timeout. ssh reports its own
+    # failures as exit code 255, which is how they are told apart from the remote command's status.
     PROBE_OPTS: tuple[str, ...] = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
     CONTROL_PATH_MAX = 104
     CONTROL_PATH_RESERVE = 20
 
+    # Per-user directory for control sockets, relative to the user's home. Anyone able to reach a
+    # control socket can open sessions on its remote host without authenticating, the master having
+    # done so already, so the directory it sits in is what protects it.
+    CONTROL_DIR = Path(".catalyst") / "cm"
+
     @staticmethod
-    def _ctl_dir() -> Path:
-        """Directory to put the control socket in: the system temp dir."""
-        return Path(tempfile.gettempdir())
+    def _private_dir(home: Path | None = None) -> Path | None:
+        """:data:`CONTROL_DIR` under ``home``, created ``0700``, or ``None`` if it cannot be.
+
+        Args:
+            home: Directory to place it under, defaulting to the user's own. Taken as an argument so
+                that creating it and locking it down is checkable against a real directory.
+        """
+        path = (home or Path.home()) / SSHArgv.CONTROL_DIR
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            path.chmod(0o700)  # mkdir's mode is masked by umask, so set it outright
+        except OSError as exc:
+            logger.debug("control-socket dir %s unusable (%s); falling back", path, exc)
+            return None
+        return path
 
     @staticmethod
     def ctl_opts() -> list[str]:
         """``ControlMaster``/``ControlPath``/``ControlPersist`` flags for connection multiplexing.
 
-        The first op opens a master socket under :meth:`_ctl_dir`; later ops
+        The first op opens a master socket under :meth:`_private_dir`; later ops
         (probe/mkdir/scp/pkill) reuse it, skipping the auth handshake. ``%C`` (a hash of
         ``%l%h%p%r``) keeps the name short. Not applied to the long-lived executor session, whose
         close SIGHUPs the executor cleanly.
         """
-        return SSHArgv._ctl_flags(SSHArgv._ctl_dir())
+        private = SSHArgv._private_dir()
+        return SSHArgv._ctl_flags(private) if private is not None else []
 
     @staticmethod
     def _ctl_flags(base: Path) -> list[str]:
         """:meth:`ctl_opts` for a given socket dir, split out so the length rule is decidable
         without touching the environment or the filesystem.
         """
-        path = f"{base}/catalyst-cm-{os.getuid()}-%C"
+        path = f"{base}/%C"
         # %C expands to a 40-character hash.
         expanded = len(path) - len("%C") + 40 + SSHArgv.CONTROL_PATH_RESERVE
         if expanded > SSHArgv.CONTROL_PATH_MAX:
@@ -311,22 +329,36 @@ class SCP:
 
         if _once(legacy=False) == 0:
             return
-        logger.info("scp failed — retrying with the legacy protocol (scp -O)")
+        # scp prints its own failure straight to stderr, so the explanation has to go there too:
+        # this module's logger carries a NullHandler, which suppresses logging's last-resort output.
+        print(
+            "[scp] the SFTP backend is declining. Retrying it with the legacy protocol (scp -O), "
+            "which hosts without an SFTP subsystem need",
+            file=sys.stderr,
+        )
         if _once(legacy=True) != 0:
             raise RuntimeError(f"scp to {user}@{host}:{dest}/ failed")
 
     @staticmethod
-    def deploy(user: str, host: str, bundle: Path, workspace: str) -> None:
-        """Create ``workspace`` on the remote, then copy every artifact in ``bundle`` to it.
+    def deploy(user: str, host: str, sources: list[Path], workspace: str) -> None:
+        """Create ``workspace`` on the remote, then copy every source into it.
 
         Raises:
-            RuntimeError: If ``bundle`` has no artifacts.
+            RuntimeError: If a source is missing, or if nothing would be copied.
         """
-        files = sorted(p for p in bundle.iterdir() if p.is_file() and p.name != "README.md")
+        missing = [str(p) for p in sources if not p.exists()]
+        if missing:
+            raise RuntimeError(f"nothing to deploy at: {missing}")
+        files: list[Path] = []
+        for src in sources:
+            if src.is_dir():
+                files += sorted(p for p in src.iterdir() if p.is_file() and p.name != "README.md")
+            else:
+                files.append(src)
         if not files:
             raise RuntimeError(
-                f"no artifacts in {bundle} — cross-compile the executor + runtime libs for the "
-                "target first, and point bundle= at the directory holding them."
+                f"no artifacts in {[str(p) for p in sources]} — cross-compile the executor + "
+                "runtime libs for the target first, and point deploy= at what holds them."
             )
         total = sum(f.stat().st_size for f in files)
         logger.info(
@@ -341,7 +373,7 @@ class SCP:
 
 
 class RemoteLauncher:
-    """Builds the argv that opens an SSH tunnel and launches ``catalyst-executor`` on a remote host."""
+    """Builds the argv opening an SSH tunnel and launching ``catalyst-executor`` on a remote host."""
 
     @staticmethod
     def ssh_argv(

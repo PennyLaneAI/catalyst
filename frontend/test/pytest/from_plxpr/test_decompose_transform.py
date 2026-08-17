@@ -1043,6 +1043,7 @@ class TestPlxPRDecomposition:
             (7, does_not_raise()),
         ],
     )
+    @pytest.mark.filterwarnings("ignore:AOT")
     def test_work_wires(self, num_work_wires, expectation):
         """
         Test that graph decomposition raises the correct exception when given an insufficient
@@ -1081,21 +1082,21 @@ class TestPlxPRDecomposition:
 
             qp.cond(angle > 1.2, true_func, false_func)()
 
+        @qp.qjit(capture=True)
+        @partial(
+            qp.transforms.decompose,
+            gate_set={qp.CNOT, qp.H, qp.X, "Conditional", "MidMeasure"},
+            fixed_decomps={qp.CRX: my_decomp},
+            num_work_wires=num_work_wires,
+        )
+        @qp.qnode(qp.device("null.qubit", wires=9))
+        def circuit():
+            qp.CRX(1.7, wires=[0, 1])
+            qp.CRX(-7.2, wires=[0, 1])
+            return qp.state()
+
         with expectation:
-
-            @qp.qjit(capture=True)
-            @partial(
-                qp.transforms.decompose,
-                gate_set={qp.CNOT, qp.H, qp.X, "Conditional", "MidMeasure"},
-                fixed_decomps={qp.CRX: my_decomp},
-                num_work_wires=num_work_wires,
-            )
-            @qp.qnode(qp.device("null.qubit", wires=9))
-            def circuit():
-                qp.CRX(1.7, wires=[0, 1])
-                qp.CRX(-7.2, wires=[0, 1])
-                return qp.state()
-
+            circuit()
         qp.decomposition.disable_graph()
 
     def test_decomp_inside_subroutine(self):
@@ -1137,7 +1138,7 @@ class TestPlxPRDecomposition:
                 name = "_UnknownOp"
 
             def _unknown_resources():
-                return {qp.resource_rep(qp.PauliX): 1}
+                return {qp.PauliX: 1}
 
             @qp.register_resources(_unknown_resources)
             def _unknown_decomp(wires):

@@ -139,17 +139,18 @@ class TestSourceCodeInfo:
                 raise RuntimeError("Test failure")
             return 0
 
-        with pytest.warns(
-            UserWarning,
-            match=(
-                f'  File "{__file__}", line [0-9]+, in {main.__name__}\n'
-                r"    for _ in range\(5\):"
-            ),
-        ):
-            try:
-                qjit(autograph=True)(main)
-            except RuntimeError as e:
-                assert e.args == ("Test failure",)
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            with pytest.warns(
+                UserWarning,
+                match=(
+                    f'  File "{__file__}", line [0-9]+, in {main.__name__}\n'
+                    r"    for _ in range\(5\):"
+                ),
+            ):
+                try:
+                    qjit(autograph=True)(main)
+                except RuntimeError as e:
+                    assert e.args == ("Test failure",)
 
     def test_qnode(self):
         """Test source info retrieval for a qnode function."""
@@ -160,17 +161,18 @@ class TestSourceCodeInfo:
                 raise RuntimeError("Test failure")
             return 0
 
-        with pytest.warns(
-            UserWarning,
-            match=(
-                f'  File "{__file__}", line [0-9]+, in {main.__name__}\n'
-                r"    for _ in range\(5\):"
-            ),
-        ):
-            try:
-                qjit(autograph=True)(main)
-            except RuntimeError as e:
-                assert e.args == ("Test failure",)
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            with pytest.warns(
+                UserWarning,
+                match=(
+                    f'  File "{__file__}", line [0-9]+, in {main.__name__}\n'
+                    r"    for _ in range\(5\):"
+                ),
+            ):
+                try:
+                    qjit(autograph=True)(main)
+                except RuntimeError as e:
+                    assert e.args == ("Test failure",)
 
     def test_func(self):
         """Test source info retrieval for a nested function."""
@@ -183,17 +185,18 @@ class TestSourceCodeInfo:
             inner()
             return 0
 
-        with pytest.warns(
-            UserWarning,
-            match=(
-                f'  File "{__file__}", line [0-9]+, in {inner.__name__}\n'
-                r"    for _ in range\(5\):"
-            ),
-        ):
-            try:
-                qjit(autograph=True)(main)
-            except RuntimeError as e:
-                assert e.args == ("Test failure",)
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            with pytest.warns(
+                UserWarning,
+                match=(
+                    f'  File "{__file__}", line [0-9]+, in {inner.__name__}\n'
+                    r"    for _ in range\(5\):"
+                ),
+            ):
+                try:
+                    qjit(autograph=True)(main)
+                except RuntimeError as e:
+                    assert e.args == ("Test failure",)
 
 
 class TestIntegration:
@@ -464,31 +467,33 @@ class TestIntegration:
 
     def test_adjoint_no_argument(self):
         """Test that passing no argument to qp.adjoint raises an error."""
-        with pytest.raises(ValueError, match="adjoint requires at least one argument"):
-            dev = qp.device("lightning.qubit", wires=2)
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            with pytest.raises(ValueError, match="adjoint requires at least one argument"):
+                dev = qp.device("lightning.qubit", wires=2)
 
-            @qp.qjit(autograph=True)
-            @qp.qnode(dev)
-            def circuit():
-                qp.adjoint()
-                return qp.probs(wires=0)
+                @qp.qjit(autograph=True)
+                @qp.qnode(dev)
+                def circuit():
+                    qp.adjoint()
+                    return qp.probs(wires=0)
 
-            circuit()
+                circuit()
 
     def test_adjoint_wrong_argument_type(self):
         """Test that passing a non-callable/non-Operation to qp.adjoint raises an error."""
-        with pytest.raises(
-            ValueError, match="First argument to adjoint must be callable or an Operation"
-        ):
-            dev = qp.device("lightning.qubit", wires=2)
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            with pytest.raises(
+                ValueError, match="First argument to adjoint must be callable or an Operation"
+            ):
+                dev = qp.device("lightning.qubit", wires=2)
 
-            @qp.qjit(autograph=True)
-            @qp.qnode(dev)
-            def circuit():
-                qp.adjoint(3)
-                return qp.probs(wires=0)
+                @qp.qjit(autograph=True)
+                @qp.qnode(dev)
+                def circuit():
+                    qp.adjoint(3)
+                    return qp.probs(wires=0)
 
-            circuit()
+                circuit()
 
     def test_tape_transform(self):
         """Test if tape transform is applied when autograph is on."""
@@ -730,12 +735,15 @@ class TestConditionals:
 
         err_type = qp.exceptions.AutoGraphError if capture_mode else AutoGraphError
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            qjitted = qjit(autograph=True, capture=capture_mode)(
+                qp.qnode(qp.device(backend, wires=1))(circuit)
+            )
+
         with pytest.raises(
             err_type, match="Some branches did not define a value for variable 'res'"
         ):
-            qjit(autograph=True, capture=capture_mode)(
-                qp.qnode(qp.device(backend, wires=1))(circuit)
-            )
+            qjitted(True)
 
     def test_branch_no_multi_return_mismatch(self, backend):
         """Test that case when the return types of all branches do not match."""
@@ -806,8 +814,11 @@ class TestConditionals:
 
             return qp.expval(qp.PauliZ(0))
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            qjitted = qjit(autograph=True)(f)
+
         with pytest.raises(TypeError, match="requires a consistent return structure"):
-            qjit(autograph=True)(f)
+            qjitted(True)
 
 
 class TestForLoops:
@@ -910,8 +921,11 @@ class TestForLoops:
             return qp.expval(qp.PauliZ(0))
 
         err_type = qp.exceptions.AutoGraphError if capture_mode else AutoGraphError
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            qjitted = qjit(autograph=True, capture=capture_mode)(f)
+
         with pytest.raises(err_type, match="Could not convert the iteration target"):
-            qjit(autograph=True, capture=capture_mode)(f)
+            qjitted()
 
     def test_for_in_static_range(self, capture_mode):
         """Test for loop over a Python range with static bounds."""
@@ -1021,11 +1035,12 @@ class TestForLoops:
                 qp.RY(params[i], wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        with pytest.warns(
-            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
-        ):
-            with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
-                qjit(autograph=True)(f)
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            with pytest.warns(
+                match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+            ):
+                with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+                    qjit(autograph=True)(f)(3)
 
     # This use case is never possible, regardless of whether AutoGraph is used or not.
     def test_for_in_dynamic_range_indexing_object_list(self):
@@ -1040,11 +1055,12 @@ class TestForLoops:
                 qp.RY(int(params[i]) * jnp.pi, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        with pytest.warns(
-            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
-        ):
-            with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
-                qjit(autograph=True)(f)
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            with pytest.warns(
+                match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+            ):
+                with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+                    qjit(autograph=True)(f)(3)
 
     def test_for_in_enumerate_array(self, capture_mode):
         """Test for loop over a Python enumeration on an array."""
@@ -1293,8 +1309,11 @@ class TestForLoops:
 
             return acc
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            f1_qjit = qjit(autograph=True)(f1)
+
         with pytest.raises(AutoGraphError, match="'acc' is potentially uninitialized"):
-            qjit(autograph=True)(f1)
+            f1_qjit()
 
         def f2():
             acc = 0
@@ -1303,8 +1322,11 @@ class TestForLoops:
 
             return x
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            f2_qjit = qjit(autograph=True)(f2)
+
         with pytest.raises(AutoGraphError, match="'x' is potentially uninitialized"):
-            qjit(autograph=True)(f2)
+            f2_qjit()
 
         def f3():
             acc = 0
@@ -1314,8 +1336,11 @@ class TestForLoops:
 
             return c
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            f3_qjit = qjit(autograph=True)(f3)
+
         with pytest.raises(AutoGraphError, match="'c' is potentially uninitialized"):
-            qjit(autograph=True)(f3)
+            f3_qjit()
 
     def test_init_with_invalid_jax_type(self, monkeypatch, capture_mode):
         """Test loop carried values initialized with an invalid JAX type."""
@@ -1330,8 +1355,11 @@ class TestForLoops:
             return x
 
         err_type = qp.exceptions.AutoGraphError if capture_mode else AutoGraphError
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            qjitted = qjit(autograph=True, capture=capture_mode)(f)
+
         with pytest.raises(err_type, match="'x' was initialized with type <class 'str'>"):
-            qjit(autograph=True, capture=capture_mode)(f)
+            qjitted()
 
     def test_init_with_mismatched_type(self, monkeypatch):
         """Test loop carried values initialized with a mismatched type compared to the values used
@@ -1347,8 +1375,11 @@ class TestForLoops:
             return x
 
         err_type = qp.exceptions.AutoGraphError if qp.capture.enabled() else AutoGraphError
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            qjitted = qjit(autograph=True)(f)
+
         with pytest.raises(err_type, match="'x' was initialized with the wrong type"):
-            qjit(autograph=True)(f)
+            qjitted()
 
     @pytest.mark.filterwarnings("error::UserWarning")
     def test_ignore_warnings(self, monkeypatch):
@@ -1501,8 +1532,9 @@ class TestWhileLoops:
                 raise RuntimeError("Test failure")
             return acc
 
-        with pytest.raises(RuntimeError):
-            qjit(autograph=True, capture=capture_mode)(f1)()
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            with pytest.raises(RuntimeError):
+                qjit(autograph=True, capture=capture_mode)(f1)()
 
     def test_uninitialized_variables(self, monkeypatch, capture_mode):
         """Verify errors for (potentially) uninitialized loop variables."""
@@ -1516,8 +1548,11 @@ class TestWhileLoops:
 
         err_type = qp.exceptions.AutoGraphError if capture_mode else AutoGraphError
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            qjitted = qjit(autograph=True, capture=capture_mode)(f)
+
         with pytest.raises(err_type, match="'x' is potentially uninitialized"):
-            qjit(autograph=True, capture=capture_mode)(f)
+            qjitted(True)
 
     def test_init_with_invalid_jax_type(self, monkeypatch, capture_mode):
         """Test loop carried values initialized with an invalid JAX type."""
@@ -1533,8 +1568,11 @@ class TestWhileLoops:
 
         err_type = qp.exceptions.AutoGraphError if capture_mode else AutoGraphError
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            qjitted = qjit(autograph=True, capture=capture_mode)(f)
+
         with pytest.raises(err_type, match="'x' was initialized with type <class 'str'>"):
-            qjit(autograph=True, capture=capture_mode)(f)
+            qjitted(True)
 
     def test_init_with_mismatched_type(self, monkeypatch):
         """Test loop carried values initialized with a mismatched type compared to the values used
@@ -1552,8 +1590,9 @@ class TestWhileLoops:
 
         err_type = qp.exceptions.AutoGraphError if qp.capture.enabled() else AutoGraphError
 
-        with pytest.raises(err_type, match="'x' was initialized with the wrong type"):
-            qjit(autograph=True)(f)(True)
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            with pytest.raises(err_type, match="'x' was initialized with the wrong type"):
+                qjit(autograph=True)(f)(True)
 
 
 @pytest.mark.parametrize(

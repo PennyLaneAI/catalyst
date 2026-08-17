@@ -53,6 +53,17 @@ StringAttr NodeAttr::keyOr(llvm::StringRef fallback) const {
 
 bool NodeAttr::isRemote() const {
     BoolAttr r = getRemote();
+}
+
+StringAttr NodeAttr::dataPathOr(llvm::StringRef dflt) const {
+    if (StringAttr p = getDataPath(); p && !p.getValue().empty()) {
+        return p;
+    }
+    return StringAttr::get(getContext(), dflt);
+}
+
+bool NodeAttr::isOutOfProcess() const {
+    BoolAttr r = getOutOfProcess();
     return r && r.getValue();
 }
 

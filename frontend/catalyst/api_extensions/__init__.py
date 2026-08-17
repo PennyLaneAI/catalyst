@@ -40,7 +40,6 @@ from catalyst.api_extensions.quantum_operators import (
     measure,
     pauli_measure,
 )
-from catalyst.api_extensions.target import attach_executor, target
 
 __all__ = (
     "accelerate",
@@ -61,6 +60,4 @@ __all__ = (
     "pauli_measure",
     "adjoint",
     "ctrl",
-    "target",
-    "attach_executor",
 )
