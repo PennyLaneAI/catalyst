@@ -1099,6 +1099,9 @@ class TestPlxPRDecomposition:
             circuit()
         qp.decomposition.disable_graph()
 
+    @pytest.mark.xfail(
+        "PL 2.0: DecomposeInterpreter is being removed in https://github.com/PennyLaneAI/pennylane/pull/9915."
+    )
     def test_decomp_inside_subroutine(self):
         """Test that decompositions can happen inside subroutines."""
         qp.decomposition.enable_graph()
