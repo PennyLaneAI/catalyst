@@ -237,13 +237,15 @@ class TestTraceTime:
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
 
-    def test_no_adjoint_rule_registered(self):
-        """When no Adjoint(Op) rule is registered, only the base rule is lowered (default)."""
+    def test_distribution_rule_synthesized_from_base_only(self):
+        """With only a base rule registered (no Adjoint(Op) rule), lowering still synthesizes a rule
+        for Adjoint(Op) by distributing the base rule over adjoint (case 3): its resources are the
+        base resources adjointed and its body is an adjoint region."""
         from operator2_dummy_gates import NoParams
 
         base_rule, _ = self._base_and_adjoint_rules()
         with local_decomps():
-            add_decomps(NoParams, base_rule)
+            add_decomps(NoParams, base_rule)  # only a base rule, no Adjoint(NoParams) rule
 
             @qjit(capture=True, target="mlir")
             @qnode(qp.device("null.qubit", wires=3))
@@ -254,7 +256,37 @@ class TestTraceTime:
             mlir = circuit.mlir
 
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert "Adjoint(" not in mlir
+        # A distribution rule for Adjoint(NoParams) is synthesized even though none was registered.
+        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+        assert 'resources = {operations = {"Adjoint(SingleParam{x:[f64]}{reg:2}{})" = 1 : i64}' in mlir
+        assert "qref.adjoint" in mlir
+
+    def test_no_distribution_rule_for_non_invertible_body(self):
+        """A distribution rule is NOT synthesized when the base rule body is non-invertible (contains
+        a mid-circuit measurement): the base rule is still lowered, but no Adjoint(Op) rule."""
+        from operator2_dummy_gates import NoParams, SingleParam
+
+        def base_resource_fn(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 1}
+
+        @register_resources(base_resource_fn)
+        def measuring_rule(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+            qp.measure(reg[0])
+
+        with local_decomps():
+            add_decomps(NoParams, measuring_rule)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                NoParams(reg=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' not in mlir
 
 
 class TestOnDemand:
