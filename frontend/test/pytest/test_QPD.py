@@ -53,6 +53,30 @@ class TestQPD:
             assert "PauliRot[f64][3]{pauli_word:XYX}_test_decomp" in result
             assert "test_decomp" in result
 
+    def test_failure_warning(self):
+        """Test a warning is raised if the mlir_module was not produced due to an error."""
+
+        with qp.decomposition.local_decomps():
+
+            class DummyOp(qp.core.Operator2):
+
+                def __init__(self, wires):
+                    super().__init__(wires=wires)
+
+            @qp.register_resources({qp.X: 1})
+            def f(wires):
+                raise ValueError
+
+            qp.add_decomps(DummyOp, f)
+
+            with pytest.warns(
+                UserWarning,
+                match="Python decomposition rule compilation failed for operator 'DummyOp'",
+            ):
+                with pytest.warns(UserWarning, match="AOT capture of jaxpr failed."):
+                    out = python_decomposition_wrapper("DummyOp", "DummyOp[][1]", [], [1], {})
+            assert out == "builtin.module{}"
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

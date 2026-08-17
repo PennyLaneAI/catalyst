@@ -25,6 +25,9 @@
   through the transport passes.
   [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
 
+* A failure during AOT compilation is now downgraded to a warning and logged.
+  [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
+
 * Adds the ability to use `pennylane.typing.AbstractArray` and `pennylane.wires.AbstractWires` as type hints for
   AOT compilation and as arguments to `pennylane.specs` calculations.
   [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
@@ -106,6 +109,8 @@
   - A `catalyst.Executor` is added for deploying and managing the `catalyst-executor` process that
     cross-compiled objects are dispatched to.
     [(#3082)](https://github.com/PennyLaneAI/catalyst/pull/3082)
+    [(#3119)](https://github.com/PennyLaneAI/catalyst/pull/3119)
+
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
@@ -347,6 +352,14 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
+  making every remote operation pay a fresh authentication handshake. The control socket went in
+  the system temp dir, which macOS puts under a per-user `/var/folders/...` path long enough to
+  overrun the 104-byte `sun_path` limit on its own. Sockets now live in `~/.catalyst/cm`, created
+  `0700`, which is both short enough and reachable only by its owner. Where no such directory can
+  be made, multiplexing is skipped rather than falling back to a world-writable one.
+  [(#3110)](https://github.com/PennyLaneAI/catalyst/pull/3110)
 
 * Fixed a bug where `Operator2` operations with integer-valued scalar parameters were incorrectly
   lowered to `qref.operator` instead of `qref.custom`.

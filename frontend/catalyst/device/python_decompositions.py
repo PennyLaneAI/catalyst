@@ -86,6 +86,16 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
                 # lowering pipeline
                 subroutine(*[0.5 for _ in dynamic_shape], wires=wires)
 
+        if circuit.mlir_module is None:
+            # AOT compilation softened the error into a warning.
+            warnings.warn(
+                f"Python decomposition rule compilation failed for operator "
+                f"'{op_name}' (id: {op_id}); it will be treated as non-decomposable "
+                f"by the graph solver.",
+                UserWarning,
+            )
+            return "builtin.module{}"
+
         return str(circuit.mlir_module)
     except:
         warnings.warn(
