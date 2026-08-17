@@ -145,11 +145,12 @@ def _node_dict(node: Node, role: str) -> dict:
         except (AttributeError, RuntimeError) as e:
             # Either it has no ``address`` at all, or it has neither launched nor settled on one.
             # The cause says which; both leave the compiled program with nowhere to dispatch.
+            who = f"{role} {node.label!r}" if node.label is not None else f"unlabelled {role}"
             raise CompileError(
-                f"backline node's executor ({type(executor).__name__}) cannot say where it serves, "
-                f"so the compiled program would have nowhere to dispatch it: {e}. Pass "
-                f"executor_options= and let the compiler settle the address, or launch the "
-                f"executor before compiling."
+                f"backline {who} has an executor ({type(executor).__name__}) that cannot say "
+                f"where it serves, so the compiled program would have nowhere to dispatch it: "
+                f"{e}. Pass executor_options= and let the compiler settle the address, or launch "
+                f"the executor before compiling."
             ) from e
         if address:  # also rejects "", which would serialize as an empty, unusable address
             d["address"] = address
