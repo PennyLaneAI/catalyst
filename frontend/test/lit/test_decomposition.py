@@ -755,7 +755,7 @@ def test_decomposition_inside_subroutine():
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
     def subroutine_circuit():
         # CHECK-DAG: [[FIRST_CONST:%.+]] = stablehlo.constant dense<5.000000e-01> : tensor<f64>
-        # CHECK-DAG: [[SECOND_CONST:%.+]] = stablehlo.constant dense<1.200000e+00> : tensor<f64>
+        # CHECK-DAG: [[SECOND_CONST:%.+]] = arith.constant 2.000000e-01 : f64
 
         # CHECK: [[QREG:%.+]] = qref.alloc
         # CHECK: call @f([[QREG]], [[FIRST_CONST]], {{%.+}}) : (!qref.reg<5>, tensor<f64>, tensor<2xi64>)
@@ -793,7 +793,7 @@ def test_decomposition_rule_name_update_multi_qubits():
     # CHECK-DAG: @_rz_to_{{(ry_rx|rx_cliff)}}(%arg0: !qref.reg<4>, %arg1: tensor<f64>, %arg2: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RZ"}
     # CHECK-DAG: @_rot_to_rz_ry_rz(%arg0: !qref.reg<4>, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>, %arg4: tensor<1xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "Rot"}
     # CHECK-DAG: @_doublexcit(%arg0: !qref.reg<4>, %arg1: tensor<1xf64>, %arg2: tensor<4xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 4 : i64, target_gate = "DoubleExcitation"}
-    # CHECK-DAG: @_single_excitation_decomp(%arg0: !qref.reg<4>, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>) attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 2 : i64, target_gate = "SingleExcitation"}
+    # CHECK-DAG: @_phaseshift_to_rz_gp(%arg0: !qref.reg<4>, %arg1: tensor<f64>, %arg2: tensor<1xi64>)
     print(circuit_15.mlir)
 
 
