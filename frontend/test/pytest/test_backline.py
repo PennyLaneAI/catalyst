@@ -37,9 +37,21 @@ from catalyst.backline import (
 )
 from catalyst.utils.exceptions import CompileError
 
-pytestmark = pytest.mark.skipif(
-    not hasattr(qp, "backline"), reason="pennylane.backline UI not available"
-)
+if hasattr(qp, "backline"):
+    from pennylane.backline import Transport
+
+
+@pytest.fixture(autouse=True)
+def _net_transport():
+    """Register a test-only ``"net"`` transport per test; unregister on teardown."""
+    from pennylane import backline as _bl
+    from pennylane.backline import register_transport
+
+    register_transport("net")(lambda: Transport("net"))
+    try:
+        yield
+    finally:
+        getattr(_bl, "_transports", {}).pop("net", None)
 
 
 def _controller(**kw):

@@ -16,6 +16,13 @@
 build the pipelines that lower it. A node's hardware and the placement transport select the
 compiled transport backend.
 
+A placement adds three passes to the compiler's stages: ``inject-transport-session`` emits the
+session's bring-up and teardown, ``lower-decode-to-transport`` turns a decode into a transport round
+over that session, and ``convert-transport-to-llvm`` lowers the result to runtime calls. A placement
+naming a ``qec_code`` also encodes the circuit, which registers the encoding passes and adds
+``convert-qecp-to-llvm``. See ``_TRANSPORT_PASSES`` and ``_QEC_LOWERING_PASSES`` for where each is
+inserted.
+
 Note: "node" here is a backline participant (a controller or coprocessor), distinct from
 :class:`catalyst.Executor`, which deploys the ``catalyst-executor`` process a node may run on.
 """
@@ -94,8 +101,9 @@ def _resolve_backend_lib(transport: str, hardware: str, role: str, remote: bool)
         hardware: Node hardware name: ``"cpu"``, ``"gpu"``, or ``"fpga"``.
         role: ``"controller"`` or ``"coprocessor"``. Each backend ships one library per role.
         remote: Whether the node runs on another machine. A remote node loads the library from the
-            bundle deployed alongside it, so it is named by filename only; a local node is given the
-            full path into this installation.
+            bundle deployed alongside it, so it is named by filename only, and always with a ``.so``
+            extension: a node on another machine has to be Linux. A local node is given the full
+            path into this installation, which may be either ``.so`` or ``.dylib``.
 
     Returns:
         str: The library path for a local node, or its bare filename for a remote one.
@@ -168,11 +176,12 @@ def _node_dict(node: Node, role: str) -> dict:
         except (AttributeError, RuntimeError) as e:
             # Either it has no ``address`` at all, or it has neither launched nor settled on one.
             # The cause says which; both leave the compiled program with nowhere to dispatch.
+            who = f"{role} {node.label!r}" if node.label is not None else f"unlabelled {role}"
             raise CompileError(
-                f"backline node's executor ({type(executor).__name__}) cannot say where it serves, "
-                f"so the compiled program would have nowhere to dispatch it: {e}. Pass "
-                f"executor_options= and let the compiler settle the address, or launch the "
-                f"executor before compiling."
+                f"backline {who} has an executor ({type(executor).__name__}) that cannot say "
+                f"where it serves, so the compiled program would have nowhere to dispatch it: "
+                f"{e}. Pass executor_options= and let the compiler settle the address, or launch "
+                f"the executor before compiling."
             ) from e
         if address:  # also rejects "", which would serialize as an empty, unusable address
             d["address"] = address
