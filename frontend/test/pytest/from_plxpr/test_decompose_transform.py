@@ -1100,7 +1100,7 @@ class TestPlxPRDecomposition:
         qp.decomposition.disable_graph()
 
     @pytest.mark.xfail(
-        reason="Tracer from IsingXX (Operator2) dynamic arg is leaking into the JAXPR. This is an upstream PL issue [sc-].",
+        reason="Tracer from IsingXX (Operator2) dynamic arg is leaking into the JAXPR. This is an upstream PL issue [sc-127907].",
         strict=True,
     )
     def test_decomp_inside_subroutine(self):
