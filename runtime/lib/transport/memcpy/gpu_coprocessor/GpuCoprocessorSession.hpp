@@ -69,8 +69,8 @@ class GpuCoprocessorSession : public CoprocessorSession {
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
     int gpu_device_ = 0;
-    std::unique_ptr<gpu_verbs::GpuRuntime> gpu_;
-    gpu_verbs::GpuRuntime::Handoff handoff_{};
+    std::unique_ptr<coproc::GpuRuntime> gpu_;
+    coproc::GpuRuntime::Handoff handoff_{};
     common::PayloadSlot *request_slot_host_ = nullptr;
     common::PayloadSlot *request_slot_dev_ = nullptr;
 

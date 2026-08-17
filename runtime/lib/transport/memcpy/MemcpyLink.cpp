@@ -23,13 +23,13 @@
 #include <string>
 #include <unordered_map>
 
-#include "BackendConfig.hpp"
+#include "ConfigParser.hpp"
 
 namespace catalyst::transport::memcpy {
 
 auto parse_pair_key(std::string_view config) -> std::string {
     std::string out;
-    common::backendconfig::for_each_config_kv(config, [&](std::string_view k, std::string_view v) {
+    common::configparser::for_each_kv(config, [&](std::string_view k, std::string_view v) {
         if (k == "pair") {
             out.assign(v);
         }

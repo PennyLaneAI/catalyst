@@ -32,6 +32,7 @@
 namespace catalyst::transport::gpu_verbs {
 using namespace catalyst::transport;
 using namespace catalyst::transport::common;
+using namespace catalyst::transport::coproc; // GpuRuntime, HandoffSlot, launchers
 
 namespace {
 // RDMA device port (single-port NIC -> 1).

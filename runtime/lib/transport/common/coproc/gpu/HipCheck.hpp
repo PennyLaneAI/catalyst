@@ -24,9 +24,9 @@
  * hipSuccess, tagged with the source location of the call.
  */
 #define HIP_CHECK(expression, what)                                                                \
-    ::catalyst::transport::gpu_verbs::_hip_check((expression), (what), __FILE__, __LINE__, __func__)
+    ::catalyst::transport::coproc::_hip_check((expression), (what), __FILE__, __LINE__, __func__)
 
-namespace catalyst::transport::gpu_verbs {
+namespace catalyst::transport::coproc {
 
 /**
  * @brief Throws a `std::runtime_error` describing a failed HIP call.
@@ -38,8 +38,8 @@ inline void _hip_check(hipError_t err, const char *what, const char *file_name, 
     }
     std::stringstream sstream;
     sstream << "[" << file_name << ":" << line << "][Function:" << function_name
-            << "] gpu_verbs: " << what << ": " << hipGetErrorString(err);
+            << "] coproc: " << what << ": " << hipGetErrorString(err);
     throw std::runtime_error(sstream.str());
 }
 
-} // namespace catalyst::transport::gpu_verbs
+} // namespace catalyst::transport::coproc

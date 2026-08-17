@@ -17,14 +17,14 @@
 
 #include <string>
 
-#include "BackendConfig.hpp"
+#include "ConfigParser.hpp"
 #include "GpuCoprocessorSession.hpp"
 #include "TransportBackend.h"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_local_gpu_coprocessor(const std::string &config) {
-    const int gpu_device =
-        catalyst::transport::common::parse_optional_index(config, "gpu", /*fallback=*/0);
+    const int gpu_device = catalyst::transport::common::configparser::parse_optional_index(
+        config, "gpu", /*fallback=*/0);
     return new catalyst::transport::memcpy::GpuCoprocessorSession(config, gpu_device);
 }
 } // namespace

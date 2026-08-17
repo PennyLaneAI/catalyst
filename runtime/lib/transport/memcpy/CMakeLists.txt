@@ -5,7 +5,7 @@
 # memcpy_cpu_impl is SHARED (not STATIC) so both memcpy plugins loaded into the same process
 # reference one copy of `acquire_memcpy_link` and its static registry map. Linking a STATIC
 # impl into two SHARED plugins would give each plugin its own private map, and a controller
-# and coprocessor dlopen'd from different .so files could not pair via (peer, oob_port).
+# and coprocessor dlopen'd from different .so files could not pair via the session pair key.
 add_library(memcpy_cpu_impl SHARED
     MemcpyLink.cpp
     cpu_controller/CpuControllerSession.cpp
@@ -15,9 +15,9 @@ target_include_directories(memcpy_cpu_impl PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu_controller
     ${CMAKE_CURRENT_SOURCE_DIR}/cpu_coprocessor
-    ${CMAKE_CURRENT_SOURCE_DIR}/../rdma/common
     ${runtime_includes}
 )
+target_link_libraries(memcpy_cpu_impl PUBLIC catalyst_transport_common)
 set_property(TARGET memcpy_cpu_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Plugins are dlopen'd by absolute path; $ORIGIN / @loader_path lets them find sibling
@@ -44,11 +44,9 @@ add_library(catalyst_transport_memcpy_coprocessor SHARED
 target_link_libraries(catalyst_transport_memcpy_coprocessor PRIVATE memcpy_cpu_impl)
 _memcpy_set_plugin_rpath(catalyst_transport_memcpy_coprocessor)
 
-# memcpy_gpu reuses shared GPU plumbing (GpuRuntime, HipCheck, GpuLaunchers) that currently
-# lives under rdma/gpu_verbs/coprocessor/. So today it can only build when both a HIP toolchain
-# and libibverbs are present (the latter guards gpu_verbs itself). Extracting the shared GPU
-# code into a common library is a follow-up that would let memcpy_gpu build with HIP alone.
-if(TRANSPORT_HAS_HIP AND TARGET catalyst_transport_gpu_verbs_coprocessor)
+# memcpy_gpu depends only on HIP (via the shared catalyst_transport_coproc_gpu). No libibverbs
+# needed — the RDMA-side gpu_verbs plugin is not required.
+if(TRANSPORT_HAS_HIP)
     add_library(memcpy_gpu_impl STATIC
         gpu_coprocessor/GpuCoprocessorSession.cpp
     )
@@ -58,14 +56,11 @@ if(TRANSPORT_HAS_HIP AND TARGET catalyst_transport_gpu_verbs_coprocessor)
     target_include_directories(memcpy_gpu_impl PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/gpu_coprocessor
-        ${CMAKE_CURRENT_SOURCE_DIR}/../rdma/common
-        ${CMAKE_CURRENT_SOURCE_DIR}/../rdma/gpu_verbs/coprocessor
-        ${CMAKE_CURRENT_SOURCE_DIR}/../rdma/gpu_verbs/coprocessor/coprocessor_functions
         ${runtime_includes}
     )
     target_link_libraries(memcpy_gpu_impl PUBLIC
-        catalyst_transport_gpu_verbs_coprocessor
         memcpy_cpu_impl
+        catalyst_transport_coproc_gpu
         hip::host
     )
     if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")

@@ -12,25 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Shared LUT (look-up table) for the [[7,1,3]] Steane code, used by both the CPU
+// CoprocessorFn (steane_decoder_fn.cpp) and the GPU __device__ decode
+// (steane_decoder.hpp). Kept here as a single source of truth so the two decoders
+// can't drift.
+
 #pragma once
 #include <cstdint>
-namespace catalyst::transport::gpu_verbs {
 
+namespace catalyst::transport::coproc {
+
+/// Number of syndrome check bits per shot for the [[7,1,3]] Steane code.
 constexpr int STEANE_CHECKS = 3;
 
-/**
- * @brief Syndrome to error qubit index for the [[7,1,3]] Steane code; -1 is no
- * error.
- *
- * Indexed by the 3 checks packed with check 0 as the most significant bit.
- * For compatibility with existing Steane decoder.
- */
+/// Syndrome → error qubit index (0..6); -1 marks "no error".
+/// Indexed by the 3 checks packed with check 0 as the most significant bit.
 constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1 << STEANE_CHECKS] = {-1, 6, 4, 5, 0, 3, 1, 2};
 
-/**
- * @brief STEANE_SYNDROME_TO_QUBIT packed into a single 32-bit word, 4 bits per
- * entry; 0xF encodes the -1 (no error) sentinel. Packed for reduced memory access.
- */
+/// STEANE_SYNDROME_TO_QUBIT packed into a single 32-bit word, 4 bits per entry;
+/// 0xF encodes the -1 (no error) sentinel. Compact form for constant-memory access
+/// on the GPU.
 constexpr std::uint32_t pack_steane_table() {
     std::uint32_t packed = 0;
     for (int i = 0; i < (1 << STEANE_CHECKS); ++i) {
@@ -43,21 +44,4 @@ constexpr std::uint32_t STEANE_TABLE_PACKED = pack_steane_table();
 static_assert(STEANE_TABLE_PACKED == 0x2130546FU,
               "packed table must match STEANE_SYNDROME_TO_QUBIT");
 
-/**
- * @brief Decode one Steane syndrome to an error qubit index.
- *
- * @param syndrome Ring word holding one byte per check, byte `i` carrying check
- *                 `i` in its low bit (a `memref<?xi1>` lowers to one byte per
- *                 element, so the checks arrive unpacked).
- * @return The error qubit index, or -1 for no error.
- */
-__device__ inline std::int64_t steane_decode(std::uint64_t syndrome) {
-    std::uint32_t packed = 0;
-    for (int i = 0; i < STEANE_CHECKS; ++i) {
-        packed = (packed << 1U) | static_cast<std::uint32_t>((syndrome >> (8 * i)) & 1U);
-    }
-    const std::uint32_t qubit = (STEANE_TABLE_PACKED >> (packed * 4U)) & 0xFU;
-    return (qubit == 0xFU) ? -1 : static_cast<std::int64_t>(qubit);
-}
-
-} // namespace catalyst::transport::gpu_verbs
+} // namespace catalyst::transport::coproc

@@ -16,7 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace catalyst::transport::gpu_verbs {
+namespace catalyst::transport::coproc {
 
 // Per-slot GPU->CPU handoff, written by the fused kernel and read by the CPU
 // engine. `seq` is the trailer (== cursor + 1). When the slot is <= 16 B the
@@ -68,4 +68,4 @@ class GpuRuntime {
     std::uint32_t *stop_host_ = nullptr;  // owned; hipHostFree in dtor
 };
 
-} // namespace catalyst::transport::gpu_verbs
+} // namespace catalyst::transport::coproc

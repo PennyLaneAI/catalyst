@@ -45,7 +45,7 @@ GpuCoprocessorSession::~GpuCoprocessorSession() {
 
 void GpuCoprocessorSession::ensure_gpu_state() {
     if (!gpu_) {
-        gpu_ = std::make_unique<gpu_verbs::GpuRuntime>(gpu_device_);
+        gpu_ = std::make_unique<coproc::GpuRuntime>(gpu_device_);
     }
     if (!request_slot_host_) {
         HIP_CHECK(hipHostMalloc(reinterpret_cast<void **>(&request_slot_host_),
@@ -135,7 +135,7 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
     ensure_gpu_state();
 
     request_slot_host_[0] = common::PayloadSlot{};
-    handoff_.host[0] = gpu_verbs::HandoffSlot{};
+    handoff_.host[0] = coproc::HandoffSlot{};
     if (handoff_.stop_host) {
         *handoff_.stop_host = 0;
     }
@@ -154,7 +154,7 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
         .total = 1,
         .stream = gpu_->stream(),
     };
-    CoprocessorLauncherFn launch = launcher_ ? launcher_ : &gpu_verbs::default_echo_launcher;
+    CoprocessorLauncherFn launch = launcher_ ? launcher_ : &coproc::default_echo_launcher;
     if (launch(&desc, launcher_ctx_) != 0) {
         throw std::runtime_error("memcpy: GPU coprocessor launcher failed");
     }

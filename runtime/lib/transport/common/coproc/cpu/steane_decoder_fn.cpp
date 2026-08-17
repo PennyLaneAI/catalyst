@@ -20,18 +20,12 @@
 #include <cstdint>
 #include <cstring>
 
-namespace {
+#include "SteaneLut.hpp"
 
-constexpr std::size_t STEANE_CHECKS = 3;
-
-/**
- * @brief Syndrome to error qubit index for the [[7,1,3]] Steane code; -1 is no
- * error. For compatibility with existing Steane decoder.
- *
- */
-constexpr std::int64_t STEANE_SYNDROME_TO_QUBIT[1u << STEANE_CHECKS] = {-1, 6, 4, 5, 0, 3, 1, 2};
-
-} // namespace
+// The shared LUT (STEANE_CHECKS, STEANE_SYNDROME_TO_QUBIT) lives in common/coproc/SteaneLut.hpp
+// so the CPU and GPU decoders can't disagree on the table.
+using catalyst::transport::coproc::STEANE_CHECKS;
+using catalyst::transport::coproc::STEANE_SYNDROME_TO_QUBIT;
 
 /**
  * @brief A hard-coded [[7,1,3]] Steane-code decode exposed as a CoprocessorFn

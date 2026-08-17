@@ -24,11 +24,8 @@ target_link_libraries(catalyst_transport_cpu_verbs_controller PRIVATE cpu_verbs_
 add_library(catalyst_transport_cpu_verbs_coprocessor SHARED coprocessor/CpuCoprocessorFactory.cpp)
 target_link_libraries(catalyst_transport_cpu_verbs_coprocessor PRIVATE cpu_verbs_impl)
 
-add_library(steane_coprocessor_cpu SHARED coprocessor/coprocessor_functions/steane_decoder_fn.cpp)
-set_property(TARGET steane_coprocessor_cpu PROPERTY POSITION_INDEPENDENT_CODE ON)
-
-add_library(echo_coprocessor_cpu SHARED coprocessor/coprocessor_functions/echo_coprocessor_fn.cpp)
-set_property(TARGET echo_coprocessor_cpu PROPERTY POSITION_INDEPENDENT_CODE ON)
+# The steane / echo CoprocessorFn plugin libraries have moved to transport/common/cpu_coproc_common/
+# so they build without libibverbs and any backend (memcpy included) can dlopen them.
 
 # Self-contained loopback application for testing
 add_executable(cpu_verbs_selftest cpu_verbs_selftest.cpp)
