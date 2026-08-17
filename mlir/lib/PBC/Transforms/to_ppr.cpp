@@ -45,6 +45,9 @@ struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
         // Remove all decomposition rules, they might involve gates we don't care about
         PassManager pm(ctx);
         pm.addPass(mlir::createSymbolDCEPass());
+        if (failed(pm.run(getOperation()))) {
+            return signalPassFailure();
+        }
 
         // Any Quantum "gate-like" operation must be converted
         target.addDynamicallyLegalDialect<quantum::QuantumDialect>(
