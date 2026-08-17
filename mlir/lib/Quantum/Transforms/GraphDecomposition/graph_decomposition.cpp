@@ -60,6 +60,7 @@
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
+#include "DGUtils.hpp"
 #include "DecompUtils.hpp"
 
 #define DEBUG_TYPE "graph-decomposition"
@@ -138,6 +139,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
         auto solution = solver.solve();
+        LLVM_DEBUG(showSolution(solution));
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
@@ -216,7 +218,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             cost.consume_back(": f64");
             cost = cost.trim();
 
-            bool success = to_float(cost, targetGateSet.ops[OperatorNode{opName.str()}]);
+            bool success = to_float(cost, targetGateSet.ops[opName.str()]);
 
             if (!success) {
                 return failure();
