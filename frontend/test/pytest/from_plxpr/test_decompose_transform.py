@@ -1185,7 +1185,7 @@ class TestPlxPRDecomposition:
                 controlled_resource_rep(
                     qp.BasisEmbedding, {"num_wires": 1}, num_control_wires=1
                 ): 1,
-                qp.resource_rep(qp.GlobalPhase): 1,
+                qp.GlobalPhase: 1,
             }
 
         @qp.register_resources(_resources)
