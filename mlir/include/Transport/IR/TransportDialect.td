@@ -124,12 +124,6 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         /// Session registry key: `name` when set and non-empty, else `fallback`.
         mlir::StringAttr keyOr(llvm::StringRef fallback) const;
 
-        /// True only when `remote` is present and set.
-        bool isRemote() const;
-
-        /// `data_path` when set, else `dflt`.
-        mlir::StringAttr dataPathOr(llvm::StringRef dflt) const;
-
         /// Whether this node's code is dispatched to an executor rather than run in the
         /// compiling process.
         bool isOutOfProcess() const;
