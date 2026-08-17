@@ -38,6 +38,9 @@ from catalyst.decomposition.type_utils import (
 from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
+# Ops that make a decomposition body non-invertible:
+_NON_INVERTIBLE_MARKERS = ("qref.measure", "quantum.measure")
+
 
 class GraphOpID:
     """
@@ -294,11 +297,18 @@ def compile_decomposition_rules(
     static_data,
     extra_data=None,
     is_custom_op=False,
+    wrap_adjoint=False,
 ) -> ModuleOp:
     """
     Return a ModuleOp containing the decomposition rules for an operator instance.
 
     The decomposition rules will be decorated with appropriate resource and target_gate attributes.
+
+    When ``wrap_adjoint`` is True, the rules registered on the base op ``op_name`` are instead
+    synthesized into rules for ``Adjoint(op_name)`` (aka the "distribution" pathway). Each base
+    rule body is wrapped in a ``qml.adjoint`` region (reduced to op-level modified gates by
+    ``adjoint-lowering`` within the decomposition pass), the ``target_gate`` updates to the adjoint
+    id, and each produced op in the resources is wrapped in ``Adjoint(...)``.
     """
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
@@ -308,18 +318,29 @@ def compile_decomposition_rules(
         op_name, kwargs | static_data | extra_data, is_custom_op
     )
 
+    # The distribution pathway targets `Adjoint(op)` and produces adjointed resource gates.
+    target_id = f"Adjoint({op_id})" if wrap_adjoint else op_id
+    if wrap_adjoint:
+        name_to_resource_ids = {
+            rule_name: {f"Adjoint({produced_id})": count for produced_id, count in ids.items()}
+            for rule_name, ids in name_to_resource_ids.items()
+        }
+
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit
     def rule_to_subroutine(rule):
         def decomp_rule(*_args, **_kwargs):
-            rule._impl(*_args, **_kwargs)
+            if wrap_adjoint:
+                qp.adjoint(rule._impl)(*_args, **_kwargs)
+            else:
+                rule._impl(*_args, **_kwargs)
 
         decomp_rule_no_static_args = partial(decomp_rule, **static_data)
         if extra_data:
             decomp_rule_no_static_args = partial(decomp_rule_no_static_args, **extra_data)
 
-        # keep the frontend name for readability, append target op_id for symbol uniqueness
-        decomp_rule_no_static_args.__name__ = rule._impl.__name__ + "_" + op_id
+        # Keep the frontend name for readability, append target op_id for symbol uniqueness:
+        decomp_rule_no_static_args.__name__ = rule._impl.__name__ + "_" + target_id
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
@@ -343,12 +364,12 @@ def compile_decomposition_rules(
             - Adds the `resources` attribute.
         """
         if op.name == "func.func":
-            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + op_id)
+            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + target_id)
             if rule_name in name_to_resource_ids:
                 op.attributes["resources"] = get_mlir_attribute_from_pyval(
                     {"operations": name_to_resource_ids[rule_name]}
                 )
-                op.attributes["target_gate"] = ir.StringAttr.get(op_id)
+                op.attributes["target_gate"] = ir.StringAttr.get(target_id)
 
         return ir.WalkResult.ADVANCE
 
@@ -391,21 +412,25 @@ def fetch_all_reachable_decomposition_rules_from_op(
     visited = [start]
 
     def compile_variants(name, op_id, dynamic_shape, wire_lens, static_data, extra_data):
-        # Compile the rules for both `name` and `Adjoint(name)`:
-        # Note a rule that its body/resources can't be be captured is skipped with a warning.
+        # CQRs/Adjoint: For an op `name` capture the rules for
+        #   1. the base op `name`,
+        #   2. the adjoint op `Adjoint(name)` rules, and
+        #   3. the adjoint op synthesized by distributing each base rule over adjoint.
+        # Note: a rule whose body or resources can't be captured is skipped with a warning.
         out = get_rule_strings_from_module(
             compile_decomposition_rules(
                 name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
             )
         )
         if not name.startswith("Adjoint("):
-            adj_name, adj_id = f"Adjoint({name})", f"Adjoint({op_id})"
+            adj_name = f"Adjoint({name})"
+            # Rules registered directly against Adjoint(name):
             try:
                 out.extend(
                     get_rule_strings_from_module(
                         compile_decomposition_rules(
                             adj_name,
-                            adj_id,
+                            f"Adjoint({op_id})",
                             dynamic_shape,
                             wire_lens,
                             static_data,
@@ -415,6 +440,30 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 )
             except Exception as e:  # pylint: disable=broad-except
                 warnings.warn(f"Failed to lower the decomposition rules for {adj_name}: {e}")
+            # Rules for Adjoint(name) synthesized by adjointing each base rule of `name`:
+            try:
+                distributed = get_rule_strings_from_module(
+                    compile_decomposition_rules(
+                        name,
+                        op_id,
+                        dynamic_shape,
+                        wire_lens,
+                        static_data,
+                        extra_data=extra_data,
+                        wrap_adjoint=True,
+                    )
+                )
+                # Suppress a distribution rule whose body is non-invertible:
+                distributed = [
+                    rule
+                    for rule in distributed
+                    if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
+                ]
+                out.extend(distributed)
+            except Exception as e:  # pylint: disable=broad-except
+                warnings.warn(
+                    f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}"
+                )
         return out
 
     rules = compile_variants(op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data)
