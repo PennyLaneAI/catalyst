@@ -136,7 +136,7 @@ def _out_of_process(node: Node) -> bool:
     return node.executor_options is not None or node.executor
 
 
-def _node_dict(node: Node, role: str) -> dict:
+def _node_dict(node: Node, role: str, transport: str) -> dict:
     """Map a backline node to a ``catalyst.backline`` node dict. Reads ``node.executor`` as-is.
 
     ``comm_host``/``oob_port`` are coprocessor-only; a controller
@@ -148,23 +148,21 @@ def _node_dict(node: Node, role: str) -> dict:
         transport: The placement's transport name. Together with ``node.hardware``, this selects
             the concrete backend. An explicit ``init_args["backend_lib"]`` path takes precedence.
     """
-    d: dict = {"remote": bool(node.remote), "out_of_process": bool(_out_of_process(node))}
+    d: dict = {"out_of_process": bool(_out_of_process(node))}
     if node.name is not None:
         d["name"] = node.name
     if role == "controller":
         d["in_bytes"] = node.in_bytes
         d["out_bytes"] = node.out_bytes
-    if node.label is not None:
-        d["name"] = node.label
     comm_host = getattr(node, "comm_host", None)
     if comm_host is not None:
         d["peer"] = comm_host
     oob_port = getattr(node, "oob_port", None)
     if oob_port is not None:
         d["oob_port"] = oob_port
-    backend = node.backend
-    if backend is not None and not (node.init_args or {}).get("backend_lib"):
-        d["backend_lib"] = _resolve_backend_lib(backend, role, bool(node.remote))
+    hardware = getattr(node, "hardware", None)
+    if hardware is not None and not (node.init_args or {}).get("backend_lib"):
+        d["backend_lib"] = _resolve_backend_lib(transport, hardware, role, bool(node.remote))
     # A node may be handed any object as its executor, so its fields are read rather than assumed.
     executor = node.executor
     if executor is not None:
@@ -176,7 +174,7 @@ def _node_dict(node: Node, role: str) -> dict:
         except (AttributeError, RuntimeError) as e:
             # Either it has no ``address`` at all, or it has neither launched nor settled on one.
             # The cause says which; both leave the compiled program with nowhere to dispatch.
-            who = f"{role} {node.label!r}" if node.label is not None else f"unlabelled {role}"
+            who = f"{role} {node.name!r}" if node.name is not None else f"unlabelled {role}"
             raise CompileError(
                 f"backline {who} has an executor ({type(executor).__name__}) that cannot say "
                 f"where it serves, so the compiled program would have nowhere to dispatch it: "
@@ -231,9 +229,9 @@ def _required_plugins(node, role: str) -> list[str]:
 def realize_executors(placement) -> None:
     """Prepare ``placement`` for execution: launch the executors it asked for, and load the
     CoprocessorFn libraries its in-process coprocessors need. Idempotent."""
-    _realize_executor(placement.controller, "controller")
+    _realize_executor(placement.controller)
     for coproc in placement.coprocessors:
-        _realize_executor(coproc, "coprocessor")
+        _realize_executor(coproc)
     _load_coprocessor_fn_libs(placement)
 
 
@@ -360,11 +358,6 @@ def _launch_executor(name, options):
 
     options.setdefault("name", name or "executor")
     return Executor(**options).launch()
-
-
-def _realize_executor(node, role=None):
-    """Return the node's launched executor, building it on first use."""
-    executor = getattr(node, "executor", None)
 
 
 def _coprocessor_fn_lib(node: Node) -> Path | None:
