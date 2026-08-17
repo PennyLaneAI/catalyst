@@ -417,6 +417,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `--to-ppr` pass now runs `--symbol-dce` at the beginning, to eliminate unnecessary
+  decomposition rules that might contain gates that cannot be converted to PPRs.
+  [(#3125)](https://github.com/PennyLaneAI/catalyst/pull/3125)
+
 * Extended internal program-capture support for PennyLane `Operator2` instances. Catalyst now
   distinguishes gates from operators used as observables.
   Native `Operator2` controlled wrappers are also handled in `catalyst.ctrl` and
