@@ -1014,12 +1014,12 @@ class TestPlxPRDecomposition:
         @qp.transforms.cancel_inverses
         @partial(
             qp.transforms.decompose,
-            gate_set=frozenset({"RZ", "RY", "CNOT", "GlobalPhase"}),
+            gate_set=frozenset({"RZ", "RY", "CNOT", "X", "GlobalPhase"}),
         )
         @qp.qnode(qp.device("null.qubit", wires=1))
         def circuit():
-            qp.PauliX(0)
-            qp.PauliX(0)
+            qp.X(0)
+            qp.X(0)
             qp.RX(0.1, wires=0)
             return qp.expval(qp.PauliX(0))
 
