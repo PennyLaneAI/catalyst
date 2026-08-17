@@ -567,7 +567,7 @@ class TestAdjointCtrl:
 
         assert qfunc_xpr.eqns[1].primitive == qref_alloc_p
         assert qfunc_xpr.eqns[2].primitive == qref_get_p
-        assert qfunc_xpr.eqns[3].primitive == qref_qinst_p
+        assert qfunc_xpr.eqns[3].primitive == qref_operator_p
 
         eqn = qfunc_xpr.eqns[4]
         assert eqn.primitive == adjoint_transform_prim
@@ -609,7 +609,7 @@ class TestAdjointCtrl:
 
         assert qfunc_xpr.eqns[2].primitive == qref_get_p
         assert qfunc_xpr.eqns[3].primitive == qref_get_p
-        assert qfunc_xpr.eqns[4].primitive == qref_qinst_p
+        assert qfunc_xpr.eqns[4].primitive == qref_operator_p
         assert qfunc_xpr.eqns[5].primitive == qref_get_p
         assert qfunc_xpr.eqns[6].primitive == qref_get_p
 
@@ -650,13 +650,15 @@ class TestAdjointCtrl:
 
         for i in [0, 1, 2]:
             assert for_loop_xpr.eqns[i].primitive == qref_get_p
-        assert for_loop_xpr.eqns[3].primitive == qref_qinst_p
+        assert for_loop_xpr.eqns[3].primitive == qref_operator_p
         assert for_loop_xpr.eqns[3].params == {
             "adjoint": False,
-            "ctrl_len": 2,
-            "op": "PauliX",
-            "params_len": 0,
-            "qubits_len": 1,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 2,
+            "op_cls": qp.X,
+            "wire_lens": (1,),
         }
 
 

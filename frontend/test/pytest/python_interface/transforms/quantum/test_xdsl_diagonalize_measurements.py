@@ -891,8 +891,11 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
         def circuit():
             return qp.expval(qp.X(0)), qp.var(qp.Z(0))
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            qjitted = qp.qjit(circuit, capture=capture_mode)
+
         with pytest.raises(CompileError, match=_non_commuting_err_msg):
-            qp.qjit(circuit, capture=capture_mode)
+            qjitted()
 
     @pytest.mark.parametrize("obs", NON_COMMUTE_MULTI_OBS_LIST)
     @pytest.mark.parametrize("m", [(qp.expval, qp.var)])
