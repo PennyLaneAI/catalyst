@@ -33,10 +33,6 @@ from catalyst.backline import (
 )
 from catalyst.utils.exceptions import CompileError
 
-pytestmark = pytest.mark.skipif(
-    not hasattr(qp, "backline"), reason="pennylane.backline UI not available"
-)
-
 if hasattr(qp, "backline"):
     from pennylane.backline import Transport
 
