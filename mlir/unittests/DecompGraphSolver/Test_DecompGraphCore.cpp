@@ -25,31 +25,36 @@ using namespace Catch::Matchers;
 using namespace DecompGraph::Core;
 
 TEST_CASE("Test OperatorNode construction", "[DecompGraph::Core]") {
-    const OperatorNode h{"Hadamard[][1]{}"};
-    const OperatorNode cnot{"CNOT[][2]{}"};
-    const OperatorNode rx{"RX[f64][1]{}"};
-    const OperatorNode rz{"RZ[f64][1]{}"};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
 
     REQUIRE(h.id == "Hadamard[][1]{}");
     REQUIRE(cnot.id == "CNOT[][2]{}");
     REQUIRE(rx.id == "RX[f64][1]{}");
     REQUIRE(rz.id == "RZ[f64][1]{}");
+
+    REQUIRE(h.name == "Hadamard");
+    REQUIRE(cnot.name == "CNOT");
+    REQUIRE(rx.name == "RX");
+    REQUIRE(rz.name == "RZ");
 }
 
 TEST_CASE("Test OperatorNode equality operator", "[DecompGraph::Core]") {
-    const OperatorNode h1{"Hadamard[][1]{}"};
-    const OperatorNode h2{"Hadamard[][1]{}"};
-    const OperatorNode cnot{"CNOT[][2]{}"};
+    const OperatorNode h1{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode h2{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
 
     REQUIRE(h1 == h2);
     REQUIRE(h1 != cnot);
 }
 
 TEST_CASE("Test OperatorNodeHash", "[DecompGraph::Core]") {
-    const OperatorNode h1{"Hadamard[][1]{}"};
-    const OperatorNode h2{"Hadamard[][1]{}"};
-    const OperatorNode h3{"Hadamard[][1]{}"};
-    const OperatorNode cnot{"CNOT[][2]{}"};
+    const OperatorNode h1{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode h2{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode h3{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
 
     const OperatorNodeHash hashFunc;
     REQUIRE(hashFunc(h1) == hashFunc(h2));
@@ -59,9 +64,9 @@ TEST_CASE("Test OperatorNodeHash", "[DecompGraph::Core]") {
 
 TEST_CASE("Test OperatorNode in unordered_map", "[DecompGraph::Core]") {
     std::unordered_map<OperatorNode, double, OperatorNodeHash> opMap;
-    const OperatorNode h{"Hadamard[][1]{}"};
-    const OperatorNode cnot{"CNOT[][2]{}"};
-    const OperatorNode rx{"RX[f64][1]{}"};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
     opMap[h] = 1.0;
     opMap[cnot] = 2.0;
@@ -72,9 +77,9 @@ TEST_CASE("Test OperatorNode in unordered_map", "[DecompGraph::Core]") {
 }
 
 TEST_CASE("Test RuleNode construction", "[DecompGraph::Core]") {
-    const OperatorNode h{"Hadamard[][1]{}"};
-    const OperatorNode rx{"RX[f64][1]{}"};
-    const OperatorNode rz{"RZ[f64][1]{}"};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
 
     const RuleNode h_to_rz_rx_rz{"h_to_rz_rx_rz", h, {{rz, 2}, {rx, 1}}};
     REQUIRE(h_to_rz_rx_rz.name == "h_to_rz_rx_rz");
@@ -87,11 +92,11 @@ TEST_CASE("Test RuleNode construction", "[DecompGraph::Core]") {
 }
 
 TEST_CASE("Test WeightedGateset construction and contains", "[DecompGraph::Core]") {
-    const OperatorNode h{"Hadamard[][1]{}"};
-    const OperatorNode cnot{"CNOT[][2]{}"};
-    const OperatorNode rx{"RX[f64][1]{}"};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{h, 1.0}, {cnot, 2.0}}};
+    const WeightedGateset gateset{{{"Hadamard", 1.0}, {"CNOT", 2.0}}};
 
     REQUIRE(gateset.contains(h));
     REQUIRE(gateset.contains(cnot));
@@ -102,9 +107,9 @@ TEST_CASE("Test WeightedGateset construction and contains", "[DecompGraph::Core]
 }
 
 TEST_CASE("Test ChosenDecompRule construction", "[DecompGraph::Core]") {
-    const OperatorNode h{"Hadamard[][1]{}"};
-    const OperatorNode rx{"RX[f64][1]{}"};
-    const OperatorNode rz{"RZ[f64][1]{}"};
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
 
     const RuleTerm term1{rz, 2};
     const RuleTerm term2{rx, 1};
