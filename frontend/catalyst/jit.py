@@ -37,9 +37,10 @@ import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.backline import (
     attach_backline_attr,
-    configure,
     find_placement,
     launch_executors,
+    placement_pipeline,
+    settle_executors,
 )
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
@@ -621,9 +622,10 @@ class QJIT(CatalystCallable):
         if self._placement is None:
             return
 
-        self.compile_options.pipelines = configure(
+        self.compile_options.pipelines = placement_pipeline(
             self._placement, self.compile_options.get_pipelines()
         )
+        settle_executors(self._placement)
 
     def _get_effective_capture_mode(self):
         """Calculate the effective capture mode for this QJIT instance.
