@@ -425,7 +425,7 @@ def _qec_pass_specs(code):
     """The encoding chain for ``code`` as ``(pass_name, kwargs)`` pairs, in application order.
 
     Names are literal rather than read off the transforms, which cannot be imported mid-trace; a
-    unit test pins them against :func:`_register_qec_passes`.
+    unit test pins them against the transforms themselves.
     """
     params = _QEC_CODES[code]
     return (
@@ -438,17 +438,6 @@ def _qec_pass_specs(code):
         ),
         ("convert-qecp-to-quantum", {}),
     )
-
-
-def _register_qec_passes():
-    """Import the encoding passes, which registers them for ``apply-transform-sequence``.
-
-    Call once the program is traced: these modules cannot be imported mid-trace.
-    """
-    # Deferred: importing the transforms registers the passes, and that package imports back into
-    # the compiler entry points that reach this module.
-    # pylint: disable=import-outside-toplevel,unused-import
-    from catalyst.python_interface.transforms import qecl, qecp  # noqa: F401
 
 
 def device_pass_pipeline(device: Device) -> tuple:
@@ -497,7 +486,10 @@ def placement_pipeline(placement: Placement, stages: list) -> list:
     """
     stages = _insert_passes(stages, _TRANSPORT_PASSES)
     if _validated_qec_code(placement.qec_code) is not None:
-        _register_qec_passes()
+        # Importing these registers the encoding passes.
+        # pylint: disable=import-outside-toplevel,unused-import
+        from catalyst.python_interface.transforms import qecl, qecp  # noqa: F401
+
         stages = _insert_passes(stages, _QEC_LOWERING_PASSES)
     return stages
 
