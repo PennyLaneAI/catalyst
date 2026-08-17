@@ -101,17 +101,21 @@ struct PendingLocalCoproc {
 // coprocessors within that kind.
 class SessionEmitter {
   public:
-    SessionEmitter(ModuleOp mod, NodeAttr ctrl, bool remoteController, ModuleOp ctrlMod)
+    SessionEmitter(ModuleOp mod, NodeAttr ctrl, bool dispatchedController, ModuleOp ctrlMod)
         : ctx(mod.getContext()), loc(mod.getLoc()), mod(mod), ctrl(ctrl),
-          remoteController(remoteController), ctrlMod(ctrlMod),
+          dispatchedController(dispatchedController), ctrlMod(ctrlMod),
           ctrlTy(SessionType::get(ctx, Role::Controller)),
           coTy(SessionType::get(ctx, Role::Coprocessor)), tokTy(TokenType::get(ctx)), b(ctx) {
         // The runtime calls @setup/@teardown around every execution; reuse them if present.
         hostSetup = findOrCreate("setup");
         hostTeardown = findOrCreate("teardown");
         // A remote controller's ops go into its target module, which @setup/@teardown launch.
-        setupFn = remoteController ? makeVoidFunc("setup_transport", ctrlMod) : hostSetup;
-        teardownFn = remoteController ? makeVoidFunc("teardown_transport", ctrlMod) : hostTeardown;
+        if (dispatchedController) {
+            setTargetFromNode(ctrlMod, ctrl);
+        }
+        setupFn = dispatchedController ? makeVoidFunc("setup_transport", ctrlMod) : hostSetup;
+        teardownFn =
+            dispatchedController ? makeVoidFunc("teardown_transport", ctrlMod) : hostTeardown;
         b.setInsertionPoint(terminatorOf(setupFn));
     }
 
@@ -144,14 +148,14 @@ class SessionEmitter {
     // Dispatch one coprocessor to the handler for its (controller, coprocessor) remoteness.
     void emitCoproc(NodeAttr coproc, size_t index, size_t count) {
         StringAttr key = coproc.keyOr("coprocessor." + std::to_string(index));
-        if (coproc.isRemote()) {
+        if (coproc.isOutOfProcess()) {
             std::string sfx = count > 1 ? ("." + std::to_string(index)) : std::string();
-            if (remoteController) {
+            if (dispatchedController) {
                 emitRemoteControllerRemoteCoproc(coproc, key, sfx);
             } else {
                 emitLocalControllerRemoteCoproc(coproc, key, sfx);
             }
-        } else if (remoteController) {
+        } else if (dispatchedController) {
             emitRemoteControllerLocalCoproc(coproc, key);
         } else {
             emitColocated(coproc, key);
@@ -166,7 +170,7 @@ class SessionEmitter {
             StopOp::create(tb, loc, s);
             DestroyOp::create(tb, loc, s);
         }
-        if (remoteController) {
+        if (dispatchedController) {
             emitHostOrchestration();
         }
     }
@@ -232,6 +236,20 @@ class SessionEmitter {
         keyed.push_back({ctrlTy, key, teardownFn});
     }
 
+    // Fill a node's nested module in with the triple it is cross-compiled to and the address it is
+    // dispatched to, both taken from its entry in the placement.
+    void setTargetFromNode(ModuleOp nested, NodeAttr node) {
+        OpBuilder b(ctx);
+        nested->setAttr(
+            "catalyst.target",
+            b.getDictionaryAttr({NamedAttribute(b.getStringAttr("triple"), node.getTriple())}));
+        if (auto addr = node.getAddress(); !addr.getValue().empty()) {
+            nested->setAttr(
+                "catalyst.dispatch",
+                b.getDictionaryAttr({NamedAttribute(b.getStringAttr("address"), addr)}));
+        }
+    }
+
     // A remote coprocessor's target module, cross-compiled to its triple and dispatched by the
     // host, returned as the serve/stop launch targets the host orchestration drives.
     RemoteCoproc emitCoprocModule(NodeAttr coproc, StringAttr key, const std::string &sfx) {
@@ -239,15 +257,8 @@ class SessionEmitter {
         mmb.setInsertionPointToEnd(mod.getBody());
         std::string coprocModName = ("module_coproc" + sfx);
         auto coprocMod = ModuleOp::create(mmb, loc, StringRef(coprocModName));
-        coprocMod->setAttr("catalyst.target",
-                           mmb.getDictionaryAttr(
-                               {NamedAttribute(mmb.getStringAttr("triple"), coproc.getTriple())}));
         coprocMod->setAttr(kRoleAttr, mmb.getStringAttr(kCoprocessorRole));
-        if (auto addr = coproc.getAddress(); !addr.getValue().empty()) {
-            coprocMod->setAttr(
-                "catalyst.dispatch",
-                mmb.getDictionaryAttr({NamedAttribute(mmb.getStringAttr("address"), addr)}));
-        }
+        setTargetFromNode(coprocMod, coproc);
 
         func::FuncOp serveFn = makeVoidFunc("coproc_serve" + sfx, coprocMod);
         OpBuilder cb(ctx);
@@ -362,7 +373,7 @@ class SessionEmitter {
     Location loc;
     ModuleOp mod;
     NodeAttr ctrl;
-    bool remoteController;
+    bool dispatchedController;
     ModuleOp ctrlMod;
     Type ctrlTy;
     Type coTy;
@@ -400,10 +411,10 @@ struct InjectTransportSessionPass
         }
 
         // Remoteness comes from the attribute, not from whether a target module is present.
-        bool remoteController = ctrl.isRemote();
+        bool dispatchedController = ctrl.isOutOfProcess();
 
         ModuleOp ctrlMod;
-        if (remoteController) {
+        if (dispatchedController) {
             for (auto m : mod.getOps<ModuleOp>()) {
                 if (m->getAttrOfType<StringAttr>(kRoleAttr) == kControllerRole) {
                     ctrlMod = m;
@@ -417,7 +428,7 @@ struct InjectTransportSessionPass
             }
         }
 
-        SessionEmitter(mod, ctrl, remoteController, ctrlMod).run(coprocs);
+        SessionEmitter(mod, ctrl, dispatchedController, ctrlMod).run(coprocs);
     }
 };
 

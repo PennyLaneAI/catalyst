@@ -32,13 +32,13 @@ extern "C" {
 typedef struct CatalystTransportSession CatalystTransportSession;
 
 // Return codes: 0 == success; negative == error
-enum {
+typedef enum {
     CATALYST_TRANSPORT_OK = 0,
     CATALYST_TRANSPORT_ERR = -1,         // Generic exception
     CATALYST_TRANSPORT_ERR_MEMORY = -2,  // Memory error
     CATALYST_TRANSPORT_ERR_TIMEOUT = -3, // Timeout error
     CATALYST_TRANSPORT_ERR_STUCK = -4,   // Something got stuck
-};
+} CatalystTransportStatus;
 
 // Session role (mirrors catalyst::transport::Role in the dialect).
 enum {

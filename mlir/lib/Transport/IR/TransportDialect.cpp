@@ -58,8 +58,8 @@ StringAttr NodeAttr::dataPathOr(llvm::StringRef dflt) const {
     return StringAttr::get(getContext(), dflt);
 }
 
-bool NodeAttr::isRemote() const {
-    BoolAttr r = getRemote();
+bool NodeAttr::isOutOfProcess() const {
+    BoolAttr r = getOutOfProcess();
     return r && r.getValue();
 }
 

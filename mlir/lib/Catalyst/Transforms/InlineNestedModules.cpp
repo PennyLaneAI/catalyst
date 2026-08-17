@@ -160,6 +160,11 @@ static constexpr llvm::StringRef fullyQualifiedNameAttr = "catalyst.fully_qualif
 static constexpr llvm::StringRef quantumNodeAttr = "quantum.node";
 static constexpr llvm::StringRef legacyQNodeAttr = "qnode";
 static constexpr llvm::StringRef targetAttr = "catalyst.target";
+static constexpr llvm::StringRef backlineRoleAttr = "catalyst.backline_role";
+
+static bool isSeparateCompilationUnit(Operation *op) {
+    return op->hasAttr(targetAttr) || op->hasAttr(backlineRoleAttr);
+}
 
 struct AnnotateWithFullyQualifiedName : public OpInterfaceRewritePattern<SymbolOpInterface> {
     using OpInterfaceRewritePattern<SymbolOpInterface>::OpInterfaceRewritePattern;
@@ -204,7 +209,7 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
                                                       PatternRewriter &rewriter) const {
     bool isSymbolTable = child->hasTrait<OpTrait::SymbolTable>();
     bool hasBeenRenamed = child->hasAttr(hasBeenRenamedAttrName);
-    bool mustRename = isSymbolTable && !hasBeenRenamed && !child->hasAttr(targetAttr);
+    bool mustRename = isSymbolTable && !hasBeenRenamed && !isSeparateCompilationUnit(child);
     if (!mustRename) {
         return failure();
     }
@@ -283,7 +288,7 @@ struct InlineNestedModule : public RewritePattern {
 
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override {
         bool isSymbolTable = op->hasTrait<OpTrait::SymbolTable>();
-        bool mustInline = isSymbolTable && !op->hasAttr(targetAttr);
+        bool mustInline = isSymbolTable && !isSeparateCompilationUnit(op);
         if (!mustInline) {
             return failure();
         }

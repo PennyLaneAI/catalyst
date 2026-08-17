@@ -114,7 +114,7 @@ def _node_dict(node: Node, role: str) -> dict:
         role: The node's role, used to resolve its ``backend`` to a library. An explicit
             ``init_args["backend_lib"]`` path takes precedence over ``backend``.
     """
-    d: dict = {"remote": bool(_out_of_process(node))}
+    d: dict = {"out_of_process": bool(_out_of_process(node))}
     if node.label is not None:
         d["name"] = node.label
     comm_host = getattr(node, "comm_host", None)
