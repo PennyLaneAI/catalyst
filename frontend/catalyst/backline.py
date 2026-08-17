@@ -17,6 +17,13 @@ build the pipelines that lower it. The backend hints a node's ``init_args`` may 
 ``_INIT_KEYS`` and forwarded as given. Anything a backend interprets itself travels inside the
 ``config`` string rather than as a key of its own.
 
+A placement adds three passes to the compiler's stages: ``inject-transport-session`` emits the
+session's bring-up and teardown, ``lower-decode-to-transport`` turns a decode into a transport round
+over that session, and ``convert-transport-to-llvm`` lowers the result to runtime calls. A placement
+naming a ``qec_code`` also encodes the circuit, which registers the encoding passes and adds
+``convert-qecp-to-llvm``. See ``_TRANSPORT_PASSES`` and ``_QEC_LOWERING_PASSES`` for where each is
+inserted.
+
 Note: "node" here is a backline participant (a controller or coprocessor), distinct from
 :class:`catalyst.Executor`, which deploys the ``catalyst-executor`` process a node may run on.
 """
@@ -69,8 +76,9 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
         backend: Backend name as given on the node, e.g. ``"cpu_verbs"``.
         role: ``"controller"`` or ``"coprocessor"``. Each backend ships one library per role.
         remote: Whether the node runs on another machine. A remote node loads the library from the
-            bundle deployed alongside it, so it is named by filename only; a local node is given the
-            full path into this installation.
+            bundle deployed alongside it, so it is named by filename only, and always with a ``.so``
+            extension: a node on another machine has to be Linux. A local node is given the full
+            path into this installation, which may be either ``.so`` or ``.dylib``.
 
     Returns:
         str: The library path for a local node, or its bare filename for a remote one.
