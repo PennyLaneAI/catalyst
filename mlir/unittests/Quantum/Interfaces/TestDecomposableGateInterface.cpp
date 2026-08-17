@@ -127,6 +127,30 @@ module {
     ASSERT_EQ(op.getGraphOpId(), "C(Adjoint(RX{0:[f64]}{wires:1}{}))");
 }
 
+TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %angle = arith.constant 0.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %c1 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc:2 = quantum.custom "RX"(%angle) %q0 adj ctrls(%c0, %c1) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate op = *module->getOps<CustomOp>().begin();
+
+    // Controls + Adjoint folding
+    ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX{0:[f64]}{wires:1}{}))");
+}
+
 TEST(DecomposableGateInterfaceTests, MultiRZOp) {
     std::string moduleStr = R"mlir(
 module {

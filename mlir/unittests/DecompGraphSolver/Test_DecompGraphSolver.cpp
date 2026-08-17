@@ -791,3 +791,21 @@ TEST_CASE("Test mixed C(Adjoint(RX)) pathways to a controlled basis", "[DecompGr
     REQUIRE(result.at(cRxAdj).ruleName == "cadj_rx_to_crx");
     REQUIRE(result.at(cRx).isBasis);
 }
+
+TEST_CASE("Test nested 2C(Adjoint(RX)) pathways opaquely", "[DecompGraph::Solver]") {
+    const OperatorNode ccAdjRx{"2C(Adjoint(RX{0:[f64]}{wires:1}{}))", "2C(Adjoint(RX))"};
+    const OperatorNode ccRx{"2C(RX{0:[f64]}{wires:1}{})", "2C(RX)"};
+
+    const WeightedGateset gateset{{{ccRx.name, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"ccadj_rx_to_ccrx", ccAdjRx, {{ccRx, 1}}},
+    };
+
+    const DecompositionGraph graph({ccAdjRx}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE_FALSE(result.at(ccAdjRx).isBasis);
+    REQUIRE(result.at(ccAdjRx).ruleName == "ccadj_rx_to_ccrx");
+    REQUIRE(result.at(ccRx).isBasis);
+}
