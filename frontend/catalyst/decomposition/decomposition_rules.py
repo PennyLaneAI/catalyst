@@ -461,9 +461,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 ]
                 out.extend(distributed)
             except Exception as e:  # pylint: disable=broad-except
-                warnings.warn(
-                    f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}"
-                )
+                warnings.warn(f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}")
         return out
 
     rules = compile_variants(op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data)
