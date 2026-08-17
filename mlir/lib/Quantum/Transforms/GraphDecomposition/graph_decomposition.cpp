@@ -143,20 +143,71 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
-        // decompose-lowering to apply the chosen decomposition rules
+        // decompose-lowering to apply the chosen decomposition rules.
+
+        ///////////////////////////
+        // CQRs:
+        //  - Adjoint: A chosen rule for an adjoint operator may re-emit its base decomposition
+        //             wrapped in a `quantum.adjoint` region. Such a region is only reduced to
+        //             op-level modified gates by `adjoint-lowering`. We therefore iterate
+        //             `(decompose-lowering -> adjoint-lowering)` to a fixpoint.
+        // The solver has already chosen every rule up front; this loop only applies them.
         ModuleOp module = getOperation();
-        OpPassManager pm("builtin.module");
 
         DecomposeLoweringPassOptions dlOptions;
         for (auto &[op, chosenRule] : solution) {
             dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
         }
 
-        pm.addPass(qref::createValueSemanticsConversionPass());
-        pm.addPass(createDecomposeLoweringPass(dlOptions));
+        // Convert reference-semantics python decompositions to value semantics once.
+        {
+            OpPassManager valueSemanticsPm("builtin.module");
+            valueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
+            if (failed(runPipeline(valueSemanticsPm, module))) {
+                return signalPassFailure();
+            }
+        }
 
-        if (failed(runPipeline(pm, module))) {
-            return signalPassFailure();
+        auto countOps = [](ModuleOp m) {
+            size_t count = 0;
+            m->walk([&](mlir::Operation *) { count++; });
+            return count;
+        };
+
+        // Fixpoint: apply the chosen rules and distribute any `quantum.adjoint` regions they emit,
+        // until the module stops changing.
+        constexpr unsigned maxIterations = 64;
+        size_t previousOpCount = countOps(module);
+        for (unsigned iter = 0; iter < maxIterations; ++iter) {
+            {
+                OpPassManager decomposePm("builtin.module");
+                decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
+                if (failed(runPipeline(decomposePm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
+            // Distribute a `quantum.adjoint` region lazily.
+            // It uses a greedy rewriter that would otherwise DCE gates in circuits that
+            // never needed adjoint handling.
+            bool hasAdjointRegion = false;
+            module->walk([&](AdjointOp) {
+                hasAdjointRegion = true;
+                return mlir::WalkResult::interrupt();
+            });
+            if (hasAdjointRegion) {
+                OpPassManager adjointPm("builtin.module");
+                adjointPm.addPass(createAdjointLoweringPass());
+                if (failed(runPipeline(adjointPm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
+            size_t currentOpCount = countOps(module);
+            if (currentOpCount == previousOpCount) {
+                break;
+            }
+            previousOpCount = currentOpCount;
         }
     }
 
