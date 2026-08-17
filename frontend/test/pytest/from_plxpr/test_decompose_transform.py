@@ -1099,6 +1099,10 @@ class TestPlxPRDecomposition:
             circuit()
         qp.decomposition.disable_graph()
 
+    @pytest.mark.xfail(
+        reason="Tracer from IsingXX (Operator2) dynamic arg is leaking into the JAXPR. This is an upstream PL issue [sc-].",
+        strict=True,
+    )
     def test_decomp_inside_subroutine(self):
         """Test that decompositions can happen inside subroutines."""
         qp.decomposition.enable_graph()
