@@ -693,3 +693,101 @@ TEST_CASE("Adjoint of an invalid target fails instead of collapsing to the base"
     DecompositionSolver solver(graph);
     REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
 }
+
+/////////////
+// Ctrl Tests
+/////////////
+
+TEST_CASE("Test single-controlled C(1, X)", "[DecompGraph::Solver]") {
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode cx{"C(PauliX{}{wires:1}{})", "C(PauliX)"};
+
+    const WeightedGateset gateset{{{cnot.name, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"cx_to_cnot", cx, {{cnot, 1}}},
+    };
+
+    const DecompositionGraph graph({cx}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    const auto &chosen = result.at(cx);
+    REQUIRE_FALSE(chosen.isBasis);
+    REQUIRE(chosen.ruleName == "cx_to_cnot");
+    REQUIRE(chosen.totalCost == 1.0);
+    REQUIRE(result.at(cnot).isBasis);
+}
+
+TEST_CASE("Test multi-controlled 2C(X)", "[DecompGraph::Solver]") {
+    const OperatorNode toffoli{"Toffoli[][3]{}", "Toffoli"};
+    const OperatorNode ccx{"2C(PauliX{}{wires:1}{})", "2C(PauliX)"};
+
+    const WeightedGateset gateset{{{toffoli.name, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"ccx_to_toffoli", ccx, {{toffoli, 1}}},
+    };
+
+    const DecompositionGraph graph({ccx}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.at(ccx).ruleName == "ccx_to_toffoli");
+    REQUIRE(result.at(toffoli).isBasis);
+}
+
+TEST_CASE("Test a controlled op that is not accepted as its base gate by name",
+          "[DecompGraph::Solver]") {
+    // C(PauliX) must reach the gate set through its own rule, even when PauliX is in the gate set.
+    const OperatorNode cx{"C(PauliX{}{wires:1}{})", "C(PauliX)"};
+
+    const WeightedGateset gateset{{{"PauliX", 1.0}}};
+    const std::vector<RuleNode> rules{};
+
+    const DecompositionGraph graph({cx}, gateset, rules);
+    DecompositionSolver solver(graph);
+    REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
+}
+
+TEST_CASE("Test controlled distribution", "[DecompGraph::Solver]") {
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode ry{"RY[f64][1]{}", "RY"};
+    const OperatorNode crz{"C(RZ{0:[f64]}{wires:1}{})", "C(RZ)"};
+    const OperatorNode cry{"C(RY{0:[f64]}{wires:1}{})", "C(RY)"};
+    const OperatorNode crot{"C(Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{})", "C(Rot)"};
+
+    const WeightedGateset gateset{{{rz.name, 1.0}, {ry.name, 2.0}}};
+    const std::vector<RuleNode> rules{
+        {"crot_distribute", crot, {{crz, 2}, {cry, 1}}},
+        {"crz_to_rz", crz, {{rz, 1}}},
+        {"cry_to_ry", cry, {{ry, 1}}},
+    };
+
+    const DecompositionGraph graph({crot}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.at(crot).ruleName == "crot_distribute");
+    REQUIRE(result.at(crot).totalCost == 4.0); // 2*1 + 2
+    REQUIRE_FALSE(result.at(crz).isBasis);
+    REQUIRE_FALSE(result.at(cry).isBasis);
+    REQUIRE(result.at(rz).isBasis);
+    REQUIRE(result.at(ry).isBasis);
+}
+
+TEST_CASE("Test mixed C(Adjoint(RX)) pathways to a controlled basis", "[DecompGraph::Solver]") {
+    const OperatorNode cRxAdj{"C(Adjoint(RX{0:[f64]}{wires:1}{}))", "C(Adjoint(RX))"};
+    const OperatorNode cRx{"C(RX{0:[f64]}{wires:1}{})", "C(RX)"};
+
+    const WeightedGateset gateset{{{cRx.name, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"cadj_rx_to_crx", cRxAdj, {{cRx, 1}}},
+    };
+
+    const DecompositionGraph graph({cRxAdj}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE_FALSE(result.at(cRxAdj).isBasis);
+    REQUIRE(result.at(cRxAdj).ruleName == "cadj_rx_to_crx");
+    REQUIRE(result.at(cRx).isBasis);
+}

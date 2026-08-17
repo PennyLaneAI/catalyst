@@ -470,10 +470,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             OperatorNode node;
             node.numWires = op.getNonCtrlQubitOperands().size();
 
-            // The modifier is carried in the name (mirroring the id), so the solver needs no
-            // per-modifier field: `Adjoint(RZ)` won't match a base `RZ` gate-set entry.
-            node.name = op.getAdjointFlag() ? ("Adjoint(" + op.getOperatorName() + ")")
-                                            : op.getOperatorName();
+            // The modifiers are carried in the name, as the result
+            // the solver doesn't need a modifier field
+            std::string name = op.getOperatorName();
+            if (op.getAdjointFlag()) {
+                name = "Adjoint(" + name + ")";
+            }
+            size_t numCtrl = op.getCtrlQubitOperands().size();
+            if (numCtrl == 1) {
+                name = "C(" + name + ")";
+            } else if (numCtrl > 1) {
+                name = std::to_string(numCtrl) + "C(" + name + ")";
+            }
+            node.name = name;
             node.id = op.getGraphOpId();
 
             if (auto paramOp =
@@ -494,6 +503,29 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
         llvm::StringRef original = raw;
+
+        // Unwrap control following the implementation for Adjoint(Op)
+        llvm::StringRef afterCount = raw;
+        size_t numDigits = 0;
+        while (numDigits < afterCount.size() && afterCount[numDigits] >= '0' &&
+               afterCount[numDigits] <= '9') {
+            numDigits++;
+        }
+        llvm::StringRef ctrlBody = afterCount.drop_front(numDigits);
+        if (ctrlBody.consume_front("C(") && (ctrlBody.contains('{') || ctrlBody.contains('['))) {
+            size_t numCtrl = 1;
+            if (numDigits > 0) {
+                (void)raw.take_front(numDigits).getAsInteger(10, numCtrl);
+            }
+            llvm::StringRef inner = ctrlBody.ends_with(")") ? ctrlBody.drop_back(1) : ctrlBody;
+            OperatorNode innerNode = parseOperator(inner);
+            node.numWires = innerNode.numWires;
+            node.numParams = innerNode.numParams;
+            node.id = original.str();
+            node.name = (numCtrl == 1 ? std::string("C(") : std::to_string(numCtrl) + "C(") +
+                        innerNode.name + ")";
+            return node;
+        }
 
         // Unwrap "Adjoint(Op)". The modifier is kept in both the id and the (coarser) name, so the
         // solver never needs a modifier flag: a modified operator's name won't match a base

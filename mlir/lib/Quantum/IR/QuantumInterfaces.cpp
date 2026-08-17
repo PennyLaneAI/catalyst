@@ -170,13 +170,30 @@ std::string defaultGetGraphOpId(Operation *op) {
     }
     ss.flush();
 
-    // Fold the adjoint modifier into the identity so that `Op` and `Adjoint(Op)`
-    // are distinct in the graphOpId. Note that the modifier is now carried in
-    // the name, so the graph-solver never needs a modifier attribute.
+    // Fold the modifiers into the identity so that `Op`, `Adjoint(Op)`, and `C(n, Op)`
+    // are distinct in the graphOpId.
+    // Notes:
+    // - The modifiers are wrapped innermost-first in a canonical control-outermost
+    //   order (matching ResourceAnalysis::collectOperation) so that `C(Adjoint(Op))`
+    //   and `Adjoint(C(Op))` collapse to the same id.
+    // - The modifier is carried in the operator name too, so the graph-solver never
+    //   needs a modifier attribute.
+    std::string result = out;
+
     if (op->hasAttr("adjoint")) {
-        return "Adjoint(" + out + ")";
+        result = "Adjoint(" + result + ")";
     }
-    return out;
+
+    if (auto gateOp = mlir::dyn_cast<QuantumGate>(op)) {
+        size_t numCtrl = gateOp.getCtrlQubitOperands().size();
+        if (numCtrl == 1) {
+            result = "C(" + result + ")";
+        } else if (numCtrl > 1) {
+            result = std::to_string(numCtrl) + "C(" + result + ")";
+        }
+    }
+
+    return result;
 }
 
 } // namespace quantum
