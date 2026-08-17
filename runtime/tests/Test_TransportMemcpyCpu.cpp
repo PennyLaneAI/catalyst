@@ -26,6 +26,11 @@
 using namespace catalyst::transport;
 using namespace catalyst::transport::memcpy;
 
+// Provided by libsteane_coprocessor_cpu — the same CoprocessorFn plugin production
+// dlopens. Linking it in lets the test exercise a real decoder end-to-end.
+extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len, void *out,
+                                          std::size_t out_cap, void *ctx);
+
 namespace {
 // Per-test pair keys. Matching keys between the controller and its paired coprocessor is what
 // the memcpy backend uses to rendezvous, mirroring what inject-transport-session emits at
@@ -111,6 +116,43 @@ TEST_CASE("memcpy uses the bound coprocessor function", "[transport_memcpy]") {
     REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
 
     CHECK(reply_word == ~request_word);
+}
+
+TEST_CASE("memcpy round-trip drives the steane decoder plugin", "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19003};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    MemRegion reply = controller.alloc_memory(sizeof(std::int64_t), MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+
+    MemRegion request = coprocessor.alloc_memory(sizeof(std::int64_t), MemKind::CpuRam);
+    PeerRef peer_reply = coprocessor.exchange_keys(request);
+
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    coprocessor.establish_channel(desc, request, peer_reply);
+
+    controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::int64_t));
+    controller.start();
+    coprocessor.start();
+    coprocessor.set_coprocessor_fn(&steane_coprocessor, nullptr);
+
+    // Syndrome [1, 0, 1] packs (check 0 as MSB) to 0b101 == 5, which the LUT maps to qubit 3.
+    // Padded into the 8-byte value slot so the coprocessor sees the syndrome at frame offset 0.
+    const std::uint8_t syndrome_bytes[8] = {1, 0, 1, 0, 0, 0, 0, 0};
+    controller.write_data_slot(syndrome_bytes, sizeof(syndrome_bytes), /*decoder_id=*/0);
+    REQUIRE(controller.kick(0) == 0);
+
+    std::int64_t err_idx = 0;
+    void *outs[1] = {&err_idx};
+    std::uint64_t out_bytes[1] = {sizeof(err_idx)};
+    REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
+
+    CHECK(err_idx == 3);
 }
 
 // ---- Pairing invariants ------------------------------------------------------
