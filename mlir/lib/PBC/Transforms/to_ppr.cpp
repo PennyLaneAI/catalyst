@@ -43,9 +43,9 @@ struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
         ConversionTarget target(*ctx);
 
         // Remove all decomposition rules, they might involve gates we don't care about
-        PassManager pm(ctx);
+        OpPassManager pm("builtin.module");
         pm.addPass(mlir::createSymbolDCEPass());
-        if (failed(pm.run(getOperation()))) {
+        if (failed(runPipeline(pm, getOperation()))) {
             return signalPassFailure();
         }
 
