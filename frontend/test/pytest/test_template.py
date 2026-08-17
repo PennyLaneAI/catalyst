@@ -81,7 +81,7 @@ def test_basis_embedding(backend):
     """Test basis embedding."""
 
     def basis_embedding(f: jax.core.ShapedArray([3], int)):
-        qp.BasisEmbedding(features=f, wires=[0, 1, 2])
+        qp.BasisEmbedding(f, wires=[0, 1, 2])
         return qp.state()
 
     device = qp.device(backend, wires=3)

@@ -588,11 +588,14 @@ class TestSignatureErrors:
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
 
-        with pytest.raises(TypeError, match="<class 'str'> is not a valid JAX type"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def f(x: str):
                 return
+
+        with pytest.raises(TypeError, match="<class 'str'> is not a valid JAX type"):
+            f("abc")
 
     def test_incompatible_abstractify(self):
         """Check error message.
@@ -1106,11 +1109,64 @@ class TestErrorNestedQNode:
             inner()
             return qp.state()
 
-        with pytest.raises(CompileError):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def fn():
                 return outer()
+
+        with pytest.raises(CompileError):
+
+            fn()
+
+
+class TestAOTFailures:
+    """Tests that an AOT failure does not cause a full error."""
+
+    def test_capture_failure(self):
+        """Test a failure capturing the jaxpr."""
+
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+
+            @qp.qjit(capture=True)
+            @qp.qnode(qp.device("null.qubit", wires=1))
+            def c():
+                raise ValueError
+
+        assert c.jaxpr is None
+
+    def test_ir_generation_failure(self):
+        """Test a failure lowering to mlir."""
+
+        dummy_p = jax.extend.core.Primitive("dummy")
+        dummy_p.multiple_results = True
+
+        @dummy_p.def_abstract_eval
+        def f():
+            return []
+
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+
+            @qp.qjit(capture=True)
+            def c():
+                dummy_p.bind()
+                return 2
+
+        assert c.jaxpr.eqns[0].primitive == dummy_p
+
+    def test_llvm_generation_failure(self):
+        """Test a failure lowering to llvmir."""
+
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+
+            @qp.qjit(capture=True)
+            @qp.qnode(qp.device("null.qubit", wires=1))
+            def c():
+                qp.RX(qp.capture.symbolic_array((), float), 0)
+                return qp.probs(wires=0)
+
+        assert c.mlir
+        assert "RX" in c.mlir
 
 
 if __name__ == "__main__":
