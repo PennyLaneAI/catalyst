@@ -57,9 +57,8 @@ inline int parse_index(std::string_view val, const char *key) {
     const auto res = std::from_chars(val.data(), last, out);
     if (res.ec != std::errc{} || res.ptr != last || out < 0) {
         char buf[192];
-        std::snprintf(buf, sizeof(buf),
-                      "config: '%s' must be a non-negative integer, got '%.*s'", key,
-                      static_cast<int>(val.size()), val.data());
+        std::snprintf(buf, sizeof(buf), "config: '%s' must be a non-negative integer, got '%.*s'",
+                      key, static_cast<int>(val.size()), val.data());
         throw std::runtime_error(buf);
     }
     return out;

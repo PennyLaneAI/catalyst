@@ -19,9 +19,9 @@
 #include "GpuRuntime.hpp"   // HandoffSlot
 #include "HipCheck.hpp"     // HIP_CHECK
 #include "WireProtocol.hpp"
-
 #include "echo_decoder.hpp"
 #include "steane_decoder.hpp"
+
 #include <hip/hip_runtime.h>
 
 namespace catalyst::transport::coproc {

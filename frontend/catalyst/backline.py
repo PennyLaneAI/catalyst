@@ -31,10 +31,10 @@ from jax.interpreters.mlir import ir
 from pennylane.backline import Node, Placement
 from pennylane.devices import Device
 
+from catalyst.device.qjit_device import extract_backend_info
 from catalyst.executor import Executor
 from catalyst.pipelines import insert_pass_before
 from catalyst.utils.exceptions import CompileError
-from catalyst.device.qjit_device import extract_backend_info
 from catalyst.utils.runtime_environment import get_lib_path
 
 # Backend hints forwarded verbatim from a node's ``init_args`` to the attribute node.
@@ -201,6 +201,7 @@ def _load_coprocessor_fn_libs(placement: Placement) -> None:
         if lib_path:
             ctypes.CDLL(str(lib_path), mode=ctypes.RTLD_GLOBAL)
 
+
 def _controller_plugin(node) -> str | None:
     """Return the controller device library that its executor must preload."""
     backend = extract_backend_info(node.device)
@@ -343,6 +344,7 @@ def _check_machine_agrees(node: Node, host, address=None, preset: bool = False) 
             "machine. Pass a 'host', or leave remote unset to run the node here."
         )
 
+
 def _launch_executor(name, options):
     """Build and launch a ``catalyst.Executor`` from a node's executor options."""
     from catalyst.executor import Executor
@@ -354,6 +356,7 @@ def _launch_executor(name, options):
 def _realize_executor(node, role=None):
     """Return the node's launched executor, building it on first use."""
     executor = getattr(node, "executor", None)
+
 
 def _coprocessor_fn_lib(node: Node) -> Path | None:
     """The library providing a coprocessor's CoprocessorFn, or ``None`` if it names none."""

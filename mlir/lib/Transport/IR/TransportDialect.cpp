@@ -51,9 +51,7 @@ StringAttr NodeAttr::keyOr(llvm::StringRef fallback) const {
     return StringAttr::get(getContext(), fallback);
 }
 
-bool NodeAttr::isRemote() const {
-    BoolAttr r = getRemote();
-}
+bool NodeAttr::isRemote() const { BoolAttr r = getRemote(); }
 
 StringAttr NodeAttr::dataPathOr(llvm::StringRef dflt) const {
     if (StringAttr p = getDataPath(); p && !p.getValue().empty()) {

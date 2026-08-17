@@ -13,8 +13,8 @@
 # limitations under the License.
 """Unit tests for the backline frontend: serialize_backline and the pipeline helpers."""
 
-from types import SimpleNamespace
 import os
+from types import SimpleNamespace
 from unittest import mock
 
 import pennylane as qp
@@ -23,8 +23,8 @@ from pennylane.backline import Transport
 
 from catalyst import Executor, qjit
 from catalyst.backline import (
-    _backend_for,
     _TRANSPORT_PASSES,
+    _backend_for,
     _insert_passes,
     _qec_pass_specs,
     _realize_executor,

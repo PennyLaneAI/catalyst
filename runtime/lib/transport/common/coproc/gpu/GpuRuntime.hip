@@ -32,8 +32,8 @@ GpuRuntime::GpuRuntime(int device) {
     }
     if (device < 0 || device >= dc) {
         char buf[128];
-        std::snprintf(buf, sizeof(buf),
-                      "GpuRuntime: HIP device %d out of range (%d present)", device, dc);
+        std::snprintf(buf, sizeof(buf), "GpuRuntime: HIP device %d out of range (%d present)",
+                      device, dc);
         throw std::runtime_error(buf);
     }
     HIP_CHECK(hipSetDevice(device), "hipSetDevice");

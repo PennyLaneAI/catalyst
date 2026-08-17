@@ -97,7 +97,8 @@ struct PendingLocalCoproc {
 // coprocessors within that kind.
 class SessionEmitter {
   public:
-    SessionEmitter(ModuleOp mod, StringAttr transport, NodeAttr ctrl, bool dispatchedController, ModuleOp ctrlMod)
+    SessionEmitter(ModuleOp mod, StringAttr transport, NodeAttr ctrl, bool dispatchedController,
+                   ModuleOp ctrlMod)
         : ctx(mod.getContext()), loc(mod.getLoc()), mod(mod), ctrl(ctrl),
           dispatchedController(dispatchedController), ctrlMod(ctrlMod),
           ctrlTy(SessionType::get(ctx, Role::Controller)),
@@ -426,8 +427,8 @@ struct InjectTransportSessionPass
             }
         }
 
-
-        SessionEmitter(mod, backline.getTransport(), ctrl, dispatchedController, ctrlMod).run(coprocs);
+        SessionEmitter(mod, backline.getTransport(), ctrl, dispatchedController, ctrlMod)
+            .run(coprocs);
     }
 };
 
