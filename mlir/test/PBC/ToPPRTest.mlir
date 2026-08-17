@@ -271,14 +271,14 @@ func.func @test_parametrized_gate_identity_angle_elision_to_ppr(%q0 : !quantum.b
 
 // -----
 
-func.func @test_dce_rules(%q1 : !quantum.bit, %q2 : !quantum.bit){
+func.func @test_dce_rules(%q1 : !quantum.bit) -> !quantum.bit {
     // CHECK-NOT: quantum.custom
     // CHECK: quantum.gphase
     // CHECK: pbc.ppr ["Z"](4)
     // CHECK: pbc.ppr ["X"](4)
     // CHECK: pbc.ppr ["Z"](4)
     %q1_0 = quantum.custom "H"() %q1 : !quantum.bit
-    func.return
+    func.return %q1_0 : !quantum.bit
 }
 
 // CHECK-NOT: func.func private @"some_decomp_rule"
