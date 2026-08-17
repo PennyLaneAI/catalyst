@@ -1,8 +1,7 @@
 name: Check Catalyst GPU
 
-# Runs the runtime transport tests on a GPU host. Modeled after
-# https://github.com/PennyLaneAI/pennylane/blob/main/.github/workflows/tests-gpu.yml
-# so pull requests are gated by the ``gpu`` label to keep GPU runner time cheap.
+# Runs the runtime transport tests on a GPU host. To keep GPU runner time cheap, pull requests
+# only trigger a run once labeled ``gpu``; ``push`` to main runs unconditionally.
 
 on:
   push:
@@ -30,16 +29,13 @@ on:
       - "mlir/include/Transport/**"
       - "frontend/catalyst/backline.py"
       - ".github/workflows/check-catalyst-gpu.yaml"
-  merge_group:
-    types:
-      - checks_requested
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: check-catalyst-gpu-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -53,17 +49,15 @@ jobs:
     runs-on:
       - single-gpu-x64
 
-    # Push and merge_group always run; PRs need a non-draft open state and the ``gpu`` label.
+    # Push always runs; PRs need a non-draft open state and the ``gpu`` label.
     if: >-
       ${{
         github.event_name == 'push' ||
-        github.event_name == 'merge_group' ||
         github.event_name == 'workflow_dispatch' ||
         (
           github.event_name == 'pull_request' &&
           github.event.pull_request.draft == false &&
-          contains(github.event.pull_request.labels.*.name, 'gpu') &&
-          github.event.pull_request.state == 'open'
+          contains(github.event.pull_request.labels.*.name, 'gpu')
         )
       }}
 
@@ -77,38 +71,23 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        id: setup_python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ needs.constants.outputs.primary_python_version }}
 
-      # The runner is pseudo-ephemeral, so any Python installs go into a per-run venv that we
-      # clean up in the final step. Matches the pennylane tests-gpu.yml convention.
-      - name: Set up Python virtual environment
-        id: setup_venv
-        env:
-          VENV_NAME: ${{ github.workspace }}/venv_${{ steps.setup_python.outputs.python-version }}_${{ github.sha }}
-        run: |
-          rm -rf venv_*
-          python -m venv "${VENV_NAME}"
-          echo "${VENV_NAME}/bin" >> $GITHUB_PATH
-          echo "venv_name=${VENV_NAME}" >> $GITHUB_OUTPUT
-
       - name: Install Python build dependencies
         run: |
-          python -m pip install --upgrade pip wheel
-          python -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
-          cmake --version
+          python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
 
-      - name: Cache LLVM source
+      - name: Get Cached LLVM Source
         id: cache-llvm-source
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: mlir/llvm-project
           key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
           enableCrossOsArchive: true
 
-      - name: Clone LLVM submodule
+      - name: Clone LLVM Submodule
         if: steps.cache-llvm-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
@@ -116,24 +95,16 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
-      - name: Set up ccache for the runtime rebuild
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ${{ github.workflow }}-${{ runner.os }}-runtime
-          max-size: "500M"
-
       # The runtime configure + build only needs LLVM source headers (MLIR_INCLUDE_DIRS
       # -> mlir/llvm-project/mlir/include, header-only via rt_capi). No built-LLVM
       # artifacts are consumed as long as ENABLE_EXECUTOR stays OFF, which it does here.
-      # LLVM_BUILD_DIR points at a non-existent path on purpose; nothing reads from it.
-      - name: Build Catalyst runtime with transport enabled
+      - name: Build Catalyst-Runtime with transport enabled
         run: |
-          COMPILER_LAUNCHER=ccache \
+          COMPILER_LAUNCHER="" \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
           ENABLE_TRANSPORT=ON \
           make runtime
 
@@ -144,8 +115,3 @@ jobs:
       - name: Run memcpy transport tests
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
-
-      - name: Cleanup virtual environment
-        if: always()
-        run: |
-          rm -rf "${{ steps.setup_venv.outputs.venv_name }}"
