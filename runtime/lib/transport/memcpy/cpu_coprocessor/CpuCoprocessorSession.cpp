@@ -32,6 +32,11 @@ std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t o
 } // namespace
 
 CpuCoprocessorSession::~CpuCoprocessorSession() {
+    // Stop the worker first so a lingering thread cannot touch `this` after teardown.
+    try {
+        stop();
+    } catch (...) {
+    }
     if (link_) {
         // Wait for any in-flight kick, then unbind so no future call reaches a dying `this`.
         std::lock_guard<std::mutex> lock(link_->mu);
@@ -76,11 +81,28 @@ PeerRef CpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) { retu
 void CpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion & /*local*/,
                                               const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
-        throw std::runtime_error("memcpy: CPU-only coprocessor supports only transport=memcpy");
+        throw std::runtime_error("only transport=memcpy is supported");
     }
 }
 
-void CpuCoprocessorSession::start() {}
+void CpuCoprocessorSession::start() {
+    stop();
+    process_cursor_ = 0;
+    request_ring_.fill(common::PayloadSlot{});
+    reply_ring_.fill(common::PayloadSlot{});
+    failed_.store(false, std::memory_order_relaxed);
+    error_ = nullptr;
+    // Capture exceptions into error_ (release-published via failed_) so process_message can
+    // surface the real error instead of the thread std::terminate-ing on an escape.
+    engine_ = std::jthread([this](std::stop_token st) {
+        try {
+            run(st);
+        } catch (...) {
+            error_ = std::current_exception();
+            failed_.store(true, std::memory_order_release);
+        }
+    });
+}
 
 int CpuCoprocessorSession::collect(void *const * /*replies*/,
                                    const std::uint64_t * /*replies_bytes*/, std::size_t /*n*/) {
@@ -88,23 +110,89 @@ int CpuCoprocessorSession::collect(void *const * /*replies*/,
     throw std::logic_error("memcpy: coprocessor collect is not used");
 }
 
-void CpuCoprocessorSession::stop() {}
+void CpuCoprocessorSession::stop() {
+    if (engine_.joinable()) {
+        engine_.request_stop();
+        engine_.join();
+    }
+}
 
 void CpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
     fn_ = fn;
     ctx_ = ctx;
 }
 
+// Worker loop: consume requests in order, run the bound fn (or echo), and publish the reply.
+// Uses the wait-until-seq-matches + acquire/release-fence pattern the ring is designed around.
+void CpuCoprocessorSession::run(std::stop_token st) {
+    constexpr std::uint32_t STOP_CHECK_SPINS = 4096;
+    for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
+        const std::size_t idx = c & (common::K_RING_SLOTS - 1);
+        const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
+        volatile std::uint32_t *rseq = &request_ring_[idx].p.seq_num;
+        // Periodically check for stop so a request that never arrives can't hang teardown.
+        std::uint32_t spins = 0;
+        while (*rseq != expect) {
+            if (++spins == STOP_CHECK_SPINS) {
+                spins = 0;
+                if (st.stop_requested()) {
+                    return;
+                }
+            }
+        }
+        std::atomic_thread_fence(std::memory_order_acquire);
+
+        // Match cpu_verbs's contract: fn writes into PAYLOAD_DATA_BYTES of the reply's value slot;
+        // the request frame is handed to the fn intact so decoder_id / seq_num remain readable.
+        common::PayloadSlot &out = reply_ring_[idx];
+        out.p.value = 0;
+        out.p.decoder_id = request_ring_[idx].p.decoder_id;
+        CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
+        const std::size_t nb = fn(&request_ring_[idx].p, sizeof(common::Payload), &out.p.value,
+                                  common::PAYLOAD_DATA_BYTES, ctx_);
+        if (nb > common::PAYLOAD_DATA_BYTES) {
+            throw std::runtime_error("memcpy: coprocessor function wrote past reply capacity");
+        }
+        std::atomic_thread_fence(std::memory_order_release);
+        out.p.seq_num = expect; // publish
+    }
+}
+
 std::size_t CpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
                                                    std::size_t out_cap) {
-    // `in` is a wire-shaped Payload (matching cpu_verbs); decoder_id sits at offset 8
-    // for any decoder that needs to dispatch on it.
-    CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
-    const std::size_t out_bytes = fn(in, in_len, out, out_cap, ctx_);
-    if (out_bytes > out_cap) {
-        throw std::runtime_error("memcpy: coprocessor wrote past reply capacity");
+    if (in_len != sizeof(common::Payload)) {
+        throw std::runtime_error("memcpy: CPU coprocessor expects one wire-shaped Payload");
     }
-    return out_bytes;
+    if (!engine_.joinable()) {
+        throw std::runtime_error("memcpy: coprocessor start() must precede process_message");
+    }
+    if (failed_.load(std::memory_order_acquire)) {
+        std::rethrow_exception(error_); // surface the worker's real error
+    }
+
+    // Publish the request into ring[cursor % K]. Copy payload first, then release-fence, then
+    // seq_num — so the worker never observes a slot where seq matches but the payload trails.
+    const std::uint64_t c = process_cursor_++;
+    const std::size_t idx = c & (common::K_RING_SLOTS - 1);
+    const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
+    std::memcpy(&request_ring_[idx].p, in, sizeof(common::Payload));
+    std::atomic_thread_fence(std::memory_order_release);
+    request_ring_[idx].p.seq_num = expect;
+
+    // Spin-wait for the worker to publish reply_ring_[idx] with the matching seq.
+    volatile std::uint32_t *sseq = &reply_ring_[idx].p.seq_num;
+    while (*sseq != expect) {
+        if (failed_.load(std::memory_order_acquire)) {
+            std::rethrow_exception(error_);
+        }
+    }
+    std::atomic_thread_fence(std::memory_order_acquire);
+
+    const std::size_t n = std::min(out_cap, common::PAYLOAD_DATA_BYTES);
+    if (n != 0 && out) {
+        std::memcpy(out, &reply_ring_[idx].p.value, n);
+    }
+    return n;
 }
 
 } // namespace catalyst::transport::memcpy
