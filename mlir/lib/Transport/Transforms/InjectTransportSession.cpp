@@ -135,7 +135,7 @@ class SessionEmitter {
     void emitControllerOnly() {
         StringAttr key = ctrl.keyOr("controller");
         Value ct = createSession(b, ctrlTy, ctrl, key);
-        ConnectOp::create(b, loc, ct, ctrl.getPeer(), portAttr(ctrl.oobPort()));
+        ConnectOp::create(b, loc, ct, peerFor(ctrl), portFor(ctrl));
         ExchangeKeysOp::create(b, loc, ct);
         EstablishChannelOp::create(b, loc, ct, b.getStringAttr(transport));
         commit(ct);
@@ -208,6 +208,14 @@ class SessionEmitter {
     // number; the LLVM lowering narrows to the runtime's uint16_t.
     IntegerAttr portAttr(int64_t v) { return b.getIntegerAttr(b.getIntegerType(32), v); }
 
+    // In-process transports (memcpy) pair on the session key and never dial peer:oob_port, so
+    // emitted transport.connect / connect_async ops carry no peer / oob_port.
+    bool needsOob() const { return transport != "memcpy"; }
+    StringAttr peerFor(NodeAttr node) { return needsOob() ? node.getPeer() : StringAttr{}; }
+    IntegerAttr portFor(NodeAttr node) {
+        return needsOob() ? portAttr(node.oobPort()) : IntegerAttr{};
+    }
+
     void commit(Value ct) {
         SetMessageSizesOp::create(b, loc, ct, b.getI32IntegerAttr(ctrl.workItemIdx()),
                                   b.getI64IntegerAttr(ctrl.inBytes()),
@@ -226,7 +234,7 @@ class SessionEmitter {
     // The controller-side session dialing a coprocessor's peer, released in teardown.
     void emitControllerDial(NodeAttr coproc, StringAttr key) {
         Value ctr = createSession(b, ctrlTy, ctrl, key);
-        ConnectOp::create(b, loc, ctr, coproc.getPeer(), portAttr(coproc.oobPort()));
+        ConnectOp::create(b, loc, ctr, peerFor(coproc), portFor(coproc));
         ExchangeKeysOp::create(b, loc, ctr);
         EstablishChannelOp::create(b, loc, ctr, b.getStringAttr(transport));
         commit(ctr);
@@ -263,8 +271,7 @@ class SessionEmitter {
         cb.setInsertionPoint(terminatorOf(serveFn));
         Value co = createSession(cb, coTy, coproc, key);
         Value tok =
-            ConnectAsyncOp::create(cb, loc, tokTy, co, coproc.getPeer(), portAttr(coproc.oobPort()))
-                .getToken();
+            ConnectAsyncOp::create(cb, loc, tokTy, co, peerFor(coproc), portFor(coproc)).getToken();
         AwaitOp::create(cb, loc, tok);
         ExchangeKeysOp::create(cb, loc, co);
         EstablishChannelOp::create(cb, loc, co, cb.getStringAttr(transport));
@@ -307,9 +314,8 @@ class SessionEmitter {
 
         OpBuilder hb(terminatorOf(hostSetup));
         Value lco = createSession(hb, coTy, coproc, key);
-        Value ltok = ConnectAsyncOp::create(hb, loc, tokTy, lco, coproc.getPeer(),
-                                            portAttr(coproc.oobPort()))
-                         .getToken();
+        Value ltok =
+            ConnectAsyncOp::create(hb, loc, tokTy, lco, peerFor(coproc), portFor(coproc)).getToken();
         SetCoprocessorFnOp::create(hb, loc, lco, coproc.getSymbol());
         pendingLocal.push_back({lco, ltok});
         keyed.push_back({coTy, key, hostTeardown});
@@ -320,9 +326,8 @@ class SessionEmitter {
         Value ct = createSession(b, ctrlTy, ctrl, key);
         Value co = createSession(b, coTy, coproc, key);
         Value t1 =
-            ConnectAsyncOp::create(b, loc, tokTy, co, coproc.getPeer(), portAttr(coproc.oobPort()))
-                .getToken();
-        ConnectOp::create(b, loc, ct, coproc.getPeer(), portAttr(coproc.oobPort()));
+            ConnectAsyncOp::create(b, loc, tokTy, co, peerFor(coproc), portFor(coproc)).getToken();
+        ConnectOp::create(b, loc, ct, peerFor(coproc), portFor(coproc));
         AwaitOp::create(b, loc, t1);
         Value t2 = ExchangeKeysAsyncOp::create(b, loc, tokTy, co).getToken();
         ExchangeKeysOp::create(b, loc, ct);

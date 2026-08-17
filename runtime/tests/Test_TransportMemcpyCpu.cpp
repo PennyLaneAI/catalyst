@@ -198,3 +198,75 @@ TEST_CASE("memcpy collect rejects more than a single reply slot", "[transport_me
     std::uint64_t out_bytes[2] = {sizeof(r0), sizeof(r1)};
     REQUIRE_THROWS_AS(controller.collect(outs, out_bytes, 2), std::runtime_error);
 }
+
+TEST_CASE("memcpy incumbent coprocessor survives a rejected second coprocessor",
+          "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19020};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    CpuCoprocessorSession incumbent(pair_cfg(ci.oob_port));
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(incumbent.connect(ci) == 0);
+
+    MemRegion reply = controller.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+    MemRegion request = incumbent.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
+    PeerRef peer_reply = incumbent.exchange_keys(request);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    incumbent.establish_channel(desc, request, peer_reply);
+    controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+    controller.start();
+    incumbent.start();
+    incumbent.set_coprocessor_fn(nullptr, nullptr); // built-in echo
+
+    {
+        // A rejected connect's dtor must not clear the incumbent's binding.
+        CpuCoprocessorSession rejected(pair_cfg(ci.oob_port));
+        REQUIRE_THROWS_AS(rejected.connect(ci), std::runtime_error);
+    }
+
+    const std::uint64_t word = 0xDEADBEEFCAFEBABEull;
+    controller.write_data_slot(&word, sizeof(word), /*decoder_id=*/0);
+    REQUIRE(controller.kick(0) == 0);
+    std::uint64_t got = 0;
+    void *outs[1] = {&got};
+    std::uint64_t out_bytes[1] = {sizeof(got)};
+    REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
+    CHECK(got == word);
+}
+
+// Match RDMA: reject in/out_bytes > wire payload instead of truncating in kick().
+TEST_CASE("memcpy rejects in/out_bytes exceeding the wire payload", "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19021};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    REQUIRE_THROWS_AS(controller.commit_work_item(0, /*in_bytes=*/32, sizeof(std::uint64_t)),
+                      std::runtime_error);
+    REQUIRE_THROWS_AS(controller.commit_work_item(0, sizeof(std::uint64_t), /*out_bytes=*/32),
+                      std::runtime_error);
+}
+
+// Distinct pair keys stay isolated even on the same peer+oob_port.
+TEST_CASE("memcpy pair keys isolate independent sessions", "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19022};
+
+    CpuControllerSession ctrl_alpha("pair=alpha");
+    CpuCoprocessorSession co_alpha("pair=alpha");
+    REQUIRE(ctrl_alpha.connect(ci) == 0);
+    REQUIRE(co_alpha.connect(ci) == 0);
+
+    CpuControllerSession ctrl_beta("pair=beta");
+    CpuCoprocessorSession co_beta("pair=beta");
+    REQUIRE_NOTHROW(ctrl_beta.connect(ci));
+    REQUIRE_NOTHROW(co_beta.connect(ci));
+}
+
+// No pair key means no way to rendezvous; refuse rather than silently cross-pair.
+TEST_CASE("memcpy rejects a session with no pair key in config", "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19023};
+    CpuControllerSession controller;
+    REQUIRE_THROWS_AS(controller.connect(ci), std::runtime_error);
+}

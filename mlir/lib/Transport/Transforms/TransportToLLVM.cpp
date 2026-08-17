@@ -135,8 +135,16 @@ template <typename OpT, bool Async> struct ConnectLoweringBase : public OpConver
                                   ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         ModuleOp mod = op->template getParentOfType<ModuleOp>();
-        Value peer = globalStr(rewriter, op.getLoc(), mod, "transport_peer_", op.getPeer());
-        Value port = constInt(rewriter, op.getLoc(), IntegerType::get(ctx, 16), op.getOobPort());
+        // peer / oob_port are optional: memcpy pairs by session key, so its transport.connect
+        // carries neither. Absent attrs lower to a null pointer + 0, which the CAPI reads as
+        // an empty peer string (TransportCAPI.cpp: `peer ? peer : ""`).
+        auto peerAttr = op.getPeerAttr();
+        Value peer =
+            peerAttr ? globalStr(rewriter, op.getLoc(), mod, "transport_peer_", peerAttr.getValue())
+                     : Value(LLVM::ZeroOp::create(rewriter, op.getLoc(), ptrTy(ctx)));
+        auto portAttr = op.getOobPortAttr();
+        Value port = constInt(rewriter, op.getLoc(), IntegerType::get(ctx, 16),
+                              portAttr ? portAttr.getInt() : 0);
         if (Async) {
             Value r = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__connect_async",
                                {ptrTy(ctx), ptrTy(ctx), IntegerType::get(ctx, 16)}, i64Ty(ctx),

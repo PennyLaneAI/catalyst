@@ -291,10 +291,15 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 
 // -----
 
-// Memcpy backline transport selects the local channel.
+// Memcpy backline transport selects the local channel. Memcpy pairs on the session key,
+// so the emitted transport.connect / connect_async ops carry no peer or oob_port.
 
 // CHECK-LABEL: func.func @setup
 // CHECK:         quantum.init
+// CHECK-DAG:     transport.connect_async %{{.*}} : !transport.session<coprocessor> -> !transport.token
+// CHECK-DAG:     transport.connect %{{.*}} : !transport.session<controller>
+// CHECK-NOT:     peer =
+// CHECK-NOT:     oob_port =
 // CHECK-DAG:     transport.establish_channel %{{.*}} "memcpy" : !transport.session<controller>
 // CHECK-DAG:     transport.establish_channel %{{.*}} "memcpy" : !transport.session<coprocessor>
 module attributes {catalyst.backline = #transport.backline<transport = "memcpy", controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18592 : i16, in_bytes = 3 : i64, out_bytes = 8 : i64>,

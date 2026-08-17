@@ -27,10 +27,16 @@ namespace catalyst::transport::memcpy {
 
 class CpuControllerSession;
 
-// In-process memcpy link keyed by the session pair key (computed once per controller/coprocessor
-// pair by inject-transport-session, plumbed through the CAPI as `pair=<key>` in the backend
-// config). The coprocessor binds `process_message`; the controller's kick() drives it inline.
-// `mu` guards `controller` and `process_message` across connect / kick / teardown.
+// Rendezvous point for a memcpy controller and its paired coprocessor. Both sides look up
+// the same MemcpyLink from a process-global registry keyed on the session pair key.
+//
+// The pair key is emitted by the compiler (inject-transport-session's `key` attribute on
+// transport.create) and folded into the backend config as `pair=<key>` by TransportCAPI, so
+// pairing is decided entirely at the MLIR level; memcpy's transport.connect intentionally
+// carries no peer or oob_port and ConnectInfo is ignored by memcpy sessions.
+//
+// The coprocessor binds `process_message` on connect(); the controller's kick() invokes it
+// inline. `mu` guards both fields across connect / kick / teardown.
 struct MemcpyLink {
     // Invoked once per controller kick(). Reads `in_len` bytes from `in` (a wire-shaped
     // `common::Payload` frame synthesized by the controller: value bytes at offset 0,
@@ -43,19 +49,23 @@ struct MemcpyLink {
                                                      std::size_t out_cap)>;
 
     std::mutex mu;
+    // Duplicate-binding sentinels: connect() throws if the field for its role is already set,
+    // and each session clears its own field in its destructor.
     CpuControllerSession *controller = nullptr;
     ProcessMessage process_message;
 };
 
-// The registry backing `acquire_memcpy_link` lives in the shared `libmemcpy_cpu_impl.so`
-// so every memcpy plugin loaded into the process sees the same pair-key → MemcpyLink map.
-// Compiling this function inline (per-plugin TU) would give each dlopen'd plugin its own
-// private copy of the static map, and controller + coprocessor plugins would fail to pair.
+// Look up (or create) the MemcpyLink for a pair key. The backing registry lives in the shared
+// `libmemcpy_cpu_impl.so`, so every memcpy plugin dlopen'd into the process shares one map;
+// putting this in a header would give each plugin its own private static and stop controller
+// and coprocessor plugins from pairing. Throws if `pair_key` is empty, since a blank key would
+// silently cross-pair unrelated sessions.
 auto acquire_memcpy_link(std::string_view pair_key) -> std::shared_ptr<MemcpyLink>;
 
-// Extract the value of `pair=<key>` from a backend config string ("k1=v1;k2=v2;..."). The
-// CAPI folds the session's compiler-emitted pair key into config on every create; this helper
-// reads it back on the backend side.
+// Extract the value of `pair=<key>` from a backend config string ("k1=v1;k2=v2;..."). The CAPI
+// folds the compiler-emitted key into config on every create; this reads it back on the
+// backend side. Returns an empty string when `pair=` is absent, which `acquire_memcpy_link`
+// rejects.
 auto parse_pair_key(std::string_view config) -> std::string;
 
 } // namespace catalyst::transport::memcpy
