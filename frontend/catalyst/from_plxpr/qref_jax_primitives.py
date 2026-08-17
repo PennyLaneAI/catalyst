@@ -40,6 +40,7 @@ from pennylane.wires import AbstractQubit
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
     AbstractObs,
+    CatxprPrimitive,
     _named_obs_attribute,
     extract_scalar,
     safe_cast_to_f64,
@@ -144,28 +145,28 @@ class MeasurementPlane(Enum):
 # Primitives #
 ##############
 
-qref_alloc_p = Primitive("qref_alloc")
-qref_dealloc_p = Primitive("qref_dealloc")
+qref_alloc_p = CatxprPrimitive("qref_alloc")
+qref_dealloc_p = CatxprPrimitive("qref_dealloc")
 qref_dealloc_p.multiple_results = True
-qref_get_p = Primitive("qref_get")
-qref_set_state_p = Primitive("qref_state_prep")
+qref_get_p = CatxprPrimitive("qref_get")
+qref_set_state_p = CatxprPrimitive("qref_state_prep")
 qref_set_state_p.multiple_results = True
-qref_set_basis_state_p = Primitive("qref_set_basis_state")
+qref_set_basis_state_p = CatxprPrimitive("qref_set_basis_state")
 qref_set_basis_state_p.multiple_results = True
-qref_qinst_p = Primitive("qref_qinst")
+qref_qinst_p = CatxprPrimitive("qref_qinst")
 qref_qinst_p.multiple_results = True
-qref_gphase_p = Primitive("qref_gphase")
+qref_gphase_p = CatxprPrimitive("qref_gphase")
 qref_gphase_p.multiple_results = True
-qref_pauli_measure_p = Primitive("pref_pauli_measure")
-qref_pauli_rot_p = Primitive("qref_pauli_rot")
+qref_pauli_measure_p = CatxprPrimitive("pref_pauli_measure")
+qref_pauli_rot_p = CatxprPrimitive("qref_pauli_rot")
 qref_pauli_rot_p.multiple_results = True
-qref_unitary_p = Primitive("qref_unitary")
+qref_unitary_p = CatxprPrimitive("qref_unitary")
 qref_unitary_p.multiple_results = True
-qref_measure_p = Primitive("qref_measure")
-qref_measure_in_basis_p = Primitive("qref_measure_in_basis")
-qref_compbasis_p = Primitive("qref_compbasis")
-qref_namedobs_p = Primitive("qref_namedobs")
-qref_hermitian_p = Primitive("qref_hermitian")
+qref_measure_p = CatxprPrimitive("qref_measure")
+qref_measure_in_basis_p = CatxprPrimitive("qref_measure_in_basis")
+qref_compbasis_p = CatxprPrimitive("qref_compbasis")
+qref_namedobs_p = CatxprPrimitive("qref_namedobs")
+qref_hermitian_p = CatxprPrimitive("qref_hermitian")
 
 
 #
