@@ -606,7 +606,7 @@ class QJIT(CatalystCallable):
 
     @property
     def _placement(self):
-        """The backline placement this program runs over, or ``None`` if it declares none and 
+        """The backline placement this program runs over, or ``None`` if it declares none and
         searched once per trace, and cached against the jaxpr it was found in.
         """
         if self._placement_cache is None or self._placement_cache[0] is not self.jaxpr:
@@ -615,7 +615,7 @@ class QJIT(CatalystCallable):
         return self._placement_cache[1]
 
     def _configure_backline(self):
-        """Prepare compilation for the placement this program declares, if it declares one. It 
+        """Prepare compilation for the placement this program declares, if it declares one. It
         selects the passes that lower a placement, and settles the address of every executor it
         dispatches to.
         """

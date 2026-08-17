@@ -114,7 +114,8 @@ class SessionEmitter {
             setTargetFromNode(ctrlMod, ctrl);
         }
         setupFn = dispatchedController ? makeVoidFunc("setup_transport", ctrlMod) : hostSetup;
-        teardownFn = dispatchedController ? makeVoidFunc("teardown_transport", ctrlMod) : hostTeardown;
+        teardownFn =
+            dispatchedController ? makeVoidFunc("teardown_transport", ctrlMod) : hostTeardown;
         b.setInsertionPoint(terminatorOf(setupFn));
     }
 

@@ -161,12 +161,10 @@ class ExecutorConfig:
     """Directory on the target the executor runs in. ``None`` generates a ``catalyst-exec-*`` one
     per launch and removes it on teardown; a directory named here is left in place."""
 
-
     plugins: list[str] | None = None
     """Shared libraries the executor ``dlopen``s at startup, in this order. A bare filename resolves
     against the workspace; ``~`` and absolute paths are taken as given. They share the global
     namespace, so the first definition of a symbol wins."""
-
 
     ready_timeout: float = 60.0
     """Seconds to wait for the executor to report that it bound its port."""

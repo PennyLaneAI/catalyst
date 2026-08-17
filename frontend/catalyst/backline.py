@@ -14,7 +14,7 @@
 
 """Serialize a PennyLane ``Placement`` into the ``catalyst.backline`` module attribute and
 build the pipelines that lower it. The backend hints a node's ``init_args`` may carry are listed in
-``_INIT_KEYS`` and forwarded as given. Anything a backend interprets itself travels inside the 
+``_INIT_KEYS`` and forwarded as given. Anything a backend interprets itself travels inside the
 ``config`` string rather than as a key of its own.
 
 Note: "node" here is a backline participant (a controller or coprocessor), distinct from
@@ -22,11 +22,11 @@ Note: "node" here is a backline participant (a controller or coprocessor), disti
 """
 
 import ctypes
-import jax
 import os
 from pathlib import Path
 from typing import NamedTuple
 
+import jax
 import pennylane as qp
 from jax.interpreters.mlir import ir
 from pennylane.backline import Node, Placement
@@ -270,7 +270,9 @@ def _executor_plugins(node: Node, given) -> list[str]:
     """The plugins an executor needs: those ``given``, then a coprocessor's decode function and a
     controller's device runtime, each appended only if not already listed."""
     # Deferred: qjit_device imports the device stack, which imports this module.
-    from catalyst.device.qjit_device import extract_backend_info  # pylint: disable=import-outside-toplevel
+    from catalyst.device.qjit_device import (  # pylint: disable=import-outside-toplevel
+        extract_backend_info,
+    )
 
     remote = bool(node.remote)
     plugins = list(given)

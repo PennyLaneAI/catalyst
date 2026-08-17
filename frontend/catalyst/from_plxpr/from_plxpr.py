@@ -30,6 +30,7 @@ from pennylane.capture.primitives import transform_prim
 from pennylane.decomposition.utils import to_name
 from pennylane.transforms import decompose as pl_decompose
 
+from catalyst.backline import device_pass_pipeline
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.from_plxpr.decompose import DecompRuleInterpreter
@@ -37,7 +38,6 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_dealloc_p,
 )
-from catalyst.backline import device_pass_pipeline
 from catalyst.jax_extras import deduce_avals, make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import get_jax_patches
 from catalyst.jax_primitives import (
@@ -309,7 +309,7 @@ def handle_qnode(
         gateset = list(sorted(gateset))  # consistent ordering for testing
         setattr(qnode, "decompose_gatesets", [gateset])
     # The device may require passes of its own, e.g. a backline placement naming a QEC code implies
-    # implicit encoding applied to it. Therefore we append the pass pipeline with the qec lowering 
+    # implicit encoding applied to it. Therefore we append the pass pipeline with the qec lowering
     # psses.
     pipelines = (("main", tuple(self._pass_pipeline) + device_pass_pipeline(qnode.device)),)
     if not self._skip_preprocess:
