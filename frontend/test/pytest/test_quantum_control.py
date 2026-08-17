@@ -1132,7 +1132,7 @@ class TestControlledOperationProperties:
         """Test parameter-frequencies against expected values."""
 
         op = C_ctrl(base, (4, 5))
-        assert op.parameter_frequencies == expected
+        assert qp.gradients.parameter_frequencies(op) == expected
 
     def test_parameter_frequencies_no_generator_error(self):
         """An error should be raised if the base doesn't have a generator."""
@@ -1386,13 +1386,13 @@ pauli_x_based_op_decomps = [
         qp.PauliX,
         [2],
         [0, 1],
-        qp.Toffoli.compute_decomposition(wires=[0, 1, 2]),
+        [qp.Toffoli(wires=[0, 1, 2])],
     ),
     (
         qp.CNOT,
         [1, 2],
         [0],
-        qp.Toffoli.compute_decomposition(wires=[0, 1, 2]),
+        [qp.Toffoli(wires=[0, 1, 2])],
     ),
     (
         qp.PauliX,

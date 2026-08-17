@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Version information.
-Version number (major.minor.patch[-label])
+"""
+This module provides the :class:`Executor` for deploying and connecting to a ``catalyst-executor``
+server, which runs compiled programs out-of-process. Compiled programs are dispatched to the
+address it serves on, either locally or on a remote host.
 """
 
-__version__ = "0.16.0-dev72"
+from .manager import Executor
+
+__all__ = ("Executor",)
