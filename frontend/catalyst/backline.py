@@ -13,25 +13,37 @@
 # limitations under the License.
 
 """Serialize a PennyLane ``Placement`` into the ``catalyst.backline`` module attribute and
-build the pipelines that lower it. Backend hints in a node's ``init_args`` are forwarded verbatim,
-so a new backend needs no change here.
+build the pipelines that lower it. The backend hints a node's ``init_args`` may carry are listed in
+``_INIT_KEYS`` and forwarded as given. Anything a backend interprets itself travels inside the
+``config`` string rather than as a key of its own.
 
 Note: "node" here is a backline participant (a controller or coprocessor), distinct from
 :class:`catalyst.Executor`, which deploys the ``catalyst-executor`` process a node may run on.
 """
 
+import ctypes
 import os
 from pathlib import Path
+from typing import NamedTuple
 
+import jax
+import pennylane as qp
+from jax.interpreters.mlir import ir
+from pennylane.backline import Node, Placement
+from pennylane.devices import Device
+
+from catalyst.executor import Executor
+from catalyst.pipelines import insert_pass_before
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
-# Backend hints forwarded verbatim from a node's ``init_args`` to the attribute node.
+# What a node's ``init_args`` keys a node may carry; any other is rejected rather than dropped.
 _INIT_KEYS = ("backend_lib", "config", "data_path", "in_bytes", "out_bytes")
 
 # A transport backend library is named for its backend and role:
 #     libcatalyst_transport_<backend>_<role>.<ext>
 # A ``make -C runtime`` build passes ``CMAKE_LIBRARY_OUTPUT_DIRECTORY``, so in-tree backends land
-# flat in ``<RUNTIME_LIB_DIR>``; a bare ``cmake`` build instead mirrors the source tree, nesting them
+# flat in ``<RUNTIME_LIB_DIR>``; a bare ``cmake`` build instead mirrors the source tree, nesting
 # under ``transport/<backend>/``. Both are searched. Out-of-tree backends build elsewhere entirely,
 # so ``CATALYST_TRANSPORT_PATH`` (``:``-separated, like ``PATH``) lists extra directories to search
 # first; each is searched directly, assuming no layout within it.
@@ -86,7 +98,12 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
     )
 
 
-def _node_dict(node, role: str) -> dict:
+def _out_of_process(node: Node) -> bool:
+    """Whether the node's code is dispatched to an executor rather than run in this process."""
+    return node.executor_options is not None or node.executor
+
+
+def _node_dict(node: Node, role: str) -> dict:
     """Map a backline node to a ``catalyst.backline`` node dict. Reads ``node.executor`` as-is.
 
     ``comm_host``/``oob_port`` are coprocessor-only; a controller
@@ -97,7 +114,7 @@ def _node_dict(node, role: str) -> dict:
         role: The node's role, used to resolve its ``backend`` to a library. An explicit
             ``init_args["backend_lib"]`` path takes precedence over ``backend``.
     """
-    d: dict = {"remote": bool(node.remote)}
+    d: dict = {"remote": bool(_out_of_process(node))}
     if node.label is not None:
         d["name"] = node.label
     comm_host = getattr(node, "comm_host", None)
@@ -106,69 +123,68 @@ def _node_dict(node, role: str) -> dict:
     oob_port = getattr(node, "oob_port", None)
     if oob_port is not None:
         d["oob_port"] = oob_port
-    backend = getattr(node, "backend", None)
+    backend = node.backend
     if backend is not None and not (node.init_args or {}).get("backend_lib"):
         d["backend_lib"] = _resolve_backend_lib(backend, role, bool(node.remote))
-    executor = getattr(node, "executor", None)
-    triple = getattr(executor, "triple", None) if executor is not None else None
-    if triple is not None:
-        d["triple"] = triple
-    if executor is not None and getattr(executor, "address", None):
-        d["address"] = executor.address
+    # A node may be handed any object as its executor, so its fields are read rather than assumed.
+    executor = node.executor
+    if executor is not None:
+        triple = getattr(executor, "triple", None)
+        if triple is not None:
+            d["triple"] = triple
+        try:
+            address = executor.address
+        except (AttributeError, RuntimeError) as e:
+            # Either it has no ``address`` at all, or it has neither launched nor settled on one.
+            # The cause says which; both leave the compiled program with nowhere to dispatch.
+            raise CompileError(
+                f"backline node's executor ({type(executor).__name__}) cannot say where it serves, "
+                f"so the compiled program would have nowhere to dispatch it: {e}. Pass "
+                f"executor_options= and let the compiler settle the address, or launch the "
+                f"executor before compiling."
+            ) from e
+        if address:  # also rejects "", which would serialize as an empty, unusable address
+            d["address"] = address
     init = node.init_args or {}
+    if unknown := sorted(set(init) - set(_INIT_KEYS)):
+        raise CompileError(
+            f"backline node has unrecognized init_args {unknown}; the recognized keys are "
+            f"{list(_INIT_KEYS)}. Settings the backend itself interprets go in 'config', as a "
+            f"'key=value;...' string."
+        )
     d.update({k: init[k] for k in _INIT_KEYS if k in init})
     return d
 
 
-def _load_coprocessor_fn_libs(placement) -> None:
-    """Load the library providing each in-process (local) coprocessor's CoprocessorFn."""
-    import ctypes  # pylint: disable=import-outside-toplevel
+def _load_coprocessor_fn_libs(placement: Placement) -> None:
+    """Load the library providing each in-process coprocessor's CoprocessorFn.
 
+    Keyed on the coprocessor being in this process rather than on ``remote``: one dispatched to an
+    executor loads the library itself, and its own installation is where the path resolves -- even
+    when that executor is a subprocess of this one on the same machine.
+    """
     for coproc in placement.coprocessors:
-        if coproc.remote:
+        if _out_of_process(coproc):
             continue
         lib_path = getattr(coproc.coprocessor_fn, "lib_path", None)
         if lib_path:
             ctypes.CDLL(str(lib_path), mode=ctypes.RTLD_GLOBAL)
 
 
-def realize_executors(placement) -> None:
-    """Prepare ``placement`` for execution: launch the executors it asked for, and load the
-    CoprocessorFn libraries its in-process coprocessors need. Idempotent."""
-    _realize_executor(placement.controller)
-    for coproc in placement.coprocessors:
-        _realize_executor(coproc)
+def launch_executors(placement: Placement | None) -> None:
+    """Deploy the placement's executors and load the CoprocessorFn libraries its in-process
+    coprocessors need.
+    """
+    if placement is None:
+        return
+    for node in (placement.controller, *placement.coprocessors):
+        executor = _realize_executor(node)
+        if executor is not None:
+            executor.launch()
     _load_coprocessor_fn_libs(placement)
 
 
-def add_transport_passes(stages):
-    """Insert the transport passes into ``stages`` (in place) at the stages where their inputs exist.
-
-    Applies to any base pipeline (e.g. ``default_pipeline()`` or a QEC one), so backline stays
-    independent of the base.
-    """
-    from catalyst.pipelines import insert_pass_before
-
-    for name, passes in stages:
-        if name == "QuantumCompilationStage":
-            passes.append("inject-transport-session")
-        elif name == "BufferizationStage":
-            passes.append("lower-decode-to-transport")
-        elif name == "MLIRToLLVMDialectConversion":
-            insert_pass_before(
-                passes, ref_pass="convert-catalyst-to-llvm", new_pass="convert-transport-to-llvm"
-            )
-    return stages
-
-
-def backline_pipeline():
-    """Default Catalyst pipeline plus the transport passes."""
-    from catalyst.pipelines import default_pipeline
-
-    return add_transport_passes(default_pipeline())
-
-
-def serialize_backline(placement) -> dict:
+def serialize_backline(placement: Placement) -> dict:
     """Serialize a ``Placement`` into the ``catalyst.backline`` attribute dict."""
     result = {
         "transport": placement.transport.name,
@@ -202,11 +218,11 @@ def _node_text(node: dict) -> str:
     return f"#transport.node<{fields}>"
 
 
-def backline_attr_text(placement) -> str:
+def backline_attr_text(placement: Placement) -> str:
     """Render a ``Placement`` as ``#transport.backline<...>`` attribute syntax."""
     d = serialize_backline(placement)
     parts = [
-        f"transport = {_literal(d.get('transport') or '')}",
+        f"transport = {_literal(d['transport'])}",
         f"controller = {_node_text(d['controller'])}",
     ]
     if coprocs := d.get("coprocessors"):
@@ -214,31 +230,337 @@ def backline_attr_text(placement) -> str:
     return "#transport.backline<" + ", ".join(parts) + ">"
 
 
-def _launch_executor(label, options):
-    """Build and launch a ``catalyst.Executor`` from a node's executor options.
+def _check_machine_agrees(node: Node, host, address=None, preset: bool = False) -> None:
+    """Reject an executor whose location contradicts the node's ``remote``.
 
-    The executor determines its own target triple, detecting it on the target host when the options
-    do not name one.
+    An ``address`` alone is not checked, since it may name either machine.
+
+    Args:
+        node: The backline node the executor belongs to.
+        host: The host the executor ssh's to, if any.
+        address: The address an attached executor serves on, if any.
+        preset: Whether the executor was attached directly rather than built from options.
+
+    Raises:
+        CompileError: If ``remote`` and the executor's location disagree.
     """
-    from catalyst.executor import Executor
+    fix = "drop its executor" if preset else "drop 'host' from its executor_options"
+    if host and not node.remote:
+        raise CompileError(
+            f"backline node is not remote but its executor is deployed to host={host!r} over ssh, "
+            f"which puts it on another machine -- so the node's libraries would be looked for in "
+            f"this installation and loaded from that one. Set remote=True on the node, or {fix} to "
+            f"run it here as a subprocess."
+        )
+    if node.remote and not (host or address or preset):
+        raise CompileError(
+            "backline node is remote but its executor_options name neither a 'host' to deploy it "
+            "to nor an 'address' to attach to, which asks for a subprocess of this process on this "
+            "machine. Pass a 'host', or leave remote unset to run the node here."
+        )
 
-    options.setdefault("name", label or "executor")
-    return Executor(**options).launch()
+
+def _coprocessor_fn_lib(node: Node) -> Path | None:
+    """The library providing a coprocessor's CoprocessorFn, or ``None`` if it names none."""
+    lib_path = getattr(getattr(node, "coprocessor_fn", None), "lib_path", None)
+    return Path(lib_path) if lib_path else None
 
 
-def _realize_executor(node):
-    """Return the node's launched executor, building it from its ``executor_options`` on first use.
+def _executor_plugins(node: Node, given) -> list[str]:
+    """The plugins an executor needs: those ``given``, then a coprocessor's decode function and a
+    controller's device runtime, each appended only if not already listed."""
+    # Deferred: qjit_device imports the device stack, which imports this module.
+    from catalyst.device.qjit_device import (  # pylint: disable=import-outside-toplevel
+        extract_backend_info,
+    )
 
-    A node requests an executor by carrying ``executor_options``, and the launched
-    one is cached back onto the node. ``None`` options mean no executor was requested, while
-    ``{}`` means one with all defaults.
+    remote = bool(node.remote)
+    plugins = list(given)
+    implied = []
+    fn_lib = _coprocessor_fn_lib(node)
+    if fn_lib is not None:
+        implied.append(fn_lib)
+    device = getattr(node, "device", None)
+    if device is not None:
+        # Last: plugins open RTLD_GLOBAL and the first definition of a symbol wins, and the device
+        # runtime carries its own copy of the runtime's exception types.
+        implied.append(Path(extract_backend_info(device).lpath))
+    for lib in implied:
+        # A node on another machine resolves a library by filename, the deployed bundle supplying
+        # the file; one running here resolves it by path into this installation.
+        if not any(Path(p).name == lib.name for p in plugins):
+            plugins.append(lib.name if remote else str(lib))
+    return plugins
+
+
+def _realize_executor(node: Node) -> Executor | None:
+    """The node's executor, built from its ``executor_options`` on first use and cached on it.
+
+    ``None`` when the node requested none, which leaves it running in this process.
+
+    Raises:
+        CompileError: If ``remote`` and the executor disagree about which machine the node is on, if
+            a remote node has no executor to reach it by, or if a ``host`` is named without a
+            ``port``.
     """
-    executor = getattr(node, "executor", None)
+    executor = node.executor
+    options = node.executor_options
+    if node.remote and executor is None and options is None:
+        raise CompileError(
+            "backline node is remote but was given no executor to reach it by. A node on another "
+            "machine is reached by dispatching its code to an executor deployed there, so pass "
+            "executor_options with a 'host'. To run the node on this machine, leave remote unset."
+        )
     if executor is not None:
+        missing = [m for m in ("address", "launch") if not hasattr(type(executor), m)]
+        if missing:
+            raise CompileError(
+                f"backline node was given {type(executor).__name__} as its executor, which is "
+                f"missing {missing}. A node's executor has to say where it serves and be "
+                f"launchable, since the compiled program carries that address and deploys it "
+                f"before dispatching. Pass executor_options= and let the compiler build one."
+            )
+        _check_machine_agrees(node, getattr(executor, "host", None), preset=True)
         return executor
-    options = getattr(node, "executor_options", None)
     if options is None:
         return None
-    executor = _launch_executor(getattr(node, "label", None), dict(options))
+    options = dict(options)
+    options.setdefault("name", node.label or "executor")
+    options["plugins"] = _executor_plugins(node, options.get("plugins") or ())
+    fn_lib = _coprocessor_fn_lib(node)
+    if fn_lib is not None and node.remote:
+        # Named by filename among the plugins above, which resolves against the workspace -- so on
+        # another machine the file has to travel there alongside whatever else is deployed.
+        options["deploy"] = [*options.get("deploy", []), str(fn_lib)]
+    _check_machine_agrees(node, options.get("host"), address=options.get("address"))
+    if options.get("host") and options.get("port") is None:
+        raise CompileError(
+            f"backline node's executor_options name host={options['host']!r} without a port. Its "
+            f"address would then settle only on deployment, so compiling would have to ssh to that "
+            f"host to learn it. Pin 'port' to keep the address predictable and let the deployment "
+            f"wait until execution."
+        )
+    executor = Executor(**options)
+    if executor.resolve() is None:
+        # Only a local executor reaches here: it searches for a free port, so its address is
+        # knowable only once it is up. That search stays on loopback and costs no network.
+        executor.launch()
     object.__setattr__(node, "executor", executor)  # cache on the (frozen) node
     return executor
+
+
+def attach_backline_attr(mlir_module, placement: Placement) -> None:
+    """Serialize ``placement`` onto ``mlir_module`` as the ``catalyst.backline`` attribute."""
+    with mlir_module.context:
+        mlir_module.operation.attributes["catalyst.backline"] = ir.Attribute.parse(
+            backline_attr_text(placement)
+        )
+
+
+def module_attributes(device: Device) -> dict[str, str]:
+    """The MLIR attributes ``device`` puts on the module of a QNode that runs on it.
+
+    Values are plain Python, ready for ``get_mlir_attribute_from_pyval``.
+
+    Args:
+        device: A PennyLane device that may carry a backline placement.
+
+    Returns:
+        dict: Attribute name to value, empty for a device that implies no attributes.
+    """
+    # Only a controller on another machine plays a role: one running in this process needs no
+    # module of its own, so it is not tagged.
+    controller = getattr(getattr(device, "placement", None), "controller", None)
+    if controller is not None and controller.remote:
+        return {"catalyst.backline_role": "controller"}
+    return {}
+
+
+# ========================================= the pipelines =========================================
+
+
+def _insert_passes(stages, specs):
+    """Insert each ``(stage, pass, ref_pass)`` of ``specs`` into ``stages`` in place, returning it.
+
+    A pass already in its stage, or a spec whose stage is absent, is skipped.
+    """
+    for stage, new_pass, ref_pass in specs:
+        for name, passes in stages:
+            if name != stage or new_pass in passes:
+                continue
+            if ref_pass is None:
+                passes.append(new_pass)
+            else:
+                insert_pass_before(passes, ref_pass=ref_pass, new_pass=new_pass)
+    return stages
+
+
+# --- per QNode, at trace: the QEC encoding that rewrites a circuit into the code ---
+
+
+class _QecLowering(NamedTuple):
+    """How a QEC code is lowered: the logical-qubit count and the encoder's own parameters."""
+
+    k: int
+    qec_code: str
+    number_errors: int
+
+
+# Lowering parameters per QEC code, keyed by the name a placement declares.
+_QEC_CODES = {
+    "steane": _QecLowering(k=1, qec_code="Steane", number_errors=1),
+}
+
+
+def _validated_qec_code(code):
+    """``code`` if it has a known lowering, or ``None`` if there is none to apply.
+
+    Raises:
+        ValueError: If a code is named but has no lowering here.
+    """
+    if code is not None and code not in _QEC_CODES:
+        raise ValueError(f"no lowering for QEC code {code!r}; known codes: {sorted(_QEC_CODES)}.")
+    return code
+
+
+def _qec_pass_specs(code):
+    """The encoding chain for ``code`` as ``(pass_name, kwargs)`` pairs, in application order.
+
+    Names are literal rather than read off the transforms, which cannot be imported mid-trace; a
+    unit test pins them against the transforms themselves.
+    """
+    params = _QEC_CODES[code]
+    return (
+        ("convert-quantum-to-qecl", {"k": params.k}),
+        ("symbol-dce", {}),
+        ("inject-noise-to-qecl", {}),
+        (
+            "convert-qecl-to-qecp",
+            {"qec_code": params.qec_code, "number_errors": params.number_errors},
+        ),
+        ("convert-qecp-to-quantum", {}),
+    )
+
+
+def device_pass_pipeline(device: Device) -> tuple:
+    """The passes ``device`` requires of any QNode that runs on it, in application order.
+
+    A device naming a ``qec_code`` asks for its circuits to run encoded in that code; this turns
+    that into the pass chain. A device requiring nothing answers the same question with ``()``.
+
+    Returns:
+        tuple: ``BoundTransform``s to append to the QNode's own pass pipeline.
+    """
+    code = _validated_qec_code(getattr(device, "qec_code", None))
+    if code is None:
+        return ()
+    return tuple(
+        qp.transforms.core.BoundTransform(qp.transform(pass_name=name), kwargs=kwargs)
+        for name, kwargs in _qec_pass_specs(code)
+    )
+
+
+# --- per program, at compile: passes inserted into the compiler's own stages ---
+
+
+# Each entry is ``(stage, pass, pass to insert before)``; a ``None`` reference appends to the stage.
+_TRANSPORT_PASSES = (
+    ("QuantumCompilationStage", "inject-transport-session", None),
+    ("BufferizationStage", "lower-decode-to-transport", None),
+    ("MLIRToLLVMDialectConversion", "convert-transport-to-llvm", "convert-catalyst-to-llvm"),
+)
+
+# Added on top of the above only for a placement naming a ``qec_code``.
+_QEC_LOWERING_PASSES = (
+    ("MLIRToLLVMDialectConversion", "convert-qecp-to-llvm", "convert-quantum-to-llvm"),
+)
+
+
+def placement_pipeline(placement: Placement, stages: list) -> list:
+    """``stages`` with the passes ``placement`` needs to be lowered, ready to compile with.
+
+    Args:
+        placement: The :class:`~pennylane.backline.Placement` to compile for.
+        stages: The base pipeline, as ``(stage_name, passes)`` pairs.
+
+    Returns:
+        list: ``stages``, edited in place and returned.
+    """
+    stages = _insert_passes(stages, _TRANSPORT_PASSES)
+    if _validated_qec_code(placement.qec_code) is not None:
+        # Importing these registers the encoding passes.
+        # pylint: disable=import-outside-toplevel,unused-import
+        from catalyst.python_interface.transforms import qecl, qecp  # noqa: F401
+
+        stages = _insert_passes(stages, _QEC_LOWERING_PASSES)
+    return stages
+
+
+# ------------------------------------ finding the placement -------------------------------------
+
+
+def _placement_of(obj, is_device=False):
+    """The backline placement ``obj`` runs over, or ``None``.
+
+    ``obj`` carries a device, unless ``is_device``, in which case it is one.
+    """
+    device = obj if is_device else getattr(obj, "device", None)
+    return getattr(device, "placement", None)
+
+
+def _traced_placements(jaxpr):
+    """Yield the placement each QNode in ``jaxpr`` runs over, in encounter order and with repeats.
+
+    Recurses through nested jaxprs, so a QNode inside a control-flow region counts.
+    """
+    for eqn in jaxpr.eqns:
+        # A qnode equation carries its device on the qnode; a device equation is the device.
+        placement = _placement_of(eqn.params.get("qnode")) or _placement_of(
+            eqn.params.get("device"), is_device=True
+        )
+        if placement is not None:
+            yield placement
+        for inner in jax.core.jaxprs_in_params(eqn.params):
+            yield from _traced_placements(inner)
+
+
+def find_placement(callable_, jaxpr=None, name: str = "this program") -> Placement | None:
+    """The placement a compiled program runs over, or ``None`` if it declares none.
+
+    Args:
+        callable_: The callable being compiled.
+        jaxpr: Its traced form, searched when the callable carries no device itself. ``None`` skips
+            that search, for a caller that has not traced yet.
+        name: Program name, used in the error below.
+
+    Returns:
+        The placement, or ``None``.
+
+    Raises:
+        CompileError: If the program's QNodes run over more than one placement. It is serialized
+            onto the root module, of which there is one, so a program can only carry one.
+    """
+    placement = _placement_of(callable_)
+    if placement is not None:
+        return placement
+    found = (
+        list({id(p): p for p in _traced_placements(jaxpr)}.values()) if jaxpr is not None else []
+    )
+    if len(found) > 1:
+        labels = ", ".join(p.controller.label or "<unlabelled>" for p in found)
+        raise CompileError(
+            f"{name!r} runs QNodes over {len(found)} different backline placements (controllers: "
+            f"{labels}), but a compiled program carries one. Split them across separate "
+            f"qjit-compiled functions."
+        )
+    return found[0] if found else None
+
+
+def settle_executors(placement: Placement) -> None:
+    """Give every node in ``placement`` an executor with a known address.
+
+    A compiled program carries those addresses, so they are settled before it is built. Deployment
+    waits until :func:`launch_executors`, so this costs no ssh.
+    """
+    for node in (placement.controller, *placement.coprocessors):
+        _realize_executor(node)
