@@ -913,3 +913,26 @@ def test_while_loop():
 # CHECK: while_decomp
 # CHECK: scf.while
 test_while_loop()
+
+
+def test_custom_op_numbered_args():
+    """
+    Check that custom op parameter names don't interfere with decomposition rule lower.
+
+    When calling from the compiler, custom op dynamic args are assigned numbers since they are
+    unnamed. Since these numbers don't correspond to names in the frontend, we need to ensure
+    that they are parsed into args and used correctly to call the decomposition rules.
+    """
+    print(
+        compile_decomposition_rules_wrapper(
+            "RZ",
+            "RZ{0:[f64]}{wires:2}{}",
+            {"0": ["f64"]},
+            {"wires": 1},
+            {},
+            is_custom_op=True,
+        )
+    )
+
+
+test_custom_op_numbered_args()

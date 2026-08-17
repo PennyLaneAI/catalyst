@@ -584,3 +584,23 @@ def c_hybrid_op_arg(x: float, y: float):
 
 
 print(c_hybrid_op_arg.mlir)
+
+
+@qp.qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("null.qubit", wires=1))
+def test_rz():
+    # CHECK-LABEL: func.func public @test_rz
+
+    # CHECK: RZ
+
+    # TODO: uncomment as migration enables these rules
+    # CHECK-DAG: _rz_to_ppr
+    # COM: CHECK-DAG: _rz_to_rx_cliff
+    # COM: CHECK-DAG: _rz_to_ry_cliff
+    # COM: CHECK-DAG: _rz_to_ry_rx
+    # CHECK-DAG: _rz_to_rot
+    # COM: CHECK-DAG: _rz_to_ps
+    qp.RZ(0.1, wires=0)
+
+
+print(test_rz.mlir)
