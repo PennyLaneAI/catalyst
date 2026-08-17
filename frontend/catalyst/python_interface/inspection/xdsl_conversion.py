@@ -33,6 +33,7 @@ from xdsl.dialects.builtin import DenseIntOrFPElementsAttr, IntegerAttr, Integer
 from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import Block, SSAValue
+from xdsl.traits import SymbolTable
 
 from catalyst.compiler import CompileError, _get_catalyst_cli_cmd
 from catalyst.jit import QJIT
@@ -206,13 +207,36 @@ def _extract_dense_constant_value(op) -> float | int:
     raise NotImplementedError(f"Unexpected attr type in constant: {type(attr)}")
 
 
+def _resolve_control_value(ssa: SSAValue) -> float | int | str:
+    """Resolve a control value passed as a constant kernel argument."""
+    op = ssa.owner
+    if not (
+        isinstance(op, TensorExtractOp)
+        and isinstance(op.tensor.owner, Block)
+        and len(op.indices) == 1
+    ):
+        return resolve_constant_params(ssa)
+
+    tensor = op.tensor
+    func_op = tensor.owner.parent_op()
+    launch_op = next(
+        candidate
+        for candidate in func_op.get_toplevel_object().walk()
+        if candidate.name == "catalyst.launch_kernel"
+        and SymbolTable.lookup_symbol(candidate, candidate.callee) is func_op
+    )
+    tensor = launch_op.operands[tensor.index]
+    values = tensor.owner.properties["value"].get_values()
+    return values[resolve_constant_params(op.indices[0])]
+
+
 def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
     """Apply adjoint and control modifiers to a gate if needed."""
     if xdsl_op.properties.get("adjoint"):
         qp_op = ops.op_math.adjoint(qp_op)
     ctrls = ssa_to_qp_wires(xdsl_op, control=True)
     if ctrls:
-        cvals = ssa_to_qp_params(xdsl_op, control=True)
+        cvals = _extract(xdsl_op, "in_ctrl_values", _resolve_control_value)
         qp_op = ops.op_math.ctrl(qp_op, control=ctrls, control_values=cvals)
     return qp_op
 

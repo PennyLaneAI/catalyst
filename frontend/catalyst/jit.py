@@ -727,16 +727,31 @@ class QJIT(CatalystCallable):
 
         # TODO: awkward, refactor or redesign the target feature
         if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
-            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                self.user_sig or ()
-            )
+            try:
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                    self.user_sig or ()
+                )
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.exception(e, exc_info=True)
+                warnings.warn("AOT capture of jaxpr failed. Error logged at exception level")
+                return
 
         if self.compile_options.target in ("mlir", "llvmir", "binary"):
             self._configure_backline()
-            self.mlir_module = self.generate_ir()
+            try:
+                self.mlir_module = self.generate_ir()
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.exception(e, exc_info=True)
+                warnings.warn("AOT generation of mlir failed. Error logged at exception level")
+                return
 
         if self.compile_options.target in ("llvmir", "binary"):
-            self.compiled_function, self.llvm_ir = self.compile()
+            try:
+                self.compiled_function, self.llvm_ir = self.compile()
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.exception(e, exc_info=True)
+                warnings.warn("AOT generation of llvmir failed. Error logged at exception level")
+                return
 
         if self.compile_options.target in ("binary",) and self.compile_options.link:
             self.fn_cache.insert(
