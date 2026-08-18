@@ -94,6 +94,7 @@ class _ClusterKind(Enum):
     CONDITIONAL = auto()
     BRANCH = auto()
     ADJOINT = auto()
+    CTRL = auto()
 
 
 @dataclass(frozen=True)
@@ -381,6 +382,25 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_stack[-1].uid,
         )
         self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.ADJOINT))
+
+        self._visit_region(operation.regions[0])
+
+        self._cluster_stack.pop()
+
+    # ====
+    # CTRL
+    # ====
+
+    @_visit_operation.register
+    def _ctrl(self, operation: quantum.CtrlOp) -> None:
+        """Handle a controlled region operation."""
+
+        cluster_uid = self.dag_builder.add_cluster(
+            label="ctrl",
+            labeljust="l",
+            cluster_uid=self._cluster_stack[-1].uid,
+        )
+        self._cluster_stack.append(ClusterEntry(uid=cluster_uid, kind=_ClusterKind.CTRL))
 
         self._visit_region(operation.regions[0])
 

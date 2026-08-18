@@ -748,7 +748,6 @@ def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_
         *args,
         body=converted,
         n_control=len(control_qubits),
-        n_consts=n_consts,
         control_values=tuple(bool(v) for v in control_values),
     )
     return []

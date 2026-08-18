@@ -33,6 +33,7 @@ from .operations import (
     AllocQubitOp,
     ComputationalBasisOp,
     CountsOp,
+    CtrlOp,
     CustomOp,
     DeallocOp,
     DeallocQubitOp,
@@ -71,6 +72,7 @@ Quantum = Dialect(
     "quantum",
     [
         AdjointOp,
+        CtrlOp,
         AllocOp,
         AllocQubitOp,
         ComputationalBasisOp,
@@ -162,6 +164,7 @@ __all__ = [
     "InsertOp",
     # Miscellaneous
     "AdjointOp",
+    "CtrlOp",
     "DeviceInitOp",
     "DeviceReleaseOp",
     "FinalizeOp",
