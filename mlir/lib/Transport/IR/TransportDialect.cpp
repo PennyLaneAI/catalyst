@@ -68,7 +68,11 @@ static int64_t intOr(IntegerAttr field, int64_t dflt) { return field ? field.get
 // Default per-message payload width, matching the current backend's defaults.
 constexpr int64_t kDefaultMessageBytes = 8;
 
-int64_t NodeAttr::oobPort() const { return intOr(getOobPort(), 0); }
+int64_t NodeAttr::oobPort() const {
+    // A port is unsigned, so zero-extend
+    IntegerAttr p = getOobPort();
+    return p ? static_cast<int64_t>(p.getValue().getZExtValue()) : 0;
+}
 int64_t NodeAttr::inBytes() const { return intOr(getInBytes(), kDefaultMessageBytes); }
 int64_t NodeAttr::outBytes() const { return intOr(getOutBytes(), kDefaultMessageBytes); }
 int64_t NodeAttr::workItemIdx() const { return intOr(getWorkItemIdx(), 0); }
@@ -88,7 +92,7 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
         }
         // The attribute is i32 so it can hold the whole unsigned range, but the runtime call
         // takes a uint16_t. Reject an out-of-range port here rather than truncate it silently.
-        if (c.getOobPort() && (c.oobPort() < 0 || c.oobPort() > 65535)) {
+        if (c.getOobPort() && c.oobPort() > 65535) {
             return emitError() << "coprocessor 'oob_port' must be in 0..65535, got " << c.oobPort();
         }
         if (!c.getSymbol() || c.getSymbol().getValue().empty()) {
