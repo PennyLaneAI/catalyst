@@ -14,11 +14,11 @@
 
 #pragma once
 #include <cstdint>
-namespace catalyst::transport::gpu_verbs {
+namespace catalyst::transport::coproc {
 
 // Passthrough self-test: returns the word unchanged.
 __device__ inline std::int64_t echo_decode(std::uint64_t syndrome) {
     return static_cast<std::int64_t>(syndrome);
 }
 
-} // namespace catalyst::transport::gpu_verbs
+} // namespace catalyst::transport::coproc

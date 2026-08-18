@@ -50,7 +50,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "bogus", 
 
 // expected-error @below {{memcpy transport requires controller and coprocessor on the same node}}
 module attributes {catalyst.backline = #transport.backline<transport = "memcpy", controller = #transport.node<backend_lib = "x">,
-  coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", symbol = "foo", remote = true>]>} {
+  coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", symbol = "foo", out_of_process = true>]>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
 }
@@ -60,7 +60,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "memcpy",
 // ... and symmetrically, a remote controller cannot pair with a local coprocessor.
 
 // expected-error @below {{memcpy transport requires controller and coprocessor on the same node}}
-module attributes {catalyst.backline = #transport.backline<transport = "memcpy", controller = #transport.node<backend_lib = "x", remote = true>,
+module attributes {catalyst.backline = #transport.backline<transport = "memcpy", controller = #transport.node<backend_lib = "x", out_of_process = true>,
   coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", symbol = "foo">]>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }

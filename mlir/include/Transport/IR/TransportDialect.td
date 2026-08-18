@@ -112,7 +112,7 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         Transport_StrField:$triple,
         Transport_StrField:$address,
         Transport_StrField:$symbol,
-        OptionalParameter<"mlir::BoolAttr">:$remote,
+        OptionalParameter<"mlir::BoolAttr">:$out_of_process,
         OptionalParameter<"mlir::IntegerAttr">:$in_bytes,
         OptionalParameter<"mlir::IntegerAttr">:$out_bytes,
         OptionalParameter<"mlir::IntegerAttr">:$work_item_idx
@@ -124,8 +124,9 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         /// Session registry key: `name` when set and non-empty, else `fallback`.
         mlir::StringAttr keyOr(llvm::StringRef fallback) const;
 
-        /// True only when `remote` is present and set.
-        bool isRemote() const;
+        /// Whether this node's code is dispatched to an executor rather than run in the
+        /// compiling process.
+        bool isOutOfProcess() const;
 
         /// Integer field accessors.
         int64_t oobPort() const;

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Definition of the process-global memcpy link registry. This lives in its own shared library
-// so all memcpy plugins dlopen'd into a process share one instance of the static map, letting
-// a controller and coprocessor loaded from separate .so files find each other by
-// (peer, oob_port).
+// Definitions for the process-global memcpy link registry. This TU is compiled into its own
+// shared library (`libmemcpy_cpu_impl.so`) so the controller and coprocessor plugins, though
+// dlopen'd separately, share one instance of the static map and rendezvous on the compiler-
+// emitted session pair key.
 
 #include "MemcpyLink.hpp"
 
@@ -23,13 +23,13 @@
 #include <string>
 #include <unordered_map>
 
-#include "BackendConfig.hpp"
+#include "ConfigParser.hpp"
 
 namespace catalyst::transport::memcpy {
 
 auto parse_pair_key(std::string_view config) -> std::string {
     std::string out;
-    common::backendconfig::for_each_config_kv(config, [&](std::string_view k, std::string_view v) {
+    common::configparser::for_each_kv(config, [&](std::string_view k, std::string_view v) {
         if (k == "pair") {
             out.assign(v);
         }

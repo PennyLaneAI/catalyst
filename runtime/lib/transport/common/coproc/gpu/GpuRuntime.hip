@@ -13,22 +13,29 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <cstdio>
 #include <stdexcept>
+#include <string>
 
-#include "Error.hpp"
 #include "GpuRuntime.hpp"
 #include "HipCheck.hpp"
 
 #include <hip/hip_runtime.h>
 
-namespace catalyst::transport::gpu_verbs {
+namespace catalyst::transport::coproc {
 
 GpuRuntime::GpuRuntime(int device) {
     int dc = 0;
     HIP_CHECK(hipGetDeviceCount(&dc), "hipGetDeviceCount");
-    RDMA_CHECK(dc > 0, "GpuRuntime: no HIP device");
-    RDMA_CHECK(device >= 0 && device < dc, "GpuRuntime: HIP device %d out of range (%d present)",
-               device, dc);
+    if (dc <= 0) {
+        throw std::runtime_error("GpuRuntime: no HIP device");
+    }
+    if (device < 0 || device >= dc) {
+        char buf[128];
+        std::snprintf(buf, sizeof(buf), "GpuRuntime: HIP device %d out of range (%d present)",
+                      device, dc);
+        throw std::runtime_error(buf);
+    }
     HIP_CHECK(hipSetDevice(device), "hipSetDevice");
     hipStream_t s = nullptr;
     HIP_CHECK(hipStreamCreate(&s), "hipStreamCreate");
@@ -98,4 +105,4 @@ void GpuRuntime::sync() {
     }
 }
 
-} // namespace catalyst::transport::gpu_verbs
+} // namespace catalyst::transport::coproc

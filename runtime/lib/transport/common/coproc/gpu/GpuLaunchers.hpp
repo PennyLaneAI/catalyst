@@ -15,7 +15,7 @@
 #pragma once
 #include "Transport.hpp" // CoprocLaunchDesc
 
-namespace catalyst::transport::gpu_verbs {
+namespace catalyst::transport::coproc {
 
 // CoprocessorLauncherFn launchers: each enqueues the persistent detect ->
 // decode -> write-handoff kernel (one per decoder) on the session's stream.
@@ -28,4 +28,4 @@ extern "C" int catalyst_gpu_steane_launcher(const CoprocLaunchDesc *desc, void *
 // (coproc_launcher_ == nullptr); identical to the echo launcher.
 int default_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);
 
-} // namespace catalyst::transport::gpu_verbs
+} // namespace catalyst::transport::coproc

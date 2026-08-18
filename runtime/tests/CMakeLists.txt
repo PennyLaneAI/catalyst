@@ -235,6 +235,7 @@ if(ENABLE_TRANSPORT)
     target_link_libraries(runner_tests_transport_memcpy PRIVATE
         Catch2WithMain
         memcpy_cpu_impl
+        steane_coprocessor_cpu
     )
     if(TRANSPORT_HAS_HIP)
         target_sources(runner_tests_transport_memcpy PRIVATE

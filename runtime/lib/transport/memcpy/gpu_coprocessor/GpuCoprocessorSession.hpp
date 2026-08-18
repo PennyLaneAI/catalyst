@@ -14,22 +14,28 @@
 
 #pragma once
 
+#include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <memory>
+#include <stop_token>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "GpuRuntime.hpp"
 #include "MemcpyLink.hpp"
 #include "Transport.hpp"
-
-namespace catalyst::transport::common {
-struct PayloadSlot;
-}
+#include "WireProtocol.hpp"
 
 namespace catalyst::transport::memcpy {
 
+// Two roles in one process: the controller writes into the request ring, a persistent decode
+// kernel drains it and publishes into the handoff ring, and an engine jthread reads the
+// handoff and republishes into a reply ring the controller consumes. process_message runs on
+// the controller thread; the engine thread bridges kernel completions to reply publication.
 class GpuCoprocessorSession : public CoprocessorSession {
   public:
     explicit GpuCoprocessorSession(const std::string &config = {}, int gpu_device = 0);
@@ -51,8 +57,9 @@ class GpuCoprocessorSession : public CoprocessorSession {
         return CoprocConvention::LaunchOnce;
     }
 
-    // Called synchronously from the paired controller's kick(); launches one GPU decode and
-    // writes the reply into `out`. Uses single slots (no ring) since total=1.
+    // Called on the controller thread from kick(). Publishes the request into the next request
+    // slot, spin-waits for the engine thread to publish the paired reply slot (fed by the
+    // persistent decode kernel's handoff), and copies the reply into `out`.
     //
     // Expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame) and
     // `out_cap >= sizeof(int64_t)`; the reply is always `sizeof(int64_t)` bytes.
@@ -61,6 +68,8 @@ class GpuCoprocessorSession : public CoprocessorSession {
 
   private:
     void ensure_gpu_state();
+    // Engine loop: handoff -> reply_ring.
+    void run(std::stop_token st);
 
     std::string pair_key_;
     std::shared_ptr<MemcpyLink> link_;
@@ -69,10 +78,23 @@ class GpuCoprocessorSession : public CoprocessorSession {
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
     int gpu_device_ = 0;
-    std::unique_ptr<gpu_verbs::GpuRuntime> gpu_;
-    gpu_verbs::GpuRuntime::Handoff handoff_{};
-    common::PayloadSlot *request_slot_host_ = nullptr;
-    common::PayloadSlot *request_slot_dev_ = nullptr;
+    std::unique_ptr<coproc::GpuRuntime> gpu_;
+    coproc::GpuRuntime::Handoff handoff_{};
+    // Host-mapped request ring polled by the persistent decode kernel via `ring_dev_`.
+    common::PayloadSlot *ring_host_ = nullptr;
+    common::PayloadSlot *ring_dev_ = nullptr;
+    // Reply ring: engine thread writes here after observing a kernel handoff, controller thread
+    // reads here in process_message.
+    std::array<common::PayloadSlot, common::K_RING_SLOTS> reply_ring_{};
+    // Monotonic cursor advanced by process_message (single-writer on controller thread).
+    std::uint64_t process_cursor_ = 0;
+    bool kernel_running_ = false;
+
+    // Engine error plumbing: if run() throws, error_ is set and failed_ published (release);
+    // process_message acquire-loads failed_ and rethrows.
+    std::atomic<bool> failed_{false};
+    std::exception_ptr error_;
+    std::jthread engine_;
 
     CoprocessorLauncherFn launcher_ = nullptr;
     void *launcher_ctx_ = nullptr;

@@ -9,7 +9,7 @@ target_include_directories(rt_transport
     ${runtime_includes}
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/rdma/common  # WireProtocol.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/interface  # WireProtocol.hpp, ConfigParser.hpp
     ${PROJECT_SOURCE_DIR}/lib/backend/common  # DynamicLibraryLoader.hpp
 )
 
@@ -22,15 +22,16 @@ set_property(TARGET rt_transport PROPERTY POSITION_INDEPENDENT_CODE ON)
 ###############################################
 # transport backends                          #
 ###############################################
+# Backends:            built when
+#   memcpy             always
+#   memcpy_gpu         HIP
+#   cpu_verbs (RDMA)   libibverbs
+#   gpu_verbs (RDMA)   libibverbs + HIP
 #
-# Build matrix:
-#   * memcpy CPU       — always built (no external deps).
-#   * memcpy GPU       — built when HIP + libibverbs are both present. The dependency on
-#                        libibverbs is transitive via gpu_verbs (memcpy_gpu currently reuses
-#                        GpuRuntime/HipCheck/GpuLaunchers from rdma/gpu_verbs); extracting those
-#                        into a shared GPU lib is a follow-up.
-#   * cpu_verbs (RDMA) — built when libibverbs is found.
-#   * gpu_verbs (RDMA) — built when both libibverbs and HIP are available.
+# Shared libs under common/:
+#   common/interface   headers (WireProtocol, ConfigParser)         ::common
+#   common/coproc/cpu  CoprocessorFn plugins (steane, echo)         ::coproc
+#   common/coproc/gpu  HIP plumbing + device decoders               ::coproc
 
 find_package(Threads REQUIRED)
 find_library(IBVERBS_LIB ibverbs)
@@ -39,8 +40,7 @@ add_custom_target(transport_all)
 add_custom_target(transport_backends)
 add_dependencies(transport_all rt_transport)
 
-# HIP toolchain detection is independent of libibverbs. Set TRANSPORT_HAS_HIP once, up front,
-# so both memcpy_gpu and gpu_verbs can consult it.
+# Detect HIP before add_subdirectory(common) so coproc/gpu can gate on TRANSPORT_HAS_HIP.
 if(DEFINED ENV{ROCM_PATH})
     list(APPEND CMAKE_PREFIX_PATH "$ENV{ROCM_PATH}")
 elseif(EXISTS "/opt/rocm")
@@ -64,20 +64,22 @@ else()
     message(STATUS "transport: no HIP compiler -> GPU backends skipped")
 endif()
 
-# --- RDMA (cpu_verbs / gpu_verbs) --------------------------------------------
-# Requires libibverbs. gpu_verbs additionally needs a HIP toolchain.
+add_subdirectory(common)
 
+# CoprocessorFn plugins are always built (no RDMA deps); any backend dlopens them at runtime.
+add_dependencies(transport_all steane_coprocessor_cpu echo_coprocessor_cpu)
+add_dependencies(transport_backends steane_coprocessor_cpu echo_coprocessor_cpu)
+
+# --- RDMA (cpu_verbs / gpu_verbs) --------------------------------------------
 if(IBVERBS_LIB)
     add_subdirectory(rdma/common)
     add_subdirectory(rdma/cpu_verbs)
     add_dependencies(transport_all
         catalyst_transport_cpu_verbs_controller
-        catalyst_transport_cpu_verbs_coprocessor
-        steane_coprocessor_cpu)
+        catalyst_transport_cpu_verbs_coprocessor)
     add_dependencies(transport_backends
         catalyst_transport_cpu_verbs_controller
-        catalyst_transport_cpu_verbs_coprocessor
-        steane_coprocessor_cpu)
+        catalyst_transport_cpu_verbs_coprocessor)
 
     if(TRANSPORT_HAS_HIP)
         add_subdirectory(rdma/gpu_verbs)
@@ -85,16 +87,10 @@ if(IBVERBS_LIB)
         add_dependencies(transport_backends catalyst_transport_gpu_verbs_coprocessor)
     endif()
 else()
-    message(STATUS
-        "transport: libibverbs not found -> skipping the RDMA backends (cpu_verbs, gpu_verbs); "
-        "rt_transport and the memcpy CPU backend still build. "
-        "Install libibverbs-dev / rdma-core to get the RDMA backends.")
+    message(STATUS "transport: libibverbs not found -> RDMA backends skipped")
 endif()
 
 # --- Memcpy (in-process shim) -------------------------------------------------
-# Always built. memcpy_gpu is added here (memcpy is processed after rdma/gpu_verbs so it can
-# `TARGET catalyst_transport_gpu_verbs_coprocessor` when deciding whether to build memcpy_gpu).
-
 add_subdirectory(memcpy)
 add_dependencies(transport_all
     catalyst_transport_memcpy_controller

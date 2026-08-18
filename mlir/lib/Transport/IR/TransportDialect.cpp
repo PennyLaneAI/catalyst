@@ -51,8 +51,8 @@ StringAttr NodeAttr::keyOr(llvm::StringRef fallback) const {
     return StringAttr::get(getContext(), fallback);
 }
 
-bool NodeAttr::isRemote() const {
-    BoolAttr r = getRemote();
+bool NodeAttr::isOutOfProcess() const {
+    BoolAttr r = getOutOfProcess();
     return r && r.getValue();
 }
 
@@ -83,18 +83,21 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
             return emitError() << "coprocessor requires a 'symbol'";
         }
         if (transport.getValue() == "memcpy") {
-            if (c.isRemote() != controller.isRemote()) {
+            if (c.isOutOfProcess() != controller.isOutOfProcess()) {
                 return emitError()
                        << "memcpy transport requires controller and coprocessor on the same node";
             }
-            // Both remote: they also have to sit on the same executor. Memcpy is in-process, so
-            // "same node" for remote sessions means "same catalyst-executor address".
-            if (c.isRemote() && c.getAddress() && controller.getAddress() &&
-                c.getAddress().getValue() != controller.getAddress().getValue()) {
-                return emitError() << "memcpy transport with remote nodes requires controller and "
-                                      "coprocessor on the same executor address (got '"
-                                   << controller.getAddress().getValue() << "' vs '"
-                                   << c.getAddress().getValue() << "')";
+            // Memcpy is in-process, so two out-of-process nodes are only on the "same node" if
+            // they share a catalyst-executor address.
+            if (c.isOutOfProcess()) {
+                llvm::StringRef ctrlAddr = controller.getAddress().getValue();
+                llvm::StringRef copAddr = c.getAddress().getValue();
+                if (ctrlAddr != copAddr) {
+                    return emitError()
+                           << "memcpy transport with remote nodes requires controller and "
+                              "coprocessor on the same executor address (got '"
+                           << ctrlAddr << "' vs '" << copAddr << "')";
+                }
             }
         }
     }

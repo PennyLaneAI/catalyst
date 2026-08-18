@@ -16,7 +16,6 @@
 remote ``catalyst-executor`` argv assembler. Subprocess is mocked throughout; these tests do
 not open real SSH connections."""
 
-import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -59,7 +58,7 @@ class TestSSHCtlOpts:
         assert opts[0] == "-o"
         assert opts[1] == "ControlMaster=auto"
         assert opts[2] == "-o"
-        assert opts[3] == f"ControlPath=/tmp/cm/catalyst-cm-{os.getuid()}-%C"
+        assert opts[3] == "ControlPath=/tmp/cm/%C"
         assert opts[4] == "-o"
         assert opts[5] == f"ControlPersist={SSHArgv.CONTROL_PERSIST}"
 
@@ -67,24 +66,29 @@ class TestSSHCtlOpts:
         """No flags at all when the control path would overflow ``sun_path``."""
         assert SSHArgv._ctl_flags(Path("/tmp") / ("x" * 200)) == []
 
-    def test_ctl_opts_delegates_to_ctl_flags(self):
-        """``ctl_opts`` is :meth:`_ctl_flags` applied to the resolved socket dir."""
-        assert SSHArgv.ctl_opts() == SSHArgv._ctl_flags(SSHArgv._ctl_dir())
-
 
 class TestSSHCtlDir:
-    """Resolution of the control-socket directory :meth:`SSHArgv._ctl_dir`."""
+    """The per-user control-socket directory :meth:`SSHArgv._private_dir`."""
 
-    def test_is_the_system_temp_dir(self):
-        """The socket lives in the temp dir, which always exists, so nothing has to be made."""
-        assert SSHArgv._ctl_dir() == Path(tempfile.gettempdir())
+    def test_is_created_and_private(self, tmp_path):
+        """Created if absent, and closed to group and other.
 
-    def test_creates_nothing(self):
-        """Building the flags has no filesystem effect, so a run leaves nothing behind."""
-        base = SSHArgv._ctl_dir()
-        before = set(base.iterdir())
-        SSHArgv.ctl_opts()
-        assert set(base.iterdir()) == before
+        Reaching a control socket is enough to open sessions on its remote host, the master having
+        authenticated already, so the directory is the whole of what keeps other users out.
+        """
+        d = SSHArgv._private_dir(tmp_path)
+        assert d == tmp_path / SSHArgv.CONTROL_DIR
+        assert d.stat().st_mode & 0o077 == 0, oct(d.stat().st_mode)
+
+    def test_none_when_it_cannot_be_made(self, tmp_path):
+        """A home that cannot hold the directory yields ``None``, not an exception.
+
+        Blocked with a file standing where the directory would go, rather than by permissions,
+        which root would be free to ignore.
+        """
+        blocked = tmp_path / "home"
+        blocked.write_text("")
+        assert SSHArgv._private_dir(blocked) is None
 
 
 class TestSSHBaseCmd:
@@ -100,10 +104,12 @@ class TestSSHBaseCmd:
         cmd = SSHArgv.base("me", "h")
         assert cmd[-1] == "me@h"
 
-    def test_multiplex_true_includes_control_opts(self):
-        """``multiplex=True`` adds the ``ControlMaster`` option to the argv."""
-        cmd = SSHArgv.base("me", "h", multiplex=True)
-        assert "ControlMaster=auto" in cmd
+    def test_multiplex_true_inserts_the_control_opts(self):
+        """``multiplex=True`` splices :meth:`ctl_opts` in, whatever this machine's dirs allow."""
+        with_mux = SSHArgv.base("me", "h", multiplex=True)
+        without = SSHArgv.base("me", "h", multiplex=False)
+        n = len(SSHArgv.BASE_CMD)
+        assert with_mux == without[:n] + SSHArgv.ctl_opts() + without[n:]
 
     def test_multiplex_false_omits_control_opts(self):
         """``multiplex=False`` omits the ``ControlMaster`` option."""
@@ -380,14 +386,14 @@ class TestSCPDeploy:
         """An empty bundle directory raises :class:`RuntimeError`."""
         # Empty directory, no artifacts.
         with pytest.raises(RuntimeError, match="no artifacts"):
-            SCP.deploy("me", "h", tmp_path, "ws")
+            SCP.deploy("me", "h", [tmp_path], "ws")
 
     def test_readme_only_is_still_empty(self, tmp_path):
         """A bundle containing only ``README.md`` is treated as empty and raises."""
         # README.md is explicitly filtered out.
         (tmp_path / "README.md").write_text("ignore me")
         with pytest.raises(RuntimeError, match="no artifacts"):
-            SCP.deploy("me", "h", tmp_path, "ws")
+            SCP.deploy("me", "h", [tmp_path], "ws")
 
     def test_deploys_via_ssh_mkdir_then_scp_run(self, tmp_path):
         """Creates the remote workspace then invokes :meth:`SCP.copy` with the filtered file list."""
@@ -396,7 +402,7 @@ class TestSCPDeploy:
         with patch("catalyst.executor.ssh.RemoteOps.mkdir") as mkdir, patch(
             "catalyst.executor.ssh.SCP.copy"
         ) as scprun:
-            SCP.deploy("me", "h", tmp_path, "ws")
+            SCP.deploy("me", "h", [tmp_path], "ws")
         mkdir.assert_called_once_with("me", "h", "ws")
         scprun.assert_called_once()
         # files argument (positional index 2) sorted, README excluded

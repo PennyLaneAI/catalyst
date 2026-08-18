@@ -78,7 +78,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 // CHECK-NEXT:    catalyst.launch_kernel @module_ctrl::@teardown_transport()
 module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x", config = "c",
     peer = "127.0.0.1", oob_port = 18590 : i16,
-    triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true,
+    triple = "aarch64-unknown-linux-gnu", address = "h:1", out_of_process = true,
     in_bytes = 8 : i64, out_bytes = 8 : i64>>} {
   func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
     %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
@@ -110,7 +110,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 // CHECK:      func.func @teardown() {
 // CHECK-NEXT:   quantum.finalize
 // CHECK-NEXT:   return
-module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true, in_bytes = 8 : i64, out_bytes = 8 : i64>>} {
+module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", out_of_process = true, in_bytes = 8 : i64, out_bytes = 8 : i64>>} {
   func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
     %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
     return %0 : tensor<4xf64>
@@ -188,8 +188,8 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 // CHECK-DAG: func.func @coproc_serve
 // CHECK-DAG: transport.set_coprocessor_fn {{.*}} {symbol = "foo"} : !transport.session<coprocessor>
 // CHECK-DAG: func.func @coproc_stop
-module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true, in_bytes = 3 : i64, out_bytes = 8 : i64>,
-  coprocessors = [#transport.node<backend_lib = "y", config = "c", peer = "10.0.0.3", oob_port = 18560 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:2", remote = true, symbol = "foo", name = "cop0">]>} {
+module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", out_of_process = true, in_bytes = 3 : i64, out_bytes = 8 : i64>,
+  coprocessors = [#transport.node<backend_lib = "y", config = "c", peer = "10.0.0.3", oob_port = 18560 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:2", out_of_process = true, symbol = "foo", name = "cop0">]>} {
   func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
     %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
     return %0 : tensor<4xf64>
@@ -225,8 +225,8 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 
 // The second coprocessor's own module carries its distinct serve function.
 // CHECK:      transport.set_coprocessor_fn %{{.*}} {symbol = "bar"} : !transport.session<coprocessor>
-module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", remote = true, in_bytes = 3 : i64, out_bytes = 8 : i64>,
-  coprocessors = [#transport.node<backend_lib = "y", config = "c", peer = "10.0.0.3", oob_port = 18560 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:2", remote = true, symbol = "foo", name = "cop0">, #transport.node<backend_lib = "z", config = "c", peer = "10.0.0.4", oob_port = 18561 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:3", remote = true, symbol = "bar", name = "cop1">]>} {
+module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x", config = "c", triple = "aarch64-unknown-linux-gnu", address = "h:1", out_of_process = true, in_bytes = 3 : i64, out_bytes = 8 : i64>,
+  coprocessors = [#transport.node<backend_lib = "y", config = "c", peer = "10.0.0.3", oob_port = 18560 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:2", out_of_process = true, symbol = "foo", name = "cop0">, #transport.node<backend_lib = "z", config = "c", peer = "10.0.0.4", oob_port = 18561 : i16, triple = "x86_64-unknown-linux-gnu", address = "h:3", out_of_process = true, symbol = "bar", name = "cop1">]>} {
   func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
     %0 = catalyst.launch_kernel @module_ctrl::@circuit() : () -> tensor<4xf64>
     return %0 : tensor<4xf64>
@@ -291,10 +291,15 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 
 // -----
 
-// Memcpy backline transport selects the local channel.
+// Memcpy backline transport selects the local channel. Memcpy pairs on the session key,
+// so the emitted transport.connect / connect_async ops carry no peer or oob_port.
 
 // CHECK-LABEL: func.func @setup
 // CHECK:         quantum.init
+// CHECK-DAG:     transport.connect_async %{{.*}} : !transport.session<coprocessor> -> !transport.token
+// CHECK-DAG:     transport.connect %{{.*}} : !transport.session<controller>
+// CHECK-NOT:     peer =
+// CHECK-NOT:     oob_port =
 // CHECK-DAG:     transport.establish_channel %{{.*}} "memcpy" : !transport.session<controller>
 // CHECK-DAG:     transport.establish_channel %{{.*}} "memcpy" : !transport.session<coprocessor>
 module attributes {catalyst.backline = #transport.backline<transport = "memcpy", controller = #transport.node<backend_lib = "x", config = "c", peer = "127.0.0.1", oob_port = 18592 : i16, in_bytes = 3 : i64, out_bytes = 8 : i64>,
@@ -335,7 +340,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "memcpy",
 // CHECK:         transport.destroy %{{.*}} : !transport.session<coprocessor>
 // CHECK:         catalyst.launch_kernel @module_ctrl::@teardown_transport()
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
-  controller = #transport.node<backend_lib = "x", remote = true, address = "h:1", in_bytes = 8 : i64, out_bytes = 8 : i64>,
+  controller = #transport.node<backend_lib = "x", out_of_process = true, address = "h:1", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", oob_port = 18560 : i16, symbol = "foo", name = "cop0">]>} {
   func.func public @jit_circuit() attributes {llvm.emit_c_interface} {
     catalyst.launch_kernel @module_ctrl::@circuit() : () -> ()
@@ -366,7 +371,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
 // CHECK:         transport.destroy %{{.*}} : !transport.session<controller>
 module attributes {catalyst.backline = #transport.backline<transport = "rdma",
   controller = #transport.node<backend_lib = "x", in_bytes = 8 : i64, out_bytes = 8 : i64>,
-  coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", oob_port = 18560 : i16, symbol = "foo", name = "cop0", remote = true, address = "h:2", triple = "x86_64-unknown-linux-gnu">]>} {
+  coprocessors = [#transport.node<backend_lib = "y", peer = "10.0.0.3", oob_port = 18560 : i16, symbol = "foo", name = "cop0", out_of_process = true, address = "h:2", triple = "x86_64-unknown-linux-gnu">]>} {
   func.func public @jit_circuit() attributes {llvm.emit_c_interface} {
     return
   }

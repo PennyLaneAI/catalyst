@@ -97,10 +97,10 @@ struct PendingLocalCoproc {
 // coprocessors within that kind.
 class SessionEmitter {
   public:
-    SessionEmitter(ModuleOp mod, StringAttr transport, NodeAttr ctrl, bool remoteController,
+    SessionEmitter(ModuleOp mod, StringAttr transport, NodeAttr ctrl, bool dispatchedController,
                    ModuleOp ctrlMod)
         : ctx(mod.getContext()), loc(mod.getLoc()), mod(mod), ctrl(ctrl),
-          remoteController(remoteController), ctrlMod(ctrlMod),
+          dispatchedController(dispatchedController), ctrlMod(ctrlMod),
           ctrlTy(SessionType::get(ctx, Role::Controller)),
           coTy(SessionType::get(ctx, Role::Coprocessor)), tokTy(TokenType::get(ctx)),
           transport(transport.getValue()), b(ctx) {
@@ -108,8 +108,12 @@ class SessionEmitter {
         hostSetup = findOrCreate("setup");
         hostTeardown = findOrCreate("teardown");
         // A remote controller's ops go into its target module, which @setup/@teardown launch.
-        setupFn = remoteController ? makeVoidFunc("setup_transport", ctrlMod) : hostSetup;
-        teardownFn = remoteController ? makeVoidFunc("teardown_transport", ctrlMod) : hostTeardown;
+        if (dispatchedController) {
+            setTargetFromNode(ctrlMod, ctrl);
+        }
+        setupFn = dispatchedController ? makeVoidFunc("setup_transport", ctrlMod) : hostSetup;
+        teardownFn =
+            dispatchedController ? makeVoidFunc("teardown_transport", ctrlMod) : hostTeardown;
         b.setInsertionPoint(terminatorOf(setupFn));
     }
 
@@ -131,7 +135,7 @@ class SessionEmitter {
     void emitControllerOnly() {
         StringAttr key = ctrl.keyOr("controller");
         Value ct = createSession(b, ctrlTy, ctrl, key);
-        ConnectOp::create(b, loc, ct, ctrl.getPeer(), portAttr(ctrl.oobPort()));
+        ConnectOp::create(b, loc, ct, peerFor(ctrl), portFor(ctrl));
         ExchangeKeysOp::create(b, loc, ct);
         EstablishChannelOp::create(b, loc, ct, b.getStringAttr(transport));
         commit(ct);
@@ -142,14 +146,14 @@ class SessionEmitter {
     // Dispatch one coprocessor to the handler for its (controller, coprocessor) remoteness.
     void emitCoproc(NodeAttr coproc, size_t index, size_t count) {
         StringAttr key = coproc.keyOr("coprocessor." + std::to_string(index));
-        if (coproc.isRemote()) {
+        if (coproc.isOutOfProcess()) {
             std::string sfx = count > 1 ? ("." + std::to_string(index)) : std::string();
-            if (remoteController) {
+            if (dispatchedController) {
                 emitRemoteControllerRemoteCoproc(coproc, key, sfx);
             } else {
                 emitLocalControllerRemoteCoproc(coproc, key, sfx);
             }
-        } else if (remoteController) {
+        } else if (dispatchedController) {
             emitRemoteControllerLocalCoproc(coproc, key);
         } else {
             emitColocated(coproc, key);
@@ -164,7 +168,7 @@ class SessionEmitter {
             StopOp::create(tb, loc, s);
             DestroyOp::create(tb, loc, s);
         }
-        if (remoteController) {
+        if (dispatchedController) {
             emitHostOrchestration();
         }
     }
@@ -204,6 +208,14 @@ class SessionEmitter {
     // number; the LLVM lowering narrows to the runtime's uint16_t.
     IntegerAttr portAttr(int64_t v) { return b.getIntegerAttr(b.getIntegerType(32), v); }
 
+    // In-process transports (memcpy) pair on the session key and never dial peer:oob_port, so
+    // emitted transport.connect / connect_async ops carry no peer / oob_port.
+    bool needsOob() const { return transport != "memcpy"; }
+    StringAttr peerFor(NodeAttr node) { return needsOob() ? node.getPeer() : StringAttr{}; }
+    IntegerAttr portFor(NodeAttr node) {
+        return needsOob() ? portAttr(node.oobPort()) : IntegerAttr{};
+    }
+
     void commit(Value ct) {
         SetMessageSizesOp::create(b, loc, ct, b.getI32IntegerAttr(ctrl.workItemIdx()),
                                   b.getI64IntegerAttr(ctrl.inBytes()),
@@ -222,12 +234,26 @@ class SessionEmitter {
     // The controller-side session dialing a coprocessor's peer, released in teardown.
     void emitControllerDial(NodeAttr coproc, StringAttr key) {
         Value ctr = createSession(b, ctrlTy, ctrl, key);
-        ConnectOp::create(b, loc, ctr, coproc.getPeer(), portAttr(coproc.oobPort()));
+        ConnectOp::create(b, loc, ctr, peerFor(coproc), portFor(coproc));
         ExchangeKeysOp::create(b, loc, ctr);
         EstablishChannelOp::create(b, loc, ctr, b.getStringAttr(transport));
         commit(ctr);
         StartOp::create(b, loc, ctr);
         keyed.push_back({ctrlTy, key, teardownFn});
+    }
+
+    // Fill a node's nested module in with the triple it is cross-compiled to and the address it is
+    // dispatched to, both taken from its entry in the placement.
+    void setTargetFromNode(ModuleOp nested, NodeAttr node) {
+        OpBuilder b(ctx);
+        nested->setAttr(
+            "catalyst.target",
+            b.getDictionaryAttr({NamedAttribute(b.getStringAttr("triple"), node.getTriple())}));
+        if (auto addr = node.getAddress(); !addr.getValue().empty()) {
+            nested->setAttr(
+                "catalyst.dispatch",
+                b.getDictionaryAttr({NamedAttribute(b.getStringAttr("address"), addr)}));
+        }
     }
 
     // A remote coprocessor's target module, cross-compiled to its triple and dispatched by the
@@ -237,23 +263,15 @@ class SessionEmitter {
         mmb.setInsertionPointToEnd(mod.getBody());
         std::string coprocModName = ("module_coproc" + sfx);
         auto coprocMod = ModuleOp::create(mmb, loc, StringRef(coprocModName));
-        coprocMod->setAttr("catalyst.target",
-                           mmb.getDictionaryAttr(
-                               {NamedAttribute(mmb.getStringAttr("triple"), coproc.getTriple())}));
         coprocMod->setAttr(kRoleAttr, mmb.getStringAttr(kCoprocessorRole));
-        if (auto addr = coproc.getAddress(); !addr.getValue().empty()) {
-            coprocMod->setAttr(
-                "catalyst.dispatch",
-                mmb.getDictionaryAttr({NamedAttribute(mmb.getStringAttr("address"), addr)}));
-        }
+        setTargetFromNode(coprocMod, coproc);
 
         func::FuncOp serveFn = makeVoidFunc("coproc_serve" + sfx, coprocMod);
         OpBuilder cb(ctx);
         cb.setInsertionPoint(terminatorOf(serveFn));
         Value co = createSession(cb, coTy, coproc, key);
         Value tok =
-            ConnectAsyncOp::create(cb, loc, tokTy, co, coproc.getPeer(), portAttr(coproc.oobPort()))
-                .getToken();
+            ConnectAsyncOp::create(cb, loc, tokTy, co, peerFor(coproc), portFor(coproc)).getToken();
         AwaitOp::create(cb, loc, tok);
         ExchangeKeysOp::create(cb, loc, co);
         EstablishChannelOp::create(cb, loc, co, cb.getStringAttr(transport));
@@ -296,8 +314,7 @@ class SessionEmitter {
 
         OpBuilder hb(terminatorOf(hostSetup));
         Value lco = createSession(hb, coTy, coproc, key);
-        Value ltok = ConnectAsyncOp::create(hb, loc, tokTy, lco, coproc.getPeer(),
-                                            portAttr(coproc.oobPort()))
+        Value ltok = ConnectAsyncOp::create(hb, loc, tokTy, lco, peerFor(coproc), portFor(coproc))
                          .getToken();
         SetCoprocessorFnOp::create(hb, loc, lco, coproc.getSymbol());
         pendingLocal.push_back({lco, ltok});
@@ -309,9 +326,8 @@ class SessionEmitter {
         Value ct = createSession(b, ctrlTy, ctrl, key);
         Value co = createSession(b, coTy, coproc, key);
         Value t1 =
-            ConnectAsyncOp::create(b, loc, tokTy, co, coproc.getPeer(), portAttr(coproc.oobPort()))
-                .getToken();
-        ConnectOp::create(b, loc, ct, coproc.getPeer(), portAttr(coproc.oobPort()));
+            ConnectAsyncOp::create(b, loc, tokTy, co, peerFor(coproc), portFor(coproc)).getToken();
+        ConnectOp::create(b, loc, ct, peerFor(coproc), portFor(coproc));
         AwaitOp::create(b, loc, t1);
         Value t2 = ExchangeKeysAsyncOp::create(b, loc, tokTy, co).getToken();
         ExchangeKeysOp::create(b, loc, ct);
@@ -360,7 +376,7 @@ class SessionEmitter {
     Location loc;
     ModuleOp mod;
     NodeAttr ctrl;
-    bool remoteController;
+    bool dispatchedController;
     ModuleOp ctrlMod;
     Type ctrlTy;
     Type coTy;
@@ -399,10 +415,10 @@ struct InjectTransportSessionPass
         }
 
         // Remoteness comes from the attribute, not from whether a target module is present.
-        bool remoteController = ctrl.isRemote();
+        bool dispatchedController = ctrl.isOutOfProcess();
 
         ModuleOp ctrlMod;
-        if (remoteController) {
+        if (dispatchedController) {
             for (auto m : mod.getOps<ModuleOp>()) {
                 if (m->getAttrOfType<StringAttr>(kRoleAttr) == kControllerRole) {
                     ctrlMod = m;
@@ -416,7 +432,8 @@ struct InjectTransportSessionPass
             }
         }
 
-        SessionEmitter(mod, backline.getTransport(), ctrl, remoteController, ctrlMod).run(coprocs);
+        SessionEmitter(mod, backline.getTransport(), ctrl, dispatchedController, ctrlMod)
+            .run(coprocs);
     }
 };
 

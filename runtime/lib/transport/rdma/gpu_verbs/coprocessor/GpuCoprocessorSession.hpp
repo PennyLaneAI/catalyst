@@ -34,6 +34,7 @@
 
 namespace catalyst::transport::gpu_verbs {
 using namespace catalyst::transport;
+using namespace catalyst::transport::coproc; // GpuRuntime, HandoffSlot, launchers
 
 class GpuCoprocessorSession : public CoprocessorSession {
   public:

@@ -74,7 +74,7 @@ PeerRef CpuControllerSession::exchange_keys(const MemRegion &local) {
 void CpuControllerSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                              const PeerRef & /*peer*/) {
     if (desc.transport != "memcpy") {
-        throw std::runtime_error("memcpy: CPU-only controller supports only transport=memcpy");
+        throw std::runtime_error("only transport=memcpy is supported");
     }
     local_reply_ = local;
 }

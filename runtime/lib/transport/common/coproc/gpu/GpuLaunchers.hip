@@ -19,12 +19,12 @@
 #include "GpuRuntime.hpp"   // HandoffSlot
 #include "HipCheck.hpp"     // HIP_CHECK
 #include "WireProtocol.hpp"
+#include "echo_decoder.hpp"
+#include "steane_decoder.hpp"
 
-#include "coprocessor_functions/echo_decoder.hpp"
-#include "coprocessor_functions/steane_decoder.hpp"
 #include <hip/hip_runtime.h>
 
-namespace catalyst::transport::gpu_verbs {
+namespace catalyst::transport::coproc {
 using namespace catalyst::transport::common;
 
 // How often the spin loop samples the teardown flag. Must be a power of two: the
@@ -114,10 +114,10 @@ static int launch_noexcept(const CoprocLaunchDesc *desc) noexcept {
         launch<DECODE>(desc);
         return 0;
     } catch (const std::exception &e) {
-        std::fprintf(stderr, "[gpu_verbs] %s\n", e.what());
+        std::fprintf(stderr, "[coproc] %s\n", e.what());
         return 1;
     } catch (...) {
-        std::fprintf(stderr, "[gpu_verbs] kernel launch failed: unknown error\n");
+        std::fprintf(stderr, "[coproc] kernel launch failed: unknown error\n");
         return 1;
     }
 }
@@ -134,4 +134,4 @@ int default_echo_launcher(const CoprocLaunchDesc *desc, void *ctx) {
     return catalyst_gpu_echo_launcher(desc, ctx);
 }
 
-} // namespace catalyst::transport::gpu_verbs
+} // namespace catalyst::transport::coproc
