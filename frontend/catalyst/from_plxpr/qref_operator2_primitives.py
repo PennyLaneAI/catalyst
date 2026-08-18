@@ -378,7 +378,7 @@ def _special_gphase_lowering(angle, *_, ctrl_qubits, ctrl_values, adjoint):
 
 @_register_special_lowering("BasisState")
 def _special_basis_state_lowering(state, *qubits, ctrl_qubits, ctrl_values, adjoint):
-    SetBasisStateOp(state, qubit)
+    SetBasisStateOp(state, qubits)
     return ()
 
 
