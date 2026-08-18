@@ -39,11 +39,13 @@ class GraphOpID:
     A parser object to compute the graph operator id for an abstract operator2 instance `op`.
 
     The format of the computed graph op ID string is as follows:
-        op_name{dynamic_data_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID (optional)]
+        op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
+    The UID is computed from the shapes, dtypes and pytree structures of the `hybrid_args` of
+    the Operator2 instance.
 
     For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
-    `label="hello"`, and UID 10 would be parsed to the following graph op ID:
+    `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
         HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
 
     The defining trait of a graph op ID is that it has unique correspondence to decomposition rules.
