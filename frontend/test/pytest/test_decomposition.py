@@ -26,10 +26,8 @@ from operator2_dummy_gates import (
     HybridWires,
     MultiParams,
     MultipleRegisters,
-    MultiRZ,
     NoParams,
     NoParamsCustomOp,
-    PauliRot,
     SingleParam,
     StaticData,
 )
@@ -122,10 +120,10 @@ class TestGenericUtilities:
                 MultiParams(Wires([0, 2, 3]), Complex, Int, Float[2]),
                 "MultiParams{a:[[complex<f64>]],b:[[i64]],c:[[f64,f64]]}{reg:3}",
             ),
-            (MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{phi:[[f64]]}{wires:4}{}"),
+            (qp.MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{theta:[f64]}{wires:4}{}"),
             (
-                PauliRot(Float, "XYZ", Wires([1, 2, 3])),
-                "PauliRot{phi:[[f64]]}{wires:3}{pauli_word:XYZ}",
+                qp.PauliRot(Float, "XYZ", Wires([1, 2, 3])),
+                "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
             ),
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
             (HybridWires(Wires([0, 1, 2])), "HybridWires{}{}{}["),  # NOTE: open brace to match uid

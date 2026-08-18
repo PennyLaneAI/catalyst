@@ -28,6 +28,8 @@ from catalyst.decomposition.type_utils import (
 )
 from catalyst.from_plxpr.uid import generate_uid
 
+_SPECIAL_LOWERINGS = {}
+
 
 class GraphOpID:
     """
@@ -76,6 +78,8 @@ class GraphOpID:
         # enters as {name: dtype}, we want the format {name: list[dtype]}
         if self.is_custom_op:
             return {str(i): ["f64"] for i in range(len(self.op.dynamic_args))}
+        elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
+            return {argname: argtype for argname, argtype in sorted(self.op.dynamic_args.items())}
         else:
             return {argname: [argtype] for argname, argtype in sorted(self.op.dynamic_args.items())}
 
@@ -125,7 +129,7 @@ class GraphOpID:
         else:
             return {}, -1  # uid is unsigned, so use -1 for invalid uid
 
-    def parse_is_custom_op(self) -> str:
+    def parse_is_custom_op(self) -> bool:
         """
         Return whether the Operator2 instance is considered a custom op in MLIR.
 
@@ -142,7 +146,7 @@ class GraphOpID:
         return all(
             arg.shape == () and arg.dtype.type == jnp.float64
             for arg in self.op.dynamic_args.values()
-        )
+        ) and not issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys()))
 
     def get_operator_name(self) -> str:
         """Return the name of the operator."""

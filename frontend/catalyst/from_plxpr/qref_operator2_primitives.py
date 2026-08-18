@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """This module contains JAX-compatible quantum primitives to support the lowering
 of quantum operations to reference semantics JAXPR.
 """
@@ -38,6 +39,7 @@ from catalyst.decomposition.decomposition_rules import (
     fetch_all_reachable_decomposition_rules_from_op,
     inject_new_rules_into_module,
 )
+from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
     format_dynamic_params_for_id,
@@ -73,9 +75,6 @@ with Patcher(
         PCPhaseOp,
         QubitUnitaryOp,
     )
-
-
-_SPECIAL_LOWERINGS = {}
 
 
 def _register_special_lowering(op_cls):
@@ -552,7 +551,7 @@ def _multirz_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint):
     return []
 
 
-@_register_special_lowering("MultiControlledX")
+@_register_special_lowering(qp.MultiControlledX)
 def _multicontrolledx_lowering(
     control_values, *qubits, ctrl_qubits, ctrl_values, adjoint, work_wire_type
 ):
