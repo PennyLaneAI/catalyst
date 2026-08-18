@@ -53,6 +53,7 @@ const PipelineList pipelineList{
       // this into something else.
       "inline-nested-module",
       "lower-mitigation",
+      "ctrl-lowering",
       "adjoint-lowering",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",
