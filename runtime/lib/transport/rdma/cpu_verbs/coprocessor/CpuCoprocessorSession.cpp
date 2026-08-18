@@ -103,11 +103,9 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         send->value = 0;
         send->decoder_id = r->decoder_id;
         if (coproc_fn_) {
-            const std::size_t nb =
+            const int status =
                 coproc_fn_(r, sizeof(Payload), &send->value, PAYLOAD_DATA_BYTES, coproc_ctx_);
-            RDMA_CHECK(nb > 0 && nb <= PAYLOAD_DATA_BYTES,
-                       "coprocessor function wrote %zu bytes, expected 1..%zu", nb,
-                       PAYLOAD_DATA_BYTES);
+            RDMA_CHECK(status == 0, "coprocessor function failed with status %d", status);
         } else {
             send->value = r->value; // built-in echo
         }

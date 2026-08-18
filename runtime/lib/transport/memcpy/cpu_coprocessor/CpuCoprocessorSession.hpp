@@ -55,7 +55,7 @@ class CpuCoprocessorSession : public CoprocessorSession {
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
 
     // Invoked inline from the controller's kick(). See MemcpyLink::ProcessMessage.
-    std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
+    int process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
     // The worker loop; runs on engine_.

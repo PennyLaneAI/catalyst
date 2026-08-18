@@ -199,8 +199,8 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
     launcher_ctx_ = ctx;
 }
 
-std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
-                                                   std::size_t out_cap) {
+int GpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
+                                           std::size_t out_cap) {
     if (in_len != sizeof(common::Payload)) {
         throw std::runtime_error("memcpy: local GPU coprocessor expects one wire-shaped Payload");
     }
@@ -236,7 +236,7 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
     std::int64_t correction = 0;
     std::memcpy(&correction, &reply_ring_[idx].p.value, sizeof(correction));
     std::memcpy(out, &correction, sizeof(correction));
-    return sizeof(correction);
+    return 0;
 }
 
 } // namespace catalyst::transport::memcpy
