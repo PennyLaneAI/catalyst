@@ -744,7 +744,7 @@ def test_from_multiple_full_args_op():
         qp.add_decomps(MultipleFullArgs, rule)
         result = compile_decomposition_rules_wrapper(
             "MultipleFullArgs",
-            "MultipleFullArgs{angles1:[[f64]],angles2:[[f64,f64]]}{reg1:1,reg2:2}{}[-4321]",
+            "MultipleFullArgs{angles1:[[f64]],angles2:[[f64,f64]]}{reg1:1,reg2:2}{}[4444]",
             {"angles1": ["f64"], "angles2": ["f64", "f64"]},
             {"reg1": 1, "reg2": 2},
             {},
@@ -760,12 +760,12 @@ def test_from_multiple_full_args_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[-4321]"
+# CHECK: func.func private @"rule_MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[4444]"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   "SingleParam{x:{{\[\[i64\]\]}}}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[-4321]"
+# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[4444]"
 # CHECK: "qref.operator"({{%.+}}) {op_name = "SingleParam"
 # CHECK: "qref.operator"({{%.+}}) {op_name = "SingleParam"
 # CHECK: "qref.operator"({{%.+}}) {op_name = "NoParams"
