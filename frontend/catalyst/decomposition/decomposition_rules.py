@@ -260,27 +260,38 @@ def compile_decomposition_rules_wrapper(
 
 
 def fetch_all_reachable_decomposition_rules_from_op(
-    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None, is_custom_op=False
 ):
     extra_data = extra_data or {}
     queue = deque()
-    start = (op_name, dynamic_shape, wire_lens, static_data, extra_data)
+    start = (op_name, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op)
     queue.append(start)
     visited = [start]
 
     rules = get_rule_strings_from_module(
         compile_decomposition_rules(
-            op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
+            op_name,
+            op_id,
+            dynamic_shape,
+            wire_lens,
+            static_data,
+            extra_data=extra_data,
+            is_custom_op=is_custom_op,
         )
     )
 
     while len(queue) != 0:
-        this_name, this_dynamic_shape, this_wire_lens, this_static_data, this_extra_data = (
-            queue.popleft()
-        )
+        (
+            this_name,
+            this_dynamic_shape,
+            this_wire_lens,
+            this_static_data,
+            this_extra_data,
+            this_is_custom_op,
+        ) = queue.popleft()
         this_extra_data = this_extra_data or {}
         this_args, this_kwargs = prepare_op_args(
-            this_dynamic_shape, this_wire_lens, is_custom_op=False
+            this_dynamic_shape, this_wire_lens, is_custom_op=this_is_custom_op
         )
         resources, _, _ = collect_resources_for_op(
             this_name, this_args, this_kwargs | this_static_data | this_extra_data
@@ -295,6 +306,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         graph_op_id.wire_lens,
                         graph_op_id.static_data,
                         graph_op_id.extra_data,
+                        graph_op_id.is_custom_op,
                     )
 
                     if not probe in visited:
@@ -307,6 +319,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                             probe[2],
                             probe[3],
                             probe[4],
+                            probe[5],
                         )
                         rules.extend(get_rule_strings_from_module(module))
             except Exception as e:

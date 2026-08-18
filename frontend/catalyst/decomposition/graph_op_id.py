@@ -14,9 +14,6 @@
 
 """Python implementation of Graph Operator ID."""
 
-import warnings
-from collections import deque
-from functools import partial
 from typing import Any
 
 import jax.numpy as jnp
@@ -26,12 +23,10 @@ from pennylane.pytrees import flatten
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
     format_dynamic_params_for_id,
-    get_dummy_values_for_arg,
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
 )
 from catalyst.from_plxpr.uid import generate_uid
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 
 class GraphOpID:
@@ -40,6 +35,7 @@ class GraphOpID:
 
     The format of the computed graph op ID string is as follows:
         op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
+
     The UID is computed from the shapes, dtypes and pytree structures of the `hybrid_args` of
     the Operator2 instance.
 
@@ -67,6 +63,7 @@ class GraphOpID:
             op, qp.core.Operator2
         ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
         self.op = op
+        self.is_custom_op = self.parse_is_custom_op()
 
         self.operator_name = op.name
         self.dynamic_shape = self.parse_dynamic_shape()
@@ -77,7 +74,10 @@ class GraphOpID:
     def parse_dynamic_shape(self) -> dict:
         """Return a dictionary of dynamic arg names to list of dtypes."""
         # enters as {name: dtype}, we want the format {name: list[dtype]}
-        return {argname: [argtype] for argname, argtype in sorted(self.op.dynamic_args.items())}
+        if self.is_custom_op:
+            return {str(i): ["f64"] for i in range(len(self.op.dynamic_args))}
+        else:
+            return {argname: [argtype] for argname, argtype in sorted(self.op.dynamic_args.items())}
 
     def parse_wire_lens(self) -> dict[str, int]:
         """Return a dictionary of wire arg names to lengths."""
@@ -124,6 +124,25 @@ class GraphOpID:
             return self.op.static_args | self.op.hybrid_args, uid
         else:
             return {}, -1  # uid is unsigned, so use -1 for invalid uid
+
+    def parse_is_custom_op(self) -> str:
+        """
+        Return whether the Operator2 instance is considered a custom op in MLIR.
+
+        The source of truth for the criteria is in qref_operator2_primitives.py,
+        in the _is_custom_op() helper function. However, that function cannot be directly used here
+        as that is a lowering time util, and only works with JAX-MLIR types.
+        """
+        if self.op.static_argnames or self.op.hybrid_argnames or self.op.compilable_argnames:
+            return False
+        if self.op.wire_argnames != ("wires",):
+            return False
+        if list(self.op._sig.parameters.keys())[-1] != "wires":
+            return False
+        return all(
+            arg.shape == () and arg.dtype.type == jnp.float64
+            for arg in self.op.dynamic_args.values()
+        )
 
     def get_operator_name(self) -> str:
         """Return the name of the operator."""

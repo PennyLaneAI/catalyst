@@ -244,10 +244,11 @@ def collect_decomp_rules(
     the rules that are registered on the resource gates of these rules as well.
     """
     if is_custom_op:
-        dynamic_shape = {dynamic_argname: ["f64"] for dynamic_argname in op_cls.dynamic_argnames}
+        dynamic_shape = {str(i): ["f64"] for i in range(len(op_cls.dynamic_argnames))}
+
         op_id = (
             op_cls.__name__
-            + format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
+            + format_dynamic_params_for_id(dynamic_shape)
             + "{"
             + f"wires:{wire_lens[0]}"
             + "}{}"
@@ -259,6 +260,7 @@ def collect_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={"wires": wire_lens[0]},
             static_data={},
+            is_custom_op=True,
         )
 
     elif op_cls is qp.MultiRZ:

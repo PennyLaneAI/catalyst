@@ -848,7 +848,7 @@ def test_for_loop():
 
 
 # CHECK: func.func private @test_rule_TestID
-# CHECK-SAME:   resources = {operations = {"TestRX{theta:{{\[\[f64\]\]}}}{wires:1}{}" = 3 : i64}}
+# CHECK-SAME:   resources = {operations = {"TestRX{0:[f64]}{wires:1}{}" = 3 : i64}}
 # CHECK-SAME:   target_gate = "TestID"
 # CHECK-DAG: stablehlo.constant dense<0> : tensor<i64>
 # CHECK-DAG: stablehlo.constant dense<3> : tensor<i64>

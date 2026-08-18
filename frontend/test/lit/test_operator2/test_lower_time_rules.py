@@ -509,7 +509,7 @@ def test_to_custom_op():
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParamCustomOp{x:{{\[\[f64\]\]}}}{wires:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParamCustomOp{0:[f64]}{wires:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: qref.custom "SingleParamCustomOp"
 test_to_custom_op()
@@ -541,9 +541,9 @@ def test_from_custom_op():
 
 # CHECK: func.func public @c()
 # CHECK: qref.custom "SingleParamCustomOp"
-# CHECK: func.func private @"__builtin_rule_SingleParamCustomOp{x:[f64]}{wires:2}{}"
+# CHECK: func.func private @"__builtin_rule_SingleParamCustomOp{0:[f64]}{wires:2}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParamCustomOp{x:[f64]}{wires:2}{}"
+# CHECK-SAME:   target_gate = "SingleParamCustomOp{0:[f64]}{wires:2}{}"
 # CHECK: qref.operator "NoParams"
 test_from_custom_op()
