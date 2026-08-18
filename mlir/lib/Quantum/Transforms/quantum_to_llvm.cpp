@@ -36,8 +36,7 @@ namespace quantum {
 
 struct QIRTypeConverter : public LLVMTypeConverter {
 
-    QIRTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
-    {
+    QIRTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx) {
         addConversion([&](QubitType type) { return convertQubitType(type); });
         addConversion([&](QuregType type) { return convertQuregType(type); });
         addConversion([&](ObservableType type) { return convertObservableType(type); });
@@ -45,25 +44,21 @@ struct QIRTypeConverter : public LLVMTypeConverter {
     }
 
   private:
-    Type convertQubitType(Type mlirType)
-    {
+    Type convertQubitType(Type mlirType) {
         return LLVM::LLVMPointerType::get(
             &getContext()); // LLVM::LLVMStructType::getOpaque("Qubit", &getContext());
     }
 
-    Type convertQuregType(Type mlirType)
-    {
+    Type convertQuregType(Type mlirType) {
         return LLVM::LLVMPointerType::get(
             &getContext()); // LLVM::LLVMStructType::getOpaque("Array", &getContext());
     }
 
-    Type convertObservableType(Type mlirType)
-    {
+    Type convertObservableType(Type mlirType) {
         return this->convertType(IntegerType::get(&getContext(), 64));
     }
 
-    Type convertResultType(Type mlirType)
-    {
+    Type convertResultType(Type mlirType) {
         return LLVM::LLVMPointerType::get(
             &getContext()); // LLVM::LLVMStructType::getOpaque("Result", &getContext());
     }
@@ -72,8 +67,7 @@ struct QIRTypeConverter : public LLVMTypeConverter {
 struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversionPass> {
     using QuantumConversionPassBase::QuantumConversionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         QIRTypeConverter typeConverter(context);
 

@@ -34,8 +34,7 @@ namespace Catalyst::Runtime::QEC {
  * @return std::string A bit string representation of the given syndrome results.
  */
 template <typename T = int8_t>
-std::string convert_syndrome_res_to_bitstr(DataView<T, 1> &syndrome_res)
-{
+std::string convert_syndrome_res_to_bitstr(DataView<T, 1> &syndrome_res) {
     std::string syndrome_str;
     for (const auto &bit : syndrome_res) {
         RT_ASSERT(bit == 0 || bit == 1);
@@ -65,8 +64,7 @@ template <typename TANNER_GRAPH_INT = int32_t>
 std::pair<std::vector<TANNER_GRAPH_INT>, std::vector<TANNER_GRAPH_INT>>
 get_parity_check_matrix(DataView<TANNER_GRAPH_INT, 1> &tanner_row_idx,
                         DataView<TANNER_GRAPH_INT, 1> &tanner_col_ptr,
-                        const std::vector<size_t> &aux_cols)
-{
+                        const std::vector<size_t> &aux_cols) {
     std::vector<TANNER_GRAPH_INT> row_idx_parity;
     std::vector<TANNER_GRAPH_INT> col_ptr_parity{0};
 
@@ -102,8 +100,7 @@ template <typename TANNER_GRAPH_INT = int32_t>
 std::string get_syndrome_from_errors(const std::vector<TANNER_GRAPH_INT> &row_idx,
                                      const std::vector<TANNER_GRAPH_INT> &col_ptr,
                                      const size_t num_rows, const size_t num_cols,
-                                     std::vector<int8_t> &err_vec)
-{
+                                     std::vector<int8_t> &err_vec) {
     std::vector<size_t> syndrome_res(num_cols, 0);
 
     for (size_t col = 0; col < num_cols; col++) {
@@ -128,8 +125,7 @@ std::string get_syndrome_from_errors(const std::vector<TANNER_GRAPH_INT> &row_id
  * @return std::vector<int64_t> Indices of qubit errors.
  */
 template <typename ERR_IDX_INT = int64_t>
-std::vector<ERR_IDX_INT> get_error_indices(std::vector<int8_t> &err_vec, const size_t num_errors)
-{
+std::vector<ERR_IDX_INT> get_error_indices(std::vector<int8_t> &err_vec, const size_t num_errors) {
     std::vector<ERR_IDX_INT> error_indices;
 
     error_indices.reserve(err_vec.size());
@@ -173,8 +169,7 @@ template <typename TANNER_GRAPH_INT = int32_t, typename ERR_IDX_INT = int64_t>
 std::unordered_map<std::string, std::vector<ERR_IDX_INT>>
 generate_lookup_table(const std::vector<TANNER_GRAPH_INT> &parity_mat_row_idx,
                       const std::vector<TANNER_GRAPH_INT> &parity_mat_col_ptr,
-                      const size_t code_size, const size_t code_distance)
-{
+                      const size_t code_size, const size_t code_distance) {
     // The key here is the bitstr representation of the syndrome results, e.g., "0101"
     // The value is the corresponding indices of qubits to correct, e.g., {0, 2}.
     std::unordered_map<std::string, std::vector<ERR_IDX_INT>> lut;
@@ -235,8 +230,7 @@ template <typename TANNER_GRAPH_INT = int32_t, typename ERR_IDX_INT = int64_t> c
     LUTs(LUTs &&) = delete;
     LUTs &operator=(LUTs &&) = delete;
 
-    static auto getInstance() -> LUTs &
-    {
+    static auto getInstance() -> LUTs & {
         static LUTs instance;
         return instance;
     }
@@ -254,8 +248,7 @@ template <typename TANNER_GRAPH_INT = int32_t, typename ERR_IDX_INT = int64_t> c
      */
     auto get_lut(size_t aux_col_offset, size_t code_size, size_t code_distance,
                  DataView<TANNER_GRAPH_INT, 1> &row_idx, DataView<TANNER_GRAPH_INT, 1> &col_ptr)
-        -> const std::unordered_map<std::string, std::vector<ERR_IDX_INT>> &
-    {
+        -> const std::unordered_map<std::string, std::vector<ERR_IDX_INT>> & {
         std::lock_guard<std::mutex> lock(mutex_);
 
         auto it = luts_.find(aux_col_offset);

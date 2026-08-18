@@ -68,8 +68,7 @@ namespace catalyst {
 namespace {
 
 // Make `fn` externally callable through the C ABI
-void exposeEntryViaCInterface(func::FuncOp fn)
-{
+void exposeEntryViaCInterface(func::FuncOp fn) {
     OpBuilder builder(fn.getContext());
     fn.setVisibility(SymbolTable::Visibility::Public);
     fn->setAttr("llvm.emit_c_interface", builder.getUnitAttr());
@@ -78,8 +77,7 @@ void exposeEntryViaCInterface(func::FuncOp fn)
 
 // The default lowering applied to a catalyst.target module: bufferization +
 // LLVM-dialect lowering, reusing the same stage definitions as the host pipeline.
-std::vector<std::string> defaultLoweringPassList()
-{
+std::vector<std::string> defaultLoweringPassList() {
     auto passes = driver::getBufferizationStage();
     auto llvmPasses = driver::getLLVMDialectLoweringStage();
     passes.insert(passes.end(), llvmPasses.begin(), llvmPasses.end());
@@ -92,8 +90,7 @@ std::vector<std::string> defaultLoweringPassList()
 // symbol). The object path is recorded on the root module for the linker, and the now-empty module
 // is erased.
 LogicalResult lowerLocalTargetCalls(ModuleOp host, ModuleOp nested,
-                                    SmallVectorImpl<Attribute> &objectFiles)
-{
+                                    SmallVectorImpl<Attribute> &objectFiles) {
     MLIRContext *ctx = host.getContext();
 
     // A statically-linked object must be built for the host architecture. A different triple can
@@ -145,8 +142,7 @@ LogicalResult lowerLocalTargetCalls(ModuleOp host, ModuleOp nested,
 struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileTargetsPass> {
     using CrossCompileTargetsPassBase::CrossCompileTargetsPassBase;
 
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
+    void getDependentDialects(DialectRegistry &registry) const override {
         mlir::registerLLVMDialectTranslation(registry);
         mlir::registerBuiltinDialectTranslation(registry);
         mlir::registerAllDialects(registry);
@@ -159,8 +155,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
                         catalyst::qecp::QecPhysicalDialect, catalyst::executor::ExecutorDialect>();
     }
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         ModuleOp host = getOperation();
 
         SmallVector<ModuleOp> targetMods;
@@ -217,8 +212,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
     }
 
     // Returns the kernel-specific subdirectory {workspace}/{name}/, creating it if needed.
-    std::string makeKernelDir(StringRef name)
-    {
+    std::string makeKernelDir(StringRef name) {
         llvm::SmallString<128> dir(workspace);
         llvm::sys::path::append(dir, name);
         (void)llvm::sys::fs::create_directories(dir);
@@ -226,8 +220,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
     }
 
     // Write `op`/`mod` to {dir}/{filename} (used only when dump-intermediate is set).
-    void dumpMLIR(mlir::Operation *op, StringRef dir, StringRef filename)
-    {
+    void dumpMLIR(mlir::Operation *op, StringRef dir, StringRef filename) {
         llvm::SmallString<128> path(dir);
         llvm::sys::path::append(path, filename);
         std::error_code ec;
@@ -237,8 +230,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         }
     }
 
-    void dumpLLVMIR(llvm::Module &mod, StringRef dir, StringRef filename)
-    {
+    void dumpLLVMIR(llvm::Module &mod, StringRef dir, StringRef filename) {
         llvm::SmallString<128> path(dir);
         llvm::sys::path::append(path, filename);
         std::error_code ec;
@@ -254,8 +246,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
      * @return The TargetMachine, or nullptr (with a diagnostic on stderr) if the
      *         triple is not available in this LLVM build.
      */
-    std::unique_ptr<llvm::TargetMachine> createTargetMachine(StringRef triple)
-    {
+    std::unique_ptr<llvm::TargetMachine> createTargetMachine(StringRef triple) {
         llvm::Triple parsedTriple{triple};
         std::string err;
         const llvm::Target *llvmTarget = llvm::TargetRegistry::lookupTarget(parsedTriple, err);
@@ -289,8 +280,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
      * @return std::string The path to the emitted object file, or "" on failure.
      */
     std::string emitObjectFile(std::unique_ptr<llvm::Module> &&llvmModule, StringRef name,
-                               StringRef dir, llvm::TargetMachine &targetMachine)
-    {
+                               StringRef dir, llvm::TargetMachine &targetMachine) {
         llvm::SmallString<128> p(dir);
         llvm::sys::path::append(p, name.str() + ".o");
         std::string objPath = std::string(p.str());
@@ -314,8 +304,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
     }
 
     // Cross-compile a catalyst.target module to a `.o` for its triple and return the path.
-    FailureOr<std::string> compileTargetModule(ModuleOp nested)
-    {
+    FailureOr<std::string> compileTargetModule(ModuleOp nested) {
         MLIRContext *ctx = &getContext();
         StringRef name = nested.getSymName().value_or("unnamed");
 
@@ -374,8 +363,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         for (auto fn : standalone->getOps<func::FuncOp>()) {
             if (entries.contains(fn.getName())) {
                 exposeEntryViaCInterface(fn);
-            }
-            else {
+            } else {
                 fn.setPrivate();
             }
         }

@@ -34,15 +34,13 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 
 namespace {
-template <typename T> void printIterable(T iterable, llvm::raw_string_ostream &ss)
-{
+template <typename T> void printIterable(T iterable, llvm::raw_string_ostream &ss) {
     ss << "[";
     llvm::interleave(iterable, ss, ",");
     ss << "]";
 }
 
-void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss)
-{
+void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
     llvm::TypeSwitch<mlir::Attribute, void>(attr)
         .Case<mlir::DictionaryAttr>([&](mlir::DictionaryAttr dict) {
             ss << "{";
@@ -73,8 +71,7 @@ void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss)
 }
 
 void printShapedType(ArrayRef<int64_t> shape, int64_t dim, Type elementType,
-                     llvm::raw_string_ostream &ss)
-{
+                     llvm::raw_string_ostream &ss) {
     int64_t length = shape[dim];
     auto printList = [&](auto printItem) {
         ss << "[";
@@ -89,14 +86,12 @@ void printShapedType(ArrayRef<int64_t> shape, int64_t dim, Type elementType,
 
     if (static_cast<int64_t>(shape.size()) == dim + 1) {
         printList([&]() { ss << elementType; });
-    }
-    else {
+    } else {
         printList([&]() { printShapedType(shape, dim + 1, elementType, ss); });
     }
 }
 
-void printType(mlir::Type type, llvm::raw_string_ostream &ss)
-{
+void printType(mlir::Type type, llvm::raw_string_ostream &ss) {
     llvm::TypeSwitch<mlir::Type, void>(type)
         .Case<mlir::ShapedType>([&](mlir::ShapedType shapedType) {
             printShapedType(shapedType.getShape(), 0, shapedType.getElementType(), ss);
@@ -104,8 +99,7 @@ void printType(mlir::Type type, llvm::raw_string_ostream &ss)
         .Default([&](mlir::Type other) { other.print(ss); });
 }
 
-void printTypeRange(mlir::TypeRange typerange, llvm::raw_string_ostream &ss)
-{
+void printTypeRange(mlir::TypeRange typerange, llvm::raw_string_ostream &ss) {
     ss << "[";
     for (auto [i, type] : llvm::enumerate(typerange)) {
         if (i > 0) {
@@ -125,8 +119,7 @@ void printTypeRange(mlir::TypeRange typerange, llvm::raw_string_ostream &ss)
 namespace catalyst {
 namespace quantum {
 
-std::string defaultGetGraphOpId(Operation *op)
-{
+std::string defaultGetGraphOpId(Operation *op) {
     std::string out;
     llvm::raw_string_ostream ss(out);
 

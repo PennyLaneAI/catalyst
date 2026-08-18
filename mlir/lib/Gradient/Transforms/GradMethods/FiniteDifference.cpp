@@ -33,8 +33,7 @@
 namespace catalyst {
 namespace gradient {
 
-LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const
-{
+LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const {
     if (op.getMethod() != "fd") {
         return failure();
     }
@@ -70,8 +69,8 @@ LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &re
 
 void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location loc,
                                            func::FuncOp gradFn, func::FuncOp callee,
-                                           const std::vector<size_t> &diffArgIndices, double hValue)
-{
+                                           const std::vector<size_t> &diffArgIndices,
+                                           double hValue) {
     ValueRange callArgs = gradFn.getArguments();
     TypeRange gradResTypes = gradFn.getResultTypes();
     std::vector<Value> gradients;
@@ -126,8 +125,7 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
             Value hForResult = arith::ConstantOp::create(rewriter, loc, shiftForResult);
             if (isGradientTensor && cast<TensorType>(gradientTy).hasStaticShape()) {
                 hForResult = tensor::SplatOp::create(rewriter, loc, hForResult, gradientTy);
-            }
-            else if (isGradientTensor) {
+            } else if (isGradientTensor) {
                 Value outTensor = tensor::EmptyOp::create(rewriter, loc, gradientShape,
                                                           baseResultTy, dynamicDimSizes);
                 hForResult =
@@ -152,8 +150,7 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                 Value callResForward = callOpForward.getResult(diffResIdx);
 
                 gradient = arith::SubFOp::create(rewriter, loc, callResForward, callRes);
-            }
-            else {
+            } else {
                 auto bodyBuilder = [&](OpBuilder &rewriter, Location loc,
                                        ValueRange tensorIndices) -> void {
                     // we need to do this to guarantee a copy here.
