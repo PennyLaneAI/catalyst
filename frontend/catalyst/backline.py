@@ -175,7 +175,7 @@ def _node_dict(node: Node, role: str, transport: str) -> dict:
         except (AttributeError, RuntimeError) as e:
             # Either it has no ``address`` at all, or it has neither launched nor settled on one.
             # The cause says which; both leave the compiled program with nowhere to dispatch.
-            who = f"{role} {node.name!r}" if node.name is not None else f"unlabelled {role}"
+            who = f"{role} {node.name!r}" if node.name is not None else f"unnamed {role}"
             raise CompileError(
                 f"backline {who} has an executor ({type(executor).__name__}) that cannot say "
                 f"where it serves, so the compiled program would have nowhere to dispatch it: "
@@ -427,7 +427,7 @@ def _realize_executor(node: Node) -> Executor | None:
         return None
     options = dict(options)
 
-    options.setdefault("name", node.label or "executor")
+    options.setdefault("name", node.name or "executor")
     options["plugins"] = _executor_plugins(node, options.get("plugins") or ())
     fn_lib = _coprocessor_fn_lib(node)
     if fn_lib is not None and node.remote:
@@ -649,10 +649,10 @@ def find_placement(callable_, jaxpr=None, name: str = "this program") -> Placeme
         list({id(p): p for p in _traced_placements(jaxpr)}.values()) if jaxpr is not None else []
     )
     if len(found) > 1:
-        labels = ", ".join(p.controller.label or "<unlabelled>" for p in found)
+        names = ", ".join(p.controller.name or "<unnamed>" for p in found)
         raise CompileError(
             f"{name!r} runs QNodes over {len(found)} different backline placements (controllers: "
-            f"{labels}), but a compiled program carries one. Split them across separate "
+            f"{names}), but a compiled program carries one. Split them across separate "
             f"qjit-compiled functions."
         )
     return found[0] if found else None
