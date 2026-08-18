@@ -38,6 +38,7 @@ class CpuControllerSession;
 // The coprocessor binds `process_message` on connect(); the controller's kick() invokes it
 // inline. `mu` guards both fields across connect / kick / teardown.
 struct MemcpyLink {
+    // TODOs: Update this once ControllerSession::kick() is renamed to post() to match the dialect and CAPI
     // Invoked once per controller kick(). Reads `in_len` bytes from `in` (a wire-shaped
     // `common::Payload` frame synthesized by the controller: value bytes at offset 0,
     // decoder_id at offset PAYLOAD_DATA_BYTES, seq_num right after), writes at most
