@@ -136,7 +136,6 @@ def collect_resources_for_op(op_name, args, kwargs):
             # The `compute_resources` function's signature is the same as the Operator2 signature
             # for the original op of the rule
             resources = rule.compute_resources(*args, **kwargs)
-            print(f"got resources for rule {rule.name}: {resources}")
             name_to_resources[rule.name] = resources.gate_counts
             name_to_resource_ids[rule.name] = {
                 GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
