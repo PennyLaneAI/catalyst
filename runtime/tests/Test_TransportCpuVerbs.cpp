@@ -57,9 +57,7 @@ static int invert_fn(const void *in, std::size_t in_len, void *out, std::size_t 
     return 0;
 }
 
-static int failing_fn(const void *, std::size_t, void *, std::size_t, void * /*ctx*/) {
-    return 1;
-}
+static int failing_fn(const void *, std::size_t, void *, std::size_t, void * /*ctx*/) { return 1; }
 
 TEST_CASE("controller and coprocessor connect: both reach INIT and open the "
           "OOB channel",
@@ -241,8 +239,7 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
     REQUIRE(got != DEMO_SYNDROME);  // and it is not a mere echo
 }
 
-TEST_CASE("cpu_verbs treats the coprocessor return value as a status code",
-          "[cpu_libibverbs]") {
+TEST_CASE("cpu_verbs treats the coprocessor return value as a status code", "[cpu_libibverbs]") {
     if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
     }
