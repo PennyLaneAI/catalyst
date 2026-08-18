@@ -187,6 +187,7 @@ HYBRID_OPS = [
 TEST_DEVICE_CONFIG_TEXT = """
 schema = 3
 [operators.gates]
+GlobalPhase = { }
 PauliX = { }
 PauliZ = { }
 RX = { }
@@ -201,6 +202,7 @@ QubitUnitary = { }
 """
 
 TARGET_GATES_FROM_CONFIG = {
+    "GlobalPhase": 1,
     "PauliX": 1,
     "PauliZ": 1,
     "RX": 100,
@@ -494,9 +496,11 @@ class TestPreprocessHybridOp:
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
-        assert len(new_tape.operations) == 2
+        assert len(new_tape.operations) == 3 if expected_second_op is qp.RZ else 2
         assert isinstance(new_tape.operations[0], qp.PauliX)
         assert isinstance(new_tape.operations[1], expected_second_op)
+        if expected_second_op is qp.RZ:
+            assert isinstance(new_tape.operations[2], qp.GlobalPhase)
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)

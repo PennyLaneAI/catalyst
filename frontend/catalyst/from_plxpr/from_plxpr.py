@@ -310,7 +310,7 @@ def handle_qnode(
         setattr(qnode, "decompose_gatesets", [gateset])
     # The device may require passes of its own, e.g. a backline placement naming a QEC code implies
     # implicit encoding applied to it. Therefore we append the pass pipeline with the qec lowering
-    # psses.
+    # passes.
     pipelines = (("main", tuple(self._pass_pipeline) + device_pass_pipeline(qnode.device)),)
     if not self._skip_preprocess:
         device_preprocessing_pipeline = create_device_preprocessing_pipeline(

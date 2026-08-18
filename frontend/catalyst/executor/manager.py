@@ -45,6 +45,7 @@ import contextlib
 import getpass
 import platform
 from dataclasses import dataclass
+from enum import Enum
 from functools import cached_property
 from pathlib import Path
 from typing import Callable, Self
@@ -144,6 +145,20 @@ class _SessionRegistry:
 _sessions = _SessionRegistry()
 
 
+class _Mode(Enum):
+    """How an :class:`Executor` reaches the process it addresses. What the caller gives picks one,
+    so there is no combination that names none."""
+
+    LOCAL = "local"
+    """Neither host nor address: spawn a subprocess here."""
+
+    REMOTE = "remote"
+    """``host=``: ssh to it, deploy, and tunnel back."""
+
+    ATTACHED = "attached"
+    """``address=`` alone: something else launched it, so there is nothing to deploy."""
+
+
 @dataclass
 class ExecutorConfig:
     """User-supplied configuration for an :class:`Executor`. The deployment fields apply to a remote
@@ -233,7 +248,7 @@ class Executor:
         self.host = host
         self.name = name
         self._address = address
-        self._local = not (host or address)
+        self._mode = _Mode.REMOTE if host else _Mode.ATTACHED if address else _Mode.LOCAL
         self._cfg = ExecutorConfig(
             user=user,
             port=port,
@@ -274,7 +289,7 @@ class Executor:
         """
         if self._launched or self._committed:
             return self
-        if not (self._local or self.host):  # attached: the address came from the caller
+        if self._mode is _Mode.ATTACHED:  # the address came from the caller
             self._committed = True
             return self
         if self._cfg.port is None:
@@ -294,7 +309,7 @@ class Executor:
     def _detect_triple(self) -> str | None:
         """Auto-detect the LLVM triple via ``uname``: local for a subprocess, remote over SSH
         for ``host=``. Returns ``None`` in attach-only mode or if the remote probe fails."""
-        if self._local:
+        if self._mode is _Mode.LOCAL:
             return triple_from_uname(platform.system(), platform.machine())
         if self.host:
             user = self._cfg.user or getpass.getuser()
@@ -384,11 +399,11 @@ class Executor:
         if self._launched:
             return self
         # Attach-only mode: nothing to deploy, just carry the address the caller supplied.
-        if not (self._local or self.host):
+        if self._mode is _Mode.ATTACHED:
             self._launched = True
             return self
         set_verbose(self._cfg.verbose)
-        make = self._local_maker() if self._local else self._remote_maker()
+        make = self._local_maker() if self._mode is _Mode.LOCAL else self._remote_maker()
         self._proc = _start_on_free_port(make, self._cfg.port, strict=self._committed)
         self._address = self._proc.addr
         self._launched = True
@@ -456,6 +471,6 @@ class Executor:
 
     def __repr__(self) -> str:
         return (
-            f"Executor(name={self.name!r}, host={self.host!r}, local={self._local}, "
+            f"Executor(name={self.name!r}, host={self.host!r}, mode={self._mode.value}, "
             f"launched={self._launched}, address={self._address!r})"
         )

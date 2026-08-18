@@ -108,7 +108,7 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
 
 def _out_of_process(node: Node) -> bool:
     """Whether the node's code is dispatched to an executor rather than run in this process."""
-    return node.executor_options is not None or node.executor
+    return node.executor_options is not None or node.executor is not None
 
 
 def _node_dict(node: Node, role: str) -> dict:
@@ -158,7 +158,7 @@ def _node_dict(node: Node, role: str) -> dict:
     if unknown := sorted(set(init) - set(_INIT_KEYS)):
         raise CompileError(
             f"backline node has unrecognized init_args {unknown}; the recognized keys are "
-            f"{list(_INIT_KEYS)}. Settings the backend itself interprets go in 'config', as a "
+            f"{list(_INIT_KEYS)}. Setting the backend itself interprets go in 'config', as a "
             f"'key=value;...' string."
         )
     d.update({k: init[k] for k in _INIT_KEYS if k in init})
@@ -377,8 +377,12 @@ def module_attributes(device: Device) -> dict[str, str]:
     Returns:
         dict: Attribute name to value, empty for a device that implies no attributes.
     """
-    # Only a controller on another machine plays a role: one running in this process needs no
-    # module of its own, so it is not tagged.
+    # Only a controller is tagged here, because a QNode is always the controller. The coprocessor
+    # runs a precompiled function, so it is not traced from Python and nothing on this side captures
+    # its code. ``inject-transport-session`` creates the coprocessor's module itself and sets its
+    # role there.
+    # A controller running in this process needs no module of its own either,
+    # so only a dispatched one is tagged.
     controller = getattr(getattr(device, "placement", None), "controller", None)
     if controller is not None and controller.remote:
         return {"catalyst.backline_role": "controller"}
