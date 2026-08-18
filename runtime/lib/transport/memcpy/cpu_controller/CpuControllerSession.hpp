@@ -22,6 +22,7 @@
 
 #include "MemcpyLink.hpp"
 #include "Transport.hpp"
+#include "WireProtocol.hpp"
 
 namespace catalyst::transport::memcpy {
 
@@ -66,8 +67,8 @@ class CpuControllerSession : public ControllerSession {
     /// prior data_slot() handed out cannot dangle behind a request_staging_ reallocation.
     bool committed_ = false;
 
-    std::uint64_t in_bytes_ = 0;
-    std::uint64_t out_bytes_ = 0;
+    std::uint64_t in_bytes_ = sizeof(common::Payload::value);
+    std::uint64_t out_bytes_ = sizeof(common::Payload::value);
     std::uint64_t staged_bytes_ = 0;
     std::uint64_t reply_bytes_ = 0;
     std::uint32_t decoder_id_ = 0;
