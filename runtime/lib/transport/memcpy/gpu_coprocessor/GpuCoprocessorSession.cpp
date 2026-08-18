@@ -192,8 +192,8 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
     launcher_ctx_ = ctx;
 }
 
-std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
-                                                   std::size_t out_cap) {
+int GpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
+                                           std::size_t out_cap) {
     TP_CHECK(in_len == sizeof(common::Payload), "Expected one wire-shaped Payload");
     TP_CHECK(out_cap >= sizeof(std::int64_t), "Reply buffer too small for GPU correction");
     TP_CHECK(kernel_running_, "Call start() before process_message");
@@ -223,7 +223,7 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
     std::int64_t correction = 0;
     std::memcpy(&correction, &reply_ring_[idx].p.value, sizeof(correction));
     std::memcpy(out, &correction, sizeof(correction));
-    return sizeof(correction);
+    return 0;
 }
 
 } // namespace catalyst::transport::memcpy

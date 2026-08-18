@@ -46,14 +46,14 @@ static bool have_rxe() {
 
 // A custom coprocessor function (bitwise-invert) to exercise the set_coprocessor_fn
 // path with a non-null, non-echo function.
-static std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
-                             void * /*ctx*/) {
+static int invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
+                     void * /*ctx*/) {
     std::uint64_t v = 0;
     std::memcpy(&v, in, std::min(in_len, sizeof(v)));
     v = ~v;
     const std::size_t n = std::min(out_cap, sizeof(v));
     std::memcpy(out, &v, n);
-    return n;
+    return 0;
 }
 
 TEST_CASE("controller and coprocessor connect: both reach INIT and open the "

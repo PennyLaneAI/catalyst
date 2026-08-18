@@ -23,12 +23,15 @@
 namespace catalyst::transport::memcpy {
 namespace {
 
-std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
+int echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
+    if ((in_len != 0 && !in) || (out_cap != 0 && !out)) {
+        return 1;
+    }
     const std::size_t n = std::min(in_len, out_cap);
-    if (n != 0 && in && out) {
+    if (n != 0) {
         std::memcpy(out, in, n);
     }
-    return n;
+    return 0;
 }
 
 } // namespace
@@ -148,16 +151,16 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         out.p.value = 0;
         out.p.decoder_id = request_ring_[idx].p.decoder_id;
         CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
-        const std::size_t nb = fn(&request_ring_[idx].p, sizeof(common::Payload), &out.p.value,
-                                  common::PAYLOAD_DATA_BYTES, ctx_);
-        TP_CHECK(nb <= common::PAYLOAD_DATA_BYTES, "Coprocessor fn overran reply");
+        const int status = fn(&request_ring_[idx].p, sizeof(common::Payload), &out.p.value,
+                              common::PAYLOAD_DATA_BYTES, ctx_);
+        TP_CHECK(status == 0, "Coprocessor fn returned nonzero status");
         std::atomic_thread_fence(std::memory_order_release);
         out.p.seq_num = expect; // publish
     }
 }
 
-std::size_t CpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
-                                                   std::size_t out_cap) {
+int CpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
+                                           std::size_t out_cap) {
     TP_CHECK(in_len == sizeof(common::Payload), "Expected one wire-shaped Payload");
     TP_CHECK(engine_.joinable(), "Call start() before process_message");
     if (failed_.load(std::memory_order_acquire)) {
@@ -186,7 +189,7 @@ std::size_t CpuCoprocessorSession::process_message(const void *in, std::size_t i
     if (n != 0 && out) {
         std::memcpy(out, &reply_ring_[idx].p.value, n);
     }
-    return n;
+    return 0;
 }
 
 } // namespace catalyst::transport::memcpy
