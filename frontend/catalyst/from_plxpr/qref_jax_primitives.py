@@ -65,9 +65,9 @@ with Patcher(
     from mlir_quantum.dialects.pbc import RefPPMeasurementOp
     from mlir_quantum.dialects.qref import (
         AdjointOp,
-        CtrlOp,
         AllocOp,
         ComputationalBasisOp,
+        CtrlOp,
         CustomOp,
         DeallocOp,
         GetOp,
@@ -677,8 +677,7 @@ def _pl_ctrl_lowering(
     n_consts,
     control_values,
 ):
-    """Build a `qref.ctrl` region op holding the region body.
-    """
+    """Build a `qref.ctrl` region op holding the region body."""
     global_qreg = invals[0]
     control_qubits = list(invals[1 : 1 + n_control])
     body_operands = invals[1 + n_control :]
@@ -695,9 +694,7 @@ def _pl_ctrl_lowering(
         body_jaxpr = body.jaxpr.replace(
             constvars=(), invars=body.jaxpr.constvars + body.jaxpr.invars
         )
-        const_ir_values = [
-            v for const in body.consts for v in mlir.ir_constants(const)
-        ]
+        const_ir_values = [v for const in body.consts for v in mlir.ir_constants(const)]
         mlir.jaxpr_subcomp(
             jax_ctx.module_context,
             body_jaxpr,

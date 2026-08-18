@@ -718,8 +718,7 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 
 
 def _ctrl_region_kernel(interpreter, jaxpr, n_consts, global_qreg, *consts_and_args):
-    """Re-interpret a control-region body (plxpr) into reference-semantics primitives.
-    """
+    """Re-interpret a control-region body (plxpr) into reference-semantics primitives."""
     converter = copy(interpreter)
     converter.init_qreg = global_qreg
     converter.eval(jaxpr, consts_and_args[:n_consts], *consts_and_args[n_consts:])
@@ -729,8 +728,7 @@ def _ctrl_region_kernel(interpreter, jaxpr, n_consts, global_qreg, *consts_and_a
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
 def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
-    """Lower a control transform to a `qref.ctrl` region op.
-    """
+    """Lower a control transform to a `qref.ctrl` region op."""
     consts = invals[:n_consts]
     args = invals[n_consts:-n_control]
     control_wires = invals[-n_control:]
