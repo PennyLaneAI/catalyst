@@ -23,7 +23,7 @@
 * The graph-based decomposition system now supports **controlled operators** for `Operator2`,
   including single control (`C(Op)`), multiple controls (`<n>C(Op)`), and their composition with
   adjoint.
-  [(#3140)](https://github.com/PennyLaneAI/catalyst/pull/3140)
+  [(#3129)](https://github.com/PennyLaneAI/catalyst/pull/3129)
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
