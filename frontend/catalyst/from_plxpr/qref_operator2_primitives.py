@@ -235,6 +235,7 @@ def collect_decomp_rules(
     repack_static_data=None,
     uid=None,
     avals_in=None,
+    n_ctrls=0,
 ):
     """
     Generate all the decomposition rules registered on the current gate, recursively generating all
@@ -256,6 +257,7 @@ def collect_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={"wires": wire_lens[0]},
             static_data={},
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.MultiRZ:
@@ -275,6 +277,7 @@ def collect_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.PauliRot:
@@ -298,6 +301,7 @@ def collect_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls in (qp.GlobalPhase, qp.PCPhase, qp.QubitUnitary):
@@ -387,6 +391,7 @@ def collect_decomp_rules(
             wire_lens=non_hybrid_wire_lens,
             static_data=repack_static_data,
             extra_data=extra_data,
+            n_ctrls=n_ctrls,
         )
 
     inject_new_rules_into_module(module, decomp_rules)
@@ -428,6 +433,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
                 op_cls=op_cls,
                 wire_lens=wire_lens,
                 repack_static_data=repack_static_data,
+                n_ctrls=n_ctrls,
             )
 
         return _SPECIAL_LOWERINGS[op_cls](
@@ -468,6 +474,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
                 op_cls=op_cls,
                 is_custom_op=True,
                 wire_lens=wire_lens,
+                n_ctrls=n_ctrls,
             )
 
         return []
@@ -530,6 +537,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             repack_static_data=repack_static_data,
             uid=uid,
             avals_in=jax_ctx.avals_in,
+            n_ctrls=n_ctrls,
         )
 
     return []

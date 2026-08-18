@@ -836,6 +836,27 @@ TEST_CASE("Test competing controlled pathways are picked by cost", "[DecompGraph
     }
 }
 
+TEST_CASE("Test multi-controlled distribution keeps the control count on each produced gate",
+          "[DecompGraph::Solver]") {
+    const OperatorNode ccrz{"2C(RZ{0:[f64]}{wires:1}{})", "2C(RZ)"};
+    const OperatorNode ccry{"2C(RY{0:[f64]}{wires:1}{})", "2C(RY)"};
+    const OperatorNode ccrot{"2C(Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{})", "2C(Rot)"};
+
+    const WeightedGateset gateset{{{ccrz.name, 1.0}, {ccry.name, 2.0}}};
+    const std::vector<RuleNode> rules{
+        {"ccrot_distribute", ccrot, {{ccrz, 2}, {ccry, 1}}},
+    };
+
+    const DecompositionGraph graph({ccrot}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.at(ccrot).ruleName == "ccrot_distribute");
+    REQUIRE(result.at(ccrot).totalCost == 4.0); // 2*1 + 2
+    REQUIRE(result.at(ccrz).isBasis);
+    REQUIRE(result.at(ccry).isBasis);
+}
+
 TEST_CASE("Test a controlled gate in the gate set is basis", "[DecompGraph::Solver]") {
     const OperatorNode ct{"C(T{}{wires:1}{})", "C(T)"};
     const OperatorNode cv{"C(V{}{wires:1}{})", "C(V)"};
