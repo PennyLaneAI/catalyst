@@ -1,8 +1,6 @@
 ###############################################
 # GPU-verbs transport backend                 #
 ###############################################
-# Shared GPU plumbing (GpuRuntime, HipCheck, GpuLaunchers) lives in transport/common/coproc/gpu/
-# and is linked as a library so memcpy_gpu can reuse it without needing libibverbs.
 
 add_library(catalyst_transport_gpu_verbs_coprocessor SHARED
     coprocessor/GpuCoprocessorSession.cpp
