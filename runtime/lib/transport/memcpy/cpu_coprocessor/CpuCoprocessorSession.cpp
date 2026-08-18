@@ -18,6 +18,8 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "Error.hpp"
+
 namespace catalyst::transport::memcpy {
 namespace {
 
@@ -49,10 +51,8 @@ int CpuCoprocessorSession::connect(const ConnectInfo & /*info*/) {
     // and threw, the destructor would clear the incumbent coprocessor's binding on the way out.
     auto candidate = acquire_memcpy_link(pair_key_);
     std::lock_guard<std::mutex> lock(candidate->mu);
-    if (candidate->process_message) {
-        throw std::runtime_error("memcpy: another coprocessor is already bound to session pair '" +
-                                 pair_key_ + "'");
-    }
+    TP_CHECK(!candidate->process_message, "Coprocessor already bound to pair '%s'",
+             pair_key_.c_str());
     candidate->process_message = [this](const void *in, std::size_t in_len, void *out,
                                         std::size_t out_cap) {
         return this->process_message(in, in_len, out, out_cap);
@@ -62,9 +62,7 @@ int CpuCoprocessorSession::connect(const ConnectInfo & /*info*/) {
 }
 
 MemRegion CpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
-    if (kind != MemKind::CpuRam) {
-        throw std::runtime_error("CPU device can only allocate CpuRam");
-    }
+    TP_CHECK(kind == MemKind::CpuRam, "CPU device can only allocate CpuRam");
     caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
                                           : std::unique_ptr<std::byte[]>{});
     return MemRegion{
@@ -80,9 +78,7 @@ PeerRef CpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) { retu
 
 void CpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion & /*local*/,
                                               const PeerRef & /*peer*/) {
-    if (desc.transport != "memcpy") {
-        throw std::runtime_error("only transport=memcpy is supported");
-    }
+    TP_CHECK(desc.transport == "memcpy", "Only transport=memcpy is supported");
 }
 
 void CpuCoprocessorSession::start() {
@@ -107,7 +103,7 @@ void CpuCoprocessorSession::start() {
 int CpuCoprocessorSession::collect(void *const * /*replies*/,
                                    const std::uint64_t * /*replies_bytes*/, std::size_t /*n*/) {
     // Compute is driven inline from the controller's kick(); nothing collects on this side.
-    throw std::logic_error("memcpy: coprocessor collect is not used");
+    throw std::logic_error("Coprocessor collect unused");
 }
 
 void CpuCoprocessorSession::stop() {
@@ -118,6 +114,10 @@ void CpuCoprocessorSession::stop() {
 }
 
 void CpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
+    // The worker thread reads fn_/ctx_ from run() without synchronization, so mutating them
+    // while it runs would race and could tear across the two reads (calling fn with the wrong
+    // ctx). The interface already documents this as bind-before-start; enforce it here.
+    TP_CHECK(!engine_.joinable(), "Bind set_coprocessor_fn before start()");
     fn_ = fn;
     ctx_ = ctx;
 }
@@ -150,9 +150,7 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
         const std::size_t nb = fn(&request_ring_[idx].p, sizeof(common::Payload), &out.p.value,
                                   common::PAYLOAD_DATA_BYTES, ctx_);
-        if (nb > common::PAYLOAD_DATA_BYTES) {
-            throw std::runtime_error("memcpy: coprocessor function wrote past reply capacity");
-        }
+        TP_CHECK(nb <= common::PAYLOAD_DATA_BYTES, "Coprocessor fn overran reply");
         std::atomic_thread_fence(std::memory_order_release);
         out.p.seq_num = expect; // publish
     }
@@ -160,12 +158,8 @@ void CpuCoprocessorSession::run(std::stop_token st) {
 
 std::size_t CpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
                                                    std::size_t out_cap) {
-    if (in_len != sizeof(common::Payload)) {
-        throw std::runtime_error("memcpy: CPU coprocessor expects one wire-shaped Payload");
-    }
-    if (!engine_.joinable()) {
-        throw std::runtime_error("memcpy: coprocessor start() must precede process_message");
-    }
+    TP_CHECK(in_len == sizeof(common::Payload), "Expected one wire-shaped Payload");
+    TP_CHECK(engine_.joinable(), "Call start() before process_message");
     if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_); // surface the worker's real error
     }
