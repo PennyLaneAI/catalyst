@@ -187,6 +187,20 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
 
+            // Distribute a `quantum.ctrl` region lazily.
+            bool hasCtrlRegion = false;
+            module->walk([&](CtrlOp) {
+                hasCtrlRegion = true;
+                return mlir::WalkResult::interrupt();
+            });
+            if (hasCtrlRegion) {
+                OpPassManager ctrlPm("builtin.module");
+                ctrlPm.addPass(createCtrlLoweringPass());
+                if (failed(runPipeline(ctrlPm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
             // Distribute a `quantum.adjoint` region lazily.
             // It uses a greedy rewriter that would otherwise DCE gates in circuits that
             // never needed adjoint handling.

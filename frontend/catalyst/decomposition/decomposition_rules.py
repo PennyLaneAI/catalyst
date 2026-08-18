@@ -42,6 +42,16 @@ from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 _NON_INVERTIBLE_MARKERS = ("qref.measure", "quantum.measure")
 
 
+def _control_modifier(n_ctrl: int) -> str:
+    """Return the graphOpId control modifier prefix for ``n_ctrl`` controls.
+
+    A single control is written ``C`` and ``n > 1`` controls ``<n>C``, mirroring
+    the current implementation in the compiler. Used as ``f"{mod}({inner})"``.
+    """
+    assert n_ctrl >= 1, "control modifier requires at least one control"
+    return "C" if n_ctrl == 1 else f"{n_ctrl}C"
+
+
 class GraphOpID:
     """
     A parser object to compute the graph operator id for the operator2 instance `op`.
@@ -298,6 +308,8 @@ def compile_decomposition_rules(
     extra_data=None,
     is_custom_op=False,
     wrap_adjoint=False,
+    wrap_control=False,
+    n_ctrl=1,
 ) -> ModuleOp:
     """
     Return a ModuleOp containing the decomposition rules for an operator instance.
@@ -309,20 +321,32 @@ def compile_decomposition_rules(
     rule body is wrapped in a ``qml.adjoint`` region (reduced to op-level modified gates by
     ``adjoint-lowering`` within the decomposition pass), the ``target_gate`` updates to the adjoint
     id, and each produced op in the resources is wrapped in ``Adjoint(...)``.
+
+    Note that ``wrap_adjoint`` and ``wrap_control`` are mutually exclusive.
     """
+    assert not (wrap_adjoint and wrap_control), "adjoint/control synthesis are mutually exclusive"
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
-    device = qp.device("null.qubit", wires=sum(wire_lens.values()))
+
+    ctrl_wire_key = "zz_ctrl_wires"
+    n_base_wires = sum(wire_lens.values())
+    device = qp.device("null.qubit", wires=n_base_wires + (n_ctrl if wrap_control else 0))
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name, kwargs | static_data | extra_data, is_custom_op
     )
 
-    # The distribution pathway targets `Adjoint(op)` and produces adjointed resource gates.
-    target_id = f"Adjoint({op_id})" if wrap_adjoint else op_id
+    # A distribution pathway targets the modified op and produces modified resource gates
     if wrap_adjoint:
+        modifier = "Adjoint"
+    elif wrap_control:
+        modifier = _control_modifier(n_ctrl)
+    else:
+        modifier = None
+    target_id = f"{modifier}({op_id})" if modifier else op_id
+    if modifier:
         name_to_resource_ids = {
-            rule_name: {f"Adjoint({produced_id})": count for produced_id, count in ids.items()}
+            rule_name: {f"{modifier}({produced_id})": count for produced_id, count in ids.items()}
             for rule_name, ids in name_to_resource_ids.items()
         }
 
@@ -332,6 +356,9 @@ def compile_decomposition_rules(
         def decomp_rule(*_args, **_kwargs):
             if wrap_adjoint:
                 qp.adjoint(rule._impl)(*_args, **_kwargs)
+            elif wrap_control:
+                ctrl_wires = _kwargs.pop(ctrl_wire_key)
+                qp.ctrl(rule._impl, control=list(ctrl_wires))(*_args, **_kwargs)
             else:
                 rule._impl(*_args, **_kwargs)
 
@@ -346,11 +373,17 @@ def compile_decomposition_rules(
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
 
+    call_kwargs = dict(kwargs)
+    if wrap_control:
+        call_kwargs[ctrl_wire_key] = jnp.array(
+            range(n_base_wires, n_base_wires + n_ctrl), dtype=int
+        )
+
     @qp.qjit(target="mlir", capture=True, skip_decomp_rules=True)
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            subroutine(**kwargs)
+            subroutine(**call_kwargs)
 
     module = circuit.mlir_module
 
@@ -403,7 +436,7 @@ def compile_decomposition_rules_wrapper(
 
 
 def fetch_all_reachable_decomposition_rules_from_op(
-    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None, n_ctrls=0
 ):
     extra_data = extra_data or {}
     queue = deque()
@@ -411,11 +444,20 @@ def fetch_all_reachable_decomposition_rules_from_op(
     queue.append(start)
     visited = [start]
 
+    # Control counts to synthesize `<n>C(...)` rules for
+    # Note: in my implementation, single control is always captured proactively
+    # but a multi-controlled instance requires extra info (number of controls).
+    # We can revisit this when porting gates to Operator 2 is complete.
+    ctrl_counts = sorted({1} | ({n_ctrls} if n_ctrls > 1 else set()))
+
     def compile_variants(name, op_id, dynamic_shape, wire_lens, static_data, extra_data):
-        # CQRs/Adjoint: For an op `name` capture the rules for
+        # CQRs (Adjoint/Control): For an op `name` capture the rules for
         #   1. the base op `name`,
-        #   2. the adjoint op `Adjoint(name)` rules, and
-        #   3. the adjoint op synthesized by distributing each base rule over adjoint.
+        #   2. the adjoint op `Adjoint(name)`: registered rules + rules synthesized by
+        #      distributing each base rule over adjoint, and
+        #   3. the controlled op `<n>C(name)` for each control count `n` in `ctrl_counts`:
+        #      registered rules + rules synthesized by distributing each base rule over `n`
+        #      controls.
         # Note: a rule whose body or resources can't be captured is skipped with a warning.
         out = get_rule_strings_from_module(
             compile_decomposition_rules(
@@ -462,6 +504,52 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 out.extend(distributed)
             except Exception as e:  # pylint: disable=broad-except
                 warnings.warn(f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}")
+
+            # Controlled op `<n>C(name)`:
+            for n in ctrl_counts:
+                mod = _control_modifier(n)
+                ctrl_name = f"{mod}({name})"
+                # Rules registered directly against <n>C(name):
+                try:
+                    out.extend(
+                        get_rule_strings_from_module(
+                            compile_decomposition_rules(
+                                ctrl_name,
+                                f"{mod}({op_id})",
+                                dynamic_shape,
+                                wire_lens,
+                                static_data,
+                                extra_data=extra_data,
+                            )
+                        )
+                    )
+                except Exception as e:  # pylint: disable=broad-except
+                    warnings.warn(f"Failed to lower the decomposition rules for {ctrl_name}: {e}")
+                # Rules for <n>C(name) synthesized by controlling each base rule:
+                try:
+                    controlled = get_rule_strings_from_module(
+                        compile_decomposition_rules(
+                            name,
+                            op_id,
+                            dynamic_shape,
+                            wire_lens,
+                            static_data,
+                            extra_data=extra_data,
+                            wrap_control=True,
+                            n_ctrl=n,
+                        )
+                    )
+                    # Suppress a distribution rule whose body is non-controllable (e.g. measure):
+                    controlled = [
+                        rule
+                        for rule in controlled
+                        if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
+                    ]
+                    out.extend(controlled)
+                except Exception as e:  # pylint: disable=broad-except
+                    warnings.warn(
+                        f"Failed to synthesize distributed control rules for {ctrl_name}: {e}"
+                    )
         return out
 
     rules = compile_variants(op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data)
