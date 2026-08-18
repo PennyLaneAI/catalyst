@@ -526,16 +526,7 @@ jobs:
         python3 -m pip install oqc-qcaas-client
         # Install graphviz for testing the mlir-op-graph integration
         sudo apt-get install -y graphviz
-        # Inlines `make frontend` so PennyLaneAI/pennylane#10017 lands between
-        # `pip install -e .` (which pulls PennyLane from PyPI as a transitive dep) and
-        # the precompile step (which imports catalyst.backline, needing pennylane.backline).
-        # TODO(catalyst#3113): restore `make frontend` once PennyLaneAI/pennylane#10017 lands.
-        python3 -m pip uninstall -y pennylane
-        python3 -m pip install -e . --extra-index-url https://test.pypi.org/simple
-        python3 -m pip install --no-deps --force-reinstall \
-          git+https://github.com/PennyLaneAI/pennylane@refs/pull/10017/head
-        python3 -m catalyst.utils.precompile_decomposition_rules
-        rm -r frontend/pennylane_catalyst.egg-info
+        make frontend
 
     - name: Verify Graphviz installation
       run: |
@@ -615,15 +606,7 @@ jobs:
         sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        # Inlines `make frontend` so PennyLaneAI/pennylane#10017 lands between
-        # `pip install -e .` and the precompile step. TODO(catalyst#3113): restore
-        # `make frontend` once PennyLaneAI/pennylane#10017 lands.
-        python3 -m pip uninstall -y pennylane
-        python3 -m pip install -e . --extra-index-url https://test.pypi.org/simple
-        python3 -m pip install --no-deps --force-reinstall \
-          git+https://github.com/PennyLaneAI/pennylane@refs/pull/10017/head
-        python3 -m catalyst.utils.precompile_decomposition_rules
-        rm -r frontend/pennylane_catalyst.egg-info
+        make frontend
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
