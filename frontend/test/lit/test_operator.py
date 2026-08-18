@@ -13,21 +13,32 @@
 # limitations under the License.
 """Tests for operator in Catalyst."""
 
-# pylint: disable = useless-parent-delegation, missing-function-docstring, missing-class-docstring, line-too-long
+# pylint: disable = missing-function-docstring,line-too-long
 
 # RUN: %PYTHON %s | FileCheck %s
 
 import numpy as np
 import pennylane as qp
-
-
-class NoParams(qp.core.Operator2):
-
-    # have to use different wire argnames or will in up CustomOp
-    wire_argnames = ("reg",)
-
-    def __init__(self, reg):
-        super().__init__(reg=reg)
+from operator2_dummy_gates import (
+    CompilableData,
+    GlobalPhase,
+    HybridNoOpArg,
+    HybridOpArg,
+    HybridWires,
+    MultiParams,
+    MultiParamsCustom,
+    MultipleRegisters,
+    MultiRZ,
+    NoParams,
+    NoParamsCustomOp,
+    PauliRot,
+    PCPhase,
+    QubitUnitary,
+    SingleParam,
+    SingleParamCustomOp,
+    SingleParamNoCustomOpBadOrder,
+    StaticData,
+)
 
 
 @qp.qjit(target="mlir", capture=True)
@@ -143,12 +154,6 @@ def c_adjoint_and_controlled():
 print(c_adjoint_and_controlled.mlir)
 
 
-class NoParamsCustomOp(qp.core.Operator2):
-
-    def __init__(self, wires):
-        super().__init__(wires=wires)
-
-
 @qp.qjit(target="mlir", capture=True)
 @qp.qnode(qp.device("null.qubit", wires=2))
 def c_no_params_custom():
@@ -173,15 +178,6 @@ def c_no_params_custom():
 
 
 print(c_no_params_custom.mlir)
-
-
-class SingleParam(qp.core.Operator2):
-
-    dynamic_argnames = ("x",)
-    wire_argnames = ("reg",)
-
-    def __init__(self, x, reg):
-        super().__init__(x, reg=reg)
 
 
 @qp.qjit(target="mlir", capture=True)
@@ -209,14 +205,6 @@ def c_single_param(x: float):
 print(c_single_param.mlir)
 
 
-class SingleParamCustomOp(qp.core.Operator2):
-
-    dynamic_argnames = ("x",)
-
-    def __init__(self, x, wires):
-        super().__init__(x, wires=wires)
-
-
 @qp.qjit(target="mlir", capture=True)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def c_single_param_custom(x: float):
@@ -237,12 +225,28 @@ def c_single_param_custom(x: float):
 print(c_single_param_custom.mlir)
 
 
-class CompilableData(qp.core.Operator2):
+@qp.qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("null.qubit", wires=3))
+def c_single_param_no_custom_bad_order(x: float):
+    # CHECK-LABEL: func.func public @c_single_param_no_custom_bad_order
 
-    compilable_argnames = ("a", "b", "thing")
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.operator "SingleParamNoCustomOpBadOrder"({{%.+}}) qubits([[q0]])
+    # CHECK:    static_data = {}
+    # CHECK:    param_map = {x = [0]} qubit_map = {wires = [0]}
+    SingleParamNoCustomOpBadOrder(x=x, wires=0)
 
-    def __init__(self, a, b, thing, wires):
-        super().__init__(a=a, b=b, thing=thing, wires=wires)
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 2]
+    # CHECK: qref.operator "SingleParamNoCustomOpBadOrder"({{%.+}}) qubits([[q1]], [[q2]])
+    # CHECK:  static_data = {}
+    # CHECK:  param_map = {x = [0]} qubit_map = {wires = [0, 1]}
+    SingleParamNoCustomOpBadOrder((1, 2), 0.5)
+
+    return qp.state()
+
+
+print(c_single_param_no_custom_bad_order.mlir)
 
 
 @qp.qjit(capture=True, target="mlir")
@@ -262,14 +266,6 @@ def c_compilable():
 
 
 print(c_compilable.mlir)
-
-
-class MultipleRegisters(qp.core.Operator2):
-
-    wire_argnames = ("reg1", "reg2")
-
-    def __init__(self, reg1, reg2):
-        super().__init__(reg1=reg1, reg2=reg2)
 
 
 @qp.qjit(capture=True, target="mlir")
@@ -301,16 +297,6 @@ def c_multiple_registers():
 print(c_multiple_registers.mlir)
 
 
-class MultiParams(qp.core.Operator2):
-
-    dynamic_argnames = ("a", "b", "c")
-    wire_argnames = ("reg",)
-
-    # note also having non-standard order with dynamic inputs after wires
-    def __init__(self, reg, a, b, c):
-        super().__init__(reg, a, b, c)
-
-
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=1))
 def c_multi_params():
@@ -329,15 +315,6 @@ def c_multi_params():
 print(c_multi_params.mlir)
 
 
-class MultiParamsCustom(qp.core.Operator2):
-
-    dynamic_argnames = ("a", "b", "c")
-
-    # note also having non-standard order with dynamic inputs after wires
-    def __init__(self, wires, a, b, c):
-        super().__init__(wires, a, b, c)
-
-
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=1))
 def c_multi_param_custom():
@@ -346,19 +323,11 @@ def c_multi_param_custom():
 
     # pylint: disable=line-too-long
     # CHECK: qref.custom "MultiParamsCustom"({{%.+}}, {{%.+}}, {{%.+}}) [[q0]] : !qref.bit
-    MultiParamsCustom(0, 0.5, c=0.7, b=2.4)
+    MultiParamsCustom(0.5, c=0.7, b=2.4, wires=0)
     return qp.state()
 
 
 print(c_multi_param_custom.mlir)
-
-
-class MultiRZ(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-
-    def __init__(self, phi, wires):
-        super().__init__(phi, wires)
 
 
 @qp.qjit(capture=True, target="mlir")
@@ -387,15 +356,6 @@ def circuit_multirz(x: float):
 
 
 print(circuit_multirz.mlir)
-
-
-class PauliRot(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-    compilable_argnames = ("pauli_word",)
-
-    def __init__(self, phi, pauli_word, wires):
-        super().__init__(phi, pauli_word, wires)
 
 
 @qp.qjit(capture=True, target="mlir")
@@ -432,15 +392,6 @@ def circuit_paulirot(x: float):
 print(circuit_paulirot.mlir)
 
 
-class GlobalPhase(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-    wire_argnames = ()
-
-    def __init__(self, phi):
-        super().__init__(phi=phi)
-
-
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def circuit_gphase(x: float):
@@ -457,14 +408,6 @@ def circuit_gphase(x: float):
 
 
 print(circuit_gphase.mlir)
-
-
-class QubitUnitary(qp.core.Operator2):
-
-    dynamic_argnames = ("matrix",)
-
-    def __init__(self, matrix, wires):
-        super().__init__(matrix, wires)
 
 
 @qp.qjit(capture=True, target="mlir")
@@ -497,15 +440,6 @@ def circuit_qubitunitary():
 print(circuit_qubitunitary.mlir)
 
 
-class PCPhase(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-    compilable_argnames = ("dim",)
-
-    def __init__(self, phi, dim, wires):
-        super().__init__(phi, dim, wires)
-
-
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def c_pcphase(x: float):
@@ -534,15 +468,6 @@ def c_pcphase(x: float):
 print(c_pcphase.mlir)
 
 
-class StaticData(qp.core.Operator2):
-
-    static_argnames = ("label",)
-    wire_argnames = ("reg",)
-
-    def __init__(self, label, reg):
-        super().__init__(label=label, reg=reg)
-
-
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=1))
 def c_static_data():
@@ -558,15 +483,6 @@ def c_static_data():
 
 
 print(c_static_data.mlir)
-
-
-class HybridWires(qp.core.Operator2):
-
-    hybrid_argnames = ("cwires",)
-    wire_argnames = ("cwires",)
-
-    def __init__(self, cwires):
-        super().__init__(cwires=cwires)
 
 
 @qp.qjit(capture=True, target="mlir")
@@ -589,14 +505,6 @@ def c_hybrid_wires():
 
 
 print(c_hybrid_wires.mlir)
-
-
-class HybridNoOpArg(qp.core.Operator2):
-
-    hybrid_argnames = ("angles",)
-
-    def __init__(self, angles, wires):
-        super().__init__(angles, wires)
 
 
 @qp.qjit(capture=True, target="mlir")
@@ -626,17 +534,6 @@ def c_hybrid_arg_not_op():
 
 
 print(c_hybrid_arg_not_op.mlir)
-
-
-class HybridOpArg(qp.core.Operator2):
-
-    dynamic_argnames = ("angle",)
-    hybrid_argnames = ("op",)
-    wire_argnames = ("cwires",)
-    static_argnames = ("n_iters",)
-
-    def __init__(self, angle, op, cwires, n_iters=1):
-        super().__init__(angle, op, cwires, n_iters)
 
 
 @qp.qjit(capture=True, target="mlir")

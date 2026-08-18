@@ -122,7 +122,7 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
-	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
+	$(PYTHON) -m catalyst.decomposition.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm stablehlo enzyme dialects runtime oqc builtin-decomp-rules
@@ -142,7 +142,7 @@ dialects:
 	$(MAKE) -C mlir dialects
 
 builtin-decomp-rules: dialects runtime frontend
-	$(PYTHON) -m frontend.catalyst.utils.precompile_decomposition_rules
+	$(PYTHON) -m frontend.catalyst.decomposition.precompile_decomposition_rules
 
 
 .PHONY: dialect-docs
@@ -265,7 +265,7 @@ wheel:
 	$(PYTHON) -m pip wheel --no-deps . -w bootstrap_dist
 	$(PYTHON) -m pip install bootstrap_dist/*.whl --extra-index-url https://test.pypi.org/simple
 
-	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
+	$(PYTHON) -m catalyst.decomposition.precompile_decomposition_rules
 
 	mkdir -p $(MK_DIR)/frontend/catalyst/resources
 	cp $$($(PYTHON) -c 'from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH; print(BYTECODE_FILE_PATH)') $(MK_DIR)/frontend/catalyst/resources/
