@@ -77,8 +77,7 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
             return emitError() << "null coprocessor";
         }
         // A 'peer' is the address of the out-of-band handshake, which only rdma performs.
-        if (transport.getValue() == "rdma" &&
-            (!c.getPeer() || c.getPeer().getValue().empty())) {
+        if (transport.getValue() == "rdma" && (!c.getPeer() || c.getPeer().getValue().empty())) {
             return emitError() << "coprocessor requires a 'peer' under the 'rdma' transport";
         }
         if (!c.getSymbol() || c.getSymbol().getValue().empty()) {

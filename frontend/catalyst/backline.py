@@ -317,8 +317,9 @@ def _executor_plugins(node: Node, given) -> list[str]:
     )
 
     remote = bool(node.remote)
-    plugins = [lib for lib in _EXECUTOR_RUNTIME_PLUGINS
-               if not any(Path(p).name == lib for p in given)]
+    plugins = [
+        lib for lib in _EXECUTOR_RUNTIME_PLUGINS if not any(Path(p).name == lib for p in given)
+    ]
     plugins += list(given)
     implied = []
     fn_lib = _coprocessor_fn_lib(node)
