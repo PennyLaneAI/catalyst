@@ -71,7 +71,7 @@ def _coproc(name, oob_port=18590, fn="coproc_fn", **kw):
         kw.setdefault("executor", SimpleNamespace(address=None, triple=None))
     kw.setdefault("init_args", {"backend_lib": "backend.so", "config": "cfg"})
     return qp.Coprocessor(
-        name=name, comm_host="127.0.0.1", oob_port=oob_port, coprocessor_fn=fn, **kw
+        name=name, endpoint=qp.Endpoint("127.0.0.1", oob_port), coprocessor_fn=fn, **kw
     )
 
 
@@ -374,7 +374,7 @@ def test_remote_controller_behind_a_wrapper_is_still_tagged(use_capture):
     """A remote controller called through a wrapper still gets its module tagged by role."""
     ctrl = qp.Controller(
         device=qp.device("null.qubit", wires=2),
-        label="ctrl",
+        name="ctrl",
         remote=True,
         executor_options={"address": "ctrl:1"},
         init_args={"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"},
@@ -479,7 +479,7 @@ class TestBackendResolution:
     """Transport and node hardware select a Catalyst backend library."""
 
     @pytest.mark.parametrize(
-        ("transport", "hardware", "backend"),
+        ("transport", "hardware", "expected"),
         [
             ("rdma", "cpu", "cpu_verbs"),
             ("rdma", "gpu", "gpu_verbs"),
@@ -488,9 +488,9 @@ class TestBackendResolution:
             ("memcpy", "gpu", "memcpy_gpu"),
         ],
     )
-    def test_transport_and_hardware_select_backend(self, transport, hardware, backend):
+    def test_transport_and_hardware_select_backend(self, transport, hardware, expected):
         """Concrete backend names remain a Catalyst implementation detail."""
-        assert _resolve_backend(transport, hardware) == backend
+        assert _resolve_backend(transport, hardware) == expected
 
     def test_unsupported_transport_hardware_pair_is_rejected(self):
         """A transport must have an implementation for the requested hardware."""
@@ -608,7 +608,7 @@ class TestBackendResolution:
         )
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            name="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", hardware="gpu"
+            name="cop0", endpoint=qp.Endpoint("127.0.0.1"), coprocessor_fn="coproc_fn", hardware="gpu"
         )
         d = serialize_backline(
             qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma").placement
@@ -624,7 +624,7 @@ class TestBackendResolution:
         )
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            name="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", hardware="cpu"
+            name="cop0", endpoint=qp.Endpoint("127.0.0.1"), coprocessor_fn="coproc_fn", hardware="cpu"
         )
         d = serialize_backline(
             qp.Backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
@@ -641,7 +641,7 @@ class TestBackendResolution:
         )
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            name="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", hardware="gpu"
+            name="cop0", endpoint=qp.Endpoint("127.0.0.1"), coprocessor_fn="coproc_fn", hardware="gpu"
         )
         d = serialize_backline(
             qp.Backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
@@ -672,7 +672,7 @@ class TestBackendResolution:
 
     def test_no_backend_leaves_backend_lib_unset(self, no_launch):
         """Omitting ``backend`` leaves the field to ``init_args`` or the compiler default."""
-        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl")
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl")
         d = serialize_backline(qp.Backline(controller=ctrl, transport="net").placement)
         assert "backend_lib" not in d["controller"]
 

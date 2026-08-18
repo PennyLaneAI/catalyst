@@ -67,6 +67,10 @@ _BACKEND_PATH_ENV = "CATALYST_TRANSPORT_PATH"
 _BACKEND_SUBDIR = "transport"
 _BACKEND_LIB_EXTS = ("so", "dylib")
 
+# Every dispatched node needs these in its executor: the compiled program calls
+# ``__catalyst__transport__*`` and ``__catalyst__rt__*`` directly.
+_EXECUTOR_RUNTIME_PLUGINS = ("librt_transport.so", "librt_capi.so")
+
 
 def _resolve_backend(transport: str, hardware: str) -> str:
     """Return Catalyst's concrete backend for a transport and hardware pair."""
@@ -305,15 +309,17 @@ def _coprocessor_fn_lib(node: Node) -> Path | None:
 
 
 def _executor_plugins(node: Node, given) -> list[str]:
-    """The plugins an executor needs: those ``given``, then a coprocessor's decode function and a
-    controller's device runtime, each appended only if not already listed."""
+    """The plugins an executor needs: the runtime libraries, those ``given``, then a coprocessor's
+    decode function and a controller's device runtime, each appended only if not already listed."""
     # Deferred: qjit_device imports the device stack, which imports this module.
     from catalyst.device.qjit_device import (  # pylint: disable=import-outside-toplevel
         extract_backend_info,
     )
 
     remote = bool(node.remote)
-    plugins = list(given)
+    plugins = [lib for lib in _EXECUTOR_RUNTIME_PLUGINS
+               if not any(Path(p).name == lib for p in given)]
+    plugins += list(given)
     implied = []
     fn_lib = _coprocessor_fn_lib(node)
     if fn_lib is not None:
