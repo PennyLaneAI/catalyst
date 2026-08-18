@@ -34,6 +34,7 @@ from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 # pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
+    SetBasisStateOp,
     extract_scalar,
     safe_cast_to_f64,
 )
@@ -231,7 +232,11 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
         return _SPECIAL_LOWERINGS[op_cls.__name__](
-            *args, ctrl_qubits=ctrl_qubits, ctrl_values=ctrl_values, adjoint=adjoint, **kwargs
+            *args,
+            ctrl_qubits=ctrl_qubits,
+            ctrl_values=ctrl_values,
+            adjoint=adjoint,
+            **kwargs,
         )
 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
@@ -368,6 +373,12 @@ def _special_gphase_lowering(angle, *_, ctrl_qubits, ctrl_values, adjoint):
         ctrl_values=ctrl_values,
         adjoint=adjoint,
     )
+    return ()
+
+
+@_register_special_lowering("BasisState")
+def _special_gphase_lowering(state, *qubits, ctrl_qubits, ctrl_values, adjoint):
+    SetBasisStateOp(state, qubit)
     return ()
 
 
