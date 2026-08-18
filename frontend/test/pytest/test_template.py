@@ -81,7 +81,7 @@ def test_basis_embedding(backend):
     """Test basis embedding."""
 
     def basis_embedding(f: jax.core.ShapedArray([3], int)):
-        qp.BasisEmbedding(features=f, wires=[0, 1, 2])
+        qp.BasisEmbedding(f, wires=[0, 1, 2])
         return qp.state()
 
     device = qp.device(backend, wires=3)
@@ -1015,6 +1015,9 @@ def test_mod_exp(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(
+    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
+)
 def test_multiplier(backend):
     """Test Multiplier."""
     x = 3
@@ -1036,6 +1039,9 @@ def test_multiplier(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(
+    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
+)
 def test_out_adder(backend):
     """Test OutAdder."""
     mod = 7
@@ -1060,6 +1066,9 @@ def test_out_adder(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(
+    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
+)
 def test_out_multiplier(backend):
     """Test OutMultiplier."""
     mod = 12

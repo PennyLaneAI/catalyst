@@ -2,6 +2,15 @@
 
 <h3>New features since last release</h3>
 
+* A new `quantum.ctrl` region op and a `ctrl-lowering` pass are added to the Quantum Dialect
+  for controlled subcircuits in Catalyst.
+  Programs can now express an entire controlled quantum region, as opposed to individual
+  operations. The `ctrl-lowering` pass distributes the control wires and control values from
+  the `quantum.ctrl` operation onto the individual gate operations inside the region.
+  [(#3089)](https://github.com/PennyLaneAI/catalyst/pull/3089)
+  [(#3090)](https://github.com/PennyLaneAI/catalyst/pull/3090)
+  [(#3096)](https://github.com/PennyLaneAI/catalyst/pull/3096)
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
@@ -11,6 +20,13 @@
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
+
+* A failure during AOT compilation is now downgraded to a warning and logged.
+  [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
+
+* Adds the ability to use `pennylane.typing.AbstractArray` and `pennylane.wires.AbstractWires` as type hints for
+  AOT compilation and as arguments to `pennylane.specs` calculations.
+  [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
 
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
@@ -90,6 +106,12 @@
   - The `catalyst-executor` server side is now added to Catalyst that receives objects, maps them
     and calls them.
     [(#3088)](https://github.com/PennyLaneAI/catalyst/pull/3088)
+
+  - A `catalyst.Executor` is added for deploying and managing the `catalyst-executor` process that
+    cross-compiled objects are dispatched to.
+    [(#3082)](https://github.com/PennyLaneAI/catalyst/pull/3082)
+    [(#3119)](https://github.com/PennyLaneAI/catalyst/pull/3119)
+
 
 * A `BufferizableOpInterface` implementation is now added for `catalyst.launch_kernel` operation and it is now bufferizable.
   [(#3024)](https://github.com/PennyLaneAI/catalyst/pull/3024)
@@ -332,6 +354,18 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
+  making every remote operation pay a fresh authentication handshake. The control socket went in
+  the system temp dir, which macOS puts under a per-user `/var/folders/...` path long enough to
+  overrun the 104-byte `sun_path` limit on its own. Sockets now live in `~/.catalyst/cm`, created
+  `0700`, which is both short enough and reachable only by its owner. Where no such directory can
+  be made, multiplexing is skipped rather than falling back to a world-writable one.
+  [(#3110)](https://github.com/PennyLaneAI/catalyst/pull/3110)
+
+* Fixed a bug where `Operator2` operations with integer-valued scalar parameters were incorrectly
+  lowered to `qref.operator` instead of `qref.custom`.
+  [(#3109)](https://github.com/PennyLaneAI/catalyst/pull/3109)
+
 * Fixed a bug where the `ResourceAnalysis` pass only analyzed functions directly contained in
   the top-level module. Functions inside nested modules, such as kernels called through
   `catalyst.launch_kernel`, are now included in the output.
@@ -388,6 +422,16 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `--to-ppr` pass now runs `--symbol-dce` at the beginning, to eliminate unnecessary
+  decomposition rules that might contain gates that cannot be converted to PPRs.
+  [(#3125)](https://github.com/PennyLaneAI/catalyst/pull/3125)
+
+* Extended internal program-capture support for PennyLane `Operator2` instances. Catalyst now
+  distinguishes gates from operators used as observables.
+  Native `Operator2` controlled wrappers are also handled in `catalyst.ctrl` and
+  device verification.
+  [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
+
 * The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
   (previously a dynamic float operand). This allows, among other things, the decomposition graph to
   distinguish pcphase gates with different `dim` values, since they need different decomposition rules.
@@ -400,10 +444,11 @@
 * Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
   This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
   This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
-  The graph solver now supports the new `graphOpId`s provided by the interface, as well as the legacy pathway with `name`, `numWires` etc.
+  The graph solver now matches operators solely by `graphOpId`; the legacy `name`/`numWires` matching pathway has been removed.
   [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
   [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
   [(#3039)](https://github.com/PennyLaneAI/catalyst/pull/3039)
+  [(#3046)](https://github.com/PennyLaneAI/catalyst/pull/3046)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly

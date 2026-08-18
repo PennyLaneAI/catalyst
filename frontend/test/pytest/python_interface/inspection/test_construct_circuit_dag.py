@@ -614,7 +614,6 @@ class TestIfOp:
     def test_nested_conditionals_with_quantum_ops(self, capture_mode):
         """Tests that nested conditionals are unflattend if quantum operations
         are present"""
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -683,7 +682,6 @@ class TestIfOp:
     def test_nested_conditionals_with_nested_quantum_ops(self, capture_mode):
         """Tests that nested conditionals are unflattend if quantum operations
         are present but nested in other operations"""
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1302,6 +1300,11 @@ class TestCreateDynamicOperatorNodes:
 
     def test_visualize_pythonic_operators(self, capture_mode):
         """Tests that we can use operators like +,-,%"""
+        pytest.xfail(
+            "sc-127303: DAG reconstruction passes symbolic xDSL parameters as strings to typed "
+            "Operator2 gate constructors, which reject string-valued angles"
+        )
+
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1702,7 +1705,6 @@ class TestOperatorConnectivity:
 
     def test_static_connection_through_conditional(self, capture_mode):
         """Tests that connections through conditionals make sense."""
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1744,7 +1746,6 @@ class TestOperatorConnectivity:
 
     def test_static_connection_through_nested_conditional(self, capture_mode):
         """Tests that connections through nested conditionals make sense."""
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
