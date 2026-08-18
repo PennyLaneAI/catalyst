@@ -422,6 +422,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `--to-ppr` pass now runs `--symbol-dce` at the beginning, to eliminate unnecessary
+  decomposition rules that might contain gates that cannot be converted to PPRs.
+  [(#3125)](https://github.com/PennyLaneAI/catalyst/pull/3125)
+
 * Extended internal program-capture support for PennyLane `Operator2` instances. Catalyst now
   distinguishes gates from operators used as observables.
   Native `Operator2` controlled wrappers are also handled in `catalyst.ctrl` and
@@ -440,10 +444,11 @@
 * Add the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
   This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
   This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
-  The graph solver now supports the new `graphOpId`s provided by the interface, as well as the legacy pathway with `name`, `numWires` etc.
+  The graph solver now matches operators solely by `graphOpId`; the legacy `name`/`numWires` matching pathway has been removed.
   [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
   [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
   [(#3039)](https://github.com/PennyLaneAI/catalyst/pull/3039)
+  [(#3046)](https://github.com/PennyLaneAI/catalyst/pull/3046)
 
 * The `graph-decomposition` pass eliminates three redundant IR manipulations:
   the cloning, removal, and re-insertion of user rules. This optimization is particularly
