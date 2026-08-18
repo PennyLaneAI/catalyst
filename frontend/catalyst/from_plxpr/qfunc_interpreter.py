@@ -40,6 +40,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
     qref_alloc_p,
     qref_compbasis_p,
+    qref_ctrl_p,
     qref_dealloc_p,
     qref_get_p,
     qref_gphase_p,
@@ -716,18 +717,42 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
     return result
 
 
+def _ctrl_region_kernel(interpreter, jaxpr, n_consts, global_qreg, *consts_and_args):
+    """Re-interpret a control-region body (plxpr) into reference-semantics primitives.
+    """
+    converter = copy(interpreter)
+    converter.init_qreg = global_qreg
+    converter.eval(jaxpr, consts_and_args[:n_consts], *consts_and_args[n_consts:])
+    return ()
+
+
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
 def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
-    """Interpret a control transform primitive."""
+    """Lower a control transform to a `qref.ctrl` region op.
+    """
     consts = invals[:n_consts]
     args = invals[n_consts:-n_control]
     control_wires = invals[-n_control:]
 
-    unroller = copy(self)
-    unroller.control_wires += tuple(control_wires)
-    unroller.control_values += tuple(control_values)
-    unroller.eval(jaxpr, consts, *args)
+    control_qubits = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
+    ]
+
+    converted = jax.make_jaxpr(partial(_ctrl_region_kernel, self, jaxpr, n_consts))(
+        self.init_qreg, *consts, *args
+    )
+
+    qref_ctrl_p.bind(
+        self.init_qreg,
+        *control_qubits,
+        *consts,
+        *args,
+        body=converted,
+        n_control=len(control_qubits),
+        n_consts=n_consts,
+        control_values=tuple(bool(v) for v in control_values),
+    )
     return []
 
 
