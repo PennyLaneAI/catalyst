@@ -24,6 +24,7 @@ import pytest
 from catalyst.executor.manager import (
     Executor,
     ExecutorConfig,
+    _Mode,
     _SessionRegistry,
     _sessions,
     _start_on_free_port,
@@ -53,14 +54,14 @@ class TestExecutorConstruction:
         """Attach-only mode (an address, no host) — inert state and default name."""
         ex = Executor("1.2.3.4:5")
         assert ex.host is None
-        assert ex._local is False
+        assert ex._mode is _Mode.ATTACHED
         assert ex.name == "executor"
         assert not ex._launched
 
     def test_subprocess_mode_is_inferred(self):
         """Naming neither a host nor an address leaves the subprocess mode."""
         ex = Executor()
-        assert ex._local is True
+        assert ex._mode is _Mode.LOCAL
 
     def test_host_mode_stored(self):
         """``host`` and ``user`` land on ``.host`` and the config."""
@@ -85,7 +86,7 @@ class TestModeSelection:
         """An address attaches, a host ssh's, and neither spawns a subprocess."""
         assert Executor("1.2.3.4:5").launch()._launched
         assert Executor(host="h").host == "h"
-        assert Executor()._local is True  # launch() would spawn; the mode itself is enough
+        assert Executor()._mode is _Mode.LOCAL  # launch() would spawn; the mode is enough
 
 
 class TestExecutorAddress:
