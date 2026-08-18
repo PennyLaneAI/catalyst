@@ -490,10 +490,12 @@ catalyst::driver::runLowering(const CompilerOptions &options, MLIRContext *ctx, 
             case SaveTemps::None:
                 break;
             }
-            targetPipeline.setPasses({"cross-compile-targets{workspace=\"" +
-                                          options.workspace.str() +
-                                          "\" save-ir-after-each=" + saveIrAfterEach + "}",
-                                      "dispatch-executor-targets"});
+            std::string opts = "workspace=\"" + options.workspace.str() + "\"";
+            if (!saveIrAfterEach.empty()) {
+                opts += " save-ir-after-each=" + saveIrAfterEach;
+            }
+            targetPipeline.setPasses(
+                {"cross-compile-targets{" + opts + "}", "dispatch-executor-targets"});
             if (failed(catalyst::utils::Timer<>::timer(
                     catalyst::driver::runPipeline, targetPipeline.getName(),
                     /* add_endl */ false, pm, options, output, targetPipeline,

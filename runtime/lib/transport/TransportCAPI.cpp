@@ -108,7 +108,7 @@ const char *collect_error_name(int rc) {
     case CATALYST_TRANSPORT_ERR_TIMEOUT:
         return "timeout";
     case CATALYST_TRANSPORT_ERR_STUCK:
-        return "stuck — no reply before the deadline";
+        return "stuck - no reply before the deadline";
     default:
         return "error";
     }
