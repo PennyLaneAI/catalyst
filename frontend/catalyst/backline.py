@@ -108,7 +108,7 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
 
 def _out_of_process(node: Node) -> bool:
     """Whether the node's code is dispatched to an executor rather than run in this process."""
-    return node.executor_options is not None or node.executor
+    return node.executor_options is not None or node.executor is not None
 
 
 def _node_dict(node: Node, role: str) -> dict:
@@ -122,7 +122,7 @@ def _node_dict(node: Node, role: str) -> dict:
         role: The node's role, used to resolve its ``backend`` to a library. An explicit
             ``init_args["backend_lib"]`` path takes precedence over ``backend``.
     """
-    d: dict = {"remote": bool(_out_of_process(node))}
+    d: dict = {"remote": _out_of_process(node)}
     if node.label is not None:
         d["name"] = node.label
     comm_host = getattr(node, "comm_host", None)
