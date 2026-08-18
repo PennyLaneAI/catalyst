@@ -167,7 +167,7 @@ def test_unlaunched_executor_names_the_node_it_came_from():
     from catalyst import Executor  # pylint: disable=import-outside-toplevel
 
     ctrl = _controller(executor=Executor(host="10.0.0.9", user="me"))
-    dev = qp.Backline(controller=ctrl, transport="net")
+    dev = qp.Backline(controller=ctrl, transport="rdma")
     with pytest.raises(CompileError, match="cannot say where it serves.*not launched"):
         serialize_backline(dev.placement)
 
@@ -175,7 +175,7 @@ def test_unlaunched_executor_names_the_node_it_came_from():
 def test_unrecognized_init_args_are_rejected():
     """An init_args key the attribute has no parameter for fails here, naming the ones it does."""
     ctrl = _controller(init_args={"config": "cfg", "in_byte": 8})
-    dev = qp.Backline(controller=ctrl, transport="net")
+    dev = qp.Backline(controller=ctrl, transport="rdma")
     with pytest.raises(CompileError, match=r"unrecognized init_args \['in_byte'\]"):
         serialize_backline(dev.placement)
 
@@ -227,12 +227,12 @@ def test_transport_passes_are_placed_in_each_stage():
 def test_device_pass_pipeline_is_empty_for_a_device_that_needs_nothing():
     """A device that declares no encoding contributes no passes."""
     assert device_pass_pipeline(qp.device("null.qubit", wires=2)) == ()
-    assert device_pass_pipeline(qp.Backline(controller=_controller(), transport="net")) == ()
+    assert device_pass_pipeline(qp.Backline(controller=_controller(), transport="rdma")) == ()
 
 
 def test_device_pass_pipeline_requests_the_encoding_chain():
     """A placement naming a code asks for the whole chain, in application order."""
-    dev = qp.Backline(controller=_controller(), transport="net", qec_code="steane")
+    dev = qp.Backline(controller=_controller(), transport="rdma", qec_code="steane")
     assert [t.pass_name for t in device_pass_pipeline(dev)] == [
         name for name, _ in _qec_pass_specs("steane")
     ]
@@ -243,7 +243,7 @@ def test_device_pass_pipeline_requests_the_encoding_chain():
 )
 def test_placement_pipeline_returns_the_stages(qec_code, wants_qec):
     """``configure`` adds the transport passes always and the QEC lowering only when asked."""
-    dev = qp.Backline(controller=_controller(), transport="net", qec_code=qec_code)
+    dev = qp.Backline(controller=_controller(), transport="rdma", qec_code=qec_code)
     # Both reference passes are present, since each insertion anchors to one of them.
     stages = placement_pipeline(
         dev.placement,
@@ -300,8 +300,6 @@ def test_placement_behind_a_wrapper_is_found(use_capture):
     """A placement reaches the module even when qjit was applied to a wrapper, not the QNode.
     The transport passes locate it by role rather than by matching a triple or address, which now
     come only from the node's executor."""
-    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
-
     ctrl = qp.Controller(
         device=qp.device("null.qubit", wires=2),
         name="ctrl",
@@ -352,7 +350,7 @@ def test_qec_encoding_reaches_a_qnode_behind_a_wrapper(use_capture):
     dev = qp.Backline(
         controller=_controller(),
         coprocessors=[_coproc("cop0")],
-        transport="net",
+        transport="rdma",
         qec_code="steane",
     )
 
@@ -379,7 +377,7 @@ def test_remote_controller_behind_a_wrapper_is_still_tagged(use_capture):
         executor_options={"address": "ctrl:1"},
         init_args={"backend_lib": "backend.so", "config": "cfg"},
     )
-    dev = qp.Backline(controller=ctrl, transport="net")
+    dev = qp.Backline(controller=ctrl, transport="rdma")
 
     @qp.qnode(dev)
     def circuit():
@@ -395,7 +393,7 @@ def test_remote_controller_behind_a_wrapper_is_still_tagged(use_capture):
 
 def test_two_qnodes_over_one_placement_are_accepted(use_capture):
     """Two QNodes sharing a device carry one placement between them, not one each."""
-    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
 
     @qp.qnode(dev)
     def circuit_a():
@@ -418,8 +416,8 @@ def test_two_qnodes_over_one_placement_are_accepted(use_capture):
 
 def test_two_placements_in_one_program_are_rejected(use_capture):
     """A compiled program carries one placement, so two distinct ones cannot be expressed."""
-    dev_a = qp.Backline(controller=_controller(), transport="net")
-    dev_b = qp.Backline(controller=_controller(), transport="net")
+    dev_a = qp.Backline(controller=_controller(), transport="rdma")
+    dev_b = qp.Backline(controller=_controller(), transport="rdma")
 
     @qp.qnode(dev_a)
     def circuit_a():
@@ -608,7 +606,10 @@ class TestBackendResolution:
         )
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            name="cop0", endpoint=qp.Endpoint("127.0.0.1"), coprocessor_fn="coproc_fn", hardware="gpu"
+            name="cop0",
+            endpoint=qp.Endpoint("127.0.0.1"),
+            coprocessor_fn="coproc_fn",
+            hardware="gpu",
         )
         d = serialize_backline(
             qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma").placement
@@ -624,7 +625,10 @@ class TestBackendResolution:
         )
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            name="cop0", endpoint=qp.Endpoint("127.0.0.1"), coprocessor_fn="coproc_fn", hardware="cpu"
+            name="cop0",
+            endpoint=qp.Endpoint("127.0.0.1"),
+            coprocessor_fn="coproc_fn",
+            hardware="cpu",
         )
         d = serialize_backline(
             qp.Backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
@@ -641,7 +645,10 @@ class TestBackendResolution:
         )
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            name="cop0", endpoint=qp.Endpoint("127.0.0.1"), coprocessor_fn="coproc_fn", hardware="gpu"
+            name="cop0",
+            endpoint=qp.Endpoint("127.0.0.1"),
+            coprocessor_fn="coproc_fn",
+            hardware="gpu",
         )
         d = serialize_backline(
             qp.Backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
@@ -673,7 +680,7 @@ class TestBackendResolution:
     def test_no_backend_leaves_backend_lib_unset(self, no_launch):
         """Omitting ``backend`` leaves the field to ``init_args`` or the compiler default."""
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl")
-        d = serialize_backline(qp.Backline(controller=ctrl, transport="net").placement)
+        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
         assert "backend_lib" not in d["controller"]
 
 
@@ -861,7 +868,7 @@ class TestExecutorRealization:
         """``launch_executors`` covers the controller and each coprocessor."""
         ctrl = _controller(executor_options={"address": "ctrl:1"})
         cop = _coproc("cop0", executor_options={"address": "cop:2"})
-        dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="net")
+        dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma")
         launch_executors(dev.placement)
         assert ctrl.executor.address == "ctrl:1"
         assert cop.executor.address == "cop:2"
