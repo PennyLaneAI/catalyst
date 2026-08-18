@@ -28,7 +28,6 @@ from catalyst.backline import (
     _insert_passes,
     _qec_pass_specs,
     _realize_executor,
-    _required_plugins,
     _resolve_backend_lib,
     device_pass_pipeline,
     launch_executors,
@@ -159,7 +158,7 @@ def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
     loaded = []
     monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
     dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
-    realize_executors(dev.placement)
+    launch_executors(dev.placement)
     assert loaded == []
 
 
@@ -848,52 +847,6 @@ class TestExecutorRealization:
         node = _controller(executor=ex, executor_options={"address": "ignored:2"})
         assert _realize_executor(node) is ex
 
-    def test_required_plugins_follow_node_role(self, monkeypatch):
-        """Runtime, device, and coprocessor-function plugins are inferred from the placement."""
-        monkeypatch.setattr("catalyst.backline._controller_plugin", lambda _node: "libdevice.so")
-        assert _required_plugins(_controller(), "controller") == [
-            "librt_transport.so",
-            "librt_capi.so",
-            "libdevice.so",
-        ]
-
-        fn = qp.CoprocessorFunction("decode_fn", lib_path="/opt/libdecode.so")
-        assert _required_plugins(_coproc("cop0", fn=fn), "coprocessor") == [
-            "librt_transport.so",
-            "librt_capi.so",
-            "libdecode.so",
-        ]
-
-    def test_inferred_plugins_extend_executor_options(self, monkeypatch):
-        """Inferred plugins are added without replacing explicit user plugins."""
-        captured = {}
-        launched = SimpleNamespace(address="launched:1", triple="x86_64")
-        monkeypatch.setattr(
-            "catalyst.backline._required_plugins",
-            lambda _node, _role: ["librt_transport.so", "librt_capi.so"],
-        )
-        monkeypatch.setattr(
-            "catalyst.backline._launch_executor",
-            lambda _name, options: captured.update(options) or launched,
-        )
-        node = _controller(executor_options={"host": "controller", "plugins": ["libcustom.so"]})
-
-        assert _realize_executor(node, "controller") is launched
-        assert captured["plugins"] == [
-            "libcustom.so",
-            "librt_transport.so",
-            "librt_capi.so",
-        ]
-
-    def test_realize_executors_walks_every_node(self):
-        """``realize_executors`` covers the controller and each coprocessor."""
-        ctrl = _controller(executor_options={"address": "ctrl:1"})
-        cop = _coproc("cop0", executor_options={"address": "cop:2"})
-        dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma")
-        realize_executors(dev.placement)
-        assert ctrl.executor.address == "ctrl:1"
-        assert cop.executor.address == "cop:2"
-
     def test_an_executor_missing_the_shape_is_rejected(self):
         """An object that cannot say where it serves, or be launched, is refused while compiling."""
 
@@ -919,7 +872,7 @@ class TestExecutorRealization:
             executor_options={"address": "10.0.0.9:1373", "triple": "aarch64-unknown-linux-gnu"},
         )
         dev = qp.Backline(controller=ctrl, transport="rdma")
-        realize_executors(dev.placement)
+        launch_executors(dev.placement)
         node = serialize_backline(dev.placement)["controller"]
         assert node["address"] == "10.0.0.9:1373"
         assert node["triple"] == "aarch64-unknown-linux-gnu"

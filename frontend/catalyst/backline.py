@@ -38,7 +38,6 @@ from jax.interpreters.mlir import ir
 from pennylane.backline import Node, Placement
 from pennylane.devices import Device
 
-from catalyst.device.qjit_device import extract_backend_info
 from catalyst.executor import Executor
 from catalyst.pipelines import insert_pass_before
 from catalyst.utils.exceptions import CompileError
@@ -67,9 +66,6 @@ _BACKENDS = {
 _BACKEND_PATH_ENV = "CATALYST_TRANSPORT_PATH"
 _BACKEND_SUBDIR = "transport"
 _BACKEND_LIB_EXTS = ("so", "dylib")
-_EXECUTOR_RUNTIME_PLUGINS = ("librt_transport.so", "librt_capi.so")
-
-
 def _backend_for(transport: str, hardware: str) -> str:
     """Return Catalyst's concrete backend for a transport and hardware pair."""
     try:
@@ -210,59 +206,6 @@ def _load_coprocessor_fn_libs(placement: Placement) -> None:
             ctypes.CDLL(str(lib_path), mode=ctypes.RTLD_GLOBAL)
 
 
-def _controller_plugin(node) -> str | None:
-    """Return the controller device library that its executor must preload."""
-    backend = extract_backend_info(node.device)
-    return Path(backend.lpath).name if backend.lpath else None
-
-
-def _required_plugins(node, role: str) -> list[str]:
-    """Return plugins inferred from a backline node's role and function."""
-    plugins = list(_EXECUTOR_RUNTIME_PLUGINS)
-    if role == "controller":
-        if device_plugin := _controller_plugin(node):
-            plugins.append(device_plugin)
-    elif lib_path := getattr(node.coprocessor_fn, "lib_path", None):
-        plugins.append(Path(lib_path).name)
-    return plugins
-
-
-def realize_executors(placement) -> None:
-    """Prepare ``placement`` for execution: launch the executors it asked for, and load the
-    CoprocessorFn libraries its in-process coprocessors need. Idempotent."""
-    _realize_executor(placement.controller)
-    for coproc in placement.coprocessors:
-        _realize_executor(coproc)
-    _load_coprocessor_fn_libs(placement)
-
-
-def add_transport_passes(stages):
-    """Insert transport passes into ``stages`` at the stages where their inputs exist.
-
-    Applies to any base pipeline (e.g. ``default_pipeline()`` or a QEC one), so backline stays
-    independent of the base.
-    """
-    from catalyst.pipelines import insert_pass_before
-
-    for name, passes in stages:
-        if name == "QuantumCompilationStage":
-            passes.append("inject-transport-session")
-        elif name == "BufferizationStage":
-            passes.append("lower-decode-to-transport")
-        elif name == "MLIRToLLVMDialectConversion":
-            insert_pass_before(
-                passes, ref_pass="convert-catalyst-to-llvm", new_pass="convert-transport-to-llvm"
-            )
-    return stages
-
-
-def backline_pipeline():
-    """Default Catalyst pipeline plus the transport passes."""
-    from catalyst.pipelines import default_pipeline
-
-    return add_transport_passes(default_pipeline())
-
-
 def launch_executors(placement: Placement | None) -> None:
     """Deploy the placement's executors and load the CoprocessorFn libraries its in-process
     coprocessors need.
@@ -351,14 +294,6 @@ def _check_machine_agrees(node: Node, host, address=None, preset: bool = False) 
             "to nor an 'address' to attach to, which asks for a subprocess of this process on this "
             "machine. Pass a 'host', or leave remote unset to run the node here."
         )
-
-
-def _launch_executor(name, options):
-    """Build and launch a ``catalyst.Executor`` from a node's executor options."""
-    from catalyst.executor import Executor
-
-    options.setdefault("name", name or "executor")
-    return Executor(**options).launch()
 
 
 def _coprocessor_fn_lib(node: Node) -> Path | None:
