@@ -31,7 +31,7 @@
 
 namespace catalyst::transport::memcpy {
 
-// Structurally mirrors the RDMA cpu_verbs coprocessor: a persistent worker jthread polls a
+// A persistent worker jthread polls a
 // request ring, runs the bound CoprocessorFn, and publishes to a reply ring. process_message
 // is called inline from the controller's kick(), stages the request into the next request
 // slot, spin-waits for the worker to publish the paired reply, and copies it out.

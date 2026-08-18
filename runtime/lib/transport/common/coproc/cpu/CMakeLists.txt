@@ -2,7 +2,7 @@
 # CPU coprocessor function libraries          #
 ###############################################
 # Pluggable `CoprocessorFn` implementations that any transport backend can dlopen at run
-# time. No RDMA/ibverbs/HIP dependencies — pure C++ decoder implementations against the
+# time. Pure C++ decoder implementations against the
 # CoprocessorFn signature in Transport.hpp.
 
 add_library(steane_coprocessor_cpu SHARED steane_decoder_fn.cpp)

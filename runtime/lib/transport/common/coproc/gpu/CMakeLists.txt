@@ -1,7 +1,7 @@
 ###############################################
 # Shared GPU coprocessor plumbing             #
 ###############################################
-# HIP-only, no RDMA. Used by both memcpy_gpu and gpu_verbs.
+# HIP-only. Used by both memcpy_gpu and gpu_verbs.
 
 add_library(catalyst_transport_coproc_gpu STATIC
     GpuRuntime.hip
