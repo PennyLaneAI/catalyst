@@ -34,7 +34,6 @@ from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 # pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
-    SetBasisStateOp,
     extract_scalar,
     safe_cast_to_f64,
 )
@@ -62,6 +61,7 @@ with Patcher(
         PauliRotOp,
         PCPhaseOp,
         QubitUnitaryOp,
+        SetBasisStateOp,
     )
 
 
