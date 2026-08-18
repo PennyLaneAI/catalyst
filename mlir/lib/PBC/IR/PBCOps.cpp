@@ -264,7 +264,7 @@ uint64_t FabricateOp::getResourceNumQubits() { return 0; }
 uint64_t PPRotationOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t PPRotationArbitraryOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t PPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
-uint64_t RefPPMeasurementOp::getResourceNumQubits() { return 0; }
+uint64_t RefPPMeasurementOp::getResourceNumQubits() { return getQubits().size(); }
 uint64_t SelectPPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
 
 uint64_t PrepareStateOp::getResourceNumCtrlQubits() { return 0; }
