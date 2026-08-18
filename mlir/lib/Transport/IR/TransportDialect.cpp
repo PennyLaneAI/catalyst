@@ -86,6 +86,11 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
         if (!c.getPeer() || c.getPeer().getValue().empty()) {
             return emitError() << "coprocessor requires a 'peer'";
         }
+        // The attribute is i32 so it can hold the whole unsigned range, but the runtime call
+        // takes a uint16_t. Reject an out-of-range port here rather than truncate it silently.
+        if (c.getOobPort() && (c.oobPort() < 0 || c.oobPort() > 65535)) {
+            return emitError() << "coprocessor 'oob_port' must be in 0..65535, got " << c.oobPort();
+        }
         if (!c.getSymbol() || c.getSymbol().getValue().empty()) {
             return emitError() << "coprocessor requires a 'symbol'";
         }
