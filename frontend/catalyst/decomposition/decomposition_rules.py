@@ -298,6 +298,7 @@ def compile_decomposition_rules(
     extra_data=None,
     is_custom_op=False,
     wrap_adjoint=False,
+    wrap_control=False,
 ) -> ModuleOp:
     """
     Return a ModuleOp containing the decomposition rules for an operator instance.
@@ -309,20 +310,33 @@ def compile_decomposition_rules(
     rule body is wrapped in a ``qml.adjoint`` region (reduced to op-level modified gates by
     ``adjoint-lowering`` within the decomposition pass), the ``target_gate`` updates to the adjoint
     id, and each produced op in the resources is wrapped in ``Adjoint(...)``.
+
+    Note that ``wrap_adjoint`` and ``wrap_control`` are mutually exclusive.
     """
+    assert not (wrap_adjoint and wrap_control), "adjoint/control synthesis are mutually exclusive"
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
-    device = qp.device("null.qubit", wires=sum(wire_lens.values()))
+
+    n_ctrl = 1
+    ctrl_wire_key = "zz_ctrl_wires"
+    n_base_wires = sum(wire_lens.values())
+    device = qp.device("null.qubit", wires=n_base_wires + (n_ctrl if wrap_control else 0))
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name, kwargs | static_data | extra_data, is_custom_op
     )
 
-    # The distribution pathway targets `Adjoint(op)` and produces adjointed resource gates.
-    target_id = f"Adjoint({op_id})" if wrap_adjoint else op_id
+    # A distribution pathway targets the modified op and produces modified resource gates.
     if wrap_adjoint:
+        modifier = "Adjoint"
+    elif wrap_control:
+        modifier = "C"
+    else:
+        modifier = None
+    target_id = f"{modifier}({op_id})" if modifier else op_id
+    if modifier:
         name_to_resource_ids = {
-            rule_name: {f"Adjoint({produced_id})": count for produced_id, count in ids.items()}
+            rule_name: {f"{modifier}({produced_id})": count for produced_id, count in ids.items()}
             for rule_name, ids in name_to_resource_ids.items()
         }
 
@@ -332,6 +346,9 @@ def compile_decomposition_rules(
         def decomp_rule(*_args, **_kwargs):
             if wrap_adjoint:
                 qp.adjoint(rule._impl)(*_args, **_kwargs)
+            elif wrap_control:
+                ctrl_wires = _kwargs.pop(ctrl_wire_key)
+                qp.ctrl(rule._impl, control=list(ctrl_wires))(*_args, **_kwargs)
             else:
                 rule._impl(*_args, **_kwargs)
 
@@ -346,11 +363,15 @@ def compile_decomposition_rules(
 
     subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
 
+    call_kwargs = dict(kwargs)
+    if wrap_control:
+        call_kwargs[ctrl_wire_key] = jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int)
+
     @qp.qjit(target="mlir", capture=True, skip_decomp_rules=True)
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            subroutine(**kwargs)
+            subroutine(**call_kwargs)
 
     module = circuit.mlir_module
 
@@ -412,10 +433,12 @@ def fetch_all_reachable_decomposition_rules_from_op(
     visited = [start]
 
     def compile_variants(name, op_id, dynamic_shape, wire_lens, static_data, extra_data):
-        # CQRs/Adjoint: For an op `name` capture the rules for
+        # CQRs (Adjoint/Control): For an op `name` capture the rules for
         #   1. the base op `name`,
-        #   2. the adjoint op `Adjoint(name)` rules, and
-        #   3. the adjoint op synthesized by distributing each base rule over adjoint.
+        #   2. the adjoint op `Adjoint(name)`: registered rules + rules synthesized by
+        #      distributing each base rule over adjoint, and
+        #   3. the controlled op `C(name)`: registered rules + rules synthesized by
+        #      distributing each base rule over a single control.
         # Note: a rule whose body or resources can't be captured is skipped with a warning.
         out = get_rule_strings_from_module(
             compile_decomposition_rules(
@@ -462,6 +485,46 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 out.extend(distributed)
             except Exception as e:  # pylint: disable=broad-except
                 warnings.warn(f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}")
+
+            ctrl_name = f"C({name})"
+            # Rules registered directly against C(name) (e.g. `ctrl_decomp_zyz`, named CNOT/CRX):
+            try:
+                out.extend(
+                    get_rule_strings_from_module(
+                        compile_decomposition_rules(
+                            ctrl_name,
+                            f"C({op_id})",
+                            dynamic_shape,
+                            wire_lens,
+                            static_data,
+                            extra_data=extra_data,
+                        )
+                    )
+                )
+            except Exception as e:  # pylint: disable=broad-except
+                warnings.warn(f"Failed to lower the decomposition rules for {ctrl_name}: {e}")
+            # Rules for C(name) synthesized by controlling each base rule of `name`:
+            try:
+                controlled = get_rule_strings_from_module(
+                    compile_decomposition_rules(
+                        name,
+                        op_id,
+                        dynamic_shape,
+                        wire_lens,
+                        static_data,
+                        extra_data=extra_data,
+                        wrap_control=True,
+                    )
+                )
+                # Suppress a distribution rule whose body is non-controllable (e.g. measure):
+                controlled = [
+                    rule
+                    for rule in controlled
+                    if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
+                ]
+                out.extend(controlled)
+            except Exception as e:  # pylint: disable=broad-except
+                warnings.warn(f"Failed to synthesize distributed control rules for {ctrl_name}: {e}")
         return out
 
     rules = compile_variants(op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data)
