@@ -81,7 +81,7 @@ def test_basis_embedding(backend):
     """Test basis embedding."""
 
     def basis_embedding(f: jax.core.ShapedArray([3], int)):
-        qp.BasisEmbedding(features=f, wires=[0, 1, 2])
+        qp.BasisEmbedding(f, wires=[0, 1, 2])
         return qp.state()
 
     device = qp.device(backend, wires=3)
@@ -230,6 +230,9 @@ def test_mottonen_state_preparation(backend):
     assert np.allclose(interpreted_fn(state), jitted_fn(state))
 
 
+@pytest.mark.xfail(
+    reason="Waiting for a Lightning nightly release with Operator2 PauliRot fix", strict=True
+)
 def test_arbitrary_state_preparation(backend):
     """Test arbitrary state preparation."""
 
@@ -588,6 +591,9 @@ def test_fermionic_double(backend):
     assert np.allclose(interpreted_fn(weight), jitted_fn(weight))
 
 
+@pytest.mark.xfail(
+    reason="Waiting for a Lightning nightly release with Operator2 PauliRot fix", strict=True
+)
 def test_arbitrary_unitary(backend):
     """Test ArbitraryUnitary."""
 
@@ -697,6 +703,9 @@ def test_local_hilbert_schmidt(backend):
     assert np.allclose(interpreted_fn(v_params), jitted_fn(v_params))
 
 
+@pytest.mark.xfail(
+    reason="Waiting for a Lightning nightly release with Operator2 PauliRot fix", strict=True
+)
 def test_commuting_evolution(backend):
     """Test CommutingEvolution."""
 
@@ -750,6 +759,9 @@ def test_qsvt(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(
+    reason="Waiting for a Lightning nightly release with Operator2 PauliRot fix", strict=True
+)
 def test_approx_time_evoluation(backend):
     """Test ApproxTimeEvolution."""
 
@@ -1015,6 +1027,9 @@ def test_mod_exp(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(
+    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
+)
 def test_multiplier(backend):
     """Test Multiplier."""
     x = 3
@@ -1036,6 +1051,9 @@ def test_multiplier(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(
+    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
+)
 def test_out_adder(backend):
     """Test OutAdder."""
     mod = 7
@@ -1060,6 +1078,9 @@ def test_out_adder(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(
+    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
+)
 def test_out_multiplier(backend):
     """Test OutMultiplier."""
     mod = 12

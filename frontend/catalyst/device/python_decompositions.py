@@ -48,10 +48,17 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
     """Generic decomposition wrapper."""
     device = qp.device("null.qubit", wires=sum(wire_lens))
     wires = tuple(jnp.array(range(length), dtype=int) for length in wire_lens)
+    op_cls = getattr(qp, op_name, None)
 
     def rule_to_subroutine(rule):
         def decomp_rule(*params, wires):
-            rule._impl(*params, *wires, **static_data)
+            if issubclass(op_cls, qp.core.Operator2):
+                arguments = dict(zip(op_cls.dynamic_argnames, params, strict=True))
+                arguments.update(zip(op_cls.wire_argnames, wires, strict=True))
+                arguments.update(static_data)
+                rule(**arguments)
+            else:  # !TODO: remove this branch once Op2 migration is complete
+                rule(*params, *wires, **static_data)  # pragma: no cover
 
         # TODO remove this once we have unified lowering, we should be able to set target_gate and
         # stop relying on function names
@@ -78,6 +85,16 @@ def python_decomposition_wrapper(op_name, op_id, dynamic_shape, wire_lens, stati
                 # this than hard-coded dummy values. Revisit this when unifying the decomp-rule
                 # lowering pipeline
                 subroutine(*[0.5 for _ in dynamic_shape], wires=wires)
+
+        if circuit.mlir_module is None:
+            # AOT compilation softened the error into a warning.
+            warnings.warn(
+                f"Python decomposition rule compilation failed for operator "
+                f"'{op_name}' (id: {op_id}); it will be treated as non-decomposable "
+                f"by the graph solver.",
+                UserWarning,
+            )
+            return "builtin.module{}"
 
         return str(circuit.mlir_module)
     except:

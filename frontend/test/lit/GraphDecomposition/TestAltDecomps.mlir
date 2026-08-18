@@ -34,7 +34,7 @@ func.func @circuit() -> !quantum.bit {
 }
 
 // CHECK-LABEL: y_to_ry
-func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="PauliY"} {
+func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="PauliY[][1]{}", resources = { operations = {"RY[f64][1]{}"=1, "GlobalPhase[][]{}"=1}}} {
     %pi = arith.constant 3.14 : f64
     %negpiby2 = arith.constant -1.57 : f64
     %q1 = quantum.custom "RY"(%pi) %q0 : !quantum.bit
@@ -43,7 +43,7 @@ func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="
 }
 
 // CHECK-LABEL: y_to_x_z
-func.func @y_to_x_z(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="PauliY"} {
+func.func @y_to_x_z(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="PauliY[][1]{}", resources = { operations = {"PauliX[][1]{}"=1, "PauliZ[][1]{}"=1}}} {
     %q1 = quantum.custom "PauliX"() %q0 : !quantum.bit
     %q2 = quantum.custom "PauliZ"() %q1 : !quantum.bit
     return %q2 : !quantum.bit
