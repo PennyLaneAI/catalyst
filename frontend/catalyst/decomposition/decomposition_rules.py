@@ -16,7 +16,7 @@
 This module provides infrastructure for lowering decomposition rules via python.
 """
 
-# pylint: disable=protected-access,bare-except
+# pylint: disable=protected-access
 
 import warnings
 from functools import partial
@@ -147,7 +147,7 @@ class GraphOpID:
         """Return the static data formatted for GraphOpId."""
         return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
 
-    def getID(self) -> str:
+    def getGraphOpId(self) -> str:
         """
         Return the GraphOpId as a string.
 
@@ -183,7 +183,7 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
             resources = rule.compute_resources(*args, **kwargs)
             name_to_resources[rule.name] = resources.gate_counts
             name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
+                GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
             }
         except Exception as e:
             warnings.warn(f"Failed to get resources for the {rule.name} decomposition rule: {e}")
