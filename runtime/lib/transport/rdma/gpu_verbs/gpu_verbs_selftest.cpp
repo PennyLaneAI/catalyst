@@ -25,7 +25,7 @@ using namespace catalyst::transport;
 using namespace catalyst::transport::gpu_verbs;
 using namespace catalyst::transport::common; // REGION_BYTES, DEMO_SYNDROME
 
-extern "C" int catalyst_gpu_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);
+extern "C" int gpu_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);
 
 int main(int argc, char **argv) {
     // --dev and --gid are required
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
         .transport = "rdma",
     };
     s.establish_channel(desc, m, p);
-    s.set_coprocessor_launcher(catalyst_gpu_echo_launcher, nullptr);
+    s.set_coprocessor_launcher(gpu_echo_launcher, nullptr);
     s.start();
     std::this_thread::sleep_for(std::chrono::seconds(3));
     std::uint64_t got = 0;

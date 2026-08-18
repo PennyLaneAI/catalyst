@@ -21,8 +21,8 @@ namespace catalyst::transport::coproc {
 // decode -> write-handoff kernel (one per decoder) on the session's stream.
 // `desc` is the datapath to wire the kernel to; `ctx` is unused. Return 0 if
 // the launch succeeded, nonzero if it failed.
-extern "C" int catalyst_gpu_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);
-extern "C" int catalyst_gpu_steane_launcher(const CoprocLaunchDesc *desc, void *ctx);
+extern "C" int gpu_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);
+extern "C" int gpu_steane_launcher(const CoprocLaunchDesc *desc, void *ctx);
 
 // Built-in launcher the session uses when no launcher is bound
 // (coproc_launcher_ == nullptr); identical to the echo launcher.
