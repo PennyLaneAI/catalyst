@@ -88,3 +88,31 @@ func.func @resolve(%syndrome: memref<?xi8>, %correction: memref<?xi8>) {
   transport.collect %s, %correction : !transport.session<controller>, memref<?xi8>
   return
 }
+
+// -----
+
+// reply_slot borrows the session's ring slot instead of allocating: the runtime hands back the
+// slot's base address, and the lowering wraps it in a memref descriptor so the rest of the
+// program can read it as an ordinary buffer .
+// CHECK-DAG: llvm.func @__catalyst__transport__reply_slot(!llvm.ptr) -> !llvm.ptr
+// CHECK-LABEL: func.func @reply_slot
+func.func @reply_slot(%syndrome: memref<?xi8>) {
+  // CHECK: %[[S:.*]] = llvm.call @__catalyst__transport__get_session
+  %s = transport.get_session {key = "cop0"} : !transport.session<controller>
+  transport.stage_payload %s, %syndrome : !transport.session<controller>, memref<?xi8>
+  transport.post %s : !transport.session<controller>
+  // CHECK: %[[P:.*]] = llvm.call @__catalyst__transport__reply_slot(%[[S]]) : (!llvm.ptr) -> !llvm.ptr
+  // CHECK-DAG: %[[OFF:.*]] = llvm.mlir.constant(0 : i64) : i64
+  // CHECK-DAG: %[[STRIDE:.*]] = llvm.mlir.constant(1 : i64) : i64
+  // CHECK-DAG: %[[SIZE:.*]] = llvm.mlir.constant(4 : i64) : i64
+  // CHECK: %[[D0:.*]] = llvm.insertvalue %[[P]], %{{.*}}[0]
+  // CHECK: %[[D1:.*]] = llvm.insertvalue %[[P]], %[[D0]][1]
+  // CHECK: %[[D2:.*]] = llvm.insertvalue %[[OFF]], %[[D1]][2]
+  // CHECK: %[[D3:.*]] = llvm.insertvalue %[[SIZE]], %[[D2]][3, 0]
+  // CHECK: llvm.insertvalue %[[STRIDE]], %[[D3]][4, 0]
+  %slot = transport.reply_slot %s : !transport.session<controller> -> memref<4xindex>
+  // CHECK: llvm.call @__catalyst__transport__collect(%[[S]]
+  transport.collect %s, %slot : !transport.session<controller>, memref<4xindex>
+  return
+}
+

@@ -58,7 +58,11 @@ bool NodeAttr::isOutOfProcess() const {
 
 static int64_t intOr(IntegerAttr field, int64_t dflt) { return field ? field.getInt() : dflt; }
 
-int64_t NodeAttr::oobPort() const { return intOr(getOobPort(), 0); }
+int64_t NodeAttr::oobPort() const {
+    // A port is unsigned, so zero-extend
+    IntegerAttr p = getOobPort();
+    return p ? static_cast<int64_t>(p.getValue().getZExtValue()) : 0;
+}
 int64_t NodeAttr::inBytes() const { return getInBytes().getInt(); }
 int64_t NodeAttr::outBytes() const { return getOutBytes().getInt(); }
 int64_t NodeAttr::workItemIdx() const { return intOr(getWorkItemIdx(), 0); }
@@ -79,6 +83,11 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
         // A 'peer' is the address of the out-of-band handshake, which only rdma performs.
         if (transport.getValue() == "rdma" && (!c.getPeer() || c.getPeer().getValue().empty())) {
             return emitError() << "coprocessor requires a 'peer' under the 'rdma' transport";
+        }
+        // The attribute is i32 so it can hold the whole unsigned range, but the runtime call
+        // takes a uint16_t. Reject an out-of-range port here rather than truncate it silently.
+        if (c.getOobPort() && c.oobPort() > 65535) {
+            return emitError() << "coprocessor 'oob_port' must be in 0..65535, got " << c.oobPort();
         }
         if (!c.getSymbol() || c.getSymbol().getValue().empty()) {
             return emitError() << "coprocessor requires a 'symbol'";

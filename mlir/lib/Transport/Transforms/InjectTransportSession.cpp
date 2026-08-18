@@ -206,7 +206,9 @@ class SessionEmitter {
 
     // Ports are carried as i32 so a value above 32767 reads as itself rather than as a negative
     // number; the LLVM lowering narrows to the runtime's uint16_t.
-    IntegerAttr portAttr(int64_t v) { return b.getIntegerAttr(b.getIntegerType(32), v); }
+    IntegerAttr portAttr(int64_t v) {
+        return b.getIntegerAttr(b.getIntegerType(16, /*isSigned=*/false), v);
+    }
 
     // In-process transports (memcpy) pair on the session key and never dial peer:oob_port, so
     // emitted transport.connect / connect_async ops carry no peer / oob_port.

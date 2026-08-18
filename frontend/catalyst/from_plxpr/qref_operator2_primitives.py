@@ -89,6 +89,8 @@ def _is_custom_op(op_cls, avals_in):
         return False
     if op_cls.wire_argnames != ("wires",):
         return False
+    if list(op_cls._sig.parameters.keys())[-1] != "wires":
+        return False
     # Complex dtypes cannot be safely cast to float64
     return all(p.shape == () and p.dtype.kind in "ifu" for p in avals_in)
 

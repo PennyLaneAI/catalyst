@@ -33,6 +33,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 #include "QecPhysical/IR/QecPhysicalOps.h"
@@ -107,30 +108,52 @@ struct LowerDecodeToTransportPass
             //
             // The right-hand one costs neither the allocation nor the backend's copy out of the
             // ring, but it hands %slot to code that was written against %buf, so it is valid
-            // only while nothing can tell the two apart. Two conditions establish that.
+            // only while nothing can tell the two apart. Three conditions establish that.
 
             // (1) The buffer is ours to retire: allocated in this function, and used only by
             //     the decode, by reads, and by its own free. Any other user is a way the
             //     rewrite goes wrong.
             Operation *alloc = correction.getDefiningOp();
             SmallVector<Operation *> frees;
+            SmallVector<Operation *> reads;
             bool ownsBuffer = alloc && isa<memref::AllocOp, memref::AllocaOp>(alloc);
             for (Operation *user : correction.getUsers()) {
                 if (isa<memref::DeallocOp>(user)) {
                     frees.push_back(user);
-                } else if (user != anchor && !isa<memref::LoadOp>(user)) {
+                } else if (isa<memref::LoadOp>(user)) {
+                    reads.push_back(user);
+                } else if (user != anchor) {
                     ownsBuffer = false;
                 }
             }
 
-            // (2) A slot can describe the buffer's type. reply_slot hands back one ring slot as
+            // (2) Every read still sees this round's reply. The ring recycles a slot every
+            //     K_RING_SLOTS rounds, so a read left until later rounds have run picks up one
+            //     of their replies, where a buffer would still hold ours. Rounds are a runtime
+            //     count, so the rule is one a pass can check: every read is in the anchor's
+            //     block, after it, with no further round posted in between. Not "reads dominate
+            //     the next post", which rejects a decode in a loop, where the next iteration's
+            //     post sits above the read.
+            auto opensAnotherRound = [](Operation *op) {
+                // An emitted post, a decode not yet lowered, or anything that could hide either.
+                return isa<PostOp, qecp::DecodeEsmCssOp>(op) || isa<CallOpInterface>(op) ||
+                       op->getNumRegions() > 0;
+            };
+            size_t promptReads = 0;
+            for (Operation *op = anchor->getNextNode(); op && !opensAnotherRound(op);
+                 op = op->getNextNode()) {
+                promptReads += llvm::is_contained(reads, op);
+            }
+            const bool readsBeatRecycle = promptReads == reads.size();
+
+            // (3) A slot can describe the buffer's type. reply_slot hands back one ring slot as
             //     a contiguous 1-D span from its base, so a strided, higher-rank or dynamically
             //     shaped buffer has no slot that stands for it.
             auto memTy = dyn_cast<MemRefType>(correction.getType());
             const bool fitsASlot = memTy && memTy.hasStaticShape() && memTy.getRank() == 1 &&
                                    memTy.getLayout().isIdentity();
 
-            if (!ownsBuffer || !fitsASlot) {
+            if (!ownsBuffer || !readsBeatRecycle || !fitsASlot) {
                 // Keep the program's buffer, and let the backend copy the reply out into it.
                 CollectOp::create(b, anchor->getLoc(), TypeRange{}, ValueRange{s, correction});
                 anchor->erase();
@@ -155,6 +178,7 @@ struct LowerDecodeToTransportPass
                 anchors.push_back(op);
             }
         });
+        // TODO: This is a naive approach. This strategy should be further analysed and refined.
         // Decodes are handed to the coprocessors round-robin.
         for (auto [k, anchor] : llvm::enumerate(anchors)) {
             emitRound(anchor, anchor.getEsm(), anchor.getErrIdxIn(), peerKeys[k % peerKeys.size()]);

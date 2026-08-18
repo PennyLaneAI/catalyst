@@ -54,7 +54,7 @@ def Transport_ConnectOp : Transport_Op<"connect"> {
     // In-process transports (memcpy) pair on the session key, so both attrs are optional.
     let arguments = (ins Transport_SessionType:$session,
                         OptionalAttr<StrAttr>:$peer,
-                        OptionalAttr<I32Attr>:$oob_port);
+                        OptionalAttr<UI16Attr>:$oob_port);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
 
@@ -62,7 +62,7 @@ def Transport_ConnectAsyncOp : Transport_Op<"connect_async"> {
     let summary = "Non-blocking connect; await the token with transport.await.";
     let arguments = (ins Transport_SessionType:$session,
                         OptionalAttr<StrAttr>:$peer,
-                        OptionalAttr<I32Attr>:$oob_port);
+                        OptionalAttr<UI16Attr>:$oob_port);
     let results = (outs Transport_TokenType:$token);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session)) `->` type($token)";
 }

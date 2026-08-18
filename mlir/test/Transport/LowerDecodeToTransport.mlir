@@ -181,3 +181,109 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
     return
   }
 }
+
+// -----
+
+// A ring slot is on loan for the round that filled it, so a correction read only after a later
+// round was posted cannot be aliased onto one: by the time the read runs, the slot may have been
+// recycled into a reply the program never asked for. The late read takes the copy-out path while
+// the prompt one still gets its slot.
+
+// CHECK-LABEL: func.func @read_after_later_round
+// CHECK:         %[[A0:.*]] = memref.alloc() : memref<1xindex>
+// CHECK:         %[[S0:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
+// CHECK:         transport.post %[[S0]] : !transport.session<controller>
+// CHECK-NOT:     transport.reply_slot
+// CHECK:         transport.collect %[[S0]], %[[A0]] : !transport.session<controller>, memref<1xindex>
+// CHECK:         %[[S1:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
+// CHECK:         transport.post %[[S1]] : !transport.session<controller>
+// CHECK:         %[[SLOT:.*]] = transport.reply_slot %[[S1]] : !transport.session<controller> -> memref<1xindex>
+// CHECK:         transport.collect %[[S1]], %[[SLOT]] : !transport.session<controller>, memref<1xindex>
+// CHECK:         memref.load %[[A0]]
+// CHECK:         memref.load %[[SLOT]]
+// CHECK:         memref.dealloc %[[A0]]
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c">,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
+  func.func @read_after_later_round(%tanner: !qecp.tanner_graph<8, 6, i32>,
+                                    %esm0: memref<3xi1>, %esm1: memref<3xi1>) -> (index, index) {
+    %c0 = arith.constant 0 : index
+    %a0 = memref.alloc() : memref<1xindex>
+    %a1 = memref.alloc() : memref<1xindex>
+    qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm0 in (%a0 : memref<1xindex>) : memref<3xi1>
+    qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm1 in (%a1 : memref<1xindex>) : memref<3xi1>
+    %v0 = memref.load %a0[%c0] : memref<1xindex>
+    %v1 = memref.load %a1[%c0] : memref<1xindex>
+    memref.dealloc %a0 : memref<1xindex>
+    memref.dealloc %a1 : memref<1xindex>
+    return %v0, %v1 : index, index
+  }
+}
+
+// -----
+
+// The same two rounds, but each correction is read before the next one is posted. Both slots are
+// still live where they are read, so neither round pays for a buffer: more than one decode on a
+// session is not by itself a reason to fall back.
+
+// CHECK-LABEL: func.func @two_prompt_reads
+// CHECK-NOT:     memref.alloc
+// CHECK:         %[[S0:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
+// CHECK:         %[[SLOT0:.*]] = transport.reply_slot %[[S0]] : !transport.session<controller> -> memref<1xindex>
+// CHECK:         transport.collect %[[S0]], %[[SLOT0]] : !transport.session<controller>, memref<1xindex>
+// CHECK:         memref.load %[[SLOT0]]
+// CHECK:         %[[S1:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
+// CHECK:         %[[SLOT1:.*]] = transport.reply_slot %[[S1]] : !transport.session<controller> -> memref<1xindex>
+// CHECK:         transport.collect %[[S1]], %[[SLOT1]] : !transport.session<controller>, memref<1xindex>
+// CHECK:         memref.load %[[SLOT1]]
+// CHECK-NOT:     memref.dealloc
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c">,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
+  func.func @two_prompt_reads(%tanner: !qecp.tanner_graph<8, 6, i32>,
+                              %esm0: memref<3xi1>, %esm1: memref<3xi1>) -> (index, index) {
+    %c0 = arith.constant 0 : index
+    %a0 = memref.alloc() : memref<1xindex>
+    %a1 = memref.alloc() : memref<1xindex>
+    qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm0 in (%a0 : memref<1xindex>) : memref<3xi1>
+    %v0 = memref.load %a0[%c0] : memref<1xindex>
+    qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm1 in (%a1 : memref<1xindex>) : memref<3xi1>
+    %v1 = memref.load %a1[%c0] : memref<1xindex>
+    memref.dealloc %a0 : memref<1xindex>
+    memref.dealloc %a1 : memref<1xindex>
+    return %v0, %v1 : index, index
+  }
+}
+
+// -----
+
+// The shape the QEC cycle actually runs: one decode per loop iteration, read before the iteration
+// ends. Each round reads its own reply back before posting the next, so the loop body keeps the
+// slot even though the block it sits in is re-entered for every round.
+
+// CHECK-LABEL: func.func @decode_in_loop
+// CHECK:         scf.for
+// CHECK-NOT:       memref.alloc
+// CHECK:           %[[S:.*]] = transport.get_session {key = "cop0"} : !transport.session<controller>
+// CHECK:           transport.post %[[S]] : !transport.session<controller>
+// CHECK:           %[[SLOT:.*]] = transport.reply_slot %[[S]] : !transport.session<controller> -> memref<1xindex>
+// CHECK:           transport.collect %[[S]], %[[SLOT]] : !transport.session<controller>, memref<1xindex>
+// CHECK:           memref.load %[[SLOT]]
+module attributes {catalyst.backline = #transport.backline<transport = "net",
+  controller = #transport.node<backend_lib = "x", config = "c">,
+  coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
+  func.func @decode_in_loop(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<3xi1>) -> index {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c8 = arith.constant 8 : index
+    %acc = scf.for %i = %c0 to %c8 step %c1 iter_args(%sum = %c0) -> (index) {
+      %buf = memref.alloc() : memref<1xindex>
+      qecp.decode_esm_css(%tanner : !qecp.tanner_graph<8, 6, i32>) %esm in (%buf : memref<1xindex>) : memref<3xi1>
+      %v = memref.load %buf[%c0] : memref<1xindex>
+      memref.dealloc %buf : memref<1xindex>
+      %next = arith.addi %sum, %v : index
+      scf.yield %next : index
+    }
+    return %acc : index
+  }
+}
