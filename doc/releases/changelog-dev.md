@@ -294,7 +294,7 @@
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
   the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
   (``any_commuting_depth`` / ``qubit_disjoint_depth``) with the same functionality.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3081)](https://github.com/PennyLaneAI/catalyst/pull/3081)
 
 * Removes the non-graph decomposition fallback when `capture=True` is enabled.
   [(#3058)](https://github.com/PennyLaneAI/catalyst/pull/3058/)
