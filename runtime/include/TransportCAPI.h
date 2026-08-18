@@ -97,9 +97,11 @@ enum {
 };
 
 // Run `iters` rounds back to back and report each round's round-trip time in nanoseconds.
+// `samples_bytes` tells how much room the caller has for the samples. The rounds report is refused
+// if `samples_bytes` is less than `iters * sizeof(uint64_t)`.
 int __catalyst__transport__start_benchmark(CatalystTransportSession *s, uint32_t iters,
                                            uint32_t decoder_id, uint32_t flags, uint64_t *samples,
-                                           uint64_t *rounds);
+                                           uint64_t samples_bytes, uint64_t *rounds);
 
 #ifdef __cplusplus
 } // extern "C"
