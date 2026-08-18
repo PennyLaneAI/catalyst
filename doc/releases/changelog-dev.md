@@ -202,7 +202,7 @@
   compute a metric per region rather than per operation (as `PBCDepthExtension` does).
   [(#3070)](https://github.com/PennyLaneAI/catalyst/pull/3070)
 
-* `ResourceAnalysis` now uses a single JSON serializer owned by `ResourceResult`, removing
+* The `resource-analysis` pass now uses a single JSON serializer owned by `ResourceResult`, removing
   duplicate serialization logic and keeping its output consistent.
   [(#3007)](https://github.com/PennyLaneAI/catalyst/issues/3007)
 
@@ -211,6 +211,13 @@
   New dialects can opt in by implementing these interfaces without changing
   the analysis.
   [(#3025)](https://github.com/PennyLaneAI/catalyst/pull/3025)
+
+* The `resource-analysis` pass JSON output has been standardized into a nested schema.
+  Gate counts are grouped by wire count under `quantum_operations`, function metadata
+  lives under `metadata`, qubit counts under `num_qubits`, static and dynamic calls
+  under `function_calls.static` / `function_calls.dynamic`, measurement processes under
+  `measurement_processes`, and pluggable metrics under `extended_fields`.
+  [(#3076)](https://github.com/PennyLaneAI/catalyst/pull/3076)
 
 * The `--adjoint-lowering` pass no longer turns statically bounded for loops into
   dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
