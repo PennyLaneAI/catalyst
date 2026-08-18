@@ -158,7 +158,7 @@ def _node_dict(node: Node, role: str) -> dict:
     if unknown := sorted(set(init) - set(_INIT_KEYS)):
         raise CompileError(
             f"backline node has unrecognized init_args {unknown}; the recognized keys are "
-            f"{list(_INIT_KEYS)}. Settings the backend itself interprets go in 'config', as a "
+            f"{list(_INIT_KEYS)}. Setting the backend itself interprets go in 'config', as a "
             f"'key=value;...' string."
         )
     d.update({k: init[k] for k in _INIT_KEYS if k in init})
