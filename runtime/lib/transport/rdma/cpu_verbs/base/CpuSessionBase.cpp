@@ -64,7 +64,7 @@ template <class Role> int CpuSessionBase<Role>::connect(const ConnectInfo &info)
 }
 
 template <class Role> MemRegion CpuSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind) {
-    RDMA_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
+    TP_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
         pd_, size, PAGE_ALIGN, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE));
     const MemoryRegion &mr = caller_memory_regions_.back();
@@ -114,9 +114,9 @@ template <class Role> PeerRef CpuSessionBase<Role>::exchange_keys(const MemRegio
 template <class Role>
 void CpuSessionBase<Role>::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                              const PeerRef &peer) {
-    RDMA_CHECK(desc.transport == "rdma", "cpu_verbs: only transport \"rdma\" supported");
-    RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
-               static_cast<std::size_t>(local.size), REGION_BYTES);
+    TP_CHECK(desc.transport == "rdma", "cpu_verbs: only transport \"rdma\" supported");
+    TP_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
+             static_cast<std::size_t>(local.size), REGION_BYTES);
     desc_ = desc;
     local_ = local;
     peer_ = peer;
@@ -146,7 +146,7 @@ void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inl
     wr.wr.rdma.rkey = peer_.rkey;
     ibv_send_wr *bad = nullptr;
     const int rc = ibv_post_send(qp, &wr, &bad);
-    RDMA_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));
+    TP_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));
 }
 
 // Non-blocking batch reap of `cq`: take whatever completions are ready (up to
@@ -170,7 +170,7 @@ template <class Role> void CpuSessionBase<Role>::reap(ibv_cq *cq, int &outstandi
         }
         empty = 0;
         for (int k = 0; k < n; k++) {
-            RDMA_CHECK(wc[k].status == IBV_WC_SUCCESS, "CQE status=%d", wc[k].status);
+            TP_CHECK(wc[k].status == IBV_WC_SUCCESS, "CQE status=%d", wc[k].status);
             --outstanding;
         }
     } while (drain && outstanding > 0);

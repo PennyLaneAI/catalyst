@@ -67,9 +67,9 @@ TEST_CASE("memcpy round-trip echoes through peer memory", "[transport_memcpy]") 
     coprocessor.establish_channel(desc, request, peer_reply);
 
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+    coprocessor.set_coprocessor_fn(nullptr, nullptr); // built-in echo
     controller.start();
     coprocessor.start();
-    coprocessor.set_coprocessor_fn(nullptr, nullptr); // built-in echo
 
     const std::uint64_t request_word = 0x0123456789ABCDEFull;
     controller.write_data_slot(&request_word, sizeof(request_word), /*decoder_id=*/0);
@@ -102,9 +102,9 @@ TEST_CASE("memcpy uses the bound coprocessor function", "[transport_memcpy]") {
     coprocessor.establish_channel(desc, request, peer_reply);
 
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+    coprocessor.set_coprocessor_fn(invert_fn, nullptr);
     controller.start();
     coprocessor.start();
-    coprocessor.set_coprocessor_fn(invert_fn, nullptr);
 
     const std::uint64_t request_word = 0x0123456789ABCDEFull;
     controller.write_data_slot(&request_word, sizeof(request_word), /*decoder_id=*/0);
@@ -137,9 +137,9 @@ TEST_CASE("memcpy round-trip drives the steane decoder plugin", "[transport_memc
     coprocessor.establish_channel(desc, request, peer_reply);
 
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::int64_t));
+    coprocessor.set_coprocessor_fn(&steane_coprocessor, nullptr);
     controller.start();
     coprocessor.start();
-    coprocessor.set_coprocessor_fn(&steane_coprocessor, nullptr);
 
     // Syndrome [1, 0, 1] packs (check 0 as MSB) to 0b101 == 5, which the LUT maps to qubit 3.
     // Padded into the 8-byte value slot so the coprocessor sees the syndrome at frame offset 0.
@@ -257,9 +257,9 @@ TEST_CASE("memcpy incumbent coprocessor survives a rejected second coprocessor",
     controller.establish_channel(desc, reply, peer_request);
     incumbent.establish_channel(desc, request, peer_reply);
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+    incumbent.set_coprocessor_fn(nullptr, nullptr); // built-in echo
     controller.start();
     incumbent.start();
-    incumbent.set_coprocessor_fn(nullptr, nullptr); // built-in echo
 
     {
         // A rejected connect's dtor must not clear the incumbent's binding.
@@ -311,4 +311,17 @@ TEST_CASE("memcpy rejects a session with no pair key in config", "[transport_mem
     ConnectInfo ci{.peer = "loopback", .oob_port = 19023};
     CpuControllerSession controller;
     REQUIRE_THROWS_AS(controller.connect(ci), std::runtime_error);
+}
+
+// The worker thread reads fn_/ctx_ without synchronization; mutating them after start() would
+// race and could tear across the two reads. Enforce the interface's bind-before-start contract.
+TEST_CASE("memcpy rejects set_coprocessor_fn after start()", "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19024};
+    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    REQUIRE(coprocessor.connect(ci) == 0);
+    coprocessor.start();
+    REQUIRE_THROWS_AS(coprocessor.set_coprocessor_fn(nullptr, nullptr), std::runtime_error);
+    coprocessor.stop();
+    // After stop(), the worker is gone and rebinding is safe again.
+    REQUIRE_NOTHROW(coprocessor.set_coprocessor_fn(nullptr, nullptr));
 }

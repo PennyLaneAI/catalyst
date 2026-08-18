@@ -53,7 +53,7 @@ QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<Compl
         .sq_sig_all = 0,
     };
     qp_ = ibv_create_qp(pd_->get(), &a);
-    RDMA_CHECK_ERRNO(qp_, "ibv_create_qp");
+    TP_CHECK_ERRNO(qp_, "ibv_create_qp");
 }
 
 QueuePair::~QueuePair() {
@@ -78,7 +78,7 @@ void QueuePair::check_transition(QpState to) const {
 void QueuePair::modify(QpState to, ibv_qp_attr &attr, int mask, const char *what) {
     check_transition(to);
     const int rc = ibv_modify_qp(qp_, &attr, mask);
-    RDMA_CHECK(rc == 0, "%s rc=%d (%s)", what, rc, std::strerror(rc));
+    TP_CHECK(rc == 0, "%s rc=%d (%s)", what, rc, std::strerror(rc));
     state_ = to; // advance only after a successful modify
 }
 

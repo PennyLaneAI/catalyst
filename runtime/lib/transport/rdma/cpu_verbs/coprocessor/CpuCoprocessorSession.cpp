@@ -34,7 +34,7 @@ void CpuCoprocessorSession::start() {
     error_ = nullptr;
     completed_.store(0, std::memory_order_relaxed);
     last_word_.store(0, std::memory_order_relaxed);
-    // jthread injects the stop_token. A data-path RDMA_CHECK throws RdmaError;
+    // jthread injects the stop_token. A data-path TP_CHECK throws TransportError;
     // it must not escape the thread function (that would std::terminate).
     // Capture it into error_ and publish via failed_ (release) so collect()
     // can rethrow the real exception.
@@ -70,8 +70,8 @@ int CpuCoprocessorSession::collect(void *const *replies, const std::uint64_t *re
     if (n > 0 && replies && replies[0]) {
         const std::uint64_t w = last_word_.load(std::memory_order_relaxed);
         const std::size_t cap = replies_bytes ? replies_bytes[0] : sizeof(w);
-        RDMA_CHECK(cap <= sizeof(w), "reply capacity (%zu) exceeds the %zu B payload", cap,
-                   sizeof(w));
+        TP_CHECK(cap <= sizeof(w), "reply capacity (%zu) exceeds the %zu B payload", cap,
+                 sizeof(w));
         std::memcpy(replies[0], &w, cap);
     }
     return 0;
@@ -105,9 +105,9 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         if (coproc_fn_) {
             const std::size_t nb =
                 coproc_fn_(r, sizeof(Payload), &send->value, PAYLOAD_DATA_BYTES, coproc_ctx_);
-            RDMA_CHECK(nb > 0 && nb <= PAYLOAD_DATA_BYTES,
-                       "coprocessor function wrote %zu bytes, expected 1..%zu", nb,
-                       PAYLOAD_DATA_BYTES);
+            TP_CHECK(nb > 0 && nb <= PAYLOAD_DATA_BYTES,
+                     "coprocessor function wrote %zu bytes, expected 1..%zu", nb,
+                     PAYLOAD_DATA_BYTES);
         } else {
             send->value = r->value; // built-in echo
         }

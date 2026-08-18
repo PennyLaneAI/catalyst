@@ -19,11 +19,11 @@
 
 #include "MemcpyLink.hpp"
 
-#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
 #include "ConfigParser.hpp"
+#include "Error.hpp"
 
 namespace catalyst::transport::memcpy {
 
@@ -38,10 +38,7 @@ auto parse_pair_key(std::string_view config) -> std::string {
 }
 
 auto acquire_memcpy_link(std::string_view pair_key) -> std::shared_ptr<MemcpyLink> {
-    if (pair_key.empty()) {
-        throw std::runtime_error(
-            "memcpy: missing session pair key in backend config (expected 'pair=<key>')");
-    }
+    TP_CHECK(!pair_key.empty(), "Missing pair key in config (expected 'pair=<key>')");
 
     static std::mutex mu;
     static std::unordered_map<std::string, std::weak_ptr<MemcpyLink>> links;

@@ -19,6 +19,7 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "Error.hpp"
 #include "GpuLaunchers.hpp"
 #include "HipCheck.hpp"
 #include "WireProtocol.hpp"
@@ -70,10 +71,8 @@ int GpuCoprocessorSession::connect(const ConnectInfo & /*info*/) {
     // a rejected second coprocessor would clear the incumbent's binding on the way out.
     auto candidate = acquire_memcpy_link(pair_key_);
     std::lock_guard<std::mutex> lock(candidate->mu);
-    if (candidate->process_message) {
-        throw std::runtime_error("memcpy: another coprocessor is already bound to session pair '" +
-                                 pair_key_ + "'");
-    }
+    TP_CHECK(!candidate->process_message, "Coprocessor already bound to pair '%s'",
+             pair_key_.c_str());
     candidate->process_message = [this](const void *in, std::size_t in_len, void *out,
                                         std::size_t out_cap) {
         return this->process_message(in, in_len, out, out_cap);
@@ -83,9 +82,7 @@ int GpuCoprocessorSession::connect(const ConnectInfo & /*info*/) {
 }
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
-    if (kind != MemKind::CpuRam) {
-        throw std::runtime_error("CPU device can only allocate CpuRam");
-    }
+    TP_CHECK(kind == MemKind::CpuRam, "CPU device can only allocate CpuRam");
     caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
                                           : std::unique_ptr<std::byte[]>{});
     return MemRegion{
@@ -101,9 +98,7 @@ PeerRef GpuCoprocessorSession::exchange_keys(const MemRegion & /*local*/) { retu
 
 void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion & /*local*/,
                                               const PeerRef & /*peer*/) {
-    if (desc.transport != "memcpy") {
-        throw std::runtime_error("only transport=memcpy is supported");
-    }
+    TP_CHECK(desc.transport == "memcpy", "Only transport=memcpy is supported");
 }
 
 void GpuCoprocessorSession::start() {
@@ -130,9 +125,7 @@ void GpuCoprocessorSession::start() {
         .stream = gpu_->stream(),
     };
     CoprocessorLauncherFn launch = launcher_ ? launcher_ : &coproc::default_echo_launcher;
-    if (launch(&desc, launcher_ctx_) != 0) {
-        throw std::runtime_error("memcpy: GPU coprocessor persistent kernel launch failed");
-    }
+    TP_CHECK(launch(&desc, launcher_ctx_) == 0, "GPU persistent kernel launch failed");
     kernel_running_ = true;
     // Engine thread: handoff -> reply_ring. Captures exceptions so a throw doesn't terminate.
     engine_ = std::jthread([this](std::stop_token st) {
@@ -147,7 +140,7 @@ void GpuCoprocessorSession::start() {
 
 int GpuCoprocessorSession::collect(void *const * /*replies*/,
                                    const std::uint64_t * /*replies_bytes*/, std::size_t /*n*/) {
-    throw std::logic_error("memcpy: coprocessor collect is not used");
+    throw std::logic_error("Coprocessor collect unused");
 }
 
 void GpuCoprocessorSession::stop() {
@@ -201,15 +194,9 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
 
 std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
                                                    std::size_t out_cap) {
-    if (in_len != sizeof(common::Payload)) {
-        throw std::runtime_error("memcpy: local GPU coprocessor expects one wire-shaped Payload");
-    }
-    if (out_cap < sizeof(std::int64_t)) {
-        throw std::runtime_error("memcpy: reply buffer too small for GPU correction");
-    }
-    if (!kernel_running_) {
-        throw std::runtime_error("memcpy: GPU coprocessor start() must precede process_message");
-    }
+    TP_CHECK(in_len == sizeof(common::Payload), "Expected one wire-shaped Payload");
+    TP_CHECK(out_cap >= sizeof(std::int64_t), "Reply buffer too small for GPU correction");
+    TP_CHECK(kernel_running_, "Call start() before process_message");
     if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_);
     }

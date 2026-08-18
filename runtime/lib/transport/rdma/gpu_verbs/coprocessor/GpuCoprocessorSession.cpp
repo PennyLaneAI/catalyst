@@ -71,7 +71,7 @@ int GpuCoprocessorSession::connect(const ConnectInfo &info) {
 }
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
-    RDMA_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
+    TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
     hbm_ = gpu_.alloc_hbm_ring(size);
     hbm_ring_.emplace(pd_, /*offset=*/static_cast<std::uint64_t>(0), hbm_.size,
                       /*iova=*/reinterpret_cast<std::uint64_t>(hbm_.ptr), hbm_.dmabuf_fd,
@@ -117,9 +117,9 @@ PeerRef GpuCoprocessorSession::exchange_keys(const MemRegion &local) {
 
 void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                               const PeerRef &peer) {
-    RDMA_CHECK(desc.transport == "rdma", "gpu_verbs: only transport \"rdma\" supported");
-    RDMA_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
-               static_cast<std::size_t>(local.size), REGION_BYTES);
+    TP_CHECK(desc.transport == "rdma", "gpu_verbs: only transport \"rdma\" supported");
+    TP_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
+             static_cast<std::size_t>(local.size), REGION_BYTES);
     desc_ = desc;
     local_ = local;
     peer_ = peer;
@@ -159,7 +159,7 @@ bool GpuCoprocessorSession::post_inline(std::uint64_t cursor) {
     wr.wr.rdma.rkey = peer_.rkey;
     ibv_send_wr *bad = nullptr;
     const int rc = ibv_post_send(bwd_qp_->get(), &wr, &bad);
-    RDMA_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));
+    TP_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));
     return signaled;
 }
 
@@ -184,7 +184,7 @@ void GpuCoprocessorSession::reap_bwd(int &outstanding, bool drain) {
         }
         empty = 0;
         for (int k = 0; k < n; ++k) {
-            RDMA_CHECK(wc[k].status == IBV_WC_SUCCESS, "bwd CQE status=%d", wc[k].status);
+            TP_CHECK(wc[k].status == IBV_WC_SUCCESS, "bwd CQE status=%d", wc[k].status);
             --outstanding;
         }
     } while (drain && outstanding > 0);
@@ -249,8 +249,8 @@ void GpuCoprocessorSession::start() {
     };
     CoprocessorLauncherFn launch = coproc_launcher_ ? coproc_launcher_ : &default_echo_launcher;
     const int lrc = launch(&L, coproc_ctx_);
-    RDMA_CHECK(lrc == 0, "gpu_verbs: coprocessor kernel launch failed");
-    // A data-path RDMA_CHECK throws RdmaError; capture it here so it doesn't
+    TP_CHECK(lrc == 0, "gpu_verbs: coprocessor kernel launch failed");
+    // A data-path TP_CHECK throws TransportError; capture it here so it doesn't
     // escape the thread (which would std::terminate), and publish via failed_.
     auto body = [this](std::stop_token st) {
         try {
@@ -283,8 +283,8 @@ int GpuCoprocessorSession::collect(void *const *outputs, const std::uint64_t *ou
     if (n > 0 && outputs && outputs[0]) {
         const std::int64_t w = last_word_.load(std::memory_order_relaxed);
         const std::size_t cap = output_bytes ? output_bytes[0] : sizeof(w);
-        RDMA_CHECK(cap <= sizeof(w), "output capacity (%zu) exceeds the %zu B payload", cap,
-                   sizeof(w));
+        TP_CHECK(cap <= sizeof(w), "output capacity (%zu) exceeds the %zu B payload", cap,
+                 sizeof(w));
         std::memcpy(outputs[0], &w, cap);
     }
     return 0;

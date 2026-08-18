@@ -54,9 +54,9 @@ constexpr bool is_valid_transition(QpState from, QpState to) {
     }
 }
 
-class BadTransition : public RdmaError {
+class BadTransition : public TransportError {
   public:
-    using RdmaError::RdmaError;
+    using TransportError::TransportError;
 };
 
 } // namespace catalyst::transport::common

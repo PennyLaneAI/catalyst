@@ -15,12 +15,13 @@
 #pragma once
 #include <cstddef>
 #include <sstream>
-#include <stdexcept>
+
+#include "Error.hpp"
 
 #include <hip/hip_runtime.h>
 
 /**
- * @brief Macro that throws `std::runtime_error` if a HIP call does not return
+ * @brief Macro that throws `TransportError` if a HIP call does not return
  * hipSuccess, tagged with the source location of the call.
  */
 #define HIP_CHECK(expression, what)                                                                \
@@ -29,7 +30,7 @@
 namespace catalyst::transport::coproc {
 
 /**
- * @brief Throws a `std::runtime_error` describing a failed HIP call.
+ * @brief Throws a `TransportError` describing a failed HIP call.
  */
 inline void _hip_check(hipError_t err, const char *what, const char *file_name, std::size_t line,
                        const char *function_name) {
@@ -39,7 +40,7 @@ inline void _hip_check(hipError_t err, const char *what, const char *file_name, 
     std::stringstream sstream;
     sstream << "[" << file_name << ":" << line << "][Function:" << function_name
             << "] coproc: " << what << ": " << hipGetErrorString(err);
-    throw std::runtime_error(sstream.str());
+    throw ::catalyst::transport::common::TransportError(sstream.str());
 }
 
 } // namespace catalyst::transport::coproc

@@ -41,7 +41,7 @@ void set_tcp_nodelay(int fd) {
 
 FdGuard tcp_listen_accept(std::uint16_t port) {
     FdGuard listener(socket(AF_INET, SOCK_STREAM, 0));
-    RDMA_CHECK_ERRNO(listener.valid(), "socket");
+    TP_CHECK_ERRNO(listener.valid(), "socket");
     int one = 1;
     setsockopt(listener.get(), SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
     sockaddr_in sa{
@@ -49,11 +49,11 @@ FdGuard tcp_listen_accept(std::uint16_t port) {
         .sin_port = htons(port),
         .sin_addr = {.s_addr = INADDR_ANY},
     };
-    RDMA_CHECK_ERRNO(bind(listener.get(), reinterpret_cast<sockaddr *>(&sa), sizeof(sa)) == 0,
-                     "bind(%u)", port);
-    RDMA_CHECK_ERRNO(listen(listener.get(), 1) == 0, "listen");
+    TP_CHECK_ERRNO(bind(listener.get(), reinterpret_cast<sockaddr *>(&sa), sizeof(sa)) == 0,
+                   "bind(%u)", port);
+    TP_CHECK_ERRNO(listen(listener.get(), 1) == 0, "listen");
     FdGuard client(accept(listener.get(), nullptr, nullptr));
-    RDMA_CHECK_ERRNO(client.valid(), "accept");
+    TP_CHECK_ERRNO(client.valid(), "accept");
     set_tcp_nodelay(client.get());
     return client; // listener closed by its FdGuard on return
 }
@@ -69,19 +69,19 @@ FdGuard tcp_connect(const char *host, std::uint16_t port) {
     std::snprintf(port_str, sizeof(port_str), "%u", port);
     addrinfo *res = nullptr;
     int rc = getaddrinfo(host, port_str, &hints, &res);
-    RDMA_CHECK(rc == 0, "getaddrinfo(%s:%s): %s", host, port_str, gai_strerror(rc));
+    TP_CHECK(rc == 0, "getaddrinfo(%s:%s): %s", host, port_str, gai_strerror(rc));
     std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> res_guard(res, freeaddrinfo);
 
     for (int attempt = 0; attempt < CONNECT_ATTEMPTS; attempt++) {
         FdGuard s(socket(res->ai_family, res->ai_socktype, res->ai_protocol));
-        RDMA_CHECK_ERRNO(s.valid(), "socket");
+        TP_CHECK_ERRNO(s.valid(), "socket");
         if (connect(s.get(), res->ai_addr, res->ai_addrlen) == 0) {
             set_tcp_nodelay(s.get());
             return s;
         }
         std::this_thread::sleep_for(CONNECT_RETRY_DELAY);
     }
-    RDMA_FAIL("tcp_connect(%s:%u) failed after %d attempts", host, port, CONNECT_ATTEMPTS);
+    TP_FAIL("tcp_connect(%s:%u) failed after %d attempts", host, port, CONNECT_ATTEMPTS);
 }
 
 void send_exact(int fd, const void *buf, std::size_t n) {
@@ -93,7 +93,7 @@ void send_exact(int fd, const void *buf, std::size_t n) {
             if (errno == EINTR) {
                 continue; // interrupted by signal; retry
             }
-            RDMA_FAIL("send: %s", std::strerror(errno));
+            TP_FAIL("send: %s", std::strerror(errno));
         }
         done += static_cast<std::size_t>(r);
     }
@@ -108,9 +108,9 @@ void recv_exact(int fd, void *buf, std::size_t n) {
             if (errno == EINTR) {
                 continue; // interrupted by signal; retry
             }
-            RDMA_FAIL("recv: %s", std::strerror(errno));
+            TP_FAIL("recv: %s", std::strerror(errno));
         }
-        RDMA_CHECK(r > 0, "recv: peer closed connection (%zu/%zu bytes)", done, n);
+        TP_CHECK(r > 0, "recv: peer closed connection (%zu/%zu bytes)", done, n);
         done += static_cast<std::size_t>(r);
     }
 }

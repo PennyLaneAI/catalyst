@@ -16,8 +16,8 @@
 
 #include <chrono>
 #include <cstring>
-#include <stdexcept>
 
+#include "Error.hpp"
 #include "WireProtocol.hpp"
 
 namespace catalyst::transport::memcpy {
@@ -43,18 +43,13 @@ CpuControllerSession::~CpuControllerSession() {
 int CpuControllerSession::connect(const ConnectInfo & /*info*/) {
     link_ = acquire_memcpy_link(pair_key_);
     std::lock_guard<std::mutex> lock(link_->mu);
-    if (link_->controller) {
-        throw std::runtime_error("memcpy: another controller is already bound to session pair '" +
-                                 pair_key_ + "'");
-    }
+    TP_CHECK(!link_->controller, "Controller already bound to pair '%s'", pair_key_.c_str());
     link_->controller = this;
     return 0;
 }
 
 MemRegion CpuControllerSession::alloc_memory(std::size_t size, MemKind kind) {
-    if (kind != MemKind::CpuRam) {
-        throw std::runtime_error("CPU device can only allocate CpuRam");
-    }
+    TP_CHECK(kind == MemKind::CpuRam, "CPU device can only allocate CpuRam");
     caller_memory_regions_.push_back(size ? std::make_unique<std::byte[]>(size)
                                           : std::unique_ptr<std::byte[]>{});
     return MemRegion{
@@ -73,9 +68,7 @@ PeerRef CpuControllerSession::exchange_keys(const MemRegion &local) {
 
 void CpuControllerSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                              const PeerRef & /*peer*/) {
-    if (desc.transport != "memcpy") {
-        throw std::runtime_error("only transport=memcpy is supported");
-    }
+    TP_CHECK(desc.transport == "memcpy", "Only transport=memcpy is supported");
     local_reply_ = local;
 }
 
@@ -86,17 +79,11 @@ void CpuControllerSession::start() {
 
 int CpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                   std::size_t n) {
-    if (n > 1) {
-        throw std::runtime_error("memcpy: only a single reply slot (n<=1) is supported");
-    }
-    if (!local_reply_.addr) {
-        throw std::runtime_error("memcpy: controller reply region is not established");
-    }
+    TP_CHECK(n <= 1, "Only one reply slot supported (n<=1)");
+    TP_CHECK(local_reply_.addr, "Reply region not established");
 
     const std::uint64_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
-    if (reply_bytes_ > cap) {
-        throw std::runtime_error("memcpy: caller reply buffer too small");
-    }
+    TP_CHECK(reply_bytes_ <= cap, "Caller reply buffer too small");
     if (n > 0 && replies && replies[0] && reply_bytes_ != 0) {
         std::memcpy(replies[0], local_reply_.addr, static_cast<std::size_t>(reply_bytes_));
     }
@@ -109,18 +96,13 @@ void CpuControllerSession::stop() {}
 
 void CpuControllerSession::commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
                                             std::uint64_t out_bytes) {
-    if (work_item_idx != 0) {
-        throw std::runtime_error("memcpy: only work_item_idx=0 is supported");
-    }
+    TP_CHECK(work_item_idx == 0, "Only work_item_idx=0 supported");
     // The wire carries an 8-byte payload; anything larger would be silently truncated in kick().
     // Match the RDMA backend's contract (rdma/cpu_verbs/.../CpuControllerSession.cpp) rather than
     // accepting and dropping bytes.
-    if (in_bytes > common::PAYLOAD_DATA_BYTES || out_bytes > common::PAYLOAD_DATA_BYTES) {
-        throw std::runtime_error("memcpy: in/out_bytes exceeds the 8 B payload data area");
-    }
-    if (committed_) {
-        throw std::runtime_error("memcpy: commit_work_item can only be called once per session");
-    }
+    TP_CHECK(in_bytes <= common::PAYLOAD_DATA_BYTES && out_bytes <= common::PAYLOAD_DATA_BYTES,
+             "In/out_bytes exceeds 8 B payload area");
+    TP_CHECK(!committed_, "Only one commit_work_item per session");
     in_bytes_ = in_bytes;
     out_bytes_ = out_bytes;
     staged_bytes_ = 0;
@@ -129,15 +111,9 @@ void CpuControllerSession::commit_work_item(std::uint32_t work_item_idx, std::ui
 }
 
 int CpuControllerSession::kick(std::uint32_t work_item_idx) {
-    if (work_item_idx != 0) {
-        throw std::runtime_error("memcpy: only work_item_idx=0 is supported");
-    }
-    if (!link_) {
-        throw std::runtime_error("memcpy: no paired coprocessor");
-    }
-    if (local_reply_.size < out_bytes_) {
-        throw std::runtime_error("memcpy: local reply region too small for committed output");
-    }
+    TP_CHECK(work_item_idx == 0, "Only work_item_idx=0 supported");
+    TP_CHECK(link_, "No paired coprocessor");
+    TP_CHECK(local_reply_.size >= out_bytes_, "Reply region too small for committed out_bytes");
 
     kick_ns_ = now_ns();
 
@@ -157,9 +133,7 @@ int CpuControllerSession::kick(std::uint32_t work_item_idx) {
     {
         // Held across check and call so teardown can't clear process_message mid-call.
         std::lock_guard<std::mutex> lock(link_->mu);
-        if (!link_->process_message) {
-            throw std::runtime_error("memcpy: no paired coprocessor");
-        }
+        TP_CHECK(link_->process_message, "No paired coprocessor");
         reply_bytes = link_->process_message(&frame, sizeof(frame), local_reply_.addr,
                                              static_cast<std::size_t>(out_bytes_));
     }
@@ -173,12 +147,8 @@ void *CpuControllerSession::data_slot() {
 
 void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
                                            std::uint32_t decoder_id) {
-    if (bytes > in_bytes_) {
-        throw std::runtime_error("memcpy: payload exceeds committed input bytes");
-    }
-    if (bytes != 0 && src == nullptr) {
-        throw std::runtime_error("memcpy: null source with non-zero payload size");
-    }
+    TP_CHECK(bytes <= in_bytes_, "Payload exceeds committed in_bytes");
+    TP_CHECK(bytes == 0 || src != nullptr, "Null source with non-zero payload");
     if (bytes != 0) {
         std::memcpy(request_staging_.data(), src, static_cast<std::size_t>(bytes));
     }

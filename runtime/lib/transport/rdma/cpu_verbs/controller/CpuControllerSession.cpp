@@ -51,10 +51,10 @@ void CpuControllerSession::stop() {
 // just recorded (out_bytes_ caps the reply in collect()).
 void CpuControllerSession::commit_work_item(std::uint32_t /*work_item_idx*/, std::uint64_t in_bytes,
                                             std::uint64_t out_bytes) {
-    RDMA_CHECK(in_bytes <= PAYLOAD_DATA_BYTES, "in_bytes (%zu) exceeds the %zu B payload",
-               static_cast<std::size_t>(in_bytes), PAYLOAD_DATA_BYTES);
-    RDMA_CHECK(out_bytes <= PAYLOAD_DATA_BYTES, "out_bytes (%zu) exceeds the %zu B payload",
-               static_cast<std::size_t>(out_bytes), PAYLOAD_DATA_BYTES);
+    TP_CHECK(in_bytes <= PAYLOAD_DATA_BYTES, "in_bytes (%zu) exceeds the %zu B payload",
+             static_cast<std::size_t>(in_bytes), PAYLOAD_DATA_BYTES);
+    TP_CHECK(out_bytes <= PAYLOAD_DATA_BYTES, "out_bytes (%zu) exceeds the %zu B payload",
+             static_cast<std::size_t>(out_bytes), PAYLOAD_DATA_BYTES);
     in_bytes_ = in_bytes;
     out_bytes_ = out_bytes;
 }
@@ -66,8 +66,8 @@ void *CpuControllerSession::data_slot() {
 
 void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
                                            std::uint32_t decoder_id) {
-    RDMA_CHECK(bytes <= in_bytes_, "payload (%zu B) exceeds the %zu B committed for this round",
-               static_cast<std::size_t>(bytes), static_cast<std::size_t>(in_bytes_));
+    TP_CHECK(bytes <= in_bytes_, "payload (%zu B) exceeds the %zu B committed for this round",
+             static_cast<std::size_t>(bytes), static_cast<std::size_t>(in_bytes_));
     Payload *send = send_payload();
     send->value = 0;
     std::memcpy(&send->value, src, bytes);
@@ -103,10 +103,10 @@ int CpuControllerSession::collect(void *const *replies, const std::uint64_t *rep
     ++next_recv_;
     if (n > 0 && replies && replies[0] && replies[0] != &r->value) {
         const std::size_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
-        RDMA_CHECK(cap <= PAYLOAD_DATA_BYTES,
-                   "reply capacity (%zu) exceeds the %zu B payload; a round carries one "
-                   "error index",
-                   cap, PAYLOAD_DATA_BYTES);
+        TP_CHECK(cap <= PAYLOAD_DATA_BYTES,
+                 "reply capacity (%zu) exceeds the %zu B payload; a round carries one "
+                 "error index",
+                 cap, PAYLOAD_DATA_BYTES);
         std::memcpy(replies[0], &r->value, cap);
     }
     return 0;

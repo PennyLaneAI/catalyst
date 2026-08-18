@@ -23,7 +23,7 @@ namespace catalyst::transport::common {
 Context::Context(const std::string &dev_name) {
     int n = 0;
     ibv_device **devs = ibv_get_device_list(&n);
-    RDMA_CHECK_ERRNO(devs && n > 0, "ibv_get_device_list");
+    TP_CHECK_ERRNO(devs && n > 0, "ibv_get_device_list");
     auto it = std::find_if(devs, devs + n,
                            [&](ibv_device *d) { return dev_name == ibv_get_device_name(d); });
     ibv_device *dev = (it != devs + n) ? *it : nullptr;
@@ -34,12 +34,12 @@ Context::Context(const std::string &dev_name) {
             avail += ibv_get_device_name(devs[i]);
         }
         ibv_free_device_list(devs);
-        RDMA_FAIL("device %s not found (available: %s)", dev_name.c_str(),
-                  avail.empty() ? "<none>" : avail.c_str());
+        TP_FAIL("device %s not found (available: %s)", dev_name.c_str(),
+                avail.empty() ? "<none>" : avail.c_str());
     }
     ctx_ = ibv_open_device(dev);
     ibv_free_device_list(devs);
-    RDMA_CHECK_ERRNO(ctx_, "ibv_open_device(%s)", dev_name.c_str());
+    TP_CHECK_ERRNO(ctx_, "ibv_open_device(%s)", dev_name.c_str());
 }
 Context::~Context() {
     if (ctx_) {
@@ -50,13 +50,13 @@ ibv_context *Context::get() const { return ctx_; }
 ibv_port_attr Context::port_attr(std::uint8_t port) const {
     ibv_port_attr attr{};
     const int rc = ibv_query_port(ctx_, port, &attr);
-    RDMA_CHECK(rc == 0, "ibv_query_port(%u) rc=%d (%s)", port, rc, std::strerror(rc));
+    TP_CHECK(rc == 0, "ibv_query_port(%u) rc=%d (%s)", port, rc, std::strerror(rc));
     return attr;
 }
 ibv_gid Context::gid(std::uint8_t port, int idx) const {
     ibv_gid gid{};
     const int rc = ibv_query_gid(ctx_, port, idx, &gid);
-    RDMA_CHECK(rc == 0, "ibv_query_gid(%u,%d) rc=%d (%s)", port, idx, rc, std::strerror(rc));
+    TP_CHECK(rc == 0, "ibv_query_gid(%u,%d) rc=%d (%s)", port, idx, rc, std::strerror(rc));
     return gid;
 }
 } // namespace catalyst::transport::common

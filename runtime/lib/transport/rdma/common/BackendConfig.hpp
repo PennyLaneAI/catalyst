@@ -47,7 +47,7 @@ inline BackendConfig parse_backend_config(const std::string &config) {
     bool have_dev = false, have_gid = false;
     configparser::for_each_kv(config, [&](std::string_view key, std::string_view val) {
         if (key == "dev") {
-            RDMA_CHECK(!val.empty(), "config: 'dev' must not be empty");
+            TP_CHECK(!val.empty(), "config: 'dev' must not be empty");
             dev = std::string(val);
             have_dev = true;
         } else if (key == "gid") {
@@ -55,9 +55,9 @@ inline BackendConfig parse_backend_config(const std::string &config) {
             have_gid = true;
         }
     });
-    RDMA_CHECK(have_dev && have_gid,
-               "config requires both 'dev' and 'gid' (e.g. \"dev=rxe0;gid=1\"), got \"%s\"",
-               config.c_str());
+    TP_CHECK(have_dev && have_gid,
+             "config requires both 'dev' and 'gid' (e.g. \"dev=rxe0;gid=1\"), got \"%s\"",
+             config.c_str());
     return BackendConfig{std::move(dev), gid};
 }
 
