@@ -122,16 +122,16 @@ static int launch_noexcept(const CoprocLaunchDesc *desc) noexcept {
     }
 }
 
-extern "C" int catalyst_gpu_echo_launcher(const CoprocLaunchDesc *desc, void *) {
+extern "C" int gpu_echo_launcher(const CoprocLaunchDesc *desc, void *) {
     return launch_noexcept<echo_decode>(desc);
 }
 
-extern "C" int catalyst_gpu_steane_launcher(const CoprocLaunchDesc *desc, void *) {
+extern "C" int gpu_steane_launcher(const CoprocLaunchDesc *desc, void *) {
     return launch_noexcept<steane_decode>(desc);
 }
 
 int default_echo_launcher(const CoprocLaunchDesc *desc, void *ctx) {
-    return catalyst_gpu_echo_launcher(desc, ctx);
+    return gpu_echo_launcher(desc, ctx);
 }
 
 } // namespace catalyst::transport::gpu_verbs
