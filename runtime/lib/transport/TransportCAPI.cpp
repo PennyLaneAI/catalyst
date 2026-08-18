@@ -443,7 +443,8 @@ std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s) {
 //     CATALYST_BENCH_PROGRESS: Print progress information.
 int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uint32_t iters,
                                            std::uint32_t decoder_id, std::uint32_t flags,
-                                           std::uint64_t *samples, std::uint64_t *rounds) {
+                                           std::uint64_t *samples, std::uint64_t samples_bytes,
+                                           std::uint64_t *rounds) {
     if (rounds) {
         *rounds = 0;
     }
@@ -451,6 +452,15 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
     if (!c || (iters && !samples)) {
         return CATALYST_TRANSPORT_ERR;
     }
+
+    const std::uint64_t samples_wanted = static_cast<std::uint64_t>(iters) * sizeof(std::uint64_t);
+    if (samples_bytes < samples_wanted) {
+        std::cerr << "[transport] start_benchmark: samples buffer is " << samples_bytes
+                  << " B, short of the " << samples_wanted << " B that " << iters
+                  << " rounds report\n";
+        return CATALYST_TRANSPORT_ERR;
+    }
+
     if (!s->work_item_ready) {
         std::cerr << "[transport] start_benchmark: no work item committed; call "
                      "commit_work_item first so the round's sizes are known\n";

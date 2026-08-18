@@ -327,14 +327,21 @@ CatalystWrapperResult __catalyst__transport__start_benchmark__wrapper(const char
     auto iters = in.get<std::uint32_t>();
     auto decoder_id = in.get<std::uint32_t>();
     auto flags = in.get<std::uint32_t>();
+    auto samples_bytes = in.get<std::uint64_t>();
 
-    Out out(I32 + static_cast<std::size_t>(iters) * U64 + U64);
+    if (samples_bytes > SIZE_MAX - I32 - U64) {
+        return wrapper_error("transport: start_benchmark was given a samples buffer size that is "
+                             "not a size");
+    }
+
+    Out out(I32 + static_cast<std::size_t>(samples_bytes) + U64);
     if (in.ok() && out) {
         std::int32_t *status = out.slot<std::int32_t>();
-        auto *samples = static_cast<std::uint64_t *>(out.reserve(iters * U64));
+        // reserve the samples buffer with the caller's capacity
+        auto *samples = static_cast<std::uint64_t *>(out.reserve(samples_bytes));
         auto *rounds = out.slot<std::uint64_t>();
         *status = __catalyst__transport__start_benchmark(session, iters, decoder_id, flags, samples,
-                                                         rounds);
+                                                         samples_bytes, rounds);
     }
     return finish(in, out);
 }
@@ -489,12 +496,12 @@ void __catalyst__transport__last_rtt_ns__call(void **args, void **results) {
 //===----------------------------------------------------------------------===//
 
 void __catalyst__transport__start_benchmark__call(void **args, void **results) {
-    put<std::int32_t>(results, 0,
-                      __catalyst__transport__start_benchmark(
-                          session_arg(args, 0), arg<std::uint32_t>(args, 1),
-                          arg<std::uint32_t>(args, 2), arg<std::uint32_t>(args, 3),
-                          static_cast<std::uint64_t *>(data_of(results, 1)),
-                          static_cast<std::uint64_t *>(data_of(results, 2))));
+    put<std::int32_t>(
+        results, 0,
+        __catalyst__transport__start_benchmark(
+            session_arg(args, 0), arg<std::uint32_t>(args, 1), arg<std::uint32_t>(args, 2),
+            arg<std::uint32_t>(args, 3), static_cast<std::uint64_t *>(data_of(results, 1)),
+            arg<std::uint64_t>(args, 4), static_cast<std::uint64_t *>(data_of(results, 2))));
 }
 
 //===----------------------------------------------------------------------===//
