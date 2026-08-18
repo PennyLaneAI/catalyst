@@ -129,7 +129,14 @@
   [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
 
 * The `resource-analysis` pass JSON output now includes `depth` for worst-case PBC layer depth
-  (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
+  (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry, including
+  commuting vs disjoint-qubit layer grouping and worst-case depth across ``scf.if`` /
+  ``scf.index_switch`` branches and statically-bounded ``scf.for`` loops.
+  [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
+  [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
+  [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
+  [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
+  [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
 * The `resource-analysis` pass now supports pluggable resource metrics through the
@@ -293,7 +300,7 @@
 
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
   the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
-  (``any_commuting_depth`` / ``qubit_disjoint_depth``) with the same functionality.
+  (``any_commuting_depth`` / ``qubit_disjoint_depth``).
   [(#3081)](https://github.com/PennyLaneAI/catalyst/pull/3081)
 
 * Removes the non-graph decomposition fallback when `capture=True` is enabled.
