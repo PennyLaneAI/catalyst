@@ -24,10 +24,10 @@ from pennylane.backline import Transport
 from catalyst import Executor, qjit
 from catalyst.backline import (
     _TRANSPORT_PASSES,
-    _resolve_backend,
     _insert_passes,
     _qec_pass_specs,
     _realize_executor,
+    _resolve_backend,
     _resolve_backend_lib,
     device_pass_pipeline,
     launch_executors,
