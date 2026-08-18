@@ -139,8 +139,8 @@ def _out_of_process(node: Node) -> bool:
 def _node_dict(node: Node, role: str, transport: str) -> dict:
     """Map a backline node to a ``catalyst.backline`` node dict. Reads ``node.executor`` as-is.
 
-    ``comm_host``/``oob_port`` are coprocessor-only; a controller
-    carries no connection endpoint of its own.
+    Coprocessor connection information is carried by ``endpoint`` in current PennyLane Backline;
+    a controller carries no connection endpoint of its own.
 
     Args:
         node: A backline node.
@@ -154,12 +154,13 @@ def _node_dict(node: Node, role: str, transport: str) -> dict:
     if role == "controller":
         d["in_bytes"] = node.in_bytes
         d["out_bytes"] = node.out_bytes
-    comm_host = getattr(node, "comm_host", None)
-    if comm_host is not None:
-        d["peer"] = comm_host
-    oob_port = getattr(node, "oob_port", None)
-    if oob_port is not None:
-        d["oob_port"] = oob_port
+
+    endpoint = getattr(node, "endpoint", None)
+    if endpoint is not None:
+        d["peer"] = endpoint.host
+        if endpoint.port is not None:
+            d["oob_port"] = endpoint.port
+
     hardware = getattr(node, "hardware", None)
     if hardware is not None and not (node.init_args or {}).get("backend_lib"):
         d["backend_lib"] = _resolve_backend_lib(transport, hardware, role, bool(node.remote))
