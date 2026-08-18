@@ -24,7 +24,7 @@ from pennylane.backline import Transport
 from catalyst import Executor, qjit
 from catalyst.backline import (
     _TRANSPORT_PASSES,
-    _backend_for,
+    _resolve_backend,
     _insert_passes,
     _qec_pass_specs,
     _realize_executor,
@@ -490,12 +490,12 @@ class TestBackendResolution:
     )
     def test_transport_and_hardware_select_backend(self, transport, hardware, backend):
         """Concrete backend names remain a Catalyst implementation detail."""
-        assert _backend_for(transport, hardware) == backend
+        assert _resolve_backend(transport, hardware) == backend
 
     def test_unsupported_transport_hardware_pair_is_rejected(self):
         """A transport must have an implementation for the requested hardware."""
         with pytest.raises(ValueError, match="transport='memcpy', hardware='fpga'"):
-            _backend_for("memcpy", "fpga")
+            _resolve_backend("memcpy", "fpga")
 
     def test_nested_cmake_backend_is_found(self, fake_lib_dir):
         """A bare CMake build nests RDMA backends below the transport directory."""

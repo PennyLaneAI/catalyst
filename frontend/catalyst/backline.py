@@ -66,7 +66,8 @@ _BACKENDS = {
 _BACKEND_PATH_ENV = "CATALYST_TRANSPORT_PATH"
 _BACKEND_SUBDIR = "transport"
 _BACKEND_LIB_EXTS = ("so", "dylib")
-def _backend_for(transport: str, hardware: str) -> str:
+
+def _resolve_backend(transport: str, hardware: str) -> str:
     """Return Catalyst's concrete backend for a transport and hardware pair."""
     try:
         return _BACKENDS[(transport, hardware)]
@@ -108,7 +109,7 @@ def _resolve_backend_lib(transport: str, hardware: str, role: str, remote: bool)
         ValueError: If the transport/hardware pair is unsupported or no library matches on a local
             node, naming every directory searched.
     """
-    backend = _backend_for(transport, hardware)
+    backend = _resolve_backend(transport, hardware)
     names = [f"libcatalyst_transport_{backend}_{role}.{ext}" for ext in _BACKEND_LIB_EXTS]
     if remote:
         return names[0]
