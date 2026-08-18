@@ -365,7 +365,9 @@ def compile_decomposition_rules(
 
     call_kwargs = dict(kwargs)
     if wrap_control:
-        call_kwargs[ctrl_wire_key] = jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int)
+        call_kwargs[ctrl_wire_key] = jnp.array(
+            range(n_base_wires, n_base_wires + n_ctrl), dtype=int
+        )
 
     @qp.qjit(target="mlir", capture=True, skip_decomp_rules=True)
     @qp.qnode(device=device)
@@ -524,7 +526,9 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 ]
                 out.extend(controlled)
             except Exception as e:  # pylint: disable=broad-except
-                warnings.warn(f"Failed to synthesize distributed control rules for {ctrl_name}: {e}")
+                warnings.warn(
+                    f"Failed to synthesize distributed control rules for {ctrl_name}: {e}"
+                )
         return out
 
     rules = compile_variants(op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data)

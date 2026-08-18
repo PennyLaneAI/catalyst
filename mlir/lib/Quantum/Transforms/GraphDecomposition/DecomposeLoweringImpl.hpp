@@ -244,7 +244,8 @@ class BaseSignatureAnalyzer {
         }
 
         // Pass the control values only if the rule has a slot for them
-        if (!signature.inCtrlValues.empty() && operandIdx < static_cast<int>(funcInputsNoQreg.size())) {
+        if (!signature.inCtrlValues.empty() &&
+            operandIdx < static_cast<int>(funcInputsNoQreg.size())) {
             operands[operandIdx] = fromTensorOrAsIs(signature.inCtrlValues,
                                                     funcInputsNoQreg[operandIdx], rewriter, loc);
             operandIdx++;
