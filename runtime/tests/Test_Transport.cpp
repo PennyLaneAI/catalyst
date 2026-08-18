@@ -156,6 +156,22 @@ TEST_CASE("destroy drains outstanding async tokens without a prior barrier", "[t
     SUCCEED();
 }
 
+TEST_CASE("create rejects a session key containing ';'", "[transport]") {
+    // The key is spliced into the config as `pair=<key>`. A ';' in the key would silently split
+    // the config into two entries instead of one; refuse rather than misparse.
+    auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "cfg",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "bad;key");
+    CHECK(s == nullptr);
+}
+
+TEST_CASE("create rejects a config that already sets the reserved 'pair' key", "[transport]") {
+    // `pair=` is reserved for the compiler-emitted session key. If a caller sets it, ours and
+    // theirs would coexist and the backend would silently pick one; refuse rather than shadow.
+    auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "pair=caller_supplied",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "reserved_key");
+    CHECK(s == nullptr);
+}
+
 TEST_CASE("memcpy backend plugins round-trip through the transport CAPI", "[transport]") {
     auto *ct = make_memcpy_controller("memcpy_roundtrip");
     auto *co = make_memcpy_coprocessor("memcpy_roundtrip");

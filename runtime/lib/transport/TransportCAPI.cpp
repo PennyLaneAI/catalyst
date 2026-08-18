@@ -29,6 +29,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "ConfigParser.hpp"
 #include "DynamicLibraryLoader.hpp"
 #include "Transport.hpp"
 #include "TransportBackend.h"
@@ -204,6 +205,40 @@ void drain_pending(CatalystTransportSession *s) {
     }
 }
 
+// Fold the compiler-emitted session key (unique per controller/coprocessor pair, as emitted by
+// inject-transport-session in MLIR) into the config as `pair=<key>` so backends that need to
+// pair endpoints in-process (e.g. memcpy) share one identifier for both sides. Transparent to
+// backends that don't parse `pair`.
+std::string fold_pair_key(const char *config, const char *key) {
+    std::string cfg = config ? config : "";
+    if (!key || !*key) {
+        return cfg;
+    }
+    const std::string_view k(key);
+    if (k.find(';') != std::string_view::npos) {
+        throw std::runtime_error("session key must not contain ';' (got '" + std::string(k) +
+                                 "'); it would split the backend config into two entries");
+    }
+    // A caller-supplied `pair=` and ours would coexist, and the backend would silently pick one.
+    bool reserved_in_use = false;
+    catalyst::transport::common::configparser::for_each_kv(
+        cfg, [&](std::string_view entry_key, std::string_view) {
+            if (entry_key == "pair") {
+                reserved_in_use = true;
+            }
+        });
+    if (reserved_in_use) {
+        throw std::runtime_error("backend config must not set 'pair'; it is reserved for the "
+                                 "compiler-emitted session key");
+    }
+    if (!cfg.empty()) {
+        cfg += ";";
+    }
+    cfg += "pair=";
+    cfg += k;
+    return cfg;
+}
+
 // Try the plugin handle first, then the process-global namespace (main image).
 void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *symbol) {
     dlerror();
@@ -229,18 +264,7 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
         }
         auto h = std::make_unique<CatalystTransportSession>();
         h->backend = std::make_unique<DynamicLibraryLoader>(backend_lib);
-        // Fold the session key (unique per controller/coprocessor pair, as emitted by
-        // inject-transport-session in MLIR) into the config as `pair=<key>` so backends that
-        // need to pair endpoints in-process (e.g. memcpy) share one identifier for both
-        // sides. This is transparent to backends that don't parse `pair`.
-        std::string cfg = config ? config : "";
-        if (key && *key) {
-            if (!cfg.empty()) {
-                cfg += ";";
-            }
-            cfg += "pair=";
-            cfg += key;
-        }
+        const std::string cfg = fold_pair_key(config, key);
         if (role == CATALYST_TRANSPORT_ROLE_COPROCESSOR) {
             auto *factory = h->backend->getSymbol<CatalystTransportCoprocessorFactoryFn *>(
                 CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL);
