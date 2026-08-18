@@ -200,42 +200,54 @@ if(ENABLE_TRANSPORT)
     add_dependencies(runner_tests_transport stub_transport_backend)
     catch_discover_tests(runner_tests_transport)
 
-    # CPU-verbs backend: device-agnostic common primitives (RDMA-backed; SKIP without rxe0).
-    add_executable(runner_tests_transport_common)
-    target_sources(runner_tests_transport_common PRIVATE
-        Test_TransportCommon.cpp
-        Test_TransportWireProtocol.cpp
-    )
-    target_link_libraries(runner_tests_transport_common PRIVATE
-        Catch2WithMain
-        catalyst_runtime_testing
-        transport_common
-    )
-    catch_discover_tests(runner_tests_transport_common)
-
-    # CPU-verbs backend: both controller and coprocessor (requires RDMA - skip without rxe0).
-    add_executable(runner_tests_transport_cpu)
-    target_sources(runner_tests_transport_cpu PRIVATE
-        Test_TransportCpuVerbs.cpp
-    )
-    target_link_libraries(runner_tests_transport_cpu PRIVATE
-        Catch2WithMain
-        catalyst_runtime_testing
-        cpu_verbs_impl
-    )
-    catch_discover_tests(runner_tests_transport_cpu)
-
-    if(TRANSPORT_HAS_HIP)
-        add_executable(runner_tests_transport_gpu)
-        target_sources(runner_tests_transport_gpu PRIVATE
-            Test_TransportGpu.cpp
+    if(IBVERBS_LIB)
+        # CPU-verbs backend: device-agnostic common primitives (RDMA-backed; SKIP without rxe0).
+        add_executable(runner_tests_transport_common)
+        target_sources(runner_tests_transport_common PRIVATE
+            Test_TransportCommon.cpp
+            Test_TransportWireProtocol.cpp
         )
-        target_link_libraries(runner_tests_transport_gpu PRIVATE
+        target_link_libraries(runner_tests_transport_common PRIVATE
             Catch2WithMain
             catalyst_runtime_testing
-            catalyst_transport_gpu_verbs_coprocessor
+            transport_common
         )
-        catch_discover_tests(runner_tests_transport_gpu)
+        catch_discover_tests(runner_tests_transport_common)
+
+        # CPU-verbs backend: both controller and coprocessor (requires RDMA - skip without rxe0).
+        add_executable(runner_tests_transport_cpu)
+        target_sources(runner_tests_transport_cpu PRIVATE
+            Test_TransportCpuVerbs.cpp
+        )
+        target_link_libraries(runner_tests_transport_cpu PRIVATE
+            Catch2WithMain
+            catalyst_runtime_testing
+            cpu_verbs_impl
+        )
+        catch_discover_tests(runner_tests_transport_cpu)
+
+        if(TRANSPORT_HAS_HIP)
+            add_executable(runner_tests_transport_gpu)
+            target_sources(runner_tests_transport_gpu PRIVATE
+                Test_TransportGpu.cpp
+            )
+            target_link_libraries(runner_tests_transport_gpu PRIVATE
+                Catch2WithMain
+                catalyst_runtime_testing
+                catalyst_transport_gpu_verbs_coprocessor
+            )
+            catch_discover_tests(runner_tests_transport_gpu)
+        endif()
+    endif()
+
+    add_custom_target(transport_tests_all)
+    add_dependencies(transport_tests_all runner_tests_transport)
+    if(IBVERBS_LIB)
+        add_dependencies(transport_tests_all runner_tests_transport_common
+                         runner_tests_transport_cpu)
+        if(TRANSPORT_HAS_HIP)
+            add_dependencies(transport_tests_all runner_tests_transport_gpu)
+        endif()
     endif()
 endif()
 
