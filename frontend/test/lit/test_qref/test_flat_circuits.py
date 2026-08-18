@@ -52,7 +52,6 @@ def test_custom_op(i: int):
     # CHECK: qref.custom "SWAP"() [[q1]], [[q2]] : !qref.bit, !qref.bit
     qp.SWAP([1, 2])
 
-    # A `qml.ctrl` over a quantum function lowers to a `qref.ctrl` region (the control is applied
     # over the whole region, distributed onto individual gates later by the `ctrl-lowering` pass).
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
     # CHECK: qref.ctrl([[q0]]) ctrlvals([[true]]) {

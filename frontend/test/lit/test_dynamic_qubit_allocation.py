@@ -231,7 +231,6 @@ def test_quantum_subroutine():
     # CHECK:   qref.custom "PauliX"() %arg1 : !qref.bit
     # CHECK:   qref.custom "PauliY"() %arg2 : !qref.bit
     # CHECK:   qref.custom "PauliZ"() %arg3 : !qref.bit
-    # A `qml.ctrl` over a quantum function lowers to a `qref.ctrl` region.
     # CHECK:   qref.ctrl(%arg1, %arg2) ctrlvals([[true]], [[true]]) {
     # CHECK:   [[glob_0:%.+]] = qref.get %arg0[ 0] : !qref.reg<1> -> !qref.bit
     # CHECK:   [[angle:%.+]] = tensor.extract %arg4[] : tensor<f64>
