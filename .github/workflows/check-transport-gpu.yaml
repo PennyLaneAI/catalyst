@@ -116,7 +116,3 @@ jobs:
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
 
-      - name: Clean up runtime build artifacts
-        if: always()
-        run: |
-          rm -rf "$(pwd)/runtime-build"
