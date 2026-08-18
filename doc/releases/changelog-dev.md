@@ -16,6 +16,10 @@
   [(#3096)](https://github.com/PennyLaneAI/catalyst/pull/3096)
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
 
+* Controlling a quantum function with `qp.ctrl` with capture enabled now lowers to a
+  `quantum.ctrl` region instead of unrolling the control onto each individual gate.
+  [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
