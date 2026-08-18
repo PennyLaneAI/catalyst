@@ -380,8 +380,8 @@ def module_attributes(device: Device) -> dict[str, str]:
     # Only a controller is tagged here, because a QNode is always the controller. The coprocessor
     # runs a precompiled function, so it is not traced from Python and nothing on this side captures
     # its code. ``inject-transport-session`` creates the coprocessor's module itself and sets its
-    # role there. 
-    # A controller running in this process needs no module of its own either, 
+    # role there.
+    # A controller running in this process needs no module of its own either,
     # so only a dispatched one is tagged.
     controller = getattr(getattr(device, "placement", None), "controller", None)
     if controller is not None and controller.remote:
