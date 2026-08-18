@@ -377,7 +377,7 @@ def test_remote_controller_behind_a_wrapper_is_still_tagged(use_capture):
         name="ctrl",
         remote=True,
         executor_options={"address": "ctrl:1"},
-        init_args={"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"},
+        init_args={"backend_lib": "backend.so", "config": "cfg"},
     )
     dev = qp.Backline(controller=ctrl, transport="net")
 
@@ -828,8 +828,8 @@ class TestExecutorRealization:
         assert ex.address == "127.0.0.1:7810"  # the local end of the ssh tunnel
         launch.assert_not_called()
 
-    def test_label_seeds_the_executor_name(self):
-        """The node's label names the executor, which uses it for its logs."""
+    def test_name_seeds_the_executor_name(self):
+        """The node's name names the executor, which uses it for its logs."""
         node = _controller(executor_options={"address": "10.0.0.9:1373"})
         assert _realize_executor(node).name == "ctrl"
 
