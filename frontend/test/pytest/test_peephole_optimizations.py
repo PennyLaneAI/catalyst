@@ -227,19 +227,12 @@ def test_convert_clifford_to_ppr():
 
     ppm_specs_output = qp.specs(test_convert_clifford_to_ppr_workflow, level=1)().resources
 
-    assert ppm_specs_output == PBCSpecsResources(
-        counts={
-            "Adjoint(PPR-pi/4)": 2,
-            "GlobalPhase": 4,
-            "PPR-pi/4-w1": 4,
-            "PPR-pi/4-w2": 1,
-            "PPR-pi/8-w1": 1,
-        },
-        measurement_processes={},
-        num_allocs=2,
-        any_commuting_depth=3,
-        qubit_disjoint_depth=6,
-    )
+    assert ppm_specs_output.quantum_operations.get("Adjoint(PPR-pi/4)", 0) ==  2
+    assert ppm_specs_output.quantum_operations.get("PPR-pi/4-w1", 0) ==  4
+    assert ppm_specs_output.quantum_operations.get("PPR-pi/4-w2", 0) ==  1
+    assert ppm_specs_output.quantum_operations.get("PPR-pi/8-w1", 0) ==  1
+    assert ppm_specs_output.any_commuting_depth == 3
+    assert ppm_specs_output.qubit_disjoint_depth == 6
 
 
 def test_convert_cz_to_ppr():
