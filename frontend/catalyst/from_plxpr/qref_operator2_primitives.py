@@ -380,6 +380,8 @@ def _special_gphase_lowering(angle, *_, ctrl_qubits, ctrl_values, adjoint):
 
 @_register_special_lowering("BasisState")
 def _special_basis_state_lowering(state, *qubits, ctrl_qubits, ctrl_values, adjoint):
+    assert not ctrl_qubits and not ctrl_values, "ctrl(BasisState) is not supported."
+    assert not adjoint, "adjoint(BasisState) is not supported."
     SetBasisStateOp(state, qubits)
     return ()
 
