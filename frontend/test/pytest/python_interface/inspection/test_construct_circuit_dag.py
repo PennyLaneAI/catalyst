@@ -1300,11 +1300,6 @@ class TestCreateDynamicOperatorNodes:
 
     def test_visualize_pythonic_operators(self, capture_mode):
         """Tests that we can use operators like +,-,%"""
-        pytest.xfail(
-            "sc-127303: DAG reconstruction passes symbolic xDSL parameters as strings to typed "
-            "Operator2 gate constructors, which reject string-valued angles"
-        )
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1314,6 +1309,8 @@ class TestCreateDynamicOperatorNodes:
             qp.RX(x % 3, wires=x % 3)
             qp.RY(x - 3, wires=x - 3)
             qp.RZ(x + 3, wires=x + 3)
+            qp.MultiRZ(x + 3, wires=[x % 3, x - 3])
+            qp.PauliRot(x + 3, "XY", wires=[x % 3, x - 3])
 
         args = (1,)
         module = my_workflow(*args)
@@ -1323,11 +1320,13 @@ class TestCreateDynamicOperatorNodes:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 4  # Device node + ops
+        assert len(nodes) == 6  # Device node + ops
 
         assert nodes["node1"]["label"] == "<name> RX|<wire> [(arg0 % 3)]"
         assert nodes["node2"]["label"] == "<name> RY|<wire> [(arg0 - 3)]"
         assert nodes["node3"]["label"] == "<name> RZ|<wire> [(arg0 + 3)]"
+        assert nodes["node4"]["label"] == "<name> MultiRZ|<wire> [(arg0 % 3), (arg0 - 3)]"
+        assert nodes["node5"]["label"] == "<name> PauliRot|<wire> [(arg0 % 3), (arg0 - 3)]"
 
     def test_ppm_dynamic(self):
         """Test that PPMs can be captured as nodes."""

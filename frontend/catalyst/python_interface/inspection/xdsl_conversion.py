@@ -23,6 +23,7 @@ from itertools import compress
 from typing import TYPE_CHECKING
 
 from pennylane import capture, ops
+from pennylane.core import Operator2
 from pennylane.ftqc.operations import RotXZX
 from pennylane.measurements import counts, expval, probs, sample, state, var
 from pennylane.operation import Operator
@@ -432,7 +433,7 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
 
 def ssa_to_qp_params(
     op, control: bool = False, single: bool = False
-) -> list[float | int] | float | int | None:
+) -> list[float | int | str] | float | int | str | None:
     """Get the parameters from the operation."""
     return _extract(op, "in_ctrl_values" if control else "params", resolve_constant_params, single)
 
@@ -447,6 +448,22 @@ def ssa_to_qp_wires_named(op: NamedObsOp) -> int:
     if not op.qubit:
         raise ValueError("No qubit found for named observable operation.")
     return resolve_constant_wire(op.qubit)
+
+
+def _operator2_compatible_param(gate_cls: type[Operator], param):
+    """Replace a symbolic expression with a typed placeholder for an Operator2 gate."""
+    if not issubclass(gate_cls, Operator2):
+        return param
+
+    # Quantum gate parameters are scalar f64 values. Dynamic expressions are represented as
+    # strings for inspection, but Operator2 validates its dynamic argument dtypes. Preserve the
+    # unknown-value semantics with a shape/dtype descriptor rather than inventing a value.
+    return jax.ShapeDtypeStruct((), float) if isinstance(param, str) else param
+
+
+def _operator2_compatible_params(gate_cls: type[Operator], params: list):
+    """Make symbolic parameters compatible with an Operator2 gate constructor."""
+    return [_operator2_compatible_param(gate_cls, param) for param in params]
 
 
 ############################################################
@@ -472,7 +489,10 @@ def xdsl_to_qp_op(op) -> Operator:
                     pw.append(str(str_attr).replace('"', ""))
                 pw = "".join(pw)
                 gate = ops.PauliRot(
-                    theta=_extract(op, "angle", resolve_constant_params, single=True),
+                    theta=_operator2_compatible_param(
+                        ops.PauliRot,
+                        _extract(op, "angle", resolve_constant_params, single=True),
+                    ),
                     pauli_word=pw,
                     wires=ssa_to_qp_wires(op),
                 )
@@ -495,7 +515,10 @@ def xdsl_to_qp_op(op) -> Operator:
 
             case "quantum.multirz":
                 gate = ops.qubit.parametric_ops_multi_qubit.MultiRZ(
-                    theta=_extract(op, "theta", resolve_constant_params, single=True),
+                    theta=_operator2_compatible_param(
+                        ops.MultiRZ,
+                        _extract(op, "theta", resolve_constant_params, single=True),
+                    ),
                     wires=ssa_to_qp_wires(op),
                 )
 
@@ -507,7 +530,8 @@ def xdsl_to_qp_op(op) -> Operator:
 
             case "quantum.custom":
                 gate_cls = resolve_gate(op.properties.get("gate_name").data)
-                gate = gate_cls(*ssa_to_qp_params(op), wires=ssa_to_qp_wires(op))
+                params = _operator2_compatible_params(gate_cls, ssa_to_qp_params(op))
+                gate = gate_cls(*params, wires=ssa_to_qp_wires(op))
 
             case _:
                 raise NotImplementedError(f"Unsupported gate: {op.name}")
