@@ -22,7 +22,6 @@ import pytest
 from pennylane.capture.primitives import (
     adjoint_transform_prim,
     for_loop_prim,
-    operator_p,
     while_loop_prim,
 )
 
@@ -452,6 +451,7 @@ class TestAdjointCtrl:
             "n_ctrls": 0,
             "op_cls": qp.S,
             "wire_lens": (1,),
+            "collect_decomp_rules": True,
         }
 
     @pytest.mark.parametrize("inner_adjoint", (True, False))
@@ -541,6 +541,7 @@ class TestAdjointCtrl:
             "n_ctrls": 2,
             "op_cls": qp.S,
             "wire_lens": (1,),
+            "collect_decomp_rules": True,
         }
 
         for i in range(3):
@@ -623,6 +624,7 @@ class TestAdjointCtrl:
             "n_ctrls": 1,
             "op_cls": qp.T,
             "wire_lens": (1,),
+            "collect_decomp_rules": True,
         }
         assert eqn.invars[0] is qfunc_xpr.eqns[5].outvars[0]
         assert eqn.invars[1] is qfunc_xpr.eqns[6].outvars[0]
@@ -659,6 +661,7 @@ class TestAdjointCtrl:
             "n_ctrls": 2,
             "op_cls": qp.X,
             "wire_lens": (1,),
+            "collect_decomp_rules": True,
         }
 
 
