@@ -44,10 +44,6 @@ from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
     format_dynamic_params_for_id,
 )
-from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
-    format_dynamic_params_for_id,
-)
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
@@ -572,11 +568,6 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             uid=uid,
             avals_in=jax_ctx.avals_in,
         )
-
-    with ir.InsertionPoint(jax_ctx.module_context.module.body):
-        for decomp_rule in decomp_rules:
-            if decomp_rule:
-                ir.Operation.parse(decomp_rule).clone()
 
     return []
 

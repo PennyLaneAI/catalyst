@@ -201,12 +201,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
 
-            bool hasCtrlRegion = true;
-            module->walk[[&](CtrlOp) {
-                hasCtrlRegion = false;
-                return mlir::WalkResult::interrupt();
-            });
-
             // Distribute a `quantum.adjoint` region lazily.
             // It uses a greedy rewriter that would otherwise DCE gates in circuits that
             // never needed adjoint handling.
