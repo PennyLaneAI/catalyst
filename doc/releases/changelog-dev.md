@@ -134,6 +134,11 @@
   distribution over the branches. The counted resources are then scaled proportionally and summed.
   [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
 
+* Warnings and diagnostics emitted by successful Catalyst compiler subprocesses are now forwarded to
+  Python callers instead of being silently discarded. LLVM diagnostic colors are preserved in
+  interactive terminals.
+  [(#3080)](https://github.com/PennyLaneAI/catalyst/pull/3080)
+
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
   [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
