@@ -109,7 +109,6 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         OptionalParameter<"mlir::IntegerAttr">:$oob_port,
         Transport_StrField:$backend_lib,
         Transport_StrField:$config,
-        Transport_StrField:$data_path,
         Transport_StrField:$triple,
         Transport_StrField:$address,
         Transport_StrField:$symbol,
@@ -125,14 +124,11 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         /// Session registry key: `name` when set and non-empty, else `fallback`.
         mlir::StringAttr keyOr(llvm::StringRef fallback) const;
 
-        /// `data_path` when set, else `dflt`.
-        mlir::StringAttr dataPathOr(llvm::StringRef dflt) const;
-
         /// Whether this node's code is dispatched to an executor rather than run in the
         /// compiling process.
         bool isOutOfProcess() const;
 
-        /// Integer fields, with the defaults applied.
+        /// Integer field accessors.
         int64_t oobPort() const;
         int64_t inBytes() const;
         int64_t outBytes() const;

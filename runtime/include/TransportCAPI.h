@@ -67,7 +67,7 @@ int64_t __catalyst__transport__connect_async(CatalystTransportSession *s, const 
 int __catalyst__transport__exchange_keys(CatalystTransportSession *s);
 int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession *s);
 int __catalyst__transport__await(int64_t token);
-int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path);
+int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *transport);
 
 // Coprocessor-only: bind the coprocessor function, resolved by runtime symbol name.
 int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol);
@@ -89,6 +89,19 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply, uin
 uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s);
 void __catalyst__transport__stop(CatalystTransportSession *s);
 void __catalyst__transport__destroy(CatalystTransportSession *s);
+
+// Flags for start_benchmark.
+enum {
+    CATALYST_BENCH_FORCE_SW_RTT = 1u << 1,
+    CATALYST_BENCH_PROGRESS = 1u << 2,
+};
+
+// Run `iters` rounds back to back and report each round's round-trip time in nanoseconds.
+// `samples_bytes` tells how much room the caller has for the samples. The rounds report is refused
+// if `samples_bytes` is less than `iters * sizeof(uint64_t)`.
+int __catalyst__transport__start_benchmark(CatalystTransportSession *s, uint32_t iters,
+                                           uint32_t decoder_id, uint32_t flags, uint64_t *samples,
+                                           uint64_t samples_bytes, uint64_t *rounds);
 
 #ifdef __cplusplus
 } // extern "C"

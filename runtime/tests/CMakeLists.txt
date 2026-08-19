@@ -192,12 +192,16 @@ if(ENABLE_TRANSPORT)
     target_sources(runner_tests_transport PRIVATE Test_Transport.cpp)
     target_link_libraries(runner_tests_transport PRIVATE
         Catch2WithMain
-        catalyst_runtime_testing
         rt_transport
     )
     target_compile_definitions(runner_tests_transport PRIVATE
-        STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>")
-    add_dependencies(runner_tests_transport stub_transport_backend)
+        STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>"
+        MEMCPY_CONTROLLER_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_memcpy_controller>"
+        MEMCPY_COPROCESSOR_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_memcpy_coprocessor>")
+    add_dependencies(runner_tests_transport
+        stub_transport_backend
+        catalyst_transport_memcpy_controller
+        catalyst_transport_memcpy_coprocessor)
     catch_discover_tests(runner_tests_transport)
 
     if(IBVERBS_LIB)
@@ -240,8 +244,29 @@ if(ENABLE_TRANSPORT)
         endif()
     endif()
 
+    # Memcpy backend: in-process request/reply copies via memcpy.
+    add_executable(runner_tests_transport_memcpy)
+    target_sources(runner_tests_transport_memcpy PRIVATE
+        Test_TransportMemcpyCpu.cpp
+    )
+    target_link_libraries(runner_tests_transport_memcpy PRIVATE
+        Catch2WithMain
+        memcpy_cpu_impl
+        steane_coprocessor_cpu
+    )
+    if(TRANSPORT_HAS_HIP)
+        target_sources(runner_tests_transport_memcpy PRIVATE
+            Test_TransportMemcpyGpu.cpp
+        )
+        target_link_libraries(runner_tests_transport_memcpy PRIVATE
+            memcpy_gpu_impl
+        )
+    endif()
+    catch_discover_tests(runner_tests_transport_memcpy)
+
     add_custom_target(transport_tests_all)
-    add_dependencies(transport_tests_all runner_tests_transport)
+    add_dependencies(transport_tests_all runner_tests_transport
+                     runner_tests_transport_memcpy)
     if(IBVERBS_LIB)
         add_dependencies(transport_tests_all runner_tests_transport_common
                          runner_tests_transport_cpu)

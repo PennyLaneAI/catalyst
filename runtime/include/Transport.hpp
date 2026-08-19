@@ -23,7 +23,7 @@ namespace catalyst::transport {
 /**
  * @brief Memory kind: selects the allocation and registration path.
  */
-enum class MemKind : std::uint8_t {
+enum class MemKind : int {
     CpuRam,
     GpuHbm,
     Ddr,
@@ -59,10 +59,10 @@ struct PeerRef {
 };
 
 /**
- * @brief Configuration for the data-movement channel a session uses.
+ * @brief Transport kind a session uses for request/reply movement.
  */
 struct ChannelDesc {
-    std::string data_path = "cpu_verbs";
+    std::string transport = "rdma";
 };
 
 /**
