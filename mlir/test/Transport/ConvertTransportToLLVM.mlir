@@ -63,8 +63,8 @@ func.func @coprocessor() {
   %c = transport.create {backend_lib = "libbackend.so", config = "cfg"} -> !transport.session<coprocessor>
   // CHECK: llvm.call @__catalyst__transport__connect_async(%[[C]]
   %t = transport.connect_async %c {peer = "127.0.0.1", oob_port = 18560 : ui16} : !transport.session<coprocessor> -> !transport.token
-  // CHECK: llvm.call @__catalyst__transport__await
-  transport.await %t : !transport.token
+  // CHECK: llvm.call @__catalyst__transport__barrier
+  transport.barrier %t : !transport.token
   // CHECK: llvm.call @__catalyst__transport__set_coprocessor_fn(%[[C]], %{{.*}}) : (!llvm.ptr, !llvm.ptr) -> i32
   transport.set_coprocessor_fn %c {symbol = "foo"} : !transport.session<coprocessor>
   // CHECK: llvm.call @__catalyst__transport__destroy(%[[C]])
