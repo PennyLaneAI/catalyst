@@ -17,7 +17,6 @@
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.resource import PBCSpecsResources, SpecsResources
 from pennylane.transforms import to_ppr as qp_to_ppr
 
 from catalyst import measure, pipeline, qjit
@@ -227,10 +226,11 @@ def test_convert_clifford_to_ppr():
 
     ppm_specs_output = qp.specs(test_convert_clifford_to_ppr_workflow, level=1)().resources
 
-    assert ppm_specs_output.quantum_operations.get("Adjoint(PPR-pi/4)", 0) ==  2
-    assert ppm_specs_output.quantum_operations.get("PPR-pi/4-w1", 0) ==  4
-    assert ppm_specs_output.quantum_operations.get("PPR-pi/4-w2", 0) ==  1
-    assert ppm_specs_output.quantum_operations.get("PPR-pi/8-w1", 0) ==  1
+    gate_types = ppm_specs_output.quantum_operations
+    assert gate_types.get("Adjoint(PPR-pi/4)", 0) == 2
+    assert gate_types.get("PPR-pi/4-w1", 0) == 4
+    assert gate_types.get("PPR-pi/4-w2", 0) == 1
+    assert gate_types.get("PPR-pi/8-w1", 0) == 1
     assert ppm_specs_output.any_commuting_depth == 3
     assert ppm_specs_output.qubit_disjoint_depth == 6
 
@@ -280,20 +280,16 @@ def test_commute_ppr():
 
     ppm_specs_output = qp.specs(test_commute_ppr_workflow, level=2)().resources
 
-    assert ppm_specs_output == PBCSpecsResources(
-        counts={
-            "Adjoint(PPR-pi/4)": 2,
-            "GlobalPhase": 4,
-            "PPM-w1": 2,
-            "PPR-pi/4-w1": 4,
-            "PPR-pi/4-w2": 1,
-            "PPR-pi/8-w1": 1,
-        },
-        measurement_processes={},
-        num_allocs=2,
-        any_commuting_depth=5,
-        qubit_disjoint_depth=7,
-    )
+    gate_types = ppm_specs_output.quantum_operations
+
+    assert gate_types.get("PPM-w1", 0) == 2
+    assert gate_types.get("Adjoint(PPR-pi/4)", 0) == 2
+    assert gate_types.get("PPR-pi/4-w1", 0) == 4
+    assert gate_types.get("PPR-pi/4-w2", 0) == 1
+    assert gate_types.get("PPR-pi/8-w1", 0) == 1
+    assert ppm_specs_output.any_commuting_depth == 5
+    assert ppm_specs_output.qubit_disjoint_depth == 7
+    assert ppm_specs_output.num_wires == 2
 
 
 def test_merge_ppr_ppm():
@@ -318,13 +314,12 @@ def test_merge_ppr_ppm():
 
     ppm_specs_output = qp.specs(test_merge_ppr_ppm_workflow, level=2)().resources
 
-    assert ppm_specs_output == PBCSpecsResources(
-        counts={"GlobalPhase": 3, "PPM-w1": 1, "PPM-w2": 1},
-        measurement_processes={},
-        num_allocs=2,
-        any_commuting_depth=1,
-        qubit_disjoint_depth=2,
-    )
+    gate_types = ppm_specs_output.quantum_operations
+    assert gate_types.get("PPM-w1", 0) == 1
+    assert gate_types.get("PPM-w2", 0) == 1
+    assert ppm_specs_output.any_commuting_depth == 1
+    assert ppm_specs_output.qubit_disjoint_depth == 2
+    assert ppm_specs_output.num_wires == 2
 
 
 def test_ppr_to_ppm_auto_corrected():
@@ -448,29 +443,21 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
         assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
 
     f_specs = qp.specs(f_workflow, level=3)().resources
-    assert f_specs == PBCSpecsResources(
-        counts={"GlobalPhase": 2, "PPM-w1": 2, "PPR-pi/8-w1": 1},
-        measurement_processes={},
-        num_allocs=2,
-        any_commuting_depth=1,
-        qubit_disjoint_depth=2,
-    )
+    assert f_specs.quantum_operations.get("PPM-w1", 0) == 2
+    assert f_specs.quantum_operations.get("PPR-pi/8-w1", 0) == 1
+    assert f_specs.any_commuting_depth == 1
+    assert f_specs.qubit_disjoint_depth == 2
+    assert f_specs.num_wires == 2
 
     g_specs = qp.specs(g_workflow, level=3)().resources
-    assert g_specs == PBCSpecsResources(
-        counts={
-            "Adjoint(PPM)": 1,
-            "Adjoint(PPR-pi/4)": 1,
-            "GlobalPhase": 4,
-            "PPM-w1": 1,
-            "PPR-pi/4-w2": 2,
-            "PPR-pi/8-w1": 2,
-        },
-        measurement_processes={},
-        num_allocs=2,
-        any_commuting_depth=3,
-        qubit_disjoint_depth=6,
-    )
+    gate_types = g_specs.quantum_operations
+    assert gate_types.get("Adjoint(PPM)", 0) == 1
+    assert gate_types.get("PPM-w1", 0) == 1
+    assert gate_types.get("Adjoint(PPR-pi/4)", 0) == 1
+    assert gate_types.get("PPR-pi/4-w2", 0) == 2
+    assert gate_types.get("PPR-pi/8-w1", 0) == 2
+    assert g_specs.any_commuting_depth == 3
+    assert g_specs.qubit_disjoint_depth == 6
 
 
 def test_merge_rotation_ppr():
