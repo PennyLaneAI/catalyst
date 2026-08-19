@@ -485,9 +485,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The `--to-ppr` pass now runs `--symbol-dce` at the beginning, to eliminate unnecessary
-  decomposition rules that might contain gates that cannot be converted to PPRs.
+* The `--to-ppr` and `--ppm-compilation` passes now run `--symbol-dce` at the beginning,
+  to eliminate unnecessary decomposition rules that might contain gates that cannot be converted to PPRs.
   [(#3125)](https://github.com/PennyLaneAI/catalyst/pull/3125)
+  [(#3135)](https://github.com/PennyLaneAI/catalyst/pull/3135)
 
 * The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
   (previously a dynamic float operand). This allows, among other things, the decomposition graph to
