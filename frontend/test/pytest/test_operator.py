@@ -13,6 +13,9 @@
 # limitations under the License.
 """
 Tests for the new Operator2 class.
+
+This file tests the execution of gates that are lowered through the operator2 primitive.
+As execution unit tests for these primitives' lowering, we do not include any decomposition rules.
 """
 
 # pylint: disable = useless-parent-delegation, missing-function-docstring, missing-class-docstring
@@ -22,94 +25,17 @@ import pytest
 from jax import numpy as jnp
 
 
-class DummyOp(qp.core.Operator2):
-
-    def __init__(self, wires):
-        super().__init__(wires=wires)
-
-
-class PauliX(qp.core.Operator2):
-
-    def __init__(self, wires):
-        super().__init__(wires=wires)
-
-
-class RX(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-
-    def __init__(self, phi, wires):
-        super().__init__(phi, wires)
-
-
-class CRX(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-
-    def __init__(self, phi, wires):
-        super().__init__(phi, wires=wires)
-
-
-class Hadamard(qp.core.Operator2):
-
-    def __init__(self, wires):
-        super().__init__(wires=wires)
-
-
-class MultiRZ(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-
-    def __init__(self, phi, wires):
-        super().__init__(phi, wires)
-
-
-class PauliRot(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-    compilable_argnames = ("pauli_word",)
-
-    def __init__(self, phi, pauli_word, wires):
-        super().__init__(phi, pauli_word, wires)
-
-
-class GlobalPhase(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-    wire_argnames = ()
-
-    def __init__(self, phi):
-        super().__init__(phi=phi)
-
-
-class QubitUnitary(qp.core.Operator2):
-
-    dynamic_argnames = ("matrix",)
-
-    def __init__(self, matrix, wires):
-        super().__init__(matrix, wires)
-
-
-class PCPhase(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-    compilable_argnames = ("dim",)
-
-    def __init__(self, phi, dim, wires):
-        super().__init__(phi, dim, wires)
-
-
 class TestOperator2Execution:
 
     def test_custom_op_supported(self):
         """Test that Operator2 versions of core ops are supported and can be executed."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(collect_decomp_rules=False, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
-            PauliX(0)
-            RX(x, 1)
-            CRX(2 * x, (0, 2))
+            qp.PauliX(0)
+            qp.RX(x, 1)
+            qp.CRX(2 * x, (0, 2))
             return qp.expval(qp.Z(0)), qp.expval(qp.Z(1)), qp.expval(qp.Z(2))
 
         res1, res2, res3 = c(0.5)
@@ -121,13 +47,13 @@ class TestOperator2Execution:
     def test_MultiRZ(self):
         """Test that MultiRZ can be executed."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(collect_decomp_rules=False, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
-            Hadamard(0)
-            Hadamard(1)
+            qp.Hadamard(0)
+            qp.Hadamard(1)
             # skip on 2 for comparison
-            MultiRZ(x, (0, 1, 2))
+            qp.MultiRZ(x, (0, 1, 2))
             return qp.expval(qp.X(0)), qp.expval(qp.X(1)), qp.expval(qp.X(2))
 
         r1, r2, r3 = c(0.5)
@@ -138,11 +64,11 @@ class TestOperator2Execution:
     def test_paulirot(self):
         """Test that PauliRot can be executed."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(collect_decomp_rules=False, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
-            Hadamard(2)
-            PauliRot(x, "XYZ", (0, 1, 2))
+            qp.Hadamard(2)
+            qp.PauliRot(x, "XYZ", (0, 1, 2))
             return qp.expval(qp.Z(0)), qp.expval(qp.Z(1)), qp.expval(qp.X(2))
 
         r1, r2, r3 = c(1.2)
@@ -153,10 +79,10 @@ class TestOperator2Execution:
     def test_globalphase(self):
         """Test that global phase can be executed."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(collect_decomp_rules=False, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def c(x):
-            GlobalPhase(x)
+            qp.GlobalPhase(x)
             return qp.state()
 
         state = c(0.5)
@@ -165,11 +91,11 @@ class TestOperator2Execution:
     def test_QubitUnitary(self):
         """Test that QubitUnitary can be executed."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(collect_decomp_rules=False, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c():
-            QubitUnitary(jnp.array([[0, 1], [1, 0]]), 0)
-            QubitUnitary(qp.CNOT.compute_matrix(), (0, 1))
+            qp.QubitUnitary(jnp.array([[0, 1], [1, 0]]), 0)
+            qp.QubitUnitary(qp.CNOT.compute_matrix(), (0, 1))
             return qp.expval(qp.Z(0)), qp.expval(qp.Z(0))
 
         r1, r2 = c()
@@ -196,12 +122,12 @@ class TestOperator2Execution:
     def test_PCPhase(self, dim, expected):
         """Test that PCPhase can be executed."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(collect_decomp_rules=False, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def c(x):
-            Hadamard(0)
-            Hadamard(1)
-            PCPhase(x, dim, (0, 1))
+            qp.Hadamard(0)
+            qp.Hadamard(1)
+            qp.PCPhase(x, dim, (0, 1))
             return qp.state()
 
         state = c(0.5)
