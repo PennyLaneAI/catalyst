@@ -275,7 +275,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
 ):
     extra_data = extra_data or {}
     queue = deque()
-    start = (op_name, dynamic_shape, wire_lens, static_data, extra_data)
+    start = (op_name, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op)
     queue.append(start)
     visited = [start]
 
@@ -292,13 +292,18 @@ def fetch_all_reachable_decomposition_rules_from_op(
     )
 
     while len(queue) != 0:
-        this_name, this_dynamic_shape, this_wire_lens, this_static_data, this_extra_data = (
-            queue.popleft()
-        )
+        (
+            this_name,
+            this_dynamic_shape,
+            this_wire_lens,
+            this_static_data,
+            this_extra_data,
+            this_is_custom_op,
+        ) = queue.popleft()
         this_extra_data = this_extra_data or {}
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         resources, _, _ = collect_resources_for_op(
-            this_name, this_kwargs | this_static_data | this_extra_data
+            this_name, this_kwargs | this_static_data | this_extra_data, this_is_custom_op
         )
         for _rule_name, resource in resources.items():
             try:
@@ -310,6 +315,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         graph_op_id.wire_lens,
                         graph_op_id.static_data,
                         graph_op_id.extra_data,
+                        graph_op_id.is_custom_op,
                     )
 
                     if not probe in visited:
@@ -322,6 +328,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                             probe[2],
                             probe[3],
                             probe[4],
+                            is_custom_op=probe[5],
                         )
                         rules.extend(get_rule_strings_from_module(module))
             except Exception as e:
