@@ -180,6 +180,9 @@
   syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
   [(#3092)](https://github.com/PennyLaneAI/catalyst/pull/3092)
 
+* CPU & GPU backline transport backends via `memcpy` are added.
+  [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
+
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
 
@@ -491,6 +494,10 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
+  the `gpu` label.
+  [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
 
 * The `--to-ppr` and `--ppm-compilation` passes now run `--symbol-dce` at the beginning,
   to eliminate unnecessary decomposition rules that might contain gates that cannot be converted to PPRs.

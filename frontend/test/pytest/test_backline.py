@@ -14,10 +14,12 @@
 """Unit tests for the backline frontend: serialize_backline and the pipeline helpers."""
 
 import os
+from types import SimpleNamespace
 from unittest import mock
 
 import pennylane as qp
 import pytest
+from pennylane.backline import Transport
 
 from catalyst import Executor, qjit
 from catalyst.backline import (
@@ -25,6 +27,7 @@ from catalyst.backline import (
     _insert_passes,
     _qec_pass_specs,
     _realize_executor,
+    _resolve_backend,
     _resolve_backend_lib,
     device_pass_pipeline,
     launch_executors,
@@ -54,42 +57,66 @@ def _controller(**kw):
     init = {
         "backend_lib": "backend.so",
         "config": "cfg",
-        "data_path": "cpu_verbs",
-        "in_bytes": 3,
-        "out_bytes": 8,
     }
+    if kw.pop("remote", False):
+        kw.setdefault("executor", SimpleNamespace(address=None, triple=None))
+    kw.setdefault("in_bytes", 3)
+    kw.setdefault("out_bytes", 8)
     kw.setdefault("init_args", init)
-    return qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl", **kw)
+    return qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", **kw)
 
 
-def _coproc(label, oob_port=18590, fn="coproc_fn", **kw):
-    kw.setdefault(
-        "init_args", {"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"}
-    )
+def _coproc(name, oob_port=18590, fn="coproc_fn", **kw):
+    if kw.pop("remote", False):
+        kw.setdefault("executor", SimpleNamespace(address=None, triple=None))
+    kw.setdefault("init_args", {"backend_lib": "backend.so", "config": "cfg"})
     return qp.Coprocessor(
-        label=label, comm_host="127.0.0.1", oob_port=oob_port, coprocessor_fn=fn, **kw
+        name=name, endpoint=qp.Endpoint("127.0.0.1", oob_port), coprocessor_fn=fn, **kw
     )
 
 
 def test_controller_node_mapping():
-    """label -> name; init_args hints forwarded. A controller carries no endpoint of its own."""
-    d = serialize_backline(qp.Backline(controller=_controller(), transport="net").placement)
-    assert d["transport"] == "net"
+    """The node name and init arguments are forwarded; controllers carry no endpoint."""
+    d = serialize_backline(qp.Backline(controller=_controller(), transport="rdma").placement)
+    assert d["transport"] == "rdma"
     ctrl = d["controller"]
     assert ctrl["name"] == "ctrl"
     assert ctrl["backend_lib"] == "backend.so" and ctrl["config"] == "cfg"
-    assert ctrl["data_path"] == "cpu_verbs" and ctrl["in_bytes"] == 3 and ctrl["out_bytes"] == 8
+    assert ctrl["in_bytes"] == 3 and ctrl["out_bytes"] == 8
     assert "peer" not in ctrl and "oob_port" not in ctrl
     assert "coprocessors" not in d  # omitted, not an empty list
 
 
+def test_default_message_sizes_are_serialized():
+    """PennyLane's message-size defaults are explicit in the transport configuration."""
+    controller = qp.Controller(init_args={"backend_lib": "backend.so"})
+    node = serialize_backline(qp.Backline(controller=controller, transport="rdma").placement)[
+        "controller"
+    ]
+
+    assert node["in_bytes"] == 8
+    assert node["out_bytes"] == 8
+
+
 def test_coprocessor_endpoint_mapping():
     """comm_host/oob_port -> peer/oob_port, and oob_port stays an int."""
-    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
     cop = serialize_backline(dev.placement)["coprocessors"][0]
     assert cop["peer"] == "127.0.0.1"
     assert cop["oob_port"] == 18590 and isinstance(cop["oob_port"], int)
-    assert cop["name"] == "cop0" and cop["symbol"] == "coproc_fn"
+
+
+def test_controller_only_has_no_coprocessors():
+    d = serialize_backline(qp.Backline(controller=_controller(), transport="rdma").placement)
+    assert "coprocessors" not in d
+
+
+def test_single_coprocessor():
+    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
+    d = serialize_backline(dev.placement)
+    assert len(d["coprocessors"]) == 1
+    assert d["coprocessors"][0]["name"] == "cop0"
+    assert d["coprocessors"][0]["symbol"] == "coproc_fn"
 
 
 def test_in_process_coprocessor_fn_lib_is_loaded(monkeypatch):
@@ -106,7 +133,7 @@ def test_in_process_coprocessor_fn_lib_is_loaded(monkeypatch):
 
     fn = qp.CoprocessorFunction("decode_fn", lib_path="/opt/libdecode.so")
     dev = qp.Backline(
-        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="net"
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
     )
     launch_executors(dev.placement)
     assert loaded == [("/opt/libdecode.so", ctypes.RTLD_GLOBAL)]
@@ -119,8 +146,8 @@ def test_out_of_process_coprocessor_fn_lib_is_not_loaded_here(monkeypatch):
     fn = qp.CoprocessorFunction("decode_fn", lib_path="/opt/libdecode.so")
     dev = qp.Backline(
         controller=_controller(),
-        coprocessors=[_coproc("cop0", fn=fn, executor_options={"address": "cop:1"})],
-        transport="net",
+        coprocessors=[_coproc("cop0", fn=fn, remote=True)],
+        transport="rdma",
     )
     launch_executors(dev.placement)
     assert loaded == []
@@ -130,7 +157,7 @@ def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
     """No ``lib_path`` means resolve from what is already loaded, so nothing is opened."""
     loaded = []
     monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
-    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
     launch_executors(dev.placement)
     assert loaded == []
 
@@ -140,7 +167,7 @@ def test_unlaunched_executor_names_the_node_it_came_from():
     from catalyst import Executor  # pylint: disable=import-outside-toplevel
 
     ctrl = _controller(executor=Executor(host="10.0.0.9", user="me"))
-    dev = qp.Backline(controller=ctrl, transport="net")
+    dev = qp.Backline(controller=ctrl, transport="rdma")
     with pytest.raises(CompileError, match="cannot say where it serves.*not launched"):
         serialize_backline(dev.placement)
 
@@ -148,7 +175,7 @@ def test_unlaunched_executor_names_the_node_it_came_from():
 def test_unrecognized_init_args_are_rejected():
     """An init_args key the attribute has no parameter for fails here, naming the ones it does."""
     ctrl = _controller(init_args={"config": "cfg", "in_byte": 8})
-    dev = qp.Backline(controller=ctrl, transport="net")
+    dev = qp.Backline(controller=ctrl, transport="rdma")
     with pytest.raises(CompileError, match=r"unrecognized init_args \['in_byte'\]"):
         serialize_backline(dev.placement)
 
@@ -158,11 +185,24 @@ def test_multiple_coprocessors_all_serialized():
     dev = qp.Backline(
         controller=_controller(),
         coprocessors=[_coproc("cop0", 18590), _coproc("cop1", 18591)],
-        transport="net",
+        transport="rdma",
     )
     d = serialize_backline(dev.placement)
     assert [c["name"] for c in d["coprocessors"]] == ["cop0", "cop1"]
     assert [c["oob_port"] for c in d["coprocessors"]] == [18590, 18591]
+
+
+def test_transport_object_serializes_to_name():
+    transport = Transport("rdma")
+    d = serialize_backline(qp.Backline(controller=_controller(), transport=transport).placement)
+    assert d["transport"] == "rdma"
+
+
+def test_transport_memcpy_object_serializes_to_name():
+    """The in-process ``memcpy`` transport carries through the Transport enum verbatim."""
+    transport = Transport("memcpy")
+    d = serialize_backline(qp.Backline(controller=_controller(), transport=transport).placement)
+    assert d["transport"] == "memcpy"
 
 
 def test_transport_passes_are_placed_in_each_stage():
@@ -187,12 +227,12 @@ def test_transport_passes_are_placed_in_each_stage():
 def test_device_pass_pipeline_is_empty_for_a_device_that_needs_nothing():
     """A device that declares no encoding contributes no passes."""
     assert device_pass_pipeline(qp.device("null.qubit", wires=2)) == ()
-    assert device_pass_pipeline(qp.Backline(controller=_controller(), transport="net")) == ()
+    assert device_pass_pipeline(qp.Backline(controller=_controller(), transport="rdma")) == ()
 
 
 def test_device_pass_pipeline_requests_the_encoding_chain():
     """A placement naming a code asks for the whole chain, in application order."""
-    dev = qp.Backline(controller=_controller(), transport="net", qec_code="steane")
+    dev = qp.Backline(controller=_controller(), transport="rdma", qec_code="steane")
     assert [t.pass_name for t in device_pass_pipeline(dev)] == [
         name for name, _ in _qec_pass_specs("steane")
     ]
@@ -203,7 +243,7 @@ def test_device_pass_pipeline_requests_the_encoding_chain():
 )
 def test_placement_pipeline_returns_the_stages(qec_code, wants_qec):
     """``configure`` adds the transport passes always and the QEC lowering only when asked."""
-    dev = qp.Backline(controller=_controller(), transport="net", qec_code=qec_code)
+    dev = qp.Backline(controller=_controller(), transport="rdma", qec_code=qec_code)
     # Both reference passes are present, since each insertion anchors to one of them.
     stages = placement_pipeline(
         dev.placement,
@@ -224,7 +264,7 @@ def test_placement_pipeline_returns_the_stages(qec_code, wants_qec):
 
 def test_backline_qnode_capture_path(use_capture):
     """A backline qnode compiles to MLIR carrying the catalyst.backline attribute."""
-    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
 
     @qjit(target="mlir", capture=True)
     @qp.qnode(dev)
@@ -235,12 +275,38 @@ def test_backline_qnode_capture_path(use_capture):
 
     ir = circuit.mlir
     assert "catalyst.backline" in ir
-    assert 'transport = "net"' in ir
+    assert 'transport = "rdma"' in ir
+
+
+def test_backline_qnode_capture_path_memcpy(use_capture):
+    """A backline qnode with the in-process ``memcpy`` transport compiles to MLIR carrying
+    ``transport = "memcpy"``.
+    """
+    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="memcpy")
+
+    @qjit(target="mlir", capture=True)
+    @qp.qnode(dev)
+    def circuit():
+        qp.Hadamard(0)
+        qp.CNOT([0, 1])
+        return qp.probs()
+
+    ir = circuit.mlir
+    assert "catalyst.backline" in ir
+    assert 'transport = "memcpy"' in ir
 
 
 def test_placement_behind_a_wrapper_is_found(use_capture):
-    """A placement reaches the module even when qjit was applied to a wrapper, not the QNode."""
-    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    """A placement reaches the module even when qjit was applied to a wrapper, not the QNode.
+    The transport passes locate it by role rather than by matching a triple or address, which now
+    come only from the node's executor."""
+    ctrl = qp.Controller(
+        device=qp.device("null.qubit", wires=2),
+        name="ctrl",
+        executor=SimpleNamespace(address=None, triple=None),
+        init_args={"backend_lib": "backend.so", "config": "cfg"},
+    )
+    dev = qp.Backline(controller=ctrl, transport="rdma")
 
     @qp.qnode(dev)
     def circuit():
@@ -284,7 +350,7 @@ def test_qec_encoding_reaches_a_qnode_behind_a_wrapper(use_capture):
     dev = qp.Backline(
         controller=_controller(),
         coprocessors=[_coproc("cop0")],
-        transport="net",
+        transport="rdma",
         qec_code="steane",
     )
 
@@ -306,12 +372,12 @@ def test_remote_controller_behind_a_wrapper_is_still_tagged(use_capture):
     """A remote controller called through a wrapper still gets its module tagged by role."""
     ctrl = qp.Controller(
         device=qp.device("null.qubit", wires=2),
-        label="ctrl",
+        name="ctrl",
         remote=True,
         executor_options={"address": "ctrl:1"},
-        init_args={"backend_lib": "backend.so", "config": "cfg", "data_path": "cpu_verbs"},
+        init_args={"backend_lib": "backend.so", "config": "cfg"},
     )
-    dev = qp.Backline(controller=ctrl, transport="net")
+    dev = qp.Backline(controller=ctrl, transport="rdma")
 
     @qp.qnode(dev)
     def circuit():
@@ -327,7 +393,7 @@ def test_remote_controller_behind_a_wrapper_is_still_tagged(use_capture):
 
 def test_two_qnodes_over_one_placement_are_accepted(use_capture):
     """Two QNodes sharing a device carry one placement between them, not one each."""
-    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="net")
+    dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
 
     @qp.qnode(dev)
     def circuit_a():
@@ -350,8 +416,8 @@ def test_two_qnodes_over_one_placement_are_accepted(use_capture):
 
 def test_two_placements_in_one_program_are_rejected(use_capture):
     """A compiled program carries one placement, so two distinct ones cannot be expressed."""
-    dev_a = qp.Backline(controller=_controller(), transport="net")
-    dev_b = qp.Backline(controller=_controller(), transport="net")
+    dev_a = qp.Backline(controller=_controller(), transport="rdma")
+    dev_b = qp.Backline(controller=_controller(), transport="rdma")
 
     @qp.qnode(dev_a)
     def circuit_a():
@@ -374,9 +440,9 @@ def test_two_placements_in_one_program_are_rejected(use_capture):
 def fake_lib_dir(tmp_path, monkeypatch):
     """Stand in for the built runtime lib dir, laid out as a bare ``cmake`` build.
 
-    That build mirrors the source tree, nesting each backend under
-    ``<RUNTIME_LIB_DIR>/transport/<backend>/``, so entries are given as ``"<backend>/<libname>"``.
-    See :func:`flat_lib_dir` for the layout ``make -C runtime`` produces.
+    That build mirrors the source tree under ``<RUNTIME_LIB_DIR>/transport/<transport>/``.
+    Entries are paths relative to that ``transport`` directory. See :func:`flat_lib_dir` for the
+    layout ``make -C runtime`` produces.
     """
     monkeypatch.setattr("catalyst.backline.get_lib_path", lambda *_: str(tmp_path))
 
@@ -408,37 +474,69 @@ def flat_lib_dir(tmp_path, monkeypatch):
 
 
 class TestBackendResolution:
-    """``node.backend`` names a backend; the compiler resolves it to a library per role."""
+    """Transport and node hardware select a Catalyst backend library."""
 
-    def test_name_is_backend_and_role(self, fake_lib_dir):
-        """The library is named for its backend and role: no stem guessing, no glob."""
+    @pytest.mark.parametrize(
+        ("transport", "hardware", "expected"),
+        [
+            ("rdma", "cpu", "cpu_verbs"),
+            ("rdma", "gpu", "gpu_verbs"),
+            ("rdma", "fpga", "hwhs"),
+            ("memcpy", "cpu", "memcpy"),
+            ("memcpy", "gpu", "memcpy_gpu"),
+        ],
+    )
+    def test_transport_and_hardware_select_backend(self, transport, hardware, expected):
+        """Concrete backend names remain a Catalyst implementation detail."""
+        assert _resolve_backend(transport, hardware) == expected
+
+    def test_unsupported_transport_hardware_pair_is_rejected(self):
+        """A transport must have an implementation for the requested hardware."""
+        with pytest.raises(ValueError, match="transport='memcpy', hardware='fpga'"):
+            _resolve_backend("memcpy", "fpga")
+
+    def test_nested_cmake_backend_is_found(self, fake_lib_dir):
+        """A bare CMake build nests RDMA backends below the transport directory."""
         fake_lib_dir(
-            "cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so",
-            "cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so",
+            "rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so",
+            "rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so",
         )
-        assert _resolve_backend_lib("cpu_verbs", "controller", False).endswith(
-            "transport/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so"
+        assert _resolve_backend_lib("rdma", "cpu", "controller", False).endswith(
+            "transport/rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so"
         )
-        assert _resolve_backend_lib("cpu_verbs", "coprocessor", False).endswith(
-            "transport/cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so"
+        assert _resolve_backend_lib("rdma", "cpu", "coprocessor", False).endswith(
+            "transport/rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so"
+        )
+
+    def test_memcpy_backends_share_transport_directory(self, fake_lib_dir):
+        """CPU and GPU memcpy libraries are emitted from the same CMake directory."""
+        fake_lib_dir(
+            "memcpy/libcatalyst_transport_memcpy_controller.so",
+            "memcpy/libcatalyst_transport_memcpy_gpu_coprocessor.so",
+        )
+        assert _resolve_backend_lib("memcpy", "cpu", "controller", False).endswith(
+            "transport/memcpy/libcatalyst_transport_memcpy_controller.so"
+        )
+        assert _resolve_backend_lib("memcpy", "gpu", "coprocessor", False).endswith(
+            "transport/memcpy/libcatalyst_transport_memcpy_gpu_coprocessor.so"
         )
 
     def test_flat_lib_dir_is_searched(self, flat_lib_dir):
         """``make -C runtime`` passes ``CMAKE_LIBRARY_OUTPUT_DIRECTORY``, flattening the lib dir.
 
         That is the layout a released or ``make``-built tree has, so it must resolve without the
-        ``transport/<backend>/`` nesting a bare ``cmake`` build produces.
+        ``transport/<transport>/[<backend>/]`` nesting a bare ``cmake`` build produces.
         """
         root = flat_lib_dir("libcatalyst_transport_cpu_verbs_controller.so")
-        assert _resolve_backend_lib("cpu_verbs", "controller", False) == str(
+        assert _resolve_backend_lib("rdma", "cpu", "controller", False) == str(
             root / "libcatalyst_transport_cpu_verbs_controller.so"
         )
 
     def test_remote_node_gets_the_bare_filename(self, fake_lib_dir):
         """A remote node loads from its deployed bundle, so it is given a name, not a local path."""
-        fake_lib_dir("cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so")
+        fake_lib_dir("rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so")
         assert (
-            _resolve_backend_lib("cpu_verbs", "coprocessor", True)
+            _resolve_backend_lib("rdma", "cpu", "coprocessor", True)
             == "libcatalyst_transport_cpu_verbs_coprocessor.so"
         )
 
@@ -450,7 +548,7 @@ class TestBackendResolution:
         """
         fake_lib_dir()  # nothing built locally
         assert (
-            _resolve_backend_lib("hwhs", "controller", True)
+            _resolve_backend_lib("rdma", "fpga", "controller", True)
             == "libcatalyst_transport_hwhs_controller.so"
         )
 
@@ -464,76 +562,125 @@ class TestBackendResolution:
         (outside / "libcatalyst_transport_hwhs_controller.so").write_bytes(b"")
         monkeypatch.setattr("catalyst.backline.get_lib_path", lambda *_: str(tmp_path / "empty"))
         monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(outside))
-        assert _resolve_backend_lib("hwhs", "controller", False) == str(
+        assert _resolve_backend_lib("rdma", "fpga", "controller", False) == str(
             outside / "libcatalyst_transport_hwhs_controller.so"
         )
 
     def test_search_path_takes_precedence_over_in_tree(self, tmp_path, monkeypatch, fake_lib_dir):
         """An override entry wins, so a local build can shadow an installed backend."""
-        fake_lib_dir("cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so")
+        fake_lib_dir("rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so")
         outside = tmp_path / "override"
         outside.mkdir()
         pinned = outside / "libcatalyst_transport_cpu_verbs_controller.so"
         pinned.write_bytes(b"")
         monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(outside))
-        assert _resolve_backend_lib("cpu_verbs", "controller", False) == str(pinned)
+        assert _resolve_backend_lib("rdma", "cpu", "controller", False) == str(pinned)
 
     def test_missing_backend_names_every_directory_searched(self, fake_lib_dir, monkeypatch):
         """The error is actionable: what was looked for, where, and how to fix it."""
-        fake_lib_dir("cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so")
+        fake_lib_dir("rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so")
         monkeypatch.setenv("CATALYST_TRANSPORT_PATH", "/opt/nowhere")
         with pytest.raises(ValueError, match="no transport backend library") as e:
-            _resolve_backend_lib("nope_verbs", "coprocessor", False)
+            _resolve_backend_lib("rdma", "gpu", "coprocessor", False)
         msg = str(e.value)
-        assert "libcatalyst_transport_nope_verbs_coprocessor.so" in msg
+        assert "libcatalyst_transport_gpu_verbs_coprocessor.so" in msg
         assert "/opt/nowhere" in msg
         assert "ENABLE_TRANSPORT=ON" in msg
         assert "CATALYST_TRANSPORT_PATH" in msg
 
     def test_role_mismatch_fails_before_dlopen(self, fake_lib_dir):
         """gpu_verbs ships no controller library, so a controller lookup fails here."""
-        fake_lib_dir("gpu_verbs/libcatalyst_transport_gpu_verbs_coprocessor.so")
+        fake_lib_dir("rdma/gpu_verbs/libcatalyst_transport_gpu_verbs_coprocessor.so")
         with pytest.raises(ValueError, match="role='controller'"):
-            _resolve_backend_lib("gpu_verbs", "controller", False)
+            _resolve_backend_lib("rdma", "gpu", "controller", False)
 
-    def test_backend_populates_backend_lib_per_role(self, fake_lib_dir):
-        """Each node's backend resolves against its own role.
+    def test_hardware_populates_backend_lib_per_role(self, fake_lib_dir):
+        """Each node's hardware resolves with the placement transport and its own role.
 
         The shared fixtures pin an explicit ``backend_lib``, which would take precedence, so these
         nodes are built without one.
         """
         fake_lib_dir(
-            "cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so",
-            "gpu_verbs/libcatalyst_transport_gpu_verbs_coprocessor.so",
+            "rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so",
+            "rdma/gpu_verbs/libcatalyst_transport_gpu_verbs_coprocessor.so",
         )
-        ctrl = qp.Controller(
-            device=qp.device("null.qubit", wires=2), label="ctrl", backend="cpu_verbs"
-        )
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
-            label="cop0", comm_host="127.0.0.1", coprocessor_fn="coproc_fn", backend="gpu_verbs"
+            name="cop0",
+            endpoint=qp.Endpoint("127.0.0.1"),
+            coprocessor_fn="coproc_fn",
+            hardware="gpu",
         )
         d = serialize_backline(
-            qp.Backline(controller=ctrl, coprocessors=[cop], transport="net").placement
+            qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma").placement
         )
         assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
         assert d["coprocessors"][0]["backend_lib"].endswith("_gpu_verbs_coprocessor.so")
 
-    def test_explicit_backend_lib_wins_over_backend(self, fake_lib_dir):
-        """An explicit ``init_args["backend_lib"]`` path is not overridden by ``backend``."""
-        fake_lib_dir("cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so")
+    def test_memcpy_cpu_to_cpu_backend_libs(self, fake_lib_dir):
+        """A CPU controller paired with a CPU coprocessor over ``memcpy``."""
+        fake_lib_dir(
+            "memcpy/libcatalyst_transport_memcpy_controller.so",
+            "memcpy/libcatalyst_transport_memcpy_coprocessor.so",
+        )
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
+        cop = qp.Coprocessor(
+            name="cop0",
+            endpoint=qp.Endpoint("127.0.0.1"),
+            coprocessor_fn="coproc_fn",
+            hardware="cpu",
+        )
+        d = serialize_backline(
+            qp.Backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
+        )
+        assert d["transport"] == "memcpy"
+        assert d["controller"]["backend_lib"].endswith("_memcpy_controller.so")
+        assert d["coprocessors"][0]["backend_lib"].endswith("_memcpy_coprocessor.so")
+
+    def test_memcpy_cpu_to_gpu_backend_libs(self, fake_lib_dir):
+        """A CPU controller paired with a GPU coprocessor over ``memcpy``."""
+        fake_lib_dir(
+            "memcpy/libcatalyst_transport_memcpy_controller.so",
+            "memcpy/libcatalyst_transport_memcpy_gpu_coprocessor.so",
+        )
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
+        cop = qp.Coprocessor(
+            name="cop0",
+            endpoint=qp.Endpoint("127.0.0.1"),
+            coprocessor_fn="coproc_fn",
+            hardware="gpu",
+        )
+        d = serialize_backline(
+            qp.Backline(controller=ctrl, coprocessors=[cop], transport="memcpy").placement
+        )
+        assert d["transport"] == "memcpy"
+        assert d["controller"]["backend_lib"].endswith("_memcpy_controller.so")
+        assert d["coprocessors"][0]["backend_lib"].endswith("_memcpy_gpu_coprocessor.so")
+
+    def test_explicit_backend_lib_bypasses_builtin_mapping(self):
+        """An explicit backend library supports out-of-tree transport/hardware combinations."""
         ctrl = qp.Controller(
             device=qp.device("null.qubit", wires=2),
-            label="ctrl",
-            backend="cpu_verbs",
+            name="ctrl",
+            hardware="fpga",
             init_args={"backend_lib": "/opt/explicit.so"},
         )
-        d = serialize_backline(qp.Backline(controller=ctrl, transport="net").placement)
+        d = serialize_backline(
+            qp.Backline(controller=ctrl, transport=Transport("custom")).placement
+        )
         assert d["controller"]["backend_lib"] == "/opt/explicit.so"
+
+    def test_default_cpu_hardware_selects_backend(self, fake_lib_dir):
+        """Omitting hardware selects the CPU backend."""
+        fake_lib_dir("rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so")
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl")
+        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
+        assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
 
     def test_no_backend_leaves_backend_lib_unset(self, no_launch):
         """Omitting ``backend`` leaves the field to ``init_args`` or the compiler default."""
-        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), label="ctrl")
-        d = serialize_backline(qp.Backline(controller=ctrl, transport="net").placement)
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl")
+        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
         assert "backend_lib" not in d["controller"]
 
 
@@ -574,6 +721,9 @@ class TestExecutorRealization:
         """A second call returns the same executor rather than launching another."""
         node = _controller(executor_options={"address": "10.0.0.9:1373"})
         assert _realize_executor(node) is _realize_executor(node)
+
+    def test_node_name_seeds_the_executor_name(self):
+        """The node's name names the executor."""
 
     @pytest.mark.parametrize("options", [{}, {"triple": "aarch64-unknown-linux-gnu"}])
     def test_options_naming_no_location_run_on_this_machine(self, options):
@@ -685,8 +835,8 @@ class TestExecutorRealization:
         assert ex.address == "127.0.0.1:7810"  # the local end of the ssh tunnel
         launch.assert_not_called()
 
-    def test_label_seeds_the_executor_name(self):
-        """The node's label names the executor, which uses it for its logs."""
+    def test_name_seeds_the_executor_name(self):
+        """The node's name names the executor, which uses it for its logs."""
         node = _controller(executor_options={"address": "10.0.0.9:1373"})
         assert _realize_executor(node).name == "ctrl"
 
@@ -718,7 +868,7 @@ class TestExecutorRealization:
         """``launch_executors`` covers the controller and each coprocessor."""
         ctrl = _controller(executor_options={"address": "ctrl:1"})
         cop = _coproc("cop0", executor_options={"address": "cop:2"})
-        dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="net")
+        dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma")
         launch_executors(dev.placement)
         assert ctrl.executor.address == "ctrl:1"
         assert cop.executor.address == "cop:2"
@@ -728,7 +878,7 @@ class TestExecutorRealization:
         ctrl = _controller(
             executor_options={"address": "10.0.0.9:1373", "triple": "aarch64-unknown-linux-gnu"},
         )
-        dev = qp.Backline(controller=ctrl, transport="net")
+        dev = qp.Backline(controller=ctrl, transport="rdma")
         launch_executors(dev.placement)
         node = serialize_backline(dev.placement)["controller"]
         assert node["address"] == "10.0.0.9:1373"
@@ -737,7 +887,7 @@ class TestExecutorRealization:
     def test_a_high_oob_port_survives_to_the_ir(self, use_capture):
         """A port above 32767 appears as itself, not as a negative number."""
         cop = _coproc("cop0", oob_port=40000)
-        dev = qp.Backline(controller=_controller(), coprocessors=[cop], transport="net")
+        dev = qp.Backline(controller=_controller(), coprocessors=[cop], transport="rdma")
 
         @qjit(target="mlir", capture=True)
         @qp.qnode(dev)

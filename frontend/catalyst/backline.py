@@ -13,9 +13,8 @@
 # limitations under the License.
 
 """Serialize a PennyLane ``Placement`` into the ``catalyst.backline`` module attribute and
-build the pipelines that lower it. The backend hints a node's ``init_args`` may carry are listed in
-``_INIT_KEYS`` and forwarded as given. Anything a backend interprets itself travels inside the
-``config`` string rather than as a key of its own.
+build the pipelines that lower it. A node's hardware and the placement transport select the
+compiled transport backend.
 
 A placement adds three passes to the compiler's stages: ``inject-transport-session`` emits the
 session's bring-up and teardown, ``lower-decode-to-transport`` turns a decode into a transport round
@@ -44,36 +43,64 @@ from catalyst.pipelines import insert_pass_before
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
-# What a node's ``init_args`` keys a node may carry; any other is rejected rather than dropped.
-_INIT_KEYS = ("backend_lib", "config", "data_path", "in_bytes", "out_bytes")
+# Backend hints forwarded verbatim from a node's ``init_args`` to the attribute node.
+_INIT_KEYS = ("backend_lib", "config")
+
+# Concrete runtime backends are a Catalyst implementation detail. PennyLane describes only the
+# transport protocol and the hardware on which each node runs.
+_BACKENDS = {
+    ("rdma", "cpu"): "cpu_verbs",
+    ("rdma", "gpu"): "gpu_verbs",
+    ("rdma", "fpga"): "hwhs",
+    ("memcpy", "cpu"): "memcpy",
+    ("memcpy", "gpu"): "memcpy_gpu",
+}
 
 # A transport backend library is named for its backend and role:
 #     libcatalyst_transport_<backend>_<role>.<ext>
 # A ``make -C runtime`` build passes ``CMAKE_LIBRARY_OUTPUT_DIRECTORY``, so in-tree backends land
-# flat in ``<RUNTIME_LIB_DIR>``; a bare ``cmake`` build instead mirrors the source tree, nesting
-# under ``transport/<backend>/``. Both are searched. Out-of-tree backends build elsewhere entirely,
+# flat in ``<RUNTIME_LIB_DIR>``. A bare ``cmake`` build instead mirrors the source tree under
+# ``transport/<transport>/[<backend>/]``. Both are searched. Out-of-tree backends build elsewhere,
 # so ``CATALYST_TRANSPORT_PATH`` (``:``-separated, like ``PATH``) lists extra directories to search
 # first; each is searched directly, assuming no layout within it.
 _BACKEND_PATH_ENV = "CATALYST_TRANSPORT_PATH"
 _BACKEND_SUBDIR = "transport"
 _BACKEND_LIB_EXTS = ("so", "dylib")
 
+# Every dispatched node needs these in its executor: the compiled program calls
+# ``__catalyst__transport__*`` and ``__catalyst__rt__*`` directly.
+_EXECUTOR_RUNTIME_PLUGINS = ("librt_transport.so", "librt_capi.so")
 
-def _backend_search_dirs(backend: str) -> list[Path]:
-    """Directories to search for ``backend``'s libraries, most specific first."""
+
+def _resolve_backend(transport: str, hardware: str) -> str:
+    """Return Catalyst's concrete backend for a transport and hardware pair."""
+    try:
+        return _BACKENDS[(transport, hardware)]
+    except KeyError:
+        raise ValueError(
+            f"unsupported backline transport/hardware combination: "
+            f"transport={transport!r}, hardware={hardware!r}"
+        ) from None
+
+
+def _backend_search_dirs(transport: str, backend: str) -> list[Path]:
+    """Directories to search for a transport backend's libraries, most specific first."""
     override = os.environ.get(_BACKEND_PATH_ENV, "")
     dirs = [Path(p) for p in override.split(os.pathsep) if p]
     lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     dirs.append(lib_dir)
-    dirs.append(lib_dir / _BACKEND_SUBDIR / backend)
+    transport_dir = lib_dir / _BACKEND_SUBDIR / transport
+    dirs.append(transport_dir)
+    dirs.append(transport_dir / backend)
     return dirs
 
 
-def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
-    """Resolve a backend name and node role to the transport library the node should load.
+def _resolve_backend_lib(transport: str, hardware: str, role: str, remote: bool) -> str:
+    """Resolve transport, hardware, and node role to the backend library the node should load.
 
     Args:
-        backend: Backend name as given on the node, e.g. ``"cpu_verbs"``.
+        transport: Placement transport name, such as ``"rdma"`` or ``"memcpy"``.
+        hardware: Node hardware name: ``"cpu"``, ``"gpu"``, or ``"fpga"``.
         role: ``"controller"`` or ``"coprocessor"``. Each backend ships one library per role.
         remote: Whether the node runs on another machine. A remote node loads the library from the
             bundle deployed alongside it, so it is named by filename only, and always with a ``.so``
@@ -84,14 +111,14 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
         str: The library path for a local node, or its bare filename for a remote one.
 
     Raises:
-        ValueError: If no library matches on a local node, naming every directory searched. A
-            backend shipping only one role (``gpu_verbs`` has no controller library) fails here
-            rather than later at ``dlopen``.
+        ValueError: If the transport/hardware pair is unsupported or no library matches on a local
+            node, naming every directory searched.
     """
+    backend = _resolve_backend(transport, hardware)
     names = [f"libcatalyst_transport_{backend}_{role}.{ext}" for ext in _BACKEND_LIB_EXTS]
     if remote:
         return names[0]
-    search = _backend_search_dirs(backend)
+    search = _backend_search_dirs(transport, backend)
     for directory in search:
         for name in names:
             candidate = directory / name
@@ -99,10 +126,10 @@ def _resolve_backend_lib(backend: str, role: str, remote: bool) -> str:
                 return str(candidate)
     searched = ", ".join(str(d) for d in search)
     raise ValueError(
-        f"no transport backend library for backend={backend!r} role={role!r}: looked for "
-        f"{names[0]} in {searched}. Transport backends are built with -DENABLE_TRANSPORT=ON "
-        f"and are not shipped in the wheel; set {_BACKEND_PATH_ENV} to point at an "
-        "out-of-tree build."
+        f"no transport backend library for transport={transport!r} hardware={hardware!r} "
+        f"backend={backend!r} role={role!r}: looked for {names[0]} in {searched}. "
+        "Transport backends are built with -DENABLE_TRANSPORT=ON and are not shipped in the "
+        f"wheel; set {_BACKEND_PATH_ENV} to point at an out-of-tree build."
     )
 
 
@@ -111,29 +138,34 @@ def _out_of_process(node: Node) -> bool:
     return node.executor_options is not None or node.executor is not None
 
 
-def _node_dict(node: Node, role: str) -> dict:
+def _node_dict(node: Node, role: str, transport: str) -> dict:
     """Map a backline node to a ``catalyst.backline`` node dict. Reads ``node.executor`` as-is.
 
-    ``comm_host``/``oob_port`` are coprocessor-only; a controller
-    carries no connection endpoint of its own.
+    Coprocessor connection information is carried by ``endpoint`` in current PennyLane Backline;
+    a controller carries no connection endpoint of its own.
 
     Args:
         node: A backline node.
-        role: The node's role, used to resolve its ``backend`` to a library. An explicit
-            ``init_args["backend_lib"]`` path takes precedence over ``backend``.
+        role: The node's role, used when resolving the backend library.
+        transport: The placement's transport name. Together with ``node.hardware``, this selects
+            the concrete backend. An explicit ``init_args["backend_lib"]`` path takes precedence.
     """
     d: dict = {"out_of_process": bool(_out_of_process(node))}
-    if node.label is not None:
-        d["name"] = node.label
-    comm_host = getattr(node, "comm_host", None)
-    if comm_host is not None:
-        d["peer"] = comm_host
-    oob_port = getattr(node, "oob_port", None)
-    if oob_port is not None:
-        d["oob_port"] = oob_port
-    backend = node.backend
-    if backend is not None and not (node.init_args or {}).get("backend_lib"):
-        d["backend_lib"] = _resolve_backend_lib(backend, role, bool(node.remote))
+    if node.name is not None:
+        d["name"] = node.name
+    if role == "controller":
+        d["in_bytes"] = node.in_bytes
+        d["out_bytes"] = node.out_bytes
+
+    endpoint = getattr(node, "endpoint", None)
+    if endpoint is not None:
+        d["peer"] = endpoint.host
+        if endpoint.port is not None:
+            d["oob_port"] = endpoint.port
+
+    hardware = getattr(node, "hardware", None)
+    if hardware is not None and not (node.init_args or {}).get("backend_lib"):
+        d["backend_lib"] = _resolve_backend_lib(transport, hardware, role, bool(node.remote))
     # A node may be handed any object as its executor, so its fields are read rather than assumed.
     executor = node.executor
     if executor is not None:
@@ -145,7 +177,7 @@ def _node_dict(node: Node, role: str) -> dict:
         except (AttributeError, RuntimeError) as e:
             # Either it has no ``address`` at all, or it has neither launched nor settled on one.
             # The cause says which; both leave the compiled program with nowhere to dispatch.
-            who = f"{role} {node.label!r}" if node.label is not None else f"unlabelled {role}"
+            who = f"{role} {node.name!r}" if node.name is not None else f"unnamed {role}"
             raise CompileError(
                 f"backline {who} has an executor ({type(executor).__name__}) that cannot say "
                 f"where it serves, so the compiled program would have nowhere to dispatch it: "
@@ -195,13 +227,14 @@ def launch_executors(placement: Placement | None) -> None:
 
 def serialize_backline(placement: Placement) -> dict:
     """Serialize a ``Placement`` into the ``catalyst.backline`` attribute dict."""
+    transport = placement.transport.name
     result = {
-        "transport": placement.transport.name,
-        "controller": _node_dict(placement.controller, "controller"),
+        "transport": transport,
+        "controller": _node_dict(placement.controller, "controller", transport),
     }
     nodes = []
     for coproc in placement.coprocessors:
-        node = _node_dict(coproc, "coprocessor")
+        node = _node_dict(coproc, "coprocessor", transport)
         # ``symbol`` names the decode function; the library providing it is loaded as an executor
         # plugin, so it must not be written into ``backend_lib``, which is the transport backend.
         node["symbol"] = coproc.coprocessor_fn.symbol_name
@@ -276,15 +309,18 @@ def _coprocessor_fn_lib(node: Node) -> Path | None:
 
 
 def _executor_plugins(node: Node, given) -> list[str]:
-    """The plugins an executor needs: those ``given``, then a coprocessor's decode function and a
-    controller's device runtime, each appended only if not already listed."""
+    """The plugins an executor needs: the runtime libraries, those ``given``, then a coprocessor's
+    decode function and a controller's device runtime, each appended only if not already listed."""
     # Deferred: qjit_device imports the device stack, which imports this module.
     from catalyst.device.qjit_device import (  # pylint: disable=import-outside-toplevel
         extract_backend_info,
     )
 
     remote = bool(node.remote)
-    plugins = list(given)
+    plugins = [
+        lib for lib in _EXECUTOR_RUNTIME_PLUGINS if not any(Path(p).name == lib for p in given)
+    ]
+    plugins += list(given)
     implied = []
     fn_lib = _coprocessor_fn_lib(node)
     if fn_lib is not None:
@@ -334,7 +370,8 @@ def _realize_executor(node: Node) -> Executor | None:
     if options is None:
         return None
     options = dict(options)
-    options.setdefault("name", node.label or "executor")
+
+    options.setdefault("name", node.name or "executor")
     options["plugins"] = _executor_plugins(node, options.get("plugins") or ())
     fn_lib = _coprocessor_fn_lib(node)
     if fn_lib is not None and node.remote:
@@ -560,10 +597,10 @@ def find_placement(callable_, jaxpr=None, name: str = "this program") -> Placeme
         list({id(p): p for p in _traced_placements(jaxpr)}.values()) if jaxpr is not None else []
     )
     if len(found) > 1:
-        labels = ", ".join(p.controller.label or "<unlabelled>" for p in found)
+        names = ", ".join(p.controller.name or "<unnamed>" for p in found)
         raise CompileError(
             f"{name!r} runs QNodes over {len(found)} different backline placements (controllers: "
-            f"{labels}), but a compiled program carries one. Split them across separate "
+            f"{names}), but a compiled program carries one. Split them across separate "
             f"qjit-compiled functions."
         )
     return found[0] if found else None

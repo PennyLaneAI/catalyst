@@ -135,8 +135,15 @@ template <typename OpT, bool Async> struct ConnectLoweringBase : public OpConver
                                   ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         ModuleOp mod = op->template getParentOfType<ModuleOp>();
-        Value peer = globalStr(rewriter, op.getLoc(), mod, "transport_peer_", op.getPeer());
-        Value port = constInt(rewriter, op.getLoc(), IntegerType::get(ctx, 16), op.getOobPort());
+        // peer / oob_port are optional: memcpy pairs by session key, so its transport.connect
+        // carries neither. Absent attrs lower to a null pointer + 0, which the CAPI reads as
+        // an empty peer string (TransportCAPI.cpp: `peer ? peer : ""`).
+        auto peerAttr = op.getPeerAttr();
+        Value peer =
+            peerAttr ? globalStr(rewriter, op.getLoc(), mod, "transport_peer_", peerAttr.getValue())
+                     : Value(LLVM::ZeroOp::create(rewriter, op.getLoc(), ptrTy(ctx)));
+        Value port =
+            constInt(rewriter, op.getLoc(), IntegerType::get(ctx, 16), op.getOobPort().value_or(0));
         if (Async) {
             Value r = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__connect_async",
                                {ptrTy(ctx), ptrTy(ctx), IntegerType::get(ctx, 16)}, i64Ty(ctx),
@@ -194,10 +201,10 @@ struct EstablishChannelLowering : public OpConversionPattern<EstablishChannelOp>
     LogicalResult matchAndRewrite(EstablishChannelOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
-        Value dp = globalStr(rewriter, op.getLoc(), moduleOf(op), "transport_data_path_",
-                             op.getDataPath());
+        Value transport =
+            globalStr(rewriter, op.getLoc(), moduleOf(op), "transport_kind_", op.getTransport());
         emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__establish_channel",
-                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), dp});
+                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), transport});
         rewriter.eraseOp(op);
         return success();
     }

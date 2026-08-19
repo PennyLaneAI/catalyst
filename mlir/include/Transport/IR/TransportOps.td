@@ -50,13 +50,19 @@ def Transport_CreateOp : Transport_Op<"create"> {
 
 def Transport_ConnectOp : Transport_Op<"connect"> {
     let summary = "Connect to the peer (blocking).";
-    let arguments = (ins Transport_SessionType:$session, StrAttr:$peer, UI16Attr:$oob_port);
+    // peer / oob_port are only needed by transports that run an OOB TCP handshake (RDMA).
+    // In-process transports (memcpy) pair on the session key, so both attrs are optional.
+    let arguments = (ins Transport_SessionType:$session,
+                        OptionalAttr<StrAttr>:$peer,
+                        OptionalAttr<UI16Attr>:$oob_port);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
 
 def Transport_ConnectAsyncOp : Transport_Op<"connect_async"> {
     let summary = "Non-blocking connect; await the token with transport.await.";
-    let arguments = (ins Transport_SessionType:$session, StrAttr:$peer, UI16Attr:$oob_port);
+    let arguments = (ins Transport_SessionType:$session,
+                        OptionalAttr<StrAttr>:$peer,
+                        OptionalAttr<UI16Attr>:$oob_port);
     let results = (outs Transport_TokenType:$token);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session)) `->` type($token)";
 }
@@ -81,13 +87,13 @@ def Transport_AwaitOp : Transport_Op<"await"> {
 }
 
 def Transport_EstablishChannelOp : Transport_Op<"establish_channel"> {
-    let summary = "Arm the data channel for the given data path.";
+    let summary = "Arm the channel for the given transport.";
     let description = [{
-        Prepares the data channel selected by `data_path` for the rounds that follow.
+        Prepares the channel selected by `transport` for the rounds that follow.
         Runs after `exchange_keys` and before `post`/`collect`.
     }];
-    let arguments = (ins Transport_SessionType:$session, StrAttr:$data_path);
-    let assemblyFormat = "$session $data_path attr-dict `:` qualified(type($session))";
+    let arguments = (ins Transport_SessionType:$session, StrAttr:$transport);
+    let assemblyFormat = "$session $transport attr-dict `:` qualified(type($session))";
 }
 
 //===----------------------------------------------------------------------===//

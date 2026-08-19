@@ -36,7 +36,7 @@ func.func @controller(%syndrome: memref<?xi8>, %correction: memref<?xi8>) {
   // CHECK: llvm.call @__catalyst__transport__exchange_keys(%[[S]])
   transport.exchange_keys %s : !transport.session<controller>
   // CHECK: llvm.call @__catalyst__transport__establish_channel(%[[S]]
-  transport.establish_channel %s "cpu_verbs" : !transport.session<controller>
+  transport.establish_channel %s "rdma" : !transport.session<controller>
   // CHECK: llvm.call @__catalyst__transport__set_message_sizes(%[[S]]
   transport.set_message_sizes %s {in_bytes = 8 : i64, out_bytes = 8 : i64} : !transport.session<controller>
   // CHECK: llvm.call @__catalyst__transport__start(%[[S]])
