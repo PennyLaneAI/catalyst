@@ -10,6 +10,7 @@ file(GLOB SRC
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
     CtrlLowering/CtrlLowering.cpp
+    RemoveGlobalPhasesPass.cpp
     ConversionPatterns.cpp
     GraphDecomposition/DecompUtils.cpp
     GraphDecomposition/DecomposeLoweringPatterns.cpp
