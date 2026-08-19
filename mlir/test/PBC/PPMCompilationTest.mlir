@@ -112,3 +112,25 @@ func.func @game_of_surface_code() -> (tensor<i1>, tensor<i1>, tensor<i1>, tensor
 
 
 // -----
+
+
+func.func @test_dce_decomp_rule() {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_qubit = quantum.custom "S"() %1 : !quantum.bit
+    %2 = quantum.insert %0[ 1], %out_qubit : !quantum.reg, !quantum.bit
+    quantum.dealloc %2 : !quantum.reg
+    return
+}
+
+func.func private @"some_decomp_rule"(%arg0: tensor<1xf64>, %arg1: tensor<1xi64>, %arg2: !quantum.reg) -> !quantum.reg attributes {resources = {operations = {"some_gate" = 1 : i64}}, target_gate = "Hadamard{}{wires:1}{}"} {
+    %0 = stablehlo.slice %arg1 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg2[%extracted] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.operator "some_gate"(%arg0: tensor<1xf64>) qubits(%2)
+      static_data = {}
+      param_map = {phi = [0]} qubit_map = {wires = [0]}
+    %3 = quantum.insert %arg2[%extracted], %out_qubits : !quantum.reg, !quantum.bit
+    return %3 : !quantum.reg
+}
