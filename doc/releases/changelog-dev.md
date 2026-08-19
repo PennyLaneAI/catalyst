@@ -125,6 +125,11 @@
   distribution over the branches. The counted resources are then scaled proportionally and summed.
   [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
 
+* Warnings and diagnostics emitted by successful Catalyst compiler subprocesses are now forwarded to
+  Python callers instead of being silently discarded. LLVM diagnostic colors are preserved in
+  interactive terminals.
+  [(#3080)](https://github.com/PennyLaneAI/catalyst/pull/3080)
+
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
   [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
@@ -476,9 +481,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The `--to-ppr` pass now runs `--symbol-dce` at the beginning, to eliminate unnecessary
-  decomposition rules that might contain gates that cannot be converted to PPRs.
+* The `--to-ppr` and `--ppm-compilation` passes now run `--symbol-dce` at the beginning,
+  to eliminate unnecessary decomposition rules that might contain gates that cannot be converted to PPRs.
   [(#3125)](https://github.com/PennyLaneAI/catalyst/pull/3125)
+  [(#3135)](https://github.com/PennyLaneAI/catalyst/pull/3135)
 
 * The `dim` argument of the `quantum.pcphase` operation has been changed to a static integer attribute
   (previously a dynamic float operand). This allows, among other things, the decomposition graph to
