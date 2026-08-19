@@ -81,6 +81,12 @@
     2. When lowering a gate operation from JAXPR to MLIR, all rules reachable from that gate are injected into the IR.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
 
+    This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
+    This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
+    If ``False``, only the circuit itself will be compiled (aka standard legacy behavior).
+    If `True`, all the decomposition rules reachable from all gates in the circuit will be compiled.
+    If `capture=False`, or `capture="global"` and `qp.capture.enabled() == False`, this argument will be ignored.
+
     3. When the `--graph-decomposition` pass encounters a gate operation without an existing rule in the IR, it will compile rules from that gate with a newly launched Python subprocess on-demand.
     [(#2769)](https://github.com/PennyLaneAI/catalyst/pull/2769)
     [(#3110)](https://github.com/PennyLaneAI/catalyst/pull/3110)
