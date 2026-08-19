@@ -387,23 +387,20 @@ def circuit_paulirot(x: float):
 print(circuit_paulirot.mlir)
 
 
-# COM: TODO: qp.GlobalPhase not migrated to Operator2 yet
-# COM: @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
-# COM: @qp.qnode(qp.device("null.qubit", wires=3))
-# COM: def circuit_gphase(x: float):
-# COM:     # CHECK-LABEL: func.func public @circuit_gphase
-# COM:     # CHECK: [[false:%.+]] = arith.constant false
-# COM:
-# COM:     # CHECK: qref.gphase({{%.+}})
-# COM:     qp.GlobalPhase(x)
-# COM:
-# COM:     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
-# COM:     # CHECK: qref.gphase({{%.+}}) adj ctrls([[q0]]) ctrlvals([[false]]) : ctrls !qref.bit
-# COM:     qp.ctrl(qp.adjoint(qp.GlobalPhase(x)), [0], [False])
-# COM:     return qp.state()
-# COM:
-# COM:
-# COM: print(circuit_gphase.mlir)
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("null.qubit", wires=3))
+def circuit_gphase(x: float):
+    # CHECK-LABEL: func.func public @circuit_gphase
+    # CHECK: [[false:%.+]] = arith.constant false
+    # CHECK: qref.gphase({{%.+}})
+    qp.GlobalPhase(x)
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: qref.gphase({{%.+}}) adj ctrls([[q0]]) ctrlvals([[false]]) : ctrls !qref.bit
+    qp.ctrl(qp.adjoint(qp.GlobalPhase(x)), [0], [False])
+    return qp.state()
+
+
+print(circuit_gphase.mlir)
 
 
 # COM: TODO: qp.QubitUnitary not migrated to Operator2 yet
@@ -437,33 +434,27 @@ print(circuit_paulirot.mlir)
 # COM: print(circuit_qubitunitary.mlir)
 
 
-# COM: TODO: qp.PCPhase not migrated to Operator2 yet
-# COM: @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
-# COM: @qp.qnode(qp.device("lightning.qubit", wires=3))
-# COM: def c_pcphase(x: float):
-# COM:     # CHECK-LABEL: func.func public @c_pcphase
-# COM:     # CHECK: [[false:%.+]] = arith.constant false
-# COM:
-# COM:     # CHECK: [[q11:%.+]] = qref.get {{%.+}}[ 0]
-# COM:     # CHECK: [[q12:%.+]] = qref.get {{%.+}}[ 1]
-# COM:     # CHECK: qref.pcphase({{%.+}}, dim : 0) [[q11]], [[q12]] : !qref.bit, !qref.bit
-# COM:
-# COM:     qp.PCPhase(x, 0, (0, 1))
-# COM:
-# COM:     # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
-# COM:     # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
-# COM:     # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 2]
-# COM:
-# COM:     # PCPhase gets automatically canonicalized, so it will never have the `adj` attribute
-# COM:     # CHECK: [[theta:%.+]] = arith.negf {{%.+}} : f64
-# COM:     # CHECK: qref.pcphase([[theta]], dim : 3) [[q3]], [[q4]] ctrls([[q5]]) ctrlvals([[false]]) :
-# COM:     # CHECK-SAME: !qref.bit, !qref.bit ctrls !qref.bit
-# COM:
-# COM:     qp.ctrl(qp.adjoint(qp.PCPhase(x, 3, (0, 1))), [2], [False])
-# COM:     return qp.state()
-# COM:
-# COM:
-# COM: print(c_pcphase.mlir)
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("lightning.qubit", wires=3))
+def c_pcphase(x: float):
+    # CHECK-LABEL: func.func public @c_pcphase
+    # CHECK: [[false:%.+]] = arith.constant false
+    # CHECK: [[q11:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q12:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: qref.pcphase({{%.+}}, dim : 0) [[q11]], [[q12]] : !qref.bit, !qref.bit
+    qp.PCPhase(x, 0, (0, 1))
+    # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 2]
+    # PCPhase gets automatically canonicalized, so it will never have the `adj` attribute
+    # CHECK: [[theta:%.+]] = arith.negf {{%.+}} : f64
+    # CHECK: qref.pcphase([[theta]], dim : 3) [[q3]], [[q4]] ctrls([[q5]]) ctrlvals([[false]]) :
+    # CHECK-SAME: !qref.bit, !qref.bit ctrls !qref.bit
+    qp.ctrl(qp.adjoint(qp.PCPhase(x, 3, (0, 1))), [2], [False])
+    return qp.state()
+
+
+print(c_pcphase.mlir)
 
 
 @qp.qjit(capture=True, target="mlir")

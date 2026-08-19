@@ -47,10 +47,10 @@ def test_multirz():
 # CHECK: func.func public @multirz()
 # CHECK: qref.multirz({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.multirz({{%.+}}) {{%.+}} : !qref.bit
-# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:{{\[f64\]}}}{wires:2}{}"
-# CHECK-SAME:   target_gate = "MultiRZ{theta:{{\[f64\]}}}{wires:2}{}"
-# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:{{\[f64\]}}}{wires:1}{}"
-# CHECK-SAME:   target_gate = "MultiRZ{theta:{{\[f64\]}}}{wires:1}{}"
+# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:2}{}"
+# CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:2}{}"
+# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:1}{}"
 test_multirz()
 
 
@@ -75,8 +75,33 @@ def test_paulirot():
 # CHECK: func.func public @paulirot()
 # CHECK: qref.paulirot ["X", "X"]({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.paulirot ["Z"]({{%.+}}) {{%.+}} : !qref.bit
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:{{\[f64\]}}}{wires:2}{pauli_word:XX}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:{{\[f64\]}}}{wires:2}{pauli_word:XX}"
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:{{\[f64\]}}}{wires:1}{pauli_word:Z}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:{{\[f64\]}}}{wires:1}{pauli_word:Z}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
 test_paulirot()
+
+
+def test_pcphase():
+    """
+    Test that decomposing qp.PCPhase works.
+    """
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=3))
+    def pcphase():
+        qp.PCPhase(0.27, dim=3, wires=range(3))
+        qp.PCPhase(0.27, dim=0, wires=range(1))
+        return qp.state()
+
+    print(pcphase.mlir)
+
+
+# CHECK: func.func public @pcphase()
+# CHECK: qref.pcphase({{%.+}}, dim : 3) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
+# CHECK: qref.pcphase({{%.+}}, dim : 0) {{%.+}} : !qref.bit
+# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:3}{dim:3}"
+# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:3}{dim:3}"
+# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:1}{dim:0}"
+# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:1}{dim:0}"
+test_pcphase()

@@ -304,7 +304,40 @@ def compile_decomp_rules(
             static_data=repack_static_data,
         )
 
-    elif op_cls in (qp.GlobalPhase, qp.PCPhase, qp.QubitUnitary):
+    elif op_cls is qp.PCPhase:
+        dynamic_shape = {qp.PCPhase.dynamic_argnames[0]: ["f64"]}
+        wire_argname = qp.PCPhase.wire_argnames[0]
+        op_id = (
+            "PCPhase"
+            + format_dynamic_params_for_id(dynamic_shape)
+            + "{"
+            + f"{wire_argname}:{wire_lens[0]}"
+            + "}{"
+            + f"dim:{repack_static_data["dim"]}"
+            + "}"
+        )
+
+        decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            op_name="PCPhase",
+            op_id=op_id,
+            dynamic_shape=dynamic_shape,
+            wire_lens={f"{wire_argname}": wire_lens[0]},
+            static_data=repack_static_data,
+        )
+
+    # elif op_cls is qp.GlobalPhase:
+    #     dynamic_shape = {qp.MultiRZ.dynamic_argnames[0]: ["f64"]}
+    #     op_id = "GlobalPhase" + format_dynamic_params_for_id(dynamic_shape) + "{}{}"
+
+    #     decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+    #         op_name="GlobalPhase",
+    #         op_id=op_id,
+    #         dynamic_shape=dynamic_shape,
+    #         wire_lens={},
+    #         static_data={},
+    #     )
+
+    elif op_cls in (qp.QubitUnitary, qp.GlobalPhase):
         raise NotImplementedError(f"{op_cls} has not been migrated to Operator2 yet")
 
     else:
