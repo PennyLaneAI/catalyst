@@ -193,6 +193,17 @@ class LinkerDriver:
         if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
             default_flags.append("-lrt_OQD_capi")
 
+        # Shared libraries exporting symbols reached by a local `runtime_call`, recorded on the
+        # module via `catalyst.runtime_artifacts` and collected into the options.
+        for artifact_path in options.runtime_artifacts:
+            artifact_path = os.path.abspath(artifact_path)
+            dir_name = os.path.dirname(artifact_path)
+            default_flags += [
+                f"-Wl,-rpath,{dir_name}",
+                f"-L{dir_name}",
+                artifact_path,
+            ]
+
         return default_flags
 
     @staticmethod

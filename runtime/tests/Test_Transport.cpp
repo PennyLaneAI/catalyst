@@ -24,6 +24,16 @@ namespace {
 CatalystTransportSession *make(std::int32_t role, const char *key) {
     return __catalyst__transport__create(STUB_BACKEND_PATH, "cfg", role, key);
 }
+
+CatalystTransportSession *make_memcpy_controller(const char *key) {
+    return __catalyst__transport__create(MEMCPY_CONTROLLER_BACKEND_PATH, "",
+                                         CATALYST_TRANSPORT_ROLE_CONTROLLER, key);
+}
+
+CatalystTransportSession *make_memcpy_coprocessor(const char *key) {
+    return __catalyst__transport__create(MEMCPY_COPROCESSOR_BACKEND_PATH, "",
+                                         CATALYST_TRANSPORT_ROLE_COPROCESSOR, key);
+}
 } // namespace
 
 TEST_CASE("create registers a session resolvable by (role, key)", "[transport]") {
@@ -112,13 +122,13 @@ TEST_CASE("set_coprocessor_fn binds through the setter the backend implements", 
 TEST_CASE("null session arguments are rejected without crashing", "[transport]") {
     CHECK(__catalyst__transport__connect(nullptr, "127.0.0.1", 0) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__exchange_keys(nullptr) == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__establish_channel(nullptr, "cpu_verbs") == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__establish_channel(nullptr, "rdma") == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__set_coprocessor_fn(nullptr, "") == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__commit_work_item(nullptr, 0, 0, 0) == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__kick(nullptr, 0) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__set_message_sizes(nullptr, 0, 0, 0) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__post(nullptr, 0) == CATALYST_TRANSPORT_ERR);
     std::uint8_t buf[4] = {};
     CHECK(__catalyst__transport__collect(nullptr, buf, sizeof(buf)) == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__data_slot(nullptr) == nullptr);
+    CHECK(__catalyst__transport__request_slot(nullptr) == nullptr);
     CHECK(__catalyst__transport__last_rtt_ns(nullptr) == 0);
     // The void entry points must simply not crash on null.
     __catalyst__transport__start(nullptr);
@@ -132,8 +142,8 @@ TEST_CASE("commit_work_item rejects a reply larger than the provisioned region",
     REQUIRE(s != nullptr);
     // exchange_keys provisions the local reply region (the stub reports a zero-size region).
     REQUIRE(__catalyst__transport__exchange_keys(s) == CATALYST_TRANSPORT_OK);
-    CHECK(__catalyst__transport__commit_work_item(s, 0, 0, 1) == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__commit_work_item(s, 0, 0, 0) == CATALYST_TRANSPORT_OK);
+    CHECK(__catalyst__transport__set_message_sizes(s, 0, 0, 1) == CATALYST_TRANSPORT_ERR);
+    CHECK(__catalyst__transport__set_message_sizes(s, 0, 0, 0) == CATALYST_TRANSPORT_OK);
     __catalyst__transport__destroy(s);
 }
 
@@ -144,4 +154,52 @@ TEST_CASE("destroy drains outstanding async tokens without a prior barrier", "[t
     REQUIRE(__catalyst__transport__exchange_keys_async(s) != 0);
     __catalyst__transport__destroy(s);
     SUCCEED();
+}
+
+TEST_CASE("create rejects a session key containing ';'", "[transport]") {
+    // The key is spliced into the config as `pair=<key>`. A ';' in the key would silently split
+    // the config into two entries instead of one; refuse rather than misparse.
+    auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "cfg",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "bad;key");
+    CHECK(s == nullptr);
+}
+
+TEST_CASE("create rejects a config that already sets the reserved 'pair' key", "[transport]") {
+    // `pair=` is reserved for the compiler-emitted session key. If a caller sets it, ours and
+    // theirs would coexist and the backend would silently pick one; refuse rather than shadow.
+    auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "pair=caller_supplied",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "reserved_key");
+    CHECK(s == nullptr);
+}
+
+TEST_CASE("memcpy backend plugins round-trip through the transport CAPI", "[transport]") {
+    auto *ct = make_memcpy_controller("memcpy_roundtrip");
+    auto *co = make_memcpy_coprocessor("memcpy_roundtrip");
+    REQUIRE(ct != nullptr);
+    REQUIRE(co != nullptr);
+
+    REQUIRE(__catalyst__transport__connect(ct, "loopback", 19011) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__connect(co, "loopback", 19011) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys(ct) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys(co) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(ct, "memcpy") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(co, "memcpy") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_message_sizes(
+                ct, 0, sizeof(std::uint64_t), sizeof(std::uint64_t)) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_coprocessor_fn(co, "") == CATALYST_TRANSPORT_OK);
+
+    __catalyst__transport__start(ct);
+    __catalyst__transport__start(co);
+
+    const std::uint64_t request = 0x0123456789ABCDEFull;
+    REQUIRE(__catalyst__transport__stage_payload(ct, &request, sizeof(request), 0) ==
+            CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__post(ct, 0) == CATALYST_TRANSPORT_OK);
+
+    std::uint64_t reply = 0;
+    REQUIRE(__catalyst__transport__collect(ct, &reply, sizeof(reply)) == CATALYST_TRANSPORT_OK);
+    CHECK(reply == request);
+
+    __catalyst__transport__destroy(ct);
+    __catalyst__transport__destroy(co);
 }
