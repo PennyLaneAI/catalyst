@@ -325,7 +325,7 @@ def c_multi_param_custom():
 print(c_multi_param_custom.mlir)
 
 
-@qp.qjit(capture=True, target="mlir", skip_decomp_rules=True)
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def circuit_multirz(x: float):
     # CHECK-LABEL: func.func public @circuit_multirz
@@ -353,7 +353,7 @@ def circuit_multirz(x: float):
 print(circuit_multirz.mlir)
 
 
-@qp.qjit(capture=True, target="mlir", skip_decomp_rules=True)
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def circuit_paulirot(x: float):
     # CHECK-LABEL: func.func public @circuit_paulirot
@@ -388,7 +388,7 @@ print(circuit_paulirot.mlir)
 
 
 # COM: TODO: qp.GlobalPhase not migrated to Operator2 yet
-# COM: @qp.qjit(capture=True, target="mlir", skip_decomp_rules=True)
+# COM: @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 # COM: @qp.qnode(qp.device("null.qubit", wires=3))
 # COM: def circuit_gphase(x: float):
 # COM:     # CHECK-LABEL: func.func public @circuit_gphase
@@ -407,7 +407,7 @@ print(circuit_paulirot.mlir)
 
 
 # COM: TODO: qp.QubitUnitary not migrated to Operator2 yet
-# COM: @qp.qjit(capture=True, target="mlir", skip_decomp_rules=True)
+# COM: @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 # COM: @qp.qnode(qp.device("lightning.qubit", wires=3))
 # COM: def circuit_qubitunitary():
 # COM:     # CHECK-LABEL: func.func public @circuit_qubitunitary
@@ -438,7 +438,7 @@ print(circuit_paulirot.mlir)
 
 
 # COM: TODO: qp.PCPhase not migrated to Operator2 yet
-# COM: @qp.qjit(capture=True, target="mlir", skip_decomp_rules=True)
+# COM: @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 # COM: @qp.qnode(qp.device("lightning.qubit", wires=3))
 # COM: def c_pcphase(x: float):
 # COM:     # CHECK-LABEL: func.func public @c_pcphase

@@ -224,7 +224,7 @@ def _abstractify_jax_array(val):
 
 
 # pylint: disable=too-many-arguments,too-many-branches
-def collect_decomp_rules(
+def compile_decomp_rules(
     module,
     op_cls,
     is_custom_op=False,
@@ -407,7 +407,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     adjoint = kwargs.pop("adjoint")
     n_ctrls = kwargs.pop("n_ctrls")
     wire_lens = kwargs.pop("wire_lens")
-    skip_decomp_rules = kwargs.pop("skip_decomp_rules")
+    collect_decomp_rules = kwargs.pop("collect_decomp_rules")
 
     repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
 
@@ -426,8 +426,8 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
 
-        if not skip_decomp_rules:
-            collect_decomp_rules(
+        if collect_decomp_rules:
+            compile_decomp_rules(
                 module=jax_ctx.module_context.module,
                 op_cls=op_cls,
                 wire_lens=wire_lens,
@@ -466,8 +466,8 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             adjoint=adjoint,
         )
 
-        if not skip_decomp_rules:
-            collect_decomp_rules(
+        if collect_decomp_rules:
+            compile_decomp_rules(
                 module=jax_ctx.module_context.module,
                 op_cls=op_cls,
                 is_custom_op=True,
@@ -520,8 +520,8 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     )
 
     # Collect decomp rules reachable from the current op
-    if not skip_decomp_rules:
-        collect_decomp_rules(
+    if collect_decomp_rules:
+        compile_decomp_rules(
             module=jax_ctx.module_context.module,
             op_cls=op_cls,
             is_custom_op=False,

@@ -106,7 +106,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         *,
         control_wires=(),
         control_values=(),
-        skip_decomp_rules=False,
+        collect_decomp_rules=True,
     ):
         self.device = device
         self.shots = shots
@@ -117,7 +117,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.control_values = control_values
         """Any control values for executing a subroutine."""
         self.has_dynamic_allocation = False
-        self.skip_decomp_rules = skip_decomp_rules
+        self.collect_decomp_rules = collect_decomp_rules
 
         super().__init__()
 
@@ -388,7 +388,7 @@ def _apply_operator2_gate(
         forward_mask=forward_mask,
         adjoint=adjoint,
         n_ctrls=n_ctrls,
-        skip_decomp_rules=self.skip_decomp_rules,
+        collect_decomp_rules=self.collect_decomp_rules,
         **kwargs,
     )
 
