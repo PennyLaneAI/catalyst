@@ -202,8 +202,8 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma",
 // CHECK:         memref.load %[[A0]]
 // CHECK:         memref.load %[[SLOT]]
 // CHECK:         memref.dealloc %[[A0]]
-module attributes {catalyst.backline = #transport.backline<transport = "net",
-  controller = #transport.node<backend_lib = "x", config = "c">,
+module attributes {catalyst.backline = #transport.backline<transport = "rdma",
+  controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @read_after_later_round(%tanner: !qecp.tanner_graph<8, 6, i32>,
                                     %esm0: memref<3xi1>, %esm1: memref<3xi1>) -> (index, index) {
@@ -237,8 +237,8 @@ module attributes {catalyst.backline = #transport.backline<transport = "net",
 // CHECK:         transport.collect %[[S1]], %[[SLOT1]] : !transport.session<controller>, memref<1xindex>
 // CHECK:         memref.load %[[SLOT1]]
 // CHECK-NOT:     memref.dealloc
-module attributes {catalyst.backline = #transport.backline<transport = "net",
-  controller = #transport.node<backend_lib = "x", config = "c">,
+module attributes {catalyst.backline = #transport.backline<transport = "rdma",
+  controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @two_prompt_reads(%tanner: !qecp.tanner_graph<8, 6, i32>,
                               %esm0: memref<3xi1>, %esm1: memref<3xi1>) -> (index, index) {
@@ -269,8 +269,8 @@ module attributes {catalyst.backline = #transport.backline<transport = "net",
 // CHECK:           %[[SLOT:.*]] = transport.reply_slot %[[S]] : !transport.session<controller> -> memref<1xindex>
 // CHECK:           transport.collect %[[S]], %[[SLOT]] : !transport.session<controller>, memref<1xindex>
 // CHECK:           memref.load %[[SLOT]]
-module attributes {catalyst.backline = #transport.backline<transport = "net",
-  controller = #transport.node<backend_lib = "x", config = "c">,
+module attributes {catalyst.backline = #transport.backline<transport = "rdma",
+  controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>,
   coprocessors = [#transport.node<backend_lib = "x", config = "c", name = "cop0", peer = "10.0.0.1", symbol = "decode">]>} {
   func.func @decode_in_loop(%tanner: !qecp.tanner_graph<8, 6, i32>, %esm: memref<3xi1>) -> index {
     %c0 = arith.constant 0 : index

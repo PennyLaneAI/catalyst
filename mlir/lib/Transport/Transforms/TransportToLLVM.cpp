@@ -142,8 +142,8 @@ template <typename OpT, bool Async> struct ConnectLoweringBase : public OpConver
         Value peer =
             peerAttr ? globalStr(rewriter, op.getLoc(), mod, "transport_peer_", peerAttr.getValue())
                      : Value(LLVM::ZeroOp::create(rewriter, op.getLoc(), ptrTy(ctx)));
-        Value port = constInt(rewriter, op.getLoc(), IntegerType::get(ctx, 16),
-                              op.getOobPort().value_or(0));
+        Value port =
+            constInt(rewriter, op.getLoc(), IntegerType::get(ctx, 16), op.getOobPort().value_or(0));
         if (Async) {
             Value r = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__connect_async",
                                {ptrTy(ctx), ptrTy(ctx), IntegerType::get(ctx, 16)}, i64Ty(ctx),
