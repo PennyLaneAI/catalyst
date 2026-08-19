@@ -476,7 +476,7 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The `--to-ppr` and `--ppm-compilation` passes now runs `--symbol-dce` at the beginning,
+* The `--to-ppr` and `--ppm-compilation` passes now run `--symbol-dce` at the beginning,
   to eliminate unnecessary decomposition rules that might contain gates that cannot be converted to PPRs.
   [(#3125)](https://github.com/PennyLaneAI/catalyst/pull/3125)
   [(#3135)](https://github.com/PennyLaneAI/catalyst/pull/3135)
