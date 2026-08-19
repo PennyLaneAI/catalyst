@@ -105,3 +105,23 @@ def test_pcphase():
 # CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:1}{dim:0}"
 # CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:1}{dim:0}"
 test_pcphase()
+
+
+def test_gphase():
+    """
+    Test that decomposing qp.GlobalPhase works.
+    Note that global phase does not have decomposition rules.
+    """
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=3))
+    def gphase():
+        qp.GlobalPhase(0.27)
+        return qp.state()
+
+    print(gphase.mlir)
+
+
+# CHECK: func.func public @gphase()
+# CHECK: qref.gphase
+test_gphase()
