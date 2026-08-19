@@ -29,7 +29,7 @@ from operator2_dummy_gates import (
     SingleParam,
     StaticData,
 )
-from pennylane.typing import Complex, Float, Int
+from pennylane.typing import Bool, Complex, Float, Int
 from pennylane.wires import Wires
 
 from catalyst.decomposition.decomposition_rules import (
@@ -121,6 +121,10 @@ class TestGenericUtilities:
                 HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
                 "HybridOpArg{angle:[[f64]]}{cwires:2}{}[",  # NOTE: open brace to match uid
             ),
+            (
+                qp.Rot(Bool, Int, Float, Wires(0)),
+                "Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{}",
+            ),  # custom ops should be promoted to f64
         ],
     )
     def test_GraphOpId(self, op, id):
