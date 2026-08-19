@@ -966,7 +966,45 @@ def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, 
     let hasVerifier = 1;
 }
 
-def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
+def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
+                                AttrSizedOperandSegments, AttrSizedResultSegments,
+                                AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>,
+                                AllTypesMatch<["args", "results"]>]> {
+    let summary = "Apply the enclosed operations controlled on the given control qubits.";
+    let description = [{
+        The `quantum.ctrl` operation applies the quantum operations in its single-block region
+        conditioned on a set of control qubits. Each `in_ctrl_values` entry selects whether the
+        matching control qubit activates on the |1> (true) or |0> (false) state.
+
+        The `ctrl-lowering` pass distributes the controls over the region: every gate in the
+        region gains the control qubits/values (appended to any controls it already carries),
+        and the control qubits are threaded through the region. Structural ops (extract, insert,
+        alloc, dealloc) are passed through unchanged, and a nested `quantum.ctrl` region has its
+        controls merged. Measurements inside a `quantum.ctrl` region are rejected.
+    }];
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_ctrl_qubits,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$results
+    );
+
+    let assemblyFormat = [{
+        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` `(` $args `)`
+        attr-dict `:` type($out_ctrl_qubits) `->` type($results) $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp", "CtrlOp"]>]> {
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins

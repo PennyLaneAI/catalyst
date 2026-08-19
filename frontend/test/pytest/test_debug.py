@@ -324,12 +324,15 @@ class TestCProgramGeneration:
             """Identity function."""
             return x
 
-        with pytest.raises(CompileError, match="C interface cannot be generated"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def error_fn(x: float):
                 """Should raise an error as we try to generate the C template during tracing."""
                 return get_cmain(f, x)
+
+        with pytest.raises(CompileError, match="C interface cannot be generated"):
+            error_fn(1.5)
 
     def test_error_non_qjit_object(self):
         """An error should be raised if the object supplied to the debug function is not a QJIT."""

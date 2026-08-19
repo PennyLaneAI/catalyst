@@ -19,7 +19,12 @@ import jax
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.capture.primitives import adjoint_transform_prim, for_loop_prim, while_loop_prim
+from pennylane.capture.primitives import (
+    adjoint_transform_prim,
+    for_loop_prim,
+    operator_p,
+    while_loop_prim,
+)
 
 import catalyst
 from catalyst.from_plxpr import from_plxpr
@@ -42,7 +47,6 @@ def catalyst_execute_jaxpr(jaxpr):
 
         # pylint: disable=missing-function-docstring
         def capture(self, args):
-
             result_treedef = jax.tree_util.tree_structure((0,) * len(jaxpr.out_avals))
             arg_signature = catalyst.tracing.type_signatures.get_abstract_signature(args)
 
@@ -112,7 +116,8 @@ class TestErrors:
         jaxpr = jax.make_jaxpr(c)()
 
         with pytest.raises(
-            NotImplementedError, match="transforms cannot currently be applied inside a QNode."
+            NotImplementedError,
+            match="transforms cannot currently be applied inside a QNode.",
         ):
             from_plxpr(jaxpr)()
 
@@ -567,7 +572,7 @@ class TestAdjointCtrl:
 
         assert qfunc_xpr.eqns[1].primitive == qref_alloc_p
         assert qfunc_xpr.eqns[2].primitive == qref_get_p
-        assert qfunc_xpr.eqns[3].primitive == qref_qinst_p
+        assert qfunc_xpr.eqns[3].primitive == qref_operator_p
 
         eqn = qfunc_xpr.eqns[4]
         assert eqn.primitive == adjoint_transform_prim
@@ -578,14 +583,9 @@ class TestAdjointCtrl:
         target_xpr = eqn.params["jaxpr"]
         assert target_xpr.eqns[1].primitive == qref_get_p
         assert target_xpr.eqns[2].primitive == qref_get_p
-        assert target_xpr.eqns[3].primitive == qref_qinst_p
-        assert target_xpr.eqns[3].params == {
-            "adjoint": False,
-            "ctrl_len": 0,
-            "op": "IsingXX",
-            "params_len": 1,
-            "qubits_len": 2,
-        }
+        assert target_xpr.eqns[3].primitive == qref_operator_p
+        assert target_xpr.eqns[3].params["op_cls"] is qp.IsingXX
+        assert target_xpr.eqns[3].params["adjoint"] == False
 
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_dynamic_control_wires(self, as_qfunc):
@@ -609,7 +609,7 @@ class TestAdjointCtrl:
 
         assert qfunc_xpr.eqns[2].primitive == qref_get_p
         assert qfunc_xpr.eqns[3].primitive == qref_get_p
-        assert qfunc_xpr.eqns[4].primitive == qref_qinst_p
+        assert qfunc_xpr.eqns[4].primitive == qref_operator_p
         assert qfunc_xpr.eqns[5].primitive == qref_get_p
         assert qfunc_xpr.eqns[6].primitive == qref_get_p
 
@@ -650,13 +650,15 @@ class TestAdjointCtrl:
 
         for i in [0, 1, 2]:
             assert for_loop_xpr.eqns[i].primitive == qref_get_p
-        assert for_loop_xpr.eqns[3].primitive == qref_qinst_p
+        assert for_loop_xpr.eqns[3].primitive == qref_operator_p
         assert for_loop_xpr.eqns[3].params == {
             "adjoint": False,
-            "ctrl_len": 2,
-            "op": "PauliX",
-            "params_len": 0,
-            "qubits_len": 1,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 2,
+            "op_cls": qp.X,
+            "wire_lens": (1,),
         }
 
 
@@ -706,7 +708,6 @@ class TestControlFlow:
         qp.capture.enable()
 
         def f(x):
-
             y = jax.numpy.array([0, 1, 2])
 
             @qp.while_loop(lambda i: jax.numpy.sum(i) < 5 * jax.numpy.sum(y))
