@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module provides infrastructure for lowering decomposition rules via python.
-"""
+"""This module provides infrastructure for lowering decomposition rules via python."""
 
 # pylint: disable=protected-access,bare-except
 
@@ -73,11 +71,6 @@ def get_rule_strings_from_module(module: ir.Module) -> list[str]:
     return funcOps
 
 
-def get_rules_from_module_as_list(module: ir.Module) -> list[str]:
-    funcOps = get_rule_funcs_from_module(module)
-    return [str(funcOp) for funcOp in funcOps]
-
-
 def get_rules_from_module(module: ir.Module) -> str:
     """
     Parse and modify decomposition rules from a ModuleOp.
@@ -96,9 +89,6 @@ def get_rules_from_module(module: ir.Module) -> str:
 def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
     with ir.InsertionPoint(module.body):
         for decomp_rule in decomp_rules:
-            if not decomp_rule:
-                continue
-
             decomp_rule_op = ir.Operation.parse(decomp_rule)
             rule_already_exists = False
 
@@ -125,18 +115,9 @@ def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
                 decomp_rule_op.clone()
 
 
-def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
+def collect_resources_for_op(op_name, args, kwargs):
     """Return resource data for all decomposition rules associated to op_name."""
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
-    args = ()
-
-    # For custom ops the dynamic params are keyed positionally ("0", "1", ...) in `kwargs`, but
-    # `compute_resources` expects them by their real argnames. Pass them positionally instead,
-    # keeping only "wires" as a keyword argument. This split must happen once, before the loop:
-    # doing it inside would drop the params on every iteration after the first.
-    if is_custom_op:
-        args = tuple(val for key, val in kwargs.items() if key != "wires")
-        kwargs = {"wires": kwargs["wires"]}
 
     # map rules to resource resources, in a more generic format
     name_to_resource_ids = {}
@@ -156,13 +137,19 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
-def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
+def prepare_op_args(dynamic_shape, wire_lens, is_custom_op) -> tuple[tuple, dict]:
+    args = ()
     kwargs = {}
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
         kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
-    return kwargs
+
+    if is_custom_op:
+        args = tuple(val for key, val in kwargs.items() if key != "wires")
+        kwargs = {"wires": kwargs["wires"]}
+
+    return args, kwargs
 
 
 def compile_decomposition_rules(
@@ -179,23 +166,15 @@ def compile_decomposition_rules(
 
     The decomposition rules will be decorated with appropriate resource and target_gate attributes.
     """
-    kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
+    rule_args, rule_kwargs = prepare_op_args(dynamic_shape, wire_lens, is_custom_op)
     extra_data = extra_data or {}
     device = qp.device("null.qubit", wires=sum(wire_lens.values()))
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
-        op_name, kwargs | static_data | extra_data, is_custom_op
+        op_name,
+        rule_args,
+        rule_kwargs | static_data | extra_data,
     )
-
-    # For custom ops the dynamic params are keyed positionally ("0", "1", ...) in `kwargs`, but the
-    # rule's `_impl` expects them by their real argnames. Pass them positionally instead, keeping
-    # only "wires" as a keyword argument (mirrors collect_resources_for_op).
-    if is_custom_op:
-        call_args = tuple(val for key, val in kwargs.items() if key != "wires")
-        call_kwargs = {"wires": kwargs["wires"]}
-    else:
-        call_args = ()
-        call_kwargs = kwargs
 
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit
@@ -218,7 +197,7 @@ def compile_decomposition_rules(
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            subroutine(*call_args, **call_kwargs)
+            subroutine(*rule_args, **rule_kwargs)
 
     module = circuit.mlir_module
 
@@ -301,9 +280,11 @@ def fetch_all_reachable_decomposition_rules_from_op(
             this_is_custom_op,
         ) = queue.popleft()
         this_extra_data = this_extra_data or {}
-        this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
+        this_args, this_kwargs = prepare_op_args(
+            this_dynamic_shape, this_wire_lens, is_custom_op=this_is_custom_op
+        )
         resources, _, _ = collect_resources_for_op(
-            this_name, this_kwargs | this_static_data | this_extra_data, this_is_custom_op
+            this_name, this_args, this_kwargs | this_static_data | this_extra_data
         )
         for _rule_name, resource in resources.items():
             try:
@@ -311,7 +292,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                     graph_op_id = GraphOpID(op)
                     probe = (
                         graph_op_id.get_operator_name(),
-                        convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
+                        convert_types_to_mlir_strings(graph_op_id.op.dynamic_args),
                         graph_op_id.wire_lens,
                         graph_op_id.static_data,
                         graph_op_id.extra_data,
@@ -328,7 +309,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                             probe[2],
                             probe[3],
                             probe[4],
-                            is_custom_op=probe[5],
+                            probe[5],
                         )
                         rules.extend(get_rule_strings_from_module(module))
             except Exception as e:

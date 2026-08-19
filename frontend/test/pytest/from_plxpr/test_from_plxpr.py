@@ -450,7 +450,6 @@ class TestAdjointCtrl:
             "hybrid_trees": (),
             "n_ctrls": 0,
             "op_cls": qp.S,
-            "collect_decomp_rules": True,
             "wire_lens": (1,),
             "collect_decomp_rules": True,
         }
@@ -541,7 +540,6 @@ class TestAdjointCtrl:
             "hybrid_trees": (),
             "n_ctrls": 2,
             "op_cls": qp.S,
-            "collect_decomp_rules": True,
             "wire_lens": (1,),
             "collect_decomp_rules": True,
         }
@@ -625,7 +623,6 @@ class TestAdjointCtrl:
             "hybrid_trees": (),
             "n_ctrls": 1,
             "op_cls": qp.T,
-            "collect_decomp_rules": True,
             "wire_lens": (1,),
             "collect_decomp_rules": True,
         }
@@ -663,7 +660,6 @@ class TestAdjointCtrl:
             "hybrid_trees": (),
             "n_ctrls": 2,
             "op_cls": qp.X,
-            "collect_decomp_rules": True,
             "wire_lens": (1,),
             "collect_decomp_rules": True,
         }

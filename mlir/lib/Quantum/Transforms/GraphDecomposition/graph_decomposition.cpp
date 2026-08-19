@@ -139,7 +139,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
         auto solution = solver.solve();
-        LLVM_DEBUG(showSolution(solution););
+        LLVM_DEBUG(showSolution(solution));
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
