@@ -19,13 +19,17 @@ import jax
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.capture.primitives import adjoint_transform_prim, for_loop_prim, while_loop_prim
+from pennylane.capture.primitives import (
+    adjoint_transform_prim,
+    ctrl_transform_prim,
+    for_loop_prim,
+    while_loop_prim,
+)
 
 import catalyst
 from catalyst.from_plxpr import from_plxpr
 from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
-    qref_ctrl_p,
     qref_get_p,
     qref_operator_p,
     qref_qinst_p,
@@ -502,15 +506,12 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        # A qfunc control lowers to a `qref.ctrl` region op, not an unrolled op-level control.
         eqn = qfunc_xpr.eqns[3]
-        assert eqn.primitive == qref_ctrl_p
+        assert eqn.primitive == ctrl_transform_prim
         assert eqn.params["n_control"] == 1
         assert eqn.params["control_values"] == (False,)
-        # invars[0] is the region qreg; invars[1] is the resolved control qubit (eqn[2]).
-        assert eqn.invars[1] is qfunc_xpr.eqns[2].outvars[0]
-        # Inside the region, the S op carries no op-level control (it is on the region instead).
-        body_xpr = eqn.params["body"]
+        assert eqn.invars[-1] is qfunc_xpr.eqns[2].outvars[0]
+        body_xpr = eqn.params["jaxpr"]
         s_eqn = body_xpr.eqns[1]
         assert s_eqn.primitive == qref_operator_p
         assert s_eqn.params["n_ctrls"] == 0
@@ -537,14 +538,14 @@ class TestAdjointCtrl:
         if as_qfunc:
             # A qfunc control lowers to nested `qref.ctrl` regions, one per control.
             outer = qfunc_xpr.eqns[3]
-            assert outer.primitive == qref_ctrl_p
+            assert outer.primitive == ctrl_transform_prim
             assert outer.params["n_control"] == 1
             assert outer.params["control_values"] == (False,)
-            inner = outer.params["body"].eqns[1]
-            assert inner.primitive == qref_ctrl_p
+            inner = outer.params["jaxpr"].eqns[1]
+            assert inner.primitive == ctrl_transform_prim
             assert inner.params["n_control"] == 1
             assert inner.params["control_values"] == (True,)
-            s_eqn = inner.params["body"].eqns[1]
+            s_eqn = inner.params["jaxpr"].eqns[1]
             assert s_eqn.primitive == qref_operator_p
             assert s_eqn.params["n_ctrls"] == 0
         else:
@@ -631,16 +632,14 @@ class TestAdjointCtrl:
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
         if as_qfunc:
-            # A qfunc control lowers to a `qref.ctrl` region; the dynamic control wire is resolved
-            # to a qubit (eqn[5]) and passed to the region op as an operand.
             assert qfunc_xpr.eqns[4].primitive == qref_operator_p  # the CNOT
             assert qfunc_xpr.eqns[5].primitive == qref_get_p  # dynamic control qubit
             eqn = qfunc_xpr.eqns[6]
-            assert eqn.primitive == qref_ctrl_p
+            assert eqn.primitive == ctrl_transform_prim
             assert eqn.params["n_control"] == 1
             assert eqn.params["control_values"] == (True,)
-            assert eqn.invars[1] is qfunc_xpr.eqns[5].outvars[0]
-            t_eqn = eqn.params["body"].eqns[1]
+            assert eqn.invars[-1] is qfunc_xpr.eqns[5].outvars[0]
+            t_eqn = eqn.params["jaxpr"].eqns[1]
             assert t_eqn.primitive == qref_operator_p
             assert t_eqn.params["n_ctrls"] == 0
         else:
@@ -689,11 +688,11 @@ class TestAdjointCtrl:
         # the control is distributed onto the loop body later by the `ctrl-lowering` pass, so the
         # loop body's op carries no op-level control here.
         ctrl_eqn = qfunc_xpr.eqns[4]
-        assert ctrl_eqn.primitive == qref_ctrl_p
+        assert ctrl_eqn.primitive == ctrl_transform_prim
         assert ctrl_eqn.params["n_control"] == 2
         assert ctrl_eqn.params["control_values"] == (True, True)
 
-        for_loop_eqn = ctrl_eqn.params["body"].eqns[0]
+        for_loop_eqn = ctrl_eqn.params["jaxpr"].eqns[0]
         for_loop_xpr = for_loop_eqn.params["jaxpr_body_fn"]
 
         assert for_loop_xpr.eqns[0].primitive == qref_get_p

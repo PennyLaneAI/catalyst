@@ -30,6 +30,7 @@ from jaxlib.mlir.dialects.arith import (
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.wires import AbstractQubit
 
 # TODO: remove after jax v0.7.2 upgrade
@@ -168,14 +169,6 @@ qref_measure_in_basis_p = Primitive("qref_measure_in_basis")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
-
-qref_ctrl_p = Primitive("qref_ctrl")
-qref_ctrl_p.multiple_results = True
-
-
-@qref_ctrl_p.def_abstract_eval
-def _qref_ctrl_abstract_eval(*args, **kwargs):
-    return []
 
 
 #
@@ -669,35 +662,37 @@ def _pl_adjoint_lowering(
 # qref ctrl region
 #
 # pylint: disable=unused-argument
+# pylint: disable=unused-argument
 def _pl_ctrl_lowering(
     jax_ctx,
-    *invals,
-    body,
+    *plxpr_invals,
+    jaxpr,
     n_control,
     control_values,
+    work_wires,
+    n_consts,
 ):
-    """Build a `qref.ctrl` region op holding the (already value-converted) region body."""
-    global_qreg = invals[0]
-    control_qubits = list(invals[1 : 1 + n_control])
-    body_operands = invals[1 + n_control :]
+    """Lower a `qml.ctrl` transform to a `qref.ctrl` region op."""
+    body_invals = plxpr_invals[: len(plxpr_invals) - n_control]
+    control_qubits = list(plxpr_invals[len(plxpr_invals) - n_control :])
 
     i1 = ir.IntegerType.get_signless(1)
-    ctrl_values_i1 = [
+    control_values_i1 = [
         ConstantOp(i1, ir.IntegerAttr.get(i1, 1 if v else 0)).result for v in control_values
     ]
 
-    op = CtrlOp(ctrl_qubits=control_qubits, ctrl_values=ctrl_values_i1)
+    op = CtrlOp(ctrl_qubits=control_qubits, ctrl_values=control_values_i1)
     ctrl_block = op.regions[0].blocks.append()
     with ir.InsertionPoint(ctrl_block):
         source_info_util.extend_name_stack("ctrl")
+        body_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)
         mlir.jaxpr_subcomp(
             jax_ctx.module_context,
-            body.jaxpr,
+            body_jaxpr,
             jax_ctx.name_stack.extend("ctrl"),
             mlir.TokenSet(),
-            [mlir.ir_constants(const) for const in body.consts],
-            global_qreg,
-            *body_operands,
+            [],
+            *body_invals,
             dim_var_values=jax_ctx.dim_var_values,
             const_lowering=jax_ctx.const_lowering,
         )
@@ -905,5 +900,5 @@ CUSTOM_LOWERING_RULES = (
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),
     (plxpr_adjoint_transform_prim, _pl_adjoint_lowering),
-    (qref_ctrl_p, _pl_ctrl_lowering),
+    (plxpr_ctrl_transform_prim, _pl_ctrl_lowering),
 )
