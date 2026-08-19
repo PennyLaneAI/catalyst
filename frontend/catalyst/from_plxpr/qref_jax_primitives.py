@@ -672,7 +672,7 @@ def _pl_ctrl_lowering(
     work_wires,
     n_consts,
 ):
-    """Lower a `qml.ctrl` transform to a `qref.ctrl` region op."""
+    """Lower a `qp.ctrl` transform to a `qref.ctrl` region op."""
     body_invals = plxpr_invals[: len(plxpr_invals) - n_control]
     control_qubits = list(plxpr_invals[len(plxpr_invals) - n_control :])
 
