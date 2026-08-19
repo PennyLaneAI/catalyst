@@ -23,7 +23,7 @@
 // CHECK-LABEL: func.func @setup
 // CHECK:         quantum.init
 // CHECK:         %[[S:.*]] = transport.create {{.*}}key = "controller"{{.*}} -> !transport.session<controller>
-// CHECK:         transport.connect %[[S]] {oob_port = 18590 : i32, peer = "127.0.0.1"} : !transport.session<controller>
+// CHECK:         transport.connect %[[S]] {oob_port = 18590 : ui16, peer = "127.0.0.1"} : !transport.session<controller>
 // CHECK:         transport.exchange_keys %[[S]] : !transport.session<controller>
 // CHECK:         transport.establish_channel %[[S]] "cpu_verbs" : !transport.session<controller>
 // CHECK:         transport.set_message_sizes %[[S]] {{.*}} : !transport.session<controller>
@@ -57,7 +57,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "net", co
 
 // CHECK-LABEL: func.func @setup_transport
 // CHECK:         %[[S:.*]] = transport.create {{.*}}key = "controller"{{.*}} -> !transport.session<controller>
-// CHECK:         transport.connect %[[S]] {oob_port = 18590 : i32, peer = "127.0.0.1"} : !transport.session<controller>
+// CHECK:         transport.connect %[[S]] {oob_port = 18590 : ui16, peer = "127.0.0.1"} : !transport.session<controller>
 // CHECK:         transport.exchange_keys %[[S]] : !transport.session<controller>
 // CHECK:         transport.establish_channel %[[S]] "cpu_verbs" : !transport.session<controller>
 // CHECK:         transport.set_message_sizes %[[S]] {{.*}} : !transport.session<controller>
@@ -296,7 +296,7 @@ module attributes {catalyst.backline = #transport.backline<transport = "net", co
 // it was created.
 
 // CHECK-LABEL: func.func @setup_transport
-// CHECK:         transport.connect %{{.*}} {oob_port = 18560 : i32, peer = "10.0.0.3"}
+// CHECK:         transport.connect %{{.*}} {oob_port = 18560 : ui16, peer = "10.0.0.3"}
 
 // CHECK-LABEL: func.func @setup() attributes {catalyst.backline_bringup}
 // CHECK:         %[[CO:.*]] = transport.create {{.*}} -> !transport.session<coprocessor>
