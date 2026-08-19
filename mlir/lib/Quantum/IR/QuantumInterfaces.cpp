@@ -38,11 +38,6 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 
 namespace {
-template <typename T> void printIterable(T iterable, llvm::raw_string_ostream &ss) {
-    ss << "[";
-    llvm::interleave(iterable, ss, ",");
-    ss << "]";
-}
 
 void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
     llvm::TypeSwitch<mlir::Attribute, void>(attr)
@@ -103,8 +98,9 @@ void printType(mlir::Type type, llvm::raw_string_ostream &ss) {
         .Default([&](mlir::Type other) { other.print(ss); });
 }
 
-void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map,
-                       llvm::raw_string_ostream &ss) {
+template <typename T, typename PrintFunc>
+void printSortedMap(const llvm::StringMap<T> &map, llvm::raw_string_ostream &ss,
+                    PrintFunc printValue) {
     llvm::SmallVector<llvm::StringRef> keys;
     for (const llvm::StringRef key : map.keys()) {
         keys.push_back(key);
@@ -116,34 +112,28 @@ void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map
         if (i > 0) {
             ss << ",";
         }
-        ss << key << ":[";
-        const auto &types = map.lookup(key);
-        for (auto [j, type] : llvm::enumerate(types)) {
-            if (j > 0) {
-                ss << ",";
-            }
-            printType(type, ss);
-        }
-        ss << "]";
+        ss << key << ":";
+        printValue(map.lookup(key), ss);
     }
     ss << "}";
 }
 
-void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream &ss) {
-    llvm::SmallVector<llvm::StringRef> keys;
-    for (const llvm::StringRef key : map.keys()) {
-        keys.push_back(key);
-    }
-    llvm::sort(keys);
-
-    ss << "{";
-    for (auto [i, key] : llvm::enumerate(keys)) {
-        if (i > 0) {
-            ss << ",";
+void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map,
+                       llvm::raw_string_ostream &ss) {
+    printSortedMap(map, ss, [](const auto &types, llvm::raw_string_ostream &stream) {
+        stream << "[";
+        for (auto [j, type] : llvm::enumerate(types)) {
+            if (j > 0) {
+                stream << ",";
+            }
+            printType(type, stream);
         }
-        ss << key << ":" << std::to_string(map.lookup(key));
-    }
-    ss << "}";
+        stream << "]";
+    });
+}
+
+void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream &ss) {
+    printSortedMap(map, ss, [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
 }
 
 } // namespace

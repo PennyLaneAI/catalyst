@@ -14,8 +14,6 @@
 
 """Unit tests for the python decompositions module."""
 
-from pathlib import Path
-
 import jax.numpy as jnp
 import pennylane as qp
 import pytest
@@ -31,25 +29,17 @@ from operator2_dummy_gates import (
     SingleParam,
     StaticData,
 )
-from pennylane import qjit, qnode
-from pennylane.decomposition import add_decomps, local_decomps, register_resources
-from pennylane.typing import Bool, Complex, Float, Int, Wire
+from pennylane.typing import Complex, Float, Int
 from pennylane.wires import Wires
 
-from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.decomposition_rules import (
     compile_decomposition_rules_wrapper,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID
-from catalyst.decomposition.precompile_decomposition_rules import (
-    get_abstract_args,
-    precompile_decomp_rules,
-)
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
     get_dummy_values_for_arg,
 )
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
 class TestGenericUtilities:
@@ -136,7 +126,7 @@ class TestGenericUtilities:
     def test_GraphOpId(self, op, id):
         """Test that GraphOpIds are generated correctly by the frontend."""
         # NOTE: use startswith to match ops with uids/extra_data
-        assert GraphOpID(op).getID().startswith(id)
+        assert GraphOpID(op).getGraphOpId().startswith(id)
 
     def test_wrapper_operator(self):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""

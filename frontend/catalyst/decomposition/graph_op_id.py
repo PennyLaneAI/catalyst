@@ -168,7 +168,7 @@ class GraphOpID:
         """Return the static data formatted for GraphOpId."""
         return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
 
-    def getID(self) -> str:
+    def getGraphOpId(self) -> str:
         """
         Return the GraphOpId as a string.
 

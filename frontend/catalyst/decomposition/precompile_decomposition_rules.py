@@ -140,7 +140,7 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
                 continue
 
             mlir_rules = compile_decomposition_rules(
-                op.__name__, GraphOpID(op).getID(), dynamic_data, wire_lens, {}
+                op.__name__, GraphOpID(op).getGraphOpId(), dynamic_data, wire_lens, {}
             )
 
             bytecode_lib += get_rules_from_module(mlir_rules) + "\n"

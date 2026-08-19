@@ -19,23 +19,17 @@
 import warnings
 from collections import deque
 from functools import partial
-from typing import Any
 
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jaxlib.mlir.dialects.builtin import ModuleOp
-from pennylane.pytrees import flatten
 
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
-    format_dynamic_params_for_id,
     get_dummy_values_for_arg,
-    post_process_concretize_leaves,
-    replace_abstract_wires_with_concrete_wires,
 )
-from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 
@@ -135,7 +129,7 @@ def collect_resources_for_op(op_name, args, kwargs):
             resources = rule.compute_resources(*args, **kwargs)
             name_to_resources[rule.name] = resources.gate_counts
             name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
+                GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
             }
         except Exception as e:
             warnings.warn(f"Failed to get resources for the {rule.name} decomposition rule: {e}")
@@ -310,7 +304,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         queue.append(probe)
                         module = compile_decomposition_rules(
                             probe[0],
-                            graph_op_id.getID(),
+                            graph_op_id.getGraphOpId(),
                             probe[1],
                             probe[2],
                             probe[3],
