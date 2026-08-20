@@ -118,9 +118,9 @@
   AOT compilation and as arguments to `pennylane.specs` calculations.
   [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
 
-* `qp.specs` now preserves nested loop call hierarchies and reports concrete resource counts using
-  average call multiplicities when dependent upper bounds are the immediately enclosing loops'
-  induction variables.
+* The `ResourceAnalysis` pass can now report concrete resource counts for nested loops whose upper
+  bounds are the induction variables of their immediately enclosing loops.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
 
   For example, this program reports average multiplicities of `3.5` for the middle loop and `2` for
   the inner loop, resulting in a total of `56` `PauliX` operations:
