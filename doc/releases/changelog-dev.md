@@ -128,7 +128,7 @@
   ```python
   import pennylane as qp
 
-  @qp.qjit(autograph=True, keep_intermediate=2)
+  @qp.qjit(autograph=True)
   @qp.qnode(qp.device("null.qubit", wires=1))
   def circuit():
       for i in range(8):
