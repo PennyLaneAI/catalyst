@@ -481,6 +481,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
+  [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)
+
 * The `--to-ppr` and `--ppm-compilation` passes now run `--symbol-dce` at the beginning,
   to eliminate unnecessary decomposition rules that might contain gates that cannot be converted to PPRs.
   [(#3125)](https://github.com/PennyLaneAI/catalyst/pull/3125)
