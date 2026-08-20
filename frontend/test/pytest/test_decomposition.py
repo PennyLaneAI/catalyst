@@ -39,9 +39,6 @@ from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
     get_dummy_values_for_arg,
-)
-from catalyst.decomposition.type_utils import (
-    get_dummy_values_for_arg,
     mlir_stringify_type,
 )
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
@@ -121,7 +118,10 @@ class TestGenericUtilities:
                 "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
             ),
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
-            (HybridWires(Wires([0, 1, 2])), "HybridWires{}{}{}["),  # NOTE: open brace to match uid
+            (
+                HybridWires(Wires([0, 1, 2])),
+                "HybridWires{}{}{}[",
+            ),  # NOTE: open brace to match uid
             (
                 HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
                 "HybridOpArg{angle:[[f64]]}{cwires:2}{}[",  # NOTE: open brace to match uid
