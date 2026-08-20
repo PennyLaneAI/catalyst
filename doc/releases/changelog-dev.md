@@ -495,6 +495,12 @@
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
 
+* `ResourceAnalysis` can now optionally count `DecomposableGate` operations by their full graph
+  operation ID. Decomposition-rule resource generation enables this detailed mode so that resource
+  annotations preserve parameter types, wire counts, static data, and operator UIDs used for graph
+  matching.
+  [(#3102)](https://github.com/PennyLaneAI/catalyst/pull/3102)
+
 * `from_plxpr` no longer depends on the `Transform.plxpr_transform` property.
   [(#3004)](https://github.com/PennyLaneAI/catalyst/pull/3004)
 
