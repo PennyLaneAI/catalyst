@@ -139,7 +139,10 @@ def _get_device_kwargs(device) -> dict:
 # code example has long lines
 # pylint: disable=line-too-long
 def from_plxpr(
-    plxpr: ClosedJaxpr, skip_preprocess: bool = False, _preprocess_warn: bool = True
+    plxpr: ClosedJaxpr,
+    skip_preprocess: bool = False,
+    _preprocess_warn: bool = True,
+    collect_decomp_rules: bool = True,
 ) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
@@ -152,6 +155,8 @@ def from_plxpr(
             if any device preprocessing transforms in the compilation pipeline do not have
             native MLIR implementations. This argument is targeted at developers and should
             generally not be used. ``True`` by default.
+        collect_decomp_rules (bool): Controls whether or not to compile the reachable
+            decomposition rules from the gates in the circuit. ``True`` by default.
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -210,7 +215,9 @@ def from_plxpr(
     """
 
     interpreter = WorkflowInterpreter(
-        skip_preprocess=skip_preprocess, _preprocess_warn=_preprocess_warn
+        skip_preprocess=skip_preprocess,
+        _preprocess_warn=_preprocess_warn,
+        collect_decomp_rules=collect_decomp_rules,
     )
     original_fn = partial(interpreter.eval, plxpr.jaxpr, plxpr.consts)
 
@@ -228,7 +235,9 @@ class WorkflowInterpreter(PlxprInterpreter):
 
     def __copy__(self):
         new_version = WorkflowInterpreter(
-            skip_preprocess=self._skip_preprocess, _preprocess_warn=self._preprocess_warn
+            skip_preprocess=self._skip_preprocess,
+            _preprocess_warn=self._preprocess_warn,
+            collect_decomp_rules=self._collect_decomp_rules,
         )
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
@@ -236,11 +245,12 @@ class WorkflowInterpreter(PlxprInterpreter):
         new_version.decompose_tkwargs = copy(self.decompose_tkwargs)
         return new_version
 
-    def __init__(self, skip_preprocess=False, _preprocess_warn=True):
+    def __init__(self, skip_preprocess=False, _preprocess_warn=True, collect_decomp_rules=True):
         self._pass_pipeline = []
         self.init_qreg = None
         self._skip_preprocess = skip_preprocess
         self._preprocess_warn = _preprocess_warn
+        self._collect_decomp_rules = collect_decomp_rules
 
         # Compiler options for the new decomposition system
         self.requires_decompose_lowering = False
@@ -292,7 +302,9 @@ def handle_qnode(
         qreg = qref_alloc_p.bind(static_num_qubits=len(device.wires))
         self.init_qreg = qreg
 
-        converter = PLxPRToQuantumJaxprInterpreter(device, shots, self.init_qreg, {})
+        converter = PLxPRToQuantumJaxprInterpreter(
+            device, shots, self.init_qreg, {}, collect_decomp_rules=self._collect_decomp_rules
+        )
         retvals = converter(closed_jaxpr, *args)
         qref_dealloc_p.bind(self.init_qreg)
         device_release_p.bind()
@@ -434,6 +446,7 @@ def trace_from_pennylane(
     static_argnums,
     abstracted_axes,
     skip_preprocess=False,
+    collect_decomp_rules=True,
     debug_info=None,
 ):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
@@ -454,6 +467,8 @@ def trace_from_pennylane(
         skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
             If ``True``, transforms used to preprocess and validate the user program before
             executing on a quantum backend will not be used. ``False`` by default.
+        collect_decomp_rules (bool): Controls whether or not to compile the reachable
+            decomposition rules from the gates in the circuit. ``True`` by default.
         debug_info(jax.api_util.debug_info): a source debug information object required by jaxprs.
 
     Returns:
@@ -497,9 +512,9 @@ def trace_from_pennylane(
             flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
             flat_inputs = [a for a in flat_inputs if qp.math.is_abstract(a)]
             abstract_shapes = _extract_abstract_shapes(flat_inputs)
-            jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(
-                *abstract_shapes, *flat_inputs
-            )
+            jaxpr = from_plxpr(
+                plxpr, skip_preprocess=skip_preprocess, collect_decomp_rules=collect_decomp_rules
+            )(*abstract_shapes, *flat_inputs)
 
             return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
 

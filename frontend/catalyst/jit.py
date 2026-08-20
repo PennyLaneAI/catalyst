@@ -104,6 +104,7 @@ def qjit(
     dialect_plugins=None,
     capture="global",
     skip_preprocess=False,
+    collect_decomp_rules=True,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -197,6 +198,11 @@ def qjit(
             the validity of the program themselves. If ``capture=False``, or ``capture="global"``
             and ``qp.capture.enabled() == False``, this argument will be ignored. ``False``
             by default.
+        collect_decomp_rules (bool): Controls whether or not to compile the decomposition
+            rules. If ``False``, only the circuit itself will be compiled. If ``True``, all the
+            decomposition rules reachable from all gates in the circuit will be compiled. If
+            ``capture=False``, or ``capture="global"`` and ``qp.capture.enabled() == False``, this
+            argument will be ignored. ``True`` by default.
 
     Returns:
         QJIT object.
@@ -874,6 +880,7 @@ class QJIT(CatalystCallable):
                     static_argnums=static_argnums,
                     abstracted_axes=abstracted_axes,
                     skip_preprocess=self.compile_options.skip_preprocess,
+                    collect_decomp_rules=self.compile_options.collect_decomp_rules,
                     debug_info=dbg,
                 )
                 return jaxpr, out_type, out_treedef, full_sig
