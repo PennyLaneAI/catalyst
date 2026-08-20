@@ -787,6 +787,61 @@ func.func @test_if_mixed_root_nonroot(%arg0: i1, %arg1: f64) -> i1 attributes {q
 // -----
 
 
+// CHECK-LABEL: test_if_with_ctrl_op
+func.func @test_if_with_ctrl_op(%arg0: i1) attributes {quantum.node} {
+    // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
+    // CHECK: [[ctrl:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[target:%.+]] = quantum.alloc_qb : !quantum.bit
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %ctrl = qref.alloc_qb : !qref.bit
+    %target = qref.alloc_qb : !qref.bit
+
+
+    // CHECK: [[ifOut:%.+]]:2 = scf.if %arg0 -> (!quantum.bit, !quantum.bit) {
+    // CHECK:   [[ctrl_out:%.+]], [[target_out:%.+]] = quantum.ctrl([[ctrl]]) ctrlvals([[true]])
+    // CHECK-SAME: ([[target]]) : !quantum.bit -> !quantum.bit {
+    // CHECK:   ^bb0(%arg1: !quantum.bit):
+    // CHECK:     [[HADAMARD:%.+]] = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+    // CHECK:     quantum.yield [[HADAMARD]] : !quantum.bit
+    // CHECK:   }
+    // CHECK:   scf.yield [[target_out]], [[ctrl_out]] : !quantum.bit, !quantum.bit
+    // CHECK: } else {
+    // CHECK:   scf.yield [[target]], [[ctrl]] : !quantum.bit, !quantum.bit
+    // CHECK: }
+    scf.if %arg0 {
+        qref.ctrl (%ctrl) ctrlvals (%true){
+            qref.custom "Hadamard"() %target : !qref.bit
+        }
+    }
+
+    // CHECK: [[ctrl_out:%.+]], [[target_out:%.+]] = quantum.ctrl([[ifOut]]#1) ctrlvals([[true]])
+    // CHECK-SAME:  ([[ifOut]]#0) : !quantum.bit -> !quantum.bit {
+    // CHECK: ^bb0(%arg1: !quantum.bit):
+    // CHECK:   [[if_out_1:%.+]] = scf.if %arg0 -> (!quantum.bit) {
+    // CHECK:     [[HADAMARD:%.+]] = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+    // CHECK:     scf.yield [[HADAMARD]] : !quantum.bit
+    // CHECK:   } else {
+    // CHECK:     scf.yield %arg1 : !quantum.bit
+    // CHECK:   }
+    // CHECK:   quantum.yield [[if_out_1]] : !quantum.bit
+    // CHECK: }
+    qref.ctrl (%ctrl) ctrlvals (%true){
+        scf.if %arg0 {
+            qref.custom "Hadamard"() %target : !qref.bit
+        }
+    }
+
+    // CHECK: quantum.dealloc_qb [[ctrl_out]] : !quantum.bit
+    // CHECK: quantum.dealloc_qb [[target_out]] : !quantum.bit
+    qref.dealloc_qb %ctrl : !qref.bit
+    qref.dealloc_qb %target : !qref.bit
+    return
+}
+
+
+// -----
+
+
 //
 // switch statements
 //

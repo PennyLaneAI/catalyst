@@ -686,6 +686,58 @@ func.func @test_if_nested_for(%arg0: i1) attributes {quantum.node} {
 // -----
 
 
+// CHECK-LABEL: test_if_with_ctrl_op
+func.func @test_if_with_ctrl_op(%arg0: i1) attributes {quantum.node} {
+    // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
+    // CHECK: [[ctrl:%.+]] = qref.alloc_qb : !qref.bit
+    // CHECK: [[target:%.+]] = qref.alloc_qb : !qref.bit
+    %0 = llvm.mlir.constant(true) : i1
+    %1 = quantum.alloc_qb : !quantum.bit
+    %2 = quantum.alloc_qb : !quantum.bit
+
+    // CHECK: scf.if %arg0 {
+    // CHECK:   qref.ctrl([[ctrl]]) ctrlvals([[true]]) {
+    // CHECK:     qref.custom "Hadamard"() [[target]] : !qref.bit
+    // CHECK:   }
+    // CHECK: }
+    %3:2 = scf.if %arg0 -> (!quantum.bit, !quantum.bit) {
+      %out_ctrl_qubits_0, %results_1 = quantum.ctrl(%1) ctrlvals(%0) (%2) : !quantum.bit -> !quantum.bit {
+      ^bb0(%arg1: !quantum.bit):
+        %out_qubits = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+        quantum.yield %out_qubits : !quantum.bit
+      }
+      scf.yield %results_1, %out_ctrl_qubits_0 : !quantum.bit, !quantum.bit
+    } else {
+      scf.yield %2, %1 : !quantum.bit, !quantum.bit
+    }
+
+    // CHECK: qref.ctrl([[ctrl]]) ctrlvals([[true]]) {
+    // CHECK:   scf.if %arg0 {
+    // CHECK:     qref.custom "Hadamard"() [[target]] : !qref.bit
+    // CHECK:   }
+    // CHECK: }
+    %out_ctrl_qubits, %results = quantum.ctrl(%3#1) ctrlvals(%0) (%3#0) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg1: !quantum.bit):
+      %4 = scf.if %arg0 -> (!quantum.bit) {
+        %out_qubits = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+      } else {
+        scf.yield %arg1 : !quantum.bit
+      }
+      quantum.yield %4 : !quantum.bit
+    }
+
+    // CHECK: qref.dealloc_qb [[ctrl]] : !qref.bit
+    // CHECK: qref.dealloc_qb [[target]] : !qref.bit
+    quantum.dealloc_qb %out_ctrl_qubits : !quantum.bit
+    quantum.dealloc_qb %results : !quantum.bit
+    return
+}
+
+
+// -----
+
+
 //
 // switch
 //

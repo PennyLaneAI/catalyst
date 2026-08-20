@@ -13,8 +13,12 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "value-semantics-conversion"
+
+// The macro REFERENCE_SEMANTICS_GATE_OPS defines a list of operations that can take in !qref.bit
+// values as operands, and do not return any observables as results.
 #define REFERENCE_SEMANTICS_GATE_OPS                                                               \
-    qref::QuantumOperation, qref::MeasureOp, mbqc::RefMeasureInBasisOp, pbc::RefPPMeasurementOp
+    qref::QuantumOperation, qref::MeasureOp, qref::CtrlOp, mbqc::RefMeasureInBasisOp,              \
+        pbc::RefPPMeasurementOp
 #define REFERENCE_SEMANTICS_OBSERVABLE_OPS                                                         \
     qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp
 
@@ -1350,6 +1354,82 @@ void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTr
     builder.eraseOp(rAdjointOp);
 }
 
+void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tracker) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(rCtrlOp);
+    Location loc = rCtrlOp->getLoc();
+
+    SetVector<Value> rValuesUsedByRegion;
+    // Special: ctrl qubits are passed in as operands explicitly instead of closure
+    size_t numCtrlQubits = rCtrlOp.getCtrlQubits().size();
+    for (Value rCtrlQubit : rCtrlOp.getCtrlQubits()) {
+        rValuesUsedByRegion.insert(rCtrlQubit);
+    }
+    collectNecessaryRegionRValues(rCtrlOp.getRegion(), rValuesUsedByRegion);
+    assert(rValuesUsedByRegion.size() >= numCtrlQubits);
+    size_t numTargetQubits = rValuesUsedByRegion.size() - numCtrlQubits;
+
+    quantum::CtrlOp vCtrlOp;
+    {
+        // 1. Send in the vValues from above as arguments
+        // This handles the flow from outside the vCtrlOp into the vCtrlOp
+        // i.e. the extract op results are sent in as operands to the vCtrlOp
+        SmallVector<Value> regionOperands;
+        regionOperands.append(rValuesUsedByRegion.begin(), rValuesUsedByRegion.end());
+        TransientQubitExtractor extractor(tracker, builder, rCtrlOp, regionOperands);
+        SmallVector<Value> vCtrlOperands;
+
+        for (Value rValue : rValuesUsedByRegion) {
+            if (isa<qref::QubitType>(rValue.getType()) && tracker.isRootRQubit(rValue)) {
+                vCtrlOperands.push_back(tracker.getCurrentVQubit(rValue));
+            } else if (isa<qref::QuregType>(rValue.getType())) {
+                vCtrlOperands.push_back(tracker.getCurrentVQreg(rValue));
+            } else {
+                // To be replaced with extracted vQubits
+                vCtrlOperands.push_back(rValue);
+            }
+        }
+        for (auto [vQubit, idx] : llvm::zip_equal(extractor.getExtractedVQubits(),
+                                                  extractor.getNonRootQubitOperandIndices())) {
+            vCtrlOperands[idx] = vQubit;
+        }
+
+        ArrayRef<Value> vCtrlQubitOperands = ArrayRef(vCtrlOperands).take_front(numCtrlQubits);
+        ArrayRef<Value> vTargetQubitOperands = ArrayRef(vCtrlOperands).take_back(numTargetQubits);
+        vCtrlOp = quantum::CtrlOp::create(builder, loc, TypeRange(vCtrlQubitOperands),
+                                          TypeRange(vTargetQubitOperands), vCtrlQubitOperands,
+                                          rCtrlOp.getCtrlValues(), vTargetQubitOperands);
+
+        // 2. Move operations from old body to new body
+        builder.inlineRegionBefore(rCtrlOp.getRegion(), vCtrlOp.getRegion(),
+                                   vCtrlOp.getRegion().end());
+        builder.setInsertionPointToEnd(&vCtrlOp.getRegion().front());
+        quantum::YieldOp::create(builder, loc, {});
+
+        // 3. Create new args with quantum.bit/reg types and set them as root for the new region
+        ArrayRef<Value> rTargetQubitOperands =
+            rValuesUsedByRegion.getArrayRef().take_back(numTargetQubits);
+        SetVector<Value> _rTargetQubitOperands(rTargetQubitOperands.begin(),
+                                               rTargetQubitOperands.end());
+        addVArgsToRegionAndHandle(builder, _rTargetQubitOperands, vCtrlOp.getRegion());
+
+        // Update tracker with results
+        for (auto [i, j] :
+             llvm::zip_equal(extractor.getQRegOperandIndices(), extractor.getQRegResultIndices())) {
+            tracker.setCurrentVQreg(rValuesUsedByRegion[i], vCtrlOp->getResult(j));
+        }
+
+        for (auto [i, j] : llvm::zip_equal(extractor.getRootQubitOperandIndices(),
+                                           extractor.getRootQubitResultIndices())) {
+            tracker.setCurrentVQubit(rValuesUsedByRegion[i], vCtrlOp->getResult(j));
+        }
+
+        extractor.setVOp(vCtrlOp);
+    }
+
+    builder.eraseOp(rCtrlOp);
+}
+
 void createElseBranchWithDefaultYields(IRRewriter &builder,
                                        const SetVector<Value> &rValuesUsedByRegion,
                                        TransientQubitExtractor &extractor,
@@ -1779,6 +1859,7 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
             .Case<pbc::RefPPMeasurementOp>([&](auto o) { handlePPM(builder, o, tracker); })
             .Case<qref::AdjointOp>([&](auto o) { handleAdjoint(builder, o, tracker); })
+            .Case<qref::CtrlOp>([&](auto o) { handleCtrl(builder, o, tracker); })
             .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
             .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
             .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker); })
