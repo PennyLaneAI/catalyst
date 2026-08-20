@@ -566,3 +566,57 @@ def test_adjoint_with_ctrl():
 
 
 print(test_adjoint_with_ctrl.mlir)
+
+
+# CHECK: func.func public @test_ctrl_with_allocation() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_ctrl_with_allocation():
+    """
+    Test ctrl with dynamic qubit allocation
+    """
+    # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
+    # CHECK-DAG: [[true:%.+]] = arith.constant true
+    # CHECK-DAG: [[false:%.+]] = arith.constant false
+    # CHECK-DAG: [[reg_device:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    def f(wires):
+        qp.RX(0.1, wires)
+
+    # CHECK: [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[alloc_q0:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK: [[alloc_q1:%.+]] = qref.get [[reg_alloc]][ 1] : !qref.reg<2> -> !qref.bit
+    with qp.allocate(2) as q:
+
+        # CHECK:  qref.ctrl([[alloc_q1]]) ctrlvals([[false]]) {
+        # CHECK:    qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
+        # CHECK:  }
+        qp.ctrl(qp.X, control=q[1], control_values=False)(q[0])
+
+        # CHECK:  qref.ctrl([[alloc_q0]]) ctrlvals([[false]]) {
+        # CHECK:    qref.custom "RX"([[angle]]) [[alloc_q1]] : !qref.bit
+        # CHECK:  }
+        qp.ctrl(f, control=q[0], control_values=False)(q[1])
+    # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<2>
+
+    # CHECK: [[q3:%.+]] = qref.get [[reg_device]][ 3] : !qref.reg<4> -> !qref.bit
+    # CHECK: qref.ctrl([[q3]]) ctrlvals([[true]]) {
+    # CHECK:   [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK:   [[alloc_q0:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK:   [[alloc_q1:%.+]] = qref.get [[reg_alloc]][ 1] : !qref.reg<2> -> !qref.bit
+    # CHECK:   qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg_device]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK:   qref.custom "CNOT"() [[q0]], [[alloc_q1]] : !qref.bit, !qref.bit
+    # CHECK:   qref.dealloc [[reg_alloc]] : !qref.reg<2>
+    # CHECK: }
+    def g():
+        with qp.allocate(2) as q:
+            qp.X(q[0])
+            qp.CNOT(wires=[0, q[1]])
+
+    qp.ctrl(g, control=3, control_values=True)()
+
+    return qp.expval(qp.X(0))
+
+
+print(test_ctrl_with_allocation.mlir)
