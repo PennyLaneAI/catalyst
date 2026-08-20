@@ -358,11 +358,17 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
             return resolve_constant_wire(op.operands[0])
 
         case _ if op.name == "stablehlo.add":
-            x, y = (resolve_constant_wire(op.operands[0]), resolve_constant_wire(op.operands[1]))
+            x, y = (
+                resolve_constant_wire(op.operands[0]),
+                resolve_constant_wire(op.operands[1]),
+            )
             return f"({x} + {y})"
 
         case _ if op.name == "stablehlo.subtract":
-            x, y = (resolve_constant_wire(op.operands[0]), resolve_constant_wire(op.operands[1]))
+            x, y = (
+                resolve_constant_wire(op.operands[0]),
+                resolve_constant_wire(op.operands[1]),
+            )
             return f"({x} - {y})"
 
         case _ if op.name == "tensor.from_elements":
@@ -471,7 +477,9 @@ def xdsl_to_qp_op(op) -> Operator:
                     wires=ssa_to_qp_wires(op),
                 )
             case "quantum.gphase":
-                gate = ops.GlobalPhase(ssa_to_qp_params(op, single=True), wires=ssa_to_qp_wires(op))
+                phi = _extract(op, "angle", resolve_constant_params, single=True)
+                assert phi is not None
+                gate = ops.GlobalPhase(phi)
 
             case "quantum.unitary":
                 gate = ops.qubit.matrix_ops.QubitUnitary(

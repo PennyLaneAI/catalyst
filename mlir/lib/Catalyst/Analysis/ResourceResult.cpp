@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <utility>
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -25,6 +26,9 @@
 #include "mlir/IR/MLIRContext.h"
 
 #include "Catalyst/Analysis/ResourceResultExtension.h"
+
+#include <llvm/ADT/DenseMap.h>
+#include <llvm/Support/JSON.h>
 
 using namespace mlir;
 
@@ -118,6 +122,16 @@ void ResourceResult::multiplyBy(double scalar) {
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
 // (fractional) count values, but the JSON output always reports the nearest integer.
+//
+// JSON Schema (per function, keyed by name at the root):
+//   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
+//   num_qubits: { alloc, arg, total }
+//   classical_instructions: { "dialect.op": count, ... }
+//   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
+//   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
+//   measurement_processes: { "meas_type": count, ... }
+//   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
+//   qubit_disjoint_depth }
 static llvm::json::Value countToJson(double count) {
     return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
 }
@@ -125,57 +139,80 @@ static llvm::json::Value countToJson(double count) {
 llvm::json::Object ResourceResult::toJson() const {
     llvm::json::Object funcObj;
 
-    llvm::json::Object opsObj;
+    /// Metadata
+    llvm::json::Object metaDataObject;
+    metaDataObject["device_name"] = deviceName;
+    metaDataObject["qnode"] = isQnode;
+    metaDataObject["has_branches"] = hasBranches;
+    metaDataObject["auto_qubit_management"] = autoQubitManagement;
+    funcObj["metadata"] = std::move(metaDataObject);
+
+    /// Qubit Allocations
+    llvm::json::Object numQubitObject;
+    numQubitObject["alloc"] = countToJson(numAllocQubits);
+    numQubitObject["arg"] = numArgQubits;
+    numQubitObject["total"] = countToJson(numQubits());
+    funcObj["num_qubits"] = std::move(numQubitObject);
+
+    // Classical Operations
+    llvm::json::Object classicalInstructionsObject;
+    for (const auto &entry : classicalInstructions) {
+        classicalInstructionsObject[entry.getKey()] = countToJson(entry.getValue());
+    }
+    funcObj["classical_instructions"] = std::move(classicalInstructionsObject);
+
+    /// Quantum Operations
+    llvm::DenseMap<int, llvm::DenseMap<StringRef, double>> quantumOperationCounts;
     for (const auto &opEntry : operations) {
         StringRef opName = opEntry.getKey();
         for (const auto &sizeEntry : opEntry.getValue()) {
             const auto &[nQubits, nParams] = sizeEntry.first;
             double count = sizeEntry.second;
-            std::string key = opName.str() + "(" + std::to_string(nQubits) + ")";
-            opsObj[key] = countToJson(count);
+            quantumOperationCounts[nQubits][opName] += count;
         }
     }
-    funcObj["operations"] = std::move(opsObj);
-
-    llvm::json::Object measObj;
-    for (const auto &entry : measurements) {
-        measObj[entry.getKey()] = countToJson(entry.getValue());
+    llvm::json::Object quantumOperationObject;
+    for (const auto &[nQubits, opCounts] : quantumOperationCounts) {
+        auto [it, _] =
+            quantumOperationObject.try_emplace(std::to_string(nQubits), llvm::json::Object{});
+        for (const auto &[opName, count] : opCounts) {
+            (*it->getSecond().getAsObject())[opName] = countToJson(count);
+        }
     }
-    funcObj["measurements"] = std::move(measObj);
+    funcObj["quantum_operations"] = std::move(quantumOperationObject);
 
-    llvm::json::Object classObj;
-    for (const auto &entry : classicalInstructions) {
-        classObj[entry.getKey()] = countToJson(entry.getValue());
-    }
-    funcObj["classical_instructions"] = std::move(classObj);
-
-    llvm::json::Object fcObj;
+    /// Function Calls
+    llvm::json::Object functionObject;
+    llvm::json::Object staticFunctionObject;
     for (const auto &entry : functionCalls) {
-        fcObj[entry.getKey()] = countToJson(entry.getValue());
+        staticFunctionObject[entry.getKey()] = countToJson(entry.getValue());
     }
-    funcObj["function_calls"] = std::move(fcObj);
-
-    llvm::json::Object vfcObj;
+    llvm::json::Object dynamicFunctionObject;
     for (const auto &entry : varFunctionCalls) {
-        vfcObj[entry.getKey()] = llvm::formatv("{0:x16}", entry.getValue()).str();
+        dynamicFunctionObject[entry.getKey()] = llvm::formatv("{0:x16}", entry.getValue()).str();
     }
-    funcObj["var_function_calls"] = std::move(vfcObj);
+    functionObject["static"] = std::move(staticFunctionObject);
+    functionObject["dynamic"] = std::move(dynamicFunctionObject);
+    funcObj["function_calls"] = std::move(functionObject);
 
-    funcObj["num_qubits"] = countToJson(numQubits());
-    funcObj["num_alloc_qubits"] = countToJson(numAllocQubits);
-    funcObj["num_arg_qubits"] = numArgQubits;
-    funcObj["device_name"] = deviceName;
-    funcObj["qnode"] = isQnode;
-    funcObj["has_branches"] = hasBranches;
-    if (autoQubitManagement.has_value()) {
-        funcObj["auto_qubit_management"] = *autoQubitManagement;
+    /// Measurement processes
+    llvm::json::Object measurementObject;
+    for (const auto &entry : measurements) {
+        measurementObject[entry.getKey()] = countToJson(entry.getValue());
     }
+    funcObj["measurement_processes"] = std::move(measurementObject);
 
+    // Extention fields
     // Emit registered extensions under their own keys (e.g. "depth").
     // Stage 4 will nest these under "extended_fields".
+    json::Object extendedFieldObject;
     for (const auto &ext : extensions) {
-        funcObj[ext->name()] = ext->toJson();
+        auto json = ext->toJson();
+        if (json != nullptr) {
+            extendedFieldObject[ext->name()] = json;
+        }
     }
+    funcObj["extended_fields"] = std::move(extendedFieldObject);
 
     return funcObj;
 }

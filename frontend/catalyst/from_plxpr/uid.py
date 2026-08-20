@@ -67,7 +67,6 @@ def generate_uid(
     reduced.append(("static", reduced_static_args))
     reduced.append(("adjoint", adjoint))
     reduced.append(("n_ctrls", n_ctrls))
-
     return hash(tuple(reduced))
 
 
