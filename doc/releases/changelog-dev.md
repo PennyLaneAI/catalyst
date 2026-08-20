@@ -125,6 +125,11 @@
   distribution over the branches. The counted resources are then scaled proportionally and summed.
   [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
 
+* Warnings and diagnostics emitted by successful Catalyst compiler subprocesses are now forwarded to
+  Python callers instead of being silently discarded. LLVM diagnostic colors are preserved in
+  interactive terminals.
+  [(#3080)](https://github.com/PennyLaneAI/catalyst/pull/3080)
+
 * A new runtime transport layer for remote/local executors is introduced.
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
   [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
@@ -489,6 +494,12 @@
 * The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
+
+* `ResourceAnalysis` can now optionally count `DecomposableGate` operations by their full graph
+  operation ID. Decomposition-rule resource generation enables this detailed mode so that resource
+  annotations preserve parameter types, wire counts, static data, and operator UIDs used for graph
+  matching.
+  [(#3102)](https://github.com/PennyLaneAI/catalyst/pull/3102)
 
 * `from_plxpr` no longer depends on the `Transform.plxpr_transform` property.
   [(#3004)](https://github.com/PennyLaneAI/catalyst/pull/3004)
