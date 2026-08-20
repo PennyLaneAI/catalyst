@@ -32,7 +32,6 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_get_p,
     qref_operator_p,
-    qref_qinst_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -476,16 +475,18 @@ class TestAdjointCtrl:
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
         eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
-        assert eqn.primitive == qref_qinst_p
+        assert eqn.primitive == qref_operator_p
         assert eqn.params == {
             "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
-            "ctrl_len": 3,
-            "op": "RX",
-            "qubits_len": 1,
-            "params_len": 1,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 3,
+            "op_cls": qp.RX,
+            "wire_lens": (1,),
         }
-        assert eqn.invars[0] is qfunc_xpr.eqns[2].outvars[0]
-        assert eqn.invars[1] is qfunc_xpr.invars[0]
+        assert eqn.invars[0] is qfunc_xpr.invars[0]
+        assert eqn.invars[1] is qfunc_xpr.eqns[2].outvars[0]
         for i in range(3):
             assert eqn.invars[2 + i] is qfunc_xpr.eqns[3 + i].outvars[0]
         assert eqn.invars[5].val == False
