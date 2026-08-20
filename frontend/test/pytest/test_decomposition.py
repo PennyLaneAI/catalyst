@@ -39,7 +39,6 @@ from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
     get_dummy_values_for_arg,
-    mlir_stringify_type,
 )
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
@@ -91,7 +90,7 @@ class TestGenericUtilities:
         ],
     )
     def test_mlir_stringify_type(self, dtype, expected):
-        """Test mlir_stringify_type."""
+        """Test convert_types_to_mlir_strings."""
         assert convert_types_to_mlir_strings(dtype) == expected
 
     @pytest.mark.parametrize(
