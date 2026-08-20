@@ -1363,6 +1363,7 @@ void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tr
         rValuesUsedByRegion.insert(rCtrlQubit);
     }
     collectNecessaryRegionRValues(rCtrlOp.getRegion(), rValuesUsedByRegion);
+    assert(rValuesUsedByRegion.size() >= numCtrlQubits);
     size_t numTargetQubits = rValuesUsedByRegion.size() - numCtrlQubits;
 
     quantum::CtrlOp vCtrlOp;
