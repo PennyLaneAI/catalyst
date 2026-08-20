@@ -120,7 +120,7 @@
 
 * The `ResourceAnalysis` pass can now report concrete resource counts for nested loops whose upper
   bounds are the induction variables of their immediately enclosing loops.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3140)](https://github.com/PennyLaneAI/catalyst/pull/3140)
 
   For example, this program reports average multiplicities of `3.5` for the middle loop and `2` for
   the inner loop, resulting in a total of `56` `PauliX` operations:
