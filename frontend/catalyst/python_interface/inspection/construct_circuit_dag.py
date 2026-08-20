@@ -221,11 +221,8 @@ class ConstructCircuitDAG:
         if _has_symbolic_gate_parameter(op):
             gate_name = xdsl_to_qp_op_name(op, adjoint_mode=False)
             wires = ssa_to_qp_wires(op, control=True) + ssa_to_qp_wires(op)
-            if isinstance(op, quantum.GlobalPhaseOp) and not wires:
-                label = gate_name
-            else:
-                wires_str = "all" if not wires else f"[{', '.join(map(str, wires))}]"
-                label = f"<name> {gate_name}|<wire> {wires_str}"
+            wires_str = "all" if not wires else f"[{', '.join(map(str, wires))}]"
+            label = f"<name> {gate_name}|<wire> {wires_str}"
         else:
             qp_op: Operator = xdsl_to_qp_op(op)
             wires = qp_op.wires
