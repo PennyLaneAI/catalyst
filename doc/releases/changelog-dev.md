@@ -118,6 +118,30 @@
   AOT compilation and as arguments to `pennylane.specs` calculations.
   [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
 
+* `qp.specs` now preserves nested loop call hierarchies and reports concrete resource counts using
+  average call multiplicities when dependent upper bounds are the immediately enclosing loops'
+  induction variables.
+
+  For example, this program reports average multiplicities of `3.5` for the middle loop and `2` for
+  the inner loop, resulting in a total of `56` `PauliX` operations:
+
+  ```python
+  import pennylane as qp
+
+  @qp.qjit(autograph=True, keep_intermediate=2)
+  @qp.qnode(qp.device("null.qubit", wires=1))
+  def circuit():
+      for i in range(8):
+          for j in range(i):
+              for _ in range(j):
+                  qp.PauliX(0)
+
+      return qp.expval(qp.X(0))
+
+  resources = qp.specs(circuit, level="all-mlir")()
+  print(resources) # 56
+  ```
+
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
   operations in question can be annotated with either a `catalyst.estimated_probability` or
