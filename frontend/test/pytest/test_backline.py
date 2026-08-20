@@ -14,7 +14,6 @@
 """Unit tests for the backline frontend: serialize_backline and the pipeline helpers."""
 
 import os
-from types import SimpleNamespace
 from unittest import mock
 
 import pennylane as qp
@@ -53,22 +52,26 @@ def _net_transport():
         getattr(_bl, "_transports", {}).pop("net", None)
 
 
+class _Attached:
+    """An executor already launched elsewhere: it says where it serves and can be launched."""
+
+    address = None
+    triple = None
+
+    def launch(self):
+        return self
+
+
 def _controller(**kw):
     init = {
         "backend_lib": "backend.so",
         "config": "cfg",
     }
-    if kw.pop("remote", False):
-        kw.setdefault("executor", SimpleNamespace(address=None, triple=None))
-    kw.setdefault("in_bytes", 3)
-    kw.setdefault("out_bytes", 8)
     kw.setdefault("init_args", init)
     return qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", **kw)
 
 
 def _coproc(name, oob_port=18590, fn="coproc_fn", **kw):
-    if kw.pop("remote", False):
-        kw.setdefault("executor", SimpleNamespace(address=None, triple=None))
     kw.setdefault("init_args", {"backend_lib": "backend.so", "config": "cfg"})
     return qp.Coprocessor(
         name=name, endpoint=qp.Endpoint("127.0.0.1", oob_port), coprocessor_fn=fn, **kw
@@ -82,7 +85,6 @@ def test_controller_node_mapping():
     ctrl = d["controller"]
     assert ctrl["name"] == "ctrl"
     assert ctrl["backend_lib"] == "backend.so" and ctrl["config"] == "cfg"
-    assert ctrl["in_bytes"] == 3 and ctrl["out_bytes"] == 8
     assert "peer" not in ctrl and "oob_port" not in ctrl
     assert "coprocessors" not in d  # omitted, not an empty list
 
@@ -303,7 +305,7 @@ def test_placement_behind_a_wrapper_is_found(use_capture):
     ctrl = qp.Controller(
         device=qp.device("null.qubit", wires=2),
         name="ctrl",
-        executor=SimpleNamespace(address=None, triple=None),
+        executor=_Attached(),
         init_args={"backend_lib": "backend.so", "config": "cfg"},
     )
     dev = qp.Backline(controller=ctrl, transport="rdma")
@@ -607,7 +609,7 @@ class TestBackendResolution:
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
             name="cop0",
-            endpoint=qp.Endpoint("127.0.0.1"),
+            endpoint=qp.Endpoint("127.0.0.1", 18590),
             coprocessor_fn="coproc_fn",
             hardware="gpu",
         )
@@ -626,7 +628,7 @@ class TestBackendResolution:
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
             name="cop0",
-            endpoint=qp.Endpoint("127.0.0.1"),
+            endpoint=qp.Endpoint("127.0.0.1", 18590),
             coprocessor_fn="coproc_fn",
             hardware="cpu",
         )
@@ -646,7 +648,7 @@ class TestBackendResolution:
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
         cop = qp.Coprocessor(
             name="cop0",
-            endpoint=qp.Endpoint("127.0.0.1"),
+            endpoint=qp.Endpoint("127.0.0.1", 18590),
             coprocessor_fn="coproc_fn",
             hardware="gpu",
         )
