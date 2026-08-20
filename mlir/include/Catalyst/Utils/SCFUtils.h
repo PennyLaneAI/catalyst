@@ -50,4 +50,8 @@ std::optional<double> getEstimatedIterationsHint(Operation *op);
 // Returns std::nullopt when the trip count cannot be determined statically.
 std::optional<double> resolveForLoopTripCount(scf::ForOp forOp);
 
+// Resolve the average trip count of a loop whose upper bound is the immediately
+// enclosing loop's induction variable, including direct chains of such loops.
+std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forOp);
+
 } // namespace catalyst

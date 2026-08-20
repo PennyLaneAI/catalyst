@@ -185,7 +185,7 @@ llvm::json::Object ResourceResult::toJson() const {
     llvm::json::Object functionObject;
     llvm::json::Object staticFunctionObject;
     for (const auto &entry : functionCalls) {
-        staticFunctionObject[entry.getKey()] = countToJson(entry.getValue());
+        staticFunctionObject[entry.getKey()] = llvm::json::Value(entry.getValue());
     }
     llvm::json::Object dynamicFunctionObject;
     for (const auto &entry : varFunctionCalls) {
