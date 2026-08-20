@@ -146,7 +146,7 @@ def prepare_op_args(dynamic_shape, wire_lens, is_custom_op) -> tuple[tuple, dict
         kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
 
     if is_custom_op:
-        args = tuple(val for key, val in kwargs.items() if key != "wires")
+        args = tuple(0.0 for key, val in kwargs.items() if key != "wires")
         kwargs = {"wires": kwargs["wires"]}
 
     return args, kwargs
