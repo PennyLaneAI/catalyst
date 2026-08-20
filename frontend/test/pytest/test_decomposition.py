@@ -32,7 +32,10 @@ from catalyst.decomposition.precompile_decomposition_rules import (
     get_abstract_args,
     precompile_decomp_rules,
 )
-from catalyst.decomposition.type_utils import get_dummy_values_for_arg, mlir_stringify_type
+from catalyst.decomposition.type_utils import (
+    get_dummy_values_for_arg,
+    mlir_stringify_type,
+)
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
@@ -85,14 +88,19 @@ class TestGenericUtilities:
         """Test mlir_stringify_type."""
         assert mlir_stringify_type(dtype) == expected
 
-    def test_wrapper_operator(self):
+    def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
-        # TODO: keep this up to date with an operator that is not migrated, and decomposes to
-        # un-migrated operators.
+        mock_decomp = mocker.MagicMock()
+        mock_decomp._impl.__name__ = "FakeRuleName"
+        mock_decomp.compute_resources.side_effect = ValueError("Fake Resource Related Error")
+
+        mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
+
         with pytest.warns(match="Failed to get resources"):
-            compile_decomposition_rules_wrapper(
-                "PauliX", 'PauliX{}{"wires":1}{}', {}, {"wires": 1}, {}
+            res = compile_decomposition_rules_wrapper(
+                "MockOp", 'MockOp{}{"wires":1}{}', {}, {"wires": 1}, {}
             )
+        assert isinstance(res, str)
 
 
 class TestPrecompiled:
