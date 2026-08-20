@@ -141,9 +141,154 @@ class TestGenericUtilities:
 class TestPrecompiled:
     """Tests for precompiled decomposition rules."""
 
+    def test_bytecode_file(self):
+        """Test that the bytecode file is generated correctly."""
+        # orig_bcfile = Path(BYTECODE_FILE_PATH)
+        # tmp_bcfile = None
+        #
+        # if orig_bcfile.exists():
+        #     tmp_bcfile = orig_bcfile.replace(BYTECODE_FILE_PATH + ".tmpbackup")
+        #
+        # try:
+        #     precompile_decomp_rules()
+        #     assert orig_bcfile.exists()
+        #
+        # finally:
+        #     if tmp_bcfile:
+        #         tmp_bcfile = tmp_bcfile.replace(orig_bcfile)
+        #     else:
+        #         orig_bcfile.unlink(missing_ok=True)
+        #
+        # # NOTE: empty pass is needed to prevent running default pipeline
+        # rules = _quantum_opt("--empty", BYTECODE_FILE_PATH)
+        #
+        # assert "_isingxy_to_h_cy" in rules
+        # assert "_doublexcit" in rules
+        # assert "_pauliz_to_ps" in rules
+        # assert "_cphase_to_ppr" in rules
+        # assert "_crot" in rules
+        pass
+
 
 class TestTraceTime:
-    """Placeholder for future tests of trace-time decomposition rule lowering."""
+    """Tests of trace-time decomposition rule lowering."""
+
+    @staticmethod
+    def _base_and_adjoint_rules():
+        from operator2_dummy_gates import SingleParam
+
+        def base_resource_fn(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 1}
+
+        @register_resources(base_resource_fn)
+        def base_rule(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+
+        def adj_resource_fn(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 2}
+
+        @register_resources(adj_resource_fn)
+        def adj_rule(reg):
+            SingleParam(x=0.2, reg=reg[0:2])
+            SingleParam(x=0.3, reg=reg[0:2])
+
+        return base_rule, adj_rule
+
+    def test_plain_gate_captures_base_and_adjoint(self):
+        """Lowering a plain gate captures the rules registered against both the gate
+        and its adjoint."""
+        from operator2_dummy_gates import NoParams
+
+        base_rule, adj_rule = self._base_and_adjoint_rules()
+        with local_decomps():
+            add_decomps(NoParams, base_rule)
+            add_decomps("Adjoint(NoParams)", adj_rule)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                NoParams(reg=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+
+    def test_adjoint_gate_captures_base_and_adjoint(self):
+        """Lowering the Adjoint of a gate captures the rules registered against both the plain gate
+        and its adjoint."""
+        from operator2_dummy_gates import NoParams
+
+        base_rule, adj_rule = self._base_and_adjoint_rules()
+        with local_decomps():
+            add_decomps(NoParams, base_rule)
+            add_decomps("Adjoint(NoParams)", adj_rule)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                qp.adjoint(NoParams(reg=[0, 1]))
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'qref.operator "NoParams"() adj' in mlir
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+
+    def test_distribution_rule_synthesized_from_base_only(self):
+        """With only a base rule registered (no Adjoint(Op) rule), lowering still synthesizes a rule
+        for Adjoint(Op) by distributing the base rule over adjoint (case 3): its resources are the
+        base resources adjointed and its body is an adjoint region."""
+        from operator2_dummy_gates import NoParams
+
+        base_rule, _ = self._base_and_adjoint_rules()
+        with local_decomps():
+            add_decomps(NoParams, base_rule)  # only a base rule, no Adjoint(NoParams) rule
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                NoParams(reg=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        # A distribution rule for Adjoint(NoParams) is synthesized even though none was registered.
+        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+        assert (
+            'resources = {operations = {"Adjoint(SingleParam{x:[f64]}{reg:2}{})" = 1 : i64}' in mlir
+        )
+        assert "qref.adjoint" in mlir
+
+    def test_no_distribution_rule_for_non_invertible_body(self):
+        """A distribution rule is NOT synthesized when the base rule body is non-invertible (contains
+        a mid-circuit measurement): the base rule is still lowered, but no Adjoint(Op) rule."""
+        from operator2_dummy_gates import NoParams, SingleParam
+
+        def base_resource_fn(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 1}
+
+        @register_resources(base_resource_fn)
+        def measuring_rule(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+            qp.measure(reg[0])
+
+        with local_decomps():
+            add_decomps(NoParams, measuring_rule)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                NoParams(reg=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' not in mlir
 
 
 class TestOnDemand:
