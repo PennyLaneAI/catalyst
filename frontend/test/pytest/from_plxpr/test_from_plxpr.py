@@ -477,11 +477,12 @@ class TestAdjointCtrl:
         eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
         assert eqn.primitive == qref_operator_p
         assert eqn.params == {
-            "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
-            "forward_mask": (),
             "hybrid_lens": (),
             "hybrid_trees": (),
+            "forward_mask": (),
+            "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
             "n_ctrls": 3,
+            "collect_decomp_rules": True,
             "op_cls": qp.RX,
             "wire_lens": (1,),
         }
