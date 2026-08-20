@@ -151,7 +151,7 @@ static double computeAverageTripCountByEnumeration(llvm::ArrayRef<LoopRange> ran
 
 std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forOp) {
     llvm::SmallVector<LoopRange> ranges;
-    int64_t outerUpper;
+    int64_t outerUpper = 0;
     scf::ForOp currentLoop = forOp;
     while (currentLoop) {
         auto lower = getConstantIntValue(currentLoop.getLowerBound());
