@@ -34,6 +34,7 @@ import getpass
 import logging
 import shlex
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -328,22 +329,36 @@ class SCP:
 
         if _once(legacy=False) == 0:
             return
-        logger.info("scp failed — retrying with the legacy protocol (scp -O)")
+        # scp prints its own failure straight to stderr, so the explanation has to go there too:
+        # this module's logger carries a NullHandler, which suppresses logging's last-resort output.
+        print(
+            "[scp] the SFTP backend is declining. Retrying it with the legacy protocol (scp -O), "
+            "which hosts without an SFTP subsystem need",
+            file=sys.stderr,
+        )
         if _once(legacy=True) != 0:
             raise RuntimeError(f"scp to {user}@{host}:{dest}/ failed")
 
     @staticmethod
-    def deploy(user: str, host: str, bundle: Path, workspace: str) -> None:
-        """Create ``workspace`` on the remote, then copy every artifact in ``bundle`` to it.
+    def deploy(user: str, host: str, sources: list[Path], workspace: str) -> None:
+        """Create ``workspace`` on the remote, then copy every source into it.
 
         Raises:
-            RuntimeError: If ``bundle`` has no artifacts.
+            RuntimeError: If a source is missing, or if nothing would be copied.
         """
-        files = sorted(p for p in bundle.iterdir() if p.is_file() and p.name != "README.md")
+        missing = [str(p) for p in sources if not p.exists()]
+        if missing:
+            raise RuntimeError(f"nothing to deploy at: {missing}")
+        files: list[Path] = []
+        for src in sources:
+            if src.is_dir():
+                files += sorted(p for p in src.iterdir() if p.is_file() and p.name != "README.md")
+            else:
+                files.append(src)
         if not files:
             raise RuntimeError(
-                f"no artifacts in {bundle} — cross-compile the executor + runtime libs for the "
-                "target first, and point bundle= at the directory holding them."
+                f"no artifacts in {[str(p) for p in sources]} — cross-compile the executor + "
+                "runtime libs for the target first, and point deploy= at what holds them."
             )
         total = sum(f.stat().st_size for f in files)
         logger.info(
@@ -358,7 +373,7 @@ class SCP:
 
 
 class RemoteLauncher:
-    """Builds the argv that opens an SSH tunnel and launches ``catalyst-executor`` on a remote host."""
+    """Builds the argv opening an SSH tunnel and launching ``catalyst-executor`` on a remote host."""
 
     @staticmethod
     def ssh_argv(

@@ -476,11 +476,26 @@ catalyst::driver::runLowering(const CompilerOptions &options, MLIRContext *ctx, 
         if (pipeline.getName() == "BufferizationStage" && !options.workspace.empty()) {
             Pipeline targetPipeline;
             targetPipeline.setName("CrossCompileTargets");
-            std::string dumpIntermediate = options.keepIntermediate ? "true" : "false";
-            targetPipeline.setPasses({"cross-compile-targets{workspace=\"" +
-                                          options.workspace.str() +
-                                          "\" dump-intermediate=" + dumpIntermediate + "}",
-                                      "dispatch-executor-targets"});
+            std::string saveIrAfterEach;
+            switch (options.keepIntermediate) {
+            case SaveTemps::AfterPipeline:
+                saveIrAfterEach = "pipeline";
+                break;
+            case SaveTemps::AfterPassChanged:
+                saveIrAfterEach = "changed";
+                break;
+            case SaveTemps::AfterPass:
+                saveIrAfterEach = "pass";
+                break;
+            case SaveTemps::None:
+                break;
+            }
+            std::string opts = "workspace=\"" + options.workspace.str() + "\"";
+            if (!saveIrAfterEach.empty()) {
+                opts += " save-ir-after-each=" + saveIrAfterEach;
+            }
+            targetPipeline.setPasses(
+                {"cross-compile-targets{" + opts + "}", "dispatch-executor-targets"});
             if (failed(catalyst::utils::Timer<>::timer(
                     catalyst::driver::runPipeline, targetPipeline.getName(),
                     /* add_endl */ false, pm, options, output, targetPipeline,

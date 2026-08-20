@@ -62,6 +62,8 @@ const PipelineList pipelineList{
      {"canonicalize",
       "func.func(chlo-legalize-to-stablehlo)",
       "func.func(stablehlo-legalize-control-flow)",
+      // builtin.module is added to support nested modules 
+      "builtin.module(func.func(stablehlo-legalize-control-flow))", 
       "func.func(stablehlo-aggressive-simplification)",
       "stablehlo-legalize-to-linalg",
       "func.func(stablehlo-legalize-to-std)",

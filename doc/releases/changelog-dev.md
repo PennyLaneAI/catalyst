@@ -21,6 +21,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
+  through the transport passes.
+  [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
+
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
   without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
   where applicable, unlocking compilation and execution for these cases. `qp.specs` and the
@@ -140,6 +144,13 @@
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
   [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
 
+* `qp.runtime_call` is supported to lower to an ordinary `catalyst.custom_call`. The shared library
+  exporting the symbol is given via `qp.runtime_declare(..., library=...)` (or `runtime_call(..., library=...)`)
+  and recorded on the module so the compiler links it. A local call may take a `buf` argument and
+  may return nothing (a `void` call is kept for its side effects), neither of which a dispatched
+  call allows.
+  [(#3101)](https://github.com/PennyLaneAI/catalyst/pull/3101)
+
 * A CPU transport backend built on libibverbs is added, which implements the controller and coprocessor
   session roles over RDMA.
   [(#3062)](https://github.com/PennyLaneAI/catalyst/pull/3062)
@@ -174,6 +185,9 @@
   `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
   syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
   [(#3092)](https://github.com/PennyLaneAI/catalyst/pull/3092)
+
+* CPU & GPU backline transport backends via `memcpy` are added.
+  [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
 
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
@@ -477,6 +491,10 @@
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
+  the `gpu` label.
+  [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
 
 * The `--to-ppr` and `--ppm-compilation` passes now run `--symbol-dce` at the beginning,
   to eliminate unnecessary decomposition rules that might contain gates that cannot be converted to PPRs.
