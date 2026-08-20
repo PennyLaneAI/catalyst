@@ -337,6 +337,27 @@ def compile_decomp_rules(
             static_data={},
         )
 
+    elif op_cls is qp.BasisState:
+        # qp.BasisState has the same number of booleans as the number of wires
+        num_wires = wire_lens[0]
+        dynamic_shape = {qp.BasisState.dynamic_argnames[0]: ["i1"] * num_wires}
+        wire_argname = qp.BasisState.wire_argnames[0]
+        op_id = (
+            "BasisState"
+            + format_dynamic_params_for_id(dynamic_shape)
+            + "{"
+            + f"{wire_argname}:{num_wires}"
+            + "}{}"
+        )
+
+        decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            op_name="BasisState",
+            op_id=op_id,
+            dynamic_shape=dynamic_shape,
+            wire_lens={f"{wire_argname}": num_wires},
+            static_data={},
+        )
+
     elif op_cls in (qp.QubitUnitary,):
         raise NotImplementedError(f"{op_cls} has not been migrated to Operator2 yet")
 
