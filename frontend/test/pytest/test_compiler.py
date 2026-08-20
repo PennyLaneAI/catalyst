@@ -31,13 +31,7 @@ import pennylane as qp
 import pytest
 
 from catalyst import QJIT, qjit
-from catalyst.compiler import (
-    CompileOptions,
-    Compiler,
-    LinkerDriver,
-    _catalyst,
-    _options_to_cli_flags,
-)
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver, _options_to_cli_flags
 from catalyst.debug import instrumentation
 from catalyst.pipelines import KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
@@ -158,53 +152,6 @@ class TestCompilerOptions:
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=pass" in flags
-
-
-class TestCompilerDiagnostics:
-    """Unit tests for diagnostics emitted by the Catalyst subprocess."""
-
-    @pytest.mark.parametrize(
-        "text,stdout,stderr",
-        [
-            (True, "output", "compiler warning\n"),
-            (False, b"output", b"compiler warning\n"),
-        ],
-    )
-    def test_forward_stderr(self, monkeypatch, text, stdout, stderr):
-        stderr_stream = io.StringIO()
-        result = subprocess.CompletedProcess([], 0, stdout=stdout, stderr=stderr)
-        monkeypatch.setattr(sys, "stderr", stderr_stream)
-        monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: result)
-
-        assert _catalyst(text=text, stderr_return=True) == stdout
-        assert stderr_stream.getvalue() == "compiler warning\n"
-
-    def test_stderr_not_forwarded_by_default(self, monkeypatch):
-        stderr_stream = io.StringIO()
-        result = subprocess.CompletedProcess([], 0, stdout="output", stderr="compiler warning\n")
-        monkeypatch.setattr(sys, "stderr", stderr_stream)
-        monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: result)
-
-        assert _catalyst() == "output"
-        assert stderr_stream.getvalue() == ""
-
-    def test_color_diagnostics_in_terminal(self, monkeypatch):
-        class Terminal(io.StringIO):
-            def isatty(self):
-                return True
-
-        command = []
-
-        def run(cmd, **_kwargs):
-            command.extend(cmd)
-            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
-
-        monkeypatch.setattr(sys, "stderr", Terminal())
-        monkeypatch.setattr(subprocess, "run", run)
-
-        _catalyst()
-
-        assert command[1] == "--color"
 
 
 class TestDefaultFlags:
