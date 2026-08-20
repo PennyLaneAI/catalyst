@@ -163,8 +163,13 @@ def _node_dict(node: Node, role: str, transport: str) -> dict:
         if endpoint.port is not None:
             d["oob_port"] = endpoint.port
 
+    init = node.init_args or {}
+    if unknown := sorted(set(init) - set(_INIT_KEYS)):
+        raise CompileError(
+            f"backline node has unrecognized init_args {unknown}; recognized: {list(_INIT_KEYS)}."
+        )
     hardware = getattr(node, "hardware", None)
-    if hardware is not None and not (node.init_args or {}).get("backend_lib"):
+    if hardware is not None and not init.get("backend_lib"):
         d["backend_lib"] = _resolve_backend_lib(transport, hardware, role, bool(node.remote))
     # A node may be handed any object as its executor, so its fields are read rather than assumed.
     executor = node.executor
@@ -186,13 +191,6 @@ def _node_dict(node: Node, role: str, transport: str) -> dict:
             ) from e
         if address:  # also rejects "", which would serialize as an empty, unusable address
             d["address"] = address
-    init = node.init_args or {}
-    if unknown := sorted(set(init) - set(_INIT_KEYS)):
-        raise CompileError(
-            f"backline node has unrecognized init_args {unknown}; the recognized keys are "
-            f"{list(_INIT_KEYS)}. Setting the backend itself interprets go in 'config', as a "
-            f"'key=value;...' string."
-        )
     d.update({k: init[k] for k in _INIT_KEYS if k in init})
     return d
 
