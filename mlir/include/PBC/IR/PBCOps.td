@@ -35,7 +35,7 @@ include "PBC/IR/PBCOpInterfaces.td"
 include "PBC/IR/PBCRefOps.td"
 
 def PrepareStateOp : PBC_Op<"prepare",
-    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Prepare auxiliary qubits in a given state.";
     let description = [{
         Prepares simple (non-magic) states in new qubits, such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩.
@@ -75,7 +75,7 @@ def PrepareStateOp : PBC_Op<"prepare",
 }
 
 def FabricateOp : PBC_Op<"fabricate",
-    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Fabricate axillary qubits from qubit factories.";
     let description = [{
         The FabricateOp represents a operation that produces/fetches auxiliary qubits from a qubit factory.
@@ -136,7 +136,7 @@ def FabricateOp : PBC_Op<"fabricate",
 }
 
 def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>]> {
     let summary = "Pauli Product Rotation on qubits.";
 
     let description = [{
@@ -254,7 +254,7 @@ def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments,
 }
 
 def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
     let summary = "Pauli Product Rotation with arbitrary angle.";
     let description = [{
         The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
@@ -357,7 +357,7 @@ def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOp
 }
 
 def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>]> {
     let summary = "Pauli Product Measurement on qubits.";
 
     let description = [{
@@ -426,7 +426,7 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
     let hasVerifier = 1;
 }
 
-def SelectPPMeasurementOp : PBC_Op<"select.ppm", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
+def SelectPPMeasurementOp : PBC_Op<"select.ppm", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
     let summary = "Multiplexed Pauli product measurement.";
 
     let description = [{
