@@ -40,7 +40,6 @@ from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
     get_dummy_values_for_arg,
 )
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 
 class TestGenericUtilities:
