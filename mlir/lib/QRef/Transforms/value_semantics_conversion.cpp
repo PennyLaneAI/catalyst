@@ -1356,18 +1356,13 @@ void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tr
     builder.setInsertionPoint(rCtrlOp);
     Location loc = rCtrlOp->getLoc();
 
-    SetVector<Value> rTargetValues;
-    collectNecessaryRegionRValues(rCtrlOp.getRegion(), rTargetValues);
-
-    // Special: ctrl qubits are passed in as operands explicitly instead of closure.
-    // Insert them first (so they occupy the front of the combined set),
-    // then append the region targets.
     SetVector<Value> rValuesUsedByRegion;
+    // Special: ctrl qubits are passed in as operands explicitly instead of closure
+    size_t numCtrlQubits = rCtrlOp.getCtrlQubits().size();
     for (Value rCtrlQubit : rCtrlOp.getCtrlQubits()) {
         rValuesUsedByRegion.insert(rCtrlQubit);
     }
-    size_t numCtrlQubits = rValuesUsedByRegion.size();
-    rValuesUsedByRegion.insert(rTargetValues.begin(), rTargetValues.end());
+    collectNecessaryRegionRValues(rCtrlOp.getRegion(), rValuesUsedByRegion);
     size_t numTargetQubits = rValuesUsedByRegion.size() - numCtrlQubits;
 
     quantum::CtrlOp vCtrlOp;
