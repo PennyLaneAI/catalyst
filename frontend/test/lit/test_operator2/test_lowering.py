@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for operator in Catalyst."""
+"""Tests for lowering PennyLane Operator2 classes in Catalyst."""
 
 # pylint: disable = missing-function-docstring,line-too-long
 
@@ -21,19 +21,14 @@ import numpy as np
 import pennylane as qp
 from operator2_dummy_gates import (
     CompilableData,
-    GlobalPhase,
     HybridNoOpArg,
     HybridOpArg,
     HybridWires,
     MultiParams,
     MultiParamsCustom,
     MultipleRegisters,
-    MultiRZ,
     NoParams,
     NoParamsCustomOp,
-    PauliRot,
-    PCPhase,
-    QubitUnitary,
     SingleParam,
     SingleParamCustomOp,
     SingleParamNoCustomOpBadOrder,
@@ -330,7 +325,7 @@ def c_multi_param_custom():
 print(c_multi_param_custom.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def circuit_multirz(x: float):
     # CHECK-LABEL: func.func public @circuit_multirz
@@ -341,7 +336,7 @@ def circuit_multirz(x: float):
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 2]
 
     # CHECK: qref.multirz({{%.+}}) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
-    MultiRZ(x, (0, 1, 2))
+    qp.MultiRZ(x, (0, 1, 2))
 
     # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
@@ -351,14 +346,14 @@ def circuit_multirz(x: float):
     # CHECK: [[theta:%.+]] = arith.negf {{%.+}} : f64
     # CHECK: qref.multirz([[theta]]) [[q3]], [[q4]] ctrls([[q5]]) ctrlvals([[false]]) :
     # CHECK-SAME: !qref.bit, !qref.bit ctrls !qref.bit
-    qp.ctrl(qp.adjoint(MultiRZ(x, wires=(0, 1))), [3], [False])
+    qp.ctrl(qp.adjoint(qp.MultiRZ(x, wires=(0, 1))), [3], [False])
     return qp.state()
 
 
 print(circuit_multirz.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def circuit_paulirot(x: float):
     # CHECK-LABEL: func.func public @circuit_paulirot
@@ -369,14 +364,14 @@ def circuit_paulirot(x: float):
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 2]
 
     # CHECK: qref.paulirot ["X", "Y", "Z"]({{%.+}}) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
-    PauliRot(x, "XYZ", (0, 1, 2))
+    qp.PauliRot(x, "XYZ", (0, 1, 2))
 
     # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 2]
 
     # CHECK: qref.paulirot ["Y", "Z", "X"]({{%.+}}) [[q3]], [[q4]], [[q5]] : !qref.bit, !qref.bit, !qref.bit
-    PauliRot(x, "YZX", (0, 1, 2))
+    qp.PauliRot(x, "YZX", (0, 1, 2))
 
     # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
@@ -384,7 +379,7 @@ def circuit_paulirot(x: float):
 
     # CHECK: qref.paulirot ["Y", "Z"]({{%.+}}) [[q3]], [[q4]] adj ctrls([[q5]])
     # CHECK-SAME: ctrlvals([[false]]) : !qref.bit, !qref.bit ctrls !qref.bit
-    qp.ctrl(qp.adjoint(PauliRot(x, "YZ", (0, 1))), [2], [False])
+    qp.ctrl(qp.adjoint(qp.PauliRot(x, "YZ", (0, 1))), [2], [False])
 
     return qp.probs(wires=(0, 1, 2))
 
@@ -392,76 +387,70 @@ def circuit_paulirot(x: float):
 print(circuit_paulirot.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def circuit_gphase(x: float):
     # CHECK-LABEL: func.func public @circuit_gphase
     # CHECK: [[false:%.+]] = arith.constant false
-
     # CHECK: qref.gphase({{%.+}})
-    GlobalPhase(x)
-
+    qp.GlobalPhase(x)
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.gphase({{%.+}}) adj ctrls([[q0]]) ctrlvals([[false]]) : ctrls !qref.bit
-    qp.ctrl(qp.adjoint(GlobalPhase(x)), [0], [False])
+    qp.ctrl(qp.adjoint(qp.GlobalPhase(x)), [0], [False])
     return qp.state()
 
 
 print(circuit_gphase.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
-@qp.qnode(qp.device("lightning.qubit", wires=3))
-def circuit_qubitunitary():
-    # CHECK-LABEL: func.func public @circuit_qubitunitary
-    # CHECK: [[false:%.+]] = arith.constant false
+# COM: TODO: qp.QubitUnitary not migrated to Operator2 yet
+# COM: @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+# COM: @qp.qnode(qp.device("lightning.qubit", wires=3))
+# COM: def circuit_qubitunitary():
+# COM:     # CHECK-LABEL: func.func public @circuit_qubitunitary
+# COM:     # CHECK: [[false:%.+]] = arith.constant false
+# COM:
+# COM:     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+# COM:     # CHECK: qref.unitary({{%.+}} : tensor<2x2xcomplex<f64>>) [[q0]] : !qref.bit
+# COM:
+# COM:     qp.QubitUnitary(np.array([[0, 1], [1, 0]]), 0)
+# COM:
+# COM:     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
+# COM:     # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 1]
+# COM:     # CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] : !qref.bit, !qref.bit
+# COM:
+# COM:     qp.QubitUnitary(qp.CNOT.compute_matrix(), (0, 1))
+# COM:
+# COM:     # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
+# COM:     # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
+# COM:     # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 2]
+# COM:     # CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>) [[q3]], [[q4]] adj ctrls([[q5]])
+# COM:     # CHECK-SAME: ctrlvals([[false]]) : !qref.bit, !qref.bit ctrls !qref.bit
+# COM:
+# COM:     qp.ctrl(qp.adjoint(qp.QubitUnitary(qp.CNOT.compute_matrix(), (0, 1))), [2], [False])
+# COM:     return qp.expval(qp.Z(0)), qp.expval(qp.Z(0))
+# COM:
+# COM:
+# COM: print(circuit_qubitunitary.mlir)
 
-    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: qref.unitary({{%.+}} : tensor<2x2xcomplex<f64>>) [[q0]] : !qref.bit
 
-    QubitUnitary(np.array([[0, 1], [1, 0]]), 0)
-
-    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 1]
-    # CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] : !qref.bit, !qref.bit
-
-    QubitUnitary(qp.CNOT.compute_matrix(), (0, 1))
-
-    # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
-    # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 2]
-    # CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>) [[q3]], [[q4]] adj ctrls([[q5]])
-    # CHECK-SAME: ctrlvals([[false]]) : !qref.bit, !qref.bit ctrls !qref.bit
-
-    qp.ctrl(qp.adjoint(QubitUnitary(qp.CNOT.compute_matrix(), (0, 1))), [2], [False])
-    return qp.expval(qp.Z(0)), qp.expval(qp.Z(0))
-
-
-print(circuit_qubitunitary.mlir)
-
-
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def c_pcphase(x: float):
     # CHECK-LABEL: func.func public @c_pcphase
     # CHECK: [[false:%.+]] = arith.constant false
-
     # CHECK: [[q11:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q12:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: qref.pcphase({{%.+}}, dim : 0) [[q11]], [[q12]] : !qref.bit, !qref.bit
-
-    PCPhase(x, 0, (0, 1))
-
+    qp.PCPhase(x, 0, (0, 1))
     # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 2]
-
     # PCPhase gets automatically canonicalized, so it will never have the `adj` attribute
     # CHECK: [[theta:%.+]] = arith.negf {{%.+}} : f64
     # CHECK: qref.pcphase([[theta]], dim : 3) [[q3]], [[q4]] ctrls([[q5]]) ctrlvals([[false]]) :
     # CHECK-SAME: !qref.bit, !qref.bit ctrls !qref.bit
-
-    qp.ctrl(qp.adjoint(PCPhase(x, 3, (0, 1))), [2], [False])
+    qp.ctrl(qp.adjoint(qp.PCPhase(x, 3, (0, 1))), [2], [False])
     return qp.state()
 
 
@@ -542,9 +531,9 @@ def c_hybrid_op_arg(x: float, y: float):
     # CHECK-LABEL: func.func public @c_hybrid_op_arg
     # CHECK-SAME: ([[x:%.+]]: tensor<f64>, [[y:%.+]]: tensor<f64>)
 
-    op1 = MultiRZ(x, [0, 1, 2])
-    op2 = MultiRZ(x, [0, 1, 2])
-    op3 = MultiRZ(x, [0, 1])
+    op1 = qp.MultiRZ(x, [0, 1, 2])
+    op2 = qp.MultiRZ(x, [0, 1, 2])
+    op3 = qp.MultiRZ(x, [0, 1])
 
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 3]
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
@@ -586,3 +575,23 @@ def c_hybrid_op_arg(x: float, y: float):
 
 
 print(c_hybrid_op_arg.mlir)
+
+
+@qp.qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("null.qubit", wires=1))
+def test_rz():
+    # CHECK-LABEL: func.func public @test_rz
+
+    # CHECK: RZ
+
+    # TODO: uncomment as migration enables these rules
+    # CHECK-DAG: _rz_to_ppr
+    # COM: CHECK-DAG: _rz_to_rx_cliff
+    # COM: CHECK-DAG: _rz_to_ry_cliff
+    # COM: CHECK-DAG: _rz_to_ry_rx
+    # CHECK-DAG: _rz_to_rot
+    # COM: CHECK-DAG: _rz_to_ps
+    qp.RZ(0.1, wires=0)
+
+
+print(test_rz.mlir)

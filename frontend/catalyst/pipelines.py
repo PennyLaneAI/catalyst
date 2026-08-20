@@ -146,6 +146,11 @@ class CompileOptions:
             the validity of the program themselves. If ``capture=False``, or ``capture="global"``
             and ``qp.capture.enabled() == False``, this argument will be ignored. ``False``
             by default.
+        collect_decomp_rules (bool): Controls whether or not to compile the decomposition
+            rules. If ``False``, only the circuit itself will be compiled. If ``True``, all the
+            decomposition rules reachable from all gates in the circuit will be compiled. If
+            ``capture=False``, or ``capture="global"`` and ``qp.capture.enabled() == False``, this
+            argument will be ignored. ``True`` by default.
     """
 
     verbose: Optional[bool] = False
@@ -170,6 +175,7 @@ class CompileOptions:
     dialect_plugins: Optional[Set[Path]] = None
     capture: bool | Literal["global"] = "global"
     skip_preprocess: bool = False
+    collect_decomp_rules: bool = True
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
