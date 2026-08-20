@@ -1239,6 +1239,30 @@ class TestSymbolicSpecs:
         r = qp.specs(c, level=0)(2).resources
         assert r.subs({var: 10 for var in r.vars}).quantum_operations["RX"] == 10
 
+    # skip this test for now untill PL supports double type of function call
+    @pytest.mark.skip(reason="PL does not support to parse double type of function call in loops")
+    def test_resolvable_nested_loop(self):
+        """Test a nested loop whose inner bound is an enclosing induction variable."""
+        n = 8
+
+        @qjit
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit(angles):
+            @qp.for_loop(n)
+            def outer(i):
+                @qp.for_loop(i)
+                def inner(j):
+                    qp.IsingZZ(angles[i, j], wires=[i, j])
+
+                inner()  # pylint: disable=no-value-for-parameter
+
+            outer()  # pylint: disable=no-value-for-parameter
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)(jnp.ones((n, n))).resources
+
+        assert resources.quantum_operations["IsingZZ"] == 28
+
     def test_symbolic_array_loop_arguemtn(self):
         """Test dynamic loop with a symbolic array as a loop argument."""
 
