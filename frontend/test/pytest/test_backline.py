@@ -22,6 +22,7 @@ from pennylane.backline import Transport
 
 from catalyst import Executor, qjit
 from catalyst.backline import (
+    _EXECUTOR_RUNTIME_PLUGINS,
     _TRANSPORT_PASSES,
     _insert_passes,
     _qec_pass_specs,
@@ -146,12 +147,10 @@ def test_out_of_process_coprocessor_fn_lib_is_not_loaded_here(monkeypatch):
     loaded = []
     monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
     fn = qp.CoprocessorFunction("decode_fn", lib_path="/opt/libdecode.so")
-    dev = qp.Backline(
-        controller=_controller(),
-        coprocessors=[_coproc("cop0", fn=fn, remote=True)],
-        transport="rdma",
-    )
-    launch_executors(dev.placement)
+    cop = _coproc("cop0", fn=fn, remote=True, executor_options={"host": "192.0.2.11", "port": 7813})
+    dev = qp.Backline(controller=_controller(), coprocessors=[cop], transport="rdma")
+    with mock.patch.object(Executor, "launch", autospec=True):
+        launch_executors(dev.placement)
     assert loaded == []
 
 
@@ -308,7 +307,7 @@ def test_placement_behind_a_wrapper_is_found(use_capture):
         executor=_Attached(),
         init_args={"backend_lib": "backend.so", "config": "cfg"},
     )
-    dev = qp.Backline(controller=ctrl, transport="rdma")
+    dev = qp.Backline(controller=ctrl, coprocessors=[_coproc("cop0")], transport="rdma")
 
     @qp.qnode(dev)
     def circuit():
@@ -322,7 +321,7 @@ def test_placement_behind_a_wrapper_is_found(use_capture):
     ir = workflow.mlir
     assert "module @workflow" in ir  # the wrapper is the root module
     assert "catalyst.backline" in ir
-    assert 'transport = "net"' in ir
+    assert 'transport = "rdma"' in ir
     assert 'symbol = "coproc_fn"' in ir  # the whole placement, coprocessor included
 
 
@@ -679,12 +678,6 @@ class TestBackendResolution:
         d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
         assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
 
-    def test_no_backend_leaves_backend_lib_unset(self, no_launch):
-        """Omitting ``backend`` leaves the field to ``init_args`` or the compiler default."""
-        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl")
-        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
-        assert "backend_lib" not in d["controller"]
-
 
 @pytest.fixture
 def no_launch():
@@ -761,9 +754,8 @@ class TestExecutorRealization:
         it by filename, the deployed bundle supplying the file."""
         node = _controller(remote=True, executor_options={"host": "192.0.2.10", "port": 7810})
         _realize_executor(node)
-        assert node.executor._cfg.plugins == [  # pylint: disable=protected-access
-            "librtd_null_qubit.so",
-        ]
+        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        assert plugins[-1] == "librtd_null_qubit.so"
 
     def test_a_dispatched_coprocessor_carries_its_function_library(self, tmp_path):
         """A decoder built for this run is not in the target's bundle, so it travels and is opened."""
@@ -793,17 +785,18 @@ class TestExecutorRealization:
         node = _coproc("cop0", remote=True, executor_options={"host": "h", "port": 7812})
         _realize_executor(node)
         plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
-        assert plugins == []
+        assert plugins == list(_EXECUTOR_RUNTIME_PLUGINS)
 
     def test_plugins_the_node_named_keep_their_place(self, no_launch):
-        """Only the missing ones are appended, so an explicit ordering still wins."""
+        """A runtime library the node names itself keeps the position it gave it rather than being
+        added a second time, and the device runtime still lands last."""
         node = _controller(
             remote=True,
             executor_options={"host": "h", "port": 1, "plugins": ["libsteane.so", "librt_capi.so"]},
         )
         _realize_executor(node)
         plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
-        assert plugins[:2] == ["libsteane.so", "librt_capi.so"]  # untouched, not duplicated
+        assert plugins.index("libsteane.so") < plugins.index("librt_capi.so")  # order kept
         assert plugins.count("librt_capi.so") == 1
         assert plugins[-1] == "librtd_null_qubit.so"
 

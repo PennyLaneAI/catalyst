@@ -317,8 +317,14 @@ def _executor_plugins(node: Node, given) -> list[str]:
     )
 
     remote = bool(node.remote)
+    # The executor resolves a bare plugin filename against its workspace and takes an absolute path
+    # as given, so a node running here must name these by path: this installation's runtime is not
+    # in the loader's search path, and a failed dlopen is only reported by the executor's log.
+    rt_lib = None if remote else Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     plugins = [
-        lib for lib in _EXECUTOR_RUNTIME_PLUGINS if not any(Path(p).name == lib for p in given)
+        lib if remote else str(rt_lib / lib)
+        for lib in _EXECUTOR_RUNTIME_PLUGINS
+        if not any(Path(p).name == lib for p in given)
     ]
     plugins += list(given)
     implied = []
