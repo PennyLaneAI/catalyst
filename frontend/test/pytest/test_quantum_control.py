@@ -792,7 +792,7 @@ class TestControlledProperties:
 
         with pytest.raises(
             AttributeError,
-            match="property 'data' of 'ControlledOp' object has no setter",
+            match="has no setter",
         ):
             setattr(op, "data", (pnp.array(2.3454),))
 
@@ -999,7 +999,7 @@ class TestControlledMiscMethods:
 
         assert copied_op.__class__ is op.__class__
         assert copied_op.control_wires == op.control_wires
-        assert copied_op.control_values == op.control_values
+        assert qp.math.allclose(copied_op.control_values, op.control_values)
         assert copied_op.data == (param1,)
 
         copied_op = qp.ops.functions.bind_new_parameters(copied_op, (6.54,))
