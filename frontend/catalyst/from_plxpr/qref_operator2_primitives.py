@@ -583,7 +583,7 @@ def _multirz_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint):
     return []
 
 
-@_register_special_lowering("PCPhase")
+@_register_special_lowering(qp.PCPhase)
 def _pcphase_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint, dim):
     dim = unflatten(*dim)
     PCPhaseOp(
