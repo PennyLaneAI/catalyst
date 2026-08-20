@@ -28,9 +28,14 @@ from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
-from pennylane.capture.primitives import operator_p
+from pennylane.capture.primitives import (
+    operator_p,
+)
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
-from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
+from pennylane.capture.primitives import (
+    quantum_subroutine_prim,
+    transform_prim,
+)
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
@@ -401,7 +406,12 @@ def _qubit_unitary_bind_call(
     mat = invals[qubits_len]
     ctrl_inputs = invals[qubits_len + 1 :]
     return qref_unitary_p.bind(
-        mat, *wires, *ctrl_inputs, qubits_len=qubits_len, ctrl_len=ctrl_len, adjoint=adjoint
+        mat,
+        *wires,
+        *ctrl_inputs,
+        qubits_len=qubits_len,
+        ctrl_len=ctrl_len,
+        adjoint=adjoint,
     )
 
 
@@ -615,23 +625,6 @@ def handle_pauli_measure(self, *wires_inval, pauli_word, **params):
     result = qref_pauli_measure_p.bind(*in_qubits, pauli_word=pauli_word, qubits_len=len(in_qubits))
     result = jnp.astype(result, int)
     return result
-
-
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qp.BasisState._primitive)
-def handle_basis_state(self, *invals, n_wires):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
-    state_inval = invals[0]
-    wires_inval = invals[1:]
-    in_qubits = []
-    for w in wires_inval:
-        if is_abstract_qubit(w):
-            in_qubits.append(w)
-        else:
-            in_qubits.append(qref_get_p.bind(self.init_qreg, w))
-
-    state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.bool))
-
-    qref_set_basis_state_p.bind(*in_qubits, state)
 
 
 # pylint: disable=unused-argument
