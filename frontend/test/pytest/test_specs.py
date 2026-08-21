@@ -1462,7 +1462,6 @@ class TestSymbolicSpecsLoopConcretization:
 
         resources = qp.specs(circuit, level=0)().resources
 
-        # Expect a symbolic value: combined complexities are not supported for concretization
         assert resources.quantum_operations["PauliZ"] == 20
 
 
