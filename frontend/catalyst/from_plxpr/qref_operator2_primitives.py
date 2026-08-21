@@ -364,8 +364,35 @@ def compile_decomp_rules(
         #     static_data={},
         # )
 
-    elif op_cls in (qp.QubitUnitary,):
-        raise NotImplementedError(f"{op_cls} has not been migrated to Operator2 yet")
+    elif op_cls is qp.QubitUnitary:
+        # TODO: qp.QubitUnitary decomp rule calls det, but the current infra cannot support
+        # rules that call other funcops
+        # When the above is implemented, uncomment the Unitary decomp rule collection impl below
+
+        op_id = ""
+        decomp_rules = []
+
+        # num_wires = wire_lens[0]
+        # matrix_size = 2**num_wires
+        # dynamic_shape = {
+        #     qp.QubitUnitary.dynamic_argnames[0]: [["complex<f64>"] * matrix_size] * matrix_size
+        # }
+        # wire_argname = qp.QubitUnitary.wire_argnames[0]
+        # op_id = (
+        #     "QubitUnitary"
+        #     + "[" + format_dynamic_params_for_id(dynamic_shape) + "]"
+        #     + "{"
+        #     + f"{wire_argname}:{wire_lens[0]}"
+        #     + "}{}"
+        # )
+
+        # decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+        #     op_name="QubitUnitary",
+        #     op_id=op_id,
+        #     dynamic_shape=dynamic_shape,
+        #     wire_lens={f"{wire_argname}": wire_lens[0]},
+        #     static_data={},
+        # )
 
     else:
         # Operator Op
@@ -645,7 +672,7 @@ def _special_basis_state_lowering(state, *qubits, ctrl_qubits, ctrl_values, adjo
 
 
 @_register_special_lowering(qp.QubitUnitary)
-def _special_unitary_lowering(matrix, *qubits, ctrl_qubits, ctrl_values, adjoint):
+def _special_unitary_lowering(matrix, *qubits, ctrl_qubits, ctrl_values, adjoint, unitary_check):
     matrix_type = matrix.type
     is_tensor = ir.RankedTensorType.isinstance(matrix_type)
     shape = ir.RankedTensorType(matrix_type).shape if is_tensor else None
