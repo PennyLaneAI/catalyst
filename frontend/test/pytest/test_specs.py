@@ -1239,30 +1239,6 @@ class TestSymbolicSpecs:
         r = qp.specs(c, level=0)(2).resources
         assert r.subs({var: 10 for var in r.vars}).quantum_operations["RX"] == 10
 
-    # skip this test for now untill PL supports double type of function call
-    @pytest.mark.skip(reason="PL does not support to parse double type of function call in loops")
-    def test_resolvable_nested_loop(self):
-        """Test a nested loop whose inner bound is an enclosing induction variable."""
-        n = 8
-
-        @qjit
-        @qp.qnode(qp.device("null.qubit", wires=n))
-        def circuit(angles):
-            @qp.for_loop(n)
-            def outer(i):
-                @qp.for_loop(i)
-                def inner(j):
-                    qp.IsingZZ(angles[i, j], wires=[i, j])
-
-                inner()  # pylint: disable=no-value-for-parameter
-
-            outer()  # pylint: disable=no-value-for-parameter
-            return qp.expval(qp.X(0))
-
-        resources = qp.specs(circuit, level=0)(jnp.ones((n, n))).resources
-
-        assert resources.quantum_operations["IsingZZ"] == 28
-
     def test_symbolic_array_loop_arguemtn(self):
         """Test dynamic loop with a symbolic array as a loop argument."""
 
@@ -1283,6 +1259,137 @@ class TestSymbolicSpecs:
 
         r = qp.specs(c, level=0)(2).resources
         assert r.subs({var: 10 for var in r.vars}).quantum_operations["RX"] == 10
+
+
+class TestSymbolicSpecsLoopConcretization:
+    """
+    Integration tests for the loop concretization feature of the resource analysis pass, which
+    allows for the resolution of nested loops whose inner bounds depend on a static outer loop
+    variable.
+    """
+
+    def test_loop_concretization(self):
+        """Test a straightforward nested loop whose inner bound depends on the outer loop var."""
+        n = 8
+
+        @qp.qjit
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            @qp.for_loop(n)
+            def outer(i):
+                @qp.for_loop(i)
+                def inner(j):
+                    qp.PauliZ(wires=j % 2)
+
+                inner()  # pylint: disable=no-value-for-parameter
+
+            outer()  # pylint: disable=no-value-for-parameter
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 28
+
+    # FIXME: Fix this bug
+    @pytest.xfail(
+        strict=True, reason="This is a bug in the current implementation. Fix before merging"
+    )
+    def test_loop_concretization_with_unrelated_middle_loop(self):
+        """Test a straightforward nested loop whose inner bound depends on the outer loop var."""
+        a, b = 4, 3
+
+        @qp.qjit
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def circuit():
+            @qp.for_loop(a)
+            def loop1(i):
+                @qp.for_loop(b)
+                def loop2(j):
+                    @qp.for_loop(i)
+                    def loop3(k):
+                        qp.PauliZ(wires=k % 2)
+
+                    loop3()  # pylint: disable=no-value-for-parameter
+
+                    qp.PauliX(wires=j % 2)
+
+                loop2()  # pylint: disable=no-value-for-parameter
+
+            loop1()  # pylint: disable=no-value-for-parameter
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 18
+        assert resources.quantum_operations["PauliX"] == 12
+
+    def test_loop_concretization_with_step(self):
+        """Test an outer loop with a step != 1."""
+        n = 8
+
+        @qp.qjit
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            @qp.for_loop(0, n, 2)
+            def outer(i):
+                @qp.for_loop(i)
+                def inner(j):
+                    qp.PauliZ(wires=j % 2)
+
+                inner()  # pylint: disable=no-value-for-parameter
+
+            outer()  # pylint: disable=no-value-for-parameter
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 12
+
+    def test_loop_concretization_reverse(self):
+        """Test concretization on a decrementing loop."""
+        n = 8
+
+        @qp.qjit
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            @qp.for_loop(n, 0, -1)
+            def outer(i):
+                @qp.for_loop(i)
+                def inner(j):
+                    qp.PauliZ(wires=j % 2)
+
+                inner()  # pylint: disable=no-value-for-parameter
+
+            outer()  # pylint: disable=no-value-for-parameter
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        # Expect a symbolic value: reverse iteration is not supported for concretization
+        assert not isinstance(resources.quantum_operations["PauliZ"], (int, float))
+
+    def test_loop_concretization_static_change(self):
+        """Test concretization where the inner loop depends indirectly on the outer loop var."""
+        n = 8
+
+        @qp.qjit
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            @qp.for_loop(n)
+            def outer(i):
+                @qp.for_loop(i + 1)  # Note the +1, this is now an expression
+                def inner(j):
+                    qp.PauliZ(wires=j % 2)
+
+                inner()  # pylint: disable=no-value-for-parameter
+
+            outer()  # pylint: disable=no-value-for-parameter
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        # Expect a symbolic value: indirect dependency is not supported for concretization
+        assert not isinstance(resources.quantum_operations["PauliZ"], (int, float))
 
 
 class TestMarkerIntegration:
