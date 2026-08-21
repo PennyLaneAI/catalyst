@@ -1000,6 +1000,38 @@ func.func @empty_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
+// The loops share lower bound 2, so the inner loop averages
+// (0 + 1 + 2 + 3) / 4 = 1.5 iterations.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliX": 1
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 1.5
+// CHECK-LABEL: "same_lower_bound_nested_for_loop": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_2": 4
+func.func @same_lower_bound_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
+    %c1 = arith.constant 1 : index
+    %c2 = arith.constant 2 : index
+    %c6 = arith.constant 6 : index
+
+    %q = scf.for %i = %c2 to %c6 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %inner = scf.for %j = %c2 to %i step %c1
+            iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
+            %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
+            scf.yield %out : !quantum.bit
+        }
+        scf.yield %inner : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
 // sum(ceil(i / 2), i = 0..7) = 16, averaging 2 calls per outer-body invocation.
 
 // CHECK-LABEL: "for_loop_1": {

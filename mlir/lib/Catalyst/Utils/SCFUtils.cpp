@@ -117,11 +117,15 @@ struct LoopRange {
     int64_t step;
 };
 
+// Store the total innermost-loop iterations and how many times that loop is reached.
+// Dividing the total by the invocation count gives its average trip count.
 struct TripCountSummary {
     int64_t total = 0;
     uint64_t invocations = 0; // how many times the innermost loop is reached
 };
 
+// Walk through each dependent loop using the previous loop's induction value as the next upper
+// bound. Track the total innermost-loop iterations and how many times that loop is reached.
 static TripCountSummary accumulateTripCounts(llvm::ArrayRef<LoopRange> ranges, size_t loopIndex,
                                              int64_t upperBound) {
     const LoopRange &range = ranges[loopIndex];
