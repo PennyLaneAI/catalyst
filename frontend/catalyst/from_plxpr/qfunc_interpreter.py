@@ -25,6 +25,7 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.sharding_impls import UNSPECIFIED
 from pennylane.capture import PlxprInterpreter, pause
+from pennylane.capture.base_interpreter import jaxpr_to_jaxpr
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
@@ -715,16 +716,26 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
 def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
-    """Interpret a control transform primitive."""
+    """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
     consts = invals[:n_consts]
     args = invals[n_consts:-n_control]
     control_wires = invals[-n_control:]
 
-    unroller = copy(self)
-    unroller.control_wires += tuple(control_wires)
-    unroller.control_values += tuple(control_values)
-    unroller.eval(jaxpr, consts, *args)
-    return []
+    control_qubits = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
+    ]
+    body = jaxpr_to_jaxpr(copy(self), jaxpr, consts, *args)
+
+    return plxpr_ctrl_transform_prim.bind(
+        *body.consts,
+        *args,
+        *control_qubits,
+        n_control=n_control,
+        jaxpr=body.jaxpr,
+        control_values=control_values,
+        work_wires=work_wires,
+        n_consts=len(body.consts),
+    )
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(transform_prim)
