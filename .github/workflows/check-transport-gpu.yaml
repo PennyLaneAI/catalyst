@@ -201,79 +201,9 @@ jobs:
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
 
-      - name: Restore cached LLVM build
-        uses: actions/cache/restore@v4
-        with:
-          path: llvm-build
-          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
-          fail-on-cache-miss: true
-
-      - name: Restore cached StableHLO source and build
-        uses: actions/cache/restore@v4
-        with:
-          path: mlir/stablehlo
-          key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
-          enableCrossOsArchive: true
-          fail-on-cache-miss: true
-      - uses: actions/cache/restore@v4
-        with:
-          path: stablehlo-build
-          key: ${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
-          fail-on-cache-miss: true
-
-      - name: Restore cached Enzyme source and build
-        uses: actions/cache/restore@v4
-        with:
-          path: mlir/Enzyme
-          key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
-          enableCrossOsArchive: true
-          fail-on-cache-miss: true
-      - uses: actions/cache/restore@v4
-        with:
-          path: enzyme-build
-          key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
-          fail-on-cache-miss: true
-
-      - name: Install Python runtime requirements
-        run: |
-          python3 -m pip install -r requirements.txt
-
-      - name: Install latest PennyLane and Lightning
-        run: |
-          # Latest/latest/latest: Catalyst is built from this checkout; PennyLane and Lightning
-          # come from their ``main`` branches so the frontend links against the same versions the
-          # CPL_latest-latest-latest job exercises.
-          pip install --no-deps --force pennylane-lightning
-          pip install --no-deps --force pennyLane-lightning-kokkos
-          pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
-
-      - name: Build Catalyst frontend (reusing the transport-enabled runtime)
-        run: |
-          COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          ENABLE_LLD=ON \
-          RT_BUILD_DIR="$(pwd)/runtime-build" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
-          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
-          DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-          ENABLE_TRANSPORT=ON \
-          make catalyst
-
-      - name: Add Frontend Dependencies to PATH
-        run: |
-          echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-          echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
-          echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-          echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-          echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-          echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-          echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-          echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-
-      - name: Run backline demo integration tests
-        run: |
-          python3 -m pytest -v \
-            frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration
+      # TODO: run frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration here.
+      # It needs the LLVM + quantum-dialect build; restoring the check-catalyst.yaml caches from
+      # this self-hosted GPU runner produces MLIRConfig.cmake without a resolvable LLVMConfig
+      # (see run 32523225599). Until the caches work across hosted/self-hosted runners, the Python
+      # integration tests only run in workflows on GH-hosted runners.
 
