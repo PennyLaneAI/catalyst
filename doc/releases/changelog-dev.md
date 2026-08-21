@@ -118,8 +118,8 @@
   AOT compilation and as arguments to `pennylane.specs` calculations.
   [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
 
-* The `ResourceAnalysis` pass can now report concrete resource counts for nested loops whose upper
-  bounds are the induction variables of their immediately enclosing loops.
+* The `ResourceAnalysis` pass can now report concrete resource counts for nested loops in cases
+  where the bounds of an inner loop are directly dependent on the loop variable of a static outer loop.
   [(#3140)](https://github.com/PennyLaneAI/catalyst/pull/3140)
 
   For example, this program reports average multiplicities of `3.5` for the middle loop and `2` for
