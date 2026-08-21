@@ -365,7 +365,7 @@ def compile_decomp_rules(
         # )
 
     elif op_cls is qp.QubitUnitary:
-        # TODO: qp.BasisState decomp rule calls det, but the current infra cannot support
+        # TODO: qp.QubitUnitary decomp rule calls det, but the current infra cannot support
         # rules that call other funcops
         # When the above is implemented, uncomment the Unitary decomp rule collection impl below
 
