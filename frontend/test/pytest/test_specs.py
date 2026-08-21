@@ -1272,18 +1272,12 @@ class TestSymbolicSpecsLoopConcretization:
         """Test a straightforward nested loop whose inner bound depends on the outer loop var."""
         n = 8
 
-        @qp.qjit
+        @qp.qjit(autograph=True)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
-            @qp.for_loop(n)
-            def outer(i):
-                @qp.for_loop(i)
-                def inner(j):
+            for i in range(n):
+                for j in range(i):
                     qp.PauliZ(wires=j % 2)
-
-                inner()  # pylint: disable=no-value-for-parameter
-
-            outer()  # pylint: disable=no-value-for-parameter
             return qp.expval(qp.X(0))
 
         resources = qp.specs(circuit, level=0)().resources
@@ -1294,23 +1288,15 @@ class TestSymbolicSpecsLoopConcretization:
         """Test 3 nested loops whose bounds depends on the outer loop var."""
         n = 8
 
-        @qp.qjit
+        @qp.qjit(autograph=True)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
-            @qp.for_loop(n)  # Runs 8 times total
-            def loop1(i):
-                @qp.for_loop(i)  # Runs 28 times total
-                def loop2(j):
-                    @qp.for_loop(j)  # Runs 56 times total
-                    def loop3(k):
+            for i in range(n):  # Runs 8 times total
+                for j in range(i):  # Runs 28 times total
+                    for k in range(j):  # Runs 56 times total
                         qp.PauliZ(wires=k % 2)
-
-                    loop3()
                     qp.PauliX(wires=j % 2)
 
-                loop2()  # pylint: disable=no-value-for-parameter
-
-            loop1()  # pylint: disable=no-value-for-parameter
             return qp.expval(qp.X(0))
 
         resources = qp.specs(circuit, level=0)().resources
@@ -1326,24 +1312,15 @@ class TestSymbolicSpecsLoopConcretization:
         """Test 3 nested loops where the middle loop is unrelated to the other 2."""
         a, b = 4, 3
 
-        @qp.qjit
+        @qp.qjit(autograph=True)
         @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
-            @qp.for_loop(a)
-            def loop1(i):
-                @qp.for_loop(b)
-                def loop2(j):
-                    @qp.for_loop(i)
-                    def loop3(k):
+            for i in range(a):  # Runs 4 times total
+                for j in range(b):  # Runs 12 times total
+                    for k in range(i):  # Runs 18 times total
                         qp.PauliZ(wires=k % 2)
-
-                    loop3()  # pylint: disable=no-value-for-parameter
-
                     qp.PauliX(wires=j % 2)
 
-                loop2()  # pylint: disable=no-value-for-parameter
-
-            loop1()  # pylint: disable=no-value-for-parameter
             return qp.expval(qp.X(0))
 
         resources = qp.specs(circuit, level=0)().resources
@@ -1351,22 +1328,35 @@ class TestSymbolicSpecsLoopConcretization:
         assert resources.quantum_operations["PauliZ"] == 18
         assert resources.quantum_operations["PauliX"] == 12
 
+    def test_loop_concretization_symbolic(self):
+        """Test nested dynamic loops."""
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=8))
+        def circuit(n):
+            for i in range(n):
+                for j in range(i):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)(8).resources
+
+        # Current behaviour is that these loops are *NOT* folded like static loops
+        assert not isinstance(resources.quantum_operations["PauliZ"], (int, float))
+        assert len(resources.quantum_operations["PauliZ"].vars) == 2
+
     def test_loop_concretization_with_step(self):
         """Test an outer loop with a step != 1."""
         n = 8
 
-        @qp.qjit
+        @qp.qjit(autograph=True)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
-            @qp.for_loop(0, n, 2)
-            def outer(i):
-                @qp.for_loop(i)
-                def inner(j):
+            for i in range(0, n, 2):
+                for j in range(i):
                     qp.PauliZ(wires=j % 2)
 
-                inner()  # pylint: disable=no-value-for-parameter
-
-            outer()  # pylint: disable=no-value-for-parameter
             return qp.expval(qp.X(0))
 
         resources = qp.specs(circuit, level=0)().resources
@@ -1377,18 +1367,13 @@ class TestSymbolicSpecsLoopConcretization:
         """Test concretization on a decrementing loop."""
         n = 8
 
-        @qp.qjit
+        @qp.qjit(autograph=True)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
-            @qp.for_loop(n, 0, -1)
-            def outer(i):
-                @qp.for_loop(i)
-                def inner(j):
+            for i in range(n, 0, -1):
+                for j in range(i):
                     qp.PauliZ(wires=j % 2)
 
-                inner()  # pylint: disable=no-value-for-parameter
-
-            outer()  # pylint: disable=no-value-for-parameter
             return qp.expval(qp.X(0))
 
         resources = qp.specs(circuit, level=0)().resources
@@ -1400,18 +1385,13 @@ class TestSymbolicSpecsLoopConcretization:
         """Test concretization where the inner loop depends indirectly on the outer loop var."""
         n = 8
 
-        @qp.qjit
+        @qp.qjit(autograph=True)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
-            @qp.for_loop(n)
-            def outer(i):
-                @qp.for_loop(i + 1)  # Note the +1, this is now an expression
-                def inner(j):
+            for i in range(n):
+                for j in range(i + 1):  # Note the +1, this is now an expression
                     qp.PauliZ(wires=j % 2)
 
-                inner()  # pylint: disable=no-value-for-parameter
-
-            outer()  # pylint: disable=no-value-for-parameter
             return qp.expval(qp.X(0))
 
         resources = qp.specs(circuit, level=0)().resources
