@@ -172,7 +172,7 @@ test-runtime:
 	$(MAKE) -C runtime test
 
 test-runtime-transport:
-	$(MAKE) -C runtime test-transport
+	$(MAKE) -C runtime test-transport ENABLE_TRANSPORT=ON
 
 test-mlir:
 	$(MAKE) -C mlir test

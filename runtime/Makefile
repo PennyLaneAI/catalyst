@@ -140,7 +140,6 @@ ifeq ($(ENABLE_EXECUTOR), ON)
 endif
 
 .PHONY: test-transport
-test-transport: ENABLE_TRANSPORT=ON
 test-transport: BUILD_TYPE?=RelWithDebInfo
 test-transport: test_runner
 	@echo "Catalyst runtime transport test suites"
