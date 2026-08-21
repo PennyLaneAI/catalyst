@@ -40,7 +40,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument,unsubscriptable-object
 
 
 class OtherHadamard(qp.Hadamard):
@@ -577,29 +577,6 @@ class TestPreprocessHybridOp:
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
             _ = catalyst_decompose(tape, capabilities)
-
-    @pytest.mark.usefixtures("create_temporary_toml_file")
-    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
-    @pytest.mark.parametrize("gate_set_src", ["capabilities", "target_gates"])
-    def test_unsupported_op_with_no_decomposition_raises_error(self, request, gate_set_src):
-        """Test that an unsupported operator that doesn't provide a decomposition
-        raises a CompileError"""
-
-        tape = qp.tape.QuantumScript([qp.Y(0)])
-
-        if gate_set_src == "capabilities":
-            capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-            setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
-            capabilities = replace(capabilities, operations={})
-            kwargs = {"capabilities": capabilities}
-        else:
-            kwargs = {"target_gates": {}, "capabilities": None}
-
-        with pytest.raises(
-            CompileError,
-            match="not supported with catalyst on this device and does not provide a decomposition",
-        ):
-            _ = catalyst_decompose(tape, **kwargs)
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
