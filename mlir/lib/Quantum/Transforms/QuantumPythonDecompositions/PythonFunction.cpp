@@ -16,8 +16,8 @@
 #include "nanobind/stl/string.h" // for type conversion
 
 #include <cstddef>
+#include <cstdint>
 #include <exception>
-#include <iostream>
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
@@ -26,12 +26,13 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Types.h"
+#include "mlir/Support/LLVM.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -44,23 +45,51 @@ namespace nb = nanobind;
 
 namespace {
 
-static nb::dict
-getPyvalFromDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map) {
-    nb::dict name_to_shape;
-    for (const auto &entry : map) {
-        nb::list types;
-        for (auto type : entry.getValue()) {
-            if (!type) {
-                continue;
-            }
-            std::string typestr;
-            llvm::raw_string_ostream ss(typestr);
-            type.print(ss);
-            types.append(typestr);
-        }
-        name_to_shape[nb::str(entry.getKey().str().c_str())] = types;
+nb::str getPyvalFromScalarType(mlir::Type type) {
+    std::string typestr;
+    llvm::raw_string_ostream ss(typestr);
+    type.print(ss);
+    return nb::str(typestr.c_str());
+}
+
+nb::list getPyvalFromShapedType(mlir::ArrayRef<int64_t> shape, int64_t dim, nb::str typestr) {
+    if (dim == shape.size()) {
+        return nb::list();
     }
-    return name_to_shape;
+    nb::list result;
+    for (int i = 0; i < shape[dim]; i++) {
+        result.append(typestr);
+    }
+    return result;
+}
+
+nb::object getPyvalFromType(mlir::Type type) {
+    return llvm::TypeSwitch<mlir::Type, nb::object>(type)
+        .Case<mlir::ShapedType>([&](mlir::ShapedType shapedType) {
+            return getPyvalFromShapedType(shapedType.getShape(), 0,
+                                          getPyvalFromScalarType(shapedType.getElementType()));
+        })
+        .Default([&](mlir::Type other) { return getPyvalFromScalarType(type); });
+}
+
+nb::dict getPyvalFromDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map) {
+    llvm::SmallVector<llvm::StringRef> keys;
+    for (const llvm::StringRef key : map.keys()) {
+        keys.push_back(key);
+    }
+    llvm::sort(keys);
+
+    nb::dict result;
+    for (auto [i, key] : llvm::enumerate(keys)) {
+        nb::list entry;
+
+        const auto &types = map.lookup(key);
+        for (auto [j, type] : llvm::enumerate(types)) {
+            entry.append(getPyvalFromType(type));
+        }
+        result[key.str().c_str()] = entry;
+    }
+    return result;
 }
 
 static nb::dict getPyvalFromWireLens(const llvm::StringMap<size_t> map) {
