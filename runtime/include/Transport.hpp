@@ -15,6 +15,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 
 namespace catalyst::transport {
@@ -22,7 +23,7 @@ namespace catalyst::transport {
 /**
  * @brief Memory kind: selects the allocation and registration path.
  */
-enum class MemKind : std::uint8_t {
+enum class MemKind : int {
     CpuRam,
     GpuHbm,
     Ddr,
@@ -58,10 +59,10 @@ struct PeerRef {
 };
 
 /**
- * @brief Configuration for the data-movement channel a session uses.
+ * @brief Transport kind a session uses for request/reply movement.
  */
 struct ChannelDesc {
-    std::string data_path = "cpu_verbs";
+    std::string transport = "rdma";
 };
 
 /**
@@ -72,7 +73,7 @@ struct ChannelDesc {
  *   2. alloc_memory      - register the region (needs the connected context)
  *   3. exchange_keys     - swap region handles over the out-of-band channel
  *   4. establish_channel - program the channel from the local + peer regions
- *   5. (coprocessor) set_coprocessor_fn before start()
+ *   5. (coprocessor) bind a coprocessor function before start()
  *   6. start / collect / stop
  */
 class TransportSession {
@@ -97,6 +98,16 @@ class TransportSession {
      * @return `MemRegion` The allocated and registered region.
      */
     virtual MemRegion alloc_memory(std::size_t size, MemKind kind) = 0;
+
+    /**
+     * @brief Where this backend wants the regions the core provisions for it.
+     *
+     * The core does not know which memory a backend can register; a device-side one may accept
+     * only its own. Reported here so the core asks for what the backend supports.
+     *
+     * @return `MemKind`
+     */
+    virtual MemKind preferred_mem_kind() const { return MemKind::CpuRam; }
 
     /**
      * @brief Advertise a local region and receive the peer's region over the out-of-band channel.
@@ -160,31 +171,102 @@ class ControllerSession : public TransportSession {
     // data_slot(). Pairs with a subsequent collect(). Returns 0 on success.
     virtual int kick(std::uint32_t work_item_idx) = 0;
 
-    // Current round's outbound slot in the transport-owned ring.
+    // Current round's outbound slot in the transport-owned ring. The slot's capacity is
+    // backend-defined and not exposed here; prefer write_data_slot(), which enforces it.
     virtual void *data_slot() = 0;
+
+    // Copy `bytes` of payload into the current round's outbound slot, ready for kick().
+    // Throws if `bytes` exceeds what the round was committed to carry, so an oversized
+    // payload will fail. `decoder_id` picks the coprocessor-side decoder for this round.
+    virtual void write_data_slot(const void *src, std::uint64_t bytes,
+                                 std::uint32_t decoder_id) = 0;
+
+    // Current round's reply slot in the transport-owned reply ring.
+    virtual void *reply_slot() { return nullptr; }
 };
 
 /**
- * @brief Opaque function to run on the coprocessor. May include a persistent kernel on the GPU.
+ * @brief Per-message coprocessor function (CPU-style). Invoked once per received
+ * message: decode `in` (`in_len` bytes) into `out` (capacity `out_cap`) and
+ * return the number of bytes written.
  */
 using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *out,
                                       std::size_t out_cap, void *ctx);
 
 /**
+ * @brief Data description for a persistent engine to receive and consume
+ * request messages, then autonomously return processed message to the handoff buffer,
+ * which is then replied by a coprocessor host thread.
+ *
+ * The session owns the buffers and keeps it valid until the engine has stopped
+ * (set `*stop` nonzero, then synchronize) or has processed `total` messages.
+ */
+struct CoprocLaunchDesc {
+    void *ring;               // recv request-slot ring base (device HBM or host RAM)
+    std::uint32_t ring_slots; // slot count of both rings; must be a power of two
+    void *handoff;            // reply-slot ring base (engine -> session, e.g. gpu to cpu)
+    void *stop;               // uint32_t teardown flag the engine polls
+    std::uint64_t total;      // messages to process, or 0 = run until stopped
+    void *stream;             // device queue to launch on (e.g. hipStream_t); null for host
+};
+
+/**
+ * @brief Launch-once coprocessor function (GPU-style). Invoked once at start():
+ * launches a persistent worker on the given datapath. Returns 0 on a successful
+ * launch, nonzero on failure.
+ */
+using CoprocessorLauncherFn = int (*)(const CoprocLaunchDesc *desc, void *ctx);
+
+/**
+ * @brief Which of the two bind methods below a coprocessor function is passed to.
+ */
+enum class CoprocConvention : std::int32_t {
+    PerMessage = 0, // CoprocessorFn: host, invoked once per received message
+    LaunchOnce = 1, // CoprocessorLauncherFn: launches a persistent engine
+};
+
+/**
  * @brief Coprocessor role: receives messages, process, and returns replies.
+ *
+ * A coprocessor function comes in two conventions:
+ * - a host/cpu per-message function vs.
+ * - a device kernel launched once.
+ * Each backend overrides only the setter it supports; the other keeps
+ * the throwing default, so a mis-bind fails loudly at bind time.
  */
 class CoprocessorSession : public TransportSession {
   public:
     /**
-     * @brief Bind the coprocessor function this session runs.
+     * @brief Bind a per-message coprocessor function (CPU-style).
      *
-     * Call before start(). `fn` is a local function pointer; `ctx` is passed
-     * back to `fn` on every invocation and may be null.
-     *
-     * @param fn The coprocessor function to run per received message.
-     * @param ctx Opaque context passed to `fn` on each invocation; may be null.
+     * Call before start(). `fn` is invoked once per received message, receiving the
+     * message's decoder_id so it can dispatch internally; `ctx` is passed back on
+     * every invocation and may be null.
      */
-    virtual void set_coprocessor_fn(CoprocessorFn fn, void *ctx) = 0;
+    virtual void set_coprocessor_fn(CoprocessorFn /*fn*/, void * /*ctx*/) {
+        throw std::logic_error(
+            "transport: per-message coprocessor function not supported by this backend");
+    }
+
+    /**
+     * @brief Bind a launch-once coprocessor function (GPU-style).
+     *
+     * Call before start(). `fn` is invoked once (in start()) to launch a
+     * persistent engine on the session's datapath; `ctx` may be null.
+     */
+    virtual void set_coprocessor_launcher(CoprocessorLauncherFn /*fn*/, void * /*ctx*/) {
+        throw std::logic_error(
+            "transport: launch-once coprocessor function not supported by this backend");
+    }
+
+    /**
+     * @brief Which of the two coprocessor function convention this backend takes.
+     *
+     * Defaults to per-message.
+     */
+    virtual CoprocConvention coprocessor_fn_convention() const {
+        return CoprocConvention::PerMessage;
+    }
 };
 
 } // namespace catalyst::transport

@@ -30,8 +30,7 @@ namespace {
  * @brief Determine if the ENABLE_DIAGNOSTICS environment variable has been set. Valid true value is
  * `ON`, with all others as false.
  */
-[[nodiscard]] inline static bool is_diagnostics_enabled()
-{
+[[nodiscard]] inline static bool is_diagnostics_enabled() {
     char *value = getenv("ENABLE_DIAGNOSTICS");
     return value && std::string(value) == "ON";
 }
@@ -43,8 +42,7 @@ namespace {
  * @param name Input to indicate previous operation name. Used only for diagnostics, and ignored if
  * empty.
  */
-inline static void print(const std::string &opStrBuf, const std::string &name)
-{
+inline static void print(const std::string &opStrBuf, const std::string &name) {
     const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
     if (!name.empty()) {
         std::cerr << "[DIAGNOSTICS] After " << std::setw(25) << std::left << name;
@@ -60,8 +58,7 @@ inline static void print(const std::string &opStrBuf, const std::string &name)
  * @param file_path
  */
 inline static void store(const std::string &opStrBuf, const std::string &name,
-                         const std::filesystem::path &file_path)
-{
+                         const std::filesystem::path &file_path) {
     const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
 
     const std::string_view key_padding = "          ";
@@ -94,8 +91,7 @@ inline static void store(const std::string &opStrBuf, const std::string &name,
  * @param opStrBuf
  * @param name
  */
-inline static void dump(const std::string &opStrBuf, const std::string &name = {})
-{
+inline static void dump(const std::string &opStrBuf, const std::string &name = {}) {
     char *file = getenv("DIAGNOSTICS_RESULTS_PATH");
     if (!file) {
         print(opStrBuf, name);
@@ -117,8 +113,7 @@ namespace catalyst::utils {
  * @param name
  */
 template <>
-void LinesCount::impl<llvm::Module>(const llvm::Module &llvmModule, const std::string &name)
-{
+void LinesCount::impl<llvm::Module>(const llvm::Module &llvmModule, const std::string &name) {
     if (!is_diagnostics_enabled()) {
         return;
     }
@@ -137,8 +132,8 @@ void LinesCount::impl<llvm::Module>(const llvm::Module &llvmModule, const std::s
  * @param op
  * @param name
  */
-template <> void LinesCount::impl<mlir::ModuleOp>(const mlir::ModuleOp &op, const std::string &name)
-{
+template <>
+void LinesCount::impl<mlir::ModuleOp>(const mlir::ModuleOp &op, const std::string &name) {
     if (!is_diagnostics_enabled()) {
         return;
     }
@@ -158,8 +153,7 @@ template <> void LinesCount::impl<mlir::ModuleOp>(const mlir::ModuleOp &op, cons
  * @param name
  */
 template <>
-void LinesCount::impl<mlir::Operation>(const mlir::Operation &op, const std::string &name)
-{
+void LinesCount::impl<mlir::Operation>(const mlir::Operation &op, const std::string &name) {
     if (!is_diagnostics_enabled()) {
         return;
     }

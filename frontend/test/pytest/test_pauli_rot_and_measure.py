@@ -136,11 +136,7 @@ def test_pauli_rot_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    with pytest.raises(
-        ValueError,
-        match=r"The given Pauli word \"A\" contains characters that are not allowed. "
-        r"Allowed characters are I, X, Y and Z",
-    ):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit(pipelines=pipe, target="mlir", capture=True)
         def test_pauli_rot_to_ppr_pauli_word_error_workflow():
@@ -151,15 +147,19 @@ def test_pauli_rot_to_ppr_pauli_word_error():
 
             return f()
 
+    with pytest.raises(
+        ValueError,
+        match=r"The given Pauli word \"A\" contains characters that are not allowed. "
+        r"Allowed characters are I, X, Y and Z",
+    ):
+        test_pauli_rot_to_ppr_pauli_word_error_workflow()
+
 
 def test_pauli_measure_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    with pytest.raises(
-        ValueError,
-        match=r"Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.",
-    ):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit(pipelines=pipe, target="mlir", capture=True)
         def test_pauli_measure_to_ppr_pauli_word_error_workflow():
@@ -169,6 +169,12 @@ def test_pauli_measure_to_ppr_pauli_word_error():
                 qp.pauli_measure("A", wires=0)
 
             return f()
+
+    with pytest.raises(
+        ValueError,
+        match=r"Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.",
+    ):
+        test_pauli_measure_to_ppr_pauli_word_error_workflow()
 
 
 def test_controlled_pauli_rot_failure():

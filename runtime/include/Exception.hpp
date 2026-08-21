@@ -66,8 +66,7 @@ class RuntimeException : public std::exception {
     RuntimeException &operator=(const RuntimeException &) = delete;
     RuntimeException &operator=(RuntimeException &&) = delete;
 
-    [[nodiscard]] auto what() const noexcept -> const char * override
-    {
+    [[nodiscard]] auto what() const noexcept -> const char * override {
         return err_msg.c_str();
     } // LCOV_EXCL_LINE
 };
@@ -78,8 +77,7 @@ class RuntimeException : public std::exception {
  * @note This is not supposed to be called directly.
  */
 [[noreturn]] inline void _abort(const char *message, const char *file_name, size_t line,
-                                const char *function_name)
-{
+                                const char *function_name) {
     std::stringstream sstream;
     sstream << "[" << file_name << ":" << line << "][Function:" << function_name
             << "] Error in Catalyst Runtime: " << message;

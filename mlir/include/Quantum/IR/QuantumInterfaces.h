@@ -16,8 +16,11 @@
 
 #include <string>
 
-#include "mlir/IR/OpDefinition.h" // for QuantumInterfaces.h..inc
+#include "llvm/ADT/StringMap.h"   // for DecomposableGate interface
+#include "mlir/IR/OpDefinition.h" // for QuantumInterfaces.h.inc
 #include "mlir/IR/Operation.h"
+
+#include "Catalyst/Analysis/ResourceInterfaces.h"
 
 //===----------------------------------------------------------------------===//
 // Quantum interface declarations.

@@ -30,6 +30,7 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -46,8 +47,7 @@ namespace {
  * @brief Helper to create a chain of parameter-less single qubit quantum custom gates.
  */
 Value createGateChain(PatternRewriter &rewriter, Location loc, Value qbitIn,
-                      ArrayRef<StringRef> gateNames, bool isAdjoint = false)
-{
+                      ArrayRef<StringRef> gateNames, bool isAdjoint = false) {
     auto qbitType = QubitType::get(rewriter.getContext());
     Value currentQbit = qbitIn;
 
@@ -74,8 +74,7 @@ Value createGateChain(PatternRewriter &rewriter, Location loc, Value qbitIn,
  * @brief Populates the scf.index_switch op for the Clifford+T basis.
  */
 void populateCliffordTSwitchCases(PatternRewriter &rewriter, Location loc,
-                                  scf::IndexSwitchOp switchOp, Value qbitIn)
-{
+                                  scf::IndexSwitchOp switchOp, Value qbitIn) {
     static StringRef gates0[] = {"T"};
     static StringRef gates1[] = {"Hadamard", "T"};
     static StringRef gates2[] = {"S", "Hadamard", "T"};
@@ -127,8 +126,7 @@ void populateCliffordTSwitchCases(PatternRewriter &rewriter, Location loc,
  * Maps the new enum (I, X2...adjZ8) to PPRotationOps.
  */
 void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
-                                 scf::IndexSwitchOp switchOp, Value qbitIn)
-{
+                                 scf::IndexSwitchOp switchOp, Value qbitIn) {
     // Helper to create a single PPRotationOp directly on the qubit.
     auto createPPROp = [&](OpBuilder &builder, ArrayRef<StringRef> pauliWord, int8_t rotationKind,
                            bool isAdjoint, Value currentQbit) -> Value {
@@ -197,8 +195,7 @@ struct DecompositionExternalFuncs {
     func::FuncOp getPhase;
 };
 
-DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, func::FuncOp func)
-{
+DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, func::FuncOp func) {
     auto f64Type = rewriter.getF64Type();
     auto i1Type = rewriter.getI1Type();
     auto indexType = rewriter.getIndexType();
@@ -226,8 +223,7 @@ DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, 
  * @brief Builds the main loop that iterates over the gate sequence and applies the quantum gates.
  */
 Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbitIn,
-                             Value gatesMemref, Value numGates, double epsilon, bool pprBasis)
-{
+                             Value gatesMemref, Value numGates, double epsilon, bool pprBasis) {
     auto qbitType = QubitType::get(rewriter.getContext());
     Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
     Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
@@ -239,7 +235,7 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
     // Add attribute to the for op to indicate the estimated iterations of the loop
     auto estimatedRanges = static_cast<int64_t>(std::ceil(10 * std::log2(1 / epsilon)));
     auto estimatedRangesAttr = rewriter.getI16IntegerAttr(estimatedRanges);
-    forOp->setAttr("estimated_iterations", estimatedRangesAttr);
+    forOp->setAttr(catalyst::EstimatedIterationsAttrName, estimatedRangesAttr);
 
     {
         OpBuilder::InsertionGuard loopGuard(rewriter);
@@ -267,8 +263,7 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
         // Populate Switch Cases
         if (pprBasis) {
             populatePPRBasisSwitchCases(rewriter, loc, switchOp, currentQbit);
-        }
-        else {
+        } else {
             populateCliffordTSwitchCases(rewriter, loc, switchOp, currentQbit);
         }
 
@@ -286,8 +281,7 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
  * This function contains the loop and switch logic acting on a Qubit.
  */
 func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewriter,
-                                          double epsilon, bool pprBasis)
-{
+                                          double epsilon, bool pprBasis) {
     StringRef funcName = pprBasis ? "__catalyst_decompose_RZ_ppr_basis" : "__catalyst_decompose_RZ";
 
     // Check if it exists
@@ -368,12 +362,9 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
     const bool pprBasis;
 
     DecomposeCustomOpPattern(MLIRContext *context, double epsilon, bool pprBasis)
-        : OpRewritePattern<CustomOp>(context), epsilon(epsilon), pprBasis(pprBasis)
-    {
-    }
+        : OpRewritePattern<CustomOp>(context), epsilon(epsilon), pprBasis(pprBasis) {}
 
-    LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override {
         StringRef gateName = op.getGateName();
         bool isRZ = gateName == "RZ";
         bool isPhaseShift = gateName == "PhaseShift";
@@ -407,8 +398,7 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
             Value c2 = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0));
             Value halfAngle = arith::DivFOp::create(rewriter, loc, angle, c2);
             finalPhase = arith::SubFOp::create(rewriter, loc, runtimePhase, halfAngle);
-        }
-        else {
+        } else {
             finalPhase = runtimePhase;
         }
 
@@ -435,13 +425,10 @@ struct DecomposePPRArbitraryOpPattern
 
     DecomposePPRArbitraryOpPattern(MLIRContext *context, double epsilon, bool pprBasis)
         : OpRewritePattern<catalyst::pbc::PPRotationArbitraryOp>(context), epsilon(epsilon),
-          pprBasis(pprBasis)
-    {
-    }
+          pprBasis(pprBasis) {}
 
     LogicalResult matchAndRewrite(catalyst::pbc::PPRotationArbitraryOp op,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         if (op.getPauliProduct() != rewriter.getStrArrayAttr({"Z"})) {
             return failure();
         }
@@ -486,8 +473,7 @@ struct DecomposePPRArbitraryOpPattern
 namespace catalyst {
 namespace quantum {
 
-void populateGridsynthPatterns(RewritePatternSet &patterns, double epsilon, bool pprBasis)
-{
+void populateGridsynthPatterns(RewritePatternSet &patterns, double epsilon, bool pprBasis) {
     patterns.add<DecomposeCustomOpPattern>(patterns.getContext(), epsilon, pprBasis);
     patterns.add<DecomposePPRArbitraryOpPattern>(patterns.getContext(), epsilon, pprBasis);
 }

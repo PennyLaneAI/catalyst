@@ -28,8 +28,7 @@ using namespace catalyst::executor;
 
 #include "Executor/IR/ExecutorOpsDialect.cpp.inc"
 
-void catalyst::executor::ExecutorDialect::initialize()
-{
+void catalyst::executor::ExecutorDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "Executor/IR/ExecutorOpsTypes.cpp.inc"

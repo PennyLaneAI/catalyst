@@ -53,6 +53,13 @@ const PipelineList pipelineList{
       // this into something else.
       "inline-nested-module",
       "lower-mitigation",
+      // Reduce `quantum.ctrl`/`quantum.adjoint` regions to op-level modifiers.
+      // Nested regions (e.g. `ctrl(adjoint(...))`) require alternating the two
+      // passes: `ctrl-lowering` defers on a nested adjoint region,
+      // `adjoint-lowering` reduces it, then `ctrl-lowering` runs again.
+      "ctrl-lowering",
+      "adjoint-lowering",
+      "ctrl-lowering",
       "adjoint-lowering",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",
@@ -62,6 +69,8 @@ const PipelineList pipelineList{
      {"canonicalize",
       "func.func(chlo-legalize-to-stablehlo)",
       "func.func(stablehlo-legalize-control-flow)",
+      // builtin.module is added to support nested modules 
+      "builtin.module(func.func(stablehlo-legalize-control-flow))", 
       "func.func(stablehlo-aggressive-simplification)",
       "stablehlo-legalize-to-linalg",
       "func.func(stablehlo-legalize-to-std)",
@@ -168,8 +177,7 @@ const PipelineList pipelineList{
       "register-inactive-callback"}}};
 // clang-format on
 
-PipelineNames getPipelineNames()
-{
+inline PipelineNames getPipelineNames() {
     static std::vector<std::string> names =
         std::accumulate(driver::pipelineList.begin(), driver::pipelineList.end(),
                         std::vector<std::string>{}, [](auto acc, const auto &pipelineInfo) {
@@ -179,8 +187,7 @@ PipelineNames getPipelineNames()
     return names;
 }
 
-PassNames getQuantumCompilationStage(bool disableAssertion = true)
-{
+inline PassNames getQuantumCompilationStage(bool disableAssertion = true) {
     PassNames ret;
     std::copy_if(pipelineList[0].passNames.begin(), pipelineList[0].passNames.end(),
                  std::back_inserter(ret), [&disableAssertion](const auto &passName) {
@@ -189,12 +196,11 @@ PassNames getQuantumCompilationStage(bool disableAssertion = true)
     return ret;
 }
 
-PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
+inline PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
 
-PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
+inline PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
 
-PassNames getBufferizationStage(bool asyncQNodes = false)
-{
+inline PassNames getBufferizationStage(bool asyncQNodes = false) {
     const std::string bufferizationOptions =
         std::string("{bufferize-function-boundaries ") + "allow-return-allocs-from-loops " +
         "function-boundary-type-conversion=identity-layout-map " +
@@ -211,8 +217,7 @@ PassNames getBufferizationStage(bool asyncQNodes = false)
     return ret;
 }
 
-PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false)
-{
+inline PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false) {
     PassNames ret;
     std::copy_if(pipelineList[4].passNames.begin(), pipelineList[4].passNames.end(),
                  std::back_inserter(ret), [&asyncQNodes](const auto &passName) {

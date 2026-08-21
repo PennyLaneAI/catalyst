@@ -38,8 +38,8 @@ func.func @send_binary() {
 func.func @launch(%arg0: memref<f64>) -> memref<f64> {
   // CHECK: %[[S:.*]] = executor.open("127.0.0.1:9000") : !executor.session
   %s = executor.open("127.0.0.1:9000") : !executor.session
-  // CHECK: executor.launch %[[S]]("qnode_0") (%{{.*}}) : !executor.session, (memref<f64>) -> memref<f64>
-  %0 = executor.launch %s("qnode_0") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
+  // CHECK: executor.launch %[[S]]("qnode_0", "/tmp/qnode.o") (%{{.*}}) : !executor.session, (memref<f64>) -> memref<f64>
+  %0 = executor.launch %s("qnode_0", "/tmp/qnode.o") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
   return %0 : memref<f64>
 }
 
@@ -68,6 +68,38 @@ func.func @close() {
 
 // -----
 
+// A `()->()` entry dispatched fire-and-forget yields a token, joined by executor.await.
+// CHECK-LABEL: func.func @launch_async
+func.func @launch_async() {
+  // CHECK: %[[S:.*]] = executor.open("127.0.0.1:9000") : !executor.session
+  %s = executor.open("127.0.0.1:9000") : !executor.session
+  // CHECK: %[[T:.*]] = executor.launch_async %[[S]]("serve", "/tmp/coproc.o") : !executor.session -> !executor.token
+  %t = executor.launch_async %s("serve", "/tmp/coproc.o") : !executor.session -> !executor.token
+  // CHECK: executor.await %[[T]] : !executor.token
+  executor.await %t : !executor.token
+  executor.close %s : !executor.session
+  return
+}
+
+// -----
+
+// Two async launches on one session yield two distinct tokens, each awaited independently.
+// CHECK-LABEL: func.func @launch_async_two
+func.func @launch_async_two() {
+  %s = executor.open("127.0.0.1:9000") : !executor.session
+  // CHECK: %[[T0:.*]] = executor.launch_async %{{.*}}("serve_0"
+  %t0 = executor.launch_async %s("serve_0", "/tmp/coproc.o") : !executor.session -> !executor.token
+  // CHECK: %[[T1:.*]] = executor.launch_async %{{.*}}("serve_1"
+  %t1 = executor.launch_async %s("serve_1", "/tmp/coproc.o") : !executor.session -> !executor.token
+  // CHECK: executor.await %[[T0]] : !executor.token
+  executor.await %t0 : !executor.token
+  // CHECK: executor.await %[[T1]] : !executor.token
+  executor.await %t1 : !executor.token
+  return
+}
+
+// -----
+
 // A single session handle chains open -> send -> launch -> close, and may be launched on more than
 // once.
 // CHECK-LABEL: func.func @session_lifecycle
@@ -75,8 +107,8 @@ func.func @session_lifecycle(%arg0: memref<f64>) -> memref<f64> {
   // CHECK: %[[S:.*]] = executor.open("127.0.0.1:9000") : !executor.session
   %s = executor.open("127.0.0.1:9000") : !executor.session
   executor.send_binary %s("/tmp/qnode_0.o") : !executor.session
-  %0 = executor.launch %s("qnode_0") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
-  %1 = executor.launch %s("qnode_0") (%0) : !executor.session, (memref<f64>) -> memref<f64>
+  %0 = executor.launch %s("qnode_0", "/tmp/qnode_0.o") (%arg0) : !executor.session, (memref<f64>) -> memref<f64>
+  %1 = executor.launch %s("qnode_0", "/tmp/qnode_0.o") (%0) : !executor.session, (memref<f64>) -> memref<f64>
   executor.close %s : !executor.session
   return %1 : memref<f64>
 }

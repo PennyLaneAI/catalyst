@@ -345,7 +345,7 @@ class TestSplitNonCommutingWires:
             qp.RX(0.3, wires=0)
             qp.RY(0.5, wires=1)
             qp.RX(0.7, wires=2)
-            return qp.expval(qp.Z(0) + qp.X(1) + 2 * qp.Y(2))
+            return qp.expval(qp.sum(qp.Z(0), qp.X(1), qp.s_prod(2, qp.Y(2))))
 
         circ_split = qjit(self.snc_pass(circ), capture=capture_mode)
         circ_ref = qjit(circ, capture=capture_mode)

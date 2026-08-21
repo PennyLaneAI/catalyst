@@ -85,8 +85,7 @@ class BaseSignatureAnalyzer {
                               .inWireIndices = {},
                               .inCtrlWireIndices = {},
                               .outQubitIndices = {},
-                              .outCtrlQubitIndices = {}})
-    {
+                              .outCtrlQubitIndices = {}}) {
         initializeQregMode(op, enableQregMode);
     }
 
@@ -104,8 +103,7 @@ class BaseSignatureAnalyzer {
                               .inWireIndices = {},
                               .inCtrlWireIndices = {},
                               .outQubitIndices = {},
-                              .outCtrlQubitIndices = {}})
-    {
+                              .outCtrlQubitIndices = {}}) {
         initializeQregMode(op, enableQregMode);
     }
 
@@ -117,22 +115,18 @@ class BaseSignatureAnalyzer {
 
     // Returns true if lateQreg is a later qreg in an insert chain from earlyQreg
     // Raise an error if both qregs are rooted at different allocations.
-    bool isDescendantQreg(Value lateQreg, Value earlyQreg, quantum::AllocOp earlyQregRootAlloc)
-    {
+    bool isDescendantQreg(Value lateQreg, Value earlyQreg, quantum::AllocOp earlyQregRootAlloc) {
         while (lateQreg != earlyQreg) {
             if (auto insertOp = lateQreg.getDefiningOp<quantum::InsertOp>()) {
                 lateQreg = insertOp.getInQreg();
-            }
-            else if (auto adjointOp = lateQreg.getDefiningOp<quantum::AdjointOp>()) {
+            } else if (auto adjointOp = lateQreg.getDefiningOp<quantum::AdjointOp>()) {
                 OpResult lateQregAsAdjointResult = cast<OpResult>(lateQreg);
                 lateQreg = adjointOp.getOperand(lateQregAsAdjointResult.getResultNumber());
-            }
-            else if (auto allocOp = lateQreg.getDefiningOp<quantum::AllocOp>()) {
+            } else if (auto allocOp = lateQreg.getDefiningOp<quantum::AllocOp>()) {
                 assert(allocOp == earlyQregRootAlloc &&
                        "The qreg of the input wires should be the same");
                 return false;
-            }
-            else {
+            } else {
                 llvm_unreachable("Encountered unknown operation. A quantum register value can only "
                                  "be produced by alloc, insert and adjoint ops.");
             }
@@ -140,8 +134,7 @@ class BaseSignatureAnalyzer {
         return true;
     }
 
-    Value getUpdatedQreg(PatternRewriter &rewriter, Location loc)
-    {
+    Value getUpdatedQreg(PatternRewriter &rewriter, Location loc) {
         // FIXME: This will cause an issue when the decomposition function has cross-qreg
         // inputs and outputs. Now, we just assume has only one qreg input, the global one exists.
         // raise an error if the qreg is not the same
@@ -169,13 +162,11 @@ class BaseSignatureAnalyzer {
             if (auto insertOp = allocFinder.getDefiningOp<quantum::InsertOp>()) {
                 allocFinder = insertOp.getInQreg();
                 continue;
-            }
-            else if (auto adjointOp = allocFinder.getDefiningOp<quantum::AdjointOp>()) {
+            } else if (auto adjointOp = allocFinder.getDefiningOp<quantum::AdjointOp>()) {
                 OpResult lateQregAsAdjointResult = cast<OpResult>(allocFinder);
                 allocFinder = adjointOp.getOperand(lateQregAsAdjointResult.getResultNumber());
                 continue;
-            }
-            else if (auto allocOp = allocFinder.getDefiningOp<quantum::AllocOp>()) {
+            } else if (auto allocOp = allocFinder.getDefiningOp<quantum::AllocOp>()) {
                 rootAllocOp = allocOp;
                 break;
             }
@@ -200,8 +191,7 @@ class BaseSignatureAnalyzer {
     // 2. qubit mode:
     //    - func(param*, inQubits*, inCtrlQubits*?, inCtrlValues*?) -> outQubits*
     llvm::SmallVector<Value> prepareOperands(func::FuncOp rule, PatternRewriter &rewriter,
-                                             Location loc)
-    {
+                                             Location loc) {
         auto funcType = rule.getFunctionType();
         auto funcInputs = funcType.getInputs();
 
@@ -239,8 +229,7 @@ class BaseSignatureAnalyzer {
                     operandIdx++;
                 }
             }
-        }
-        else {
+        } else {
             for (auto inQubit : signature.inQubits) {
                 operands[operandIdx] =
                     fromTensorOrAsIs(inQubit, funcInputsNoQreg[operandIdx], rewriter, loc);
@@ -277,8 +266,7 @@ class BaseSignatureAnalyzer {
     }
 
     // Prepare the results produced by a qreg-mode decomposition rule
-    SmallVector<Value> prepareResultsForQreg(Value qreg, Location loc, PatternRewriter &rewriter)
-    {
+    SmallVector<Value> prepareResultsForQreg(Value qreg, Location loc, PatternRewriter &rewriter) {
         assert(isa<quantum::QuregType>(qreg.getType()) && "only allow to have qreg result");
 
         SmallVector<Value> newResults;
@@ -296,16 +284,14 @@ class BaseSignatureAnalyzer {
     }
 
   private:
-    Value fromTensorOrAsIs(ValueRange values, Type type, PatternRewriter &rewriter, Location loc)
-    {
+    Value fromTensorOrAsIs(ValueRange values, Type type, PatternRewriter &rewriter, Location loc) {
         if (isa<RankedTensorType>(type)) {
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
         return values.front();
     }
 
-    static size_t getElementsCount(Type type)
-    {
+    static size_t getElementsCount(Type type) {
         if (isa<RankedTensorType>(type)) {
             auto tensorType = cast<RankedTensorType>(type);
             return tensorType.getNumElements() > 0 ? tensorType.getNumElements() : 1;
@@ -315,8 +301,7 @@ class BaseSignatureAnalyzer {
 
     // Helper function to find the range of function input types that correspond to params
     static std::pair<size_t, size_t> findParamTypeRange(ArrayRef<Type> funcInputs,
-                                                        size_t sigParamCount, size_t startIdx = 0)
-    {
+                                                        size_t sigParamCount, size_t startIdx = 0) {
         size_t paramTypeCount = 0;
         size_t paramTypeEnd = startIdx;
 
@@ -335,8 +320,7 @@ class BaseSignatureAnalyzer {
 
     // generate params for the decomposition function based on function type requirements
     SmallVector<Value> generateParams(ValueRange signatureParams, ArrayRef<Type> funcParamTypes,
-                                      PatternRewriter &rewriter, Location loc)
-    {
+                                      PatternRewriter &rewriter, Location loc) {
         SmallVector<Value> operands;
         size_t sigParamIdx = 0;
 
@@ -355,14 +339,12 @@ class BaseSignatureAnalyzer {
     }
 
     Value fromTensorOrAsIs(ArrayRef<QubitIndex> indices, Type type, PatternRewriter &rewriter,
-                           Location loc)
-    {
+                           Location loc) {
         SmallVector<Value> values;
         for (const QubitIndex &index : indices) {
             if (index.isValue()) {
                 values.emplace_back(index.getValue());
-            }
-            else if (index.isAttr()) {
+            } else if (index.isAttr()) {
                 auto attr = index.getAttr();
                 auto constantValue = arith::ConstantOp::create(rewriter, loc, attr.getType(), attr);
                 values.emplace_back(constantValue);
@@ -377,8 +359,7 @@ class BaseSignatureAnalyzer {
         return values.front();
     }
 
-    void initializeQregMode(mlir::Operation *op, bool enableQregMode)
-    {
+    void initializeQregMode(mlir::Operation *op, bool enableQregMode) {
         if (!enableQregMode || !op) {
             return;
         }
@@ -425,9 +406,7 @@ class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
                                     : mlir::ValueRange{},
                                 op.getNonCtrlQubitOperands(), op.getCtrlQubitOperands(),
                                 op.getCtrlValueOperands(), op.getNonCtrlQubitResults(),
-                                op.getCtrlQubitResults(), enableQregMode)
-    {
-    }
+                                op.getCtrlQubitResults(), enableQregMode) {}
 };
 
 } // namespace quantum

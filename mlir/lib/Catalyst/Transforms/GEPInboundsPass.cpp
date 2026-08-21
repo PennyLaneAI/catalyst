@@ -33,8 +33,7 @@ namespace catalyst {
 struct GEPInboundsPass : impl::GEPInboundsPassBase<GEPInboundsPass> {
     using GEPInboundsPassBase::GEPInboundsPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "GEP inbounds pass"
                           << "\n");
 

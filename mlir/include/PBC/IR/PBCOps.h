@@ -22,6 +22,7 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+#include "Catalyst/Analysis/ResourceInterfaces.h"
 #include "PBC/IR/PBCOpInterfaces.h"
 
 //===----------------------------------------------------------------------===//

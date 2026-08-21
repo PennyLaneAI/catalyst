@@ -33,6 +33,7 @@ set(TEST_SUITES
     RTIO
     QecLogical
     QecPhysical
+    Transport
 )
 
 

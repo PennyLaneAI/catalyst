@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <dlfcn.h>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -25,6 +26,7 @@
 #include <tuple>
 #include <unordered_set>
 
+#include "DataView.hpp"
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
@@ -42,8 +44,7 @@ class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
   public:
     explicit MemoryManager() { _impl.reserve(1024); };
 
-    ~MemoryManager()
-    {
+    ~MemoryManager() {
         // Lock the mutex to protect _impl free
         std::lock_guard<std::mutex> lock(mu);
         for (auto *allocation : _impl) {
@@ -51,20 +52,17 @@ class MemoryManager // NOLINT(cppcoreguidelines-special-member-functions,
         }
     }
 
-    void insert(void *ptr)
-    {
+    void insert(void *ptr) {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
         _impl.insert(ptr);
     }
-    void erase(void *ptr)
-    {
+    void erase(void *ptr) {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
         _impl.erase(ptr);
     }
-    bool contains(void *ptr)
-    {
+    bool contains(void *ptr) {
         // Lock the mutex to protect _impl update
         std::lock_guard<std::mutex> lock(mu);
         return _impl.contains(ptr);
@@ -77,23 +75,50 @@ class SharedLibraryManager final {
 
   public:
     SharedLibraryManager() = delete;
-    explicit SharedLibraryManager(const std::string &filename)
-    {
+    explicit SharedLibraryManager(const std::string &filename) {
 #ifdef __APPLE__
         auto rtld_flags = RTLD_LAZY;
+        constexpr const char *dl_ext = ".dylib";
 #else
         // Closing the dynamic library of Lightning simulators with dlclose() where OpenMP
         // directives (in Lightning simulators) are in use would raise memory segfaults.
         // Note that we use RTLD_NODELETE as a workaround to fix the issue.
         auto rtld_flags = RTLD_LAZY | RTLD_NODELETE;
+        constexpr const char *dl_ext = ".so";
 #endif
 
-        _handler = dlopen(filename.c_str(), rtld_flags);
-        RT_FAIL_IF(!_handler, dlerror());
+        // Normalize to the platform-native extension up front.
+        std::filesystem::path path(filename);
+        auto name = path.filename().string();
+        if (!name.ends_with(dl_ext)) {
+            auto dot = name.find_last_of('.');
+            if (dot != std::string::npos) {
+                name.resize(dot);
+            }
+            name += dl_ext;
+            path = path.has_parent_path() ? path.parent_path() / name : std::filesystem::path(name);
+        }
+
+        const std::string candidate = path.string();
+        _handler = dlopen(candidate.c_str(), rtld_flags);
+        if (_handler) {
+            return;
+        }
+
+        // dlerror() is destructive: capture before any further use.
+        const char *primary_dlerror = dlerror();
+        std::string primary_error = primary_dlerror ? primary_dlerror : "unknown dlopen error";
+
+        // retry with basename via the loader search path.
+        if (path.has_parent_path()) {
+            _handler = dlopen(name.c_str(), rtld_flags);
+        }
+
+        const std::string err = "dlopen failed to load " + filename + ": " + primary_error;
+        RT_FAIL_IF(!_handler, err.c_str());
     }
 
-    ~SharedLibraryManager()
-    {
+    ~SharedLibraryManager() {
         // dlopen and dlclose increment and decrement reference counters.
         // Since we have a guaranteed _handler in a valid SharedLibraryManager instance
         // then we don't really need to worry about dlclose.
@@ -126,8 +151,7 @@ class SharedLibraryManager final {
     SharedLibraryManager(SharedLibraryManager &&other) = delete;
     SharedLibraryManager &operator=(SharedLibraryManager &&other) = delete;
 
-    void *getSymbol(const std::string &symbol)
-    {
+    void *getSymbol(const std::string &symbol) {
         void *sym = dlsym(_handler, symbol.c_str());
         RT_FAIL_IF(!sym, dlerror());
         return sym;
@@ -170,8 +194,8 @@ class RTDevice {
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
 
-    static void _complete_dylib_os_extension(std::string &rtd_lib, const std::string &name) noexcept
-    {
+    static void _complete_dylib_os_extension(std::string &rtd_lib,
+                                             const std::string &name) noexcept {
 #ifdef __linux__
         rtd_lib = "librtd_" + name + ".so";
 #elif defined(__APPLE__)
@@ -179,8 +203,7 @@ class RTDevice {
 #endif
     }
 
-    static void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept
-    {
+    static void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept {
         // The following if-elif is required for C++ tests where these backend devices
         // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
         // Besides, this provides support for runtime device (RTD) libraries added to the system
@@ -189,16 +212,13 @@ class RTDevice {
         if (rtd_lib == "null.qubit") {
             rtd_name = "NullQubit";
             _complete_dylib_os_extension(rtd_lib, "null_qubit");
-        }
-        else if (rtd_lib == "lightning.qubit") {
+        } else if (rtd_lib == "lightning.qubit") {
             rtd_name = "LightningSimulator";
             _complete_dylib_os_extension(rtd_lib, "lightning");
-        }
-        else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
+        } else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
             rtd_name = "OpenQasmDevice";
             _complete_dylib_os_extension(rtd_lib, "openqasm");
-        }
-        else if (rtd_lib == "oqd.qubit") {
+        } else if (rtd_lib == "oqd.qubit") {
             rtd_name = "oqd";
             _complete_dylib_os_extension(rtd_lib, "oqd_device");
         }
@@ -208,16 +228,14 @@ class RTDevice {
     explicit RTDevice(std::string _rtd_lib, std::string _rtd_name = {},
                       std::string _rtd_kwargs = {}, bool _auto_qubit_management = false)
         : rtd_lib(std::move(_rtd_lib)), rtd_name(std::move(_rtd_name)),
-          rtd_kwargs(std::move(_rtd_kwargs)), auto_qubit_management(_auto_qubit_management)
-    {
+          rtd_kwargs(std::move(_rtd_kwargs)), auto_qubit_management(_auto_qubit_management) {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
     explicit RTDevice(std::string_view _rtd_lib, std::string_view _rtd_name,
                       std::string_view _rtd_kwargs, bool _auto_qubit_management)
         : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs),
-          auto_qubit_management(_auto_qubit_management)
-    {
+          auto_qubit_management(_auto_qubit_management) {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
@@ -227,15 +245,13 @@ class RTDevice {
     RTDevice(RTDevice &&other) = delete;
     RTDevice &operator=(RTDevice &&other) = delete;
 
-    auto operator==(const RTDevice &other) const -> bool
-    {
+    auto operator==(const RTDevice &other) const -> bool {
         return (this->rtd_lib == other.rtd_lib && this->rtd_name == other.rtd_name) &&
                this->rtd_kwargs == other.rtd_kwargs &&
                this->auto_qubit_management == other.auto_qubit_management;
     }
 
-    [[nodiscard]] auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> &
-    {
+    [[nodiscard]] auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> & {
         if (rtd_qdevice) {
             return rtd_qdevice;
         }
@@ -251,8 +267,7 @@ class RTDevice {
     }
 
     [[nodiscard]] auto getDeviceInfo() const
-        -> std::tuple<std::string, std::string, std::string, bool>
-    {
+        -> std::tuple<std::string, std::string, std::string, bool> {
         return {rtd_lib, rtd_name, rtd_kwargs, auto_qubit_management};
     }
 
@@ -264,8 +279,7 @@ class RTDevice {
 
     [[nodiscard]] auto getDeviceStatus() const -> RTDeviceStatus { return status; }
 
-    friend std::ostream &operator<<(std::ostream &os, const RTDevice &device)
-    {
+    friend std::ostream &operator<<(std::ostream &os, const RTDevice &device) {
         os << "RTD, name: " << device.rtd_name << " lib: " << device.rtd_lib
            << " kwargs: " << device.rtd_kwargs
            << "auto_qubit_management: " << device.auto_qubit_management;
@@ -292,8 +306,7 @@ class ExecutionContext final {
     std::mt19937 foldGen;
 
   public:
-    explicit ExecutionContext(uint32_t *seed = nullptr) : seed(seed)
-    {
+    explicit ExecutionContext(uint32_t *seed = nullptr) : seed(seed) {
         memory_man_ptr = std::make_unique<MemoryManager>();
 
         if (this->seed != nullptr) {
@@ -301,8 +314,7 @@ class ExecutionContext final {
             // Derive a decoupled (but reproducible) stream for folding.
             std::seed_seq foldSeq{static_cast<uint32_t>(*seed), static_cast<uint32_t>(0x9e3779b9U)};
             this->foldGen = std::mt19937(foldSeq);
-        }
-        else {
+        } else {
             // No user seed: make folding non-deterministic across runs.
             this->foldGen = std::mt19937(std::random_device{}());
         }
@@ -316,28 +328,24 @@ class ExecutionContext final {
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
 
-    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool
-    {
+    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool {
         return initial_tape_recorder_status;
     }
 
-    [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> &
-    {
+    [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> & {
         return memory_man_ptr;
     }
 
     // Uniform random number in [0, 1) from the dedicated folding PRNG (used by
     // ZNE random local folding). Decoupled from the measurement-readout stream.
-    [[nodiscard]] double getRandomNumber()
-    {
+    [[nodiscard]] double getRandomNumber() {
         std::uniform_real_distribution<double> distribution(0.0, 1.0);
         return distribution(foldGen);
     }
 
     [[nodiscard]] auto getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,
                                          std::string_view rtd_kwargs, bool auto_qubit_management)
-        -> const std::shared_ptr<RTDevice> &
-    {
+        -> const std::shared_ptr<RTDevice> & {
         std::lock_guard<std::mutex> lock(pool_mu);
 
         auto device =
@@ -358,8 +366,7 @@ class ExecutionContext final {
         device->setDeviceStatus(RTDeviceStatus::Active);
         if (this->seed != nullptr) {
             device->getQuantumDevicePtr()->SetDevicePRNG(&(this->gen));
-        }
-        else {
+        } else {
             device->getQuantumDevicePtr()->SetDevicePRNG(nullptr);
         }
         device_pool.push_back(device);
@@ -370,21 +377,18 @@ class ExecutionContext final {
     [[nodiscard]] auto
     getOrCreateDevice(const std::string &rtd_lib, const std::string &rtd_name = {},
                       const std::string &rtd_kwargs = {}, bool auto_qubit_management = false)
-        -> const std::shared_ptr<RTDevice> &
-    {
+        -> const std::shared_ptr<RTDevice> & {
         return getOrCreateDevice(std::string_view{rtd_lib}, std::string_view{rtd_name},
                                  std::string_view{rtd_kwargs}, auto_qubit_management);
     }
 
-    [[nodiscard]] auto getDevice(size_t device_key) -> const std::shared_ptr<RTDevice> &
-    {
+    [[nodiscard]] auto getDevice(size_t device_key) -> const std::shared_ptr<RTDevice> & {
         std::lock_guard<std::mutex> lock(pool_mu);
         RT_FAIL_IF(device_key >= device_pool.size(), "Invalid device_key");
         return device_pool[device_key];
     }
 
-    void deactivateDevice(RTDevice *RTD_PTR)
-    {
+    void deactivateDevice(RTDevice *RTD_PTR) {
         std::lock_guard<std::mutex> lock(pool_mu);
         RTD_PTR->setDeviceStatus(RTDeviceStatus::Inactive);
     }

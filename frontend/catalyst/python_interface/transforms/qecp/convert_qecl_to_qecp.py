@@ -49,6 +49,7 @@ from xdsl.dialects.builtin import (
     ArrayAttr,
     DenseArrayBase,
     IndexType,
+    StringAttr,
     SymbolRefAttr,
     TensorType,
     i1,
@@ -1322,6 +1323,7 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
             esm=pack_mres_tensor_op.result,
             err_idx_type=TensorType(IndexType(), shape=(num_correctable_errors,)),
         )
+        decode_esm_op.properties["check_type"] = StringAttr(check_type.value.lower())
 
         # Apply correction(s)
         err_indices = cast(OpResult[TensorType[IndexType]], decode_esm_op.err_idx)

@@ -29,4 +29,31 @@ def ConvertTransportToLLVMPass : Pass<"convert-transport-to-llvm", "mlir::Module
     ];
 }
 
+def InjectTransportSessionPass : Pass<"inject-transport-session", "mlir::ModuleOp"> {
+    let summary = "Emit transport session bring-up/teardown from a catalyst.backline attribute.";
+    let description = [{
+        Reads the `catalyst.backline` module attribute and injects the session
+        lifecycle into the host entry function.
+    }];
+
+    let dependentDialects = [
+        "::catalyst::transport::TransportDialect",
+        "mlir::func::FuncDialect"
+    ];
+}
+
+def LowerDecodeToTransportPass : Pass<"lower-decode-to-transport", "mlir::ModuleOp"> {
+    let summary = "Lower qecp decode ops to a transport post/collect round over their buffers.";
+    let description = [{
+        Replaces each bufferized `qecp.decode_esm_css` op with transport.get_session +
+        transport.post + transport.collect, offloading the decode to a backline coprocessor.
+        The pass is a no-op unless the module carries a `catalyst.backline` attribute declaring at
+        least one coprocessor
+    }];
+
+    let dependentDialects = [
+        "::catalyst::transport::TransportDialect"
+    ];
+}
+
 #endif // TRANSPORT_PASSES

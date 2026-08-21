@@ -29,24 +29,25 @@ using namespace catalyst::transport;
 using namespace catalyst::transport::cpu_verbs;
 using namespace catalyst::transport::common; // DEMO_SYNDROME, REGION_BYTES
 
-static bool have_rxe()
-{
+static bool have_rxe() {
     int n = 0;
     ibv_device **devs = ibv_get_device_list(&n);
     bool found = false;
-    for (int i = 0; i < n; ++i)
-        if (std::string(ibv_get_device_name(devs[i])) == "rxe0")
+    for (int i = 0; i < n; i++) {
+        if (std::string(ibv_get_device_name(devs[i])) == "rxe0") {
             found = true;
-    if (devs)
+        }
+    }
+    if (devs) {
         ibv_free_device_list(devs);
+    }
     return found;
 }
 
 // A custom coprocessor function (bitwise-invert) to exercise the set_coprocessor_fn
 // path with a non-null, non-echo function.
 static std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
-                             void * /*ctx*/)
-{
+                             void * /*ctx*/) {
     std::uint64_t v = 0;
     std::memcpy(&v, in, std::min(in_len, sizeof(v)));
     v = ~v;
@@ -57,10 +58,10 @@ static std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std:
 
 TEST_CASE("controller and coprocessor connect: both reach INIT and open the "
           "OOB channel",
-          "[cpu_libibverbs]")
-{
-    if (!have_rxe())
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
+    }
     const std::uint16_t port = 18590;
     int coproc_rc = -99;
     std::thread t([&] {
@@ -82,10 +83,10 @@ TEST_CASE("controller and coprocessor connect: both reach INIT and open the "
     REQUIRE(coproc_rc == 0);
 }
 
-TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[cpu_libibverbs]")
-{
-    if (!have_rxe())
+TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[cpu_libibverbs]") {
+    if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
+    }
     const std::uint16_t port = 18591;
     const std::size_t SIZE = REGION_BYTES;
     std::uint32_t coproc_rkey = 0;
@@ -123,10 +124,11 @@ TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[c
     REQUIRE(coproc_peer_size == SIZE);
 }
 
-TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply", "[cpu_libibverbs]")
-{
-    if (!have_rxe())
+TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
+    }
     const std::uint16_t port = 18593;
     const std::size_t SIZE = REGION_BYTES;
     std::uint64_t coproc_got = 0;
@@ -140,7 +142,7 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
         MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam);
         PeerRef p = coproc.exchange_keys(m);
         ChannelDesc desc{
-            .data_path = "cpu_verbs",
+            .transport = "rdma",
         };
         coproc.establish_channel(desc, m, p);
         coproc.set_coprocessor_fn(nullptr, nullptr); // built-in echo
@@ -159,7 +161,7 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
     MemRegion m = controller.alloc_memory(SIZE, MemKind::CpuRam);
     PeerRef p = controller.exchange_keys(m);
     ChannelDesc desc{
-        .data_path = "cpu_verbs",
+        .transport = "rdma",
     };
     controller.establish_channel(desc, m, p);
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
@@ -179,10 +181,10 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
 }
 
 TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor",
-          "[cpu_libibverbs]")
-{
-    if (!have_rxe())
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
         SKIP("no rxe0 RDMA device");
+    }
     const std::uint16_t port = 18595;
     const std::size_t SIZE = REGION_BYTES;
     std::thread t([&] {
@@ -195,7 +197,7 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
         MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam);
         PeerRef p = coproc.exchange_keys(m);
         ChannelDesc desc{
-            .data_path = "cpu_verbs",
+            .transport = "rdma",
         };
         coproc.establish_channel(desc, m, p);
         coproc.set_coprocessor_fn(invert_fn, nullptr);
@@ -215,7 +217,7 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
     MemRegion m = controller.alloc_memory(SIZE, MemKind::CpuRam);
     PeerRef p = controller.exchange_keys(m);
     ChannelDesc desc{
-        .data_path = "cpu_verbs",
+        .transport = "rdma",
     };
     controller.establish_channel(desc, m, p);
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));

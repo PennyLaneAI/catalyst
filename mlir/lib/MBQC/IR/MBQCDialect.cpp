@@ -29,8 +29,7 @@ using namespace catalyst::mbqc;
 
 #include "MBQC/IR/MBQCOpsDialect.cpp.inc"
 
-void MBQCDialect::initialize()
-{
+void MBQCDialect::initialize() {
     /// Uncomment the lines below if defining types for the MBQC dialect
     //     addTypes<
     // #define GET_TYPEDEF_LIST

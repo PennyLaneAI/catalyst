@@ -217,6 +217,50 @@ func.func @test_adjoint_with_args(%r: !qref.reg<2>, %q: !qref.bit)
 
 // -----
 
+func.func @test_ctrl_op_no_MP(%q0: !qref.bit, %q1: !qref.bit, %r: !qref.reg<2>)
+{
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+
+    // expected-error@+1 {{quantum measurements are not allowed in the ctrl regions}}
+    qref.ctrl (%q0, %q1) ctrlvals (%true, %false){
+    ^bb0():
+        %0 = qref.get %r[0] : !qref.reg<2> -> !qref.bit
+        %obs = qref.namedobs %0 [ PauliX] : !quantum.obs
+        %expval = quantum.expval %obs : f64
+    }
+    return
+}
+
+// -----
+
+func.func @test_ctrl_with_args(%q0: !qref.bit, %q1: !qref.bit)
+{
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+
+    // expected-error@+1 {{qref.ctrl op must have no arguments on its block}}
+    qref.ctrl (%q0, %q1) ctrlvals (%true, %false){
+    ^bb0(%arg0: !qref.reg<2>):
+    }
+    return
+}
+
+// -----
+
+func.func @test_ctrl_num_mismatch(%q0: !qref.bit, %q1: !qref.bit)
+{
+    %true = llvm.mlir.constant (1 : i1) :i1
+
+    // expected-error@+1 {{Ctrl op number of control values must be the same as the number of control qubits}}
+    qref.ctrl (%q0, %q1) ctrlvals (%true){
+    ^bb0():
+    }
+    return
+}
+
+// -----
+
 func.func @test_hermitian_bad_matrix_shape(%q0: !qref.bit, %matrix: tensor<20x20xcomplex<f64>>) {
     // expected-error@+1 {{The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)}}
     %obs = qref.hermitian(%matrix : tensor<20x20xcomplex<f64>>) %q0 : !quantum.obs

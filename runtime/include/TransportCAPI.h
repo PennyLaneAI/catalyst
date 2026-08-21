@@ -32,13 +32,13 @@ extern "C" {
 typedef struct CatalystTransportSession CatalystTransportSession;
 
 // Return codes: 0 == success; negative == error
-enum {
+typedef enum {
     CATALYST_TRANSPORT_OK = 0,
     CATALYST_TRANSPORT_ERR = -1,         // Generic exception
     CATALYST_TRANSPORT_ERR_MEMORY = -2,  // Memory error
     CATALYST_TRANSPORT_ERR_TIMEOUT = -3, // Timeout error
     CATALYST_TRANSPORT_ERR_STUCK = -4,   // Something got stuck
-};
+} CatalystTransportStatus;
 
 // Session role (mirrors catalyst::transport::Role in the dialect).
 enum {
@@ -66,17 +66,22 @@ int64_t __catalyst__transport__connect_async(CatalystTransportSession *s, const 
                                              uint16_t oob_port);
 int __catalyst__transport__exchange_keys(CatalystTransportSession *s);
 int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession *s);
-int __catalyst__transport__barrier(int64_t token);
-int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path);
+int __catalyst__transport__await(int64_t token);
+int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *transport);
 
-// Coprocessor-only: bind the function run per received message, resolved by runtime symbol name.
+// Coprocessor-only: bind the coprocessor function, resolved by runtime symbol name.
 int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const char *symbol);
 
 // Controller-only: work items + kick.
-int __catalyst__transport__commit_work_item(CatalystTransportSession *s, uint32_t work_item_idx,
-                                            uint64_t in_bytes, uint64_t out_bytes);
-void *__catalyst__transport__data_slot(CatalystTransportSession *s);
-int __catalyst__transport__kick(CatalystTransportSession *s, uint32_t work_item_idx);
+int __catalyst__transport__set_message_sizes(CatalystTransportSession *s, uint32_t work_item_idx,
+                                             uint64_t in_bytes, uint64_t out_bytes);
+void *__catalyst__transport__request_slot(CatalystTransportSession *s);
+// Copy `bytes` into the round's outbound slot and address it to `decoder_id`. Fails
+// if `bytes` exceeds what set_message_sizes committed.
+int __catalyst__transport__stage_payload(CatalystTransportSession *s, const void *src,
+                                         uint64_t bytes, uint32_t decoder_id);
+void *__catalyst__transport__reply_slot(CatalystTransportSession *s);
+int __catalyst__transport__post(CatalystTransportSession *s, uint32_t work_item_idx);
 
 // Run / collect / teardown.
 void __catalyst__transport__start(CatalystTransportSession *s);
@@ -84,6 +89,19 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply, uin
 uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s);
 void __catalyst__transport__stop(CatalystTransportSession *s);
 void __catalyst__transport__destroy(CatalystTransportSession *s);
+
+// Flags for start_benchmark.
+enum {
+    CATALYST_BENCH_FORCE_SW_RTT = 1u << 1,
+    CATALYST_BENCH_PROGRESS = 1u << 2,
+};
+
+// Run `iters` rounds back to back and report each round's round-trip time in nanoseconds.
+// `samples_bytes` tells how much room the caller has for the samples. The rounds report is refused
+// if `samples_bytes` is less than `iters * sizeof(uint64_t)`.
+int __catalyst__transport__start_benchmark(CatalystTransportSession *s, uint32_t iters,
+                                           uint32_t decoder_id, uint32_t flags, uint64_t *samples,
+                                           uint64_t samples_bytes, uint64_t *rounds);
 
 #ifdef __cplusplus
 } // extern "C"

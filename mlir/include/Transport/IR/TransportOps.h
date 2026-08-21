@@ -22,5 +22,8 @@
 
 #include "Transport/IR/TransportDialect.h"
 
+#define GET_ATTRDEF_CLASSES
+#include "Transport/IR/TransportAttributes.h.inc"
+
 #define GET_OP_CLASSES
 #include "Transport/IR/TransportOps.h.inc"

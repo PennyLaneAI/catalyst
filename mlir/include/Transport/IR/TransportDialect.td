@@ -37,6 +37,7 @@ def Transport_Dialect : Dialect {
     let name = "transport";
     let cppNamespace = "::catalyst::transport";
     let useDefaultTypePrinterParser = 1;
+    let useDefaultAttributePrinterParser = 1;
     let usePropertiesForAttributes = 1;
 }
 
@@ -70,7 +71,7 @@ def Transport_SessionType : Transport_Type<"Session", "session"> {
 }
 
 def Transport_TokenType : Transport_Type<"Token", "token"> {
-    let summary = "A handle to an in-flight asynchronous step, awaited with transport.barrier.";
+    let summary = "A handle to an in-flight asynchronous step, awaited with transport.await.";
 }
 
 // Role-constrained session types used by the role-specific ops.
@@ -85,6 +86,69 @@ def Transport_CoprocessorSession : Type<
           "::llvm::cast<::catalyst::transport::SessionType>($_self).getRole() == "
           "::catalyst::transport::Role::Coprocessor">,
     "coprocessor transport session">;
+
+//===----------------------------------------------------------------------===//
+// Attributes.
+//===----------------------------------------------------------------------===//
+
+class Transport_Attr<string name, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<Transport_Dialect, name, traits> {
+    let mnemonic = attrMnemonic;
+}
+
+// A string field that reads as empty when omitted, so consumers need no null checks.
+def Transport_StrField : DefaultValuedParameter<"mlir::StringAttr",
+                                                "mlir::StringAttr::get($_ctxt, \"\")">;
+
+def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
+    let summary = "A backline participant: a controller or a coprocessor.";
+
+    let parameters = (ins
+        Transport_StrField:$name,
+        Transport_StrField:$peer,
+        OptionalParameter<"mlir::IntegerAttr">:$oob_port,
+        Transport_StrField:$backend_lib,
+        Transport_StrField:$config,
+        Transport_StrField:$triple,
+        Transport_StrField:$address,
+        Transport_StrField:$symbol,
+        OptionalParameter<"mlir::BoolAttr">:$out_of_process,
+        OptionalParameter<"mlir::IntegerAttr">:$in_bytes,
+        OptionalParameter<"mlir::IntegerAttr">:$out_bytes,
+        OptionalParameter<"mlir::IntegerAttr">:$work_item_idx
+    );
+
+    let assemblyFormat = "`<` struct(params) `>`";
+
+    let extraClassDeclaration = [{
+        /// Session registry key: `name` when set and non-empty, else `fallback`.
+        mlir::StringAttr keyOr(llvm::StringRef fallback) const;
+
+        /// Whether this node's code is dispatched to an executor rather than run in the
+        /// compiling process.
+        bool isOutOfProcess() const;
+
+        /// Integer field accessors.
+        int64_t oobPort() const;
+        int64_t inBytes() const;
+        int64_t outBytes() const;
+        int64_t workItemIdx() const;
+    }];
+}
+
+def Transport_BacklineAttr : Transport_Attr<"Backline", "backline"> {
+    let summary = "A backline placement: one controller and the coprocessors it drives.";
+
+    let parameters = (ins
+        "mlir::StringAttr":$transport,
+        "::catalyst::transport::NodeAttr":$controller,
+        OptionalArrayRefParameter<"::catalyst::transport::NodeAttr">:$coprocessors
+    );
+
+    let assemblyFormat = [{ `<` `transport` `=` $transport `,` `controller` `=` $controller
+                            (`,` `coprocessors` `=` `[` $coprocessors^ `]`)? `>` }];
+    let genVerifyDecl = 1;
+}
 
 //===----------------------------------------------------------------------===//
 // Operation base.

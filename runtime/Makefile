@@ -14,9 +14,11 @@ BUILD_TYPE ?= RelWithDebInfo
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
 ENABLE_TRANSPORT ?= OFF
+ENABLE_EXECUTOR ?= OFF
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 LLVM_DIR ?= $(MK_DIR)/../mlir/llvm-project/
+LLVM_BUILD_DIR ?= $(LLVM_DIR)/build
 
 PLATFORM := $(shell uname -s)
 
@@ -55,14 +57,14 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 
 ifeq ($(ENABLE_TRANSPORT), ON)
-	BUILD_TARGETS += rt_transport
+	BUILD_TARGETS += transport_all
+	TEST_TARGETS += transport_tests_all
 endif
 
-TRANSPORT_TEST_TARGETS := \
-	runner_tests_transport \
-	runner_tests_transport_common \
-	runner_tests_transport_cpu \
-	cpu_verbs_selftest
+ifeq ($(ENABLE_EXECUTOR), ON)
+	BUILD_TARGETS += rt_executor catalyst-executor
+	TEST_TARGETS += runner_tests_executor
+endif
 
 .PHONY: help
 help:
@@ -84,12 +86,14 @@ configure:
 		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DMLIR_INCLUDE_DIRS=$(LLVM_DIR)/mlir/include \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_OQD=$(ENABLE_OQD) \
 		-DENABLE_TRANSPORT=$(ENABLE_TRANSPORT) \
+		-DENABLE_EXECUTOR=$(ENABLE_EXECUTOR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
@@ -123,22 +127,17 @@ ifeq ($(ENABLE_OQD), ON)
 	# Test the OQD devices C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
-
-.PHONY: test-transport
-test-transport: ENABLE_TRANSPORT=ON
-test-transport: CODE_COVERAGE=OFF
-test-transport: BUILD_TYPE?=RelWithDebInfo
-test-transport: configure
-	cmake --build $(RT_BUILD_DIR) --target $(TRANSPORT_TEST_TARGETS) -j$(NPROC)
-	@echo "Catalyst transport CAPI/loader test suite (stub backend)"
-	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_transport
-	@echo "Catalyst transport common primitives (SKIPs without rxe0)"
-	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_transport_common
-	@echo "Catalyst transport cpu_verbs backend (SKIPs without rxe0)"
-	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_transport_cpu
-	@echo "Catalyst transport cpu_verbs two-process loopback (requires rxe0)"
-	BIN=$(RT_BUILD_DIR)/lib/transport/cpu_verbs/cpu_verbs_selftest \
-	    $(MK_DIR)/lib/transport/cpu_verbs/run_loopback.sh
+ifeq ($(ENABLE_TRANSPORT), ON)
+	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t; \
+	done
+endif
+ifeq ($(ENABLE_EXECUTOR), ON)
+	# Test the catalyst-executor server over a loopback connection
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
+endif
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -158,6 +157,16 @@ ifeq ($(ENABLE_OPENQASM), ON)
 endif
 ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
+endif
+ifeq ($(ENABLE_TRANSPORT), ON)
+	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t; \
+	done
+endif
+ifeq ($(ENABLE_EXECUTOR), ON)
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
 endif
 ifeq ($(PLATFORM),Linux)
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
@@ -196,6 +205,7 @@ check-tidy:
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DMLIR_INCLUDE_DIRS="$(abspath $(LLVM_DIR))/mlir/include" \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DRUNTIME_CLANG_TIDY=ON
 
 	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(NPROC)

@@ -45,8 +45,7 @@ static const std::string pluginName = "libQuantumPythonDecompositions.so";
 // 2. function parameter
 // 3. <exe_dir>/../lib/libQuantumPythonDecompositions.so (build & install)
 // 4. <exe_dir>/libQuantumPythonDecompositions.so (alongside)
-std::string resolvePluginPath(std::string libQPDPath)
-{
+std::string resolvePluginPath(std::string libQPDPath) {
     if (auto override_ = llvm::sys::Process::GetEnv("CATALYST_QPD")) {
         return *override_;
     }
@@ -94,8 +93,7 @@ std::string resolvePluginPath(std::string libQPDPath)
 }
 
 // Ensure libpython is loaded into the process before the plugin .so is opened.
-bool tryLoadLibpython(llvm::StringRef where)
-{
+bool tryLoadLibpython(llvm::StringRef where) {
     if (where.empty()) {
         return false;
     }
@@ -112,11 +110,11 @@ bool tryLoadLibpython(llvm::StringRef where)
 // Try, in order:
 //   1. $CATALYST_LIBPYTHON: explicit user override (any deployment)
 //   2. function parameter
-void ensureLibpythonLoaded(std::string libpythonPath)
-{
+void ensureLibpythonLoaded(std::string libpythonPath) {
     if (auto over = llvm::sys::Process::GetEnv("CATALYST_LIBPYTHON")) {
-        if (tryLoadLibpython(*over))
+        if (tryLoadLibpython(*over)) {
             LDBG() << "Found python from CATALYST_LIBPYTHON environment variable:" << over;
+        }
         return;
     }
 
@@ -131,8 +129,7 @@ void ensureLibpythonLoaded(std::string libpythonPath)
                     "library path to prevent this.\n";
 }
 
-PythonRuleLoweringFn loadAndResolve(std::string libQPDPath, std::string libpythonPath)
-{
+PythonRuleLoweringFn loadAndResolve(std::string libQPDPath, std::string libpythonPath) {
     std::string path = resolvePluginPath(libQPDPath);
     if (path.empty()) {
         llvm::errs() << "[QPD-loader] The plugin path could not be resolved.\n";
@@ -172,8 +169,7 @@ PythonRuleLoweringFn loadAndResolve(std::string libQPDPath, std::string libpytho
 
 } // namespace
 
-bool loadQPD(std::string libQPDPath, std::string libpythonPath)
-{
+bool loadQPD(std::string libQPDPath, std::string libpythonPath) {
     if (pythonRuleLowering) {
         return true;
     }

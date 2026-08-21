@@ -81,15 +81,58 @@ def Executor_LaunchOp : Executor_Op<"launch"> {
     let arguments = (ins
         Executor_SessionType:$session,
         Variadic<AnyMemRef>:$inputs,
-        StrAttr:$kernel_callee
+        StrAttr:$kernel_callee,
+        StrAttr:$object
     );
 
     let results = (outs Variadic<AnyMemRef>:$results);
 
     let assemblyFormat = [{
-        $session `(` $kernel_callee `)` `(` $inputs `)` attr-dict
+        $session `(` $kernel_callee `,` $object `)` `(` $inputs `)` attr-dict
             `:` type($session) `,` functional-type($inputs, $results)
     }];
+}
+
+//===----------------------------------------------------------------------===//
+// executor.launch_async
+//===----------------------------------------------------------------------===//
+
+def Executor_LaunchAsyncOp : Executor_Op<"launch_async"> {
+    let summary = "Dispatch a `()->()` entry on the executor without waiting for it.";
+    let description = [{
+        Like `executor.launch`, but returns as soon as the entry has been started instead of waiting
+        for it to finish; the entry runs on a background thread on the host. Pass the returned token
+        to `executor.await` to wait for it.
+    }];
+
+    let arguments = (ins
+        Executor_SessionType:$session,
+        StrAttr:$kernel_callee,
+        StrAttr:$object
+    );
+
+    let results = (outs Executor_TokenType:$token);
+
+    let assemblyFormat = [{
+        $session `(` $kernel_callee `,` $object `)` attr-dict
+            `:` type($session) `->` type($token)
+    }];
+}
+
+//===----------------------------------------------------------------------===//
+// executor.await
+//===----------------------------------------------------------------------===//
+
+def Executor_AwaitOp : Executor_Op<"await"> {
+    let summary = "Wait for one `executor.launch_async` to finish.";
+    let description = [{
+        Block until the `executor.launch_async` that produced `token` has finished. Waiting on the
+        token rather than on the session means other launches on that session are left running.
+    }];
+
+    let arguments = (ins Executor_TokenType:$token);
+
+    let assemblyFormat = [{ $token attr-dict `:` type($token) }];
 }
 
 //===----------------------------------------------------------------------===//

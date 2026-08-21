@@ -17,8 +17,7 @@
 #include "gmock/gmock.h" // HasSubstr
 
 namespace {
-TEST(MLIRCatalystUtils, VersionIsNotUnknown)
-{
+TEST(MLIRCatalystUtils, VersionIsNotUnknown) {
     auto output = std::string{};
     auto rss = llvm::raw_string_ostream{output};
     catalyst::printVersion(rss);

@@ -599,10 +599,13 @@ class TestMeasurementTransforms:
             qp.RX(theta, 0)
             return qp.sample()
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            compiled_circuit = qjit(circuit)
+
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_counts"
         ):
-            qjit(circuit)
+            compiled_circuit(0.5)
 
     def test_measurement_from_samples_raises_not_implemented(self):
         """Test that an measurement not supported by the measurements_from_counts or
@@ -617,10 +620,13 @@ class TestMeasurementTransforms:
             qp.RX(theta, 0)
             return qp.counts()
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            compiled_circuit = qjit(circuit)
+
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_samples"
         ):
-            qjit(circuit)
+            compiled_circuit(0.5)
 
     @pytest.mark.parametrize(
         "unsupported_obs",

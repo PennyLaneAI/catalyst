@@ -47,8 +47,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     quantum::CustomOp createSimpleOneBitGate(StringRef gateName, const Value &inQubit,
                                              const Value &outQubit, mlir::IRRewriter &builder,
                                              Location &loc,
-                                             const quantum::CustomOp &insert_after_gate)
-    {
+                                             const quantum::CustomOp &insert_after_gate) {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
         quantum::CustomOp newGate =
@@ -69,8 +68,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     // if multiple gates are to be inserted after SWAP transformation
     quantum::CustomOp createSimpleOneBitGate(StringRef gateName, const Value &inQubit,
                                              mlir::IRRewriter &builder, Location &loc,
-                                             const quantum::CustomOp &insert_after_gate)
-    {
+                                             const quantum::CustomOp &insert_after_gate) {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
         quantum::CustomOp newGate =
@@ -93,8 +91,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
                                              const Value &targetIn, const Value &controlOut,
                                              const Value &targetOut, mlir::IRRewriter &builder,
                                              Location &loc,
-                                             const quantum::CustomOp &insert_after_gate)
-    {
+                                             const quantum::CustomOp &insert_after_gate) {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
         quantum::CustomOp newGate = quantum::CustomOp::create(
@@ -116,8 +113,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     quantum::CustomOp createSimpleTwoBitGate(StringRef gateName, const Value &controlIn,
                                              const Value &targetIn, mlir::IRRewriter &builder,
                                              Location &loc,
-                                             const quantum::CustomOp &insert_after_gate)
-    {
+                                             const quantum::CustomOp &insert_after_gate) {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
         quantum::CustomOp newGate = quantum::CustomOp::create(
@@ -134,8 +130,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
         return newGate;
     }
 
-    void disentangleSWAPs(FunctionOpInterface &func)
-    {
+    void disentangleSWAPs(FunctionOpInterface &func) {
         mlir::IRRewriter builder(func->getContext());
         Location loc = func->getLoc();
 
@@ -495,8 +490,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
         });
     }
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         auto op = getOperation();
         for (Operation &nestedOp : op->getRegion(0).front().getOperations()) {
             if (auto func = dyn_cast<FunctionOpInterface>(nestedOp)) {

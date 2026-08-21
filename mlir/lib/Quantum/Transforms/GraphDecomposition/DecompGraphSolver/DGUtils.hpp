@@ -25,14 +25,14 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "DGTypes.hpp"
 
 namespace DecompGraph::Core {
 
-static inline auto print_op(const OperatorNode &op) -> std::string
-{
+static inline auto print_op(const OperatorNode &op) -> std::string {
     // id override
     if (!op.id.empty()) {
         return "id: " + op.id;
@@ -60,8 +60,8 @@ static inline auto print_op(const OperatorNode &op) -> std::string
 }
 
 static inline auto graph_failed_message(const OperatorNode &op,
-                                        const std::vector<std::string> &rule_errors) -> std::string
-{
+                                        const std::vector<std::string> &rule_errors)
+    -> std::string {
     std::ostringstream oss;
     oss << "Decomposition rule not found for operator '" << print_op(op) << "'";
     if (!rule_errors.empty()) {
@@ -73,8 +73,7 @@ static inline auto graph_failed_message(const OperatorNode &op,
     return oss.str();
 }
 
-static inline void showSolution(const Core::GraphResult &result)
-{
+static inline void showSolution(const Core::GraphResult &result) {
     std::cerr << "Decomposition Solution:\n";
     for (const auto &[op, rule] : result) {
         std::cerr << "  Operator: " << print_op(op) << "\n";
@@ -96,9 +95,7 @@ class GraphError : public std::runtime_error {
 class GraphSolverFailedError : public GraphError {
   public:
     GraphSolverFailedError(OperatorNode op, std::vector<std::string> rule_errors)
-        : GraphError(graph_failed_message(op, rule_errors))
-    {
-    }
+        : GraphError(graph_failed_message(op, rule_errors)) {}
 };
 
 class RuleInvalidOverrideError : public GraphError {
@@ -106,9 +103,7 @@ class RuleInvalidOverrideError : public GraphError {
     RuleInvalidOverrideError(const std::string &kind, const OperatorNode &op, const RuleNode &rule)
         : GraphError("Invalid " + kind + " override for operator '" + print_op(op) +
                      "' with rule '" + rule.name + "' for rule.output '" + print_op(rule.output) +
-                     "'")
-    {
-    }
+                     "'") {}
 };
 
 } // namespace DecompGraph::Core

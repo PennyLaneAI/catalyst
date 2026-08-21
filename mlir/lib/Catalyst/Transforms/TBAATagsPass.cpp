@@ -42,8 +42,7 @@ class MemrefToLLVMWithTBAAPass
     void lowerMemrefWithTBAA(ModuleOp module);
 };
 
-void MemrefToLLVMWithTBAAPass::runOnOperation()
-{
+void MemrefToLLVMWithTBAAPass::runOnOperation() {
     ModuleOp mod = getOperation();
     bool containGradients = false;
     mod.walk([&](LLVM::LLVMFuncOp op) {
@@ -58,8 +57,7 @@ void MemrefToLLVMWithTBAAPass::runOnOperation()
     }
 }
 
-void MemrefToLLVMWithTBAAPass::lowerMemrefWithTBAA(ModuleOp module)
-{
+void MemrefToLLVMWithTBAAPass::lowerMemrefWithTBAA(ModuleOp module) {
     mlir::MLIRContext *ctx = module.getContext();
 
     auto root = mlir::StringAttr::get(ctx, "Catalyst TBAA");

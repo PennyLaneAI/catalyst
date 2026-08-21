@@ -18,29 +18,28 @@
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/ConstantResolve.h"
 
 using namespace mlir;
 
 namespace catalyst {
 
-static int64_t getNumIterations(double lowerBound, double upperBound, double step)
-{
+static int64_t getNumIterations(double lowerBound, double upperBound, double step) {
     assert(upperBound >= lowerBound && step > 0);
     return std::ceil((upperBound - lowerBound) / step);
 }
 
-static int64_t getIntFromArithConstantOp(arith::ConstantOp op)
-{
+static int64_t getIntFromArithConstantOp(arith::ConstantOp op) {
     // The magical incantation to get a cpp integer from an arith.constant op
     assert(isa<IntegerAttr>(op.getValue()));
     return cast<IntegerAttr>(op.getValue()).getValue().getSExtValue();
 }
 
-template <typename OpTy> static bool hasAncestorOfType(Operation *op)
-{
+template <typename OpTy> static bool hasAncestorOfType(Operation *op) {
     return op->getParentOfType<OpTy>() != nullptr;
 }
 
@@ -52,8 +51,7 @@ bool isOpInWhileOp(Operation *op) { return hasAncestorOfType<scf::WhileOp>(op); 
 
 // Returns the static trip count of `forOp` if all three bounds are
 // arith.constant ops, or -1 if any bound is dynamic.
-int64_t countStaticForOpIterations(scf::ForOp forOp)
-{
+int64_t countStaticForOpIterations(scf::ForOp forOp) {
     Operation *lowerBoundOp = forOp.getLowerBound().getDefiningOp();
     if (!lowerBoundOp || !isa<arith::ConstantOp>(lowerBoundOp)) {
         return -1;
@@ -75,19 +73,32 @@ int64_t countStaticForOpIterations(scf::ForOp forOp)
     return getNumIterations(l, u, s);
 }
 
-std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp)
-{
-    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
-        return estAttr.getValue().getSExtValue();
+std::optional<double> getEstimatedIterationsHint(Operation *op) {
+    Attribute attr = op->getAttr(EstimatedIterationsAttrName);
+    if (!attr) {
+        return std::nullopt;
+    }
+    if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
+        return static_cast<double>(intAttr.getValue().getSExtValue());
+    }
+    if (auto floatAttr = dyn_cast<FloatAttr>(attr)) {
+        return floatAttr.getValueAsDouble();
+    }
+    return std::nullopt;
+}
+
+std::optional<double> resolveForLoopTripCount(scf::ForOp forOp) {
+    if (auto iters = getEstimatedIterationsHint(forOp)) {
+        return *iters;
     }
     if (auto staticTrip = forOp.getStaticTripCount()) {
-        return staticTrip->getSExtValue();
+        return static_cast<double>(staticTrip->getSExtValue());
     }
     auto lb = resolveConstantInt(forOp.getLowerBound());
     auto ub = resolveConstantInt(forOp.getUpperBound());
     auto step = resolveConstantInt(forOp.getStep());
     if (lb && ub && step && *step != 0 && *ub > *lb) {
-        return (*ub - *lb + *step - 1) / *step;
+        return static_cast<double>((*ub - *lb + *step - 1) / *step);
     }
     return std::nullopt;
 }
@@ -98,8 +109,7 @@ std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp)
 //
 // Note: if the input op is not inside any for loop operations,
 // this method returns 1, since there would be just one "iteration".
-int64_t countStaticForloopIterations(Operation *op)
-{
+int64_t countStaticForloopIterations(Operation *op) {
     assert(!isa<scf::ForOp>(op));
 
     int64_t count = 1;
