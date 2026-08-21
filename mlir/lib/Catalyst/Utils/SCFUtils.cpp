@@ -221,12 +221,13 @@ std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forO
     }
     if (canUseClosedFormAverage) {
         int64_t depth = static_cast<int64_t>(ranges.size());
-        double average = static_cast<double>(outerUpper - commonLower - depth + 1) /
-                         static_cast<double>(depth);
+        double average =
+            static_cast<double>(outerUpper - commonLower - depth + 1) / static_cast<double>(depth);
         return std::max(0.0, average);
     }
 
-    // Each loop is resolved separately, so loops with other bounds or steps may revisit outer loops.
+    // Each loop is resolved separately, so loops with other bounds or
+    // steps may revisit outer loops.
     return computeAverageTripCountByEnumeration(ranges, outerUpper);
 }
 
