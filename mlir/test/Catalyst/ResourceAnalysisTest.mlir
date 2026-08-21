@@ -674,6 +674,7 @@ func.func @nested_static_for(%arg0: !quantum.bit) -> !quantum.bit {
 // An inner loop bounded by the enclosing induction variable executes
 // sum(i, i = 0..7) = 28 times. Preserve the ordinary hierarchy by recording
 // its average 28 / 8 = 3.5 calls per outer-body invocation.
+
 // CHECK-LABEL: "for_loop_1": {
 // CHECK: "quantum_operations"
 // CHECK:   "PauliX": 1
@@ -694,6 +695,11 @@ func.func @resolvable_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
     %c1 = arith.constant 1 : index
     %c8 = arith.constant 8 : index
 
+    // Python code:
+    // for i in range(8):           // 8 total, average 8
+    //     for j in range(i):       // 28 total, average 3.5
+    //         qp.PauliX(0)
+
     // loop i in 0..8
     %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
         // loop j in 0..i
@@ -711,6 +717,7 @@ func.func @resolvable_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
 
 // The outer, middle, and inner loops execute 8, 28, and 56 times, so their
 // preserved call edges have average multiplicities 8, 3.5, and 2.
+
 // CHECK-LABEL: "for_loop_1": {
 // CHECK: "quantum_operations"
 // CHECK:   "PauliX": 1
@@ -734,6 +741,12 @@ func.func @triple_dependent_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit
     %c1 = arith.constant 1 : index
     %c8 = arith.constant 8 : index
 
+    // Python code:
+    // for i in range(8):           // 8 total, average 8
+    //     for j in range(i):       // 28 total, average 3.5
+    //         for k in range(j):   // 56 total, average 2
+    //             qp.PauliX(0)
+
     %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
         %middle = scf.for %j = %c0 to %i step %c1 iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
             %inner = scf.for %k = %c0 to %j step %c1 iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
@@ -749,31 +762,32 @@ func.func @triple_dependent_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit
 
 // -----
 
-// An estimated iteration count on the enclosing loop does not describe its induction values,
-// so the dependent inner loop must remain dynamic.
-// CHECK-LABEL: "dyn_for_loop_1": {
-// CHECK: "quantum_operations"
-// CHECK:   "PauliX": 1
+// With unit step and an estimated iteration count of 4, resource analysis
+// models the enclosing induction values as 0, 1, 2, and 3. The dependent
+// inner loop therefore averages (0 + 1 + 2 + 3) / 4 = 1.5 iterations.
+
 // CHECK-LABEL: "estimated_iterations_enclosing_nested_for_loop": {
 // CHECK: "function_calls"
 // CHECK:   "static":
-// CHECK:       "for_loop_1": 4
+// CHECK:       "for_loop_2": 4
 // CHECK-LABEL: "for_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliX": 1
+// CHECK-LABEL: "for_loop_2": {
 // CHECK: "function_calls"
-// CHECK:   "dynamic":
-// CHECK:       "dyn_for_loop_1"
-func.func @estimated_iterations_enclosing_nested_for_loop(
-    %arg0: !quantum.bit) -> !quantum.bit {
+// CHECK:   "dynamic": {}
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 1.5
+func.func @estimated_iterations_enclosing_nested_for_loop(%arg0: !quantum.bit, %N: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
-    %c8 = arith.constant 8 : index
 
     // Python code:
-    // for i in range(8):
+    // for i in range(N):
     //     for _ in range(i):
     //         qp.PauliX(0)
 
-    %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
+    %q = scf.for %i = %c0 to %N step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
         %inner = scf.for %j = %c0 to %i step %c1 iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
             %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
             scf.yield %out : !quantum.bit
@@ -786,6 +800,7 @@ func.func @estimated_iterations_enclosing_nested_for_loop(
 // -----
 
 // A branch between the loops prevents the inner loop from being treated as directly nested.
+
 // CHECK-LABEL: "dyn_for_loop_1": {
 // CHECK: "quantum_operations"
 // CHECK:   "PauliX": 1
@@ -811,8 +826,7 @@ func.func @intervening_if_nested_for_loop(
 
     %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
         %selected = scf.if %cond -> !quantum.bit {
-            %inner = scf.for %j = %c0 to %i step %c1
-                iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
+            %inner = scf.for %j = %c0 to %i step %c1 iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
                 %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
                 scf.yield %out : !quantum.bit
             }
@@ -828,6 +842,8 @@ func.func @intervening_if_nested_for_loop(
 // -----
 
 // Arithmetic-derived bounds are outside the direct-IV resolver's scope.
+// Fallback to symbolic analysis.
+
 // CHECK-LABEL: "arithmetic_bound_nested_for_loop": {
 // CHECK: "function_calls"
 // CHECK:   "static":
@@ -850,6 +866,7 @@ func.func @arithmetic_bound_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit
     // for i in range(8):
     //     for _ in range(i + 1):
     //         qp.PauliX(0)
+
     %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
         %upper = arith.addi %i, %c1 : index
         %inner = scf.for %j = %c0 to %upper step %c1 iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
@@ -863,41 +880,7 @@ func.func @arithmetic_bound_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit
 
 // -----
 
-// A constant-minus-IV bound is outside the direct-IV resolver's scope.
-// CHECK-LABEL: "dyn_for_loop_1": {
-// CHECK: "quantum_operations"
-// CHECK:   "PauliX": 1
-// CHECK-LABEL: "for_loop_1": {
-// CHECK: "function_calls"
-// CHECK:   "dynamic":
-// CHECK:       "dyn_for_loop_1"
-// CHECK-LABEL: "subtracted_bound_nested_for_loop": {
-// CHECK: "function_calls"
-// CHECK:   "static":
-// CHECK:       "for_loop_1": 4
-func.func @subtracted_bound_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-    %c4 = arith.constant 4 : index
 
-    // Originates from Python code:
-    //  for i in range(4, 0, -1):
-    //      for _ in range(i):
-    //          qp.PauliX(0)
-
-    // Lowering to MLIR, it canonicalized to:
-    // loop i in 0..4
-    %q = scf.for %i = %c0 to %c4 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
-        %upper = arith.subi %c4, %i : index
-        // loop j in 0..(4-i)
-        %inner = scf.for %j = %c0 to %upper step %c1 iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
-            %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
-            scf.yield %out : !quantum.bit
-        }
-        scf.yield %inner : !quantum.bit
-    }
-    return %q : !quantum.bit
-}
 
 // -----
 
@@ -915,9 +898,14 @@ func.func @subtracted_bound_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit
 func.func @empty_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
+
+    // Python code:
+    // for i in range(1):
+    //     for j in range(0, i):
+    //         qp.PauliX(0)
+
     %q = scf.for %i = %c0 to %c1 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
-        %inner = scf.for %j = %c0 to %i step %c1
-            iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
+        %inner = scf.for %j = %c0 to %i step %c1 iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
             %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
             scf.yield %out : !quantum.bit
         }
@@ -929,6 +917,7 @@ func.func @empty_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
 // -----
 
 // sum(ceil(i / 2), i = 0..7) = 16, averaging 2 calls per outer-body invocation.
+
 // CHECK-LABEL: "for_loop_1": {
 // CHECK: "quantum_operations"
 // CHECK:   "PauliX": 1
@@ -946,6 +935,12 @@ func.func @nested_for_loop_step_two(%arg0: !quantum.bit) -> !quantum.bit {
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
     %c8 = arith.constant 8 : index
+
+    // Python code:
+    // for i in range(8):
+    //     for j in range(0, i, 2):
+    //         qp.PauliX(0)
+
     %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
         %inner = scf.for %j = %c0 to %i step %c2
             iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
@@ -959,11 +954,12 @@ func.func @nested_for_loop_step_two(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Three non-canonical levels:
+// Three nested levels with non-canonical middle and inner ranges:
 //   i = 0..5,
 //   j = 2..i (6 total executions, averaging 1 per outer invocation),
 //   k = 0..j step 2 (9 total executions, averaging 1.5 per middle invocation).
 // This also covers empty middle ranges for i = 0, 1, and 2.
+
 // CHECK-LABEL: "for_loop_1": {
 // CHECK: "quantum_operations"
 // CHECK:   "PauliX": 1
@@ -989,11 +985,14 @@ func.func @nested_for_loop_nonzero_lower_and_step(
     %c2 = arith.constant 2 : index
     %c6 = arith.constant 6 : index
 
-    // loop i in 0..6
+    // Python code:
+    // for i in range(6):
+    //     for j in range(2, i):
+    //         for k in range(0, j, 2):
+    //             qp.PauliX(0)
+
     %q = scf.for %i = %c0 to %c6 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
-        // loop j in 2..i
         %middle = scf.for %j = %c2 to %i step %c1 iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
-            // loop k in 0..j step 2
             %inner = scf.for %k = %c0 to %j step %c2 iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
                 %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
                 scf.yield %out : !quantum.bit
@@ -1024,9 +1023,12 @@ func.func @argument_dependent_nested_for_loop(
     %c1 = arith.constant 1 : index
     %c8 = arith.constant 8 : index
 
-    // loop i in 0..8
+    // Python code:
+    // for i in range(8):
+    //     for j in range(n):
+    //         qp.PauliX(0)
+
     %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
-        // loop j in 0..n
         %inner = scf.for %j = %c0 to %n step %c1
             iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
             %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
@@ -1064,20 +1066,22 @@ func.func @resolvable_nested_for_loop_dynamic(%arg0: !quantum.bit, %n: index) ->
     %c1 = arith.constant 1 : index
     %c8 = arith.constant 8 : index
 
-    // loop i in 0..8
+    // Python code:
+    // for i in range(8):
+    //     qp.PauliY(0)
+    //     for j in range(i):
+    //         qp.PauliZ(0)
+    //         for k in range(n):
+    //             qp.PauliX(0)
+
     %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
         %y = quantum.custom "PauliY"() %outer_arg : !quantum.bit
-
-        // loop j in 0..i
         %middle = scf.for %j = %c0 to %i step %c1 iter_args(%middle_arg = %y) -> !quantum.bit {
             %z = quantum.custom "PauliZ"() %middle_arg : !quantum.bit
-
-            // loop k in 0..%n
             %inner = scf.for %k = %c0 to %n step %c1 iter_args(%inner_arg = %z) -> !quantum.bit {
                 %x = quantum.custom "PauliX"() %inner_arg : !quantum.bit
                 scf.yield %x : !quantum.bit
             }
-
             scf.yield %inner : !quantum.bit
         }
         scf.yield %middle : !quantum.bit

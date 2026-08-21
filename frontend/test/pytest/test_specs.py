@@ -1264,7 +1264,7 @@ class TestSymbolicSpecs:
 class TestSymbolicSpecsLoopConcretization:
     """
     Integration tests for the loop concretization feature of the resource analysis pass, which
-    allows for the resolution of nested loops whose inner bounds depend on a static outer loop
+    resolves nested loops whose inner bounds are the immediately enclosing loop's induction
     variable.
     """
 

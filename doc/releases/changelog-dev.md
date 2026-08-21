@@ -138,8 +138,8 @@
 
       return qp.expval(qp.X(0))
 
-  resources = qp.specs(circuit, level="all-mlir")()
-  print(resources) # 56
+  resources = qp.specs(circuit, level="all-mlir")().resources
+  print(resources.quantum_operations["PauliX"])  # 56
   ```
 
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
