@@ -169,7 +169,7 @@ def replace_abstract_wires_with_concrete_wires(node):
         return tuple(replace_abstract_wires_with_concrete_wires(item) for item in node)
     else:
         if isinstance(node, qp.typing.AbstractWires):
-            return qp.wires.Wires(range(node.num_wires))
+            return qp.wires.Wires(range(len(node)))
         else:
             return node
 
