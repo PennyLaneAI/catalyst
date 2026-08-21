@@ -139,6 +139,21 @@ ifeq ($(ENABLE_EXECUTOR), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
 endif
 
+.PHONY: test-transport
+test-transport: BUILD_TYPE?=RelWithDebInfo
+test-transport: test_runner
+	@echo "Catalyst runtime transport test suites"
+	@set -e; ran=0; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -x "$$t" ] || continue; \
+		echo "Running $${t##*/}"; \
+		$(ASAN_COMMAND) $$t; \
+		ran=$$((ran + 1)); \
+	done; \
+	if [ "$$ran" -eq 0 ]; then \
+		echo "No transport test binaries found under $(RT_BUILD_DIR)/tests. Was the build configured with ENABLE_TRANSPORT=ON?" >&2; \
+		exit 1; \
+	fi
+
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
 coverage: CODE_COVERAGE=ON

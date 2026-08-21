@@ -1,36 +1,24 @@
-name: Check Transport Backends (GPU)
-
-# Runs the runtime transport tests on a GPU host. To keep GPU runner time cheap, pull requests
-# only trigger a run once labeled ``gpu``; ``push`` to main runs unconditionally.
+name: Check Transport Backends
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'runtime/lib/transport/**'
-      - 'runtime/include/Transport*'
-      - 'runtime/tests/Test_Transport*'
-      - 'mlir/lib/Transport/**'
-      - 'mlir/include/Transport/**'
-      - 'frontend/catalyst/backline.py'
-      - 'frontend/test/pytest/test_backline.py'
-      - '.github/workflows/check-transport-gpu.yaml'
   pull_request:
     types:
       - opened
       - reopened
       - synchronize
       - ready_for_review
-      - labeled
     paths:
       - 'runtime/lib/transport/**'
-      - 'runtime/include/Transport*'
-      - 'runtime/tests/Test_Transport*'
-      - 'mlir/lib/Transport/**'
-      - 'mlir/include/Transport/**'
-      - 'frontend/catalyst/backline.py'
-      - 'frontend/test/pytest/test_backline.py'
-      - '.github/workflows/check-transport-gpu.yaml'
+      - 'runtime/tests/Test_Transport*.cpp'
+      - 'runtime/tests/stubs/stub_transport_backend*'
+      - 'runtime/tests/CMakeLists.txt'
+      - 'runtime/CMakeLists.txt'
+      - 'runtime/lib/CMakeLists.txt'
+      - 'runtime/Makefile'
+      - 'Makefile'
+      - '.github/workflows/check-transport.yaml'
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -41,34 +29,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  determine_runner:
+    if: github.event.pull_request.draft == false
+    name: Determine runner type to use
+    uses: ./.github/workflows/determine-workflow-runner.yml
+    with:
+      default_runner: ubuntu-24.04
+
   constants:
-    name: Set build matrix
+    name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
+    needs: [determine_runner]
+    with:
+      multiple_compilers: false
+      runs_on: ${{ needs.determine_runner.outputs.runner_group }}
 
-  transport-tests-gpu:
-    name: Transport Backend Tests (GPU)
-    needs: [constants]
-    runs-on:
-      - single-gpu-x64
-
-    # Push always runs; PRs need a non-draft open state and the ``gpu`` label.
-    if: >-
-      ${{
-        github.event_name == 'push' ||
-        github.event_name == 'workflow_dispatch' ||
-        (
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.draft == false &&
-          contains(github.event.pull_request.labels.*.name, 'gpu')
-        )
-      }}
+  transport-tests:
+    name: Transport Backend Tests (Soft-RoCE)
+    needs: [constants, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
 
     steps:
-      - name: Update PATH and LD_LIBRARY_PATH for CUDA
-        run: |
-          echo "/usr/local/cuda/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
-
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
 
@@ -77,16 +58,14 @@ jobs:
         with:
           python-version: ${{ needs.constants.outputs.primary_python_version }}
 
-      - name: Install Python build dependencies
-        run: |
-          python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
-
-      - name: Install RDMA userland dependencies
+      - name: Install build and RDMA userland dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            cmake ninja-build clang make \
             libibverbs-dev libibverbs1 ibverbs-providers ibverbs-utils \
             rdma-core iproute2
+          python3 -m pip install "nanobind<2.13" pybind11
 
       - name: Ensure rdma_rxe.ko is available for the running kernel
         run: |
@@ -180,30 +159,31 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
-      # The runtime configure + build only needs LLVM source headers (MLIR_INCLUDE_DIRS
-      # -> mlir/llvm-project/mlir/include, header-only via rt_capi). No built-LLVM
-      # artifacts are consumed as long as ENABLE_EXECUTOR stays OFF, which it does here.
-      - name: Build Catalyst-Runtime with transport enabled
+      - name: Build Catalyst-Runtime with ENABLE_TRANSPORT=ON
         run: |
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          C_COMPILER=$(which clang) \
+          CXX_COMPILER=$(which clang++) \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          ENABLE_ASAN=OFF \
           ENABLE_TRANSPORT=ON \
           make runtime
 
-      - name: Build the memcpy test binary
+      - name: Run transport test suite (Catch2 + loopback)
         run: |
-          cmake --build "$(pwd)/runtime-build" --target runner_tests_transport_memcpy -j
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which clang) \
+          CXX_COMPILER=$(which clang++) \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          make test-runtime-transport
 
-      - name: Run memcpy transport tests
-        run: |
-          "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
-
-      # TODO: run frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration here.
-      # It needs the LLVM + quantum-dialect build; restoring the check-catalyst.yaml caches from
-      # this self-hosted GPU runner produces MLIRConfig.cmake without a resolvable LLVMConfig
-      # (see run 32523225599). Until the caches work across hosted/self-hosted runners, the Python
-      # integration tests only run in workflows on GH-hosted runners.
-
+      - name: Upload loopback logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transport-loopback-logs
+          path: |
+            /tmp/cvl_coproc.log
+            /tmp/cvl_ctrl.log
+          if-no-files-found: ignore
+          retention-days: 7
