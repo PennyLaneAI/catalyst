@@ -14,6 +14,7 @@
 """Unit tests for the backline frontend: serialize_backline and the pipeline helpers."""
 
 import os
+import platform
 from unittest import mock
 
 import pennylane as qp
@@ -34,6 +35,7 @@ from catalyst.backline import (
     placement_pipeline,
     serialize_backline,
 )
+from catalyst.device.qjit_device import BackendInfo, extract_backend_info
 from catalyst.utils.exceptions import CompileError
 
 if hasattr(qp, "backline"):
@@ -757,6 +759,19 @@ class TestExecutorRealization:
         plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
         assert plugins[-1] == "librtd_null_qubit.so"
 
+    def test_a_remote_nodes_device_runtime_drops_this_platforms_extension(self, no_launch):
+        """A node on another machine is Linux and loads the runtime from its deployed bundle, so a
+        macOS host's ``.dylib`` would not name the file there."""
+        node = _controller(remote=True, executor_options={"host": "h", "port": 1})
+        info = extract_backend_info(node.device)
+        macos = BackendInfo(
+            info.device_name, info.c_interface_name, "/opt/lib/librtd_null_qubit.dylib", info.kwargs
+        )
+        with mock.patch("catalyst.device.qjit_device.extract_backend_info", return_value=macos):
+            _realize_executor(node)
+        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        assert plugins[-1] == "librtd_null_qubit.so"
+
     def test_a_dispatched_coprocessor_carries_its_function_library(self, tmp_path):
         """A decoder built for this run is not in the target's bundle, so it travels and is opened."""
         lib = tmp_path / "libdecoder.so"
@@ -801,12 +816,14 @@ class TestExecutorRealization:
         assert plugins[-1] == "librtd_null_qubit.so"
 
     def test_a_node_on_this_machine_gets_full_library_paths(self, no_launch):
-        """Its libraries come from this installation, so a filename alone would not resolve."""
+        """Its libraries come from this installation, so a filename alone would not resolve, and the
+        device runtime keeps this platform's extension rather than a remote node's ``.so``."""
+        ext = "dylib" if platform.system() == "Darwin" else "so"
         node = _controller(executor_options={})
         _realize_executor(node)
         plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
         assert all(p.startswith("/") for p in plugins)
-        assert [p.rsplit("/", 1)[-1] for p in plugins][-1] == "librtd_null_qubit.so"
+        assert [p.rsplit("/", 1)[-1] for p in plugins][-1] == f"librtd_null_qubit.{ext}"
 
     def test_an_attached_executor_is_taken_at_the_nodes_word(self):
         """An ``address`` may name either machine, so ``remote`` is not second-guessed for it."""
