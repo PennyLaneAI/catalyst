@@ -767,9 +767,7 @@ class TestExecutorRealization:
         macos = BackendInfo(
             info.device_name, info.c_interface_name, "/opt/lib/librtd_null_qubit.dylib", info.kwargs
         )
-        with mock.patch(
-            "catalyst.device.qjit_device.extract_backend_info", return_value=macos
-        ):
+        with mock.patch("catalyst.device.qjit_device.extract_backend_info", return_value=macos):
             _realize_executor(node)
         plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
         assert plugins[-1] == "librtd_null_qubit.so"
