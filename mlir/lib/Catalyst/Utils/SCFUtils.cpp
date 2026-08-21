@@ -199,27 +199,28 @@ std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forO
     }
     std::reverse(ranges.begin(), ranges.end());
 
-    // Loops that start at 0 and step by 1 use this average: (outerUpper - depth + 1) / depth.
+    // Loops that start at 0 and step by 1 and the inner bound is the parent induction variable.
+    // then we can use a closed form average: (outerUpper - depth + 1) / depth.
     // Example:
     // for i in 0..8
     //     for j in 0..i
     //         for k in 0..j (average trip count is 2)
     //             ...
     // The average trip count is (8 - 3 + 1) / 3 = 2
-    bool isCanonical = true;
+    bool canUseClosedFormAverage = true;
     for (const LoopRange &range : ranges) {
         if (range.lower != 0 || range.step != 1) {
-            isCanonical = false;
+            canUseClosedFormAverage = false;
             break;
         }
     }
-    if (isCanonical) {
+    if (canUseClosedFormAverage) {
         int64_t depth = static_cast<int64_t>(ranges.size());
         double average = static_cast<double>(outerUpper - depth + 1) / static_cast<double>(depth);
         return std::max(0.0, average);
     }
 
-    // Each loop is resolved separately, so nested non-canonical loops may revisit outer loops.
+    // Each loop is resolved separately, so loops with other bounds or steps may revisit outer loops.
     return computeAverageTripCountByEnumeration(ranges, outerUpper);
 }
 
