@@ -134,6 +134,29 @@
   AOT compilation and as arguments to `pennylane.specs` calculations.
   [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
 
+* The `ResourceAnalysis` pass can now report concrete resource counts for nested loops in cases
+  where the bounds of an inner loop are directly dependent on the loop variable of a static outer loop.
+  [(#3140)](https://github.com/PennyLaneAI/catalyst/pull/3140)
+
+  For example, this program reports a total of `56` `PauliX` operations, since the number of iterations of the inner loops can be statically determined from the outer loop:
+
+  ```python
+  import pennylane as qp
+
+  @qp.qjit(autograph=True)
+  @qp.qnode(qp.device("null.qubit", wires=1))
+  def circuit():
+      for i in range(8):
+          for j in range(i):
+              for _ in range(j):
+                  qp.PauliX(0)
+
+      return qp.expval(qp.X(0))
+
+  resources = qp.specs(circuit, level="all-mlir")().resources
+  print(resources.quantum_operations["PauliX"])  # 56
+  ```
+
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
   operations in question can be annotated with either a `catalyst.estimated_probability` or

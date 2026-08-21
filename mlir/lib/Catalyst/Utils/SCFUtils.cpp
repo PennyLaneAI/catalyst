@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cmath> // std::ceil()
+#include "Catalyst/Utils/SCFUtils.h"
+
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
@@ -28,9 +34,12 @@ using namespace mlir;
 
 namespace catalyst {
 
-static int64_t getNumIterations(double lowerBound, double upperBound, double step) {
-    assert(upperBound >= lowerBound && step > 0);
-    return std::ceil((upperBound - lowerBound) / step);
+static int64_t computeTripCount(int64_t lowerBound, int64_t upperBound, int64_t step) {
+    assert(step > 0);
+    if (upperBound <= lowerBound) {
+        return 0;
+    }
+    return (upperBound - lowerBound + step - 1) / step;
 }
 
 static int64_t getIntFromArithConstantOp(arith::ConstantOp op) {
@@ -70,7 +79,7 @@ int64_t countStaticForOpIterations(scf::ForOp forOp) {
     }
     int64_t s = getIntFromArithConstantOp(cast<arith::ConstantOp>(stepOp));
 
-    return getNumIterations(l, u, s);
+    return computeTripCount(l, u, s);
 }
 
 std::optional<double> getEstimatedIterationsHint(Operation *op) {
@@ -97,10 +106,129 @@ std::optional<double> resolveForLoopTripCount(scf::ForOp forOp) {
     auto lb = resolveConstantInt(forOp.getLowerBound());
     auto ub = resolveConstantInt(forOp.getUpperBound());
     auto step = resolveConstantInt(forOp.getStep());
-    if (lb && ub && step && *step != 0 && *ub > *lb) {
-        return static_cast<double>((*ub - *lb + *step - 1) / *step);
+    if (lb && ub && step && *step > 0 && *ub > *lb) {
+        return static_cast<double>(computeTripCount(*lb, *ub, *step));
     }
     return std::nullopt;
+}
+
+struct LoopRange {
+    int64_t lower;
+    int64_t step;
+};
+
+// Store the total innermost-loop iterations and how many times that loop is reached.
+// Dividing the total by the invocation count gives its average trip count.
+struct TripCountSummary {
+    int64_t total = 0;
+    uint64_t invocations = 0; // how many times the innermost loop is reached
+};
+
+// Walk through each dependent loop using the previous loop's induction value as the next upper
+// bound. Track the total innermost-loop iterations and how many times that loop is reached.
+static TripCountSummary accumulateTripCounts(llvm::ArrayRef<LoopRange> ranges, size_t loopIndex,
+                                             int64_t upperBound) {
+    const LoopRange &range = ranges[loopIndex];
+    if (loopIndex + 1 == ranges.size()) {
+        return {computeTripCount(range.lower, upperBound, range.step), 1};
+    }
+
+    TripCountSummary summary;
+    for (int64_t inductionValue = range.lower; inductionValue < upperBound;
+         inductionValue += range.step) {
+        TripCountSummary nested = accumulateTripCounts(ranges, loopIndex + 1, inductionValue);
+        summary.total += nested.total;
+        summary.invocations += nested.invocations;
+    }
+    return summary;
+}
+
+static double computeAverageTripCountByEnumeration(llvm::ArrayRef<LoopRange> ranges,
+                                                   int64_t outerUpper) {
+    TripCountSummary summary = accumulateTripCounts(ranges, 0, outerUpper);
+
+    if (summary.invocations == 0) {
+        return 0.0;
+    }
+    return summary.total / static_cast<double>(summary.invocations);
+}
+
+std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forOp) {
+    llvm::SmallVector<LoopRange> ranges;
+    int64_t outerUpper = 0;
+    scf::ForOp currentLoop = forOp;
+    while (currentLoop) {
+        auto lower = resolveConstantInt(currentLoop.getLowerBound());
+        auto step = resolveConstantInt(currentLoop.getStep());
+
+        if (!lower || !step || *step <= 0) {
+            return std::nullopt;
+        }
+        ranges.push_back({*lower, *step});
+
+        if (Attribute attr = currentLoop->getAttr(EstimatedIterationsAttrName)) {
+            auto intAttr = dyn_cast<IntegerAttr>(attr);
+            if (!intAttr) {
+                return std::nullopt;
+            }
+            auto iterationCount = intAttr.getValue().trySExtValue();
+            if (!iterationCount || *iterationCount < 0) {
+                return std::nullopt;
+            }
+
+            int64_t span;
+            if (__builtin_mul_overflow(*iterationCount, *step, &span) ||
+                __builtin_add_overflow(*lower, span, &outerUpper)) {
+                return std::nullopt;
+            }
+            break;
+        }
+
+        if (auto upper = resolveConstantInt(currentLoop.getUpperBound())) {
+            outerUpper = *upper;
+            break;
+        }
+
+        auto parent = dyn_cast_or_null<scf::ForOp>(currentLoop->getParentOp());
+        while (parent && currentLoop.getUpperBound() != parent.getInductionVar()) {
+            if (parent->hasAttr(EstimatedIterationsAttrName) || !resolveForLoopTripCount(parent)) {
+                return std::nullopt;
+            }
+            parent = dyn_cast_or_null<scf::ForOp>(parent->getParentOp());
+        }
+        if (!parent) {
+            return std::nullopt;
+        }
+        currentLoop = parent;
+    }
+    std::reverse(ranges.begin(), ranges.end());
+
+    // Loops that share a lower bound, step by 1, and use the parent induction variable as their
+    // upper bound have this closed-form average:(outerUpper - commonLower - depth + 1) / depth.
+    // Example:
+    // for i in 0..8
+    //     for j in 0..i
+    //         for k in 0..j (average trip count is 2)
+    //             ...
+    // The average trip count is (8 - 3 + 1) / 3 = 2
+    int64_t commonLower = ranges.front().lower;
+    bool canUseClosedFormAverage = true;
+    for (const LoopRange &range : ranges) {
+        if (range.lower != commonLower || range.step != 1) {
+            canUseClosedFormAverage = false;
+            break;
+        }
+    }
+    if (canUseClosedFormAverage) {
+        int64_t depth = static_cast<int64_t>(ranges.size());
+        double average =
+            static_cast<double>(outerUpper - commonLower - depth + 1) / static_cast<double>(depth);
+        return std::max(0.0, average);
+    }
+
+    // Each loop is resolved separately, so loops with other bounds or
+    // steps may revisit outer loops.
+    return computeAverageTripCountByEnumeration(ranges, outerUpper);
 }
 
 // Given an op in a for loop body with a static number of start, end and step,
