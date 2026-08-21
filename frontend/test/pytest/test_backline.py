@@ -23,9 +23,7 @@ import pytest
 from pennylane.backline import Transport
 
 from catalyst import Executor, qjit
-from catalyst.from_plxpr.from_plxpr import _get_device_kwargs
 from catalyst.backline import (
-    remote_device_lib,
     _EXECUTOR_RUNTIME_PLUGINS,
     _TRANSPORT_PASSES,
     _insert_passes,
@@ -36,9 +34,11 @@ from catalyst.backline import (
     device_pass_pipeline,
     launch_executors,
     placement_pipeline,
+    remote_device_lib,
     serialize_backline,
 )
 from catalyst.device.qjit_device import BackendInfo, extract_backend_info
+from catalyst.from_plxpr.from_plxpr import _get_device_kwargs
 from catalyst.utils.exceptions import CompileError
 
 if hasattr(qp, "backline"):
