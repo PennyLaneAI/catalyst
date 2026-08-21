@@ -1019,9 +1019,13 @@ func.func @same_lower_bound_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit
     %c2 = arith.constant 2 : index
     %c6 = arith.constant 6 : index
 
+    // Python code:
+    // for i in range(2, 6):
+    //     for j in range(2, i):
+    //         qp.PauliX(0)
+
     %q = scf.for %i = %c2 to %c6 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
-        %inner = scf.for %j = %c2 to %i step %c1
-            iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
+        %inner = scf.for %j = %c2 to %i step %c1 iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
             %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
             scf.yield %out : !quantum.bit
         }
