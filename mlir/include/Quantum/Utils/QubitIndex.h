@@ -75,8 +75,7 @@ class QubitIndex {
     operator bool() const { return isValue() || isAttr(); }
     mlir::Value getReg() const { return qreg; }
     mlir::Value getValue() const { return isValue() ? std::get<mlir::Value>(index) : nullptr; }
-    mlir::IntegerAttr getAttr() const
-    {
+    mlir::IntegerAttr getAttr() const {
         return isAttr() ? std::get<mlir::IntegerAttr>(index) : nullptr;
     }
 };
@@ -92,8 +91,7 @@ class QubitIndex {
 ///
 /// Returns an invalid (default-constructed) QubitIndex if the chain ends in
 /// some other defining op or a block argument.
-inline QubitIndex getExtractIndex(mlir::Value qubit)
-{
+inline QubitIndex getExtractIndex(mlir::Value qubit) {
     while (qubit) {
         if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
             if (mlir::Value idx = extractOp.getIdx()) {
@@ -117,9 +115,8 @@ inline QubitIndex getExtractIndex(mlir::Value qubit)
                     continue;
                 }
             }
-        }
-        else if (auto measureOp =
-                     mlir::dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
+        } else if (auto measureOp =
+                       mlir::dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
             qubit = measureOp.getInQubit();
             continue;
         }

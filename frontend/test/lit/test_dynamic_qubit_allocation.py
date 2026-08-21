@@ -231,9 +231,11 @@ def test_quantum_subroutine():
     # CHECK:   qref.custom "PauliX"() %arg1 : !qref.bit
     # CHECK:   qref.custom "PauliY"() %arg2 : !qref.bit
     # CHECK:   qref.custom "PauliZ"() %arg3 : !qref.bit
+    # CHECK:   qref.ctrl(%arg1, %arg2) ctrlvals([[true]], [[true]]) {
     # CHECK:   [[glob_0:%.+]] = qref.get %arg0[ 0] : !qref.reg<1> -> !qref.bit
     # CHECK:   [[angle:%.+]] = tensor.extract %arg4[] : tensor<f64>
-    # CHECK:   qref.custom "RX"([[angle]]) [[glob_0]] ctrls(%arg1, %arg2) ctrlvals([[true]], [[true]]) : !qref.bit ctrls !qref.bit, !qref.bit
+    # CHECK:   qref.custom "RX"([[angle]]) [[glob_0]] : !qref.bit
+    # CHECK:   }
     # CHECK:   return
 
     print(circuit.mlir)

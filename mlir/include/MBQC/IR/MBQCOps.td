@@ -18,6 +18,7 @@
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
+include "Catalyst/Analysis/ResourceInterfaces.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
 
@@ -49,7 +50,8 @@ defvar getNumQubitsFromAdjMatrixSize = [{
 
 include "MBQC/IR/MBQCRefOps.td"
 
-def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
+def MeasureInBasisOp : MBQC_Op<"measure_in_basis",
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A parametric single-qubit projective measurement in an arbitrary basis.";
     let description = [{
         A parametric single-qubit projective measurement is equivalent to the `quantum.measure`
@@ -86,7 +88,9 @@ def MeasureInBasisOp : MBQC_Op<"measure_in_basis"> {
     }];
 }
 
-def GraphStatePrepOp : MBQC_Op<"graph_state_prep"> {
+def GraphStatePrepOp : MBQC_Op<"graph_state_prep",
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>,
+     DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate resources for a new graph state.";
     let description = [{
         This operation allocates the resources for a new quantum *graph state* for use in MBQC

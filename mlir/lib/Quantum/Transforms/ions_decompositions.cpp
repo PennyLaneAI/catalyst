@@ -36,8 +36,7 @@ namespace quantum {
 struct IonsDecompositionPass : impl::IonsDecompositionPassBase<IonsDecompositionPass> {
     using IonsDecompositionPassBase::IonsDecompositionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "ions decomposition pass"
                           << "\n");
 

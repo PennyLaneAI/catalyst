@@ -23,8 +23,7 @@
 
 using namespace Catalyst::Runtime::OpenQASM2;
 
-TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm]")
-{
+TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm]") {
     // Check lookup supported gates
     CHECK(lookup_qasm_gate_name("PauliX") == "x");
     CHECK(lookup_qasm_gate_name("Hadamard") == "h");
@@ -38,8 +37,7 @@ TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm
                             "The given QIR gate name is not supported by the OpenQASM builder"));
 }
 
-TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]") {
     auto reg = QASMRegister(RegisterType::Qubit, "qubits", 5);
     CHECK(reg.getName() == "qubits");
     CHECK(reg.getSize() == 5);
@@ -64,8 +62,7 @@ TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]")
                                            "Unsupported OpenQasm register mode"));
 }
 
-TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]") {
     auto reg = QASMRegister(RegisterType::Bit, "bits", 5);
     CHECK(reg.getName() == "bits");
     CHECK(reg.getSize() == 5);
@@ -97,8 +94,7 @@ TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
                                            "Unsupported OpenQasm register mode"));
 }
 
-TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]") {
     auto qubits = QASMRegister(RegisterType::Qubit, "q", 5);
 
     // Check a supported gate without params
@@ -147,8 +143,7 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
             "gate name is not supported by the OpenQASM builder"));
 }
 
-TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
-{
+TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]") {
     auto qubits = QASMRegister(RegisterType::Qubit, "q", 5);
     auto cbits = QASMRegister(RegisterType::Bit, "c", 5);
 
@@ -175,8 +170,8 @@ TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
     CHECK(mz2.toOpenQASM2(qubits, cbits) == mz2_res_toqasm);
 }
 
-TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure", "[openqasm]")
-{
+TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure",
+          "[openqasm]") {
     auto builder = OpenQASM2Builder();
 
     builder.AddRegisters("q", 5, "c", 5);
@@ -206,8 +201,7 @@ TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and meas
 }
 
 TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure all",
-          "[openqasm]")
-{
+          "[openqasm]") {
     auto builder = OpenQASM2Builder();
 
     builder.AddRegisters("q", 5, "c", 5);

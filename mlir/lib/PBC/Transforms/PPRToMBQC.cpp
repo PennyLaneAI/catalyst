@@ -26,8 +26,7 @@ using namespace catalyst::pbc;
 
 namespace {
 
-CustomOp buildCNOTGate(Value control, Value target, ConversionPatternRewriter &rewriter)
-{
+CustomOp buildCNOTGate(Value control, Value target, ConversionPatternRewriter &rewriter) {
     return quantum::CustomOp::create(
         rewriter, control.getLoc(),
         /*out_qubits=*/mlir::TypeRange({control.getType(), target.getType()}),
@@ -42,8 +41,7 @@ CustomOp buildCNOTGate(Value control, Value target, ConversionPatternRewriter &r
 
 // Overload for static (compile-time) parameters
 CustomOp buildSingleQubitGate(Value qubit, StringRef gateName, ArrayRef<double> params,
-                              ConversionPatternRewriter &rewriter)
-{
+                              ConversionPatternRewriter &rewriter) {
     SmallVector<Value, 1> paramValues;
     auto f64Ty = rewriter.getF64Type();
     for (double p : params) {
@@ -65,8 +63,7 @@ CustomOp buildSingleQubitGate(Value qubit, StringRef gateName, ArrayRef<double> 
 
 // Version for dynamic (runtime) parameters
 CustomOp buildSingleQubitGateWithDynamicParams(Value qubit, StringRef gateName, ValueRange params,
-                                               ConversionPatternRewriter &rewriter)
-{
+                                               ConversionPatternRewriter &rewriter) {
     return quantum::CustomOp::create(rewriter, qubit.getLoc(),
                                      /*out_qubits=*/mlir::TypeRange({qubit.getType()}),
                                      /*out_ctrl_qubits=*/mlir::TypeRange({}),
@@ -78,8 +75,7 @@ CustomOp buildSingleQubitGateWithDynamicParams(Value qubit, StringRef gateName, 
                                      /*in_ctrl_values=*/mlir::ValueRange());
 }
 
-MeasureOp buildMeasurementOp(Value qubit, ConversionPatternRewriter &rewriter)
-{
+MeasureOp buildMeasurementOp(Value qubit, ConversionPatternRewriter &rewriter) {
     return quantum::MeasureOp::create(rewriter, qubit.getLoc(),
                                       /*mres=*/rewriter.getI1Type(),
                                       /*out_qubits=*/qubit.getType(),
@@ -90,8 +86,7 @@ MeasureOp buildMeasurementOp(Value qubit, ConversionPatternRewriter &rewriter)
 // Applies per-qubit conjugations that map the provided Pauli string to the Z
 // basis. If `isReverse` is true, applies the inverse mapping.
 void constructPauliConjugationLayer(SmallVector<Value> &qubits, ArrayRef<StringRef> pauliString,
-                                    bool isReverse, ConversionPatternRewriter &rewriter)
-{
+                                    bool isReverse, ConversionPatternRewriter &rewriter) {
     // Apply the conjugation gate on the corresponding qubit index.
     // Expect the Pauli string length to match the number of qubits.
     size_t numQubits = qubits.size();
@@ -126,8 +121,7 @@ void constructPauliConjugationLayer(SmallVector<Value> &qubits, ArrayRef<StringR
 }
 
 // Applies a right-to-left CNOT ladder to accumulate parity onto `qubits[0]`.
-void constructCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRewriter &rewriter)
-{
+void constructCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRewriter &rewriter) {
     size_t numQubits = qubits.size();
     for (size_t i = numQubits - 1; i > 0; i--) {
         auto outQubits = buildCNOTGate(qubits[i], qubits[i - 1], rewriter).getOutQubits();
@@ -137,8 +131,7 @@ void constructCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRewriter &
 }
 
 // Reverses the CNOT ladder to uncompute parity accumulation.
-void constructReverseCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRewriter &rewriter)
-{
+void constructReverseCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRewriter &rewriter) {
     size_t numQubits = qubits.size();
     for (size_t i = 0; i < numQubits - 1; i++) {
         auto outQubits = buildCNOTGate(qubits[i + 1], qubits[i], rewriter).getOutQubits();
@@ -156,18 +149,15 @@ void constructReverseCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRew
 //      RZ(phi)       = exp(-i * phi/2 * Z)
 //      Therefore: phi = 2 * theta
 void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, PBCOpInterface op,
-                              ConversionPatternRewriter &rewriter)
-{
+                              ConversionPatternRewriter &rewriter) {
     if (isa<PPMeasurementOp>(op)) {
         auto measOp = buildMeasurementOp(qubits[0], rewriter);
         measResult = measOp.getMres();
         qubits[0] = measOp.getOutQubit();
-    }
-    else if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
+    } else if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
         double rk = 2 * (llvm::numbers::pi / (static_cast<double>(pprOp.getRotationKind())));
         qubits[0] = buildSingleQubitGate(qubits[0], "RZ", {rk}, rewriter).getOutQubits().front();
-    }
-    else if (auto pprArbitraryOp = dyn_cast<PPRotationArbitraryOp>(op.getOperation())) {
+    } else if (auto pprArbitraryOp = dyn_cast<PPRotationArbitraryOp>(op.getOperation())) {
         Value angle = pprArbitraryOp.getArbitraryAngle();
         auto loc = pprArbitraryOp.getLoc();
 
@@ -219,8 +209,7 @@ void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, PBC
 // [[maybe_unused]] is used to suppress the warning about the function being unused.
 //
 [[maybe_unused]]
-LogicalResult convertToMBQC(PBCOpInterface op, ConversionPatternRewriter &rewriter)
-{
+LogicalResult convertToMBQC(PBCOpInterface op, ConversionPatternRewriter &rewriter) {
     Value measResult;
     auto pauliString = extractPauliString(op);
     SmallVector<Value> qubits = op.getInQubits();
@@ -251,13 +240,10 @@ LogicalResult convertToMBQC(PBCOpInterface op, ConversionPatternRewriter &rewrit
 
 template <typename TargetOp> struct PPRToMBQCLowering : public ConversionPattern {
     PPRToMBQCLowering(MLIRContext *context)
-        : ConversionPattern(TargetOp::getOperationName(), 1, context)
-    {
-    }
+        : ConversionPattern(TargetOp::getOperationName(), 1, context) {}
 
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const final
-    {
+                                  ConversionPatternRewriter &rewriter) const final {
         if (auto pbcOp = dyn_cast<PBCOpInterface>(op)) {
             return convertToMBQC(pbcOp, rewriter);
         }
@@ -274,8 +260,7 @@ using PPMeasurementOpLowering = PPRToMBQCLowering<pbc::PPMeasurementOp>;
 namespace catalyst {
 namespace pbc {
 
-void populatePPRToMBQCPatterns(RewritePatternSet &patterns)
-{
+void populatePPRToMBQCPatterns(RewritePatternSet &patterns) {
     patterns.add<PPRotationOpLowering>(patterns.getContext());
     patterns.add<PPRotationArbitraryOpLowering>(patterns.getContext());
     patterns.add<PPMeasurementOpLowering>(patterns.getContext());

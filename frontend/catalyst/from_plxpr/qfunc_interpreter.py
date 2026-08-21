@@ -25,12 +25,18 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.sharding_impls import UNSPECIFIED
 from pennylane.capture import PlxprInterpreter, pause
+from pennylane.capture.base_interpreter import jaxpr_to_jaxpr
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
-from pennylane.capture.primitives import operator_p
+from pennylane.capture.primitives import (
+    operator_p,
+)
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
-from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
+from pennylane.capture.primitives import (
+    quantum_subroutine_prim,
+    transform_prim,
+)
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
@@ -106,6 +112,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         *,
         control_wires=(),
         control_values=(),
+        collect_decomp_rules=True,
     ):
         self.device = device
         self.shots = shots
@@ -116,8 +123,28 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.control_values = control_values
         """Any control values for executing a subroutine."""
         self.has_dynamic_allocation = False
+        self.collect_decomp_rules = collect_decomp_rules
 
         super().__init__()
+
+    def interpret_operation_eqn(self, eqn):
+        """Override to handle Operator2 (operator_p) equations.
+
+        For Operator2 ops used as observables (output is not DropVar),
+        return the operator instance without applying it as a gate.
+        For Operator2 ops used as gates (output is DropVar), apply the gate
+        using the Operator2-specific lowering.
+        For legacy ops, delegate to the parent implementation.
+        """
+        if eqn.primitive is operator_p:
+            invals = [self.read(invar) for invar in eqn.invars]
+            with qp.QueuingManager.stop_recording():
+                op = eqn.primitive.impl(*invals, **eqn.params)
+            if isinstance(eqn.outvars[0], jax.core.DropVar):
+                _apply_operator2_gate(self, *invals, **eqn.params)
+                return ()
+            return op
+        return super().interpret_operation_eqn(eqn)
 
     def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
         """Re-bind a pennylane operation as a catalyst instruction.
@@ -144,7 +171,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 control_values=control_values,
                 control_wires=control_wires,
             )
-        if type(op) in {qp.ops.Controlled, qp.ops.ControlledOp}:
+        if type(op) in {qp.ops.Controlled, qp.ops.ControlledOp, qp.ops.ControlledOp2}:
             return self.interpret_operation(
                 op.base,
                 is_adjoint=is_adjoint,
@@ -311,8 +338,7 @@ def _new_hybrid_arg(interp: PLxPRToQuantumJaxprInterpreter, arg) -> list:
 
 
 # pylint: disable=too-many-arguments
-@PLxPRToQuantumJaxprInterpreter.register_primitive(operator_p)
-def handle_operator(
+def _apply_operator2_gate(
     self,
     *args,
     op_cls,
@@ -324,7 +350,7 @@ def handle_operator(
     n_ctrls,
     **kwargs,
 ):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the operator_p primitive."""
+    """Apply an Operator2 as a gate instruction using qref_operator_p."""
     n_wires = sum(wire_lens)
     wire_inputs = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + n_wires]
     if n_ctrls:
@@ -332,6 +358,10 @@ def handle_operator(
         control_values = args[-n_ctrls:]
     else:
         control_wire_inputs = control_values = ()
+
+    control_wire_inputs += self.control_wires
+    control_values += self.control_values
+    n_ctrls += len(self.control_wires)
 
     new_wires = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wire_inputs
@@ -364,9 +394,9 @@ def handle_operator(
         forward_mask=forward_mask,
         adjoint=adjoint,
         n_ctrls=n_ctrls,
+        collect_decomp_rules=self.collect_decomp_rules,
         **kwargs,
     )
-    return []
 
 
 # pylint: disable=unused-argument, too-many-arguments
@@ -377,7 +407,12 @@ def _qubit_unitary_bind_call(
     mat = invals[qubits_len]
     ctrl_inputs = invals[qubits_len + 1 :]
     return qref_unitary_p.bind(
-        mat, *wires, *ctrl_inputs, qubits_len=qubits_len, ctrl_len=ctrl_len, adjoint=adjoint
+        mat,
+        *wires,
+        *ctrl_inputs,
+        qubits_len=qubits_len,
+        ctrl_len=ctrl_len,
+        adjoint=adjoint,
     )
 
 
@@ -593,23 +628,6 @@ def handle_pauli_measure(self, *wires_inval, pauli_word, **params):
     return result
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qp.BasisState._primitive)
-def handle_basis_state(self, *invals, n_wires):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
-    state_inval = invals[0]
-    wires_inval = invals[1:]
-    in_qubits = []
-    for w in wires_inval:
-        if is_abstract_qubit(w):
-            in_qubits.append(w)
-        else:
-            in_qubits.append(qref_get_p.bind(self.init_qreg, w))
-
-    state = jax.lax.convert_element_type(state_inval, jnp.dtype(jnp.bool))
-
-    qref_set_basis_state_p.bind(*in_qubits, state)
-
-
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.StatePrep._primitive)
 def handle_state_prep(self, *invals, n_wires, **kwargs):
@@ -698,16 +716,26 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
 def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
-    """Interpret a control transform primitive."""
+    """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
     consts = invals[:n_consts]
     args = invals[n_consts:-n_control]
     control_wires = invals[-n_control:]
 
-    unroller = copy(self)
-    unroller.control_wires += tuple(control_wires)
-    unroller.control_values += tuple(control_values)
-    unroller.eval(jaxpr, consts, *args)
-    return []
+    control_qubits = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
+    ]
+    body = jaxpr_to_jaxpr(copy(self), jaxpr, consts, *args)
+
+    return plxpr_ctrl_transform_prim.bind(
+        *body.consts,
+        *args,
+        *control_qubits,
+        n_control=n_control,
+        jaxpr=body.jaxpr,
+        control_values=control_values,
+        work_wires=work_wires,
+        n_consts=len(body.consts),
+    )
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(transform_prim)

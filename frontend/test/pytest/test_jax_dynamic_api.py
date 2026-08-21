@@ -361,8 +361,11 @@ class TestBasicArrayCreation:
         def f():
             return jnp.empty(shape=bad_shape, dtype=int)
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            f = qjit(f, capture=capture_mode)
+
         with pytest.raises(TypeError, match="Shapes must be 1D sequences of integer scalars"):
-            qjit(f, capture=capture_mode)
+            f()
 
     def test_accessing_shapes(self, capture_mode):
         """Test that dynamic tensor shapes are available for calculations"""

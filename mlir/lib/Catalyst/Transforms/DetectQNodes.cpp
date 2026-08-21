@@ -72,13 +72,13 @@ struct DetectCallsInAsyncRegionsTransform : public OpRewritePattern<LLVM::CallOp
  * DetectCallsInAsyncregionsTransform pattern will match
  */
 LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp callOp,
-                                                                  PatternRewriter &rewriter) const
-{
+                                                                  PatternRewriter &rewriter) const {
     // Calls to direct functions
     //    llvm.call @callee() : () -> ()
     std::optional<LLVM::LLVMFuncOp> candidate = AsyncUtils::getCalleeSafe(callOp);
-    if (!candidate)
+    if (!candidate) {
         return failure();
+    }
 
     LLVM::LLVMFuncOp callee = candidate.value();
     // Where the callee is annotated with the qnode attribute
@@ -94,12 +94,14 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
     auto caller = AsyncUtils::getCaller(callOp);
     bool validCandidate = isQnode && AsyncUtils::isAsync(caller);
 
-    if (!validCandidate)
+    if (!validCandidate) {
         return failure();
+    }
 
     bool hasBeenTransformed = AsyncUtils::isScheduledForTransformation(callOp);
-    if (hasBeenTransformed)
+    if (hasBeenTransformed) {
         return failure();
+    }
 
     /* Will be transformed to add the attribute catalyst.preInvoke
      *     llvm.call @callee() { catalyst.preInvoke }
@@ -120,8 +122,7 @@ struct AddExceptionHandlingTransform : public OpRewritePattern<LLVM::CallOp> {
  * is that this pattern can potentially be reused as long as this single annotation is present.
  */
 LogicalResult AddExceptionHandlingTransform::matchAndRewrite(LLVM::CallOp callOp,
-                                                             PatternRewriter &rewriter) const
-{
+                                                             PatternRewriter &rewriter) const {
     // The following is a valid match
     //     llvm.call @callee() { catalyst.preInvoke }
     bool validCandidate = AsyncUtils::isScheduledForTransformation(callOp);
@@ -225,8 +226,7 @@ LogicalResult AddExceptionHandlingTransform::matchAndRewrite(LLVM::CallOp callOp
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToEnd(failBlock);
         LLVM::UnreachableOp::create(rewriter, invokeOp->getLoc());
-    }
-    else {
+    } else {
         auto successor = successBlock->getSuccessor(0);
 
         // This is roughly what the function looks like after transformation
@@ -276,8 +276,7 @@ struct RemoveAbortAndPutsInsertCallTransform : public OpRewritePattern<LLVM::Cal
 // These functions return async values or tokens.
 LogicalResult
 RemoveAbortAndPutsInsertCallTransform::matchAndRewrite(LLVM::CallOp callOp,
-                                                       PatternRewriter &rewriter) const
-{
+                                                       PatternRewriter &rewriter) const {
     auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee) {
         return failure();
@@ -447,8 +446,7 @@ struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
 };
 
 LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink,
-                                                       PatternRewriter &rewriter) const
-{
+                                                       PatternRewriter &rewriter) const {
     // We match on function calls that have the sink attribute.
     //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
     if (!AsyncUtils::isSink(sink)) {
@@ -470,8 +468,9 @@ LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink,
     // but at another sink in this same function. This depends on the liveness analysis.
     caller->walk([&](LLVM::CallOp callOp) {
         bool isInteresting = AsyncUtils::callsSource(callOp);
-        if (!isInteresting)
+        if (!isInteresting) {
             return;
+        }
 
         sources.push_back(callOp);
         auto results = callOp.getResults();
@@ -530,8 +529,9 @@ LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink,
     //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
     for (auto awaitMe : tokens) {
         auto contains = valuesToDrop.find(awaitMe) != valuesToDrop.end();
-        if (contains)
+        if (contains) {
             LLVM::CallOp::create(rewriter, sink.getLoc(), awaitFnDecl, awaitMe);
+        }
     }
 
     // We will drop all values that were alive. Tokens and values.
@@ -566,21 +566,21 @@ struct BranchToUnreachableTransform : public OpRewritePattern<LLVM::BrOp> {
 };
 
 LogicalResult CleanUpSourceTransform::matchAndRewrite(LLVM::CallOp candidate,
-                                                      PatternRewriter &rewriter) const
-{
-    if (!AsyncUtils::callsSource(candidate))
+                                                      PatternRewriter &rewriter) const {
+    if (!AsyncUtils::callsSource(candidate)) {
         return failure();
+    }
 
     AsyncUtils::cleanupSource(candidate, rewriter);
     return success();
 }
 
 LogicalResult BranchToUnreachableTransform::matchAndRewrite(LLVM::BrOp candidate,
-                                                            PatternRewriter &rewriter) const
-{
+                                                            PatternRewriter &rewriter) const {
     bool hasAttr = AsyncUtils::hasChangeToUnreachableAttr(candidate);
-    if (!hasAttr)
+    if (!hasAttr) {
         return failure();
+    }
 
     auto unreachable = LLVM::UnreachableOp::create(rewriter, candidate.getLoc());
     rewriter.replaceOp(candidate, unreachable);
@@ -611,8 +611,7 @@ LogicalResult BranchToUnreachableTransform::matchAndRewrite(LLVM::BrOp candidate
 // We can now say that A calls a function B and B may raise an exception.
 // So A must catch it and decide how to deallocate resources from A, B, and C.
 
-void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM::CallOp> &calls)
-{
+void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM::CallOp> &calls) {
     for (Block *block : blocks) {
         block->walk([&](LLVM::CallOp op) {
             if (AsyncUtils::callsAbort(op)) {
@@ -623,8 +622,7 @@ void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM:
     }
 }
 
-void removeCallsToPutsInBlocks(SmallVector<Block *> &blocks, PatternRewriter &rewriter)
-{
+void removeCallsToPutsInBlocks(SmallVector<Block *> &blocks, PatternRewriter &rewriter) {
     for (Block *block : blocks) {
         block->walk([&](LLVM::CallOp op) {
             if (AsyncUtils::callsPuts(op)) {
@@ -636,8 +634,7 @@ void removeCallsToPutsInBlocks(SmallVector<Block *> &blocks, PatternRewriter &re
 }
 
 void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target,
-                                  SmallVector<LLVM::CallOp> &newCalls, PatternRewriter &rewriter)
-{
+                                  SmallVector<LLVM::CallOp> &newCalls, PatternRewriter &rewriter) {
     for (auto oldCallOp : oldCallOps) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPoint(oldCallOp);
@@ -649,8 +646,7 @@ void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::L
 }
 
 void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &aborts,
-                            SmallVector<Block *> &success)
-{
+                            SmallVector<Block *> &success) {
     for (auto condition : conditions) {
         for (Operation *user : condition.getUsers()) {
             if (isa<LLVM::CondBrOp>(user)) {
@@ -660,8 +656,7 @@ void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *>
                 if (AsyncUtils::hasAbortInBlock(trueDest)) {
                     aborts.push_back(trueDest);
                     success.push_back(falseDest);
-                }
-                else {
+                } else {
                     aborts.push_back(falseDest);
                     success.push_back(trueDest);
                 }
@@ -670,8 +665,7 @@ void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *>
     }
 }
 
-void collectPutsBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &puts)
-{
+void collectPutsBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &puts) {
     for (auto condition : conditions) {
         for (Operation *user : condition.getUsers()) {
             if (isa<LLVM::CondBrOp>(user)) {
@@ -685,15 +679,15 @@ void collectPutsBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &put
 }
 
 void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
-                                                     SmallVector<Value> &results)
-{
+                                                     SmallVector<Value> &results) {
     for (Value value : values) {
         for (Operation *user : value.getUsers()) {
             bool isCallToIsErrorToken = AsyncUtils::callsMlirAsyncRuntimeIsTokenError(user);
             bool isCallToIsValueToken = AsyncUtils::callsMlirAsyncRuntimeIsValueError(user);
             bool isValid = isCallToIsErrorToken || isCallToIsValueToken;
-            if (!isValid)
+            if (!isValid) {
                 continue;
+            }
 
             auto boolVal = user->getResult(0);
             results.push_back(boolVal);
@@ -701,8 +695,7 @@ void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
     }
 }
 
-void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &conditions)
-{
+void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &conditions) {
     for (auto boolVal : values) {
         for (Operation *user : boolVal.getUsers()) {
             if (isa<LLVM::XOrOp>(user)) {
@@ -714,37 +707,34 @@ void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &
 }
 
 void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &tokens,
-                            SmallVector<Value> &values)
-{
+                            SmallVector<Value> &values) {
     Value result = results.front();
     Type resultTy = result.getType();
 
     if (isa<LLVM::LLVMPointerType>(resultTy)) {
         tokens.push_back(result);
-    }
-    else if (isa<LLVM::LLVMStructType>(resultTy)) {
+    } else if (isa<LLVM::LLVMStructType>(resultTy)) {
         for (Operation *user : result.getUsers()) {
             if (isa<LLVM::ExtractValueOp>(user)) {
                 LLVM::ExtractValueOp extract = cast<LLVM::ExtractValueOp>(user);
                 auto isToken = extract.getPosition()[0] == 0;
-                if (isToken)
+                if (isToken) {
                     tokens.push_back(user->getResult(0));
-                else
+                } else {
                     values.push_back(user->getResult(0));
+                }
             }
         }
     }
 }
 
-void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLookFor)
-{
+void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLookFor) {
     Value result = results.front();
     Type resultTy = result.getType();
 
     if (isa<LLVM::LLVMPointerType>(resultTy)) {
         valuesToLookFor.push_back(result);
-    }
-    else if (isa<LLVM::LLVMStructType>(resultTy)) {
+    } else if (isa<LLVM::LLVMStructType>(resultTy)) {
         // How to refer to a value without using llvm.extract
         for (Operation *user : result.getUsers()) {
             if (isa<LLVM::ExtractValueOp>(user)) {
@@ -756,8 +746,7 @@ void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLo
 
 void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> abortBlocks,
                                                           SmallVector<Block *> successBlocks,
-                                                          PatternRewriter &rewriter)
-{
+                                                          PatternRewriter &rewriter) {
     for (auto [abort, success] : llvm::zip(abortBlocks, successBlocks)) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         auto terminator = abort->getTerminator();
@@ -769,8 +758,7 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
     }
 }
 
-std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewriter &rewriter)
-{
+std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewriter &rewriter) {
     // TODO: Maybe split this logic a bit?
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     Block *blockContainingCall = callOp->getBlock();
@@ -793,8 +781,7 @@ std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewr
 }
 
 void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp personality,
-                             PatternRewriter &rewriter)
-{
+                             PatternRewriter &rewriter) {
     rewriter.modifyOpInPlace(callerOp, [&] {
         auto personalityAttr = FlatSymbolRefAttr::get(personality.getSymNameAttr());
         callerOp.setPersonalityAttr(personalityAttr);
@@ -802,8 +789,7 @@ void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp persona
 }
 
 LLVM::InvokeOp transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *failBlock,
-                                     PatternRewriter &rewriter)
-{
+                                     PatternRewriter &rewriter) {
     auto calleeAttr = callOp.getCalleeAttr();
     SmallVector<Value> unwindArgs;
     auto invokeOp = LLVM::InvokeOp::create(rewriter, callOp.getLoc(), callOp.getResultTypes(),
@@ -814,8 +800,7 @@ LLVM::InvokeOp transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, B
 }
 
 std::tuple<std::vector<Value>, std::vector<Value>>
-collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp)
-{
+collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp) {
     // Since we are guaranteed to be in an asynchronous execution function
     // we need to gather all values generated from mlirAsyncRuntimeCreateToken
     // and mlirAsyncRuntimeCreateValue.
@@ -825,15 +810,17 @@ collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp)
 
     funcOp.walk([&](LLVM::CallOp call) {
         auto calleeMaybeIndirect = AsyncUtils::getCalleeSafe(call);
-        if (!calleeMaybeIndirect)
+        if (!calleeMaybeIndirect) {
             return;
+        }
 
         auto callee = calleeMaybeIndirect.value();
         bool tokens = AsyncUtils::isMlirAsyncRuntimeCreateToken(callee);
         bool values = AsyncUtils::isMlirAsyncRuntimeCreateValue(callee);
         bool skip = !tokens && !values;
-        if (skip)
+        if (skip) {
             return;
+        }
 
         if (tokens) {
             for (auto value : call.getResults()) {
@@ -851,8 +838,7 @@ collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp)
 }
 
 void insertCallToMlirAsyncRuntimeErrorFunction(Value value, LLVM::LLVMFuncOp fnDecl,
-                                               Block *failBlock, PatternRewriter &rewriter)
-{
+                                               Block *failBlock, PatternRewriter &rewriter) {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     rewriter.setInsertionPointToEnd(failBlock);
     SmallVector<Value> operands = {value};
@@ -860,8 +846,7 @@ void insertCallToMlirAsyncRuntimeErrorFunction(Value value, LLVM::LLVMFuncOp fnD
 }
 
 void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Block *failBlock,
-                      PatternRewriter &rewriter)
-{
+                      PatternRewriter &rewriter) {
     // At the fail block, it is guaranteed that all runtime values are available
     // but they
     PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -881,8 +866,7 @@ void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Bloc
     }
 }
 
-void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewriter &rewriter)
-{
+void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewriter &rewriter) {
     // The reason why we are unconditionally jumping from failure to success
     // is because the failure is communicated through the state of the runtime tokens
     // and values.
@@ -909,8 +893,7 @@ namespace catalyst {
 struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptionHandlingPass> {
     using AddExceptionHandlingPassBase::AddExceptionHandlingPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
 
         RewritePatternSet patterns1(context);

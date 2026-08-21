@@ -38,8 +38,7 @@ namespace pauli_frame {
 struct CliffordTToPauliFramePass : impl::CliffordTToPauliFramePassBase<CliffordTToPauliFramePass> {
     using CliffordTToPauliFramePassBase::CliffordTToPauliFramePassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "Clifford+T to Pauli frame pass\n");
 
         Operation *module = getOperation();

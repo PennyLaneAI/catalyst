@@ -46,8 +46,7 @@ namespace gradient {
 struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPass> {
     using GradientLoweringPassBase::GradientLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet gradientPatterns(&getContext());
         populateLoweringPatterns(gradientPatterns);
 

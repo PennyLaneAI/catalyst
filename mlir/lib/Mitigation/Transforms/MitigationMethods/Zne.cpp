@@ -36,8 +36,7 @@
 namespace catalyst {
 namespace mitigation {
 
-bool containsQnodes(func::FuncOp funcOp)
-{
+bool containsQnodes(func::FuncOp funcOp) {
     bool containsQnodes = false;
     funcOp.walk([&](func::CallOp op) {
         auto insideFuncOp =
@@ -51,8 +50,7 @@ bool containsQnodes(func::FuncOp funcOp)
     return containsQnodes;
 }
 
-func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter, Type foldCountType)
-{
+func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter, Type foldCountType) {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     auto loc = funcOp.getLoc();
     TypeRange originalTypes = funcOp.getArgumentTypes();
@@ -76,8 +74,7 @@ func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter, Type 
 // Also all functions exploree in the call graph get their ZNE version.
 func::FuncOp ZneLowering::getOrCreateFoldedCallee(Location loc, PatternRewriter &rewriter,
                                                   mitigation::ZneOp op, func::FuncOp calleeOp,
-                                                  Folding foldingAlgorithm, Type foldCountType)
-{
+                                                  Folding foldingAlgorithm, Type foldCountType) {
     auto moduleOp = op->getParentOfType<ModuleOp>();
 
     if (calleeOp->hasAttr("qnode")) {
@@ -150,8 +147,7 @@ func::FuncOp ZneLowering::getOrCreateFoldedCallee(Location loc, PatternRewriter 
 Value ZneLowering::buildFoldedResultsLoop(Location loc, PatternRewriter &rewriter,
                                           mitigation::ZneOp op, func::FuncOp fnFoldedOp,
                                           Value numFolds, bool randomFolding,
-                                          int64_t numScaleFactors, RankedTensorType resultType)
-{
+                                          int64_t numScaleFactors, RankedTensorType resultType) {
     // Loop over the num fold to create a folded circuit per factor
     Value c0 = index::ConstantOp::create(rewriter, loc, 0);
     Value c1 = index::ConstantOp::create(rewriter, loc, 1);
@@ -170,8 +166,7 @@ Value ZneLowering::buildFoldedResultsLoop(Location loc, PatternRewriter &rewrite
                        // Keep the f64 fold count; its fractional part drives the
                        // probabilistic extra fold.
                        newArgs.push_back(numFold);
-                   }
-                   else {
+                   } else {
                        // Integral by construction convert
                        // to an index for the fold loops.
                        Value numFoldInt =
@@ -192,8 +187,7 @@ Value ZneLowering::buildFoldedResultsLoop(Location loc, PatternRewriter &rewrite
                        Value resultExtracted;
                        if (isa<RankedTensorType>(resultValue.getType())) {
                            resultExtracted = tensor::ExtractOp::create(builder, loc, resultValue);
-                       }
-                       else {
+                       } else {
                            resultExtracted = resultValue;
                        }
                        vectorResultsMulti.push_back(resultExtracted);
@@ -213,8 +207,7 @@ Value ZneLowering::buildFoldedResultsLoop(Location loc, PatternRewriter &rewrite
                                SmallVector<Value> indices;
                                if (numResults == 1) {
                                    indices = {i};
-                               }
-                               else {
+                               } else {
                                    indices = {i, j};
                                }
                                Value resultInserted = tensor::InsertOp::create(
@@ -228,8 +221,7 @@ Value ZneLowering::buildFoldedResultsLoop(Location loc, PatternRewriter &rewrite
         .getResult(0);
 }
 
-LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
-{
+LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const {
     Location loc = op.getLoc();
     // Number of folds
     auto numFolds = op.getNumFolds();
@@ -269,8 +261,7 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
                                 StringAttr kwargs, int64_t numberQubits, FunctionType fnFoldedType,
                                 SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
                                 func::FuncOp fnAllocOp, func::FuncOp fnWithoutMeasurementsOp,
-                                func::FuncOp fnWithMeasurementsOp)
-{
+                                func::FuncOp fnWithMeasurementsOp) {
     // Function folded: Create the folded circuit (withoutMeasurement *
     // Adjoint(withoutMeasurement))**num_fold * withMeasurements
     Type qregType = quantum::QuregType::get(rewriter.getContext());
@@ -345,8 +336,7 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
 }
 
 static func::FuncOp getOrInsertRandomDecl(PatternRewriter &rewriter, ModuleOp moduleOp,
-                                          Location loc)
-{
+                                          Location loc) {
     StringRef rngName = "__catalyst__rt__random_double";
     if (auto existing = moduleOp.lookupSymbol<func::FuncOp>(rngName)) {
         return existing;
@@ -362,8 +352,8 @@ static func::FuncOp getOrInsertRandomDecl(PatternRewriter &rewriter, ModuleOp mo
 
 // Helper: clone `op` as a folding pair $G G^\dagger$ acting on `inQubits`, returning
 // the qubit values produced by the adjoint gate.
-static ValueRange cloneFoldingPair(OpBuilder &builder, quantum::QuantumGate op, ValueRange inQubits)
-{
+static ValueRange cloneFoldingPair(OpBuilder &builder, quantum::QuantumGate op,
+                                   ValueRange inQubits) {
     quantum::QuantumGate origOp = dyn_cast<quantum::QuantumGate>(builder.clone(*op));
     origOp.setQubitOperands(inQubits);
     quantum::QuantumGate adjointOp = dyn_cast<quantum::QuantumGate>(builder.clone(*origOp));
@@ -382,8 +372,7 @@ static ValueRange cloneFoldingPair(OpBuilder &builder, quantum::QuantumGate op, 
 // (n - i)`; this picks exactly `k` gates, each `k`-subset equally likely. Fidelity-weighted
 // folding (Mitiq's optional `fidelities` argument) is not modelled.
 FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
-                                     func::FuncOp fnFoldedOp, Value c0, Value c1)
-{
+                                     func::FuncOp fnFoldedOp, Value c0, Value c1) {
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
@@ -468,8 +457,7 @@ FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFo
 }
 // In *.cpp module only, to keep extraneous headers out of *.hpp
 FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
-                                  func::FuncOp fnFoldedOp, Value c0, Value c1)
-{
+                                  func::FuncOp fnFoldedOp, Value c0, Value c1) {
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
 
@@ -509,8 +497,7 @@ FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFolde
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
-                                                        func::FuncOp op, Folding foldingAlgorithm)
-{
+                                                        func::FuncOp op, Folding foldingAlgorithm) {
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
     std::string fnFoldedName = op.getName().str() + ".folded";
@@ -595,8 +582,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     return randomLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
-                                                       func::FuncOp op)
-{
+                                                       func::FuncOp op) {
     // Quantum Alloc function
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
@@ -624,8 +610,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewr
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
                                                                 PatternRewriter &rewriter,
-                                                                func::FuncOp op)
-{
+                                                                func::FuncOp op) {
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
@@ -674,9 +659,9 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     quantum::replaceQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
     return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
 }
-FlatSymbolRefAttr
-ZneLowering::getOrInsertFnWithMeasurements(Location loc, PatternRewriter &rewriter, func::FuncOp op)
-{
+FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
+                                                             PatternRewriter &rewriter,
+                                                             func::FuncOp op) {
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();

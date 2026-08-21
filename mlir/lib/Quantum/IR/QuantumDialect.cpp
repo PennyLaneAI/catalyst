@@ -39,8 +39,7 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
     /// Returns true if the given operation 'callable' can be inlined into the
     /// position given by the 'call'. Currently, we always inline quantum
     /// decomposition functions.
-    bool isLegalToInline(Operation *call, Operation *callable, bool wouldBeCloned) const final
-    {
+    bool isLegalToInline(Operation *call, Operation *callable, bool wouldBeCloned) const final {
         if (auto funcOp = dyn_cast<func::FuncOp>(callable)) {
             return funcOp->hasAttr(decompAttr);
         }
@@ -50,8 +49,7 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
     /// Returns true if the given region 'src' can be inlined into the region
     /// 'dest'. Only allow for decomposition functions.
     bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                         IRMapping &valueMapping) const final
-    {
+                         IRMapping &valueMapping) const final {
         if (auto funcOp = src->getParentOfType<func::FuncOp>()) {
             return funcOp->hasAttr(decompAttr);
         }
@@ -60,8 +58,7 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
 
     // Allow to inline operations from decomposition functions.
     bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
-                         IRMapping &valueMapping) const final
-    {
+                         IRMapping &valueMapping) const final {
         if (auto funcOp = op->getParentOfType<func::FuncOp>()) {
             return funcOp->hasAttr(decompAttr);
         }
@@ -70,8 +67,7 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
 
     /// Handle the given inlined terminator by replacing it with a new operation
     /// as necessary. Required when the region has only one block.
-    void handleTerminator(Operation *op, ValueRange valuesToRepl) const final
-    {
+    void handleTerminator(Operation *op, ValueRange valuesToRepl) const final {
         auto yieldOp = dyn_cast<YieldOp>(op);
         if (!yieldOp) {
             return;
@@ -90,8 +86,7 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
 
 #include "Quantum/IR/QuantumOpsDialect.cpp.inc"
 
-void QuantumDialect::initialize()
-{
+void QuantumDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "Quantum/IR/QuantumOpsTypes.cpp.inc"
@@ -115,8 +110,7 @@ void QuantumDialect::initialize()
 }
 
 /// Verify the QNode attribute invariants
-LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttribute namedAttr)
-{
+LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttribute namedAttr) {
     StringRef attrName = namedAttr.getName().getValue();
     if (attrName != "quantum.node") {
         return success();

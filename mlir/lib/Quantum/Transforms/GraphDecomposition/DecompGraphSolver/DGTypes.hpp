@@ -48,44 +48,19 @@ namespace DecompGraph::Core {
  * When non-empty, static arguments participate in equality
  * comparisons so that rules guarded on a specific value only
  * match operator queries that carry the same value.
- *
- * TODO: Fix the equality with wildcards for numWires and numParams
- * when adding support for operators with dynamic numbers of wires/params.
  */
 struct OperatorNode {
-    std::string name;
-    int numWires{-1};
-    int numParams{-1};
+    std::string id;
+    std::string name; // name is required for gateset checking
+
     bool adjoint{false};
 
-    // Optional static arguments for operators that require additional data.
+    // optional params, primarily for debug use
+    int numWires{-1};
+    int numParams{-1};
     std::unordered_map<std::string, std::string> staticNamedArgs{};
-    std::string id{""};
 
-    bool operator==(const OperatorNode &other) const
-    {
-        // id match
-        if (!id.empty() && !other.id.empty() && id == other.id) {
-            return true;
-        }
-        // legacy fallback if either op is missing ID
-
-        // For equality, we consider numWires and numParams conditionally equal
-        // if they are not set to -1 (which indicates a wildcard that can match any value).
-        const bool default_wires =
-            (numWires == -1 || other.numWires == -1 || numWires == other.numWires);
-        const bool default_params =
-            (numParams == -1 || other.numParams == -1 || numParams == other.numParams);
-
-        // Static arguments are optional: if either side has no static args, they
-        // are treated as matching (wildcard). When both sides provide entries, the maps must
-        // be equal element-wise for the operators to be considered equivalent.
-        const bool static_args_match = staticNamedArgs.empty() || other.staticNamedArgs.empty() ||
-                                       staticNamedArgs == other.staticNamedArgs;
-
-        return name == other.name && default_wires && default_params && adjoint == other.adjoint &&
-               static_args_match;
-    }
+    bool operator==(const OperatorNode &other) const { return id == other.id; }
     bool operator!=(const OperatorNode &other) const { return !(*this == other); }
 };
 
@@ -105,13 +80,8 @@ struct OperatorNode {
  * in the hash when converting MLIR operations to OperatorNodes.
  */
 struct OperatorNodeHash {
-    std::size_t operator()(const OperatorNode &node) const
-    {
-        // prefer id if available
-        if (!node.id.empty()) {
-            return std::hash<std::string>{}(node.id);
-        }
-        return std::hash<std::string>{}(node.name);
+    std::size_t operator()(const OperatorNode &node) const {
+        return std::hash<std::string>{}(node.id);
     }
 };
 
@@ -119,33 +89,15 @@ struct OperatorNodeHash {
  * @brief This represents the weighted target gateset for the graph decomposition problem.
  */
 struct WeightedGateset {
-    std::unordered_map<OperatorNode, double, OperatorNodeHash> ops;
+    std::unordered_map<std::string, double> ops;
 
-    [[nodiscard]] bool contains(const OperatorNode &op) const
-    {
-        // hash match
-        if (ops.find(op) != ops.end()) {
-            return true;
-        }
-
-        // use op-matching if hashes failed (could be id vs name)
-        for (auto [gatesetOp, cost] : ops) {
-            if (gatesetOp == op) {
-                return true;
-            }
-        }
-
-        return false;
+    [[nodiscard]] bool contains(const OperatorNode &op) const {
+        return ops.find(op.name) != ops.end();
     }
 
-    [[nodiscard]] double getCost(const OperatorNode &op) const
-    {
-        auto it = ops.find(op);
-        if (it != ops.end()) {
-            return it->second;
-        }
-
-        return std::numeric_limits<double>::infinity();
+    [[nodiscard]] double getCost(const OperatorNode &op) const {
+        auto it = ops.find(op.name);
+        return it != ops.end() ? it->second : std::numeric_limits<double>::infinity();
     }
 };
 
@@ -196,8 +148,7 @@ struct RuleNode {
     std::vector<RuleTerm> inputs;
     RuleOrigin origin{RuleOrigin::Default};
 
-    bool operator==(const RuleNode &other) const
-    {
+    bool operator==(const RuleNode &other) const {
         return name == other.name && output == other.output && origin == other.origin;
     }
 

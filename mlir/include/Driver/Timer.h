@@ -60,8 +60,7 @@ template <IsRatio Duration = std::milli> class CPUTimeInstance {
      *
      * @return int64_t
      */
-    double getTime()
-    {
+    double getTime() {
         if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t) == 0) {
             return static_cast<double>(t.tv_sec * Duration::den + t.tv_nsec);
         }
@@ -72,8 +71,7 @@ template <IsRatio Duration = std::milli> class CPUTimeInstance {
     timespec t;
 };
 
-template <IsRatio Duration = std::milli> static inline double getClock()
-{
+template <IsRatio Duration = std::milli> static inline double getClock() {
     CPUTimeInstance<std::nano> t;
     return static_cast<double>(t.getTime()) * (Duration::den / std::nano::den);
 }
@@ -101,8 +99,7 @@ template <IsRatio Duration = std::milli> class Timer {
     double start_cpu_time_;
     double stop_cpu_time_;
 
-    static inline bool enable_debug_timer() noexcept
-    {
+    static inline bool enable_debug_timer() noexcept {
         char *value = getenv("ENABLE_DIAGNOSTICS");
         return value && std::string(value) == "ON";
     }
@@ -112,8 +109,7 @@ template <IsRatio Duration = std::milli> class Timer {
 
     [[nodiscard]] bool is_active() const noexcept { return running; }
 
-    void start() noexcept
-    {
+    void start() noexcept {
         if (debug_timer) {
             start_wall_time_ = std::chrono::high_resolution_clock::now();
             start_cpu_time_ = getClock<Duration>();
@@ -121,8 +117,7 @@ template <IsRatio Duration = std::milli> class Timer {
         }
     }
 
-    void stop() noexcept
-    {
+    void stop() noexcept {
         if (debug_timer && running) {
             stop_cpu_time_ = getClock<Duration>();
             stop_wall_time_ = std::chrono::high_resolution_clock::now();
@@ -130,22 +125,19 @@ template <IsRatio Duration = std::milli> class Timer {
         }
     }
 
-    [[nodiscard]] auto elapsed() noexcept
-    {
+    [[nodiscard]] auto elapsed() noexcept {
         if (debug_timer) {
             if (running) {
                 stop();
             }
             return std::chrono::duration_cast<std::chrono::nanoseconds>(stop_wall_time_ -
                                                                         start_wall_time_);
-        }
-        else {
+        } else {
             return std::chrono::nanoseconds(0);
         }
     }
 
-    void print(const std::string &name, bool add_endl = true) noexcept
-    {
+    void print(const std::string &name, bool add_endl = true) noexcept {
         // Convert nanoseconds (long) to milliseconds (double)
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
         const auto cpu_elapsed =
@@ -161,8 +153,7 @@ template <IsRatio Duration = std::milli> class Timer {
         }
     }
 
-    void store(const std::string &name, const std::filesystem::path &file_path)
-    {
+    void store(const std::string &name, const std::filesystem::path &file_path) {
         // Convert nanoseconds (long) to milliseconds (double)
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
         const auto cpu_elapsed =
@@ -190,8 +181,7 @@ template <IsRatio Duration = std::milli> class Timer {
         ofile.close();
     }
 
-    void dump(const std::string &name, bool add_endl = true)
-    {
+    void dump(const std::string &name, bool add_endl = true) {
         if (!debug_timer) {
             return;
         }
@@ -207,8 +197,7 @@ template <IsRatio Duration = std::milli> class Timer {
 
     template <typename Function, typename... Args>
         requires std::is_invocable_v<Function, Args...>
-    static auto timer(Function func, const std::string &name, bool add_endl, Args &&...args)
-    {
+    static auto timer(Function func, const std::string &name, bool add_endl, Args &&...args) {
         if (!enable_debug_timer()) {
             return func(std::forward<Args>(args)...);
         }

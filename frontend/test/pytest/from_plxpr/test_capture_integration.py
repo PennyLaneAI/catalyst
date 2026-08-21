@@ -83,6 +83,11 @@ class TestCapture:
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_simple_circuit_aot(self, backend, theta):
         """Test the integration for a simple circuit."""
+        if backend == "lightning.qubit":
+            pytest.xfail(
+                reason="Waiting for https://github.com/PennyLaneAI/pennylane-lightning/pull/1420"
+            )
+
         dev = qp.device(backend, wires=2)
 
         @qp.qnode(device=dev)
@@ -250,6 +255,11 @@ class TestCapture:
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
     def test_adjoint(self, backend, theta, val):
         """Test the integration for a circuit with adjoint."""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
+
         device = qp.device(backend, wires=2)
 
         # Capture enabled
@@ -305,6 +315,10 @@ class TestCapture:
         """Test the integration for a PCPhase circuit with control."""
         if backend == "lightning.kokkos":
             pytest.xfail(reason="Controlled PCPhase not yet implemented on Kokkos.")
+        if backend == "lightning.qubit":
+            pytest.xfail(
+                reason="Waiting for https://github.com/PennyLaneAI/pennylane-lightning/pull/1420"
+            )
 
         device = qp.device(backend, wires=3)
 
@@ -312,7 +326,7 @@ class TestCapture:
 
         @qp.qnode(device)
         def circuit(theta):
-            qp.ctrl(qp.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
+            qp.ctrl(qp.PCPhase, control=[1], control_values=[False])(theta, dim=2, wires=[0])
             return qp.state()
 
         capture_result = qjit(circuit, capture=True)(theta)
@@ -1130,38 +1144,9 @@ class TestCapture:
             == captured_rotations_inverses_result
         )
 
-    def test_transform_decompose_workflow(self, backend):
-        """Test the integration for a circuit with a 'decompose' transform."""
-
-        # Capture enabled
-
-        @qjit(capture=True)
-        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
-        @qp.qnode(qp.device(backend, wires=2))
-        def captured_circuit(x: float, y: float, z: float):
-            qp.Rot(x, y, z, 0)
-            return qp.expval(qp.PauliZ(0))
-
-        capture_result = captured_circuit(1.5, 2.5, 3.5)
-        assert is_rot_decomposed(captured_circuit.mlir)
-
-        # Capture disabled
-
-        @qjit
-        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
-        @qp.qnode(qp.device(backend, wires=2))
-        def circuit(x: float, y: float, z: float):
-            qp.Rot(x, y, z, 0)
-            return qp.expval(qp.PauliZ(0))
-
-        assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
-
+    @pytest.mark.xfail(reason="qp.decompose doesn't use graph-decomposition yet.")
     def test_transform_graph_decompose_workflow(self, backend):
         """Test the integration for a circuit with a 'decompose' graph transform."""
-
-        # Capture enabled
-
-        qp.decomposition.enable_graph()
 
         @qjit(capture=True)
         @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
@@ -1177,8 +1162,6 @@ class TestCapture:
             return qp.expval(qp.PauliZ(0))
 
         capture_result = captured_circuit(1.5, 2.5, 3.5)
-
-        qp.decomposition.disable_graph()
 
         # Capture disabled
         @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])

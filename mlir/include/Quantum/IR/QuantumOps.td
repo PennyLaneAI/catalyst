@@ -111,7 +111,7 @@ def NumQubitsOp : Quantum_Op<"num_qubits", [MemoryEffects<[MemRead]>]> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-def AllocOp : Memory_Op<"alloc"> {
+def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];
@@ -132,7 +132,7 @@ def AllocOp : Memory_Op<"alloc"> {
     let hasCanonicalizeMethod = 1;
 }
 
-def AllocQubitOp : Memory_Op<"alloc_qb"> {
+def AllocQubitOp : Memory_Op<"alloc_qb", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate a single qubit.";
     let description = [{
     }];
@@ -263,6 +263,18 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
             values.insert(values.end(), getOutQubits().begin(), getOutQubits().end());
             return values;
         }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getInQubits().size();
+        }
+
+        uint64_t getResourceNumCtrlQubits() { return 0; }
+
+        uint64_t getResourceNumParams() { return 0; }
+
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -340,6 +352,29 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
         mlir::ResultRange getCtrlQubitResults() {
             return getOutCtrlQubits();
         }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getInQubits().size();
+        }
+
+        uint64_t getResourceNumCtrlQubits() {
+            return getInCtrlQubits().size();
+        }
+
+        uint64_t getResourceNumParams() {
+            if (auto gate = mlir::dyn_cast<quantum::ParametrizedGate>(getOperation())){
+                return gate.getAllParams().size();
+            }
+            return 0;
+        }
+
+        bool getResourceAdjointFlag() {
+            return getAdjointFlag();
+        }
+
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -931,7 +966,45 @@ def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, 
     let hasVerifier = 1;
 }
 
-def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
+def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
+                                AttrSizedOperandSegments, AttrSizedResultSegments,
+                                AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>,
+                                AllTypesMatch<["args", "results"]>]> {
+    let summary = "Apply the enclosed operations controlled on the given control qubits.";
+    let description = [{
+        The `quantum.ctrl` operation applies the quantum operations in its single-block region
+        conditioned on a set of control qubits. Each `in_ctrl_values` entry selects whether the
+        matching control qubit activates on the |1> (true) or |0> (false) state.
+
+        The `ctrl-lowering` pass distributes the controls over the region: every gate in the
+        region gains the control qubits/values (appended to any controls it already carries),
+        and the control qubits are threaded through the region. Structural ops (extract, insert,
+        alloc, dealloc) are passed through unchanged, and a nested `quantum.ctrl` region has its
+        controls merged. Measurements inside a `quantum.ctrl` region are rejected.
+    }];
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_ctrl_qubits,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$results
+    );
+
+    let assemblyFormat = [{
+        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` `(` $args `)`
+        attr-dict `:` type($out_ctrl_qubits) `->` type($results) $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp", "CtrlOp"]>]> {
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
@@ -1155,9 +1228,10 @@ def HamiltonianOp : Observable_Op<"hamiltonian"> {
 // -----
 
 class Measurement_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
+        Quantum_Op<mnemonic, traits # [MeasurementProcess,
+                                        DeclareOpInterfaceMethods<ResourceMeasurementOpInterface>]>;
 
-def MeasureOp : Quantum_Op<"measure"> {
+def MeasureOp : Quantum_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];

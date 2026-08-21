@@ -26,8 +26,7 @@ using namespace catalyst;
 namespace catalyst {
 namespace quantum {
 
-void verifyTypeIsCacheable(Type ty, Operation *op)
-{
+void verifyTypeIsCacheable(Type ty, Operation *op) {
     // Sanitizing inputs.
     // Technically we know for a fact that none of this will ever issue an
     // error. This is because QubitUnitary is guaranteed to have a
@@ -61,8 +60,7 @@ void verifyTypeIsCacheable(Type ty, Operation *op)
     }
 }
 
-QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc)
-{
+QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc) {
     MLIRContext *ctx = builder.getContext();
     auto paramVectorType = ArrayListType::get(ctx, builder.getF64Type());
     auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
@@ -82,8 +80,7 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
         .paramVector = paramVector, .wireVector = wireVector, .controlFlowTapes = controlFlowTapes};
 }
 
-void QuantumCache::emitDealloc(OpBuilder &builder, Location loc)
-{
+void QuantumCache::emitDealloc(OpBuilder &builder, Location loc) {
     ListDeallocOp::create(builder, loc, paramVector);
     ListDeallocOp::create(builder, loc, wireVector);
     for (const auto &[_key, controlFlowTape] : controlFlowTapes) {

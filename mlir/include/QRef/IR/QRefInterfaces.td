@@ -16,8 +16,9 @@
 #define QREF_INTERFACES
 
 include "mlir/IR/OpBase.td"
+include "Catalyst/Analysis/ResourceInterfaces.td"
 
-def QuantumOperation : OpInterface<"QuantumOperation"> {
+def QuantumOperation : OpInterface<"QuantumOperation", [ResourceQuantumOpInterface]> {
     let description = [{
         A base class for all quantum operations that can be considered actions on qubits.
         The actions do not have to be unitary. For example, the SetState operations also falls

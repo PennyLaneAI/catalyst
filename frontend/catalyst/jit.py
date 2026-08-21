@@ -35,6 +35,13 @@ from jax.tree_util import tree_flatten, tree_unflatten
 
 import catalyst
 from catalyst.autograph import run_autograph
+from catalyst.backline import (
+    attach_backline_attr,
+    find_placement,
+    launch_executors,
+    placement_pipeline,
+    settle_executors,
+)
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
@@ -59,6 +66,7 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
+from catalyst.utils.runtime_artifacts import collect_runtime_artifacts
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -96,6 +104,7 @@ def qjit(
     dialect_plugins=None,
     capture="global",
     skip_preprocess=False,
+    collect_decomp_rules=True,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -189,6 +198,11 @@ def qjit(
             the validity of the program themselves. If ``capture=False``, or ``capture="global"``
             and ``qp.capture.enabled() == False``, this argument will be ignored. ``False``
             by default.
+        collect_decomp_rules (bool): Controls whether or not to compile the decomposition
+            rules. If ``False``, only the circuit itself will be compiled. If ``True``, all the
+            decomposition rules reachable from all gates in the circuit will be compiled. If
+            ``capture=False``, or ``capture="global"`` and ``qp.capture.enabled() == False``, this
+            argument will be ignored. ``True`` by default.
 
     Returns:
         QJIT object.
@@ -568,6 +582,8 @@ class QJIT(CatalystCallable):
         self.jaxed_function = None
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
+        # ``(jaxpr, placement)`` once searched; see ``_placement``.
+        self._placement_cache = None
         self.mlir_module = None
         self.llvm_ir = None
         self.out_type = None
@@ -593,6 +609,29 @@ class QJIT(CatalystCallable):
             self.aot_compile()
 
         super().__init__("user_function")
+
+    @property
+    def _placement(self):
+        """The backline placement this program runs over, or ``None`` if it declares none and
+        searched once per trace, and cached against the jaxpr it was found in.
+        """
+        if self._placement_cache is None or self._placement_cache[0] is not self.jaxpr:
+            found = find_placement(self.user_function, self.jaxpr, self.__name__)
+            self._placement_cache = (self.jaxpr, found)
+        return self._placement_cache[1]
+
+    def _configure_backline(self):
+        """Prepare compilation for the placement this program declares, if it declares one. It
+        selects the passes that lower a placement, and settles the address of every executor it
+        dispatches to.
+        """
+        if self._placement is None:
+            return
+
+        self.compile_options.pipelines = placement_pipeline(
+            self._placement, self.compile_options.get_pipelines()
+        )
+        settle_executors(self._placement)
 
     def _get_effective_capture_mode(self):
         """Calculate the effective capture mode for this QJIT instance.
@@ -694,15 +733,31 @@ class QJIT(CatalystCallable):
 
         # TODO: awkward, refactor or redesign the target feature
         if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
-            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                self.user_sig or ()
-            )
+            try:
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                    self.user_sig or ()
+                )
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.exception(e, exc_info=True)
+                warnings.warn("AOT capture of jaxpr failed. Error logged at exception level")
+                return
 
         if self.compile_options.target in ("mlir", "llvmir", "binary"):
-            self.mlir_module = self.generate_ir()
+            self._configure_backline()
+            try:
+                self.mlir_module = self.generate_ir()
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.exception(e, exc_info=True)
+                warnings.warn("AOT generation of mlir failed. Error logged at exception level")
+                return
 
         if self.compile_options.target in ("llvmir", "binary"):
-            self.compiled_function, self.llvm_ir = self.compile()
+            try:
+                self.compiled_function, self.llvm_ir = self.compile()
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.exception(e, exc_info=True)
+                warnings.warn("AOT generation of llvmir failed. Error logged at exception level")
+                return
 
         if self.compile_options.target in ("binary",) and self.compile_options.link:
             self.fn_cache.insert(
@@ -754,6 +809,7 @@ class QJIT(CatalystCallable):
 
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
+            self._configure_backline()
             self.mlir_module = self.generate_ir()
             self.compiled_function, self.llvm_ir = self.compile()
 
@@ -824,6 +880,7 @@ class QJIT(CatalystCallable):
                     static_argnums=static_argnums,
                     abstracted_axes=abstracted_axes,
                     skip_preprocess=self.compile_options.skip_preprocess,
+                    collect_decomp_rules=self.compile_options.collect_decomp_rules,
                     debug_info=dbg,
                 )
                 return jaxpr, out_type, out_treedef, full_sig
@@ -886,6 +943,12 @@ class QJIT(CatalystCallable):
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
+        # Collect the shared libraries a local `runtime_call` recorded, so the linker gets them.
+        collect_runtime_artifacts(mlir_module, self.compile_options)
+        # If the device declares a backline placement, serialize it onto the top module.
+        if self._placement is not None:
+            attach_backline_attr(mlir_module, self._placement)
+
         return mlir_module
 
     @instrument(size_from=1, has_finegrained=True)
@@ -940,6 +1003,8 @@ class QJIT(CatalystCallable):
         Returns:
             Any: results of the execution arranged into the original function's output PyTrees
         """
+        # Deploy the executors the program dispatches to specified by the placement.
+        launch_executors(self._placement)
         results = self.compiled_function(*args, **kwargs)
 
         # TODO: Move this to the compiled function object.

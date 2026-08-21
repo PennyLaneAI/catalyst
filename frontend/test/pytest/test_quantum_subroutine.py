@@ -83,11 +83,14 @@ class TestSubroutineHOP:
             qp.Hadamard(wires=[0])
 
         msg = "inside subroutine"
-        with pytest.raises(NotImplementedError, match=msg):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qp.qjit(autograph=False, capture=True)
             def subroutine_test():
                 Hadamard0()
+
+        with pytest.raises(NotImplementedError, match=msg):
+            subroutine_test()
 
     def test_quantum_subroutine_conditional(self):
         """Test quantum subroutine control flow"""

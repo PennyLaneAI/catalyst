@@ -38,8 +38,7 @@ using namespace catalyst::quantum;
 namespace {
 bool isQuantumType(Type type) { return isa<quantum::QuantumDialect>(type.getDialect()); }
 
-void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdxMapping)
-{
+void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdxMapping) {
     unsigned newIdx = 0;
     for (const auto &[oldIdx, type] : llvm::enumerate(types)) {
         if (!isQuantumType(type)) {
@@ -54,9 +53,7 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
 class AugmentedCircuitGenerator {
   public:
     AugmentedCircuitGenerator(IRMapping &oldToCloned, QuantumCache &cache)
-        : oldToCloned(oldToCloned), cache(cache)
-    {
-    }
+        : oldToCloned(oldToCloned), cache(cache) {}
 
     /// Given a `region` containing classical preprocessing and quantum operations, generate an
     /// augmented version that caches all the parameters required to deterministically re-execute
@@ -80,8 +77,7 @@ class AugmentedCircuitGenerator {
                     const DenseMap<unsigned, unsigned> &argIdxMapping);
 
     // Emit an operation to cache a dynamic wire for quantum.insert/extract ops.
-    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, OpBuilder &builder)
-    {
+    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, OpBuilder &builder) {
         if (!op.getIdxAttr().has_value()) {
             ListPushOp::create(builder, op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
                                cache.wireVector);
@@ -91,8 +87,7 @@ class AugmentedCircuitGenerator {
     void cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder);
 };
 
-void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder) {
     ValueRange params = gate.getAllParams();
 
     for (Value param : params) {
@@ -162,8 +157,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
     }
 }
 
-void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder) {
     assert(region.hasOneBlock() &&
            "Expected only structured control flow (each region should have a single block)");
     auto isClassicalSCFOp = [](Operation &op) {
@@ -174,37 +168,27 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
     for (Operation &op : region.front().without_terminator()) {
         if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
             cacheDynamicWire(insertOp, builder);
-        }
-        else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
+        } else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
             cacheDynamicWire(extractOp, builder);
-        }
-        else if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
+        } else if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
             cacheGate(gate, builder);
-        }
-        else if (isa<QuantumDialect>(op.getDialect())) {
+        } else if (isa<QuantumDialect>(op.getDialect())) {
             // Any quantum op other than a parametrized gate/insert/extract is ignored.
-        }
-        else if (isa<pbc::PPRotationOp>(op)) {
+        } else if (isa<pbc::PPRotationOp>(op)) {
             // PPRs are ignored
-        }
-        else if (isClassicalSCFOp(op)) {
+        } else if (isClassicalSCFOp(op)) {
             // Purely classical SCF ops should be treated as any other purely classical op, but
             // quantum SCF ops need to be recursively visited.
             builder.clone(op, oldToCloned);
-        }
-        else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+        } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
             visitOperation(forOp, builder);
-        }
-        else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+        } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
             visitOperation(ifOp, builder);
-        }
-        else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
+        } else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
             visitOperation(whileOp, builder);
-        }
-        else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
+        } else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
             visitOperation(switchOp, builder);
-        }
-        else if (auto callOp = dyn_cast<func::CallOp>(op)) {
+        } else if (auto callOp = dyn_cast<func::CallOp>(op)) {
             auto results = callOp.getResultTypes();
             bool quantum = std::any_of(results.begin(), results.end(), [](const auto &value) {
                 return isa<QuregType, QubitType>(value);
@@ -214,16 +198,14 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
             if (!quantum) {
                 builder.clone(op, oldToCloned);
             }
-        }
-        else {
+        } else {
             // Purely classical ops are deeply cloned as-is.
             builder.clone(op, oldToCloned);
         }
     }
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &builder) {
     DenseMap<unsigned, unsigned> argIdxMapping;
     SmallVector<Value> classicalInits;
     populateArgIdxMapping(forOp.getResultTypes(), argIdxMapping);
@@ -263,8 +245,7 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &buil
     mapResults(forOp, newForOp, argIdxMapping);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &builder) {
     SmallVector<Type> classicalResultTypes;
     SmallVector<Value> classicalInits;
     DenseMap<unsigned, unsigned> argIdxMapping;
@@ -319,8 +300,7 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
     ListPushOp::create(builder, whileOp.getLoc(), numIters, tape);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder) {
     auto getRegionBuilder = [&](Region &oldRegion) {
         return [&](OpBuilder &builder, Location loc) {
             generate(oldRegion, builder);
@@ -369,8 +349,7 @@ void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBu
     mapResults(switchOp, newSwitchOp, argIdxMapping);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builder) {
     auto getRegionBuilder = [&](Region &oldRegion) {
         return [&](OpBuilder &builder, Location loc) {
             generate(oldRegion, builder);
@@ -395,8 +374,7 @@ void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builde
 }
 
 void AugmentedCircuitGenerator::cloneTerminatorClassicalOperands(Operation *terminator,
-                                                                 OpBuilder &builder)
-{
+                                                                 OpBuilder &builder) {
     SmallVector<Value> newYieldOperands;
     for (Value operand : terminator->getOperands()) {
         if (!isQuantumType(operand.getType())) {
@@ -408,8 +386,7 @@ void AugmentedCircuitGenerator::cloneTerminatorClassicalOperands(Operation *term
 }
 
 void AugmentedCircuitGenerator::mapResults(Operation *oldOp, Operation *clonedOp,
-                                           const DenseMap<unsigned, unsigned> &argIdxMapping)
-{
+                                           const DenseMap<unsigned, unsigned> &argIdxMapping) {
     for (const auto &[oldIdx, oldResult] : llvm::enumerate(oldOp->getResults())) {
         if (argIdxMapping.contains(oldIdx)) {
             unsigned newIdx = argIdxMapping.at(oldIdx);
@@ -424,8 +401,7 @@ namespace catalyst {
 namespace quantum {
 
 void generateAdjointForwardPass(Region &region, OpBuilder &builder, IRMapping &oldToCloned,
-                                QuantumCache &cache)
-{
+                                QuantumCache &cache) {
     AugmentedCircuitGenerator generator{oldToCloned, cache};
     generator.generate(region, builder);
 }

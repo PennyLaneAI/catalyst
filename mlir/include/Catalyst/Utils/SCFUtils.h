@@ -39,11 +39,15 @@ int64_t countStaticForloopIterations(Operation *op);
 // arith.constant ops, or -1 if any bound is dynamic.
 int64_t countStaticForOpIterations(scf::ForOp forOp);
 
-// Resolve a for loop's static trip count using, in order of preference:
-//   1. an `estimated_iterations` integer attribute,
+// Reads the `catalyst.estimated_iterations` resource-estimation hint from an op, if present.
+// The hint may be an integer or a float. The value is then returned as an optional double.
+std::optional<double> getEstimatedIterationsHint(Operation *op);
+
+// Resolve a for loop's expected trip count using, in order of preference:
+//   1. a `catalyst.estimated_iterations` integer/float attribute,
 //   2. scf::ForOp::getStaticTripCount(), then
 //   3. recursively-resolved constant lower/upper bounds and step.
 // Returns std::nullopt when the trip count cannot be determined statically.
-std::optional<int64_t> resolveForLoopTripCount(scf::ForOp forOp);
+std::optional<double> resolveForLoopTripCount(scf::ForOp forOp);
 
 } // namespace catalyst

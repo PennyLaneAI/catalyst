@@ -27,8 +27,7 @@ namespace {
 /// Create a single-qubit gate using CustomOp
 /// Returns the output qubit from the gate
 Value createGate(Location loc, PatternRewriter &rewriter, Value inQubit, StringRef gateName,
-                 bool adjoint = false)
-{
+                 bool adjoint = false) {
     auto outQubitType = inQubit.getType();
     auto gateOp = CustomOp::create(rewriter, loc,
                                    /*out_qubits=*/TypeRange{outQubitType},
@@ -45,8 +44,7 @@ Value createGate(Location loc, PatternRewriter &rewriter, Value inQubit, StringR
 /// Apply the gates required to prepare the given state from |0⟩
 /// Returns the final qubit after all gates are applied
 Value applyStatePreparationGates(Location loc, PatternRewriter &rewriter, Value qubit,
-                                 LogicalInitKind initState)
-{
+                                 LogicalInitKind initState) {
     switch (initState) {
     case LogicalInitKind::zero: // |0⟩ - no gates needed
         return qubit;
@@ -79,8 +77,7 @@ Value applyStatePreparationGates(Location loc, PatternRewriter &rewriter, Value 
 template <typename OpType> struct LowerPBCInitOpPattern : public OpRewritePattern<OpType> {
     using OpRewritePattern<OpType>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         auto initState = op.getInitState();
 
@@ -106,8 +103,7 @@ template <typename OpType> struct LowerPBCInitOpPattern : public OpRewritePatter
 namespace catalyst {
 namespace pbc {
 
-void populateLowerPBCInitOpsPatterns(RewritePatternSet &patterns)
-{
+void populateLowerPBCInitOpsPatterns(RewritePatternSet &patterns) {
     patterns.add<LowerPBCInitOpPattern<PrepareStateOp>>(patterns.getContext());
     patterns.add<LowerPBCInitOpPattern<FabricateOp>>(patterns.getContext());
 }

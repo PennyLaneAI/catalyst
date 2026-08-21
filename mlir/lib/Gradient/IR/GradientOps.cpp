@@ -34,8 +34,7 @@ using namespace catalyst::gradient;
 //===----------------------------------------------------------------------===//
 
 // A method to check types for equality that compares ShapedTypes by their shape and element type.
-bool shapeEqual(Type rhs, Type lhs)
-{
+bool shapeEqual(Type rhs, Type lhs) {
     auto shapedRhs = dyn_cast<ShapedType>(rhs);
     auto shapedLhs = dyn_cast<ShapedType>(lhs);
     if (shapedRhs && shapedLhs) {
@@ -47,14 +46,14 @@ bool shapeEqual(Type rhs, Type lhs)
 
 // Gradient input checker
 LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRange callee_operands,
-                               const std::vector<size_t> &diff_arg_indices)
-{
+                               const std::vector<size_t> &diff_arg_indices) {
     // Check that the call operand types match the callee operand types.
     ValueRange fnArgs = callee_operands;
     FunctionType fnType = callee.getFunctionType();
-    if (fnType.getNumInputs() != fnArgs.size())
+    if (fnType.getNumInputs() != fnArgs.size()) {
         return op_state->emitOpError("incorrect number of operands for callee, ")
                << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
+    }
 
     if (callee->getAttrOfType<UnitAttr>(catalyst::gradient::hasInvalidGradientOp)) {
         // Check that the method is not finite difference, as finite difference should always be
@@ -75,48 +74,54 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         }
     }
 
-    for (unsigned i = 0; i < fnArgs.size(); ++i)
-        if (!shapeEqual(fnArgs[i].getType(), fnType.getInput(i)))
+    for (unsigned i = 0; i < fnArgs.size(); ++i) {
+        if (!shapeEqual(fnArgs[i].getType(), fnType.getInput(i))) {
             return op_state->emitOpError("operand type mismatch: expected operand type ")
                    << fnType.getInput(i) << ", but provided " << fnArgs[i].getType()
                    << " for operand number " << i;
+        }
+    }
 
     // Only differentiation on real numbers is supported.
     const std::vector<size_t> &diffArgIndices = diff_arg_indices;
     for (size_t idx : diffArgIndices) {
         Type diffArgBaseType = fnArgs[idx].getType();
-        if (auto tensorType = dyn_cast<ShapedType>(diffArgBaseType))
+        if (auto tensorType = dyn_cast<ShapedType>(diffArgBaseType)) {
             diffArgBaseType = tensorType.getElementType();
+        }
 
-        if (!isa<FloatType>(diffArgBaseType))
+        if (!isa<FloatType>(diffArgBaseType)) {
             return op_state->emitOpError("invalid numeric base type: callee operand at position ")
                    << idx << " must be floating point to be differentiable";
+        }
     }
     return success();
 }
 
 // Gradient output checker
 LogicalResult verifyGradOutputs(OpState *op_state, func::FuncOp fn,
-                                const std::vector<size_t> &diff_arg_indices, TypeRange result_types)
-{
+                                const std::vector<size_t> &diff_arg_indices,
+                                TypeRange result_types) {
     const std::vector<Type> &expectedTypes = computeResultTypes(fn, diff_arg_indices);
 
     // Verify the number of results matches the expected gradient shape.
     // The grad output should contain one set of results (equal in size to
     // the number of function results) for each differentiable argument.
-    if (result_types.size() != expectedTypes.size())
+    if (result_types.size() != expectedTypes.size()) {
         return op_state->emitOpError("incorrect number of results in the gradient of the callee, ")
                << "expected " << expectedTypes.size() << " results "
                << "but got " << result_types.size();
+    }
 
     // Verify the shape of each result. The numeric type should match the numeric type
     // of the corresponding function result. The shape is given by grouping the differentiated
     // argument shape with the corresponding function result shape.
     TypeRange gradResultTypes = result_types;
     for (unsigned i = 0; i < expectedTypes.size(); i++) {
-        if (gradResultTypes[i] != expectedTypes[i])
+        if (gradResultTypes[i] != expectedTypes[i]) {
             return op_state->emitOpError("invalid result type: grad result at position ")
                    << i << " must be " << expectedTypes[i] << " but got " << gradResultTypes[i];
+        }
     }
 
     return success();
@@ -128,8 +133,7 @@ LogicalResult verifyGradOutputs(OpState *op_state, func::FuncOp fn,
 
 CallInterfaceCallable GradOp::getCallableForCallee() { return getCalleeAttr(); }
 
-void GradOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
+void GradOp::setCalleeFromCallable(CallInterfaceCallable callee) {
     (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
@@ -139,15 +143,15 @@ Operation::operand_range GradOp::getArgOperands() { return getOperands(); }
 // GradOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
+LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute refers to a valid function.
     auto fn = ({
         auto callee = this->getCalleeAttr();
         func::FuncOp fn =
             symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), callee);
-        if (!fn)
+        if (!fn) {
             return this->emitOpError("invalid function name specified: ") << callee;
+        }
         fn;
     });
 
@@ -160,8 +164,7 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     return success(succeeded(r1) && succeeded(r2));
 }
 
-LogicalResult CustomGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
+LogicalResult CustomGradOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     return success();
 }
 
@@ -169,11 +172,11 @@ LogicalResult CustomGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 // GradOp Extra methods
 //===----------------------------------------------------------------------===//
 
-LogicalResult GradOp::verify()
-{
+LogicalResult GradOp::verify() {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "auto")
+    if (method != "fd" && method != "auto") {
         return emitOpError("got invalid differentiation method: ") << method;
+    }
     return success();
 }
 
@@ -185,8 +188,7 @@ MutableOperandRange GradOp::getArgOperandsMutable() { return getOperandsMutable(
 
 CallInterfaceCallable ValueAndGradOp::getCallableForCallee() { return getCalleeAttr(); }
 
-void ValueAndGradOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
+void ValueAndGradOp::setCalleeFromCallable(CallInterfaceCallable callee) {
     (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
@@ -196,14 +198,14 @@ Operation::operand_range ValueAndGradOp::getArgOperands() { return getOperands()
 // ValueAndGradOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
+LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute refers to a valid function.
     func::FuncOp callee = ({
         auto cattr = this->getCalleeAttr();
         auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
-        if (!fn)
+        if (!fn) {
             return this->emitOpError("invalid function name specified: ") << cattr;
+        }
         fn;
     });
 
@@ -239,11 +241,11 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
 // ValueAndGradOp Extra methods
 //===----------------------------------------------------------------------===//
 
-LogicalResult ValueAndGradOp::verify()
-{
+LogicalResult ValueAndGradOp::verify() {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "auto")
+    if (method != "fd" && method != "auto") {
         return emitOpError("got invalid differentiation method: ") << method;
+    }
     return success();
 }
 
@@ -255,8 +257,7 @@ MutableOperandRange ValueAndGradOp::getArgOperandsMutable() { return getOperands
 
 CallInterfaceCallable JVPOp::getCallableForCallee() { return getCalleeAttr(); }
 
-void JVPOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
+void JVPOp::setCalleeFromCallable(CallInterfaceCallable callee) {
     (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
@@ -266,14 +267,14 @@ Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
 // JVPOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
+LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute refers to a valid function.
     func::FuncOp callee = ({
         auto cattr = this->getCalleeAttr();
         auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
-        if (!fn)
+        if (!fn) {
             return this->emitOpError("invalid function name specified: ") << cattr;
+        }
         fn;
     });
 
@@ -346,11 +347,11 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 // JVPOp Extra methods
 //===----------------------------------------------------------------------===//
 
-LogicalResult JVPOp::verify()
-{
+LogicalResult JVPOp::verify() {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj" && method != "auto")
+    if (method != "fd" && method != "ps" && method != "adj" && method != "auto") {
         return emitOpError("got invalid differentiation method: ") << method;
+    }
     return success();
 }
 
@@ -362,8 +363,7 @@ MutableOperandRange JVPOp::getArgOperandsMutable() { return getParamsMutable(); 
 
 CallInterfaceCallable VJPOp::getCallableForCallee() { return getCalleeAttr(); }
 
-void VJPOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
+void VJPOp::setCalleeFromCallable(CallInterfaceCallable callee) {
     (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
@@ -373,15 +373,15 @@ Operation::operand_range VJPOp::getArgOperands() { return getOperands(); }
 // VJPOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
+LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute refers to a valid function.
     auto callee = ({
         auto cattr = this->getCalleeAttr();
         func::FuncOp fn =
             symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
-        if (!fn)
+        if (!fn) {
             return this->emitOpError("invalid function name specified: ") << cattr;
+        }
         fn;
     });
 
@@ -430,11 +430,11 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 // VJPOp Extra methods
 //===----------------------------------------------------------------------===//
 
-LogicalResult VJPOp::verify()
-{
+LogicalResult VJPOp::verify() {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj" && method != "auto")
+    if (method != "fd" && method != "ps" && method != "adj" && method != "auto") {
         return emitOpError("got invalid differentiation method: ") << method;
+    }
     return success();
 }
 
@@ -444,16 +444,14 @@ MutableOperandRange VJPOp::getArgOperandsMutable() { return getParamsMutable(); 
 // Backprop SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-bool hasTensorSemantics(TypeRange operandTypes, TypeRange resultTypes)
-{
+bool hasTensorSemantics(TypeRange operandTypes, TypeRange resultTypes) {
     auto hasTensorType = [](Type type) { return isa<RankedTensorType>(type); };
     bool hasTensorOperands = llvm::any_of(operandTypes, hasTensorType);
     bool hasTensorResults = llvm::any_of(resultTypes, hasTensorType);
     return hasTensorOperands || hasTensorResults;
 }
 
-LogicalResult BackpropOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
+LogicalResult BackpropOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute refers to a valid function.
     func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(),
                                                                         this->getCalleeAttr());
@@ -496,27 +494,30 @@ LogicalResult BackpropOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 // BackpropOp Extra methods
 //===----------------------------------------------------------------------===//
 
-LogicalResult BackpropOp::verify()
-{
+LogicalResult BackpropOp::verify() {
     size_t numDiffArgs =
         this->getDiffArgIndices().has_value() ? this->getDiffArgIndicesAttr().size() : 1;
     bool tensorSemantics = hasTensorSemantics(getOperandTypes(), getResultTypes());
 
-    if (this->getDiffArgShadows().size() && tensorSemantics)
+    if (this->getDiffArgShadows().size() && tensorSemantics) {
         return emitOpError("cannot have both tensor results and memref output arguments");
+    }
 
-    if (this->getCalleeResults().size() && tensorSemantics)
+    if (this->getCalleeResults().size() && tensorSemantics) {
         return emitOpError("cannot have callee result buffers before bufferization");
+    }
 
-    if (!tensorSemantics && this->getCalleeResults().size() != this->getCotangents().size())
+    if (!tensorSemantics && this->getCalleeResults().size() != this->getCotangents().size()) {
         return emitOpError("need as many callee result buffers as there are cotangents")
                << ", expected " << this->getCotangents().size() << " but got "
                << this->getCalleeResults().size();
+    }
 
-    if (this->getDiffArgShadows().size() + this->getGradients().size() != numDiffArgs)
+    if (this->getDiffArgShadows().size() + this->getGradients().size() != numDiffArgs) {
         return emitOpError("number of gradient results did not match number of differentiable")
                << " arguments, expected " << numDiffArgs << " but got "
                << this->getDiffArgShadows().size() + this->getGradients().size();
+    }
 
     return success();
 }

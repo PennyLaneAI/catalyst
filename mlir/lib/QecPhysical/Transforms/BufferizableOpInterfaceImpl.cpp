@@ -41,28 +41,24 @@ struct AssembleTannerGraphOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<AssembleTannerGraphOpInterface,
                                                                    AssembleTannerGraphOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto assembleTannerOp = cast<AssembleTannerGraphOp>(op);
         Location loc = op->getLoc();
 
@@ -95,28 +91,24 @@ struct DecodeEsmCssOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<DecodeEsmCssOpInterface,
                                                                    DecodeEsmCssOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto decodeEsmCssOp = cast<DecodeEsmCssOp>(op);
         Location loc = op->getLoc();
 
@@ -132,7 +124,8 @@ struct DecodeEsmCssOpInterface
         Value errIdxBuffer = memref::AllocOp::create(rewriter, loc, errIdxMemRefType);
 
         DecodeEsmCssOp::create(rewriter, loc, TypeRange{}, esmToBufferOp.getResult(),
-                               decodeEsmCssOp.getTannerGraph(), errIdxBuffer);
+                               decodeEsmCssOp.getTannerGraph(), errIdxBuffer,
+                               decodeEsmCssOp.getCheckTypeAttr());
 
         bufferization::replaceOpWithBufferizedValues(rewriter, op, errIdxBuffer);
         return success();
@@ -147,28 +140,24 @@ struct DecodePhysicalMeasurementOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<
           DecodePhysicalMeasurementOpInterface, DecodePhysicalMeasurementOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto decodePhysMeasOp = cast<DecodePhysicalMeasurementOp>(op);
         Location loc = op->getLoc();
 
@@ -195,8 +184,7 @@ struct DecodePhysicalMeasurementOpInterface
 
 } // namespace
 
-void catalyst::qecp::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
-{
+void catalyst::qecp::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::qecp::QecPhysicalDialect *dialect) {
         AssembleTannerGraphOp::attachInterface<AssembleTannerGraphOpInterface>(*ctx);
         DecodeEsmCssOp::attachInterface<DecodeEsmCssOpInterface>(*ctx);
