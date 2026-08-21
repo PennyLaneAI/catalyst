@@ -328,17 +328,19 @@ def _executor_plugins(node: Node, given) -> list[str]:
     implied = []
     fn_lib = _coprocessor_fn_lib(node)
     if fn_lib is not None:
-        implied.append(fn_lib)
+        implied.append((fn_lib, fn_lib.name))
     device = getattr(node, "device", None)
     if device is not None:
         # Last: plugins open RTLD_GLOBAL and the first definition of a symbol wins, and the device
         # runtime carries its own copy of the runtime's exception types.
-        implied.append(Path(extract_backend_info(device).lpath))
-    for lib in implied:
+        lib = Path(extract_backend_info(device).lpath)
+        implied.append((lib, lib.with_suffix(f".{_BACKEND_LIB_EXTS[0]}").name))
+    for lib, remote_name in implied:
         # A node on another machine resolves a library by filename, the deployed bundle supplying
         # the file; one running here resolves it by path into this installation.
-        if not any(Path(p).name == lib.name for p in plugins):
-            plugins.append(lib.name if remote else str(lib))
+        name = remote_name if remote else lib.name
+        if not any(Path(p).name == name for p in plugins):
+            plugins.append(name if remote else str(lib))
     return plugins
 
 
