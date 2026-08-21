@@ -1359,6 +1359,57 @@ class TestSymbolicSpecsLoopConcretization:
 
         assert resources.quantum_operations["PauliZ"] == 12
 
+    def test_loop_concretization_with_inner_step(self):
+        """Test an inner loop with a step != 1."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for j in range(0, i, 2):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 16
+
+    def test_loop_concretization_with_lower_bound(self):
+        """Test an outer loop with a lower bound."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(2, n):
+                for j in range(i):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 27
+
+    def test_loop_concretization_with_inner_lower_bound(self):
+        """Test an inner loop with a lower bound."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for j in range(1, i):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 21
+
     def test_loop_concretization_reverse(self):
         """Test concretization on a decrementing loop."""
         n = 8
@@ -1394,6 +1445,25 @@ class TestSymbolicSpecsLoopConcretization:
 
         # Expect a symbolic value: indirect dependency is not supported for concretization
         assert not isinstance(resources.quantum_operations["PauliZ"], (int, float))
+
+    def test_loop_concretization_combined(self):
+        """Test concretization with all different complexities on loop bounds put together."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(1, n, 2):
+                for j in range(1, i):
+                    for k in range(0, j, 2):
+                        qp.PauliZ(wires=k % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        # Expect a symbolic value: combined complexities are not supported for concretization
+        assert resources.quantum_operations["PauliZ"] == 20
 
 
 class TestMarkerIntegration:
