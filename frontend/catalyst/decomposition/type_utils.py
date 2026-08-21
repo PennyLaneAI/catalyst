@@ -169,7 +169,7 @@ def replace_abstract_wires_with_concrete_wires(node):
         return tuple(replace_abstract_wires_with_concrete_wires(item) for item in node)
     else:
         if isinstance(node, qp.typing.AbstractWires):
-            return qp.wires.Wires(range(node.num_wires))
+            return qp.wires.Wires(range(len(node)))
         else:
             return node
 
@@ -182,7 +182,7 @@ def _replace_op_abstract_wires_with_concrete_wires(op2):
     new_op = copy.deepcopy(op2)
     for wire_arg in new_op.wire_argnames:
         if isinstance(new_op.arguments[wire_arg], qp.typing.AbstractWires):
-            num_wires = new_op.arguments[wire_arg].num_wires
+            num_wires = len(new_op.arguments[wire_arg])
             new_op.arguments[wire_arg] = qp.wires.Wires(range(-1, -num_wires - 1, -1))
     for hybrid_arg in new_op.hybrid_argnames:
         if isinstance(new_op.arguments[hybrid_arg], qp.core.Operator2):

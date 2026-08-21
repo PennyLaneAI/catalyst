@@ -191,7 +191,10 @@ def compile_decomposition_rules(
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
-    subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
+    subroutines = []
+    for rule in decomp_rules:
+        if rule.is_applicable(*rule_args, **rule_kwargs):
+            subroutines.append(rule_to_subroutine(rule))
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
