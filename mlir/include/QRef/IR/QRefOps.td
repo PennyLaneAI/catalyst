@@ -723,10 +723,10 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
     let summary = "Apply the enclosed operations controlled on the given control qubits.";
     let description = [{
         The `qref.ctrl` operation applies the quantum operations in its single-block region
-        conditioned on a set of control qubits. Each `in_ctrl_values` entry selects whether the
+        conditioned on a set of control qubits. Each `ctrl_values` entry selects whether the
         matching control qubit activates on the |1> (true) or |0> (false) state.
 
-        Measurements inside a `quantum.ctrl` region are rejected.
+        Measurements inside a `qref.ctrl` region are rejected.
     }];
 
     let regions = (region SizedRegion<1>:$region);

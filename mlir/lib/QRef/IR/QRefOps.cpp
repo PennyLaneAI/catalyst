@@ -23,6 +23,8 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpImplementation.h"
 
+#include "MBQC/IR/MBQCOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 
@@ -348,8 +350,10 @@ LogicalResult AdjointOp::verify() {
 
 LogicalResult CtrlOp::verify() {
     auto res = this->getRegion().walk([](Operation *op) {
-        return isa<quantum::MeasurementProcess, MeasureOp>(op) ? WalkResult::interrupt()
-                                                               : WalkResult::advance();
+        return isa<quantum::MeasurementProcess, MeasureOp, pbc::RefPPMeasurementOp,
+                   mbqc::RefMeasureInBasisOp>(op)
+                   ? WalkResult::interrupt()
+                   : WalkResult::advance();
     });
 
     if (res.wasInterrupted()) {

@@ -107,7 +107,7 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
 
     if (mlir_module := getattr(workflow, "mlir_module", None)) is not None:
         value_semantics_mlir = _quantum_opt_stderr(
-            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize)"',
             "--mlir-print-op-generic",
             stdin=str(mlir_module),
         )
@@ -119,7 +119,7 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
             mlir_module = workflow.generate_ir()
 
         value_semantics_mlir = _quantum_opt_stderr(
-            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize)"',
             "--mlir-print-op-generic",
             stdin=str(mlir_module),
         )

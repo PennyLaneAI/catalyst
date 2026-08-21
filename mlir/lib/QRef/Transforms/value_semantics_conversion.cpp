@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #define DEBUG_TYPE "value-semantics-conversion"
+
+// The macro REFERENCE_SEMANTICS_GATE_OPS defines a list of operations that can take in !qref.bit
+// values as operands, and do not return any observables as results.
 #define REFERENCE_SEMANTICS_GATE_OPS                                                               \
     qref::QuantumOperation, qref::MeasureOp, qref::CtrlOp, mbqc::RefMeasureInBasisOp,              \
         pbc::RefPPMeasurementOp
@@ -1363,6 +1366,7 @@ void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tr
         rValuesUsedByRegion.insert(rCtrlQubit);
     }
     collectNecessaryRegionRValues(rCtrlOp.getRegion(), rValuesUsedByRegion);
+    assert(rValuesUsedByRegion.size() >= numCtrlQubits);
     size_t numTargetQubits = rValuesUsedByRegion.size() - numCtrlQubits;
 
     quantum::CtrlOp vCtrlOp;

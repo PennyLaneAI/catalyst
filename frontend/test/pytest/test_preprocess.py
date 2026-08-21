@@ -19,8 +19,10 @@ from dataclasses import replace
 import numpy as np
 import pennylane as qp
 import pytest
+from pennylane.decomposition import add_decomps, register_resources
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane.ops.op_math.adjoint2 import adjoint_rotation as adjoint_rotation2
 from pennylane.tape import QuantumScript
 from utils import CONFIG_CUSTOM_DEVICE
 
@@ -73,6 +75,15 @@ class OtherRX(qp.RX):
     def decomposition(self):
         """decomposes to normal RX"""
         return [qp.RX(*self.parameters, self.wires)]
+
+
+@register_resources({qp.RX: 1})
+def _other_rx_to_rx(phi, wires):
+    qp.RX(phi, wires)
+
+
+add_decomps(OtherRX, _other_rx_to_rx)
+add_decomps("Adjoint(OtherRX)", adjoint_rotation2)
 
 
 class CustomDevice(Device):
@@ -518,7 +529,7 @@ class TestPreprocessHybridOp:
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
-        assert len(new_tape.operations) == 6
+        assert len(new_tape.operations) == 14
         assert np.allclose(qp.matrix(new_tape, wire_order=[1, 0]), tape.operations[0].matrix())
 
     @pytest.mark.usefixtures("create_temporary_toml_file")

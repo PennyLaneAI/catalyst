@@ -57,7 +57,8 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 
 ifeq ($(ENABLE_TRANSPORT), ON)
-	BUILD_TARGETS += rt_transport
+	BUILD_TARGETS += transport_all
+	TEST_TARGETS += transport_tests_all
 endif
 
 ifeq ($(ENABLE_EXECUTOR), ON)
@@ -126,6 +127,13 @@ ifeq ($(ENABLE_OQD), ON)
 	# Test the OQD devices C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
+ifeq ($(ENABLE_TRANSPORT), ON)
+	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t; \
+	done
+endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	# Test the catalyst-executor server over a loopback connection
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
@@ -149,6 +157,13 @@ ifeq ($(ENABLE_OPENQASM), ON)
 endif
 ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
+endif
+ifeq ($(ENABLE_TRANSPORT), ON)
+	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t; \
+	done
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor

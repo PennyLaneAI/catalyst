@@ -21,7 +21,6 @@ import pennylane as qp
 import pytest
 from pennylane.capture.primitives import (
     adjoint_transform_prim,
-    ctrl_transform_prim,
     for_loop_prim,
     while_loop_prim,
 )
@@ -32,7 +31,6 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_get_p,
     qref_operator_p,
-    qref_qinst_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -452,6 +450,7 @@ class TestAdjointCtrl:
             "n_ctrls": 0,
             "op_cls": qp.S,
             "wire_lens": (1,),
+            "collect_decomp_rules": True,
         }
 
     @pytest.mark.parametrize("inner_adjoint", (True, False))
@@ -476,16 +475,19 @@ class TestAdjointCtrl:
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
         eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
-        assert eqn.primitive == qref_qinst_p
+        assert eqn.primitive == qref_operator_p
         assert eqn.params == {
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "forward_mask": (),
             "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
-            "ctrl_len": 3,
-            "op": "RX",
-            "qubits_len": 1,
-            "params_len": 1,
+            "n_ctrls": 3,
+            "collect_decomp_rules": True,
+            "op_cls": qp.RX,
+            "wire_lens": (1,),
         }
-        assert eqn.invars[0] is qfunc_xpr.eqns[2].outvars[0]
-        assert eqn.invars[1] is qfunc_xpr.invars[0]
+        assert eqn.invars[0] is qfunc_xpr.invars[0]
+        assert eqn.invars[1] is qfunc_xpr.eqns[2].outvars[0]
         for i in range(3):
             assert eqn.invars[2 + i] is qfunc_xpr.eqns[3 + i].outvars[0]
         assert eqn.invars[5].val == False
@@ -534,6 +536,18 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+        eqn = qfunc_xpr.eqns[5]
+        assert eqn.primitive == qref_operator_p
+        assert eqn.params == {
+            "adjoint": False,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 2,
+            "op_cls": qp.S,
+            "wire_lens": (1,),
+            "collect_decomp_rules": True,
+        }
 
         if as_qfunc:
             # A qfunc control lowers to nested `qref.ctrl` regions, one per control.
@@ -645,20 +659,21 @@ class TestAdjointCtrl:
             assert qfunc_xpr.eqns[5].primitive == qref_get_p
             assert qfunc_xpr.eqns[6].primitive == qref_get_p
 
-            eqn = qfunc_xpr.eqns[7]
-            assert eqn.primitive == qref_operator_p
-            assert eqn.params == {
-                "adjoint": False,
-                "forward_mask": (),
-                "hybrid_lens": (),
-                "hybrid_trees": (),
-                "n_ctrls": 1,
-                "op_cls": qp.T,
-                "wire_lens": (1,),
-            }
-            assert eqn.invars[0] is qfunc_xpr.eqns[5].outvars[0]
-            assert eqn.invars[1] is qfunc_xpr.eqns[6].outvars[0]
-            assert eqn.invars[2].val == True
+        eqn = qfunc_xpr.eqns[7]
+        assert eqn.primitive == qref_operator_p
+        assert eqn.params == {
+            "adjoint": False,
+            "forward_mask": (),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "n_ctrls": 1,
+            "op_cls": qp.T,
+            "wire_lens": (1,),
+            "collect_decomp_rules": True,
+        }
+        assert eqn.invars[0] is qfunc_xpr.eqns[5].outvars[0]
+        assert eqn.invars[1] is qfunc_xpr.eqns[6].outvars[0]
+        assert eqn.invars[2].val == True
 
     def test_ctrl_around_for_loop(self):
         """Test that ctrl applied to a for loop lowers to a qref.ctrl region around the loop."""
@@ -700,6 +715,7 @@ class TestAdjointCtrl:
             "n_ctrls": 0,
             "op_cls": qp.X,
             "wire_lens": (1,),
+            "collect_decomp_rules": True,
         }
 
 
