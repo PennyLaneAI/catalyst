@@ -17,9 +17,10 @@ There are 5 special operators that do not lower to CustomOp or OperatorOp in MLI
 to their own operations:
 - MultiRZ
 - PauliRot
-- GlobalPhase (TODO: migration to Operator2 not done yet)
-- PCPhase (TODO: migration to Operator2 not done yet)
-- QubitUnitary (TODO: migration to Operator2 not done yet)
+- GlobalPhase
+- PCPhase
+- QubitUnitary (TODO: cannot yet lower rules that call helper functions)
+- BasisState (TODO: cannot yet lower rules that call helper functions)
 """
 
 # RUN: %PYTHON %s | FileCheck %s
@@ -64,9 +65,7 @@ def test_paulirot():
     def paulirot():
         qp.PauliRot(theta=0.1, pauli_word="XX", wires=[0, 1])
         qp.PauliRot(theta=0.2, pauli_word="Z", wires=[2])
-        # TODO: decomposition rule of Y PauliRot involves RX, which has not been migrated to
-        # Operator2 yet
-        # qp.PauliRot(theta=0.2, pauli_word="YZX", wires=[0, 1, 2])
+        qp.PauliRot(theta=0.2, pauli_word="YZX", wires=[0, 1, 2])
         return qp.state()
 
     print(paulirot.mlir)
@@ -75,10 +74,13 @@ def test_paulirot():
 # CHECK: func.func public @paulirot()
 # CHECK: qref.paulirot ["X", "X"]({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.paulirot ["Z"]({{%.+}}) {{%.+}} : !qref.bit
+# CHECK: qref.paulirot ["Y", "Z", "X"]({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
 # CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
 # CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
 # CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
 # CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:3}{pauli_word:YZX}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word:YZX}"
 test_paulirot()
 
 
