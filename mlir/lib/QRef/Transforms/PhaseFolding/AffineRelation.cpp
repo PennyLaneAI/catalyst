@@ -72,6 +72,14 @@ BinaryMatrix AffineRelation::concretizer(const PropagateSchema &propSchm) // <X'
 std::string AffineRelation::toString() const {
     std::string res = "";
 
+    if (matrix.getNumRows() > 0) {
+        res += "X' X";
+        if (schema.auxVars.size() > 0) {
+            res += " Y";
+        }
+        res += " | c\n";
+    }
+
     for (size_t i = 0; i < matrix.getNumRows(); ++i) {
         std::string post = matrix.getRowAt(i).toStringWithOrder(schema.postVars);
         std::string pre = matrix.getRowAt(i).toStringWithOrder(schema.preVars);

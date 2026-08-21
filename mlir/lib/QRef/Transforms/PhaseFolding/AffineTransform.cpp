@@ -22,6 +22,15 @@ using namespace catalyst::phase_folding;
 std::string AffineTransform::toString() const {
     std::string res = "";
 
+    if (matrix.getNumRows() > 0) {
+        res += "X";
+        if (schema.auxVars.size() > 0) {
+            res += " Y";
+        }
+        res += " | c\n";
+    } 
+
+
     for (size_t i = 0; i < matrix.getNumRows(); ++i) {
         std::string pre = matrix.getRowAt(i).toStringWithOrder(schema.preVars);
         std::string aux = matrix.getRowAt(i).toStringWithOrder(schema.auxVars);

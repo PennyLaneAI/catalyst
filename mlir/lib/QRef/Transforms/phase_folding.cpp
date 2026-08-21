@@ -539,55 +539,55 @@ struct PhaseAnalyzer {
         }
         llvm::TypeSwitch<mlir::Operation *, void>(op)
             .Case<mlir::scf::IfOp>([&](mlir::scf::IfOp ifOp) {
-                llvm::outs() << "IfOp:  " << "\n";
+                // llvm::outs() << "IfOp:  " << "\n";
                 handleIfOp(ifOp, currentAbst, wireTable);
             })
             .Case<mlir::scf::ForOp>([&](mlir::scf::ForOp forOp) {
-                llvm::outs() << "ForOp: " << "\n";
+                // llvm::outs() << "ForOp: " << "\n";
                 handleForOp(forOp, currentAbst, wireTable);
             })
             .Case<mlir::func::CallOp>([&](mlir::func::CallOp callOp) {
-                llvm::outs() << "CallOp:    " << callOp << "\n";
+                // llvm::outs() << "CallOp:    " << callOp << "\n";
                 // handleCallOp(callOp, currentAbst, wireTable);
             })
             .Case<qref::CustomOp>([&](qref::CustomOp customOp) {
-                llvm::outs() << "CustomOp:  " << customOp << "\n";
+                // llvm::outs() << "CustomOp:  " << customOp << "\n";
                 handleCustomOp(customOp, currentAbst, gateID, wireTable);
             })
             .Case<qref::SetBasisStateOp>([&](qref::SetBasisStateOp basisOp) {
-                llvm::outs() << "SetBasisStateOp:   " << basisOp << "\n";
+                // llvm::outs() << "SetBasisStateOp:   " << basisOp << "\n";
                 initQubitsState(basisOp, currentAbst, wireTable);
             })
             .Case<qref::AllocOp>([&](qref::AllocOp allocOp) {
-                llvm::outs() << "AllocOp:   " << allocOp << "\n";
+                // llvm::outs() << "AllocOp:   " << allocOp << "\n";
             })
             .Case<qref::AllocQubitOp>([&](qref::AllocQubitOp allocQbOp) {
-                llvm::outs() << "AllocQubitOp:  " << allocQbOp << "\n";
+                // llvm::outs() << "AllocQubitOp:  " << allocQbOp << "\n";
             })
             .Case<qref::DeallocOp>([&](qref::DeallocOp deallocOp) {
-                llvm::outs() << "DeallocOp:   " << deallocOp << "\n";
+                // llvm::outs() << "DeallocOp:   " << deallocOp << "\n";
                 // deallocateRegister(deallocOp.getQreg());
             })
             .Case<qref::DeallocQubitOp>([&](qref::DeallocQubitOp deallocQbOp) {
-                llvm::outs() << "DeallocQubitOp:   " << deallocQbOp << "\n";
+                // llvm::outs() << "DeallocQubitOp:   " << deallocQbOp << "\n";
                 // deallocateQubit(deallocQbOp.getQubit());
             })
             .Case<qref::GetOp>([&](qref::GetOp getOp) {
-                llvm::outs() << "GetOp: " << getOp << "\n";
+                // llvm::outs() << "GetOp: " << getOp << "\n";
             })
             .Case<qref::MeasureOp>([&](qref::MeasureOp measureOp) {
-                llvm::outs() << "MeasureOp:  " << measureOp << "\n";
+                // llvm::outs() << "MeasureOp:  " << measureOp << "\n";
             })
             .Case<qref::GlobalPhaseOp>([&](qref::GlobalPhaseOp gpOp) {
-                llvm::outs() << "GlobalPhaseOp: " << gpOp << "\n";
+                // llvm::outs() << "GlobalPhaseOp: " << gpOp << "\n";
             })
             .Case<mlir::scf::YieldOp>([&](mlir::scf::YieldOp yieldOp) {
-                llvm::outs() << "YieldOp:  " << yieldOp << "\n";
+                // llvm::outs() << "YieldOp:  " << yieldOp << "\n";
                 
             })
             .Default([&](mlir::Operation *unknownOp) {
                 // Handle or ignore operations that don't affect phases (e.g., standard arithmetic)
-                llvm::outs() << "UnknownOp: " << *unknownOp << "\n";
+                // llvm::outs() << "UnknownOp: " << *unknownOp << "\n";
                 // applyUndefinedOp(unknownOp, currentAbst);
             });
     }
@@ -813,7 +813,7 @@ struct PhaseFoldingPass : public impl::PhaseFoldingPassBase<PhaseFoldingPass> {
         PhaseFoldingPlan plan;
         PhaseAnalyzer analyzer(plan, tracer.get());
         for (auto func : rootModule.getOps<mlir::func::FuncOp>()) {
-            llvm::outs() << "FuncOp:\n" << func << "\n";
+            // llvm::outs() << "FuncOp:\n" << func << "\n";
             if (!func.isExternal()) {   // only analyze functions with bodies
                 analyzer.analyzeFuncOp(func);
             }

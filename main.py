@@ -38,17 +38,18 @@ from catalyst.passes import graph_decomposition, phase_folding
 #     qp.CNOT([1, 0])
 
 
-@qp.qjit(keep_intermediate=2, capture=False)
+@qp.qjit(keep_intermediate=2, capture=True)
 # @qp.transform(pass_name="phase-folding")
-@phase_folding(report_stats=True, trace_abstraction=True)
+# @phase_folding(report_stats=True, trace_abstraction=True)
+@qp.transform(pass_name="convert-to-reference-semantics")
 @qp.qnode(device=qp.device("lightning.qubit", wires=2))
 def circuit_ex425():
-    qp.StatePrep([0, 1], wires=1)
-    qp.BasisState(1, wires=1)  # becomes dynamic, so not yet
-    qp.T(1)
-    qp.CNOT([0, 1])
-    qp.T(0)
-    qp.T(1)
+    # qp.StatePrep([0, 1], wires=1)
+    qp.BasisState(0, wires=1)  # becomes dynamic, so not yet
+    # qp.T(1)
+    # qp.CNOT([0, 1])
+    # qp.T(0)
+    # qp.T(1)
 
 
 # @qp.qjit(keep_intermediate=2, capture=False)

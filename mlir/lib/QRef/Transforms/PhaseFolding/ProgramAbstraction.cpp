@@ -101,31 +101,31 @@ void ProgramAbstraction::applyGateY_dag(size_t wire, GateID gateId) {
 }
 
 void ProgramAbstraction::applySummary(RegionSummary &&summary) {
-    llvm::errs() << "heyyyyyyyyyyyy\n*************\n";
+    // llvm::errs() << "heyyyyyyyyyyyy\n*************\n";
 
-    llvm::errs() << "\nProgramAbstraction::applySummary...\n";
-    llvm::errs() << "currentAbstraction:\n" << *this << "\n";
-    llvm::errs() << "summary:\n" << summary << "\n";
+    // llvm::errs() << "\nProgramAbstraction::applySummary...\n";
+    // llvm::errs() << "currentAbstraction:\n" << *this << "\n";
+    // llvm::errs() << "summary:\n" << summary << "\n";
 
     AffineRelation precondition(std::move(stateTransform));
-    llvm::errs() << "precondition:\n" << precondition << "\n";
+    // llvm::errs() << "precondition:\n" << precondition << "\n";
 
     summary.nullifyPhasesUnder(precondition);
-    llvm::errs() << "\nnullifiedSummary:\n" << summary << "\n";
+    // llvm::errs() << "\nnullifiedSummary:\n" << summary << "\n";
 
     precondition.propagateThrough(summary.affineRel);
-    llvm::errs() << "\npropagatedThrough:\n" << precondition << "\n";
+    // llvm::errs() << "\npropagatedThrough:\n" << precondition << "\n";
 
     this->normalizePhasesUnder(precondition);
-    llvm::errs() << "\nnormalizedPhases:\n" << phases << "\n";
+    // llvm::errs() << "\nnormalizedPhases:\n" << phases << "\n";
 
     this->stateTransform = precondition.solveRelation();
-    llvm::errs() << "\nsolvedRelation:\n" << stateTransform << "\n";
+    // llvm::errs() << "\nsolvedRelation:\n" << stateTransform << "\n";
 
     summary.accumulatePhasesInto(this->phases, getSchema());
-    llvm::errs() << "\naccumulatedPhases:\n" << phases << "\n";
+    // llvm::errs() << "\naccumulatedPhases:\n" << phases << "\n";
 
-    llvm::errs() << "\nfinalAbstraction:\n" << *this << "\n";
+    // llvm::errs() << "\nfinalAbstraction:\n" << *this << "\n";
 }
 
 inline void ProgramAbstraction::normalizePhasesUnder(const AffineRelation &postcondRel) {

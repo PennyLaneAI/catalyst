@@ -27,9 +27,9 @@
 // no change
 // limitation of HH
 // func.func @test_loop_block() attributes {quantum.node} {
-//     %start = arith.constant 0 : index
-//     %step = arith.constant 1 : index
-//     %stop = arith.constant 37 : index
+    // %start = arith.constant 0 : index
+    // %step = arith.constant 1 : index
+    // %stop = arith.constant 37 : index
 
 //     %reg = qref.alloc( 2) : !qref.reg<2>
 //     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
@@ -112,8 +112,8 @@ func.func @test_loop_nested() attributes {quantum.node} {
     %q0 = qref.get %reg[ 0] : !qref.reg<2> -> !qref.bit
     %q1 = qref.get %reg[ 1] : !qref.reg<2> -> !qref.bit
 
-    %tens01 = arith.constant dense<[false]> : tensor<1xi1>
-    qref.set_basis_state(%tens01) %q0 : tensor<1xi1>, !qref.bit
+    %cst0 = arith.constant dense<[false]> : tensor<1xi1>
+    qref.set_basis_state(%cst0) %q0 : tensor<1xi1>, !qref.bit
 
     qref.custom "T"() %q1 : !qref.bit   // l0
 
