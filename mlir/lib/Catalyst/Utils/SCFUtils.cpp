@@ -158,8 +158,8 @@ std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forO
     int64_t outerUpper = 0;
     scf::ForOp currentLoop = forOp;
     while (currentLoop) {
-        auto lower = getConstantIntValue(currentLoop.getLowerBound());
-        auto step = getConstantIntValue(currentLoop.getStep());
+        auto lower = resolveConstantInt(currentLoop.getLowerBound());
+        auto step = resolveConstantInt(currentLoop.getStep());
 
         if (!lower || !step || *step <= 0) {
             return std::nullopt;
@@ -184,7 +184,7 @@ std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forO
             break;
         }
 
-        if (auto upper = getConstantIntValue(currentLoop.getUpperBound())) {
+        if (auto upper = resolveConstantInt(currentLoop.getUpperBound())) {
             outerUpper = *upper;
             break;
         }
