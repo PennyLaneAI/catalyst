@@ -27,6 +27,8 @@ set_property(TARGET rt_transport PROPERTY POSITION_INDEPENDENT_CODE ON)
 #   memcpy_gpu         HIP
 #   cpu_verbs (RDMA)   libibverbs
 #   gpu_verbs (RDMA)   libibverbs + HIP
+#   fpga_verbs (RDMA)  libibverbs + ENABLE_TRANSPORT_FPGA
+#   fpga_hwhs (RDMA)   libibverbs + ENABLE_TRANSPORT_FPGA
 #
 # Shared libs under common/:
 #   common/interface   headers (WireProtocol, ConfigParser)         ::common
@@ -85,6 +87,29 @@ if(IBVERBS_LIB)
         add_subdirectory(rdma/gpu_verbs)
         add_dependencies(transport_all catalyst_transport_gpu_verbs_coprocessor)
         add_dependencies(transport_backends catalyst_transport_gpu_verbs_coprocessor)
+    endif()
+
+    # The FPGA controllers are for one board and are off by default: they compile
+    # against patched verbs headers, and at run time they need /dev/mem plus a
+    # character device from an out-of-tree kernel module. Instructions for this
+    # cross-compilation is in the backline repo.
+    if(ENABLE_TRANSPORT_FPGA)
+        message(STATUS "transport: ENABLE_TRANSPORT_FPGA -> building FPGA controllers")
+        add_subdirectory(rdma/fpga_verbs)
+        add_dependencies(transport_all catalyst_transport_fpga_verbs_controller)
+        add_dependencies(transport_backends catalyst_transport_fpga_verbs_controller)
+
+        # The hardware-handshake session writes the START doorbell through an aarch64
+        # Device-MMIO barrier and #errors out on anything else, so it is the board's
+        # architecture or nothing. fpga_verbs above has no such restriction.
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+            add_subdirectory(rdma/fpga_hwhs)
+            add_dependencies(transport_all catalyst_transport_hwhs_controller)
+            add_dependencies(transport_backends catalyst_transport_hwhs_controller)
+        else()
+            message(STATUS
+                "transport: fpga_hwhs skipped -- aarch64 only, this is ${CMAKE_SYSTEM_PROCESSOR}")
+        endif()
     endif()
 else()
     message(STATUS "transport: libibverbs not found -> RDMA backends skipped")
