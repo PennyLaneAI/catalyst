@@ -14,7 +14,8 @@
 
 #define DEBUG_TYPE "reference-semantics-conversion"
 #define VALUE_SEMANTICS_GATE_OPS                                                                   \
-    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp
+    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, pbc::PPRotationOp,        \
+        pbc::SelectPPMeasurementOp, mbqc::MeasureInBasisOp
 #define VALUE_SEMANTICS_OBSERVABLE_OPS                                                             \
     quantum::ComputationalBasisOp, quantum::HermitianOp, quantum::NamedObsOp
 
@@ -372,6 +373,45 @@ void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTrack
 
     builder.replaceAllUsesWith(vPPMOp.getMres(), rPPMOp.getMres());
     erasureWorklist.push_back(vPPMOp);
+}
+
+void handlePPR(IRRewriter &builder, pbc::PPRotationOp vPPROp, QubitValueTracker &tracker,
+               SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+
+    migrateOpToReferenceSemantics<pbc::RefPPRotationOp>(builder, vPPROp, tracker);
+
+    erasureWorklist.push_back(vPPROp);
+}
+
+void handleSelectPPM(IRRewriter &builder, pbc::SelectPPMeasurementOp vSelPPMOp,
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+
+    auto rSelPPMOp =
+        migrateOpToReferenceSemantics<pbc::RefSelectPPMeasurementOp>(builder, vSelPPMOp, tracker);
+
+    builder.replaceAllUsesWith(vSelPPMOp.getMres(), rSelPPMOp.getMres());
+    erasureWorklist.push_back(vSelPPMOp);
+}
+
+// Shared handler for pbc.fabricate / pbc.prepare. VOpTy is deduced from the producer argument.
+template <typename ROpTy, typename VOpTy>
+void handleQubitProducer(IRRewriter &builder, VOpTy vProducerOp, QubitValueTracker &tracker,
+                         SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vProducerOp);
+    Location loc = vProducerOp.getLoc();
+    MLIRContext *ctx = vProducerOp.getContext();
+
+    SmallVector<Type> rQubitTypes(vProducerOp.getOutQubits().size(), qref::QubitType::get(ctx));
+    auto rProducerOp = ROpTy::create(builder, loc, rQubitTypes, vProducerOp.getInitState());
+
+    for (auto [vQubit, rQubit] :
+         llvm::zip_equal(vProducerOp.getOutQubits(), rProducerOp.getOutQubits())) {
+        tracker.setRQubit(vQubit, rQubit);
+    }
+    erasureWorklist.push_back(vProducerOp);
 }
 
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
@@ -796,6 +836,16 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker, erasureWorklist); })
             .Case<pbc::PPMeasurementOp>(
                 [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::PPRotationOp>(
+                [&](auto o) { handlePPR(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::SelectPPMeasurementOp>(
+                [&](auto o) { handleSelectPPM(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::FabricateOp>([&](auto o) {
+                handleQubitProducer<pbc::RefFabricateOp>(builder, o, tracker, erasureWorklist);
+            })
+            .Case<pbc::PrepareStateOp>([&](auto o) {
+                handleQubitProducer<pbc::RefPrepareStateOp>(builder, o, tracker, erasureWorklist);
+            })
             .Case<quantum::AdjointOp>(
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
             .Case<quantum::CtrlOp>(
