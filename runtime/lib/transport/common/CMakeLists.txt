@@ -1,15 +1,20 @@
 ###############################################
-# Transport common — transport-agnostic bits  #
-# No RDMA / ibverbs / HIP dependencies.       #
+# library transport_common
+# Device-agnostic RDMA verbs primitives
+# shared by all transport backends
 ###############################################
-# Header-only: WireProtocol.hpp and ConfigParser.hpp. Every transport backend can depend
-# on this without dragging in libibverbs or HIP.
 
-add_library(catalyst_transport_common INTERFACE)
-target_include_directories(catalyst_transport_common INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/interface
-    ${runtime_includes}
+add_library(transport_common STATIC
+    CompletionQueue.cpp
+    Context.cpp
+    MemoryRegion.cpp
+    OobSocket.cpp
+    ProtectionDomain.cpp
+    QueuePair.cpp
 )
 
-# Coprocessor-shared code (CPU plugin implementations + GPU shared plumbing).
-add_subdirectory(coproc)
+target_include_directories(transport_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+target_link_libraries(transport_common PUBLIC ${IBVERBS_LIB} Threads::Threads)
+
+set_property(TARGET transport_common PROPERTY POSITION_INDEPENDENT_CODE ON)
