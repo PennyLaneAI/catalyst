@@ -15,8 +15,10 @@
 
 import os
 import platform
+from pathlib import Path
 from unittest import mock
 
+import numpy as np
 import pennylane as qp
 import pytest
 from pennylane.backline import Transport
@@ -37,6 +39,7 @@ from catalyst.backline import (
 )
 from catalyst.device.qjit_device import BackendInfo, extract_backend_info
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime_environment import get_lib_path
 
 if hasattr(qp, "backline"):
     from pennylane.backline import Transport
@@ -297,6 +300,234 @@ def test_backline_qnode_capture_path_memcpy(use_capture):
     ir = circuit.mlir
     assert "catalyst.backline" in ir
     assert 'transport = "memcpy"' in ir
+
+
+@pytest.mark.skipif(
+    "CATALYST_TRANSPORT_PATH" not in os.environ,
+    reason=(
+        "Backline demo integration tests need the transport backend libraries built with "
+        "-DENABLE_TRANSPORT=ON, which the wheel does not ship. Add that build directory to "
+        "CATALYST_TRANSPORT_PATH to run them; the check-transport-gpu workflow does this on a "
+        "GPU runner."
+    ),
+)
+class TestBacklineDemoIntegration:
+    """Mirrors ``backline/demos`` end-to-end, adapted to run in the unit-test environment.
+
+    Each test mirrors a ``backline/demos`` script and JIT-compiles the whole placement. The ones
+    that call the QNode also execute it, so they need the transport backend libraries and the
+    decoder library reachable to the dynamic loader.
+    """
+
+    def test_local_cpu_to_local_cpu_memcpy(self, use_capture):
+        """Demo 1: local CPU ↔ local CPU over ``memcpy``, Steane-encoded.
+
+        Mirrors ``demos/demo_1_local_cpu_to_local_cpu_memcpy.py``: both roles in this process,
+        memcpy carrying the decode round of each error-correction cycle.
+        """
+        steane_lib = str(
+            Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
+        )
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("lightning.qubit", wires=3),
+            init_args={"backend_lib": "libcatalyst_transport_memcpy_controller.so"},
+        )
+        coproc = qp.Coprocessor(
+            name="cpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
+            init_args={"backend_lib": "libcatalyst_transport_memcpy_coprocessor.so"},
+        )
+        dev = qp.Backline(
+            controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
+        )
+
+        @qjit(capture=True)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
+
+        ir = ghz.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "memcpy"' in ir
+        assert 'symbol = "steane_coprocessor"' in ir
+        for pass_name, _ in _qec_pass_specs("steane"):
+            assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
+
+        samples = ghz()
+        assert samples is not None
+
+    def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture):
+        """Demo 1a: local CPU ↔ local CPU over RDMA loopback, Steane-encoded.
+
+        Mirrors ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``: both roles in this process, but
+        the round travels through a verbs device (soft-RoCE) rather than a shared buffer, so queue
+        pairs and the out-of-band handshake are exercised end-to-end.
+        """
+        steane_lib = str(
+            Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
+        )
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("lightning.qubit", wires=3),
+            init_args={
+                "backend_lib": "libcatalyst_transport_cpu_verbs_controller.so",
+                "config": "cfg",
+            },
+        )
+        coproc = qp.Coprocessor(
+            name="cpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
+            endpoint=qp.Endpoint("127.0.0.1", 18590),
+            init_args={
+                "backend_lib": "libcatalyst_transport_cpu_verbs_coprocessor.so",
+                "config": "cfg",
+            },
+        )
+        dev = qp.Backline(
+            controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
+        )
+
+        @qjit(capture=True)
+        @qp.set_shots(10)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
+
+        ir = ghz.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "rdma"' in ir
+        assert 'symbol = "steane_coprocessor"' in ir
+        assert 'peer = "127.0.0.1"' in ir
+        for pass_name, _ in _qec_pass_specs("steane"):
+            assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
+
+        samples = ghz()
+        assert samples is not None
+
+    def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(self, use_capture):
+        """CPU controller ↔ GPU coprocessor over ``memcpy`` with a manually-scheduled QEC cycle.
+
+        Ports the CSS BP decoder demo to memcpy backends: the QNode extracts syndromes, calls the
+        coprocessor's decoder via ``qp.backline.decode``, and applies corrections in the same shot.
+        Substitutes a plain ``CoprocessorFunction`` for the ``css_bp_decoder`` builder, whose
+        Triton compilation is not available in the unit-test environment.
+        """
+        n_data = 13
+        aux = n_data
+        checks = np.array([[1] * 7 + [0] * 6, [0] * 6 + [1] * 7])
+        logical_support = list(range(n_data))
+        swap_pairs = [(0, 1), (2, 3)]
+
+        decoder = qp.CoprocessorFunction("hgp_bp_osd_decoder")
+
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=n_data + 1),
+            init_args={"backend_lib": "libcatalyst_transport_memcpy_controller.so"},
+        )
+        coproc = qp.Coprocessor(
+            name="gpu-coproc",
+            coprocessor_fn=decoder,
+            endpoint=qp.Endpoint("127.0.0.1", 18590),
+            init_args={"backend_lib": "libcatalyst_transport_memcpy_gpu_coprocessor.so"},
+        )
+        dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
+
+        def encode_logical_zero():
+            encoder = {
+                0: [6, 9, 11],
+                1: [7, 9, 10, 11, 12],
+                2: [8, 10, 12],
+                3: [6, 11],
+                4: [7, 11, 12],
+                5: [8, 12],
+            }
+            for pivot, targets in encoder.items():
+                qp.Hadamard(wires=pivot)
+                for t in targets:
+                    qp.CNOT(wires=[pivot, t])
+
+        def logical_circuit():
+            for w in logical_support:
+                qp.X(wires=w)
+            for w in range(n_data):
+                qp.Hadamard(wires=w)
+            for a, b in swap_pairs:
+                qp.SWAP(wires=[a, b])
+            for w in logical_support:
+                qp.Z(wires=w)
+            for w in range(n_data):
+                qp.Hadamard(wires=w)
+            for a, b in swap_pairs:
+                qp.SWAP(wires=[a, b])
+
+        def add_error(error_qubit, error_kind):
+            for q in range(n_data):
+                is_target = error_qubit == q
+                qp.cond(is_target & (error_kind == 1), qp.X)(wires=q)
+                qp.cond(is_target & (error_kind == 2), qp.Y)(wires=q)
+                qp.cond(is_target & (error_kind == 3), qp.Z)(wires=q)
+
+        def extract_syndromes():
+            z_syndrome = []
+            for row in checks:
+                for q in np.flatnonzero(row):
+                    qp.CNOT(wires=[int(q), aux])
+                z_syndrome.append(qp.measure(aux, reset=True))
+            x_syndrome = []
+            for row in checks:
+                qp.Hadamard(wires=aux)
+                for q in np.flatnonzero(row):
+                    qp.CNOT(wires=[aux, int(q)])
+                qp.Hadamard(wires=aux)
+                x_syndrome.append(qp.measure(aux, reset=True))
+            return z_syndrome, x_syndrome
+
+        def apply_correction(correction, pauli):
+            for q in range(n_data):
+                qp.cond(correction[q], pauli)(wires=q)
+
+        def mean_stabilizer(rows, pauli):
+            return qp.dot(
+                [1 / len(rows)] * len(rows),
+                [qp.prod(*(pauli(wires=int(q)) for q in np.flatnonzero(row))) for row in rows],
+            )
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def encoded_decoded_circuit(error_kind):
+            encode_logical_zero()
+            logical_circuit()
+            for error_qubit in range(n_data):
+                add_error(error_qubit, error_kind)
+                z_syndrome, x_syndrome = extract_syndromes()
+                correction_z = qp.backline.decode(x_syndrome, decoder_id=0)
+                correction_x = qp.backline.decode(z_syndrome, decoder_id=1)
+                apply_correction(correction_x, qp.X)
+                apply_correction(correction_z, qp.Z)
+            return (
+                qp.expval(mean_stabilizer(checks, qp.Z)),
+                qp.expval(mean_stabilizer(checks, qp.X)),
+            )
+
+        ir = encoded_decoded_circuit.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "memcpy"' in ir
+        assert 'symbol = "hgp_bp_osd_decoder"' in ir
+        assert "libcatalyst_transport_memcpy_controller.so" in ir
+        assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
+
+        result = encoded_decoded_circuit(0)  # error_kind=0: identity, no injected error
+        assert len(result) == 2
 
 
 def test_placement_behind_a_wrapper_is_found(use_capture):
