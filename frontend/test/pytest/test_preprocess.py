@@ -19,8 +19,10 @@ from dataclasses import replace
 import numpy as np
 import pennylane as qp
 import pytest
+from pennylane.decomposition import add_decomps, register_resources
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane.ops.op_math.adjoint2 import adjoint_rotation as adjoint_rotation2
 from pennylane.tape import QuantumScript
 from utils import CONFIG_CUSTOM_DEVICE
 
@@ -73,6 +75,15 @@ class OtherRX(qp.RX):
     def decomposition(self):
         """decomposes to normal RX"""
         return [qp.RX(*self.parameters, self.wires)]
+
+
+@register_resources({qp.RX: 1})
+def _other_rx_to_rx(phi, wires):
+    qp.RX(phi, wires)
+
+
+add_decomps(OtherRX, _other_rx_to_rx)
+add_decomps("Adjoint(OtherRX)", adjoint_rotation2)
 
 
 class CustomDevice(Device):
@@ -187,6 +198,7 @@ HYBRID_OPS = [
 TEST_DEVICE_CONFIG_TEXT = """
 schema = 3
 [operators.gates]
+GlobalPhase = { }
 PauliX = { }
 PauliZ = { }
 RX = { }
@@ -201,6 +213,7 @@ QubitUnitary = { }
 """
 
 TARGET_GATES_FROM_CONFIG = {
+    "GlobalPhase": 1,
     "PauliX": 1,
     "PauliZ": 1,
     "RX": 100,
@@ -494,9 +507,11 @@ class TestPreprocessHybridOp:
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
-        assert len(new_tape.operations) == 2
+        assert len(new_tape.operations) == 3 if expected_second_op is qp.RZ else 2
         assert isinstance(new_tape.operations[0], qp.PauliX)
         assert isinstance(new_tape.operations[1], expected_second_op)
+        if expected_second_op is qp.RZ:
+            assert isinstance(new_tape.operations[2], qp.GlobalPhase)
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
@@ -514,7 +529,7 @@ class TestPreprocessHybridOp:
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
-        assert len(new_tape.operations) == 6
+        assert len(new_tape.operations) == 14
         assert np.allclose(qp.matrix(new_tape, wire_order=[1, 0]), tape.operations[0].matrix())
 
     @pytest.mark.usefixtures("create_temporary_toml_file")

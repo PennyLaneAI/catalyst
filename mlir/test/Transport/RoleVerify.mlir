@@ -16,11 +16,11 @@
 
 // Role safety: controller-only ops reject a coprocessor session and vice versa.
 
-func.func @kick_requires_controller() {
+func.func @stage_payload_requires_controller() {
   %c = transport.create {backend_lib = "x", config = "c"} -> !transport.session<coprocessor>
   %buf = memref.alloc() : memref<1xi8>
   // expected-error @+1 {{operand #0 must be}}
-  transport.kick %c, %buf {work_item_idx = 0 : i32} : !transport.session<coprocessor>, memref<1xi8>
+  transport.stage_payload %c, %buf : !transport.session<coprocessor>, memref<1xi8>
   return
 }
 
@@ -29,7 +29,7 @@ func.func @kick_requires_controller() {
 func.func @commit_requires_controller() {
   %c = transport.create {backend_lib = "x", config = "c"} -> !transport.session<coprocessor>
   // expected-error @+1 {{operand #0 must be}}
-  transport.commit_work_item %c {work_item_idx = 0 : i32, in_bytes = 8 : i64, out_bytes = 8 : i64} : !transport.session<coprocessor>
+  transport.set_message_sizes %c {in_bytes = 8 : i64, out_bytes = 8 : i64} : !transport.session<coprocessor>
   return
 }
 

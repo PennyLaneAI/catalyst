@@ -33,7 +33,13 @@ from pennylane import adjoint as PL_adjoint
 from pennylane import cond
 from pennylane import ctrl as PL_ctrl
 from pennylane import for_loop, qjit, while_loop
-from pennylane.operation import DecompositionUndefinedError, Operation, Operator, Operator2, Wires
+from pennylane.operation import (
+    DecompositionUndefinedError,
+    Operation,
+    Operator,
+    Operator2,
+    Wires,
+)
 from pennylane.ops.op_math.controlled import Controlled
 from pennylane.tape import QuantumTape
 
@@ -226,7 +232,13 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=3), 0.1, 0, 2, 2, capture_mode=capture_mode
+            circuit,
+            qp.device(backend, wires=3),
+            0.1,
+            0,
+            2,
+            2,
+            capture_mode=capture_mode,
         )
 
     def test_qctrl_func_nested(self, backend, capture_mode):
@@ -584,7 +596,10 @@ class TestCatalystOnlyControlled:
             qp.SemiAdder(x_wires=x_wires, y_wires=output, work_wires=work_wires_add)
 
         hybrid_ctrl = C_ctrl(
-            _func, control=c_wire, work_wires=work_wires_ctrl, work_wire_type=work_wire_type
+            _func,
+            control=c_wire,
+            work_wires=work_wires_ctrl,
+            work_wire_type=work_wire_type,
         )()
         assert hybrid_ctrl.work_wire_type == work_wire_type
 
@@ -776,7 +791,8 @@ class TestControlledProperties:
         assert op.data == (x,)
 
         with pytest.raises(
-            AttributeError, match="property 'data' of 'ControlledOp' object has no setter"
+            AttributeError,
+            match="has no setter",
         ):
             setattr(op, "data", (pnp.array(2.3454),))
 
@@ -804,7 +820,12 @@ class TestControlledProperties:
         assert op.has_matrix is value
 
     @pytest.mark.parametrize(
-        "base", (qp.RX(1.23, 0), qp.Rot(1.2, 2.3, 3.4, 0), qp.QubitUnitary([[0, 1], [1, 0]], 0))
+        "base",
+        (
+            qp.RX(1.23, 0),
+            qp.Rot(1.2, 2.3, 3.4, 0),
+            qp.QubitUnitary([[0, 1], [1, 0]], 0),
+        ),
     )
     def test_ndim_params(self, base):
         """Test that `catalyst.ctrl` defers to base ndim_params"""
@@ -978,7 +999,7 @@ class TestControlledMiscMethods:
 
         assert copied_op.__class__ is op.__class__
         assert copied_op.control_wires == op.control_wires
-        assert copied_op.control_values == op.control_values
+        assert qp.math.allclose(copied_op.control_values, op.control_values)
         assert copied_op.data == (param1,)
 
         copied_op = qp.ops.functions.bind_new_parameters(copied_op, (6.54,))
@@ -991,9 +1012,11 @@ class TestControlledMiscMethods:
         base = qp.U1(1.23, wires=0)
         op = C_ctrl(base, "a")
 
-        assert op.label() == base.label()
-        assert op.label(decimals=2) == base.label(decimals=2)
-        assert op.label(base_label="hi") == base.label(base_label="hi")
+        # NOTE: As of https://github.com/PennyLaneAI/pennylane/pull/9981,
+        # ctrl(U1) eagerly dispatches to controlled phase shift.
+        assert op.label() == "Rϕ"
+        assert op.label(decimals=2) == "Rϕ\n(1.23)"
+        assert op.label(base_label="hi") == "hi"
 
     def test_label_matrix_param(self):
         """Test that the label method simply returns the label of the base and updates the cache."""
@@ -1055,7 +1078,8 @@ class TestControlledMiscMethods:
 
         expected = qp.exp(op.generator(), 1j * op.base.data[0])
         assert qp.math.allclose(
-            expected.matrix(wire_order=["a", "b", "c"]), op.matrix(wire_order=["a", "b", "c"])
+            expected.matrix(wire_order=["a", "b", "c"]),
+            op.matrix(wire_order=["a", "b", "c"]),
         )
 
     def test_diagonalizing_gates(self):

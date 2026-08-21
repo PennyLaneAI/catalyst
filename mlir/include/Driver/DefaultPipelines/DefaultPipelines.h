@@ -53,6 +53,13 @@ const PipelineList pipelineList{
       // this into something else.
       "inline-nested-module",
       "lower-mitigation",
+      // Reduce `quantum.ctrl`/`quantum.adjoint` regions to op-level modifiers.
+      // Nested regions (e.g. `ctrl(adjoint(...))`) require alternating the two
+      // passes: `ctrl-lowering` defers on a nested adjoint region,
+      // `adjoint-lowering` reduces it, then `ctrl-lowering` runs again.
+      "ctrl-lowering",
+      "adjoint-lowering",
+      "ctrl-lowering",
       "adjoint-lowering",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",
@@ -62,6 +69,8 @@ const PipelineList pipelineList{
      {"canonicalize",
       "func.func(chlo-legalize-to-stablehlo)",
       "func.func(stablehlo-legalize-control-flow)",
+      // builtin.module is added to support nested modules 
+      "builtin.module(func.func(stablehlo-legalize-control-flow))", 
       "func.func(stablehlo-aggressive-simplification)",
       "stablehlo-legalize-to-linalg",
       "func.func(stablehlo-legalize-to-std)",

@@ -14,14 +14,18 @@
 
 #include "Quantum/IR/QuantumInterfaces.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
 using namespace mlir;
@@ -34,11 +38,6 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 
 namespace {
-template <typename T> void printIterable(T iterable, llvm::raw_string_ostream &ss) {
-    ss << "[";
-    llvm::interleave(iterable, ss, ",");
-    ss << "]";
-}
 
 void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
     llvm::TypeSwitch<mlir::Attribute, void>(attr)
@@ -72,6 +71,13 @@ void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
 
 void printShapedType(ArrayRef<int64_t> shape, int64_t dim, Type elementType,
                      llvm::raw_string_ostream &ss) {
+    // Rank-0 tensors (e.g. tensor<f64>) have an empty shape; print the
+    // element type directly instead of indexing into the empty ArrayRef.
+    if (shape.empty()) {
+        ss << elementType;
+        return;
+    }
+
     int64_t length = shape[dim];
     auto printList = [&](auto printItem) {
         ss << "[";
@@ -99,15 +105,42 @@ void printType(mlir::Type type, llvm::raw_string_ostream &ss) {
         .Default([&](mlir::Type other) { other.print(ss); });
 }
 
-void printTypeRange(mlir::TypeRange typerange, llvm::raw_string_ostream &ss) {
-    ss << "[";
-    for (auto [i, type] : llvm::enumerate(typerange)) {
+template <typename T, typename PrintFunc>
+void printSortedMap(const llvm::StringMap<T> &map, llvm::raw_string_ostream &ss,
+                    PrintFunc printValue) {
+    llvm::SmallVector<llvm::StringRef> keys;
+    for (const llvm::StringRef key : map.keys()) {
+        keys.push_back(key);
+    }
+    llvm::sort(keys);
+
+    ss << "{";
+    for (auto [i, key] : llvm::enumerate(keys)) {
         if (i > 0) {
             ss << ",";
         }
-        printType(type, ss);
+        ss << key << ":";
+        printValue(map.lookup(key), ss);
     }
-    ss << "]";
+    ss << "}";
+}
+
+void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map,
+                       llvm::raw_string_ostream &ss) {
+    printSortedMap(map, ss, [](const auto &types, llvm::raw_string_ostream &stream) {
+        stream << "[";
+        for (auto [j, type] : llvm::enumerate(types)) {
+            if (j > 0) {
+                stream << ",";
+            }
+            printType(type, stream);
+        }
+        stream << "]";
+    });
+}
+
+void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream &ss) {
+    printSortedMap(map, ss, [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
 }
 
 } // namespace
@@ -126,8 +159,8 @@ std::string defaultGetGraphOpId(Operation *op) {
     DecomposableGate gate = cast<DecomposableGate>(op);
 
     ss << gate.getOperatorName();
-    printTypeRange(gate.getDynamicShape(), ss);
-    printIterable(gate.getWireLens(), ss);
+    printDynamicShape(gate.getDynamicShape(), ss);
+    printWireLens(gate.getWireLens(), ss);
     printAttr(gate.getStaticData(), ss);
     if (gate.getExtraData() != "") {
         ss << '[' << gate.getExtraData() << ']';
