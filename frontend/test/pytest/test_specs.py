@@ -134,7 +134,10 @@ class TestDeviceLevelSpecs:
         assert cat_specs["device_name"] == "lightning.qubit"
         check_specs_same(cat_specs, pl_specs)
 
-    @pytest.mark.xfail(reason="ControlledQubitUnitary doesn't work with specs in non-jit PL")
+    @pytest.mark.xfail(reason="""
+        ControlledQubitUnitary doesn't work with specs in non-jit PL
+        https://app.shortcut.com/xanaduai/story/128500/controlledqubitunitary-doesn-t-work-with-specs-in-non-jit-pl
+    """)
     def test_complex(self):
         """Test a complex case of qp.specs() against PennyLane"""
 

@@ -323,7 +323,14 @@ class TestControlled:
         expected = native_controlled()
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
 
-    @pytest.mark.xfail(reason="ControlledQubitUnitary's decomp rules are buggy and not jittable")
+    @pytest.mark.xfail(reason="""
+        ControlledQubitUnitary's decomp rules are buggy and not jittable.
+        https://app.shortcut.com/xanaduai/story/128492/ctrl-decomp-bisect-rule-of-controlledqubitunitary-is-not-jittable,
+        https://app.shortcut.com/xanaduai/story/128494/controlled-two-qubit-unitary-rule-on-controlledqubitunitary-is-not-jittable
+
+        Since qp.ctrl(qp.Unitary) now lowers to `quantum.operator "ControlledUnitary"`, which does
+        not have a runtime lowering, the only way to execute it is through decomposition rules.
+    """)
     def test_native_controlled_unitary(self, capture_mode):
         """Test native control of a custom operation."""
         dev = qp.device("lightning.qubit", wires=4)
