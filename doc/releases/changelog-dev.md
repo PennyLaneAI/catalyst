@@ -15,6 +15,7 @@
   [(#3090)](https://github.com/PennyLaneAI/catalyst/pull/3090)
   [(#3096)](https://github.com/PennyLaneAI/catalyst/pull/3096)
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
+  [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
