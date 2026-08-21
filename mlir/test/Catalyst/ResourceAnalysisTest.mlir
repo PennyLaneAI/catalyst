@@ -762,6 +762,90 @@ func.func @triple_dependent_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit
 
 // -----
 
+// A statically bounded unrelated middle loop does not change the average value
+// of the outer induction variable seen by the inner loop.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliZ": 1
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 1.5
+// CHECK: "quantum_operations"
+// CHECK:   "PauliX": 1
+// CHECK-LABEL: "for_loop_3": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_2": 3
+// CHECK-LABEL: "unrelated_static_middle_loop": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_3": 4
+func.func @unrelated_static_middle_loop(%arg0: !quantum.bit) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c3 = arith.constant 3 : index
+    %c4 = arith.constant 4 : index
+
+    %q = scf.for %i = %c0 to %c4 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %middle = scf.for %j = %c0 to %c3 step %c1
+            iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
+            %inner = scf.for %k = %c0 to %i step %c1
+                iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
+                %z = quantum.custom "PauliZ"() %inner_arg : !quantum.bit
+                scf.yield %z : !quantum.bit
+            }
+            %x = quantum.custom "PauliX"() %inner : !quantum.bit
+            scf.yield %x : !quantum.bit
+        }
+        scf.yield %middle : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
+// A dynamically bounded unrelated middle loop remains a barrier.
+
+// CHECK-LABEL: "dyn_for_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliZ": 1
+// CHECK-LABEL: "dyn_for_loop_2": {
+// CHECK: "function_calls"
+// CHECK:   "dynamic":
+// CHECK:       "dyn_for_loop_1"
+// CHECK-LABEL: "dynamic_unrelated_middle_loop": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 4
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "function_calls"
+// CHECK:   "dynamic":
+// CHECK:       "dyn_for_loop_2"
+func.func @dynamic_unrelated_middle_loop(
+    %arg0: !quantum.bit, %N: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c4 = arith.constant 4 : index
+
+    %q = scf.for %i = %c0 to %c4 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %middle = scf.for %j = %c0 to %N step %c1
+            iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
+            %inner = scf.for %k = %c0 to %i step %c1
+                iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
+                %z = quantum.custom "PauliZ"() %inner_arg : !quantum.bit
+                scf.yield %z : !quantum.bit
+            }
+            scf.yield %inner : !quantum.bit
+        }
+        scf.yield %middle : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
 // With unit step and an estimated iteration count of 4, resource analysis
 // models the enclosing induction values as 0, 1, 2, and 3. The dependent
 // inner loop therefore averages (0 + 1 + 2 + 3) / 4 = 1.5 iterations.

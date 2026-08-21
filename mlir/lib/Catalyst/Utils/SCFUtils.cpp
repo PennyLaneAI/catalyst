@@ -186,7 +186,13 @@ std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forO
         }
 
         auto parent = dyn_cast_or_null<scf::ForOp>(currentLoop->getParentOp());
-        if (!parent || currentLoop.getUpperBound() != parent.getInductionVar()) {
+        while (parent && currentLoop.getUpperBound() != parent.getInductionVar()) {
+            if (parent->hasAttr(EstimatedIterationsAttrName) || !resolveForLoopTripCount(parent)) {
+                return std::nullopt;
+            }
+            parent = dyn_cast_or_null<scf::ForOp>(parent->getParentOp());
+        }
+        if (!parent) {
             return std::nullopt;
         }
         currentLoop = parent;

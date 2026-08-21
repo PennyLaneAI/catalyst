@@ -1304,10 +1304,6 @@ class TestSymbolicSpecsLoopConcretization:
         assert resources.quantum_operations["PauliZ"] == 56
         assert resources.quantum_operations["PauliX"] == 28
 
-    # FIXME: Fix this bug
-    @pytest.mark.xfail(
-        strict=True, reason="This is a bug in the current implementation. Fix before merging"
-    )
     def test_loop_concretization_with_unrelated_middle_loop(self):
         """Test 3 nested loops where the middle loop is unrelated to the other 2."""
         a, b = 4, 3
