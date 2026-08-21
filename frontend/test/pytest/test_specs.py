@@ -1290,12 +1290,40 @@ class TestSymbolicSpecsLoopConcretization:
 
         assert resources.quantum_operations["PauliZ"] == 28
 
+    def test_triple_nested_loop_concretization(self):
+        """Test 3 nested loops whose bounds depends on the outer loop var."""
+        n = 8
+
+        @qp.qjit
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            @qp.for_loop(n)  # Runs 8 times total
+            def loop1(i):
+                @qp.for_loop(i)  # Runs 28 times total
+                def loop2(j):
+                    @qp.for_loop(j)  # Runs 56 times total
+                    def loop3(k):
+                        qp.PauliZ(wires=k % 2)
+
+                    loop3()
+                    qp.PauliX(wires=j % 2)
+
+                loop2()  # pylint: disable=no-value-for-parameter
+
+            loop1()  # pylint: disable=no-value-for-parameter
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 56
+        assert resources.quantum_operations["PauliX"] == 28
+
     # FIXME: Fix this bug
-    @pytest.xfail(
+    @pytest.mark.xfail(
         strict=True, reason="This is a bug in the current implementation. Fix before merging"
     )
     def test_loop_concretization_with_unrelated_middle_loop(self):
-        """Test a straightforward nested loop whose inner bound depends on the outer loop var."""
+        """Test 3 nested loops where the middle loop is unrelated to the other 2."""
         a, b = 4, 3
 
         @qp.qjit
