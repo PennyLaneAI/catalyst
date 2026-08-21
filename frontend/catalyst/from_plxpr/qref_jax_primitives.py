@@ -662,7 +662,6 @@ def _pl_adjoint_lowering(
 # qref ctrl region
 #
 # pylint: disable=unused-argument
-# pylint: disable=unused-argument
 def _pl_ctrl_lowering(
     jax_ctx,
     *plxpr_invals,
