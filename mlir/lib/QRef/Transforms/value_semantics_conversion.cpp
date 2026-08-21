@@ -1359,13 +1359,22 @@ void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tr
     builder.setInsertionPoint(rCtrlOp);
     Location loc = rCtrlOp->getLoc();
 
+    SetVector<Value> rTargetValues;
+    collectNecessaryRegionRValues(rCtrlOp.getRegion(), rTargetValues);
+
+    // Special: ctrl qubits are passed in as operands explicitly instead of closure.
+    // Insert them first so they occupy the front of the combined set, then append the
+    // region targets. numCtrlQubits must be the number of *distinct* control values (as
+    // deduplicated by the SetVector), not the raw operand count: a duplicate or
+    // target-overlapping control value would otherwise make the take_front/take_back
+    // split below land on the wrong values and leave a qubit untracked, crashing later
+    // with a DenseMap::at missing-key assertion.
     SetVector<Value> rValuesUsedByRegion;
-    // Special: ctrl qubits are passed in as operands explicitly instead of closure
-    size_t numCtrlQubits = rCtrlOp.getCtrlQubits().size();
     for (Value rCtrlQubit : rCtrlOp.getCtrlQubits()) {
         rValuesUsedByRegion.insert(rCtrlQubit);
     }
-    collectNecessaryRegionRValues(rCtrlOp.getRegion(), rValuesUsedByRegion);
+    size_t numCtrlQubits = rValuesUsedByRegion.size();
+    rValuesUsedByRegion.insert(rTargetValues.begin(), rTargetValues.end());
     assert(rValuesUsedByRegion.size() >= numCtrlQubits);
     size_t numTargetQubits = rValuesUsedByRegion.size() - numCtrlQubits;
 
