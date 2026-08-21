@@ -122,8 +122,7 @@
   where the bounds of an inner loop are directly dependent on the loop variable of a static outer loop.
   [(#3140)](https://github.com/PennyLaneAI/catalyst/pull/3140)
 
-  For example, this program reports average multiplicities of `3.5` for the middle loop and `2` for
-  the inner loop, resulting in a total of `56` `PauliX` operations:
+  For example, this program reports a total of `56` `PauliX` operations, since the number of iterations of the inner loops can be statically determined from the outer loop:
 
   ```python
   import pennylane as qp
