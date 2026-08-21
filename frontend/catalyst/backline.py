@@ -409,6 +409,20 @@ def attach_backline_attr(mlir_module, placement: Placement) -> None:
         )
 
 
+def remote_device_lib(device: Device, lpath: str) -> str | None:
+    """The filename a dispatched controller's device runtime is named by, ``None`` if it is local.
+
+    A remote node resolves it against its workspace, from what was deployed there, so the absolute
+    ``lpath`` into this installation would name a directory that exists only here. Always ``.so``,
+    as :func:`_resolve_backend_lib` does for a remote node's transport backend: the far machine is
+    Linux whatever this one is.
+    """
+    controller = getattr(getattr(device, "placement", None), "controller", None)
+    if controller is None or not controller.remote:
+        return None
+    return Path(lpath).with_suffix(".so").name
+
+
 def module_attributes(device: Device) -> dict[str, str]:
     """The MLIR attributes ``device`` puts on the module of a QNode that runs on it.
 
