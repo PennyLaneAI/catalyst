@@ -31,4 +31,32 @@ def VerifyNoQuantumUseAfterFreePass : Pass<"verify-no-quantum-use-after-free"> {
     let summary = "Verify that the quantum program has no uses of qubits or registers after they have been deallocated";
 }
 
+def PhaseFoldingPass : Pass<"phase-folding"> {
+    let summary = "Perform phase-folding optimization on hybrid quantum-classical programs to reduce T-count.";
+
+    let dependentDialects = [
+        "catalyst::qref::QRefDialect",
+        "mlir::scf::SCFDialect",
+        "mlir::func::FuncDialect",
+        "mlir::arith::ArithDialect",
+    ];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"report_stats",
+            /*CLI arg name=*/"report-stats",
+            /*type=*/"bool",
+            /*default=*/"false",
+            "Print gate modification statistics to stderr after folding.">,
+
+        Option<
+            /*C++ var name=*/"trace_abstraction",
+            /*CLI arg name=*/"trace-abstraction",
+            /*type=*/"bool",
+            /*default=*/"false",
+            "Print program abstraction evolution to a trace file during phase analysis.">,
+    ];
+}
+
+
 #endif // QREF_PASSES
