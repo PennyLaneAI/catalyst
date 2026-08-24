@@ -115,7 +115,8 @@ std::optional<double> resolveForLoopTripCount(scf::ForOp forOp) {
     return std::nullopt;
 }
 
-// Maps each already-enumerated loop's induction variable to its current value.
+// Store each enclosing loop's current induction value.
+// Example: while evaluating `%i=3`, the map contain `%i` -> `3`.
 using InductionValues = llvm::DenseMap<Value, int64_t>;
 
 // Resolve `loop`'s own upper bound as a concrete integer so its induction values can be
