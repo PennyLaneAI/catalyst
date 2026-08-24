@@ -59,6 +59,7 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
+        circuit(0.5)
         result = circuit.jaxpr.pretty_print(use_color=False).strip()
         assert expected.strip() == result
 
@@ -89,6 +90,7 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
+        circuit(0.5, 3)
         result = circuit.jaxpr.pretty_print(use_color=False).strip()
         assert expected.strip() == result
 
