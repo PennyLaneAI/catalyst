@@ -1,17 +1,18 @@
 #define DEBUG_TYPE "remove-global-phases"
 
 #include "llvm/Support/Debug.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace llvm;
 using namespace mlir;
 using namespace catalyst::quantum;
 
-namespace{
+namespace {
 
 /// delete phase ops without control wires
 struct RemoveGlobalPhasesRewritePattern : public OpRewritePattern<GlobalPhaseOp> {
@@ -21,7 +22,7 @@ struct RemoveGlobalPhasesRewritePattern : public OpRewritePattern<GlobalPhaseOp>
         // Find out if there are any control regions in the parent chain,
         // Or if there are control qubits associated with this operation.
         // If so, it must be ignored
-        if(op->getParentOfType<CtrlOp>() || !op.getInCtrlQubits().empty()){
+        if (op->getParentOfType<CtrlOp>() || !op.getInCtrlQubits().empty()) {
             return failure();
         }
 
@@ -42,7 +43,7 @@ namespace quantum {
 #define GEN_PASS_DEF_REMOVEGLOBALPHASESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct RemoveGlobalPhasesPass : public impl::RemoveGlobalPhasesPassBase<RemoveGlobalPhasesPass>{
+struct RemoveGlobalPhasesPass : public impl::RemoveGlobalPhasesPassBase<RemoveGlobalPhasesPass> {
     using impl::RemoveGlobalPhasesPassBase<RemoveGlobalPhasesPass>::RemoveGlobalPhasesPassBase;
 
     void runOnOperation() final {
@@ -51,9 +52,9 @@ struct RemoveGlobalPhasesPass : public impl::RemoveGlobalPhasesPassBase<RemoveGl
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
-        }        
+        }
     }
 };
-    
+
 } // namespace quantum
 } // namespace catalyst
