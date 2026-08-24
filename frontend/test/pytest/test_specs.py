@@ -133,6 +133,7 @@ class TestDeviceLevelSpecs:
         assert cat_specs["device_name"] == "lightning.qubit"
         check_specs_same(cat_specs, pl_specs)
 
+    @pytest.mark.xfail(reason="Broken by changes to tape-based specs. Fixed in PL PR #9988")
     def test_complex(self):
         """Test a complex case of qp.specs() against PennyLane"""
 
@@ -801,6 +802,33 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    def test_empty_loops(self, capture_mode):
+        """Test that empty static loops are handled correctly."""
+
+        @qp.qjit(capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            for _ in range(0):
+                qp.PauliX(0)
+                for _ in range(2, 2):
+                    qp.Hadamard(0)
+            return qp.expval(qp.PauliX(0))
+
+        actual = qp.specs(circuit, level=0)()
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=1,
+            shots=Shots(None),
+            level="Before MLIR Passes",
+            resources=SpecsResources(
+                counts={},
+                measurement_processes={"expval(PauliX)": 1},
+                num_wires=1,
+            ),
+        )
+
+        check_specs_same(actual, expected)
+
     def test_split_non_commuting_tape(self):
         """Test that qp.transforms.split_non_commuting works as expected"""
 
@@ -1446,6 +1474,26 @@ class TestSymbolicSpecsLoopConcretization:
         # Expect a symbolic value: indirect dependency is not supported for concretization
         assert not isinstance(resources.quantum_operations["PauliZ"], (int, float))
 
+    # FIXME: This case is failing
+    @pytest.mark.xfail
+    def test_loop_concretization_multi_dependency(self):
+        """Test concretization with a loop that has 2 direct dependencies from inner loops."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for _ in range(i):
+                    for k in range(i):  # Depends on outer-most loop
+                        qp.PauliZ(wires=k % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations.get("PauliZ", 0) == 140
+
     def test_loop_concretization_combined(self):
         """Test concretization with all different complexities on loop bounds put together."""
         n = 8
@@ -1463,6 +1511,26 @@ class TestSymbolicSpecsLoopConcretization:
         resources = qp.specs(circuit, level=0)().resources
 
         assert resources.quantum_operations["PauliZ"] == 20
+
+    def test_loop_concretization_no_iters(self):
+        """Test concretization with a loop that has no iterations."""
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            for i in range(0):
+                for j in range(i):
+                    qp.PauliZ(wires=j % 2)
+            for i in range(2, 2):
+                for j in range(i):
+                    qp.PauliX(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations.get("PauliZ", 0) == 0
+        assert resources.quantum_operations.get("PauliX", 0) == 0
 
 
 class TestMarkerIntegration:
