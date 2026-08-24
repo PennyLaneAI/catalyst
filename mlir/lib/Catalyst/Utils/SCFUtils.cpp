@@ -100,11 +100,11 @@ std::optional<double> getEstimatedIterationsHint(Operation *op) {
 }
 
 std::optional<double> resolveForLoopTripCount(scf::ForOp forOp) {
-    if (auto iters = getEstimatedIterationsHint(forOp)) {
-        return *iters;
-    }
     if (auto staticTrip = forOp.getStaticTripCount()) {
         return static_cast<double>(staticTrip->getSExtValue());
+    }
+    if (auto iters = getEstimatedIterationsHint(forOp)) {
+        return *iters;
     }
     auto lb = resolveConstantInt(forOp.getLowerBound());
     auto ub = resolveConstantInt(forOp.getUpperBound());
