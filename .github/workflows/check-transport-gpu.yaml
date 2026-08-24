@@ -131,22 +131,8 @@ jobs:
           sudo apt-get install -y cmake ninja-build clang lld libxml2-dev
           python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
 
-      - name: Cache LLVM Source
-        id: cache-llvm-source
-        uses: actions/cache@v4
-        with:
-          path: mlir/llvm-project
-          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-          enableCrossOsArchive: true
-
-      - name: Clone LLVM Submodule
-        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: llvm/llvm-project
-          ref: ${{ needs.constants.outputs.llvm_version }}
-          path: mlir/llvm-project
-
+      # LLVM source is already restored earlier in the job (for the runtime build) via the
+      # cache-llvm-source step above, so we don't need to re-restore or re-clone here.
       - name: Cache LLVM Build (GPU-runner scoped)
         id: cache-llvm-build
         uses: actions/cache@v4
