@@ -170,6 +170,11 @@ jobs:
 
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
         run: |
+          # make catalyst -> make frontend invokes precompile_decomposition_rules, which imports
+          # catalyst -> mlir_quantum. mlir_quantum lives under quantum-build/python_packages/quantum
+          # once the dialects sub-target has run, so PYTHONPATH must include that dir before this
+          # step's shell exits.
+          export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
           COMPILER_LAUNCHER="" \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
