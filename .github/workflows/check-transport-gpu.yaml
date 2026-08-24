@@ -81,9 +81,6 @@ jobs:
         run: |
           python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
 
-      - name: Set up Soft-RoCE loopback
-        uses: ./.github/actions/setup-soft-roce
-
       - name: Get Cached LLVM Source
         id: cache-llvm-source
         uses: actions/cache/restore@v4

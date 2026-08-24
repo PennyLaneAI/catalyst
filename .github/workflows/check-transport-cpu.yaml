@@ -1,4 +1,4 @@
-name: Check Transport Backends
+name: Check Transport Backends (CPU)
 
 on:
   pull_request:
@@ -16,7 +16,7 @@ on:
       - 'runtime/lib/CMakeLists.txt'
       - 'runtime/Makefile'
       - 'Makefile'
-      - '.github/workflows/check-transport.yaml'
+      - '.github/workflows/check-transport-cpu.yaml'
   push:
     branches: [ main ]
   workflow_dispatch:
