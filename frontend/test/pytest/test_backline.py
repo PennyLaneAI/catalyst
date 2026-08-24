@@ -360,8 +360,9 @@ class TestBacklineDemoIntegration:
         for pass_name, _ in _qec_pass_specs("steane"):
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
-        samples = ghz()
-        assert samples is not None
+        samples = np.asarray(ghz())
+        # 1 shot x 3 mid-circuit measurements -> a length-3 sample array.
+        assert samples.shape == (3,), f"expected shape (3,), got {samples.shape}"
 
     def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture):
         """Demo 1a: local CPU ↔ local CPU over RDMA loopback, compile + execute attempt.
@@ -417,8 +418,9 @@ class TestBacklineDemoIntegration:
         for pass_name, _ in _qec_pass_specs("steane"):
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
-        samples = ghz()
-        assert samples is not None
+        samples = np.asarray(ghz())
+        # 1 shot x 3 mid-circuit measurements -> a length-3 sample array.
+        assert samples.shape == (3,), f"expected shape (3,), got {samples.shape}"
 
     def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(self, use_capture, gpu_triton_platform):
         """CPU controller ↔ GPU coprocessor over ``memcpy`` with a manually-scheduled QEC cycle.
@@ -544,19 +546,23 @@ class TestBacklineDemoIntegration:
         result = encoded_decoded_circuit(0)  # error_kind=0: identity, no injected error
         assert len(result) == 2
 
-    def test_cpu_controller_to_gpu_coproc_memcpy_precompiled(self, use_capture):
-        """Precompiled GPU decoder (``gpu_steane_launcher``) reached over local memcpy.
+    def test_cpu_controller_to_gpu_coproc_memcpy_precompiled(
+        self, use_capture, gpu_triton_platform
+    ):
+        """Precompiled GPU decoder (``gpu_steane_launcher``) reached over local memcpy, executed.
 
         Adapts demo 4's steane-on-GPU pattern to local memcpy transport - remote SSH
-        executors from the demo are stripped so both roles run in this process. The
-        ``gpu_steane_launcher`` symbol lives inside
+        executors from the demo are stripped so both roles run in this process on the GPU
+        runner. The ``gpu_steane_launcher`` symbol lives inside
         ``libcatalyst_transport_memcpy_gpu_coprocessor.so`` (via the static
         ``catalyst_transport_coproc_gpu`` lib), so ``CoprocessorFunction`` carries no
         ``lib_path``; the runtime resolves the symbol after dlopen of the backend .so.
-        Compile-only: executing ``ghz()`` would need HIP + a real GPU to launch the
-        persistent decode kernel, and that's covered by the Triton test on the GPU
-        workflow.
+
+        Skipped by ``gpu_triton_platform`` on runners without a GPU. On the GPU workflow this
+        executes end-to-end once HIP-on-CUDA is installed and the runtime CMake builds the
+        transport GPU coproc lib with the launcher symbol.
         """
+        del gpu_triton_platform  # only used to gate on GPU presence; string not consumed here
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("null.qubit", wires=3),
@@ -587,6 +593,9 @@ class TestBacklineDemoIntegration:
         assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
         for pass_name, _ in _qec_pass_specs("steane"):
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
+
+        samples = np.asarray(ghz())
+        assert samples.shape == (3,), f"expected shape (3,), got {samples.shape}"
 
     def test_cpu_controller_to_gpu_coproc_triton_css_bp(self, use_capture, gpu_triton_platform):
         """CSS BP decoder built via Triton, adapted from demo 2 to a local memcpy placement.

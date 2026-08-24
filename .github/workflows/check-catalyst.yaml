@@ -613,17 +613,15 @@ jobs:
       # Only fires when the PR touched transport paths (see the `changes` job). The runtime
       # artifact downloaded above already includes the transport backend .so files because
       # the `runtime:` job builds with ENABLE_TRANSPORT=ON in that case.
-      #   _memcpy: CPU controller + CPU coproc over local memcpy, executes end-to-end.
-      #   _gpu_coproc_memcpy_precompiled: verifies the frontend generates the right IR
-      #   for the precompiled GPU decoder (gpu_steane_launcher) dispatch. Compile-only,
-      #   no GPU needed here. Executing GPU path (Triton) lives in check-transport-gpu.yaml.
+      # Only the CPU-CPU memcpy case runs here (executes end-to-end). GPU-coproc cases now
+      # execute on check-transport-gpu.yaml where the runner has a real GPU; the shared
+      # gpu_triton_platform fixture skips them cleanly on GH-hosted runners.
       if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
       env:
         CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib
       run: |
         python3 -m pytest -v \
-          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
-          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled"
+          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy"
 
     - name: Attempt rdma_loopback execution (diagnostic)
       # The rdma_loopback case runs both roles in-process over rdma_rxe on lo. An earlier
