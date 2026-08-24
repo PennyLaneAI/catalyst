@@ -118,6 +118,17 @@ jobs:
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
 
+      # TODO(cloud-team): install HIP-on-CUDA (ROCm's hip-runtime-nvidia + hipcc) on this
+      # self-hosted GPU runner. The transport runtime's GPU coprocessor code compiles cleanly
+      # against HIP-on-CUDA - runtime/lib/transport/common/coproc/gpu/CMakeLists.txt already
+      # has an explicit `if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")` branch - and the current
+      # runner falls through to `-- transport: no HIP compiler -> GPU backends skipped`,
+      # leaving libcatalyst_transport_memcpy_gpu_coprocessor.so without the gpu_steane_launcher
+      # symbol. Once HIP-on-CUDA is available, we can add an executing counterpart to
+      # test_cpu_controller_to_gpu_coproc_memcpy_precompiled (currently compile-only in
+      # check-catalyst.yaml) that actually launches the persistent GPU decode kernel here.
+      # Related matrix case: I (frontend memcpy CPU->GPU precompiled, execute).
+
       # From here down: build LLVM/StableHLO/Enzyme *on this self-hosted GPU runner* rather than
       # consuming check-catalyst.yaml's caches. Cross-runner reuse hit three layered blockers
       # (MLIRConfig HINTS, LLVMConfig absolute paths, and a GLIBC 2.36/2.38 mismatch in the
