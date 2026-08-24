@@ -207,8 +207,8 @@ static std::optional<llvm::SmallVector<scf::ForOp>> collectLoopChain(scf::ForOp 
     }
 }
 
-// Fast path for the canonical shape where every loop shares a common lower bound, unit step,
-// and uses only its immediate predecessor's induction variable as its upper bound:
+// Fast path for the most common case, where every loop shares a common lower bound,
+// has a step of 1 and uses only its immediate predecessor's loop variable as its upper bound:
 // for i in 0..8
 //     for j in 0..i
 //         for k in 0..j (average trip count is 2)
