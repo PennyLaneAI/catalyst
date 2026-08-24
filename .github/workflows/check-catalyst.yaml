@@ -34,9 +34,42 @@ jobs:
       multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
       runs_on: ${{ needs.determine_runner.outputs.runner_group }}
 
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      transport: ${{ steps.filter.outputs.transport }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # need history to diff against the base ref
+
+      - id: filter
+        run: |
+          # Pick the base ref to diff HEAD against. For PRs use the PR's merge base;
+          # for pushes to main use the previous head. Both are provided by the
+          # GitHub context, no API calls needed.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+
+          # Fall back to comparing against the parent commit if BASE is unreachable
+          # (shallow clones, first push to a new branch, etc).
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE="HEAD^"
+          fi
+
+          transport=false
+          if git diff --name-only "$BASE" HEAD | grep -qE '^(runtime/lib/transport/|runtime/tests/Test_Transport|mlir/(lib|include)/Transport/|frontend/catalyst/backline\.py|frontend/test/pytest/test_backline\.py|\.github/actions/setup-soft-roce/|\.github/workflows/check-transport-cpu\.yaml)'; then
+            transport=true
+          fi
+
+          echo "transport=$transport" >> "$GITHUB_OUTPUT"
+
   runtime:
     name: Catalyst-Runtime Build
-    needs: [constants, determine_runner]
+    needs: [constants, changes, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
@@ -74,6 +107,11 @@ jobs:
           path: mlir/llvm-project
 
       - name: Build Catalyst-Runtime
+        env:
+          # Turn on ENABLE_TRANSPORT only when the PR touches transport paths (see the
+          # `changes` job's filter). Otherwise the runtime skips building the transport backends
+          # and non-transport PRs pay nothing extra.
+          ENABLE_TRANSPORT: ${{ needs.changes.outputs.transport == 'true' && 'ON' || 'OFF' }}
         run: |
           COMPILER_LAUNCHER="" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
@@ -82,6 +120,7 @@ jobs:
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_ASAN=OFF \
           ENABLE_OQD=ON \
+          ENABLE_TRANSPORT="$ENABLE_TRANSPORT" \
           make runtime
 
           COMPILER_LAUNCHER="" \
@@ -91,6 +130,35 @@ jobs:
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           make oqc
+
+      # Only run the transport C++ tests once (gcc matrix entry). The tests aren't compiler-
+      # sensitive, and running them under both gcc + clang on push-to-main just burns runner
+      # time. Soft-RoCE also mutates the runner's RDMA link table, so we don't want two matrix
+      # entries racing to create rxe0 on the same runner (they wouldn't be on the same runner,
+      # but keep the invariant clean).
+      - name: Set up Soft-RoCE loopback (transport tests only)
+        if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+        uses: ./.github/actions/setup-soft-roce
+
+      - name: Run transport C++ test suite (Catch2 + soft-RoCE loopback)
+        if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+        run: |
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          make test-runtime-transport
+
+      - name: Upload loopback logs on failure
+        if: failure() && needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+        uses: actions/upload-artifact@v4
+        with:
+          name: transport-loopback-logs
+          path: |
+            /tmp/cvl_coproc.log
+            /tmp/cvl_ctrl.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v4
@@ -463,7 +531,7 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
-    needs: [constants, llvm, runtime, quantum, determine_runner]
+    needs: [constants, changes, llvm, runtime, quantum, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
@@ -540,6 +608,19 @@ jobs:
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         make coverage-frontend ENABLE_OQD=ON
         mv coverage.xml coverage-${{ github.job }}.xml
+
+    - name: Run backline transport integration test
+      # Only fires when the PR touched transport paths (see the `changes` job). The runtime
+      # artifact downloaded above already includes the transport backend .so files because
+      # the `runtime:` job builds with ENABLE_TRANSPORT=ON in that case. rdma_loopback is
+      # excluded - it SIGSEGVs in-process on soft-RoCE loopback and covers a case that
+      # needs a real NIC; the GPU-coproc variants live in check-transport-gpu.yaml.
+      if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+      env:
+        CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib
+      run: |
+        python3 -m pytest -v \
+          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu[memcpy]"
 
     - name: Upload to Codecov
       uses: codecov/codecov-action@v4
