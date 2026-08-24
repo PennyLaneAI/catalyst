@@ -101,6 +101,84 @@ jobs:
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           make test-runtime-transport
 
+      # Cross-workflow cache restore relies on mlir/Makefile passing LLVM_DIR explicitly to the
+      # dialects/stablehlo/plugin cmake invocations. Without it, MLIRConfig's baked-in HINTS
+      # references the absolute path from wherever LLVM was configured and find_package(LLVM)
+      # fails when llvm-build/ was populated by check-catalyst.yaml on a different runner.
+      - name: Restore cached LLVM build
+        uses: actions/cache/restore@v4
+        with:
+          path: llvm-build
+          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-clang
+          fail-on-cache-miss: true
+
+      - name: Restore cached StableHLO source and build
+        uses: actions/cache/restore@v4
+        with:
+          path: mlir/stablehlo
+          key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v4
+        with:
+          path: stablehlo-build
+          key: ${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-clang
+          fail-on-cache-miss: true
+
+      - name: Restore cached Enzyme source and build
+        uses: actions/cache/restore@v4
+        with:
+          path: mlir/Enzyme
+          key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v4
+        with:
+          path: enzyme-build
+          key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-clang
+          fail-on-cache-miss: true
+
+      - name: Install Python runtime requirements
+        run: |
+          python3 -m pip install -r requirements.txt
+
+      - name: Install latest PennyLane and Lightning
+        run: |
+          pip install --no-deps --force pennylane-lightning
+          pip install --no-deps --force pennyLane-lightning-kokkos
+          pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
+
+      - name: Build Catalyst frontend (reusing the transport-enabled runtime)
+        run: |
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which clang) \
+          CXX_COMPILER=$(which clang++) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
+          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+          DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+          ENABLE_TRANSPORT=ON \
+          make catalyst
+
+      - name: Add Frontend Dependencies to PATH
+        run: |
+          echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+          echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+          echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+          echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+          echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+          echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+
+      - name: Run backline cpu-cpu integration tests
+        # Covers memcpy (2.a) and rdma_loopback (2.c) parametrize cases; excludes
+        # test_cpu_controller_to_gpu_coproc_memcpy_manual_qec, which needs the GPU coproc lib.
+        run: |
+          python3 -m pytest -v \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu"
+
       - name: Upload loopback logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
