@@ -12,6 +12,15 @@ llvm_map_components_to_libnames(_executor_llvm_libs
     AllTargetsCodeGens AllTargetsDescs AllTargetsInfos
 )
 
+# gcc 13+ emits a false-positive -Wmaybe-uninitialized against LLVM's ADT/FunctionExtras.h
+# (llvm::unique_function's StorageUnion) whenever an ORC header is transitively included.
+# RUNTIME_ENABLE_WARNINGS promotes it to -Werror, so all three targets in this file
+# (catalyst_executor_session, rt_executor, catalyst-executor) fail to build under gcc.
+# Suppress at directory scope; scoped to gcc so clang isn't affected.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wno-error=maybe-uninitialized)
+endif()
+
 #  catalyst_executor_session
 add_library(catalyst_executor_session SHARED ExecutorSession.cpp)
 
@@ -82,14 +91,6 @@ target_link_libraries(catalyst-executor PRIVATE
 )
 
 target_compile_options(catalyst-executor PRIVATE -fno-rtti)
-
-# gcc 13+ emits a false-positive -Wmaybe-uninitialized against LLVM's FunctionExtras.h
-# (unique_function's StorageUnion). RUNTIME_ENABLE_WARNINGS promotes it to an error via
-# -Werror; suppress just this diagnostic when the host compiler is gcc so the executor
-# still builds cleanly.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(catalyst-executor PRIVATE -Wno-error=maybe-uninitialized)
-endif()
 
 if(APPLE)
     target_link_options(catalyst-executor PRIVATE -Wl,-export_dynamic)
