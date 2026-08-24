@@ -118,18 +118,161 @@ jobs:
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
 
-      # TODO: run frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration here.
-      # Consuming check-catalyst.yaml's LLVM/StableHLO/Enzyme caches on this self-hosted runner
-      # peeled back three layered blockers:
-      #   1. MLIRConfig.cmake baked-in absolute HINTS pointing at LLVM_CONFIG_CMAKE_DIR from the
-      #      configure-time runner - fixed in mlir/Makefile by passing -DLLVM_DIR explicitly.
-      #   2. LLVMConfig.cmake include() lines hardcoding the configure-time absolute path
-      #      (/home/runner/work/... vs /opt/actions-runner/_work/...), and missing lld/libxml2-dev.
-      #      Fixable by sed-rewriting the .cmake files and installing the packages.
-      #   3. mlir-tblgen (and every other prebuilt LLVM binary) requires GLIBC 2.36/2.38 symbols
-      #      that don't exist on this runner's older libc. Not fixable without either upgrading
-      #      the runner OS or building LLVM from source on the runner (~30-60 min).
-      # CPU frontend memcpy (case 2.a) runs in check-transport-cpu.yaml on a GH-hosted runner
-      # where the caches align. Wire this up once the runner OS matches or a from-source LLVM
-      # build gets added to this workflow.
+      # From here down: build LLVM/StableHLO/Enzyme *on this self-hosted GPU runner* rather than
+      # consuming check-catalyst.yaml's caches. Cross-runner reuse hit three layered blockers
+      # (MLIRConfig HINTS, LLVMConfig absolute paths, and a GLIBC 2.36/2.38 mismatch in the
+      # cached mlir-tblgen). The first two are fixable in-workflow; the third is a hard binary
+      # portability issue. Building on-runner sidesteps all three. Caches use a "selfhosted-gpu-"
+      # prefix so they never collide with GH-hosted CI caches, and match on runner.os so
+      # different self-hosted runners keep separate stores.
+      - name: Install build dependencies for LLVM/dialects
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang lld libxml2-dev
+          python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
+
+      - name: Cache LLVM Source
+        id: cache-llvm-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/llvm-project
+          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone LLVM Submodule
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          ref: ${{ needs.constants.outputs.llvm_version }}
+          path: mlir/llvm-project
+
+      - name: Cache LLVM Build (GPU-runner scoped)
+        id: cache-llvm-build
+        uses: actions/cache@v4
+        with:
+          path: llvm-build
+          key: selfhosted-gpu-${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
+
+      - name: Build LLVM
+        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+        run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          COMPILER_LAUNCHER="" \
+          make llvm
+
+      - name: Cache StableHLO Source
+        id: cache-stablehlo-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/stablehlo
+          key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone StableHLO Submodule
+        if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: openxla/stablehlo
+          ref: ${{ needs.constants.outputs.stablehlo_version }}
+          path: mlir/stablehlo
+
+      - name: Cache StableHLO Build (GPU-runner scoped)
+        id: cache-stablehlo-build
+        uses: actions/cache@v4
+        with:
+          path: stablehlo-build
+          key: selfhosted-gpu-${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
+
+      - name: Build StableHLO
+        if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+        run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
+          COMPILER_LAUNCHER="" \
+          make stablehlo
+
+      - name: Cache Enzyme Source
+        id: cache-enzyme-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/Enzyme
+          key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone Enzyme Submodule
+        if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: EnzymeAD/Enzyme
+          ref: ${{ needs.constants.outputs.enzyme_version }}
+          path: mlir/Enzyme
+
+      - name: Cache Enzyme Build (GPU-runner scoped)
+        id: cache-enzyme-build
+        uses: actions/cache@v4
+        with:
+          path: enzyme-build
+          key: selfhosted-gpu-${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
+
+      - name: Build Enzyme
+        if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+        run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+          COMPILER_LAUNCHER="" \
+          make enzyme
+
+      - name: Install Python runtime requirements
+        run: |
+          python3 -m pip install -r requirements.txt
+
+      - name: Install latest PennyLane and Lightning
+        run: |
+          pip install --no-deps --force pennylane-lightning
+          pip install --no-deps --force pennyLane-lightning-kokkos
+          pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
+
+      - name: Build Catalyst frontend (reusing the transport-enabled runtime)
+        run: |
+          # make catalyst -> make frontend runs precompile_decomposition_rules, which imports
+          # catalyst -> mlir_quantum. mlir_quantum lives under quantum-build/python_packages/quantum
+          # once the dialects sub-target has run, so PYTHONPATH must include that dir before this
+          # step's shell exits.
+          export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          ENABLE_LLD=ON \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
+          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+          DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+          ENABLE_TRANSPORT=ON \
+          make catalyst
+
+      - name: Add Frontend Dependencies to PATH
+        run: |
+          echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+          echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+          echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+          echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+          echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+          echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+
+      - name: Run backline memcpy integration tests
+        # RDMA cases live in check-transport-cpu.yaml where soft-RoCE is set up; this runner
+        # only exercises the memcpy path (case 2.b).
+        run: |
+          python3 -m pytest -v \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu[memcpy]"
 
