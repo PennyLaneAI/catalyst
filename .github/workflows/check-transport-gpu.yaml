@@ -219,12 +219,6 @@ jobs:
         run: |
           python3 -m pip install -r requirements.txt
 
-      - name: Install latest PennyLane and Lightning
-        run: |
-          pip install --no-deps --force pennylane-lightning
-          pip install --no-deps --force pennyLane-lightning-kokkos
-          pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@main
-
       - name: Install Triton for the css_bp_decoder test
         # The test_cpu_controller_to_gpu_coproc_triton_css_bp case builds a decoder via
         # pennylane.backline.css_bp_decoder, which requires triton to codegen the .so.
@@ -261,11 +255,12 @@ jobs:
           echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
           echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
 
-      - name: Run backline memcpy + triton integration tests
-        # RDMA cases live in check-transport-cpu.yaml where soft-RoCE is set up; this runner
-        # covers case 2.b (memcpy) and the css_bp_decoder Triton path (adapted from demo 2).
+      - name: Run backline Triton integration test
+        # The CPU-CPU memcpy case (test_local_cpu_to_local_cpu[memcpy]) is covered by
+        # check-catalyst.yaml on a GH-hosted runner. This workflow only runs cases that
+        # genuinely need the GPU runner - here the css_bp_decoder path (Triton codegen
+        # against the local GPU, adapted from demo 2).
         run: |
           python3 -m pytest -v \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu[memcpy]" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp"
 
