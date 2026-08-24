@@ -936,3 +936,34 @@ def test_custom_op_numbered_args():
 
 
 test_custom_op_numbered_args()
+
+
+def test_rule_with_helper_functions():
+    """
+    Check that decomp rules that call helper functions are correctly inlined.
+    """
+
+    @qp.capture.subroutine
+    def my_helper():
+        return 4.2
+
+    @qp.register_resources({MultiParams(reg=Wire[1], a=Float, b=Float, c=Float): 1})
+    def rule(reg):
+        MultiParams(reg=reg, a=my_helper(), b=0.2, c=0.3)
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(NoParams, rule)
+        result = compile_decomposition_rules_wrapper(
+            "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+        )
+        print(result)
+
+
+# CHECK: func.func private @"__builtin_rule_NoParams{}{reg:1}{}"
+# CHECK-SAME:   resources = {operations = {
+# CHECK-SAME:   "MultiParams{a:{{\[\[f64\]\]}},b:{{\[\[f64\]\]}},c:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+# CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
+# CHECK-NOT: call
+# CHECK-NOT: my_helper
+test_rule_with_helper_functions()
