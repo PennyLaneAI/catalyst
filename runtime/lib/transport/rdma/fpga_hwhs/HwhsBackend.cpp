@@ -25,8 +25,7 @@
 
 namespace {
 
-std::string cfg_get(const std::string &config, const std::string &key, const std::string &dflt)
-{
+std::string cfg_get(const std::string &config, const std::string &key, const std::string &dflt) {
     const std::string needle = key + "=";
     std::size_t pos = 0;
     while (pos <= config.size()) {
@@ -44,8 +43,8 @@ std::string cfg_get(const std::string &config, const std::string &key, const std
     return dflt;
 }
 
-std::optional<catalyst::transport::MemKind> mem_kind_opt(const std::string &config, const char *key)
-{
+std::optional<catalyst::transport::MemKind> mem_kind_opt(const std::string &config,
+                                                         const char *key) {
     std::string v = cfg_get(config, key, "");
     if (v.empty()) {
         return std::nullopt;
@@ -62,8 +61,7 @@ std::optional<catalyst::transport::MemKind> mem_kind_opt(const std::string &conf
     throw std::runtime_error("unknown mem placement '" + v + "' (want ps|pl|bram) for key " + key);
 }
 
-catalyst::transport::ControllerSession *make_hwhs_controller(const std::string &config)
-{
+catalyst::transport::ControllerSession *make_hwhs_controller(const std::string &config) {
     std::string dev = cfg_get(config, "dev", "xib_0");
     int gid = std::stoi(cfg_get(config, "gid", "1"));
     // Defaults to the wire protocol's ring size: the peer's slot index is cursor % K_RING_SLOTS.
@@ -95,10 +93,10 @@ catalyst::transport::ControllerSession *make_hwhs_controller(const std::string &
     demo.cmd_cnt = static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_cnt", "1")));
     demo.syn_depth = static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_depth", "256")));
     demo.bram_pa = std::stoull(cfg_get(config, "demo_bram", "0x80000000"), nullptr, 0);
-    demo.freq_span = static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_span", "0"),
-                                                           nullptr, 0));
-    demo.lfsr_seed = static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_seed", "0"),
-                                                          nullptr, 0));
+    demo.freq_span =
+        static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_span", "0"), nullptr, 0));
+    demo.lfsr_seed =
+        static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_seed", "0"), nullptr, 0));
     //   demo_trace=<pa>    physical address the BD maps the RTT trace RAM at.
     //   demo_table=<file>  a byte-for-byte image of the BRAM table
     //   demo_trace_out=<f> where to write the trace

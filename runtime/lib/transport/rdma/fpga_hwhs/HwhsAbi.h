@@ -20,7 +20,6 @@
 #pragma once
 
 #include <cstdint>
-
 #include <sys/ioctl.h>
 
 // It was defined in the `umm_export.h` of VPK120 sysroots
@@ -113,10 +112,10 @@ enum hw_hsk_mod_fn {
     HH_FN_SET_PATTERN,
     HH_FN_SET_WQE_IDX,
     HH_FN_QPCTX_COMMIT,
-    HH_FN_MR_REBASE,   // 9
-    HH_FN_DEMO_CFG,    // 10
-    HH_FN_DEMO_START,  // 11
-    HH_FN_DEMO_STOP,   // 12
+    HH_FN_MR_REBASE,  // 9
+    HH_FN_DEMO_CFG,   // 10
+    HH_FN_DEMO_START, // 11
+    HH_FN_DEMO_STOP,  // 12
     HH_FN_DEMO_STATUS,
     HH_FN_TRACE_ARM,
     HH_FN_TRACE_STATUS, // 13

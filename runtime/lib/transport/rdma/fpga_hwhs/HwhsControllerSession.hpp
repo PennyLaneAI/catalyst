@@ -189,10 +189,10 @@ class HwhsControllerSession final : public ControllerSession {
 
     // Demo mode bookkeeping
     std::uint32_t last_round_cnt_ = 0;
-    std::uint64_t rounds_seen_ = 0;    // rounds the engine actually ran while we watched
-    bool demo_armed_ = false;          // the pacer level has been raised for this run
-    bool demo_finished_ = false;       // the engine hit cmd_cnt; no more rounds are coming
-    std::uint32_t err_cnt_base_ = 0;   // since power-on error count
+    std::uint64_t rounds_seen_ = 0;  // rounds the engine actually ran while we watched
+    bool demo_armed_ = false;        // the pacer level has been raised for this run
+    bool demo_finished_ = false;     // the engine hit cmd_cnt; no more rounds are coming
+    std::uint32_t err_cnt_base_ = 0; // since power-on error count
 
     // Report the collected per-round RTTs (min/percentiles/max/mean) on teardown.
     void report_rtt() const;

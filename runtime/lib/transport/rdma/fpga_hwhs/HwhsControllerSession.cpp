@@ -22,18 +22,18 @@
 #include <cstdlib> // getenv (HWHS_RTT_WARMUP)
 #include <cstring>
 #include <ctime>
-#include <fcntl.h>
 #include <string>
-#include <unistd.h>
-#include <vector>
-
-#include <infiniband/verbs.h>
 #include <sys/mman.h>
+#include <vector>
 
 #include "Exception.hpp"
 #include "HwhsAbi.h"
 #include "TransportCAPI.h" // CATALYST_TRANSPORT_* status codes
 #include "WireProtocol.hpp"
+
+#include <fcntl.h>
+#include <infiniband/verbs.h>
+#include <unistd.h>
 
 namespace catalyst::transport::hwhs {
 
@@ -42,8 +42,7 @@ namespace {
 // Map a physical address to a virtual address and return a pointer to the mapped region with page
 // alignment (4KB)
 volatile std::uint8_t *map_pa(int memfd, std::uint64_t pa, std::size_t len, void **out_base,
-                              std::size_t *out_span)
-{
+                              std::size_t *out_span) {
     auto base = static_cast<off_t>(pa & ~0xfffULL);
     std::size_t span = static_cast<std::size_t>(pa - static_cast<std::uint64_t>(base)) + len;
     void *m = ::mmap(nullptr, span, PROT_READ | PROT_WRITE, MAP_SHARED, memfd, base);
@@ -53,15 +52,13 @@ volatile std::uint8_t *map_pa(int memfd, std::uint64_t pa, std::size_t len, void
     return static_cast<volatile std::uint8_t *>(m) + (pa - static_cast<std::uint64_t>(base));
 }
 
-void view_zero(volatile std::uint8_t *p, std::size_t len)
-{
+void view_zero(volatile std::uint8_t *p, std::size_t len) {
     for (std::size_t i = 0; i + 4 <= len; i += 4) {
         *reinterpret_cast<volatile std::uint32_t *>(p + i) = 0;
     }
 }
 
-std::uint64_t now_ns()
-{
+std::uint64_t now_ns() {
     timespec ts = {};
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return static_cast<std::uint64_t>(ts.tv_sec) * 1'000'000'000ULL +
@@ -88,8 +85,7 @@ constexpr std::uint64_t kReplyTimeoutCycles =
     1000ULL * 1000ULL * static_cast<std::uint64_t>(kClkMhz); // 1s @ 200MHz
 static_assert(kReplyTimeoutCycles <= 0xFFFFFFFFULL, "reply_to is a 32-bit cycle count");
 
-int mem_type_of(MemKind kind)
-{
+int mem_type_of(MemKind kind) {
     switch (kind) {
     case MemKind::CpuRam:
         return XMEM_PS_DDR;
@@ -114,8 +110,7 @@ HwhsControllerSession::HwhsControllerSession(std::string dev, int gid_idx, std::
     : dev_(std::move(dev)), gid_idx_(gid_idx), ring_slots_(ring_slots ? ring_slots : 1),
       stride_log2_(stride_log2), stride_((stride_log2 < 32) ? (1u << stride_log2) : 1u),
       data_kind_(data_kind), sq_kind_(sq_kind), reply_kind_(reply_kind), sw_poll_(sw_poll),
-      kick_ioctl_(kick_ioctl), demo_(demo)
-{
+      kick_ioctl_(kick_ioctl), demo_(demo) {
     if (demo_.enable) {
         RT_FAIL_IF(demo_.syn_depth == 0 || (demo_.syn_depth % 64u) != 0,
                    "demo_depth must be a non-zero multiple of 64");
@@ -140,8 +135,7 @@ HwhsControllerSession::HwhsControllerSession(std::string dev, int gid_idx, std::
 HwhsControllerSession::~HwhsControllerSession() { stop(); }
 
 // The unified region allocation interface
-Region HwhsControllerSession::region_alloc(std::uint64_t size, int mem_type, int access)
-{
+Region HwhsControllerSession::region_alloc(std::uint64_t size, int mem_type, int access) {
     void *ctx = ctx_->get();
     Region r(&umm_, ctx_);
     r.size = size;
@@ -181,8 +175,7 @@ Region HwhsControllerSession::region_alloc(std::uint64_t size, int mem_type, int
     return r;
 }
 
-void Region::release() noexcept
-{
+void Region::release() noexcept {
     void *ctx = ctx_ ? ctx_->get() : nullptr;
     if (mr) {
         ibv_dereg_mr(mr);
@@ -213,8 +206,7 @@ Region::~Region() { release(); }
 
 Region::Region(Region &&other) noexcept { *this = std::move(other); }
 
-Region &Region::operator=(Region &&other) noexcept
-{
+Region &Region::operator=(Region &&other) noexcept {
     if (this != &other) {
         release();
         umm_ = other.umm_;
@@ -244,8 +236,7 @@ Region &Region::operator=(Region &&other) noexcept
     return *this;
 }
 
-int HwhsControllerSession::connect(const ConnectInfo &info)
-{
+int HwhsControllerSession::connect(const ConnectInfo &info) {
     RT_FAIL_IF(!umm_.loaded(), "UMM allocator not loaded");
 
     // Engine + physical-memory device nodes
@@ -296,8 +287,7 @@ int HwhsControllerSession::connect(const ConnectInfo &info)
     return kOk;
 }
 
-MemRegion HwhsControllerSession::alloc_memory(std::size_t size, MemKind kind)
-{
+MemRegion HwhsControllerSession::alloc_memory(std::size_t size, MemKind kind) {
     RT_FAIL_IF(!ctx_, "alloc_memory before connect()");
     caller_regions_.push_back(
         region_alloc(size, mem_type_of(kind),
@@ -313,8 +303,7 @@ MemRegion HwhsControllerSession::alloc_memory(std::size_t size, MemKind kind)
     return out;
 }
 
-PeerRef HwhsControllerSession::exchange_keys(const MemRegion & /*local*/)
-{
+PeerRef HwhsControllerSession::exchange_keys(const MemRegion & /*local*/) {
     RT_FAIL_IF(!oob_.valid(), "exchange_keys before connect()");
     RT_FAIL_IF(!reply_.mr, "exchange_keys: local reply region has no MR");
 
@@ -347,8 +336,7 @@ PeerRef HwhsControllerSession::exchange_keys(const MemRegion & /*local*/)
 }
 
 void HwhsControllerSession::establish_channel(const ChannelDesc &desc, const MemRegion & /*local*/,
-                                              const PeerRef &peer)
-{
+                                              const PeerRef &peer) {
     RT_FAIL_IF(desc.transport != "rdma",
                "HwhsControllerSession only implements the \"rdma\" transport");
     peer_rkey_ = peer.rkey;
@@ -405,8 +393,7 @@ void HwhsControllerSession::establish_channel(const ChannelDesc &desc, const Mem
 }
 
 void HwhsControllerSession::commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
-                                             std::uint64_t out_bytes)
-{
+                                             std::uint64_t out_bytes) {
     RT_FAIL_IF(!out_.view, "commit_work_item before establish_channel()");
     RT_FAIL_IF(work_item_idx != 0, "only a single work item (idx 0) is supported");
     std::uint32_t syndrome_bytes = static_cast<std::uint32_t>(in_bytes);
@@ -446,8 +433,7 @@ void HwhsControllerSession::commit_work_item(std::uint32_t work_item_idx, std::u
 }
 
 // Push the DemoCfg into the engine and clear the demo counters.
-void HwhsControllerSession::demo_program()
-{
+void HwhsControllerSession::demo_program() {
     if (!demo_.enable) {
         return;
     }
@@ -472,8 +458,7 @@ void HwhsControllerSession::demo_program()
 }
 
 // Start the pacer
-void HwhsControllerSession::demo_arm()
-{
+void HwhsControllerSession::demo_arm() {
     // Baseline for the round counter
     hh_status_rd st = {};
     last_round_cnt_ = (ioctl(hh_fd_, HH_READ_STATUS, &st) == 0) ? st.round_cnt : 0u;
@@ -492,15 +477,13 @@ void HwhsControllerSession::demo_arm()
 #if defined(__aarch64__)
         asm volatile("dsb st" ::: "memory");
 #endif
-    }
-    else {
+    } else {
         RT_FAIL_IF(ioctl(hh_fd_, HH_DEMO_START_RUN) != 0, "HH_DEMO_START_RUN failed");
     }
 }
 
 // Fill the BRAM syndrome table transport_demo replays
-void HwhsControllerSession::demo_preload()
-{
+void HwhsControllerSession::demo_preload() {
     const std::uint32_t slots = demo_.syn_depth / 64u;
     RT_FAIL_IF(slots == 0, "demo_depth must cover at least one 64 B slot");
 
@@ -531,8 +514,7 @@ void HwhsControllerSession::demo_preload()
         for (std::size_t b = 0; b < table_bytes; ++b) {
             tbl[b] = img[b];
         }
-    }
-    else {
+    } else {
         for (std::uint32_t i = 0; i < slots; ++i) {
             const std::uint64_t value = static_cast<std::uint64_t>(i) + 1;
             for (std::uint32_t half = 0; half < 2; ++half) {
@@ -557,8 +539,7 @@ void HwhsControllerSession::demo_preload()
 }
 
 // Read the trace RAM out after the run and write it as cycles,ns
-void HwhsControllerSession::demo_dump_trace() const
-{
+void HwhsControllerSession::demo_dump_trace() const {
     if (demo_.trace_pa == 0 || demo_.trace_out.empty() || mem_fd_ < 0) {
         return;
     }
@@ -605,8 +586,7 @@ void HwhsControllerSession::demo_dump_trace() const
                  ts.sat ? "   <-- some entry clamped to 0xFFFF: it is a ceiling, not a value" : "");
 }
 
-void HwhsControllerSession::demo_diff_dump() const
-{
+void HwhsControllerSession::demo_diff_dump() const {
     if (!demo_.enable || mem_fd_ < 0 || reply_.view == nullptr) {
         return;
     }
@@ -647,8 +627,7 @@ void HwhsControllerSession::demo_diff_dump() const
     ::munmap(base, span);
 }
 
-void HwhsControllerSession::demo_dump(const char *why) const
-{
+void HwhsControllerSession::demo_dump(const char *why) const {
     static const char *kStates[16] = {"S_IDLE",    "S_WQE_ISS",  "S_WQE_WAIT",   "S_DAT_WAIT",
                                       "S_DAT_ISS", "S_RING_ISS", "S_RING_WAIT",  "S_WAIT_RPL",
                                       "S_NEXT",    "S_DAT_IDLE", "S_DAT_TX_ISS", "S_DAT_TX_WAIT",
@@ -680,8 +659,7 @@ void HwhsControllerSession::demo_dump(const char *why) const
     }
 }
 
-void HwhsControllerSession::demo_report() const
-{
+void HwhsControllerSession::demo_report() const {
     if (!demo_.enable || hh_fd_ < 0) {
         return;
     }
@@ -700,16 +678,14 @@ void HwhsControllerSession::demo_report() const
         ds.cmd_cnt, ds.done, err_this_run, ds.err_cnt, err_this_run ? "   <-- DATA MISMATCH" : "");
 }
 
-void *HwhsControllerSession::data_slot()
-{
+void *HwhsControllerSession::data_slot() {
     RT_FAIL_IF(!out_.view, "data_slot before establish_channel()");
     std::uint32_t slot = static_cast<std::uint32_t>(submitted_ % ring_slots_);
     return const_cast<std::uint8_t *>(out_.view + static_cast<std::size_t>(slot) * stride_);
 }
 
 void HwhsControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
-                                            std::uint32_t decoder_id)
-{
+                                            std::uint32_t decoder_id) {
     RT_FAIL_IF(!out_.view, "write_data_slot before establish_channel()");
     RT_FAIL_IF(bytes > common::PAYLOAD_DATA_BYTES, "write_data_slot: bytes exceeds Payload::value");
     if (demo_.enable) {
@@ -733,15 +709,13 @@ void HwhsControllerSession::write_data_slot(const void *src, std::uint64_t bytes
         static_cast<std::uint32_t>(submitted_ + 1);
 }
 
-void *HwhsControllerSession::reply_slot()
-{
+void *HwhsControllerSession::reply_slot() {
     RT_FAIL_IF(!reply_.view, "reply_slot before connect()");
     std::uint32_t slot = static_cast<std::uint32_t>(collected_ % ring_slots_);
     return const_cast<std::uint8_t *>(reply_.view + static_cast<std::size_t>(slot) * stride_);
 }
 
-int HwhsControllerSession::kick(std::uint32_t work_item_idx)
-{
+int HwhsControllerSession::kick(std::uint32_t work_item_idx) {
     RT_FAIL_IF(work_item_idx != 0, "only a single work item (idx 0) is supported");
     RT_FAIL_IF(!committed_[work_item_idx], "kick: work_item not committed");
     RT_FAIL_IF(submitted_ - collected_ >= 1,
@@ -779,8 +753,7 @@ int HwhsControllerSession::kick(std::uint32_t work_item_idx)
 #else
 #error "HwhsControllerSession START doorbell needs an aarch64 Device-MMIO store barrier (dsb st)"
 #endif
-    }
-    else {
+    } else {
         RT_FAIL_IF(ioctl(hh_fd_, HH_START) != 0, "HH_START failed");
     }
     ++submitted_;
@@ -788,8 +761,7 @@ int HwhsControllerSession::kick(std::uint32_t work_item_idx)
 }
 
 int HwhsControllerSession::collect(void *const *replies, const std::uint64_t * /*replies_bytes*/,
-                                   std::size_t n)
-{
+                                   std::size_t n) {
     RT_FAIL_IF(!armed_, "collect before commit_work_item()");
     RT_FAIL_IF(submitted_ == collected_, "collect: nothing in flight");
 
@@ -845,8 +817,7 @@ int HwhsControllerSession::collect(void *const *replies, const std::uint64_t * /
             }
         }
         last_rtt_ns_ = now_ns() - kick_ns_;
-    }
-    else {
+    } else {
         // HW reply-poll
         hh_status_rd st = {};
         const std::uint64_t deadline = now_ns() + kCollectTimeoutNs;
@@ -872,8 +843,7 @@ int HwhsControllerSession::collect(void *const *replies, const std::uint64_t * /
     return kOk;
 }
 
-void HwhsControllerSession::report_rtt() const
-{
+void HwhsControllerSession::report_rtt() const {
     if (rtt_samples_.empty()) {
         return;
     }
@@ -904,8 +874,7 @@ void HwhsControllerSession::report_rtt() const
                  (unsigned long long)(sum / n));
 }
 
-void HwhsControllerSession::stop()
-{
+void HwhsControllerSession::stop() {
     if (stopped_) {
         return;
     }

@@ -6,14 +6,15 @@
 #include <cstring>
 #include <ctime>
 #include <exception>
-#include <execinfo.h>
-#include <fcntl.h>
 #include <string>
-#include <unistd.h>
 #include <vector>
 
 #include "FpgaControllerSession.hpp"
 #include "WireProtocol.hpp"
+
+#include <execinfo.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::common;
@@ -41,56 +42,42 @@ struct Args {
 };
 // clang-format on
 
-std::uint64_t now_ns()
-{
+std::uint64_t now_ns() {
     timespec ts = {};
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
     return static_cast<std::uint64_t>(ts.tv_sec) * 1000000000ull +
            static_cast<std::uint64_t>(ts.tv_nsec);
 }
 
-bool parse(int argc, char **argv, Args &a)
-{
+bool parse(int argc, char **argv, Args &a) {
     for (int i = 1; i < argc; ++i) {
         auto eq = [&](const char *f) { return std::strcmp(argv[i], f) == 0; };
         auto next = [&]() { return argv[++i]; };
         if (eq("--dev")) {
             a.dev = next();
-        }
-        else if (eq("--gid")) {
+        } else if (eq("--gid")) {
             a.gid = std::atoi(next());
-        }
-        else if (eq("--peer")) {
+        } else if (eq("--peer")) {
             a.peer = next();
-        }
-        else if (eq("--port")) {
+        } else if (eq("--port")) {
             a.port = static_cast<std::uint16_t>(std::atoi(next()));
-        }
-        else if (eq("--iters")) {
+        } else if (eq("--iters")) {
             a.iters = std::strtoull(next(), nullptr, 10);
-        }
-        else if (eq("--warmup")) {
+        } else if (eq("--warmup")) {
             a.warmup = std::strtoull(next(), nullptr, 10);
-        }
-        else if (eq("--ring")) {
+        } else if (eq("--ring")) {
             a.ring = static_cast<std::uint32_t>(std::strtoul(next(), nullptr, 0));
-        }
-        else if (eq("--stride-log2")) {
+        } else if (eq("--stride-log2")) {
             a.stride_log2 = static_cast<std::uint32_t>(std::strtoul(next(), nullptr, 0));
-        }
-        else if (eq("--syndrome-bytes")) {
+        } else if (eq("--syndrome-bytes")) {
             a.syndrome_bytes = static_cast<std::uint32_t>(std::strtoul(next(), nullptr, 0));
-        }
-        else if (eq("--correction-bytes")) {
+        } else if (eq("--correction-bytes")) {
             a.correction_bytes = static_cast<std::uint32_t>(std::strtoul(next(), nullptr, 0));
-        }
-        else if (eq("--cpu-pin")) {
+        } else if (eq("--cpu-pin")) {
             a.cpu_pin = std::atoi(next());
-        }
-        else if (eq("--csv")) {
+        } else if (eq("--csv")) {
             a.csv = next();
-        }
-        else {
+        } else {
             std::fprintf(stderr, "unknown arg: %s\n", argv[i]);
             return false;
         }
@@ -100,8 +87,7 @@ bool parse(int argc, char **argv, Args &a)
 
 // Print the fault addr, backtrace, and /proc/self/maps
 // (for offline addr2line), then re-raise. Async-signal-safe calls only.
-void crash_handler(int sig, siginfo_t *si, void * /*ucontext*/)
-{
+void crash_handler(int sig, siginfo_t *si, void * /*ucontext*/) {
     char buf[160];
     int len =
         std::snprintf(buf, sizeof(buf), "\n[controller] *** FATAL signal %d at fault addr %p ***\n",
@@ -129,8 +115,7 @@ void crash_handler(int sig, siginfo_t *si, void * /*ucontext*/)
     raise(sig);
 }
 
-void install_crash_handler()
-{
+void install_crash_handler() {
     struct sigaction sa = {};
     sa.sa_sigaction = crash_handler;
     sa.sa_flags = SA_SIGINFO | SA_RESETHAND;
@@ -143,8 +128,7 @@ void install_crash_handler()
 }
 
 // RTT percentiles (ns) over samples, dropping the leading `warmup` shots.
-void report_rtt(std::vector<std::uint64_t> s, std::uint64_t warmup, const char *clock)
-{
+void report_rtt(std::vector<std::uint64_t> s, std::uint64_t warmup, const char *clock) {
     if (warmup > 0 && s.size() > warmup) {
         s.erase(s.begin(), s.begin() + static_cast<std::ptrdiff_t>(warmup));
     }
@@ -173,8 +157,7 @@ void report_rtt(std::vector<std::uint64_t> s, std::uint64_t warmup, const char *
     row("mean", mean);
 }
 
-void write_csv(const char *path, const std::vector<std::uint64_t> &s, std::uint64_t warmup)
-{
+void write_csv(const char *path, const std::vector<std::uint64_t> &s, std::uint64_t warmup) {
     std::size_t start = (warmup > 0) ? static_cast<std::size_t>(warmup) : 0;
     if (s.size() <= start) {
         std::fprintf(stderr, "[controller] no post-warmup samples; csv not written\n");
@@ -196,8 +179,7 @@ void write_csv(const char *path, const std::vector<std::uint64_t> &s, std::uint6
 
 } // namespace
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     install_crash_handler();
 
     Args a;
@@ -321,8 +303,7 @@ int main(int argc, char **argv)
                      static_cast<unsigned long long>(completed),
                      static_cast<unsigned long long>(a.iters), pass ? "PASS" : "FAIL");
         return pass ? 0 : 1;
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         std::fprintf(stderr, "[controller] FAILED: %s\n", e.what());
         return 1;
     }

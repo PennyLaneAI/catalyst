@@ -45,8 +45,7 @@ struct FpgaConfig {
 
 // `ps` (PS DDR), `pl` (PL DDR) and `bram` are the placements the board's
 // allocator exposes.
-inline catalyst::transport::MemKind parse_mem_kind(std::string_view key, const std::string &val)
-{
+inline catalyst::transport::MemKind parse_mem_kind(std::string_view key, const std::string &val) {
     if (val == "ps") {
         return catalyst::transport::MemKind::CpuRam;
     }
@@ -60,8 +59,7 @@ inline catalyst::transport::MemKind parse_mem_kind(std::string_view key, const s
                              std::string(key));
 }
 
-inline FpgaConfig parse_fpga_config(const std::string &config)
-{
+inline FpgaConfig parse_fpga_config(const std::string &config) {
     FpgaConfig cfg;
     for (std::size_t pos = 0; pos < config.size();) {
         const std::size_t sep = config.find(';', pos);
@@ -70,22 +68,24 @@ inline FpgaConfig parse_fpga_config(const std::string &config)
         if (const std::size_t eq = tok.find('='); eq != std::string_view::npos) {
             const std::string_view key = tok.substr(0, eq);
             const std::string val(tok.substr(eq + 1));
-            if (key == "dev")
+            if (key == "dev") {
                 cfg.dev = val;
-            else if (key == "gid")
+            } else if (key == "gid") {
                 cfg.gid = std::atoi(val.c_str());
-            else if (key == "ring")
+            } else if (key == "ring") {
                 cfg.ring = static_cast<std::uint32_t>(std::strtoul(val.c_str(), nullptr, 10));
-            else if (key == "stride_log2")
+            } else if (key == "stride_log2") {
                 cfg.stride_log2 =
                     static_cast<std::uint32_t>(std::strtoul(val.c_str(), nullptr, 10));
-            else if (key == "data_mem")
+            } else if (key == "data_mem") {
                 cfg.data_mem = parse_mem_kind(key, val);
-            else if (key == "reply_mem")
+            } else if (key == "reply_mem") {
                 cfg.reply_mem = parse_mem_kind(key, val);
+            }
         }
-        if (sep == std::string::npos)
+        if (sep == std::string::npos) {
             break;
+        }
         pos = sep + 1;
     }
     return cfg;

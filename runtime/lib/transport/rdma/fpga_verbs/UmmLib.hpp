@@ -15,8 +15,7 @@ namespace rdma::devices::fpga_verbs {
 // absent; loaded() reports whether the allocator symbols were all found.
 class UmmLib {
   public:
-    UmmLib()
-    {
+    UmmLib() {
         lib_ = dlopen("libumm.so.1", RTLD_NOW | RTLD_GLOBAL);
         if (lib_ != nullptr) {
             alloc_chunk_ = reinterpret_cast<AllocChunk>(dlsym(lib_, "xib_umem_alloc_chunk"));
@@ -27,8 +26,7 @@ class UmmLib {
         }
         reg_mr_ex_ = reinterpret_cast<RegMrEx>(dlsym(RTLD_DEFAULT, "ibv_reg_mr_ex"));
     }
-    ~UmmLib()
-    {
+    ~UmmLib() {
         if (lib_ != nullptr) {
             dlclose(lib_);
         }
@@ -37,32 +35,26 @@ class UmmLib {
     UmmLib &operator=(const UmmLib &) = delete;
 
     // Software datapath only needs alloc/free + reg_mr; get_phy_addr is optional.
-    [[nodiscard]] bool loaded() const
-    {
+    [[nodiscard]] bool loaded() const {
         return lib_ != nullptr && alloc_chunk_ != nullptr && alloc_mem_ != nullptr &&
                free_mem_ != nullptr && free_chunk_ != nullptr;
     }
 
-    int alloc_chunk(void *ctx, int mem_type, std::uint64_t block, std::uint64_t total, bool proc)
-    {
+    int alloc_chunk(void *ctx, int mem_type, std::uint64_t block, std::uint64_t total, bool proc) {
         return alloc_chunk_(ctx, mem_type, block, total, proc);
     }
-    std::uint64_t alloc_mem(void *ctx, int chunk, std::uint64_t size)
-    {
+    std::uint64_t alloc_mem(void *ctx, int chunk, std::uint64_t size) {
         return alloc_mem_(ctx, chunk, size);
     }
-    int get_phy_addr(void *ctx, unsigned chunk, std::uint64_t va, std::uint64_t *pa)
-    {
+    int get_phy_addr(void *ctx, unsigned chunk, std::uint64_t va, std::uint64_t *pa) {
         return get_phy_(ctx, chunk, va, pa);
     }
-    int free_mem(void *ctx, unsigned chunk, std::uint64_t uva, std::uint64_t size)
-    {
+    int free_mem(void *ctx, unsigned chunk, std::uint64_t uva, std::uint64_t size) {
         return free_mem_(ctx, chunk, uva, size);
     }
     int free_chunk(void *ctx, int chunk) { return free_chunk_(ctx, chunk); }
 
-    ibv_mr *reg_mr(ibv_pd *pd, std::uint64_t addr, std::uint64_t size, int access)
-    {
+    ibv_mr *reg_mr(ibv_pd *pd, std::uint64_t addr, std::uint64_t size, int access) {
         if (reg_mr_ex_ != nullptr) {
             return reg_mr_ex_(pd, addr, size, access);
         }

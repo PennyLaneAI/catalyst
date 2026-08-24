@@ -8,8 +8,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <sched.h>
 #include <utility>
+
+#include <sched.h>
 
 #ifdef RDMA_VENDOR_IBVERBS
 #include "infiniband/verbs.h"
@@ -37,8 +38,7 @@ enum class XMem : int {
     Bram = 5,
 };
 
-int mem_type_of(MemKind kind)
-{
+int mem_type_of(MemKind kind) {
     switch (kind) {
     case MemKind::CpuRam:
         return static_cast<int>(XMem::PsDdr);
@@ -55,28 +55,24 @@ int mem_type_of(MemKind kind)
 // DC ZVA above ~256 B, and cache maintenance faults on this Device mapping.
 // Also, the allocator does not zero on alloc, so stale seq_num values could
 // masquerade as replies.
-void set_zero(volatile std::uint8_t *p, std::uint64_t n)
-{
+void set_zero(volatile std::uint8_t *p, std::uint64_t n) {
     auto *q = reinterpret_cast<volatile std::uint64_t *>(p);
     for (std::uint64_t k = 0; k < n / sizeof(std::uint64_t); ++k) {
         q[k] = 0;
     }
 }
 
-void pin_to_cpu(int cpu)
-{
+void pin_to_cpu(int cpu) {
     if (cpu < 0) {
         return;
     }
     cpu_set_t set;
     CPU_ZERO(&set);
     CPU_SET(cpu, &set);
-    TP_CHECK(sched_setaffinity(0, sizeof(set), &set) == 0, "sched_setaffinity(cpu=%d) failed",
-               cpu);
+    TP_CHECK(sched_setaffinity(0, sizeof(set), &set) == 0, "sched_setaffinity(cpu=%d) failed", cpu);
 }
 
-std::uint64_t mono_ns()
-{
+std::uint64_t mono_ns() {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                           std::chrono::steady_clock::now().time_since_epoch())
                                           .count());
@@ -89,31 +85,27 @@ FpgaControllerSession::FpgaControllerSession(std::string dev, int gid_idx, std::
                                              std::optional<MemKind> reply_kind)
     : dev_(std::move(dev)), gid_idx_(gid_idx), ring_slots_(ring_slots ? ring_slots : 1),
       stride_log2_(stride_log2), stride_((stride_log2 < 32) ? (1u << stride_log2) : 1u),
-      mem_kind_(reply_kind.value_or(MemKind::CpuRam)), data_kind_(data_kind)
-{
+      mem_kind_(reply_kind.value_or(MemKind::CpuRam)), data_kind_(data_kind) {
     TP_CHECK(stride_log2 < 32, "stride_log2 out of range (must be < 32)");
     TP_CHECK(stride_ >= sizeof(PayloadSlot),
-               "stride too small: a ring slot must hold a PayloadSlot (%zu B)",
-               sizeof(PayloadSlot));
+             "stride too small: a ring slot must hold a PayloadSlot (%zu B)", sizeof(PayloadSlot));
 }
 
-Region FpgaControllerSession::region_alloc(std::uint64_t size, int mem_type, int access)
-{
+Region FpgaControllerSession::region_alloc(std::uint64_t size, int mem_type, int access) {
     void *ctx = ctx_->get();
     Region r;
     r.size = size;
     r.chunk = umm_.alloc_chunk(ctx, mem_type, size, size, /*proc=*/true);
     TP_CHECK(r.chunk >= 0, "on-board alloc_chunk(size=%llu): %d",
-               static_cast<unsigned long long>(size), r.chunk);
+             static_cast<unsigned long long>(size), r.chunk);
     r.va = umm_.alloc_mem(ctx, r.chunk, size);
     if (r.va == 0) {
         umm_.free_chunk(ctx, r.chunk);
         TP_FAIL("on-board alloc_mem(chunk=%d size=%llu) returned 0", r.chunk,
-                  static_cast<unsigned long long>(size));
+                static_cast<unsigned long long>(size));
     }
     TP_CHECK((r.va % NIC_DMA_ALIGN) == 0, "buffer not %llu-B aligned: 0x%llx",
-               static_cast<unsigned long long>(NIC_DMA_ALIGN),
-               static_cast<unsigned long long>(r.va));
+             static_cast<unsigned long long>(NIC_DMA_ALIGN), static_cast<unsigned long long>(r.va));
     r.view = reinterpret_cast<volatile std::uint8_t *>(r.va);
     set_zero(r.view, size);
     if (access) {
@@ -127,8 +119,7 @@ Region FpgaControllerSession::region_alloc(std::uint64_t size, int mem_type, int
     return r;
 }
 
-void FpgaControllerSession::region_free(Region &r)
-{
+void FpgaControllerSession::region_free(Region &r) {
     void *ctx = ctx_ ? ctx_->get() : nullptr;
     if (r.mr != nullptr) {
         ibv_dereg_mr(r.mr);
@@ -143,8 +134,7 @@ void FpgaControllerSession::region_free(Region &r)
     r = Region{};
 }
 
-void FpgaControllerSession::reap(ibv_cq *cq, int &outstanding, bool drain)
-{
+void FpgaControllerSession::reap(ibv_cq *cq, int &outstanding, bool drain) {
     std::array<ibv_wc, REAP_BATCH> wc{};
     int empty = 0;
     constexpr int DRAIN_MAX_EMPTY = 1000000;
@@ -167,10 +157,9 @@ void FpgaControllerSession::reap(ibv_cq *cq, int &outstanding, bool drain)
     } while (drain && outstanding > 0);
 }
 
-int FpgaControllerSession::connect(const ConnectInfo &info)
-{
+int FpgaControllerSession::connect(const ConnectInfo &info) {
     TP_CHECK(umm_.loaded(),
-               "on-board memory allocator not available (FPGA controller requires it)");
+             "on-board memory allocator not available (FPGA controller requires it)");
     ctx_ = std::make_shared<Context>(dev_);
     pd_ = std::make_shared<ProtectionDomain>(ctx_);
 
@@ -195,8 +184,7 @@ int FpgaControllerSession::connect(const ConnectInfo &info)
     return 0;
 }
 
-MemRegion FpgaControllerSession::alloc_memory(std::size_t size, MemKind kind)
-{
+MemRegion FpgaControllerSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(ctx_ != nullptr, "alloc_memory before connect()");
 
     constexpr int REPLY_ACCESS = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE;
@@ -214,8 +202,7 @@ MemRegion FpgaControllerSession::alloc_memory(std::size_t size, MemKind kind)
     };
 }
 
-PeerRef FpgaControllerSession::exchange_keys(const MemRegion &local)
-{
+PeerRef FpgaControllerSession::exchange_keys(const MemRegion &local) {
     TP_CHECK(oob_.valid(), "exchange_keys before connect()");
     TP_CHECK(reply_.mr != nullptr, "exchange_keys: reply region has no MR (alloc remote-write)");
 
@@ -251,8 +238,7 @@ PeerRef FpgaControllerSession::exchange_keys(const MemRegion &local)
 }
 
 void FpgaControllerSession::establish_channel(const ChannelDesc &desc, const MemRegion & /*local*/,
-                                              const PeerRef &peer)
-{
+                                              const PeerRef &peer) {
     (void)desc.transport;
     peer_rkey_ = peer.rkey;
     peer_addr_ = peer.remote_addr;
@@ -271,11 +257,10 @@ void FpgaControllerSession::establish_channel(const ChannelDesc &desc, const Mem
 void FpgaControllerSession::start() { pin_to_cpu(cpu_pin_); }
 
 void FpgaControllerSession::commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
-                                             std::uint64_t out_bytes)
-{
+                                             std::uint64_t out_bytes) {
     TP_CHECK(out_.va != 0 && reply_.va != 0, "commit_work_item before establish_channel()");
     TP_CHECK(work_item_idx < K_NUM_WORK_ITEMS,
-               "commit_work_item: work_item_idx out of range (0..15)");
+             "commit_work_item: work_item_idx out of range (0..15)");
     TP_CHECK(in_bytes != 0, "commit_work_item: in_bytes is 0");
     TP_CHECK(in_bytes <= stride_, "commit_work_item: in_bytes exceeds ring-slot stride");
     TP_CHECK(out_bytes <= stride_, "commit_work_item: out_bytes exceeds ring-slot stride");
@@ -306,16 +291,14 @@ void FpgaControllerSession::commit_work_item(std::uint32_t work_item_idx, std::u
     armed_ = true;
 }
 
-void *FpgaControllerSession::data_slot()
-{
+void *FpgaControllerSession::data_slot() {
     TP_CHECK(out_.va != 0, "data_slot before establish_channel()");
     std::uint32_t slot = static_cast<std::uint32_t>(submitted_ % ring_slots_);
     return reinterpret_cast<void *>(out_.va + static_cast<std::uint64_t>(slot) * stride_);
 }
 
 void FpgaControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
-                                           std::uint32_t decoder_id)
-{
+                                            std::uint32_t decoder_id) {
     TP_CHECK(out_.va != 0, "write_data_slot before establish_channel()");
     TP_CHECK(bytes <= stride_, "write_data_slot: bytes exceeds ring-slot capacity");
     pending_decoder_ = decoder_id;
@@ -328,16 +311,14 @@ void FpgaControllerSession::write_data_slot(const void *src, std::uint64_t bytes
     }
 }
 
-void *FpgaControllerSession::reply_slot()
-{
+void *FpgaControllerSession::reply_slot() {
     TP_CHECK(reply_.va != 0, "reply_slot before connect()");
     std::uint32_t slot = static_cast<std::uint32_t>(collected_ % ring_slots_);
     return reinterpret_cast<void *>(reply_.va + static_cast<std::uint64_t>(slot) * stride_);
 }
 
 void FpgaControllerSession::post_write(ibv_qp *qp, std::uint32_t work_item_idx,
-                                       std::uint64_t cursor, bool signaled)
-{
+                                       std::uint64_t cursor, bool signaled) {
     std::uint32_t slot = static_cast<std::uint32_t>(cursor % ring_slots_);
     std::uint64_t off = static_cast<std::uint64_t>(slot) * stride_;
 
@@ -353,17 +334,16 @@ void FpgaControllerSession::post_write(ibv_qp *qp, std::uint32_t work_item_idx,
 
     ibv_send_wr *bad = nullptr;
     TP_CHECK(ibv_post_send(qp, &wr, &bad) == 0, "ibv_post_send failed (cursor=%llu)",
-               static_cast<unsigned long long>(cursor));
+             static_cast<unsigned long long>(cursor));
 }
 
-int FpgaControllerSession::kick(std::uint32_t work_item_idx)
-{
+int FpgaControllerSession::kick(std::uint32_t work_item_idx) {
     kick_t0_ns_ = mono_ns();
 
     TP_CHECK(work_item_idx < K_NUM_WORK_ITEMS && committed_[work_item_idx],
-               "kick: work_item_idx not committed");
+             "kick: work_item_idx not committed");
     TP_CHECK(submitted_ - collected_ < max_in_flight_,
-               "kick: max_in_flight reached, collect() first");
+             "kick: max_in_flight reached, collect() first");
 
     std::uint64_t cursor = submitted_;
     bool signaled = (cursor % SIGNAL_EVERY) == 0;
@@ -379,8 +359,7 @@ int FpgaControllerSession::kick(std::uint32_t work_item_idx)
     return 0;
 }
 
-volatile PayloadSlot *FpgaControllerSession::poll_message_arrival(std::uint64_t cursor)
-{
+volatile PayloadSlot *FpgaControllerSession::poll_message_arrival(std::uint64_t cursor) {
     std::uint32_t slot = static_cast<std::uint32_t>(cursor % ring_slots_);
     std::uint32_t expected = static_cast<std::uint32_t>(cursor + 1);
     auto *rslot = reinterpret_cast<volatile PayloadSlot *>(
@@ -396,9 +375,9 @@ volatile PayloadSlot *FpgaControllerSession::poll_message_arrival(std::uint64_t 
         int got = ibv_poll_cq(fwd_cq_->get(), REAP_BATCH, wc);
         for (int k = 0; k < got; ++k) {
             TP_CHECK(wc[k].status == IBV_WC_SUCCESS,
-                       "collect: fwd WRITE failed at cursor=%llu: status=%d (%s)",
-                       static_cast<unsigned long long>(cursor), wc[k].status,
-                       ibv_wc_status_str(wc[k].status));
+                     "collect: fwd WRITE failed at cursor=%llu: status=%d (%s)",
+                     static_cast<unsigned long long>(cursor), wc[k].status,
+                     ibv_wc_status_str(wc[k].status));
             --signaled_outstanding_;
         }
     }
@@ -408,12 +387,10 @@ volatile PayloadSlot *FpgaControllerSession::poll_message_arrival(std::uint64_t 
 }
 
 int FpgaControllerSession::collect(void *const *outputs, const std::size_t *output_bytes,
-                                   std::size_t n)
-{
+                                   std::size_t n) {
     TP_CHECK(armed_, "collect before commit_work_item()");
     TP_CHECK(submitted_ > collected_, "collect: nothing in flight");
-    TP_CHECK(n >= 1 && outputs != nullptr && output_bytes != nullptr,
-               "collect: no output buffer");
+    TP_CHECK(n >= 1 && outputs != nullptr && output_bytes != nullptr, "collect: no output buffer");
     void *replies = outputs[0];
     std::uint64_t bytes = output_bytes[0];
     TP_CHECK(replies != nullptr, "collect: null output");
@@ -422,8 +399,8 @@ int FpgaControllerSession::collect(void *const *outputs, const std::size_t *outp
     std::uint32_t corr = correction_bytes_[active_item_];
 
     TP_CHECK(corr == 0 || bytes >= corr,
-               "collect: output buffer (%llu B) smaller than committed correction (%u B)",
-               static_cast<unsigned long long>(bytes), corr);
+             "collect: output buffer (%llu B) smaller than committed correction (%u B)",
+             static_cast<unsigned long long>(bytes), corr);
 
     const std::uint64_t t0 = kick_t0_ns_;
     volatile PayloadSlot *rslot = poll_message_arrival(cursor);
@@ -443,8 +420,7 @@ int FpgaControllerSession::collect(void *const *outputs, const std::size_t *outp
     return 0;
 }
 
-void FpgaControllerSession::stop()
-{
+void FpgaControllerSession::stop() {
     if (stopped_) {
         return;
     }
