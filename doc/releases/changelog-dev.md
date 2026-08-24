@@ -137,7 +137,7 @@
 
       return qp.expval(qp.X(0))
 
-  resources = qp.specs(circuit, level="all-mlir")().resources
+  resources = qp.specs(circuit, level=0)().resources
   print(resources.quantum_operations["PauliX"])  # 56
   ```
 
