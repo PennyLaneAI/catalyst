@@ -332,15 +332,17 @@ def test_global_phase():
 print(test_global_phase.mlir)
 
 
-# CHECK: func.func public @test_unitary(%arg0: tensor<2x2xf64>, %arg1: tensor<4x4xf64>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+# COM: TODO: ControlledQubitUnitary's decomp rules are buggy and not jittable.
+# COM: https://app.shortcut.com/xanaduai/story/128492/ctrl-decomp-bisect-rule-of-controlledqubitunitary-is-not-jittable,
+# COM: https://app.shortcut.com/xanaduai/story/128494/controlled-two-qubit-unitary-rule-on-controlledqubitunitary-is-not-jittable
+# When fixed, turn collect_decomp_rules back on.
+# CHECK: func.func public @test_unitary(%arg0: tensor<2x2xf64>, %arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_unitary():
     """
     Test unitary.
     """
-    # CHECK-DAG: [[true:%.+]] = arith.constant true
-
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
@@ -348,11 +350,12 @@ def test_unitary():
     # CHECK: qref.unitary([[mat2]] : tensor<2x2xcomplex<f64>>) [[q1]] : !qref.bit
     qp.QubitUnitary(np.identity(2), wires=[1])
 
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
-    # CHECK: [[mat4:%.+]] = stablehlo.convert %arg1 : (tensor<4x4xf64>) -> tensor<4x4xcomplex<f64>>
-    # CHECK: qref.unitary([[mat4]] : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # CHECK: qref.operator "ControlledQubitUnitary"(%arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) qubits([[q0]], [[q1]], [[q2]])
+    # CHECK:   static_data = {unitary_check = false, work_wire_type = "borrowed"}
+    # CHECK:   param_map = {U = [0], control_values = [1]} qubit_map = {wires = [0, 1, 2]}
     qp.ctrl(qp.QubitUnitary(np.identity(4), wires=[1, 2]), control=[0])
 
     return qp.expval(qp.X(0))

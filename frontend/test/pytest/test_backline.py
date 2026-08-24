@@ -35,9 +35,11 @@ from catalyst.backline import (
     device_pass_pipeline,
     launch_executors,
     placement_pipeline,
+    remote_device_lib,
     serialize_backline,
 )
 from catalyst.device.qjit_device import BackendInfo, extract_backend_info
+from catalyst.from_plxpr.from_plxpr import _get_device_kwargs
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -989,6 +991,42 @@ class TestExecutorRealization:
             _realize_executor(node)
         plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
         assert plugins[-1] == "librtd_null_qubit.so"
+
+    def test_a_dispatched_controller_names_its_runtime_by_filename(self):
+        """A program carrying this installation's path opens it on the far machine and fails."""
+        dev = qp.Backline(controller=_controller(remote=True), transport="rdma")
+        info = extract_backend_info(dev)
+        assert remote_device_lib(dev, info.lpath) == "librtd_null_qubit.so"
+        assert _get_device_kwargs(dev)["rtd_lib"] == "librtd_null_qubit.so"
+
+    def test_a_controller_in_this_process_keeps_its_full_path(self):
+        """Nothing was deployed, so the path into this installation is what resolves."""
+        dev = qp.Backline(controller=_controller(), transport="rdma")
+        info = extract_backend_info(dev)
+        assert remote_device_lib(dev, info.lpath) is None
+        assert _get_device_kwargs(dev)["rtd_lib"] == info.lpath
+
+    def test_a_device_with_no_placement_is_left_alone(self):
+        """Only a backline placement implies a remote node, so every other device is untouched."""
+        plain = qp.device("null.qubit", wires=1)
+        assert remote_device_lib(plain, "/opt/lib/librtd_null_qubit.so") is None
+
+    def test_a_dispatched_runtime_is_named_with_a_linux_extension(self):
+        """A node on another machine is Linux, so a macOS host's .dylib is not what it asks for."""
+        dev = qp.Backline(controller=_controller(remote=True), transport="rdma")
+        assert remote_device_lib(dev, "/opt/lib/librtd_null_qubit.dylib") == "librtd_null_qubit.so"
+
+    def test_a_remote_controllers_device_runtime_is_not_carried(self, no_launch):
+        """A node of another architecture needs the copy cross-built for its own bundle.
+
+        Sending this host's would land the wrong architecture in its workspace under that filename,
+        displacing the right one.
+        """
+        node = _controller(remote=True, executor_options={"host": "192.0.2.10", "port": 7810})
+        _realize_executor(node)
+        cfg = node.executor._cfg  # pylint: disable=protected-access
+        assert cfg.plugins[-1] == "librtd_null_qubit.so"
+        assert not cfg.deploy
 
     def test_a_dispatched_coprocessor_carries_its_function_library(self, tmp_path):
         """A decoder built for this run is not in the target's bundle, so it travels and is opened."""
