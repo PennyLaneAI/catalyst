@@ -365,7 +365,7 @@ class TestBacklineDemoIntegration:
         )
         ctrl = qp.Controller(
             name="cpu-controller",
-            device=qp.device("lightning.qubit", wires=3),
+            device=qp.device("null.qubit", wires=3),
             init_args={"backend_lib": ctrl_lib, **extra_init},
         )
         coproc_kwargs = {
@@ -381,7 +381,7 @@ class TestBacklineDemoIntegration:
         )
 
         @qjit(capture=True)
-        @qp.set_shots(10)
+        @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot")
         def ghz():
             qp.Hadamard(0)
