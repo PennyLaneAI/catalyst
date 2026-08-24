@@ -266,12 +266,18 @@ jobs:
           echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
           echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
 
-      - name: Run backline Triton integration test
-        # The CPU-CPU memcpy case (test_local_cpu_to_local_cpu[memcpy]) is covered by
-        # check-catalyst.yaml on a GH-hosted runner. This workflow only runs cases that
-        # genuinely need the GPU runner - here the css_bp_decoder path (Triton codegen
-        # against the local GPU, adapted from demo 2).
+      - name: Run backline Triton integration tests
+        # CPU-CPU memcpy is covered by check-catalyst.yaml on a GH-hosted runner. This workflow
+        # only runs cases that need the local GPU:
+        #   - triton_css_bp: minimal Triton codegen path (compile-only, no ghz)
+        #   - manual_qec: demo 2's full elaborate circuit + Triton-built hgp_bp_osd_decoder,
+        #     executes ghz() on the GPU. Blocked from a green pass until HIP-on-CUDA is
+        #     installed on the runner (see the TODO above about the cloud team); after that,
+        #     the runtime GPU coproc backend .so exists and this passes end-to-end.
+        # The gpu_triton_platform fixture picks NVIDIA (cuda:*) or AMD (hip:*) based on which
+        # SDK is detected on the runner, so the same test body runs on either target.
         run: |
           python3 -m pytest -v \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp"
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp" \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
 

@@ -420,21 +420,28 @@ class TestBacklineDemoIntegration:
         samples = ghz()
         assert samples is not None
 
-    def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(self, use_capture):
+    def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(self, use_capture, gpu_triton_platform):
         """CPU controller ↔ GPU coprocessor over ``memcpy`` with a manually-scheduled QEC cycle.
 
-        Ports the CSS BP decoder demo to memcpy backends: the QNode extracts syndromes, calls the
-        coprocessor's decoder via ``qp.backline.decode``, and applies corrections in the same shot.
-        Substitutes a plain ``CoprocessorFunction`` for the ``css_bp_decoder`` builder, whose
-        Triton compilation is not available in the unit-test environment.
+        Ports demo 2's CSS BP decoder + manual QEC pattern to local memcpy transport, executed
+        on whichever GPU is attached (NVIDIA via ``cuda:*`` or AMD via ``hip:*`` — the platform
+        is picked by ``gpu_triton_platform``). The QNode extracts syndromes, calls the
+        coprocessor's Triton-built ``hgp_bp_osd_decoder`` via ``qp.backline.decode`` for each of
+        the 13 data qubits, and applies corrections in the same shot. The elaborate encoded /
+        logical-op / iterated-error-injection structure follows demo 2 and is what distinguishes
+        this test from the shorter ``*_triton_css_bp`` variant above.
         """
+        pytest.importorskip("triton")
+
         n_data = 13
         aux = n_data
         checks = np.array([[1] * 7 + [0] * 6, [0] * 6 + [1] * 7])
         logical_support = list(range(n_data))
         swap_pairs = [(0, 1), (2, 3)]
 
-        decoder = qp.CoprocessorFunction("hgp_bp_osd_decoder")
+        decoder = qp.backline.css_bp_decoder(
+            checks, checks, postprocess="osd", num_iters=5, prob=0.1, platform=gpu_triton_platform
+        )
 
         ctrl = qp.Controller(
             name="cpu-controller",
@@ -444,7 +451,6 @@ class TestBacklineDemoIntegration:
         coproc = qp.Coprocessor(
             name="gpu-coproc",
             coprocessor_fn=decoder,
-            endpoint=qp.Endpoint("127.0.0.1", 18590),
             init_args={"backend_lib": "libcatalyst_transport_memcpy_gpu_coprocessor.so"},
         )
         dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
@@ -530,7 +536,8 @@ class TestBacklineDemoIntegration:
         ir = encoded_decoded_circuit.mlir
         assert "catalyst.backline" in ir
         assert 'transport = "memcpy"' in ir
-        assert 'symbol = "hgp_bp_osd_decoder"' in ir
+        assert decoder.symbol_name in ir
+        assert decoder.lib_path is not None and decoder.lib_path in ir
         assert "libcatalyst_transport_memcpy_controller.so" in ir
         assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
 
@@ -581,7 +588,7 @@ class TestBacklineDemoIntegration:
         for pass_name, _ in _qec_pass_specs("steane"):
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
-    def test_cpu_controller_to_gpu_coproc_triton_css_bp(self, use_capture):
+    def test_cpu_controller_to_gpu_coproc_triton_css_bp(self, use_capture, gpu_triton_platform):
         """CSS BP decoder built via Triton, adapted from demo 2 to a local memcpy placement.
 
         Mirrors ``demos/demo_2_remote_cpu_to_remote_gpu_triton.py``: X- and Z-type parity checks
@@ -593,26 +600,7 @@ class TestBacklineDemoIntegration:
         Triton-built ``.so``, which is orthogonal to what the demo pattern is verifying.
         """
         pytest.importorskip("triton")
-
-        # Detect the local GPU's compute capability so the Triton kernel targets the actual
-        # hardware. On a runner without nvidia-smi (or without a CUDA GPU), skip.
-        import subprocess  # pylint: disable=import-outside-toplevel
-
-        try:
-            cc = (
-                subprocess.check_output(
-                    ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
-                    text=True,
-                    stderr=subprocess.DEVNULL,
-                )
-                .strip()
-                .splitlines()[0]
-                .strip()
-            )
-            major, minor = cc.split(".")
-            platform = f"cuda:{major}{minor}:32"
-        except (FileNotFoundError, subprocess.CalledProcessError, ValueError, IndexError):
-            pytest.skip("nvidia-smi with compute_cap not available on this runner")
+        platform = gpu_triton_platform
 
         n_data = 13
         aux = n_data

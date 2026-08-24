@@ -16,6 +16,7 @@ Pytest configuration file for Catalyst test suite.
 """
 
 import os
+import subprocess
 from importlib.util import find_spec
 from tempfile import TemporaryDirectory
 from textwrap import dedent
@@ -23,6 +24,54 @@ from warnings import warn
 
 import pennylane as qp
 import pytest
+
+
+def _detect_gpu_triton_platform():
+    """Return a Triton ``platform`` string matching this runner's GPU, or ``None``.
+
+    Auto-detects NVIDIA (via ``nvidia-smi``) and AMD (via ``rocminfo``) so the same test
+    body runs against whichever hardware is attached. Preferring NVIDIA when both are
+    somehow present is arbitrary but consistent across runners.
+    """
+    # NVIDIA: nvidia-smi reports compute cap as e.g. "8.0". Warp size is always 32.
+    try:
+        cc = (
+            subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+            .strip()
+            .splitlines()[0]
+            .strip()
+        )
+        major, minor = cc.split(".")
+        return f"cuda:{major}{minor}:32"
+    except (FileNotFoundError, subprocess.CalledProcessError, ValueError, IndexError):
+        pass
+
+    # AMD: rocminfo lists ``Name: gfxNNN`` for each agent. Wave size is 64 on gfx9/10,
+    # some gfx11 SKUs use 32; default to 64 which matches the demo examples.
+    try:
+        rocm = subprocess.check_output(["rocminfo"], text=True, stderr=subprocess.DEVNULL)
+        for line in rocm.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("Name:") and "gfx" in stripped:
+                arch = stripped.split(":", 1)[1].strip()
+                return f"hip:{arch}:64"
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+
+    return None
+
+
+@pytest.fixture(scope="module")
+def gpu_triton_platform():
+    """Skip cleanly if no NVIDIA or AMD GPU is attached to this runner."""
+    platform = _detect_gpu_triton_platform()
+    if platform is None:
+        pytest.skip("No NVIDIA or AMD GPU detected on this runner")
+    return platform
 
 
 @pytest.fixture(scope="function")
