@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// ERNIC™ is a trademark of Advanced Micro Devices, Inc. It is referred to here
-// only to identify the hardware this ABI targets.
+// ERNIC™ is a trademark of Advanced Micro Devices, Inc.
 
 // HWHS ABI
 
