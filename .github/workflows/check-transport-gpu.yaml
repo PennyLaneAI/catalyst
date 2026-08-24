@@ -155,6 +155,28 @@ jobs:
           key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
           fail-on-cache-miss: true
 
+      - name: Install self-hosted runner build dependencies
+        # lld: HandleLLVMOptions.cmake probes -fuse-ld=lld when consuming LLVMConfig.
+        # libxml2-dev: LLVMConfig.cmake calls find_package(LibXml2).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lld libxml2-dev
+
+      - name: Rewrite absolute paths in cached CMake configs
+        # LLVMConfig.cmake and its includes bake in absolute paths from wherever LLVM was
+        # configured. check-catalyst.yaml runs on GH-hosted runners (/home/runner/work/...),
+        # while this workflow runs on a self-hosted GPU runner (/opt/actions-runner/_work/...),
+        # so those include() lines resolve to nonexistent files. Rewrite them in-place.
+        run: |
+          set -euo pipefail
+          REAL_PWD="$(pwd)"
+          for host_prefix in /home/runner/work/catalyst/catalyst; do
+            if [ "$host_prefix" = "$REAL_PWD" ]; then continue; fi
+            find llvm-build stablehlo-build enzyme-build mlir/stablehlo mlir/Enzyme \
+              -name '*.cmake' -type f -print0 2>/dev/null \
+              | xargs -0 --no-run-if-empty sed -i "s|${host_prefix}|${REAL_PWD}|g"
+          done
+
       - name: Install Python runtime requirements
         run: |
           python3 -m pip install -r requirements.txt
