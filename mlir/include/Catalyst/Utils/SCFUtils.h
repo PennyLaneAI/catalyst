@@ -51,14 +51,14 @@ std::optional<double> getEstimatedIterationsHint(Operation *op);
 // Returns std::nullopt when the trip count cannot be determined statically.
 std::optional<double> resolveForLoopTripCount(scf::ForOp forOp);
 
-// Resolve the average trip count of a loop whose upper bound is 1) a fixed constant or 2) 
+// Resolve the average trip count of a loop whose upper bound is 1) a fixed constant or 2)
 // the loop variable of any enclosing scf.for loop, including chains of nested loops regardless
-// of if the loops' variables are reused by subsequent loops. An enclosing 
-// loop whose induction variable is not used composes as a scalar multiplicity from its own 
-// `catalyst.estimated_iterations` hint (integer or fractional) or static trip count. An integer 
-// hint on an enclosing loop whose induction variable *is* used supplies the first K induction 
-// values; a fractional hint cannot, so other unresolved bounds (arithmetic expressions, 
-// unrelated dynamic loops, `scf.if` barriers, a fractional estimate needed as an induction 
+// of if the loops' variables are reused by subsequent loops. An enclosing
+// loop whose induction variable is not used composes as a scalar multiplicity from its own
+// `catalyst.estimated_iterations` hint (integer or fractional) or static trip count. An integer
+// hint on an enclosing loop whose induction variable *is* used supplies the first K induction
+// values; a fractional hint cannot, so other unresolved bounds (arithmetic expressions,
+// unrelated dynamic loops, `scf.if` barriers, a fractional estimate needed as an induction
 // domain) return std::nullopt.
 std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forOp);
 

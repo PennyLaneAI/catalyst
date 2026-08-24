@@ -231,21 +231,22 @@ static std::optional<double> tryClosedFormAverage(llvm::ArrayRef<scf::ForOp> cha
         }
     }
     InductionValues noInductionValues;
-    auto outerUpperBound = resolveEnumerableUpperBound(outer, *outerLowerBound, 1, noInductionValues);
+    auto outerUpperBound =
+        resolveEnumerableUpperBound(outer, *outerLowerBound, 1, noInductionValues);
     if (!outerUpperBound) {
         return std::nullopt;
     }
     int64_t depth = static_cast<int64_t>(chain.size());
-    double average =
-        static_cast<double>(*outerUpperBound - *outerLowerBound - depth + 1) / static_cast<double>(depth);
+    double average = static_cast<double>(*outerUpperBound - *outerLowerBound - depth + 1) /
+                     static_cast<double>(depth);
     return std::max(0.0, average);
 }
 
 // Store the target loop's total iterations and how many times it is reached across every
 // enumerated context. Dividing the total by the invocation count gives its average trip count.
 struct TripCountSummary {
-    double totalIterations = 0.0;  // The total number of times the loop body is executed
-    double entryCount = 0.0;  // The total number of times this loop is reached by the outer caller
+    double totalIterations = 0.0; // The total number of times the loop body is executed
+    double entryCount = 0.0; // The total number of times this loop is reached by the outer caller
 };
 
 // Evaluate chain[position..], given the induction values recorded for already-enumerated
