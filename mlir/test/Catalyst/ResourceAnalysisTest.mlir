@@ -1118,6 +1118,35 @@ func.func @fractional_estimated_iterations_enclosing_nested_for_loop(
 
 // -----
 
+// Synthesizing the estimated outer loop's induction domain would compute
+// 0 + 2^62 * 2, which does not fit in a signed 64-bit integer. The additional
+// dependent loop ensures the overflow is handled across a deeper loop chain.
+
+func.func @estimated_iterations_domain_overflow(
+    %arg0: !quantum.bit, %N: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c2 = arith.constant 2 : index
+
+    // expected-warning@below {{Cannot resolve estimated loop domain: integer overflow}}
+    %q = scf.for %i = %c0 to %N step %c2
+        iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %middle = scf.for %j = %c0 to %i step %c1
+            iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
+            %inner = scf.for %k = %c0 to %j step %c1
+                iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
+                %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
+                scf.yield %out : !quantum.bit
+            }
+            scf.yield %inner : !quantum.bit
+        }
+        scf.yield %middle : !quantum.bit
+    } {catalyst.estimated_iterations = 4611686018427387904 : i64}
+    return %q : !quantum.bit
+}
+
+// -----
+
 // A branch between the loops prevents the inner loop from being treated as directly nested.
 
 // CHECK-LABEL: "dyn_for_loop_1": {

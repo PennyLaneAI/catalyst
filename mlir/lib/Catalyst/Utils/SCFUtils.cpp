@@ -22,6 +22,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CheckedArithmetic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -139,11 +140,9 @@ static std::optional<int64_t> resolveEnumerableUpperBound(scf::ForOp loop, int64
     if (!iterationCount || *iterationCount < 0) {
         return std::nullopt;
     }
-    int64_t span;
-    int64_t upper;
-    if (__builtin_mul_overflow(*iterationCount, step, &span) ||
-        __builtin_add_overflow(lower, span, &upper)) {
-        return std::nullopt;
+    auto upper = llvm::checkedMulAdd(*iterationCount, step, lower);
+    if (!upper) {
+        loop.emitWarning("Cannot resolve estimated loop domain: integer overflow");
     }
     return upper;
 }
@@ -259,7 +258,7 @@ static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> 
     llvm::ArrayRef<scf::ForOp> descendants = chain.drop_front(position + 1);
     bool isReferencedLater =
         std::any_of(descendants.begin(), descendants.end(), [&](scf::ForOp descendant) {
-            return descendant.getUpperBound() == loop.getInductionVar(); 
+            return descendant.getUpperBound() == loop.getInductionVar();
         });
 
     // Loop of induction variable is not upperbound of any later loop.
