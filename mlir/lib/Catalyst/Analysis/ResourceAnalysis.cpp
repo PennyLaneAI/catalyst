@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/Support/raw_ostream.h>
+#include <mlir/IR/MLIRContext.h>
 #define DEBUG_TYPE "resource-analysis"
-
-#include "Catalyst/Analysis/ResourceAnalysis.h"
 
 #include <algorithm>
 #include <cmath>
@@ -30,6 +30,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
+#include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/SCFUtils.h"
@@ -50,8 +51,7 @@ namespace catalyst {
 // Skipped operations set (mirrors Python _SKIPPED_OPS)
 //===----------------------------------------------------------------------===//
 
-static bool isSkippedOp(Operation *op)
-{
+static bool isSkippedOp(Operation *op) {
     return isa<quantum::ComputationalBasisOp, qref::ComputationalBasisOp, quantum::DeallocOp,
                qref::DeallocOp, quantum::DeallocQubitOp, qref::DeallocQubitOp,
                quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp,
@@ -61,8 +61,7 @@ static bool isSkippedOp(Operation *op)
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.
-static bool isCustomDialectOp(Operation *op)
-{
+static bool isCustomDialectOp(Operation *op) {
     mlir::Dialect *dialect = op->getDialect();
     if (!dialect) {
         return false;
@@ -75,8 +74,24 @@ static bool isCustomDialectOp(Operation *op)
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
 
-ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
-{
+ResourceResult ResourceAnalysis::makeEmptyResult() const {
+    ResourceResult result;
+    result.extensions.reserve(extensionAnalyses.size());
+    for (const auto &analysis : extensionAnalyses) {
+        result.extensions.push_back(analysis->makeEmpty());
+    }
+    return result;
+}
+
+ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
+                                   ArrayRef<ExtensionProvider> extensionProviders,
+                                   bool collectDetailedOperations)
+    : collectDetailedOperations(collectDetailedOperations) {
+    extensionAnalyses.reserve(extensionProviders.size());
+    for (const auto &provider : extensionProviders) {
+        extensionAnalyses.push_back(provider());
+    }
+
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
 
     SmallVector<func::FuncOp> definedFuncOps;
@@ -113,7 +128,7 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
     entryFuncName = entryFunc.str();
 
     for (auto funcOp : definedFuncOps) {
-        ResourceResult result;
+        ResourceResult result = makeEmptyResult();
         for (auto &region : funcOp->getRegions()) {
             analyzeRegion(region, result, /*isAdjoint=*/false);
         }
@@ -136,9 +151,16 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp)
     }
 }
 
-ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp)
-{
-    ResourceResult result;
+ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
+                                   ArrayRef<ExtensionProvider> extensionProviders,
+                                   bool collectDetailedOperations)
+    : collectDetailedOperations(collectDetailedOperations) {
+    extensionAnalyses.reserve(extensionProviders.size());
+    for (const auto &provider : extensionProviders) {
+        extensionAnalyses.push_back(provider());
+    }
+
+    ResourceResult result = makeEmptyResult();
 
     for (auto &region : funcOp->getRegions()) {
         analyzeRegion(region, result, /*isAdjoint*/ false);
@@ -150,8 +172,7 @@ ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp)
     funcResults[funcOp.getName()] = std::move(result);
 }
 
-std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t &counter)
-{
+std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t &counter) {
     // Bump `counter` until the resulting name does not collide with an
     // existing entry. This protects against user functions named e.g.
     // `for_loop_3` shadowing or being shadowed by a lifted body.
@@ -163,9 +184,8 @@ std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t 
     return candidate;
 }
 
-void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
-{
-    ResourceResult bodyResult;
+void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint) {
+    ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
     // Try to resolve a static trip count.
@@ -178,7 +198,6 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         // The name is always new, so we don't overwrite an old entry.
         std::string name = makeUniqueSyntheticName("for_loop_", forLoopCounter);
         funcResults[name] = std::move(bodyResult);
-        syntheticLoopBodies[name] = forOp;
         result.functionCalls[name] = tripCount.value();
         return;
     }
@@ -187,32 +206,28 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     // and store a fixed number (hash) so each such loop has its own id in the output.
     std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
     funcResults[name] = std::move(bodyResult);
-    syntheticLoopBodies[name] = forOp;
     result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
     result.hasDynLoop = true;
 }
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
-                                        bool isAdjoint)
-{
-    ResourceResult bodyResult;
+                                        bool isAdjoint) {
+    ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
 
     if (auto iters = getEstimatedIterationsHint(whileOp)) {
-        bodyResult.multiplyByScalar(*iters);
-    }
-    else {
+        bodyResult.multiplyBy(*iters);
+    } else {
         result.hasDynLoop = true;
     }
 
     result.mergeWith(bodyResult);
 }
 
-void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint) {
     result.hasBranches = true;
 
-    ResourceResult thenResult;
+    ResourceResult thenResult = makeEmptyResult();
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint);
 
     // If a branch probability hint is present, compute the expected (average) resource counts
@@ -222,13 +237,13 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
         double pThen = probAttr.getValueAsDouble();
         double pElse = 1.0 - pThen;
 
-        ResourceResult elseResult;
+        ResourceResult elseResult = makeEmptyResult();
         if (!ifOp.getElseRegion().empty()) {
             analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
         }
 
-        thenResult.multiplyByScalar(pThen);
-        elseResult.multiplyByScalar(pElse);
+        thenResult.multiplyBy(pThen);
+        elseResult.multiplyBy(pElse);
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Sum);
 
         result.mergeWith(thenResult);
@@ -237,7 +252,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 
     // No hint: fall back to worst-case (max across branches).
     if (!ifOp.getElseRegion().empty()) {
-        ResourceResult elseResult;
+        ResourceResult elseResult = makeEmptyResult();
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Max);
     }
@@ -245,8 +260,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 }
 
 void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
-                                            bool isAdjoint)
-{
+                                            bool isAdjoint) {
     result.hasBranches = true;
 
     // If branch probabilities are provided, compute the expected (average) resource counts.
@@ -254,17 +268,17 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     // (excluding the default which is computed automatically).
     auto caseRegions = switchOp.getCaseRegions();
     if (auto probsAttr = switchOp->getAttrOfType<ArrayAttr>(EstimatedProbabilitiesAttrName)) {
-        ResourceResult expected;
+        ResourceResult expected = makeEmptyResult();
         double sumProb = 0.0;
 
         for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
-            ResourceResult caseResult;
+            ResourceResult caseResult = makeEmptyResult();
             analyzeRegion(caseRegion, caseResult, isAdjoint);
 
             double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
             sumProb += p;
 
-            caseResult.multiplyByScalar(p);
+            caseResult.multiplyBy(p);
             expected.mergeWith(caseResult, ResourceResult::MergeMethod::Sum);
         }
 
@@ -272,9 +286,9 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         // of floating-point error.
         double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
 
-        ResourceResult defaultResult;
+        ResourceResult defaultResult = makeEmptyResult();
         analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
-        defaultResult.multiplyByScalar(pDefault);
+        defaultResult.multiplyBy(pDefault);
         expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
 
         result.mergeWith(expected);
@@ -282,31 +296,30 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // No hint: fall back to worst-case (max across all cases).
-    ResourceResult maxResult;
+    ResourceResult maxResult = makeEmptyResult();
     bool first = true;
 
     for (auto &caseRegion : caseRegions) {
-        ResourceResult caseResult;
+        ResourceResult caseResult = makeEmptyResult();
         analyzeRegion(caseRegion, caseResult, isAdjoint);
         if (first) {
             maxResult = std::move(caseResult);
             first = false;
-        }
-        else {
+        } else {
             maxResult.mergeWith(caseResult, ResourceResult::MergeMethod::Max);
         }
     }
 
     // default region
-    ResourceResult defaultResult;
+    ResourceResult defaultResult = makeEmptyResult();
     analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
     maxResult.mergeWith(defaultResult, ResourceResult::MergeMethod::Max);
 
     result.mergeWith(maxResult);
 }
 
-void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result,
+                                       bool isAdjoint) {
     for (auto &layerRegion : layerOp->getRegions()) {
         analyzeRegion(layerRegion, result, isAdjoint);
     }
@@ -321,8 +334,7 @@ void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &res
  * @param result The ResourceResult to accumulate counts into.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  */
-void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint) {
     for (Block &block : region) {
         for (Operation &op : block) {
             bool needsCollection = true;
@@ -353,8 +365,18 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 
             if (needsCollection) {
                 collectOperation(&op, result, isAdjoint);
+                if (collectDetailedOperations) {
+                    result.collectDetailedOperations = true;
+                    collectDetailedOperation(&op, result, isAdjoint);
+                }
             }
         }
+    }
+
+    assert(result.extensions.size() == extensionAnalyses.size() &&
+           "extension data/collector size mismatch");
+    for (size_t i = 0, e = extensionAnalyses.size(); i < e; ++i) {
+        extensionAnalyses[i]->analyze(region, *result.extensions[i], isAdjoint);
     }
 }
 
@@ -368,8 +390,14 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @param result The ResourceResult to update with the operation's resource usage.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  */
-void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
-{
+void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
+                                        bool isAdjoint) const {
+    // Collect extensions for the operation
+    assert(result.extensions.size() == extensionAnalyses.size() &&
+           "extension data/collector size mismatch");
+    for (size_t i = 0, e = extensionAnalyses.size(); i < e; ++i) {
+        extensionAnalyses[i]->collect(op, *result.extensions[i], isAdjoint);
+    }
 
     // Skipped ops
     if (isSkippedOp(op)) {
@@ -393,8 +421,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
         if (nCtrlQubits == 1) {
             name = "C(" + name + ")";
-        }
-        else if (nCtrlQubits > 1) {
+        } else if (nCtrlQubits > 1) {
             name = std::to_string(nCtrlQubits) + "C(" + name + ")";
         }
 
@@ -444,6 +471,21 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     result.classicalInstructions[op->getName().getStringRef()] += 1;
 }
 
+void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
+                                                bool isAdjoint) const {
+    if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
+        // Keep the canonical graph ID unchanged so it matches decomposition rules.
+        // Adjoint and control details will appear here once getGraphOpId() encodes them.
+        result.detailedOperations[inst.getGraphOpId()] += 1;
+        return;
+    }
+
+    if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
+        result.detailedOperations[inst.getResourceDetailedName()] += 1;
+        return;
+    }
+}
+
 /**
  * @brief Merge `source`'s quantum content, classical content, and transitive
  * call counts into `dest`, scaled by `count`. Used to fold callee/loop-body
@@ -453,13 +495,16 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
  * @param source The ResourceResult to merge into `dest` (unmodified).
  * @param count A scalar to multiply the `source`'s counts by (defaults to 1).
  */
-static void accumulateScaled(ResourceResult &dest, const ResourceResult &source, double count = 1.0)
-{
+static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
+                             double count = 1.0) {
     for (const auto &opEntry : source.operations) {
         auto &innerDst = dest.operations[opEntry.getKey()];
         for (const auto &sizeEntry : opEntry.getValue()) {
             innerDst[sizeEntry.first] += sizeEntry.second * count;
         }
+    }
+    for (const auto &opEntry : source.detailedOperations) {
+        dest.detailedOperations[opEntry.getKey()] += opEntry.getValue() * count;
     }
     for (const auto &m : source.measurements) {
         dest.measurements[m.getKey()] += m.getValue() * count;
@@ -476,6 +521,8 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
     dest.numAllocQubits += source.numAllocQubits * count;
     dest.hasBranches = dest.hasBranches || source.hasBranches;
     dest.hasDynLoop = dest.hasDynLoop || source.hasDynLoop;
+    dest.collectDetailedOperations =
+        dest.collectDetailedOperations || source.collectDetailedOperations;
 }
 
 /**
@@ -493,8 +540,7 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
  * @return Pointer to the cached flattened result, or nullptr if `funcName`
  *         is external or unknown.
  */
-const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName) const
-{
+const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName) const {
     if (auto it = flattenedCache.find(funcName); it != flattenedCache.end()) {
         return &it->second;
     }

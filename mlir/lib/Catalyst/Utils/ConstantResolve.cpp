@@ -28,8 +28,7 @@ namespace catalyst {
 
 /// Signed ceiling division matching `arith.ceildivsi` constant folding.
 /// Returns nullopt on division by zero.
-static std::optional<int64_t> ceilDivSI(int64_t a, int64_t b)
-{
+static std::optional<int64_t> ceilDivSI(int64_t a, int64_t b) {
     if (b == 0) {
         return std::nullopt;
     }
@@ -43,8 +42,7 @@ static std::optional<int64_t> ceilDivSI(int64_t a, int64_t b)
 }
 
 /// Extract a double from a constant-like Attribute.
-static std::optional<double> attrToDouble(Attribute attr)
-{
+static std::optional<double> attrToDouble(Attribute attr) {
     if (auto floatAttr = dyn_cast<FloatAttr>(attr)) {
         return floatAttr.getValueAsDouble();
     }
@@ -64,8 +62,7 @@ static std::optional<double> attrToDouble(Attribute attr)
     return std::nullopt;
 }
 
-std::optional<double> resolveConstantArithmetic(Value val, Operation *op)
-{
+std::optional<double> resolveConstantArithmetic(Value val, Operation *op) {
     // arith integer binary ops
     if (isa<arith::AddIOp, arith::SubIOp, arith::MulIOp, arith::CeilDivSIOp>(op)) {
         auto lhs = resolveConstant(op->getOperand(0));
@@ -92,8 +89,7 @@ std::optional<double> resolveConstantArithmetic(Value val, Operation *op)
     return std::nullopt;
 }
 
-std::optional<double> resolveConstantStableHLO(Value val, Operation *op)
-{
+std::optional<double> resolveConstantStableHLO(Value val, Operation *op) {
     // stablehlo ops (matched by name to avoid header dependency)
     // OpName is used to avoid header dependency
     StringRef opName = op->getName().getStringRef();
@@ -124,8 +120,7 @@ std::optional<double> resolveConstantStableHLO(Value val, Operation *op)
     return std::nullopt;
 }
 
-std::optional<double> resolveConstant(Value val)
-{
+std::optional<double> resolveConstant(Value val) {
     if (!val) {
         return std::nullopt;
     }
@@ -178,8 +173,7 @@ std::optional<double> resolveConstant(Value val)
     return std::nullopt;
 }
 
-std::optional<int64_t> resolveConstantInt(Value val)
-{
+std::optional<int64_t> resolveConstantInt(Value val) {
     auto result = resolveConstant(val);
     if (!result) {
         return std::nullopt;

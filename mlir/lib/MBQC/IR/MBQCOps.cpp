@@ -37,8 +37,7 @@ namespace catalyst::mbqc {
 // MBQC op verifiers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult RefGraphStatePrepOp::verify()
-{
+LogicalResult RefGraphStatePrepOp::verify() {
     qref::QuregType qregType = getQreg().getType();
     if (qregType.isDynamic()) {
         return emitOpError() << "expected static allocation size";
@@ -69,8 +68,8 @@ llvm::StringRef RefMeasureInBasisOp::getResourceName() { return getOperationName
 llvm::StringRef GraphStatePrepOp::getResourceName() { return getOperationName(); }
 llvm::StringRef RefGraphStatePrepOp::getResourceName() { return getOperationName(); }
 
-uint64_t MeasureInBasisOp::getResourceNumQubits() { return 0; }
-uint64_t RefMeasureInBasisOp::getResourceNumQubits() { return 0; }
+uint64_t MeasureInBasisOp::getResourceNumQubits() { return 1; }
+uint64_t RefMeasureInBasisOp::getResourceNumQubits() { return 1; }
 uint64_t GraphStatePrepOp::getResourceNumQubits() { return 0; }
 uint64_t RefGraphStatePrepOp::getResourceNumQubits() { return 0; }
 
@@ -85,8 +84,7 @@ uint64_t GraphStatePrepOp::getResourceNumParams() { return 0; }
 uint64_t RefGraphStatePrepOp::getResourceNumParams() { return 0; }
 
 uint64_t GraphStatePrepOp::getResourceNumAllocQubits() { return getNumQubitsFromAdjMatrixSize(); }
-uint64_t RefGraphStatePrepOp::getResourceNumAllocQubits()
-{
+uint64_t RefGraphStatePrepOp::getResourceNumAllocQubits() {
     return getNumQubitsFromAdjMatrixSize();
 }
 

@@ -45,8 +45,7 @@ namespace quantum {
 struct CancelInversesPass : impl::CancelInversesPassBase<CancelInversesPass> {
     using CancelInversesPassBase::CancelInversesPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "cancel inverses"
                           << "\n");
 

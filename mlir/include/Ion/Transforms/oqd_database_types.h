@@ -41,9 +41,7 @@ struct Beam {
     Beam(double _rabi, double _detuning, std::vector<int64_t> _polarization,
          std::vector<int64_t> _wavevector, std::optional<int> _transition_index = std::nullopt)
         : rabi(_rabi), detuning(_detuning), polarization(_polarization), wavevector(_wavevector),
-          transition_index(_transition_index)
-    {
-    }
+          transition_index(_transition_index) {}
 };
 
 struct Phonon {
@@ -52,9 +50,7 @@ struct Phonon {
     std::vector<double> eigenvector;
 
     Phonon(double _energy, std::vector<double> _eigenvector)
-        : energy(_energy), eigenvector(_eigenvector)
-    {
-    }
+        : energy(_energy), eigenvector(_eigenvector) {}
 };
 
 //
@@ -74,8 +70,7 @@ struct Level {
           double _spin_orbital_nuclear_magnetization, double _energy)
         : label(_label), principal(_principal), spin(_spin), orbital(_orbital), nuclear(_nuclear),
           spin_orbital(_spin_orbital), spin_orbital_nuclear(_spin_orbital_nuclear),
-          spin_orbital_nuclear_magnetization(_spin_orbital_nuclear_magnetization), energy(_energy)
-    {
+          spin_orbital_nuclear_magnetization(_spin_orbital_nuclear_magnetization), energy(_energy) {
     }
 };
 
@@ -87,9 +82,7 @@ struct Transition {
 
     Transition(std::string _level_0, std::string _level_1, std::string _multipole,
                double _einstein_a)
-        : level_0(_level_0), level_1(_level_1), multipole(_multipole), einstein_a(_einstein_a)
-    {
-    }
+        : level_0(_level_0), level_1(_level_1), multipole(_multipole), einstein_a(_einstein_a) {}
 };
 
 struct Ion {
@@ -104,9 +97,7 @@ struct Ion {
     Ion(std::string _name, double _mass, double _charge, std::vector<double> _position,
         std::vector<Level> _levels, std::vector<Transition> _transitions)
         : name(_name), mass(_mass), charge(_charge), position(_position), levels(_levels),
-          transitions(_transitions)
-    {
-    }
+          transitions(_transitions) {}
 };
 
 } // namespace ion

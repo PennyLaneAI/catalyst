@@ -45,4 +45,21 @@ def Executor_SessionType : Executor_Type<"Session", "session"> {
     }];
 }
 
+def Executor_TokenType : Executor_Type<"Token", "token"> {
+    let summary = "A handle to one launch that has not finished yet.";
+
+    let description = [{
+        Produced by `executor.launch_async` and consumed by `executor.await`, which waits for that
+        one launch.
+        
+        #### Example:
+
+        ```mlir
+        %t = executor.launch_async %s("serve", "/tmp/coproc.o")
+            : !executor.session -> !executor.token
+        executor.await %t : !executor.token
+        ```
+    }];
+}
+
 #endif // EXECUTOR_TYPES

@@ -33,8 +33,7 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::
     using mlir::OpRewritePattern<stablehlo::CustomCallOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(stablehlo::CustomCallOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         StringRef calleeName = op.getCallTargetName();
         auto operands = op.getOperands();
         TypeRange resultsType = op.getResultTypes();
@@ -76,18 +75,15 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::
                     auto type = RankedTensorType::get({}, intAttr.getType());
                     constVal = arith::ConstantOp::create(
                         rewriter, loc, DenseElementsAttr::get(type, intAttr.getValue()));
-                }
-                else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attrValue)) {
+                } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attrValue)) {
                     auto type = RankedTensorType::get({}, floatAttr.getType());
                     constVal = arith::ConstantOp::create(
                         rewriter, loc, DenseElementsAttr::get(type, floatAttr.getValue()));
-                }
-                else if (auto boolAttr = llvm::dyn_cast<BoolAttr>(attrValue)) {
+                } else if (auto boolAttr = llvm::dyn_cast<BoolAttr>(attrValue)) {
                     auto type = RankedTensorType::get({}, rewriter.getI1Type());
                     constVal = arith::ConstantOp::create(
                         rewriter, loc, DenseElementsAttr::get(type, boolAttr.getValue()));
-                }
-                else {
+                } else {
                     LLVM_DEBUG(llvm::dbgs() << "Unsupported attribute type for: "
                                             << attr.getName().strref() << "\n");
                     return failure();
@@ -111,8 +107,7 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::
                     int64_t size = shape[0];
                     newOperands.push_back(makeConst(size));
                     LLVM_DEBUG(llvm::dbgs() << "DEBUG: Appended vector size=" << size << "\n");
-                }
-                else if (rank >= 2) {
+                } else if (rank >= 2) {
                     int64_t batch = 1;
                     for (size_t i = 0; i < rank - 2; ++i) {
                         batch *= shape[i];
@@ -141,8 +136,7 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::
     }
 };
 
-void populateHloCustomCallPatterns(RewritePatternSet &patterns)
-{
+void populateHloCustomCallPatterns(RewritePatternSet &patterns) {
     patterns.add<HloCustomCallOpRewritePattern>(patterns.getContext());
 }
 

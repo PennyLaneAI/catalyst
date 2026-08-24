@@ -143,6 +143,44 @@ def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
 }
 
+def CrossCompileTargetsPass : Pass<"cross-compile-targets", "mlir::ModuleOp"> {
+    let summary = "Cross-compile catalyst.target nested modules to standalone `.o` files.";
+    let description = [{
+        For every `builtin.module` carrying a `catalyst.target` attribute, this pass:
+
+        1. Extracts the module body into a standalone root module.
+        2. Runs the default lowering pipeline on it (bufferization + LLVM-dialect lowering).
+        3. Translates to LLVM IR and emits an object file.
+        4. Records the emitted object path on the module as a `catalyst.object_file` string
+           attribute and reduces the module to external declarations of its entry functions.
+
+        The target triple is taken from the optional `triple` key on the `catalyst.target`
+        dict, falling back to the host triple.
+    }];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"workspace",
+            /*CLI arg name=*/"workspace",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "Filesystem directory to write cross-compiled `.o` files into."
+        >,
+        Option<
+            /*C++ var name=*/"saveIrAfterEach",
+            /*CLI arg name=*/"save-ir-after-each",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/
+            "How much of each target module's lowering to write into its workspace subdirectory."
+            "Empty writes  nothing; `pipeline` writes the extracted MLIR and translated LLVM IR "
+            "(`extracted.mlir`, `<name>.ll`); `changed` and `pass` add the IR after each pass "
+            "that altered it, or after every pass. Set by the driver from `keep_intermediate`."
+        >,
+    ];
+}
+
 def InlineNestedModulePass : Pass<"inline-nested-module"> {
     let summary = "Inline nested modules with qnode attribute.";
 

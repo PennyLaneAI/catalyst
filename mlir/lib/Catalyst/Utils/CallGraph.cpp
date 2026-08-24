@@ -20,8 +20,7 @@ using namespace mlir;
 namespace catalyst {
 
 void traverseCallGraph(func::FuncOp start, SymbolTableCollection *symbolTable,
-                       function_ref<void(func::FuncOp)> processFunc)
-{
+                       function_ref<void(func::FuncOp)> processFunc) {
     DenseSet<Operation *> visited{start};
     std::deque<Operation *> frontier{start};
 

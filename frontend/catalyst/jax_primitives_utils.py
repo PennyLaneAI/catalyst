@@ -27,6 +27,7 @@ from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, Name
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 from pennylane.transforms.core import BoundTransform
 
+from catalyst.backline import module_attributes
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.passes import PassPlugin
 
@@ -245,8 +246,11 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
     assert isinstance(callable_, qp.QNode), "This function expects qnodes"
 
     name = "module_" + callable_.__name__
+    device_attrs = module_attributes(callable_.device)
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
+        for attr_name, value in device_attrs.items():
+            module.operation.attributes[attr_name] = get_mlir_attribute_from_pyval(value)
         transform_module_lowering(ctx, pipelines)
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines)

@@ -41,8 +41,7 @@ namespace gradient {
 struct GradientConversionPass : impl::GradientConversionPassBase<GradientConversionPass> {
     using GradientConversionPassBase::GradientConversionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         LowerToLLVMOptions options(context);
         options.useGenericFunctions = useGenericFunctions;

@@ -31,8 +31,7 @@ struct ArrayListBuilder {
     Type elementType;
 
     static FailureOr<ArrayListBuilder> get(Location loc, const TypeConverter *typeConverter,
-                                           TypedValue<ArrayListType> list, OpBuilder &b)
-    {
+                                           TypedValue<ArrayListType> list, OpBuilder &b) {
         SmallVector<Type> resultTypes;
         if (failed(typeConverter->convertType(list.getType(), resultTypes))) {
             return failure();
@@ -45,8 +44,7 @@ struct ArrayListBuilder {
                                 .elementType = list.getType().getElementType()};
     }
 
-    FlatSymbolRefAttr getOrInsertPushFunction(Location loc, ModuleOp moduleOp, OpBuilder &b) const
-    {
+    FlatSymbolRefAttr getOrInsertPushFunction(Location loc, ModuleOp moduleOp, OpBuilder &b) const {
         MLIRContext *ctx = b.getContext();
         std::string funcName = "__catalyst_arraylist_push";
         llvm::raw_string_ostream nameStream{funcName};
@@ -102,8 +100,7 @@ struct ArrayListBuilder {
     }
 
     FlatSymbolRefAttr getOrInsertPopFunction(Location loc, ModuleOp moduleOp,
-                                             OpBuilder &builder) const
-    {
+                                             OpBuilder &builder) const {
         MLIRContext *ctx = builder.getContext();
         std::string funcName = "__catalyst_arraylist_pop";
         llvm::raw_string_ostream nameStream{funcName};
@@ -140,14 +137,12 @@ struct ArrayListBuilder {
         return SymbolRefAttr::get(ctx, funcName);
     }
 
-    void emitPush(Location loc, Value value, OpBuilder &b, FlatSymbolRefAttr pushFn) const
-    {
+    void emitPush(Location loc, Value value, OpBuilder &b, FlatSymbolRefAttr pushFn) const {
         func::CallOp::create(b, loc, pushFn, /*results=*/TypeRange{},
                              /*operands=*/ValueRange{dataField, sizeField, capacityField, value});
     }
 
-    Value emitPop(Location loc, OpBuilder &builder, FlatSymbolRefAttr popFn) const
-    {
+    Value emitPop(Location loc, OpBuilder &builder, FlatSymbolRefAttr popFn) const {
         auto callOp =
             func::CallOp::create(builder, loc, popFn, /*results=*/elementType,
                                  /*operands=*/ValueRange{dataField, sizeField, capacityField});
@@ -159,8 +154,7 @@ struct LowerListInit : public OpConversionPattern<ListInitOp> {
     using OpConversionPattern<ListInitOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListInitOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         SmallVector<Type> resultTypes;
         if (failed(getTypeConverter()->convertType(op.getType(), resultTypes))) {
             op.emitError() << "Failed to convert type " << op.getType();
@@ -190,8 +184,7 @@ struct LowerListDealloc : public OpConversionPattern<ListDeallocOp> {
     using OpConversionPattern<ListDeallocOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListDeallocOp op, OneToNOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto typeConverter = getTypeConverter();
         FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), typeConverter, op.getList(), rewriter);
@@ -213,8 +206,7 @@ struct LowerListPush : public OpConversionPattern<ListPushOp> {
     using OpConversionPattern<ListPushOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListPushOp op, OneToNOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto typeConverter = getTypeConverter();
         FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), typeConverter, op.getList(), rewriter);
@@ -234,8 +226,7 @@ struct LowerListPop : public OpConversionPattern<ListPopOp> {
     using OpConversionPattern<ListPopOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListPopOp op, OneToNOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto typeConverter = getTypeConverter();
         FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), typeConverter, op.getList(), rewriter);
@@ -255,8 +246,7 @@ struct LowerListLoadData : public OpConversionPattern<ListLoadDataOp> {
     using OpConversionPattern<ListLoadDataOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListLoadDataOp op, OneToNOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto typeConverter = getTypeConverter();
         FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), typeConverter, op.getList(), rewriter);
@@ -283,8 +273,7 @@ struct LowerListLoadData : public OpConversionPattern<ListLoadDataOp> {
 struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayListToMemRefPass> {
     using ArrayListToMemRefPassBase::ArrayListToMemRefPassBase;
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         MLIRContext *context = &getContext();
         TypeConverter arraylistTypeConverter;
 

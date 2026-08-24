@@ -44,8 +44,7 @@ namespace catalyst::pauli_frame {
  * @return LogicalResult Success if verified, opError otherwise
  */
 LogicalResult verifyQubitCounts(Operation *op, const OperandRange &inQubits,
-                                const ResultRange &outQubits)
-{
+                                const ResultRange &outQubits) {
     if (inQubits.size() == 0) {
         return op->emitOpError("expected to have at least one qubit");
     }
@@ -60,8 +59,7 @@ LogicalResult InitOp::verify() { return verifyQubitCounts(*this, getInQubits(), 
 
 LogicalResult UpdateOp::verify() { return verifyQubitCounts(*this, getInQubits(), getOutQubits()); }
 
-LogicalResult UpdateWithCliffordOp::verify()
-{
+LogicalResult UpdateWithCliffordOp::verify() {
     LogicalResult result = verifyQubitCounts(*this, getInQubits(), getOutQubits());
 
     if (!result.succeeded()) {

@@ -143,8 +143,11 @@ class TestGradContextIntegration:
             assert not GradContext.am_inside_grad(), msg
             return x
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            identity = qjit(identity)
+
         with pytest.raises(AssertionError, match=msg):
-            qjit(identity)
+            identity(1.2)
 
 
 class TestEvaluationModes:

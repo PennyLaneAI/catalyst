@@ -42,8 +42,18 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
     /// We build a map from values mentioned in the source data flow to the values of
     /// the program where quantum control flow is reversed. Most of the time, there is a 1-to-1
     /// correspondence with a notable exception caused by `insert`/`extract` API asymmetry.
-    LogicalResult matchAndRewrite(AdjointOp adjoint, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(AdjointOp adjoint, PatternRewriter &rewriter) const override {
+        // Defer (not an error) if the region still contains a nested quantum.ctrl region.
+        // ctrl-lowering must reduce it to op-level controlled gates first; reversing and adjointing
+        // those gates is then trivial ((C(g))^dagger = C(g^dagger)). The pipeline runs
+        // (ctrl-lowering, adjoint-lowering) to a fixpoint, so this adjoint op lowers on a later
+        // iteration. Pre-scanning here avoids the ReversePass "Unhandled operation" error path.
+        if (adjoint.getRegion()
+                .walk([](CtrlOp) { return WalkResult::interrupt(); })
+                .wasInterrupted()) {
+            return failure();
+        }
+
         QuantumCache cache =
             QuantumCache::initialize(adjoint.getRegion(), rewriter, adjoint.getLoc());
 
@@ -88,8 +98,7 @@ namespace quantum {
 struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> {
     using AdjointLoweringPassBase::AdjointLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
         patterns.add<AdjointSingleOpRewritePattern>(patterns.getContext(), 1);
 

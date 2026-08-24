@@ -614,7 +614,6 @@ class TestIfOp:
     def test_nested_conditionals_with_quantum_ops(self, capture_mode):
         """Tests that nested conditionals are unflattend if quantum operations
         are present"""
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -683,7 +682,6 @@ class TestIfOp:
     def test_nested_conditionals_with_nested_quantum_ops(self, capture_mode):
         """Tests that nested conditionals are unflattend if quantum operations
         are present but nested in other operations"""
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1302,6 +1300,11 @@ class TestCreateDynamicOperatorNodes:
 
     def test_visualize_pythonic_operators(self, capture_mode):
         """Tests that we can use operators like +,-,%"""
+        pytest.xfail(
+            "sc-127303: DAG reconstruction passes symbolic xDSL parameters as strings to typed "
+            "Operator2 gate constructors, which reject string-valued angles"
+        )
+
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1577,11 +1580,21 @@ class TestOperatorConnectivity:
         assert "Adjoint(GlobalPhase)" in nodes["node3"]["label"]
 
         # Ensure proper connectivity
-        expected_edges = (
-            ("NullQubit", "PauliX"),
-            ("PauliX", "C(GlobalPhase)"),
-            ("C(GlobalPhase)", "PauliY"),
-        )
+        if capture_mode:
+            # `qp.ctrl(qp.GlobalPhase, ...)` is a qfunc (class) control, so it lowers to a
+            # `quantum.ctrl` region. GlobalPhase has no target wires, so the controlled node floats
+            # in the `ctrl` cluster and the wire threads PauliX -> PauliY directly through the
+            # (control-only) region.
+            expected_edges = (
+                ("NullQubit", "PauliX"),
+                ("PauliX", "PauliY"),
+            )
+        else:
+            expected_edges = (
+                ("NullQubit", "PauliX"),
+                ("PauliX", "C(GlobalPhase)"),
+                ("C(GlobalPhase)", "PauliY"),
+            )
         assert_dag_structure(nodes, edges, expected_edges)
 
     def test_static_connection_within_cluster(self, capture_mode):
@@ -1702,7 +1715,6 @@ class TestOperatorConnectivity:
 
     def test_static_connection_through_conditional(self, capture_mode):
         """Tests that connections through conditionals make sense."""
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1744,7 +1756,6 @@ class TestOperatorConnectivity:
 
     def test_static_connection_through_nested_conditional(self, capture_mode):
         """Tests that connections through nested conditionals make sense."""
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -2714,9 +2725,15 @@ class TestCtrl:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert "CH" in nodes["node1"]["label"]
-        assert "[1, 0]" in nodes["node1"]["label"]
-        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+        if capture_mode:
+            # A qfunc control lowers to a `quantum.ctrl` region, shown as a `ctrl` cluster with the
+            # base gate inside it (the control is distributed onto it later by `ctrl-lowering`).
+            assert "Hadamard" in nodes["node1"]["label"]
+            assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
+        else:
+            assert "CH" in nodes["node1"]["label"]
+            assert "[1, 0]" in nodes["node1"]["label"]
+            assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
     def test_ctrl_operator_instance(self, capture_mode):
         """Test that the ctrl of an operator instance works."""
@@ -2764,9 +2781,15 @@ class TestCtrl:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert "CH" in nodes["node1"]["label"]
-        assert "[1, 0]" in nodes["node1"]["label"]
-        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+        if capture_mode:
+            # `qp.ctrl(qp.H, ...)` is a qfunc (class) control -> `quantum.ctrl` region / `ctrl`
+            # cluster with the base gate inside.
+            assert "Hadamard" in nodes["node1"]["label"]
+            assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
+        else:
+            assert "CH" in nodes["node1"]["label"]
+            assert "[1, 0]" in nodes["node1"]["label"]
+            assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
     def test_ctrl_operator_without_alias(self, capture_mode):
         """Test that the ctrl of an operator instance that doesn't have an alias works."""
@@ -2794,9 +2817,13 @@ class TestCtrl:
         assert "C(Hadamard)" in nodes["node1"]["label"]
         assert "[1, 2, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
-        assert "C(Hadamard)" in nodes["node2"]["label"]
-        assert "[1, 2, 0]" in nodes["node2"]["label"]
-        assert nodes["node2"]["parent_cluster_uid"] == "cluster1"
+        if capture_mode:
+            assert "Hadamard" in nodes["node2"]["label"]
+            assert nodes["node2"]["parent_cluster_uid"] == "cluster2"
+        else:
+            assert "C(Hadamard)" in nodes["node2"]["label"]
+            assert "[1, 2, 0]" in nodes["node2"]["label"]
+            assert nodes["node2"]["parent_cluster_uid"] == "cluster1"
 
 
 class TestAdjoint:

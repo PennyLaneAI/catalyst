@@ -38,8 +38,7 @@ using namespace catalyst::mitigation;
 
 CallInterfaceCallable ZneOp::getCallableForCallee() { return getCalleeAttr(); }
 
-void ZneOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
+void ZneOp::setCalleeFromCallable(CallInterfaceCallable callee) {
     (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
@@ -49,8 +48,7 @@ Operation::operand_range ZneOp::getArgOperands() { return getOperands(); }
 // ZneOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
+LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute refers to a valid function.
     auto callee = this->getCalleeAttr();
     func::FuncOp fn =

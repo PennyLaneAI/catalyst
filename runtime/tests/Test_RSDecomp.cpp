@@ -44,8 +44,7 @@ std::map<GateType, std::vector<std::complex<double>>> gate_type_to_matrix = {
 };
 
 std::vector<std::complex<double>> multiply_matrices(const std::vector<std::complex<double>> &A,
-                                                    const std::vector<std::complex<double>> &B)
-{
+                                                    const std::vector<std::complex<double>> &B) {
     std::vector<std::complex<double>> result(4, 0.0);
     result[0] = A[0] * B[0] + A[1] * B[2];
     result[1] = A[0] * B[1] + A[1] * B[3];
@@ -55,8 +54,7 @@ std::vector<std::complex<double>> multiply_matrices(const std::vector<std::compl
 }
 
 std::vector<std::complex<double>>
-matrix_from_decomp_result(const std::vector<GateType> &decomposition)
-{
+matrix_from_decomp_result(const std::vector<GateType> &decomposition) {
     std::vector<std::complex<double>> result = gate_type_to_matrix.at(GateType::I);
     for (const auto &gate : decomposition) {
         result = multiply_matrices(gate_type_to_matrix.at(gate), result);
@@ -64,8 +62,7 @@ matrix_from_decomp_result(const std::vector<GateType> &decomposition)
     return result;
 }
 
-TEST_CASE("Test Matrix Multiplication", "[RSDecomp][Ross Selinger]")
-{
+TEST_CASE("Test Matrix Multiplication", "[RSDecomp][Ross Selinger]") {
     auto res_HT =
         multiply_matrices(gate_type_to_matrix[GateType::T], gate_type_to_matrix[GateType::H]);
     auto expected_HT = gate_type_to_matrix[GateType::HT];
@@ -83,8 +80,7 @@ TEST_CASE("Test Matrix Multiplication", "[RSDecomp][Ross Selinger]")
     }
 }
 
-TEST_CASE("Test matrix_from_decomp_result", "[RSDecomp][Ross Selinger]")
-{
+TEST_CASE("Test matrix_from_decomp_result", "[RSDecomp][Ross Selinger]") {
     std::vector<GateType> decomp = {GateType::H, GateType::T};
 
     auto result_matrix = matrix_from_decomp_result(decomp);
@@ -106,8 +102,7 @@ TEST_CASE("Test matrix_from_decomp_result", "[RSDecomp][Ross Selinger]")
     }
 }
 
-TEST_CASE("Test ross_selinger generic angles", "[RSDecomp][Ross Selinger]")
-{
+TEST_CASE("Test ross_selinger generic angles", "[RSDecomp][Ross Selinger]") {
     double tolerance = GENERATE(1e-2, 1e-3, 1e-4, 1e-5, 1e-6);
     int angle_int = GENERATE(range(-70, 71));
     double angle = angle_int / 10.0;
@@ -128,8 +123,7 @@ TEST_CASE("Test ross_selinger generic angles", "[RSDecomp][Ross Selinger]")
     CHECK(residue_norm <= tolerance);
 }
 
-TEST_CASE("Test ross_selinger pi/16 multiples", "[RSDecomp][Ross Selinger]")
-{
+TEST_CASE("Test ross_selinger pi/16 multiples", "[RSDecomp][Ross Selinger]") {
     double tolerance = GENERATE(1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7);
     int angle_int = GENERATE(range(-70, 71));
     double angle = angle_int * M_PI / 16.0;
@@ -150,8 +144,7 @@ TEST_CASE("Test ross_selinger pi/16 multiples", "[RSDecomp][Ross Selinger]")
     CHECK(residue_norm <= tolerance);
 }
 
-TEST_CASE("Test Zero Angle (Identity)", "[RSDecomp][Ross Selinger]")
-{
+TEST_CASE("Test Zero Angle (Identity)", "[RSDecomp][Ross Selinger]") {
     // An angle of 0.0 should result in Identity
     const auto [gates, phase] = eval_ross_algorithm(0.0, 1e-10);
 
@@ -173,8 +166,7 @@ TEST_CASE("Test Zero Angle (Identity)", "[RSDecomp][Ross Selinger]")
     CHECK(std::abs(mat[2] - zero) < 1e-9);
 }
 
-TEST_CASE("Test HST_to_PPR Conversion Rules", "[RSDecomp][Ross Selinger]")
-{
+TEST_CASE("Test HST_to_PPR Conversion Rules", "[RSDecomp][Ross Selinger]") {
     // Rule: HT, HT -> X8, Z8
     CHECK(HST_to_PPR({GateType::HT, GateType::HT}).first ==
           std::vector<PPRGateType>{PPRGateType::X8, PPRGateType::Z8});
@@ -228,8 +220,7 @@ TEST_CASE("Test HST_to_PPR Conversion Rules", "[RSDecomp][Ross Selinger]")
     CHECK(HST_to_PPR(input_mixed).second == -3 * M_PI / 4.0);
 }
 
-TEST_CASE("Test C-API Wrapper (Memref Interface)", "[RSDecomp][Ross Selinger]")
-{
+TEST_CASE("Test C-API Wrapper (Memref Interface)", "[RSDecomp][Ross Selinger]") {
     double angle = M_PI / 4.0; // Decomposes to exactly T
     double epsilon = 1e-5;
 
@@ -256,12 +247,10 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[RSDecomp][Ross Selinger]")
     CHECK(static_cast<PPRGateType>(buffer_ppr[0]) == PPRGateType::Z8);
 }
 
-TEST_CASE("rs_decomposition_get_size emits warning for epsilon < 1e-6", "[RSDecomp][Warning]")
-{
+TEST_CASE("rs_decomposition_get_size emits warning for epsilon < 1e-6", "[RSDecomp][Warning]") {
     const double theta = 0.5;
 
-    SECTION("warning is emitted when epsilon < 1e-6")
-    {
+    SECTION("warning is emitted when epsilon < 1e-6") {
         std::ostringstream buf;
         std::streambuf *old = std::cerr.rdbuf(buf.rdbuf());
         (void)rs_decomposition_get_size(theta, 1e-8, false);
@@ -271,8 +260,7 @@ TEST_CASE("rs_decomposition_get_size emits warning for epsilon < 1e-6", "[RSDeco
         CHECK_THAT(buf.str(), ContainsSubstring("For epsilon smaller than 1e-6"));
     }
 
-    SECTION("no warning when epsilon >= 1e-6")
-    {
+    SECTION("no warning when epsilon >= 1e-6") {
         std::ostringstream buf;
         std::streambuf *old = std::cerr.rdbuf(buf.rdbuf());
         (void)rs_decomposition_get_size(theta, 1e-4, false);
@@ -281,8 +269,7 @@ TEST_CASE("rs_decomposition_get_size emits warning for epsilon < 1e-6", "[RSDeco
         CHECK(buf.str().empty());
     }
 
-    SECTION("no warning at boundary epsilon == 1e-6")
-    {
+    SECTION("no warning at boundary epsilon == 1e-6") {
         std::ostringstream buf;
         std::streambuf *old = std::cerr.rdbuf(buf.rdbuf());
         (void)rs_decomposition_get_size(theta, 1e-6, false);

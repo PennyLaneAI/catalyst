@@ -23,18 +23,26 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
 
+#include "Catalyst/Analysis/ResourceResultExtension.h"
+
+#include <llvm/ADT/StringRef.h>
+
 namespace catalyst {
+
+enum class MergeMethod { Sum, Max, Min };
 
 // ResourceResult holds the resource counts for a single function.
 // It mirrors the Python-side ResourcesResult from specs_collector.py.
 struct ResourceResult {
     // method for merging two ResourceResult values
-    enum class MergeMethod { Sum, Max, Min };
+    using MergeMethod = catalyst::MergeMethod;
 
     // quantum, qref, pbc, mbqc operations are stored
     // as a map from operation name to a map of
     // name -> ((numWires, numParams) -> count)
     llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> operations;
+
+    llvm::StringMap<double> detailedOperations;
 
     llvm::StringMap<double> measurements;
 
@@ -43,7 +51,7 @@ struct ResourceResult {
     llvm::StringMap<double> functionCalls;
 
     // `dyn_for_loop_<N>` -> stable hash id for that loop op (not a trip count).
-    // Ignored by `multiplyByScalar`; `mergeWith` mints a fresh id on key conflicts.
+    // Ignored by `multiplyBy`; `mergeWith` mints a fresh id on key conflicts.
     llvm::StringMap<uint64_t> varFunctionCalls;
 
     // qubits from qref/quantum alloc/alloc_qubit ops
@@ -68,23 +76,32 @@ struct ResourceResult {
     // whether any loop has a trip count that could not be statically resolved
     bool hasDynLoop = false;
 
+    // If this is true, detailedOperations is included during serialization, otherwise it is
+    // omitted.
+    bool collectDetailedOperations = false;
+
     // Set when quantum.device is present: true if {auto_qubit_management} is
     // active (register grows dynamically on quantum.extract/qref.get), false if not.
     // nullopt means no quantum.device in this function.
     std::optional<bool> autoQubitManagement;
-
-    // PBC depths as (any_commuting_depth, qubit_disjoint_depth), or nullopt if unavailable.
-    std::optional<std::pair<int64_t, int64_t>> pbcDepth;
 
     // merge another ResourceResult into this one
     void mergeWith(const ResourceResult &other, MergeMethod method = MergeMethod::Sum);
 
     // multiply all counts by a scalar, which may be be fractional to account for probabilistic
     // counting sometimes employed in branches for example
-    void multiplyByScalar(double scalar);
+    void multiplyBy(double scalar);
 
     // Serialize this function's resources into a JSON object.
     llvm::json::Object toJson() const;
+
+    // It is used to store additional resource information
+    // that is not covered by the core resource result
+    llvm::SmallVector<std::unique_ptr<ResourceResultExtension>> extensions;
+
+    ResourceResult() = default;
+    ResourceResult(ResourceResult &&) = default;
+    ResourceResult &operator=(ResourceResult &&) = default;
 };
 
 mlir::DictionaryAttr buildResourceDict(mlir::MLIRContext *ctx, const ResourceResult &result);

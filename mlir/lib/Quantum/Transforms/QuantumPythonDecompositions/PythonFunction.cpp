@@ -13,20 +13,28 @@
 // limitations under the License.
 
 #include "nanobind/nanobind.h"
-#include "nanobind/stl/string.h" // for automatic string conversion
-#include "nanobind/stl/vector.h" // for automatic vector conversion
+#include "nanobind/stl/string.h" // for type conversion
 
+#include <cstddef>
 #include <exception>
+#include <iostream>
 #include <string>
-#include <vector>
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/QuantumOps.h"
 
 #include "PythonDriverUtils.hpp"
 
@@ -36,8 +44,34 @@ namespace nb = nanobind;
 
 namespace {
 
-static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange)
-{
+static nb::dict
+getPyvalFromDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map) {
+    nb::dict name_to_shape;
+    for (const auto &entry : map) {
+        nb::list types;
+        for (auto type : entry.getValue()) {
+            if (!type) {
+                continue;
+            }
+            std::string typestr;
+            llvm::raw_string_ostream ss(typestr);
+            type.print(ss);
+            types.append(typestr);
+        }
+        name_to_shape[nb::str(entry.getKey().str().c_str())] = types;
+    }
+    return name_to_shape;
+}
+
+static nb::dict getPyvalFromWireLens(const llvm::StringMap<size_t> map) {
+    nb::dict dict;
+    for (const auto &entry : map) {
+        dict[nb::str(entry.getKey().str().c_str())] = entry.getValue();
+    }
+    return dict;
+}
+
+static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange) {
     nb::list pyTypes;
     for (auto type : typerange) {
         std::string typestr;
@@ -48,8 +82,7 @@ static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange)
     return pyTypes;
 }
 
-static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
-{
+static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
     return llvm::TypeSwitch<mlir::Attribute, nb::object>(attr)
         .Case<mlir::DictionaryAttr>([](auto dictAttr) {
             nb::dict outDict;
@@ -72,29 +105,28 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr)
 
 } // namespace
 
-std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
-{
+std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
     QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
-        const char *moduleName = "catalyst.device.python_decompositions";
-        const char *functionName = "python_decomposition_wrapper";
+        const char *moduleName = "catalyst.decomposition.decomposition_rules";
+        const char *functionName = "compile_decomposition_rules_wrapper";
 
         try {
+            auto tmp = op.getDynamicShape();
             nb::module_ wrapperModule = nb::module_::import_(moduleName);
             nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-            nb::object pythonResult =
-                wrapperFunction(op.getOperatorName(), op.getGraphOpId(),
-                                getPyvalFromTypeRange(op.getDynamicShape()), op.getWireLens(),
-                                getPyvalFromMlirAttribute(op.getStaticData()));
-
+            nb::object pythonResult = wrapperFunction(
+                op.getOperatorName(), op.getGraphOpId(),
+                getPyvalFromDynamicShape(op.getDynamicShape()),
+                getPyvalFromWireLens(op.getWireLens()),
+                getPyvalFromMlirAttribute(op.getStaticData()), nb::arg("extra_data") = nb::none(),
+                nb::arg("is_custom_op") = isa<catalyst::quantum::CustomOp>(op));
             return nb::borrow<nb::str>(pythonResult).c_str();
-        }
-        catch (const nb::python_error &error) {
+        } catch (const nb::python_error &error) {
             throw QuantumPythonDecompositions::TracingError(moduleName, functionName,
                                                             op.getGraphOpId(), error.what());
-        }
-        catch (const std::exception &error) {
+        } catch (const std::exception &error) {
             throw;
         }
     });
@@ -102,7 +134,6 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op)
     return mlirText;
 }
 
-extern "C" __attribute__((visibility("default"))) void *getPythonRuleLoweringFunction()
-{
+extern "C" __attribute__((visibility("default"))) void *getPythonRuleLoweringFunction() {
     return reinterpret_cast<void *>(pythonRuleLowering);
 }

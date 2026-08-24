@@ -37,7 +37,9 @@ from pennylane.ops import (
     BasisState,
     CompositeOp,
     Controlled,
+    Controlled2,
     ControlledOp,
+    ControlledOp2,
     StatePrep,
     SymbolicOp,
 )
@@ -54,6 +56,13 @@ from catalyst.device.op_support import (
 from catalyst.jax_tracer import HybridOp, has_nested_tapes, nested_quantum_regions
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
+
+_CONTROLLED_WRAPPER_TYPES = (
+    Controlled,
+    ControlledOp,
+    Controlled2,
+    ControlledOp2,
+)
 
 
 def _verify_nested(
@@ -142,7 +151,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
     def _ctrl_op_checker(op, in_control):
         # For PL controlled instances we don't recurse via nested tapes, so check the base op here.
-        if type(op) in (Controlled, ControlledOp):
+        if type(op) in _CONTROLLED_WRAPPER_TYPES:
             if isinstance(op.base, HybridOp):
                 raise CompileError(
                     f"Cannot compile PennyLane control of the hybrid op {type(op.base)}."
@@ -176,7 +185,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             return in_inverse
         # If its a PL Controlled we also want to check its base to catch C(Adjoint(base)).
         # PL simplification should mean pure PL operators will not be more nested than this.
-        if type(op) in (Controlled, ControlledOp):
+        if type(op) in _CONTROLLED_WRAPPER_TYPES:
             _inv_op_checker(op.base, in_inverse)
             return in_inverse
         # Exclude control flow ops we always know how to invert
@@ -199,7 +208,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # is handled in _inv_op_checker and _ctrl_op_checker.
         # Specialized control op classes (e.g. CRZ) should be checked directly though, which is why
         # we can't use isinstance(op, Controlled).
-        if type(op) in (Controlled, ControlledOp) or isinstance(op, (Adjoint)):
+        if type(op) in _CONTROLLED_WRAPPER_TYPES or isinstance(op, Adjoint):
             pass
         elif not op.name in supported_ops:
             raise CompileError(

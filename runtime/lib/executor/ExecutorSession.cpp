@@ -15,14 +15,20 @@
 #include "ExecutorSession.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <numeric>
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
+#include <thread>
 #include <vector>
 
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/EPCDynamicLibrarySearchGenerator.h"
@@ -67,8 +73,7 @@ constexpr size_t kAlignedOff = sizeof(void *);
 constexpr size_t kOffsetOff = sizeof(void *) * 2;
 constexpr size_t kShapeOff = sizeof(void *) * 2 + sizeof(size_t);
 
-void initialize_targets()
-{
+void initialize_targets() {
     static const bool inited = []() {
         InitializeAllTargets();
         InitializeAllTargetMCs();
@@ -78,22 +83,64 @@ void initialize_targets()
     (void)inited;
 }
 
+// FDSimpleRemoteEPCTransport whose disconnect() also shutdown()s the socket, to avoid a
+// teardown deadlock.
+//
+// SimpleRemoteEPC::disconnect() (via ExecutionSession::endSession()) closes the transport, then
+// waits for the listener thread to observe EOF. The stock transport only close()s the fd, but the
+// listener's in-flight read() keeps the socket alive — so close() neither wakes that read nor
+// sends a FIN, and the wait blocks forever (the peer never sees EOF either).
+//
+// shutdown(SHUT_RDWR) forces the read() to return and sends the FIN. We do it in disconnect() so
+// it runs only after endSession() has finished its own messaging (e.g. freeing JIT'd memory).
+class ShutdownFDTransport : public SimpleRemoteEPCTransport {
+  public:
+    static Expected<std::unique_ptr<ShutdownFDTransport>> Create(SimpleRemoteEPCTransportClient &C,
+                                                                 int InFD, int OutFD) {
+        auto Inner = FDSimpleRemoteEPCTransport::Create(C, InFD, OutFD);
+        if (!Inner) {
+            return Inner.takeError();
+        }
+        return std::make_unique<ShutdownFDTransport>(std::move(*Inner), InFD, OutFD);
+    }
+
+    ShutdownFDTransport(std::unique_ptr<FDSimpleRemoteEPCTransport> inner, int inFD, int outFD)
+        : Inner(std::move(inner)), InFD(inFD), OutFD(outFD) {}
+
+    Error start() override { return Inner->start(); }
+
+    Error sendMessage(SimpleRemoteEPCOpcode OpC, uint64_t SeqNo, ExecutorAddr TagAddr,
+                      ArrayRef<char> ArgBytes) override {
+        return Inner->sendMessage(OpC, SeqNo, TagAddr, ArgBytes);
+    }
+
+    void disconnect() override {
+        ::shutdown(InFD, SHUT_RDWR);
+        if (OutFD != InFD) {
+            ::shutdown(OutFD, SHUT_RDWR);
+        }
+        Inner->disconnect();
+    }
+
+  private:
+    std::unique_ptr<FDSimpleRemoteEPCTransport> Inner;
+    int InFD, OutFD;
+};
+
 // For avoiding the error message being overwritten by subsequent errors in async jobs.
 // We use thread_local to store the error message.
 thread_local std::string g_last_error;
 void set_error(const std::string &msg) { g_last_error = msg; }
 void clear_error() { g_last_error.clear(); }
 
-void check(Error E, const Twine &what)
-{
+void check(Error E, const Twine &what) {
     if (E) {
         throw std::runtime_error((what + ": " + toString(std::move(E))).str());
     }
 }
 
 // unwrap LLVM Expected to C++ exception
-template <typename T> T unwrap(Expected<T> v, const Twine &what)
-{
+template <typename T> T unwrap(Expected<T> v, const Twine &what) {
     check(v.takeError(), what);
     return std::move(*v);
 }
@@ -101,15 +148,26 @@ template <typename T> T unwrap(Expected<T> v, const Twine &what)
 // TCP connect (mirrored from llvm-jitlink)
 std::string OutOfProcessExecutorConnect;
 
-Error createTCPSocketError(Twine Details)
-{
+Error createTCPSocketError(Twine Details) {
     return make_error<StringError>("Failed to connect TCP socket '" +
                                        Twine(OutOfProcessExecutorConnect) + "': " + Details,
                                    inconvertibleErrorCode());
 }
 
-Expected<int> connectTCPSocket(std::string Host, std::string PortStr)
-{
+// Seconds to wait for the catalyst-executor ORC bootstrap handshake before giving up. Overridable
+// via CATALYST_REMOTE_CONNECT_TIMEOUT; defaults to 10s. A value of 0 disables the timeout.
+unsigned remoteConnectTimeoutSeconds() {
+    if (const char *env = std::getenv("CATALYST_REMOTE_CONNECT_TIMEOUT")) {
+        char *end = nullptr;
+        unsigned long secs = std::strtoul(env, &end, 10);
+        if (end != env) {
+            return static_cast<unsigned>(secs);
+        }
+    }
+    return 10;
+}
+
+Expected<int> connectTCPSocket(std::string Host, std::string PortStr) {
     addrinfo *AI;
     addrinfo Hints{};
     Hints.ai_family = AF_INET;
@@ -128,12 +186,14 @@ Expected<int> connectTCPSocket(std::string Host, std::string PortStr)
     for (Server = AI; Server != nullptr; Server = Server->ai_next) {
         // socket might fail, e.g. if the address family is not supported. Skip to
         // the next addrinfo structure in such a case.
-        if ((SockFD = socket(AI->ai_family, AI->ai_socktype, AI->ai_protocol)) < 0)
+        if ((SockFD = socket(AI->ai_family, AI->ai_socktype, AI->ai_protocol)) < 0) {
             continue;
+        }
 
         // If connect returns null, we exit the loop with a working socket.
-        if (connect(SockFD, Server->ai_addr, Server->ai_addrlen) == 0)
+        if (connect(SockFD, Server->ai_addr, Server->ai_addrlen) == 0) {
             break;
+        }
 
         close(SockFD);
     }
@@ -150,8 +210,7 @@ Expected<int> connectTCPSocket(std::string Host, std::string PortStr)
 
 // Slab-based JIT-link memory manager: reserve a 1 GB slab on the remote once
 Expected<std::unique_ptr<jitlink::JITLinkMemoryManager>>
-createSimpleRemoteMemoryManager(SimpleRemoteEPC &SREPC)
-{
+createSimpleRemoteMemoryManager(SimpleRemoteEPC &SREPC) {
     SimpleRemoteMemoryMapper::SymbolAddrs SAs;
     if (auto Err = SREPC.getBootstrapSymbols(
             {{SAs.Instance, rt::SimpleExecutorMemoryManagerInstanceName},
@@ -169,13 +228,16 @@ createSimpleRemoteMemoryManager(SimpleRemoteEPC &SREPC)
                                                                                   SAs);
 }
 
-Expected<std::unique_ptr<MemoryBuffer>> getFile(const Twine &filename)
-{
+Expected<std::unique_ptr<MemoryBuffer>> getFile(const Twine &filename) {
     auto F = MemoryBuffer::getFile(filename);
     if (F) {
         return std::move(*F);
     }
     return createFileError(filename, F.getError());
+}
+
+void discardEPC(Expected<std::unique_ptr<SimpleRemoteEPC>> &EPC) {
+    consumeError(EPC ? (*EPC)->disconnect() : EPC.takeError());
 }
 
 } // namespace
@@ -190,7 +252,12 @@ struct ExecutorSession {
     MangleAndInterner Mangle;
     ObjectLinkingLayer ObjectLayer;
 
+    // Shared namespace: the process-symbol generator (QIR runtime, libc) plus library-call objects.
     JITDylib &MainJD;
+    // One JITDylib per shipped kernel object, keyed by its object-file path. Each links against
+    // MainJD for its external deps, but keeps its own entry symbol isolated — so two objects can
+    // export the same `_catalyst_pyface_<entry>` without colliding.
+    StringMap<JITDylib *> KernelJDs;
 
     ExecutorAddr alloc_fn{0};
     ExecutorAddr free_fn{0};
@@ -199,21 +266,18 @@ struct ExecutorSession {
 
     ExecutorSession(std::unique_ptr<ExecutionSession> es, DataLayout dl)
         : ES(std::move(es)), DL(std::move(dl)), Mangle(*this->ES, this->DL), ObjectLayer(*this->ES),
-          MainJD(this->ES->createBareJITDylib("<main>"))
-    {
+          MainJD(this->ES->createBareJITDylib("<main>")) {
         MainJD.addGenerator(
             cantFail(EPCDynamicLibrarySearchGenerator::GetForTargetProcess(*this->ES)));
     }
 
-    ~ExecutorSession()
-    {
+    ~ExecutorSession() {
         if (auto Err = ES->endSession()) {
             ES->reportError(std::move(Err));
         }
     }
 
-    static Expected<std::unique_ptr<ExecutorSession>> Create(StringRef remote_addr)
-    {
+    static Expected<std::unique_ptr<ExecutorSession>> Create(StringRef remote_addr) {
         initialize_targets();
 
         OutOfProcessExecutorConnect = remote_addr.str();
@@ -234,9 +298,50 @@ struct ExecutorSession {
 
         auto setup = SimpleRemoteEPC::Setup();
         setup.CreateMemoryManager = createSimpleRemoteMemoryManager;
-        auto EPC = SimpleRemoteEPC::Create<FDSimpleRemoteEPCTransport>(
+        // The ORC bootstrap handshake inside SimpleRemoteEPC::Create is an unbounded blocking read
+        // on the socket. If the peer is not a live catalyst-executor, it would hang forever.
+        // A watchdog shuts the socket down after the timeout, which forces the blocked read to
+        // fail and Create to return an error instead of hanging.
+        const int sockFd = *SockFD;
+        const unsigned timeoutSecs = remoteConnectTimeoutSeconds();
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool handshakeDone = false;
+        bool timedOut = false;
+        std::thread watchdog;
+        if (timeoutSecs > 0) {
+            watchdog = std::thread([&] {
+                std::unique_lock<std::mutex> lock(mtx);
+                if (!cv.wait_for(lock, std::chrono::seconds(timeoutSecs),
+                                 [&] { return handshakeDone; })) {
+                    timedOut = true;
+                    ::shutdown(sockFd, SHUT_RDWR);
+                }
+            });
+        }
+
+        // ShutdownFDTransport instead of FDSimpleRemoteEPCTransport so teardown shutdown()s the
+        // socket and doesn't deadlock
+        auto EPC = SimpleRemoteEPC::Create<ShutdownFDTransport>(
             std::make_unique<DynamicThreadPoolTaskDispatcher>(std::nullopt), std::move(setup),
-            *SockFD, *SockFD);
+            sockFd, sockFd);
+
+        if (watchdog.joinable()) {
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                handshakeDone = true;
+            }
+            cv.notify_all();
+            watchdog.join();
+        }
+
+        if (timedOut) {
+            discardEPC(EPC);
+            return createTCPSocketError("handshake with catalyst-executor timed out after " +
+                                        Twine(timeoutSecs) +
+                                        "s (is a catalyst-executor actually listening there?). "
+                                        "Override with CATALYST_REMOTE_CONNECT_TIMEOUT");
+        }
         if (!EPC) {
             return EPC.takeError();
         }
@@ -244,20 +349,39 @@ struct ExecutorSession {
         JITTargetMachineBuilder JTMB((*EPC)->getTargetTriple());
         auto DL = JTMB.getDefaultDataLayoutForTarget();
         if (!DL) {
-            return DL.takeError();
+            discardEPC(EPC);
+            return joinErrors(
+                createStringError(llvm::inconvertibleErrorCode(),
+                                  "no data layout for the catalyst-executor's target triple '" +
+                                      (*EPC)->getTargetTriple().str() +
+                                      "'; this runtime may lack the LLVM backend for it"),
+                DL.takeError());
         }
 
         auto ES = std::make_unique<ExecutionSession>(std::move(*EPC));
         return std::make_unique<ExecutorSession>(std::move(ES), std::move(*DL));
     }
 
-    Error addObjectFile(std::unique_ptr<MemoryBuffer> Buf)
-    {
-        return ObjectLayer.add(MainJD, std::move(Buf));
+    Error addObjectFile(StringRef path, std::unique_ptr<MemoryBuffer> Buf) {
+        if (KernelJDs.count(path)) {
+            return make_error<StringError>("object already loaded: " + path,
+                                           inconvertibleErrorCode());
+        }
+        JITDylib &jd = ES->createBareJITDylib(("kernel:" + path).str());
+        jd.addToLinkOrder(MainJD);
+        KernelJDs[path] = &jd;
+        return ObjectLayer.add(jd, std::move(Buf));
     }
 
-    ExecutorAddr lookupSym(StringRef Name)
-    {
+    ExecutorAddr lookupSym(StringRef path, StringRef Name) {
+        auto it = KernelJDs.find(path);
+        JITDylib *jd = (it != KernelJDs.end()) ? it->second : &MainJD;
+        auto Sym = unwrap(ES->lookup({jd}, Mangle(Name.str())), "lookup(" + Name + ")");
+        return Sym.getAddress();
+    }
+
+    // Resolve `Name` in the shared process namespace (library-call symbols).
+    ExecutorAddr lookupSym(StringRef Name) {
         auto Sym = unwrap(ES->lookup({&MainJD}, Mangle(Name.str())), "lookup(" + Name + ")");
         return Sym.getAddress();
     }
@@ -271,8 +395,7 @@ struct ExecutorSession {
 
 namespace {
 
-ExecutorAddr remote_alloc(ExecutorSession *s, size_t size)
-{
+ExecutorAddr remote_alloc(ExecutorSession *s, size_t size) {
     ExecutorAddr ret;
     auto &epc = s->getEPC();
     std::string error_prefix = "alloc(" + std::to_string(size) + ")";
@@ -285,23 +408,20 @@ ExecutorAddr remote_alloc(ExecutorSession *s, size_t size)
     return ret;
 }
 
-void remote_free(ExecutorSession *s, ExecutorAddr addr)
-{
+void remote_free(ExecutorSession *s, ExecutorAddr addr) {
     auto &epc = s->getEPC();
     if (auto err = epc.callSPSWrapper<void(shared::SPSExecutorAddr)>(s->free_fn, addr)) {
         consumeError(std::move(err));
     }
 }
 
-void remote_write(ExecutorSession *s, ExecutorAddr addr, const void *data, size_t size)
-{
+void remote_write(ExecutorSession *s, ExecutorAddr addr, const void *data, size_t size) {
     auto &epc = s->getEPC();
     tpctypes::BufferWrite w{addr, ArrayRef<char>(static_cast<const char *>(data), size)};
     check(epc.getMemoryAccess().writeBuffers({w}), "write");
 }
 
-void remote_read(ExecutorSession *s, ExecutorAddr addr, void *data, size_t size)
-{
+void remote_read(ExecutorSession *s, ExecutorAddr addr, void *data, size_t size) {
     ExecutorAddrRange r(addr, addr + size);
     auto out = unwrap(s->getEPC().getMemoryAccess().readBuffers({r}), "read");
     if (out.empty()) {
@@ -313,8 +433,7 @@ void remote_read(ExecutorSession *s, ExecutorAddr addr, void *data, size_t size)
     std::memcpy(data, out[0].data(), size);
 }
 
-void remote_invoke(ExecutorSession *s, ExecutorAddr entry, ArrayRef<ExecutorAddr> arg_addrs)
-{
+void remote_invoke(ExecutorSession *s, ExecutorAddr entry, ArrayRef<ExecutorAddr> arg_addrs) {
     auto &epc = s->getEPC();
     check(epc.callSPSWrapper<void(shared::SPSExecutorAddr,
                                   shared::SPSSequence<shared::SPSExecutorAddr>)>(s->invoke_fn,
@@ -324,8 +443,7 @@ void remote_invoke(ExecutorSession *s, ExecutorAddr entry, ArrayRef<ExecutorAddr
 
 // Memref descriptors are layout-equivalent to:
 // { void *allocated; void *aligned; size_t offset; size_t sizes[rank]; size_t strides[rank]; }
-size_t memref_desc_size(size_t rank)
-{
+size_t memref_desc_size(size_t rank) {
     return sizeof(void *)          // void *allocated
            + sizeof(void *)        // void *aligned
            + sizeof(size_t)        // size_t offset
@@ -334,8 +452,7 @@ size_t memref_desc_size(size_t rank)
         ;
 }
 
-size_t memref_data_size(const char *desc, size_t rank, size_t elem_size)
-{
+size_t memref_data_size(const char *desc, size_t rank, size_t elem_size) {
     if (rank == 0) {
         return elem_size;
     }
@@ -350,8 +467,7 @@ class RemoteAllocator {
 
   public:
     explicit RemoteAllocator(ExecutorSession *s) : sess(s) {}
-    ~RemoteAllocator()
-    {
+    ~RemoteAllocator() {
         for (ExecutorAddr a : addrs) {
             remote_free(sess, a);
         }
@@ -359,8 +475,7 @@ class RemoteAllocator {
     RemoteAllocator(const RemoteAllocator &) = delete;
     RemoteAllocator &operator=(const RemoteAllocator &) = delete;
 
-    ExecutorAddr alloc(size_t size)
-    {
+    ExecutorAddr alloc(size_t size) {
         ExecutorAddr addr = remote_alloc(sess, size);
         addrs.push_back(addr);
         return addr;
@@ -379,8 +494,7 @@ class RemoteAllocator {
  * @param remote_addr the remote address
  * @return ExecutorSession * the session object
  */
-ExecutorSession *open(const char *remote_addr)
-{
+ExecutorSession *open(const char *remote_addr) {
     clear_error();
     try {
         auto s = unwrap(ExecutorSession::Create(remote_addr), "open(" + Twine(remote_addr) + ")");
@@ -390,8 +504,7 @@ ExecutorSession *open(const char *remote_addr)
                                                {s->store_asset_fn, "catalyst_remote_store_asset"}}),
               "getBootstrapSymbols");
         return s.release();
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         set_error(e.what());
         return nullptr;
     }
@@ -412,15 +525,13 @@ void close(ExecutorSession *s) { delete s; }
  * @param path the path to the object file
  * @return int 0 on success, non-zero on error
  */
-int load_object_path(ExecutorSession *s, const char *path)
-{
+int load_object_path(ExecutorSession *s, const char *path) {
     clear_error();
     try {
         auto buf = unwrap(getFile(path), "getFile(" + Twine(path) + ")");
-        check(s->addObjectFile(std::move(buf)), "addObjectFile");
+        check(s->addObjectFile(path, std::move(buf)), "addObjectFile");
         return 0;
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         set_error(e.what());
         return -1;
     }
@@ -433,8 +544,7 @@ int load_object_path(ExecutorSession *s, const char *path)
  * @param path the path to the asset file
  * @return int 0 on success, -1 on error
  */
-int load_asset_path(ExecutorSession *s, const char *path)
-{
+int load_asset_path(ExecutorSession *s, const char *path) {
     clear_error();
     try {
         auto buf = unwrap(getFile(path), "getFile(" + Twine(path) + ")");
@@ -449,8 +559,7 @@ int load_asset_path(ExecutorSession *s, const char *path)
                                      "): " + std::to_string(rc));
         }
         return 0;
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         set_error(e.what());
         return -1;
     }
@@ -470,8 +579,7 @@ int load_asset_path(ExecutorSession *s, const char *path)
  * @return int 0 on success, -1 on error.
  */
 int call_wrapper_raw(ExecutorSession *s, const char *sym, const char *args_buf, size_t args_size,
-                     char **out_buf, size_t *out_size)
-{
+                     char **out_buf, size_t *out_size) {
     clear_error();
     *out_buf = nullptr;
     *out_size = 0;
@@ -493,8 +601,7 @@ int call_wrapper_raw(ExecutorSession *s, const char *sym, const char *args_buf, 
         *out_buf = buf;
         *out_size = n;
         return 0;
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         set_error(e.what());
         return -1;
     }
@@ -507,13 +614,14 @@ int call_wrapper_raw(ExecutorSession *s, const char *sym, const char *args_buf, 
  * @param name the name of the symbol
  * @return uint64_t the address of the symbol
  */
-uint64_t lookup(ExecutorSession *s, const char *name)
-{
+uint64_t lookup(ExecutorSession *s, const char *name, const char *object) {
     clear_error();
     try {
+        if (object && *object) {
+            return s->lookupSym(object, name).getValue();
+        }
         return s->lookupSym(name).getValue();
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         set_error(e.what());
         return 0;
     }
@@ -538,8 +646,7 @@ uint64_t lookup(ExecutorSession *s, const char *name)
  * @return ExecutorAddr the remote address of the memref descriptor
  */
 ExecutorAddr push_memref(ExecutorSession *s, RemoteAllocator &alloc, void *host_desc, size_t rank,
-                         size_t elem_size, bool copy_data)
-{
+                         size_t elem_size, bool copy_data) {
     char *desc_host = static_cast<char *>(host_desc);
     size_t desc_size = memref_desc_size(rank);
     size_t data_size = memref_data_size(desc_host, rank, elem_size);
@@ -597,8 +704,7 @@ ExecutorAddr push_memref(ExecutorSession *s, RemoteAllocator &alloc, void *host_
 int invoke_kernel(ExecutorSession *s, uint64_t entry_addr, size_t num_inputs,
                   void *const *input_descs, const size_t *input_ranks,
                   const size_t *input_elem_sizes, size_t num_outputs, void *const *output_descs,
-                  const size_t *output_ranks, const size_t *output_elem_sizes)
-{
+                  const size_t *output_ranks, const size_t *output_elem_sizes) {
     clear_error();
     RemoteAllocator allocator(s);
     try {
@@ -684,8 +790,7 @@ int invoke_kernel(ExecutorSession *s, uint64_t entry_addr, size_t num_inputs,
             }
         }
         return 0;
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
         set_error(e.what());
         return -1;
     }

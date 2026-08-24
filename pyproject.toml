@@ -1,3 +1,18 @@
+[build-system]
+requires = [
+  "cmake",
+  "nanobind",
+  "ninja",
+  "numpy>2.0.0",
+  "pybind11>=2.12.0",
+  "setuptools<=83, >=62",
+  "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.bandit]
+skips = ["B607"]
+
 [tool.black]
 line-length = 100
 extend-exclude = '''
@@ -13,8 +28,26 @@ extend-exclude = '''
 )
 '''
 
+[tool.coverage.run]
+branch = true
+source = [
+  "./frontend/catalyst/",
+]
+omit = [
+  "*/python_bindings/*",
+  "./frontend/catalyst/_version.py",
+  "./frontend/catalyst/_revision.py",
+  "*/standalone/*",
+]
+
+[tool.coverage.html]
+directory = "coverage_html_report"
+
+[tool.coverage.report]
+sort = "Cover"
+
 [tool.isort]
-py_version=312
+py_version = 312
 profile = "black"
 line_length = 100
 skip = [
@@ -39,31 +72,6 @@ extend_skip_glob = [
 known_first_party = ["catalyst"]
 known_third_party = ["diastatic-malt", "jax", "jaxlib", "numpy", "pennylane"]
 
-[tool.bandit]
-skips = ["B607"]
-
-[build-system]
-requires = ["setuptools>=62", "wheel", "pybind11>=2.12.0", "numpy>2.0.0", "nanobind", "cmake", "ninja"]
-build-backend = "setuptools.build_meta"
-
 [tool.pytest.ini_options]
-cache_dir='/tmp/.pytest_cache'
-testpaths=["frontend/test/pytest", "frontend/test/test_oqc/oqc"]
-
-[tool.coverage.run]
-branch = true
-source = [
-    "./frontend/catalyst/",
-]
-omit = [
-    "*/python_bindings/*",
-    "./frontend/catalyst/_version.py",
-    "./frontend/catalyst/_revision.py",
-    "*/standalone/*",
-]
-
-[tool.coverage.html]
-directory = "coverage_html_report"
-
-[tool.coverage.report]
-sort = "Cover"
+cache_dir = "/tmp/.pytest_cache"
+testpaths = ["frontend/test/pytest", "frontend/test/test_oqc/oqc"]
