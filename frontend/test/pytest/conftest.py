@@ -25,6 +25,8 @@ from warnings import warn
 import pennylane as qp
 import pytest
 
+from catalyst import Executor
+
 
 def _detect_gpu_triton_platform():
     """Return a Triton ``platform`` string matching this runner's GPU, or ``None``.
@@ -72,6 +74,24 @@ def gpu_triton_platform():
     if platform is None:
         pytest.skip("No NVIDIA or AMD GPU detected on this runner")
     return platform
+
+
+@pytest.fixture(scope="function")
+def local_executor():
+    """A ``catalyst.Executor`` in local-subprocess mode with explicit teardown.
+
+    ``Executor()`` (no host, no address) spawns ``catalyst-executor`` on ``127.0.0.1``. Catalyst's
+    ``_SessionRegistry`` covers process-exit cleanup via an ``atexit`` hook, but that isn't
+    enough within a pytest session: without an explicit ``stop()`` the subprocess lingers and
+    keeps the coprocessor's OOB TCP port bound, so reruns / ``pytest-xdist`` / any second use
+    would fail with ``EADDRINUSE``. This fixture calls ``stop()`` on teardown regardless of
+    test outcome, which also runs ``teardown_workspace()`` to clean up the deploy dir.
+    """
+    ex = Executor()
+    try:
+        yield ex
+    finally:
+        ex.stop()
 
 
 @pytest.fixture(scope="function")

@@ -364,16 +364,20 @@ class TestBacklineDemoIntegration:
         # 1 shot x 3 mid-circuit measurements -> a length-3 sample array.
         assert samples.shape == (3,), f"expected shape (3,), got {samples.shape}"
 
-    def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture):
+    def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture, local_executor):
         """Demo 1a: local CPU ↔ local CPU over RDMA loopback, out-of-process.
 
         Mirrors ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``, but runs the coprocessor role
-        in a ``catalyst-executor`` subprocess on ``127.0.0.1`` (via ``remote=True`` + empty
-        ``executor_options``) instead of in this process. An earlier in-process version SIGSEGV'd
-        inside ``ghz()`` on GH-hosted ubuntu's ``rdma_rxe`` loopback: the failure mode was
-        specific to two ibverbs QPs opened by the same process, and the subprocess split
-        sidesteps it. This also mirrors real deployments, where controller and coprocessor
-        always live in different processes.
+        in a ``catalyst-executor`` subprocess on ``127.0.0.1`` (via the ``local_executor``
+        fixture) instead of in this process. An earlier in-process version SIGSEGV'd inside
+        ``ghz()`` on GH-hosted ubuntu's ``rdma_rxe`` loopback: the failure mode was specific to
+        two ibverbs QPs opened by the same process, and the subprocess split sidesteps it. This
+        also mirrors real deployments, where controller and coprocessor always live in
+        different processes.
+
+        The ``local_executor`` fixture owns the ``catalyst-executor`` subprocess's lifecycle
+        and stops it on teardown, so the coprocessor's OOB TCP port is released cleanly and
+        reruns / ``pytest-xdist`` don't collide.
         """
         steane_lib = str(
             Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
@@ -391,11 +395,9 @@ class TestBacklineDemoIntegration:
             coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
             endpoint=qp.Endpoint("127.0.0.1", 18590),
             # ``Executor()`` with no host/address is a subprocess on 127.0.0.1 (see
-            # frontend/catalyst/executor/manager.py). This runs the coprocessor role in a
-            # separate ``catalyst-executor`` process, sidestepping the in-process rdma_rxe
-            # SIGSEGV and mirroring how real deployments split controller/coproc across
-            # machines.
-            executor=Executor(),
+            # frontend/catalyst/executor/manager.py). Consumed from the ``local_executor``
+            # fixture which owns the teardown - see the docstring above.
+            executor=local_executor,
             init_args={
                 "backend_lib": "libcatalyst_transport_cpu_verbs_coprocessor.so",
                 "config": "cfg",
