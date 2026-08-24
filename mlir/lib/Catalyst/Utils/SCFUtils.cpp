@@ -294,8 +294,8 @@ static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> 
             inductionValues.erase(loop.getInductionVar());
             return std::nullopt;
         }
-        summary.total += nested->total;
-        summary.invocations += nested->invocations;
+        summary.totalIterations += nested->totalIterations;
+        summary.entryCount += nested->entryCount;
     }
     inductionValues.erase(loop.getInductionVar());
     return summary;
@@ -315,10 +315,10 @@ std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forO
     if (!summary) {
         return std::nullopt;
     }
-    if (summary->invocations == 0.0) {
+    if (summary->entryCount == 0.0) {
         return 0.0;
     }
-    return summary->total / summary->invocations;
+    return summary->totalIterations / summary->entryCount;
 }
 
 // Given an op in a for loop body with a static number of start, end and step,
