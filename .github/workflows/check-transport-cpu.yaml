@@ -61,7 +61,10 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build make
+          # lld is required at dialects-configure time: the cached LLVM was built with
+          # LLVM_ENABLE_LLD=ON, and HandleLLVMOptions.cmake probes the host toolchain for
+          # -fuse-ld=lld when the dialects project includes LLVMConfig.
+          sudo apt-get install -y cmake ninja-build make lld
           python3 -m pip install "nanobind<2.13" pybind11
 
       - name: Set up Soft-RoCE loopback
