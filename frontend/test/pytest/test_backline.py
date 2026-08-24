@@ -364,14 +364,15 @@ class TestBacklineDemoIntegration:
         assert samples is not None
 
     def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture):
-        """Demo 1a: local CPU ↔ local CPU over RDMA loopback, compile-only.
+        """Demo 1a: local CPU ↔ local CPU over RDMA loopback, compile + execute attempt.
 
-        Mirrors ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py`` at the frontend/dialect level:
-        verifies the placement lowers to IR with the right transport backends, the OOB endpoint,
-        and the QEC pass insertion for the ``rdma`` path. Execution is skipped: running both roles
-        in-process over ``rdma_rxe`` on the loopback interface SIGSEGVs on GH-hosted ubuntu; the
-        real-hardware / two-process runtime exercise is deferred (needs a NIC or a subprocess-
-        based executor).
+        Mirrors ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``. Verifies the frontend/dialect
+        lowering (IR shape, endpoint, backend libs, QEC passes) and then attempts to execute the
+        QNode over the soft-RoCE loopback path. A prior version of this test SIGSEGV'd inside
+        ``ghz()`` with ``lightning.qubit`` + 10 shots on GH-hosted ubuntu's rdma_rxe; the current
+        ``null.qubit`` + 1-shot setup is lighter and may complete. If it still crashes, the
+        workflow captures a backtrace via ``continue-on-error`` + ``gdb`` so we get real signal
+        rather than a silent skip.
         """
         steane_lib = str(
             Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
@@ -415,6 +416,9 @@ class TestBacklineDemoIntegration:
         assert "libcatalyst_transport_cpu_verbs_coprocessor.so" in ir
         for pass_name, _ in _qec_pass_specs("steane"):
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
+
+        samples = ghz()
+        assert samples is not None
 
     def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(self, use_capture):
         """CPU controller ↔ GPU coprocessor over ``memcpy`` with a manually-scheduled QEC cycle.

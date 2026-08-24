@@ -613,21 +613,49 @@ jobs:
       # Only fires when the PR touched transport paths (see the `changes` job). The runtime
       # artifact downloaded above already includes the transport backend .so files because
       # the `runtime:` job builds with ENABLE_TRANSPORT=ON in that case.
-      #   [memcpy]: CPU controller + CPU coproc over local memcpy, executes end-to-end.
-      #   *_gpu_coproc_memcpy_precompiled: verifies the frontend generates the right IR
+      #   _memcpy: CPU controller + CPU coproc over local memcpy, executes end-to-end.
+      #   _gpu_coproc_memcpy_precompiled: verifies the frontend generates the right IR
       #   for the precompiled GPU decoder (gpu_steane_launcher) dispatch. Compile-only,
-      #   no GPU needed here. Execution of the GPU path (Triton) lives in
-      #   check-transport-gpu.yaml.
-      # Excluded on purpose: rdma_loopback SIGSEGVs in-process on soft-RoCE loopback and
-      # covers a case that needs a real NIC.
+      #   no GPU needed here. Executing GPU path (Triton) lives in check-transport-gpu.yaml.
       if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
       env:
         CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib
       run: |
         python3 -m pytest -v \
           "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
-          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback" \
           "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled"
+
+    - name: Attempt rdma_loopback execution (diagnostic)
+      # The rdma_loopback case runs both roles in-process over rdma_rxe on lo. An earlier
+      # version with lightning.qubit + 10 shots SIGSEGV'd here; the current null.qubit + 1-shot
+      # test is lighter and may pass. continue-on-error keeps the job green either way; if the
+      # test crashes, the follow-up gdb run captures a backtrace so we get real signal instead
+      # of a silent skip. Once we see a stable pass or have a diagnosis, this step folds into
+      # the pytest step above (or gets deleted).
+      if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+      continue-on-error: true
+      env:
+        CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib
+      run: |
+        set +e
+        python3 -m pytest -v -s \
+          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback"
+        rc=$?
+        if [ $rc -ne 0 ]; then
+          echo "::group::rdma_loopback failed with exit $rc - attempting gdb backtrace"
+          sudo apt-get install -y gdb 2>/dev/null || true
+          ulimit -c unlimited
+          gdb -batch \
+            -ex "run" \
+            -ex "bt full" \
+            -ex "info threads" \
+            -ex "thread apply all bt" \
+            --args python3 -m pytest -v -s \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback" \
+            2>&1 | tail -200
+          echo "::endgroup::"
+        fi
+        exit 0  # never fail the step - diagnostic only
 
     - name: Upload to Codecov
       uses: codecov/codecov-action@v4
