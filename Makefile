@@ -122,7 +122,7 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
-	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
+	$(PYTHON) -m catalyst.decomposition.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm stablehlo enzyme dialects runtime oqc builtin-decomp-rules
@@ -142,12 +142,19 @@ dialects:
 	$(MAKE) -C mlir dialects
 
 builtin-decomp-rules: dialects runtime frontend
-	$(PYTHON) -m frontend.catalyst.utils.precompile_decomposition_rules
+	$(PYTHON) -m frontend.catalyst.decomposition.precompile_decomposition_rules
 
 
 .PHONY: dialect-docs
 dialect-docs:
 	$(MAKE) -C mlir dialect-docs
+
+# TODO: executor links LLVM and finds it through LLVM_DIR. This creates a dependancy between runtime and 
+# LLVM. For now we can run LLVM once in the begining if ENABLE_EXECUTOR is specified. The better
+# solution is perhaps to detactch the executor from runtime into its own target.
+ifeq ($(ENABLE_EXECUTOR), ON)
+runtime: mlir
+endif
 
 runtime:
 	$(MAKE) -C runtime runtime ENABLE_OQD=$(ENABLE_OQD)
@@ -265,10 +272,11 @@ wheel:
 	$(PYTHON) -m pip wheel --no-deps . -w bootstrap_dist
 	$(PYTHON) -m pip install bootstrap_dist/*.whl --extra-index-url https://test.pypi.org/simple
 
-	$(PYTHON) -m catalyst.utils.precompile_decomposition_rules
+	$(PYTHON) -m catalyst.decomposition.precompile_decomposition_rules
 
 	mkdir -p $(MK_DIR)/frontend/catalyst/resources
-	cp $$($(PYTHON) -c 'from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH; print(BYTECODE_FILE_PATH)') $(MK_DIR)/frontend/catalyst/resources/
+	# TODO: re-enable this once pre-compiled rules are migrated for Operator2 compatibility
+	# cp $$($(PYTHON) -c 'from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH; print(BYTECODE_FILE_PATH)') $(MK_DIR)/frontend/catalyst/resources/
 
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 

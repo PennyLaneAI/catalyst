@@ -23,6 +23,8 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpImplementation.h"
 
+#include "MBQC/IR/MBQCOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 
@@ -341,6 +343,31 @@ LogicalResult AdjointOp::verify() {
     Block &b = this->getRegion().front();
     if (b.getNumArguments() != 0) {
         return emitOpError("qref.adjoint op must have no arguments on its block");
+    }
+
+    return success();
+}
+
+LogicalResult CtrlOp::verify() {
+    auto res = this->getRegion().walk([](Operation *op) {
+        return isa<quantum::MeasurementProcess, MeasureOp, pbc::RefPPMeasurementOp,
+                   mbqc::RefMeasureInBasisOp>(op)
+                   ? WalkResult::interrupt()
+                   : WalkResult::advance();
+    });
+
+    if (res.wasInterrupted()) {
+        return emitOpError("quantum measurements are not allowed in the ctrl regions");
+    }
+
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != 0) {
+        return emitOpError("qref.ctrl op must have no arguments on its block");
+    }
+
+    if (this->getCtrlValues().size() != this->getCtrlQubits().size()) {
+        return emitOpError("Ctrl op number of control values must be the same as the number of "
+                           "control qubits");
     }
 
     return success();

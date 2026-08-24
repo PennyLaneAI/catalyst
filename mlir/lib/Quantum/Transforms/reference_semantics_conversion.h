@@ -76,6 +76,8 @@ void handleGraphStatePrep(IRRewriter &builder, mbqc::GraphStatePrepOp vGraphStat
                           QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValueTracker &tracker,
                    SmallVector<Operation *> &erasureWorklist);
+void handleCtrl(IRRewriter &builder, quantum::CtrlOp vCtrlOp, QubitValueTracker &tracker,
+                SmallVector<Operation *> &erasureWorklist);
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
               SmallVector<Operation *> &erasureWorklist);
 void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker,

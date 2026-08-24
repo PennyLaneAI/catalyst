@@ -386,14 +386,14 @@ class TestSCPDeploy:
         """An empty bundle directory raises :class:`RuntimeError`."""
         # Empty directory, no artifacts.
         with pytest.raises(RuntimeError, match="no artifacts"):
-            SCP.deploy("me", "h", tmp_path, "ws")
+            SCP.deploy("me", "h", [tmp_path], "ws")
 
     def test_readme_only_is_still_empty(self, tmp_path):
         """A bundle containing only ``README.md`` is treated as empty and raises."""
         # README.md is explicitly filtered out.
         (tmp_path / "README.md").write_text("ignore me")
         with pytest.raises(RuntimeError, match="no artifacts"):
-            SCP.deploy("me", "h", tmp_path, "ws")
+            SCP.deploy("me", "h", [tmp_path], "ws")
 
     def test_deploys_via_ssh_mkdir_then_scp_run(self, tmp_path):
         """Creates the remote workspace then invokes :meth:`SCP.copy` with the filtered file list."""
@@ -402,7 +402,7 @@ class TestSCPDeploy:
         with patch("catalyst.executor.ssh.RemoteOps.mkdir") as mkdir, patch(
             "catalyst.executor.ssh.SCP.copy"
         ) as scprun:
-            SCP.deploy("me", "h", tmp_path, "ws")
+            SCP.deploy("me", "h", [tmp_path], "ws")
         mkdir.assert_called_once_with("me", "h", "ws")
         scprun.assert_called_once()
         # files argument (positional index 2) sorted, README excluded
