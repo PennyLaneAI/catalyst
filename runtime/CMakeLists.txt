@@ -16,12 +16,10 @@ option(RUNTIME_ENABLE_WARNINGS "Enable -Wall and -Werror" ON)
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 option(ENABLE_OQD "Build OQD backend device" OFF)
 option(ENABLE_TRANSPORT "Build the backend-agnostic transport loader (rt_transport)" OFF)
-option(ENABLE_TRANSPORT_FPGA "Build the VPK120 FPGA controller backends (needs patched verbs headers)" OFF)
+option(ENABLE_TRANSPORT_FPGA "Build the FPGA controller backends" OFF)
 if(ENABLE_TRANSPORT_FPGA AND NOT ENABLE_TRANSPORT)
     message(FATAL_ERROR
-        "ENABLE_TRANSPORT_FPGA needs ENABLE_TRANSPORT=ON: the FPGA backends live under "
-        "lib/transport, which is only added when the transport is enabled. Without this "
-        "the option would be accepted and build nothing.")
+        "ENABLE_TRANSPORT_FPGA requires ENABLE_TRANSPORT=ON.")
 endif()
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
