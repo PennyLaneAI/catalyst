@@ -625,7 +625,8 @@ jobs:
         CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib
       run: |
         python3 -m pytest -v \
-          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu[memcpy]" \
+          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
+          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback" \
           "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled"
 
     - name: Upload to Codecov
