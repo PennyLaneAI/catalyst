@@ -25,6 +25,7 @@ import pennylane as qp
 from jax._src.lib.mlir import ir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 
+from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
@@ -226,7 +227,17 @@ def compile_decomposition_rules(
     with module.context:
         module.operation.walk(update_funcop_attributes)
 
-    return module
+    # Inline to avoid helper functions. We want all decomp rule functions to be standalone
+    # Generic printing needed when parsing --quantum-opt string output back to jax IR ModuleOps
+    # since Catalyst's python bindings never export the Catalyst dialects
+    inlined = _quantum_opt(
+        "--inline=inlining-threshold=4294967295",  # Use uint max to indicate always inline
+        "--mlir-print-op-generic",
+        stdin=str(module),
+    )
+
+    inlined_module = ir.Operation.parse(inlined, context=module.context)
+    return inlined_module
 
 
 def compile_decomposition_rules_wrapper(
