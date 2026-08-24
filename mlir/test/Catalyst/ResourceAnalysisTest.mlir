@@ -809,6 +809,59 @@ func.func @shared_ancestor_bound_nested_for_loop(%arg0: !quantum.bit) -> !quantu
 
 // -----
 
+// The innermost loop jumps back to the outermost induction variable, skipping
+// two enclosing levels. The two direct-parent averages (3.5 and 2) are
+// unaffected; the jumped-to average is (322 / 56) = 5.75.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliZ": 1
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 5.75
+// CHECK-LABEL: "for_loop_3": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_2": 2
+// CHECK-LABEL: "for_loop_4": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_3": 3.5
+// CHECK-LABEL: "mixed_ancestor_dependencies": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_4": 8
+func.func @mixed_ancestor_dependencies(%arg0: !quantum.bit) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c8 = arith.constant 8 : index
+
+    // Python code:
+    // for i in range(8):
+    //     for j in range(i):
+    //         for k in range(j):
+    //             for _ in range(i):  # jumps back to i
+    //                 qp.PauliZ(0)
+
+    %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %j_res = scf.for %j = %c0 to %i step %c1 iter_args(%j_arg = %outer_arg) -> !quantum.bit {
+            %k_res = scf.for %k = %c0 to %j step %c1 iter_args(%k_arg = %j_arg) -> !quantum.bit {
+                %w_res = scf.for %w = %c0 to %i step %c1 iter_args(%w_arg = %k_arg) -> !quantum.bit {
+                    %out = quantum.custom "PauliZ"() %w_arg : !quantum.bit
+                    scf.yield %out : !quantum.bit
+                }
+                scf.yield %w_res : !quantum.bit
+            }
+            scf.yield %k_res : !quantum.bit
+        }
+        scf.yield %j_res : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
 // A statically bounded unrelated middle loop does not change the average value
 // of the outer induction variable seen by the inner loop.
 
@@ -876,11 +929,15 @@ func.func @dynamic_unrelated_middle_loop(
     %c1 = arith.constant 1 : index
     %c4 = arith.constant 4 : index
 
+    // Python code:
+    // for i in range(4):
+    //     for j in range(N):
+    //         for k in range(i):
+    //             qp.PauliZ(0)
+
     %q = scf.for %i = %c0 to %c4 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
-        %middle = scf.for %j = %c0 to %N step %c1
-            iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
-            %inner = scf.for %k = %c0 to %i step %c1
-                iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
+        %middle = scf.for %j = %c0 to %N step %c1 iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
+            %inner = scf.for %k = %c0 to %i step %c1 iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
                 %z = quantum.custom "PauliZ"() %inner_arg : !quantum.bit
                 scf.yield %z : !quantum.bit
             }
@@ -893,24 +950,25 @@ func.func @dynamic_unrelated_middle_loop(
 
 // -----
 
-// An estimated unrelated middle loop remains a barrier, even though the
-// middle loop itself has a static estimated iteration count.
+// An estimated unrelated middle loop no longer blocks concretization: its own
+// trip count (3, from the hint) is independent of `i`, so it factors out of
+// the inner loop's average, which is (0 + 1 + 2 + 3) / 4 = 1.5.
 
-// CHECK-LABEL: "dyn_for_loop_1": {
-// CHECK: "quantum_operations"
-// CHECK:   "PauliZ": 1
 // CHECK-LABEL: "estimated_unrelated_middle_loop": {
 // CHECK: "function_calls"
 // CHECK:   "static":
-// CHECK:       "for_loop_2": 4
+// CHECK:       "for_loop_3": 4
 // CHECK-LABEL: "for_loop_1": {
-// CHECK: "function_calls"
-// CHECK:   "dynamic":
-// CHECK:       "dyn_for_loop_1"
+// CHECK: "quantum_operations"
+// CHECK:   "PauliZ": 1
 // CHECK-LABEL: "for_loop_2": {
 // CHECK: "function_calls"
 // CHECK:   "static":
-// CHECK:       "for_loop_1": 3
+// CHECK:       "for_loop_1": 1.5
+// CHECK-LABEL: "for_loop_3": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_2": 3
 func.func @estimated_unrelated_middle_loop(
     %arg0: !quantum.bit, %N: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
@@ -933,6 +991,52 @@ func.func @estimated_unrelated_middle_loop(
             }
             scf.yield %inner : !quantum.bit
         } {catalyst.estimated_iterations = 3 : i64}
+        scf.yield %middle : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
+// A fractional estimate on an unrelated middle loop also factors out of the
+// inner loop's average, exactly like the integer case above: its own trip
+// count (2.5) is independent of `i`, and (0 + 1 + 2 + 3) / 4 = 1.5.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliZ": 1
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 1.5
+// CHECK-LABEL: "for_loop_3": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_2": 2.5
+// CHECK-LABEL: "fractional_estimated_unrelated_middle_loop": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_3": 4
+func.func @fractional_estimated_unrelated_middle_loop(
+    %arg0: !quantum.bit, %N: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c4 = arith.constant 4 : index
+
+    // Python code:
+    // for i in range(4):
+    //     for _ in range(N):  # estimated_iterations = 2.5
+    //         for _ in range(i):
+    //             qp.PauliZ(0)
+
+    %q = scf.for %i = %c0 to %c4 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %middle = scf.for %j = %c0 to %N step %c1 iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
+            %inner = scf.for %k = %c0 to %i step %c1 iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
+                %z = quantum.custom "PauliZ"() %inner_arg : !quantum.bit
+                scf.yield %z : !quantum.bit
+            }
+            scf.yield %inner : !quantum.bit
+        } {catalyst.estimated_iterations = 2.5 : f64}
         scf.yield %middle : !quantum.bit
     }
     return %q : !quantum.bit
@@ -972,6 +1076,43 @@ func.func @estimated_iterations_enclosing_nested_for_loop(%arg0: !quantum.bit, %
         }
         scf.yield %inner : !quantum.bit
     } {catalyst.estimated_iterations = 4 : i64}
+    return %q : !quantum.bit
+}
+
+// -----
+
+// A fractional estimate cannot supply an induction-value domain, so a
+// directly dependent inner loop remains dynamic even though the outer loop's
+// own trip count (2.5) is known.
+
+// CHECK-LABEL: "dyn_for_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliX": 1
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "function_calls"
+// CHECK:   "dynamic":
+// CHECK:       "dyn_for_loop_1"
+// CHECK-LABEL: "fractional_estimated_iterations_enclosing_nested_for_loop": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 2.5
+func.func @fractional_estimated_iterations_enclosing_nested_for_loop(
+    %arg0: !quantum.bit, %N: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    // Python code:
+    // for i in range(N):  # estimated_iterations = 2.5
+    //     for _ in range(i):
+    //         qp.PauliX(0)
+
+    %q = scf.for %i = %c0 to %N step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %inner = scf.for %j = %c0 to %i step %c1 iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
+            %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
+            scf.yield %out : !quantum.bit
+        }
+        scf.yield %inner : !quantum.bit
+    } {catalyst.estimated_iterations = 2.5 : f64}
     return %q : !quantum.bit
 }
 

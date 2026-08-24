@@ -19,6 +19,8 @@
 #include <optional>
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -112,134 +114,209 @@ std::optional<double> resolveForLoopTripCount(scf::ForOp forOp) {
     return std::nullopt;
 }
 
-struct LoopRange {
-    int64_t lower;
-    int64_t step;
-    bool sharesParentUpperBound = false;
-};
+// Maps each already-enumerated loop's induction variable to its current value.
+using InductionValues = llvm::DenseMap<Value, int64_t>;
 
-// Store the total innermost-loop iterations and how many times that loop is reached.
-// Dividing the total by the invocation count gives its average trip count.
-struct TripCountSummary {
-    int64_t total = 0;
-    uint64_t invocations = 0; // how many times the innermost loop is reached
-};
-
-// Walk through each dependent loop using the previous loop's induction value as the next upper
-// bound. Track the total innermost-loop iterations and how many times that loop is reached.
-static TripCountSummary accumulateTripCounts(llvm::ArrayRef<LoopRange> ranges, size_t loopIndex,
-                                             int64_t upperBound) {
-    const LoopRange &range = ranges[loopIndex];
-    if (loopIndex + 1 == ranges.size()) {
-        return {computeTripCount(range.lower, upperBound, range.step), 1};
+// Resolve `loop`'s own upper bound as a concrete integer so its induction values can be
+// enumerated: a resolved constant, the recorded value of an already-enumerated enclosing loop,
+// or, for an integer `catalyst.estimated_iterations = K` hint, the first K values starting at
+// `lower`. A fractional hint has no discrete domain.
+static std::optional<int64_t> resolveEnumerableUpperBound(scf::ForOp loop, int64_t lower,
+                                                          int64_t step,
+                                                          const InductionValues &inductionValues) {
+    if (auto upper = resolveConstantInt(loop.getUpperBound())) {
+        return upper;
     }
-
-    TripCountSummary summary;
-    for (int64_t inductionValue = range.lower; inductionValue < upperBound;
-         inductionValue += range.step) {
-        int64_t nestedUpperBound =
-            ranges[loopIndex + 1].sharesParentUpperBound ? upperBound : inductionValue;
-        TripCountSummary nested =
-            accumulateTripCounts(ranges, loopIndex + 1, nestedUpperBound);
-        summary.total += nested.total;
-        summary.invocations += nested.invocations;
+    auto it = inductionValues.find(loop.getUpperBound());
+    if (it != inductionValues.end()) {
+        return it->second;
     }
-    return summary;
+    auto intAttr = dyn_cast_or_null<IntegerAttr>(loop->getAttr(EstimatedIterationsAttrName));
+    if (!intAttr) {
+        return std::nullopt;
+    }
+    auto iterationCount = intAttr.getValue().trySExtValue();
+    if (!iterationCount || *iterationCount < 0) {
+        return std::nullopt;
+    }
+    int64_t span;
+    int64_t upper;
+    if (__builtin_mul_overflow(*iterationCount, step, &span) ||
+        __builtin_add_overflow(lower, span, &upper)) {
+        return std::nullopt;
+    }
+    return upper;
 }
 
-static double computeAverageTripCountByEnumeration(llvm::ArrayRef<LoopRange> ranges,
-                                                   int64_t outerUpper) {
-    TripCountSummary summary = accumulateTripCounts(ranges, 0, outerUpper);
-
-    if (summary.invocations == 0) {
-        return 0.0;
+// Resolve `loop`'s own scalar trip count: an estimated-iterations hint (integer or fractional),
+// or lower/step/upper bounds where the upper bound is a resolved constant or the recorded value
+// of an already-enumerated enclosing loop.
+static std::optional<double> resolveOwnTripCount(scf::ForOp loop,
+                                                 const InductionValues &inductionValues) {
+    if (auto iters = getEstimatedIterationsHint(loop)) {
+        return *iters;
     }
-    return summary.total / static_cast<double>(summary.invocations);
-}
-
-std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forOp) {
-    llvm::SmallVector<LoopRange> ranges;
-    int64_t outerUpper = 0;
-    scf::ForOp currentLoop = forOp;
-    while (currentLoop) {
-        auto lower = resolveConstantInt(currentLoop.getLowerBound());
-        auto step = resolveConstantInt(currentLoop.getStep());
-
-        if (!lower || !step || *step <= 0) {
+    auto lower = resolveConstantInt(loop.getLowerBound());
+    auto step = resolveConstantInt(loop.getStep());
+    if (!lower || !step || *step <= 0) {
+        return std::nullopt;
+    }
+    auto upper = resolveConstantInt(loop.getUpperBound());
+    if (!upper) {
+        auto it = inductionValues.find(loop.getUpperBound());
+        if (it == inductionValues.end()) {
             return std::nullopt;
         }
-        ranges.push_back({*lower, *step});
+        upper = it->second;
+    }
+    return static_cast<double>(computeTripCount(*lower, *upper, *step));
+}
 
-        if (Attribute attr = currentLoop->getAttr(EstimatedIterationsAttrName)) {
-            auto intAttr = dyn_cast<IntegerAttr>(attr);
-            if (!intAttr) {
-                return std::nullopt;
-            }
-            auto iterationCount = intAttr.getValue().trySExtValue();
-            if (!iterationCount || *iterationCount < 0) {
-                return std::nullopt;
-            }
+// True if `loop`'s own upper bound is already explained without searching further ancestors:
+// either an estimated-iterations hint (of any kind) or a resolved constant.
+static bool closesOwnUpperBound(scf::ForOp loop) {
+    return getEstimatedIterationsHint(loop).has_value() ||
+           resolveConstantInt(loop.getUpperBound()).has_value();
+}
 
-            int64_t span;
-            if (__builtin_mul_overflow(*iterationCount, *step, &span) ||
-                __builtin_add_overflow(*lower, span, &outerUpper)) {
-                return std::nullopt;
-            }
-            break;
+// Collect the minimal chain of enclosing scf.for loops, outer to inner, needed to resolve
+// `target`'s upper-bound dependency. Walking upward, a loop's induction variable resolves any
+// not-yet-explained upper bound that uses it directly; std::nullopt means some dependency
+// reaches an unresolved bound, a non-scf.for parent (e.g. scf.if), or the top of the function.
+static std::optional<llvm::SmallVector<scf::ForOp>> collectLoopChain(scf::ForOp target) {
+    llvm::SmallVector<scf::ForOp> chain;
+    llvm::SmallPtrSet<Value, 4> unresolved;
+
+    scf::ForOp currentLoop = target;
+    while (true) {
+        chain.push_back(currentLoop);
+        unresolved.erase(currentLoop.getInductionVar());
+        if (!closesOwnUpperBound(currentLoop)) {
+            unresolved.insert(currentLoop.getUpperBound());
         }
-
-        if (auto upper = resolveConstantInt(currentLoop.getUpperBound())) {
-            outerUpper = *upper;
-            break;
+        if (unresolved.empty()) {
+            std::reverse(chain.begin(), chain.end());
+            return chain;
         }
 
         auto parent = dyn_cast_or_null<scf::ForOp>(currentLoop->getParentOp());
-        while (parent && currentLoop.getUpperBound() != parent.getInductionVar()) {
-            if (parent->hasAttr(EstimatedIterationsAttrName)) {
-                return std::nullopt;
-            }
-            if (currentLoop.getUpperBound() == parent.getUpperBound()) {
-                ranges.back().sharesParentUpperBound = true;
-                break;
-            }
-            if (!resolveForLoopTripCount(parent)) {
-                return std::nullopt;
-            }
-            parent = dyn_cast_or_null<scf::ForOp>(parent->getParentOp());
-        }
         if (!parent) {
             return std::nullopt;
         }
         currentLoop = parent;
     }
-    std::reverse(ranges.begin(), ranges.end());
+}
 
-    // Loops that share a lower bound, step by 1, and use the parent induction variable as their
-    // upper bound have this closed-form average:(outerUpper - commonLower - depth + 1) / depth.
-    // Example:
-    // for i in 0..8
-    //     for j in 0..i
-    //         for k in 0..j (average trip count is 2)
-    //             ...
-    // The average trip count is (8 - 3 + 1) / 3 = 2
-    int64_t commonLower = ranges.front().lower;
-    bool canUseClosedFormAverage = true;
-    for (const LoopRange &range : ranges) {
-        if (range.lower != commonLower || range.step != 1 || range.sharesParentUpperBound) {
-            canUseClosedFormAverage = false;
-            break;
+// Fast path for the canonical shape where every loop shares a common lower bound, unit step,
+// and uses only its immediate predecessor's induction variable as its upper bound:
+// for i in 0..8
+//     for j in 0..i
+//         for k in 0..j (average trip count is 2)
+//             ...
+// The average trip count is (8 - 3 + 1) / 3 = 2 for this immediate-parent chain.
+static std::optional<double> tryClosedFormAverage(llvm::ArrayRef<scf::ForOp> chain) {
+    scf::ForOp outer = chain.front();
+    auto commonLower = resolveConstantInt(outer.getLowerBound());
+    if (!commonLower) {
+        return std::nullopt;
+    }
+    for (size_t i = 0; i < chain.size(); i++) {
+        scf::ForOp loop = chain[i];
+        if (resolveConstantInt(loop.getLowerBound()) != commonLower ||
+            resolveConstantInt(loop.getStep()) != 1) {
+            return std::nullopt;
+        }
+        if (i > 0 && loop.getUpperBound() != scf::ForOp(chain[i - 1]).getInductionVar()) {
+            return std::nullopt;
         }
     }
-    if (canUseClosedFormAverage) {
-        int64_t depth = static_cast<int64_t>(ranges.size());
-        double average =
-            static_cast<double>(outerUpper - commonLower - depth + 1) / static_cast<double>(depth);
-        return std::max(0.0, average);
+    InductionValues noInductionValues;
+    auto outerUpper = resolveEnumerableUpperBound(outer, *commonLower, 1, noInductionValues);
+    if (!outerUpper) {
+        return std::nullopt;
+    }
+    int64_t depth = static_cast<int64_t>(chain.size());
+    double average =
+        static_cast<double>(*outerUpper - *commonLower - depth + 1) / static_cast<double>(depth);
+    return std::max(0.0, average);
+}
+
+// Store the target loop's total iterations and how many times it is reached across every
+// enumerated context. Dividing the total by the invocation count gives its average trip count.
+struct TripCountSummary {
+    double total = 0.0;
+    double invocations = 0.0; // how many times the loop is reached across every enumerated context
+};
+
+// Evaluate chain[position..], given the induction values recorded for already-enumerated
+// enclosing loops and the scalar weight contributed by loops folded so far. A loop is enumerated
+// (its induction values tracked) only when a later loop's upper bound directly uses it;
+// otherwise its own trip count is folded into `pathWeight` without enumeration.
+static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> chain,
+                                                     size_t position, double pathWeight,
+                                                     InductionValues &inductionValues) {
+    scf::ForOp loop = chain[position];
+    llvm::ArrayRef<scf::ForOp> descendants = chain.drop_front(position + 1);
+    bool isReferencedLater =
+        std::any_of(descendants.begin(), descendants.end(), [&](scf::ForOp descendant) {
+            return descendant.getUpperBound() == loop.getInductionVar(); 
+        });
+
+    // Loop of induction variable is not upperbound of any later loop.
+    if (!isReferencedLater) {
+        auto tripCount = resolveOwnTripCount(loop, inductionValues);
+        if (!tripCount) {
+            return std::nullopt;
+        }
+        if (descendants.empty()) {
+            return TripCountSummary{pathWeight * *tripCount, pathWeight};
+        }
+        return evaluateChain(chain, position + 1, pathWeight * *tripCount, inductionValues);
     }
 
-    // Each loop is resolved separately, so loops with other bounds or
-    // steps may revisit outer loops.
-    return computeAverageTripCountByEnumeration(ranges, outerUpper);
+    auto lower = resolveConstantInt(loop.getLowerBound());
+    auto step = resolveConstantInt(loop.getStep());
+    if (!lower || !step || *step <= 0) {
+        return std::nullopt;
+    }
+    auto upper = resolveEnumerableUpperBound(loop, *lower, *step, inductionValues);
+    if (!upper) {
+        return std::nullopt;
+    }
+
+    TripCountSummary summary;
+    for (int64_t iv = *lower; iv < *upper; iv += *step) {
+        inductionValues[loop.getInductionVar()] = iv;
+        auto nested = evaluateChain(chain, position + 1, pathWeight, inductionValues);
+        if (!nested) {
+            inductionValues.erase(loop.getInductionVar());
+            return std::nullopt;
+        }
+        summary.total += nested->total;
+        summary.invocations += nested->invocations;
+    }
+    inductionValues.erase(loop.getInductionVar());
+    return summary;
+}
+
+std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forOp) {
+    auto chain = collectLoopChain(forOp);
+    if (!chain) {
+        return std::nullopt;
+    }
+    if (auto closedForm = tryClosedFormAverage(*chain)) {
+        return closedForm;
+    }
+
+    InductionValues inductionValues;
+    auto summary = evaluateChain(*chain, 0, /*pathWeight=*/1.0, inductionValues);
+    if (!summary) {
+        return std::nullopt;
+    }
+    if (summary->invocations == 0.0) {
+        return 0.0;
+    }
+    return summary->total / summary->invocations;
 }
 
 // Given an op in a for loop body with a static number of start, end and step,

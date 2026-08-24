@@ -1492,6 +1492,26 @@ class TestSymbolicSpecsLoopConcretization:
 
         assert resources.quantum_operations.get("PauliZ", 0) == 140
 
+    def test_loop_concretization_multi_level_dependency(self):
+        """Test concretization with a loop that jumps back to an outer ancestor,
+        skipping two enclosing loops."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for j in range(i):
+                    for k in range(j):
+                        for _ in range(i):  # Jumps back to the outer-most loop
+                            qp.PauliZ(wires=k % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations.get("PauliZ", 0) == 322
+
     def test_loop_concretization_combined(self):
         """Test concretization with all different complexities on loop bounds put together."""
         n = 8
