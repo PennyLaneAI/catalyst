@@ -215,13 +215,13 @@ static std::optional<llvm::SmallVector<scf::ForOp>> collectLoopChain(scf::ForOp 
 // The average trip count is (8 - 3 + 1) / 3 = 2 for this immediate-parent chain.
 static std::optional<double> tryClosedFormAverage(llvm::ArrayRef<scf::ForOp> chain) {
     scf::ForOp outer = chain.front();
-    auto commonLower = resolveConstantInt(outer.getLowerBound());
-    if (!commonLower) {
+    auto outerLowerBound = resolveConstantInt(outer.getLowerBound());
+    if (!outerLowerBound) {
         return std::nullopt;
     }
     for (size_t i = 0; i < chain.size(); i++) {
         scf::ForOp loop = chain[i];
-        if (resolveConstantInt(loop.getLowerBound()) != commonLower ||
+        if (resolveConstantInt(loop.getLowerBound()) != outerLowerBound ||
             resolveConstantInt(loop.getStep()) != 1) {
             return std::nullopt;
         }
@@ -230,21 +230,21 @@ static std::optional<double> tryClosedFormAverage(llvm::ArrayRef<scf::ForOp> cha
         }
     }
     InductionValues noInductionValues;
-    auto outerUpper = resolveEnumerableUpperBound(outer, *commonLower, 1, noInductionValues);
-    if (!outerUpper) {
+    auto outerUpperBound = resolveEnumerableUpperBound(outer, *outerLowerBound, 1, noInductionValues);
+    if (!outerUpperBound) {
         return std::nullopt;
     }
     int64_t depth = static_cast<int64_t>(chain.size());
     double average =
-        static_cast<double>(*outerUpper - *commonLower - depth + 1) / static_cast<double>(depth);
+        static_cast<double>(*outerUpperBound - *outerLowerBound - depth + 1) / static_cast<double>(depth);
     return std::max(0.0, average);
 }
 
 // Store the target loop's total iterations and how many times it is reached across every
 // enumerated context. Dividing the total by the invocation count gives its average trip count.
 struct TripCountSummary {
-    double total = 0.0;
-    double invocations = 0.0; // how many times the loop is reached across every enumerated context
+    double totalIterations = 0.0;  // The total number of times the loop body is executed
+    double entryCount = 0.0;  // The total number of times this loop is reached by the outer caller
 };
 
 // Evaluate chain[position..], given the induction values recorded for already-enumerated
@@ -256,12 +256,14 @@ static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> 
                                                      InductionValues &inductionValues) {
     scf::ForOp loop = chain[position];
     llvm::ArrayRef<scf::ForOp> descendants = chain.drop_front(position + 1);
+    // Whether or not *any* subsequent loop's trip count depends on the current induction variable
     bool isReferencedLater =
         std::any_of(descendants.begin(), descendants.end(), [&](scf::ForOp descendant) {
             return descendant.getUpperBound() == loop.getInductionVar();
         });
 
-    // Loop of induction variable is not upperbound of any later loop.
+    // Current loop's induction variable does not affect upper bound of any subsequent loop.
+    // Can just get this loop's trip count and continue
     if (!isReferencedLater) {
         auto tripCount = resolveOwnTripCount(loop, inductionValues);
         if (!tripCount) {
