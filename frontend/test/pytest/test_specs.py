@@ -1474,8 +1474,6 @@ class TestSymbolicSpecsLoopConcretization:
         # Expect a symbolic value: indirect dependency is not supported for concretization
         assert not isinstance(resources.quantum_operations["PauliZ"], (int, float))
 
-    # FIXME: This case is failing
-    @pytest.mark.xfail
     def test_loop_concretization_multi_dependency(self):
         """Test concretization with a loop that has 2 direct dependencies from inner loops."""
         n = 8

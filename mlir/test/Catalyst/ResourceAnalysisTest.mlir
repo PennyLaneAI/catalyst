@@ -762,6 +762,53 @@ func.func @triple_dependent_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit
 
 // -----
 
+// Both inner loops use the outer induction variable as their upper bound.
+// The middle and inner loops execute 28 and 140 times, so their average
+// multiplicities are 3.5 and 5.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliZ": 1
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 5
+// CHECK-LABEL: "for_loop_3": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_2": 3.5
+// CHECK-LABEL: "shared_ancestor_bound_nested_for_loop": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_3": 8
+func.func @shared_ancestor_bound_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c8 = arith.constant 8 : index
+
+    // Python code:
+    // for i in range(8):
+    //     for _ in range(i):
+    //         for _ in range(i):
+    //             qp.PauliZ(0)
+
+    %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %middle = scf.for %j = %c0 to %i step %c1
+            iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
+            %inner = scf.for %k = %c0 to %i step %c1
+                iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
+                %out = quantum.custom "PauliZ"() %inner_arg : !quantum.bit
+                scf.yield %out : !quantum.bit
+            }
+            scf.yield %inner : !quantum.bit
+        }
+        scf.yield %middle : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
 // A statically bounded unrelated middle loop does not change the average value
 // of the outer induction variable seen by the inner loop.
 
@@ -839,6 +886,53 @@ func.func @dynamic_unrelated_middle_loop(
             }
             scf.yield %inner : !quantum.bit
         }
+        scf.yield %middle : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
+// An estimated unrelated middle loop remains a barrier, even though the
+// middle loop itself has a static estimated iteration count.
+
+// CHECK-LABEL: "dyn_for_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliZ": 1
+// CHECK-LABEL: "estimated_unrelated_middle_loop": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_2": 4
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "function_calls"
+// CHECK:   "dynamic":
+// CHECK:       "dyn_for_loop_1"
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 3
+func.func @estimated_unrelated_middle_loop(
+    %arg0: !quantum.bit, %N: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c4 = arith.constant 4 : index
+
+    // Python code:
+    // for i in range(4):
+    //     for _ in range(N):  # estimated_iterations = 3
+    //         for _ in range(i):
+    //             qp.PauliZ(0)
+
+    %q = scf.for %i = %c0 to %c4 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %middle = scf.for %j = %c0 to %N step %c1
+            iter_args(%middle_arg = %outer_arg) -> !quantum.bit {
+            %inner = scf.for %k = %c0 to %i step %c1
+                iter_args(%inner_arg = %middle_arg) -> !quantum.bit {
+                %z = quantum.custom "PauliZ"() %inner_arg : !quantum.bit
+                scf.yield %z : !quantum.bit
+            }
+            scf.yield %inner : !quantum.bit
+        } {catalyst.estimated_iterations = 3 : i64}
         scf.yield %middle : !quantum.bit
     }
     return %q : !quantum.bit

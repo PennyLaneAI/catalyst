@@ -115,6 +115,7 @@ std::optional<double> resolveForLoopTripCount(scf::ForOp forOp) {
 struct LoopRange {
     int64_t lower;
     int64_t step;
+    bool sharesParentUpperBound = false;
 };
 
 // Store the total innermost-loop iterations and how many times that loop is reached.
@@ -136,7 +137,10 @@ static TripCountSummary accumulateTripCounts(llvm::ArrayRef<LoopRange> ranges, s
     TripCountSummary summary;
     for (int64_t inductionValue = range.lower; inductionValue < upperBound;
          inductionValue += range.step) {
-        TripCountSummary nested = accumulateTripCounts(ranges, loopIndex + 1, inductionValue);
+        int64_t nestedUpperBound =
+            ranges[loopIndex + 1].sharesParentUpperBound ? upperBound : inductionValue;
+        TripCountSummary nested =
+            accumulateTripCounts(ranges, loopIndex + 1, nestedUpperBound);
         summary.total += nested.total;
         summary.invocations += nested.invocations;
     }
@@ -191,7 +195,14 @@ std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forO
 
         auto parent = dyn_cast_or_null<scf::ForOp>(currentLoop->getParentOp());
         while (parent && currentLoop.getUpperBound() != parent.getInductionVar()) {
-            if (parent->hasAttr(EstimatedIterationsAttrName) || !resolveForLoopTripCount(parent)) {
+            if (parent->hasAttr(EstimatedIterationsAttrName)) {
+                return std::nullopt;
+            }
+            if (currentLoop.getUpperBound() == parent.getUpperBound()) {
+                ranges.back().sharesParentUpperBound = true;
+                break;
+            }
+            if (!resolveForLoopTripCount(parent)) {
                 return std::nullopt;
             }
             parent = dyn_cast_or_null<scf::ForOp>(parent->getParentOp());
@@ -214,7 +225,7 @@ std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forO
     int64_t commonLower = ranges.front().lower;
     bool canUseClosedFormAverage = true;
     for (const LoopRange &range : ranges) {
-        if (range.lower != commonLower || range.step != 1) {
+        if (range.lower != commonLower || range.step != 1 || range.sharesParentUpperBound) {
             canUseClosedFormAverage = false;
             break;
         }
