@@ -128,7 +128,7 @@ jobs:
       - name: Install build dependencies for LLVM/dialects
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang lld libxml2-dev
+          sudo apt-get install -y cmake ninja-build clang lld
           python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
 
       # LLVM source is already restored earlier in the job (for the runtime build) via the
