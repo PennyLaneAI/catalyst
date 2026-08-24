@@ -319,11 +319,44 @@ class TestBacklineDemoIntegration:
     decoder library reachable to the dynamic loader.
     """
 
-    def test_local_cpu_to_local_cpu_memcpy(self, use_capture):
-        """Demo 1: local CPU ↔ local CPU over ``memcpy``, Steane-encoded.
+    @pytest.mark.parametrize(
+        "transport, ctrl_lib, coproc_lib, endpoint_args, extra_init, extra_ir_asserts",
+        [
+            pytest.param(
+                "memcpy",
+                "libcatalyst_transport_memcpy_controller.so",
+                "libcatalyst_transport_memcpy_coprocessor.so",
+                None,
+                {},
+                (),
+                id="memcpy",
+            ),
+            pytest.param(
+                "rdma",
+                "libcatalyst_transport_cpu_verbs_controller.so",
+                "libcatalyst_transport_cpu_verbs_coprocessor.so",
+                ("127.0.0.1", 18590),
+                {"config": "cfg"},
+                ('peer = "127.0.0.1"',),
+                id="rdma_loopback",
+            ),
+        ],
+    )
+    def test_local_cpu_to_local_cpu(
+        self,
+        use_capture,
+        transport,
+        ctrl_lib,
+        coproc_lib,
+        endpoint_args,
+        extra_init,
+        extra_ir_asserts,
+    ):
+        """Demo 1 / 1a: local CPU ↔ local CPU steane-encoded, JIT-compiled and executed.
 
-        Mirrors ``demos/demo_1_local_cpu_to_local_cpu_memcpy.py``: both roles in this process,
-        memcpy carrying the decode round of each error-correction cycle.
+        Mirrors ``demos/demo_1{,a}_local_cpu_to_local_cpu_*.py``: both roles in this process.
+        The ``memcpy`` case carries the decode round through a shared buffer; the ``rdma`` case
+        goes through a verbs device (soft-RoCE), exercising queue pairs and the OOB handshake.
         """
         steane_lib = str(
             Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
@@ -331,15 +364,18 @@ class TestBacklineDemoIntegration:
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("lightning.qubit", wires=3),
-            init_args={"backend_lib": "libcatalyst_transport_memcpy_controller.so"},
+            init_args={"backend_lib": ctrl_lib, **extra_init},
         )
-        coproc = qp.Coprocessor(
-            name="cpu-coproc",
-            coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
-            init_args={"backend_lib": "libcatalyst_transport_memcpy_coprocessor.so"},
-        )
+        coproc_kwargs = {
+            "name": "cpu-coproc",
+            "coprocessor_fn": qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
+            "init_args": {"backend_lib": coproc_lib, **extra_init},
+        }
+        if endpoint_args is not None:
+            coproc_kwargs["endpoint"] = qp.Endpoint(*endpoint_args)
+        coproc = qp.Coprocessor(**coproc_kwargs)
         dev = qp.Backline(
-            controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
+            controller=ctrl, coprocessors=[coproc], transport=transport, qec_code="steane"
         )
 
         @qjit(capture=True)
@@ -353,59 +389,10 @@ class TestBacklineDemoIntegration:
 
         ir = ghz.mlir
         assert "catalyst.backline" in ir
-        assert 'transport = "memcpy"' in ir
+        assert f'transport = "{transport}"' in ir
         assert 'symbol = "steane_coprocessor"' in ir
-        for pass_name, _ in _qec_pass_specs("steane"):
-            assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
-
-        samples = ghz()
-        assert samples is not None
-
-    def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture):
-        """Demo 1a: local CPU ↔ local CPU over RDMA loopback, Steane-encoded.
-
-        Mirrors ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``: both roles in this process, but
-        the round travels through a verbs device (soft-RoCE) rather than a shared buffer, so queue
-        pairs and the out-of-band handshake are exercised end-to-end.
-        """
-        steane_lib = str(
-            Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
-        )
-        ctrl = qp.Controller(
-            name="cpu-controller",
-            device=qp.device("lightning.qubit", wires=3),
-            init_args={
-                "backend_lib": "libcatalyst_transport_cpu_verbs_controller.so",
-                "config": "cfg",
-            },
-        )
-        coproc = qp.Coprocessor(
-            name="cpu-coproc",
-            coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
-            endpoint=qp.Endpoint("127.0.0.1", 18590),
-            init_args={
-                "backend_lib": "libcatalyst_transport_cpu_verbs_coprocessor.so",
-                "config": "cfg",
-            },
-        )
-        dev = qp.Backline(
-            controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
-        )
-
-        @qjit(capture=True)
-        @qp.set_shots(10)
-        @qp.qnode(dev, mcm_method="one-shot")
-        def ghz():
-            qp.Hadamard(0)
-            qp.CNOT([0, 1])
-            qp.CNOT([1, 2])
-            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
-
-        ir = ghz.mlir
-        assert "catalyst.backline" in ir
-        assert 'transport = "rdma"' in ir
-        assert 'symbol = "steane_coprocessor"' in ir
-        assert 'peer = "127.0.0.1"' in ir
+        for extra in extra_ir_asserts:
+            assert extra in ir
         for pass_name, _ in _qec_pass_specs("steane"):
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
