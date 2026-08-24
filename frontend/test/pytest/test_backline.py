@@ -518,6 +518,50 @@ class TestBacklineDemoIntegration:
         result = encoded_decoded_circuit(0)  # error_kind=0: identity, no injected error
         assert len(result) == 2
 
+    def test_cpu_controller_to_gpu_coproc_memcpy_precompiled(self, use_capture):
+        """Precompiled GPU decoder (``gpu_steane_launcher``) reached over local memcpy.
+
+        Adapts demo 4's steane-on-GPU pattern to local memcpy transport - remote SSH
+        executors from the demo are stripped so both roles run in this process. The
+        ``gpu_steane_launcher`` symbol lives inside
+        ``libcatalyst_transport_memcpy_gpu_coprocessor.so`` (via the static
+        ``catalyst_transport_coproc_gpu`` lib), so ``CoprocessorFunction`` carries no
+        ``lib_path``; the runtime resolves the symbol after dlopen of the backend .so.
+        Compile-only: executing ``ghz()`` would need HIP + a real GPU to launch the
+        persistent decode kernel, and that's covered by the Triton test on the GPU
+        workflow.
+        """
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=3),
+            init_args={"backend_lib": "libcatalyst_transport_memcpy_controller.so"},
+        )
+        coproc = qp.Coprocessor(
+            name="gpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction("gpu_steane_launcher"),
+            init_args={"backend_lib": "libcatalyst_transport_memcpy_gpu_coprocessor.so"},
+        )
+        dev = qp.Backline(
+            controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
+        )
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
+
+        ir = ghz.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "memcpy"' in ir
+        assert 'symbol = "gpu_steane_launcher"' in ir
+        assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
+        for pass_name, _ in _qec_pass_specs("steane"):
+            assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
+
     def test_cpu_controller_to_gpu_coproc_triton_css_bp(self, use_capture):
         """CSS BP decoder built via Triton, adapted from demo 2 to a local memcpy placement.
 
