@@ -52,16 +52,21 @@ def test_custom_op(i: int):
     # CHECK: qref.custom "SWAP"() [[q1]], [[q2]] : !qref.bit, !qref.bit
     qp.SWAP([1, 2])
 
+    # over the whole region, distributed onto individual gates later by the `ctrl-lowering` pass).
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: qref.ctrl([[q0]]) ctrlvals([[true]]) {
     # CHECK: [[i:%.+]] = tensor.extract %arg0[] : tensor<i64>
     # CHECK: [[qi:%.+]] = qref.get [[reg]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
-    # CHECK: qref.custom "RX"([[angle]]) [[qi]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit ctrls !qref.bit
+    # CHECK: qref.custom "RX"([[angle]]) [[qi]] : !qref.bit
+    # CHECK: }
     qp.ctrl(qp.RX, control=0)(0.1, wires=[i])
 
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: qref.ctrl([[q0]]) ctrlvals([[false]]) {
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
-    # CHECK: qref.custom "CNOT"() [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[false]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # CHECK: qref.custom "CNOT"() [[q1]], [[q2]] : !qref.bit, !qref.bit
+    # CHECK: }
     qp.ctrl(qp.CNOT, control=0, control_values=False)(wires=[1, 2])
 
     return qp.expval(qp.X(0))
@@ -134,10 +139,12 @@ def test_dynamic_qubit_allocation(i: int):
         # CHECK: qref.custom "CNOT"() [[q0]], [[alloc_q0]] : !qref.bit, !qref.bit
         qp.CNOT(wires=[0, q[0]])
 
+        # CHECK: qref.ctrl([[alloc_q1]]) ctrlvals([[false]]) {
         # CHECK: [[i:%.+]] = tensor.extract %arg1[] : tensor<i64>
         # CHECK: [[qi:%.+]] = qref.get [[reg_device]][[[i]]] : !qref.reg<3>, i64 -> !qref.bit
         # CHECK: [[q2:%.+]] = qref.get [[reg_device]][ 2] : !qref.reg<3> -> !qref.bit
-        # CHECK: qref.custom "CNOT"() [[qi]], [[q2]] ctrls([[alloc_q1]]) ctrlvals([[false]]) : !qref.bit, !qref.bit ctrls !qref.bit
+        # CHECK: qref.custom "CNOT"() [[qi]], [[q2]] : !qref.bit, !qref.bit
+        # CHECK: }
         qp.ctrl(qp.CNOT, control=q[1], control_values=False)(wires=[i, 2])
 
         # CHECK: qref.multirz({{%.+}}) [[alloc_q1]] : !qref.bit
@@ -193,10 +200,12 @@ def test_multirz():
     # CHECK: qref.multirz([[angle]]) [[q1]] : !qref.bit
     qp.MultiRZ(0.1, wires=1)
 
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: qref.ctrl([[q0]]) ctrlvals([[true]]) {
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
-    # CHECK: qref.multirz([[angle]]) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # CHECK: qref.multirz([[angle]]) [[q1]], [[q2]] : !qref.bit, !qref.bit
+    # CHECK: }
     qp.ctrl(qp.MultiRZ, control=0, control_values=True)(0.1, wires=[1, 2])
 
     return qp.expval(qp.X(0))
@@ -223,10 +232,12 @@ def test_pcphase():
     # CHECK: qref.pcphase([[angle]], dim : 2) [[q0]], [[q1]], [[q2]] : !qref.bit, !qref.bit, !qref.bit
     qp.PCPhase(0.1, dim=2, wires=[0, 1, 2])
 
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
+    # CHECK: qref.ctrl([[q0]]) ctrlvals([[true]]) {
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<3> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<3> -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<3> -> !qref.bit
-    # CHECK: qref.pcphase([[angle]], dim : 1) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # CHECK: qref.pcphase([[angle]], dim : 1) [[q1]], [[q2]] : !qref.bit, !qref.bit
+    # CHECK: }
     qp.ctrl(qp.PCPhase, control=0, control_values=True)(0.1, dim=1, wires=[1, 2])
 
     return qp.expval(qp.X(0))
@@ -321,15 +332,17 @@ def test_global_phase():
 print(test_global_phase.mlir)
 
 
-# CHECK: func.func public @test_unitary(%arg0: tensor<2x2xf64>, %arg1: tensor<4x4xf64>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+# COM: TODO: ControlledQubitUnitary's decomp rules are buggy and not jittable.
+# COM: https://app.shortcut.com/xanaduai/story/128492/ctrl-decomp-bisect-rule-of-controlledqubitunitary-is-not-jittable,
+# COM: https://app.shortcut.com/xanaduai/story/128494/controlled-two-qubit-unitary-rule-on-controlledqubitunitary-is-not-jittable
+# When fixed, turn collect_decomp_rules back on.
+# CHECK: func.func public @test_unitary(%arg0: tensor<2x2xf64>, %arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) -> tensor<f64>
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_unitary():
     """
     Test unitary.
     """
-    # CHECK-DAG: [[true:%.+]] = arith.constant true
-
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
@@ -337,11 +350,12 @@ def test_unitary():
     # CHECK: qref.unitary([[mat2]] : tensor<2x2xcomplex<f64>>) [[q1]] : !qref.bit
     qp.QubitUnitary(np.identity(2), wires=[1])
 
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
-    # CHECK: [[mat4:%.+]] = stablehlo.convert %arg1 : (tensor<4x4xf64>) -> tensor<4x4xcomplex<f64>>
-    # CHECK: qref.unitary([[mat4]] : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # CHECK: qref.operator "ControlledQubitUnitary"(%arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) qubits([[q0]], [[q1]], [[q2]])
+    # CHECK:   static_data = {unitary_check = false, work_wire_type = "borrowed"}
+    # CHECK:   param_map = {U = [0], control_values = [1]} qubit_map = {wires = [0, 1, 2]}
     qp.ctrl(qp.QubitUnitary(np.identity(4), wires=[1, 2]), control=[0])
 
     return qp.expval(qp.X(0))
@@ -380,7 +394,7 @@ def test_set_state():
 print(test_set_state.mlir)
 
 
-# CHECK: func.func public @test_set_basis_state(%arg0: tensor<3xi64>, %arg1: tensor<2xi64>) -> tensor<f64>
+# CHECK: func.func public @test_set_basis_state(%arg0: tensor<3xi1>, %arg1: tensor<2xi1>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_set_basis_state():
@@ -392,15 +406,13 @@ def test_set_basis_state():
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q3:%.+]] = qref.get [[reg]][ 3] : !qref.reg<4> -> !qref.bit
-    # CHECK: [[state:%.+]] = stablehlo.convert {{%.+}} : tensor<3xi1>
-    # CHECK: qref.set_basis_state([[state]]) [[q0]], [[q2]], [[q3]] : tensor<3xi1>, !qref.bit, !qref.bit, !qref.bit
+    # CHECK: qref.set_basis_state({{%.+}}) [[q0]], [[q2]], [[q3]] : tensor<3xi1>, !qref.bit, !qref.bit, !qref.bit
     qp.BasisState(np.array([0, 0, 1]), wires=[0, 2, 3])
 
     # CHECK: [[reg_alloc:%.+]] = qref.alloc( 1) : !qref.reg<1>
     # CHECK: [[q0_alloc:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<1> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
-    # CHECK: [[state:%.+]] = stablehlo.convert {{%.+}} : tensor<2xi1>
-    # CHECK: qref.set_basis_state([[state]]) [[q0_alloc]], [[q2]] : tensor<2xi1>, !qref.bit, !qref.bit
+    # CHECK: qref.set_basis_state({{%.+}}) [[q0_alloc]], [[q2]] : tensor<2xi1>, !qref.bit, !qref.bit
     # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<1>
     with qp.allocate(1) as q:
         qp.BasisState(np.array([0, 1]), wires=[q[0], 2])
@@ -524,19 +536,25 @@ def test_adjoint_with_ctrl():
     # CHECK: [[true:%.+]] = arith.constant true
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
-    # CHECK: qref.adjoint {
-    # CHECK:   [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
-    # CHECK:   [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
-    # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
-    # CHECK:   qref.custom "SWAP"() [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # ctrl over a function whose body is an adjoint region: `qref.ctrl { qref.adjoint { ... } }`.
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: qref.ctrl([[q0]]) ctrlvals([[true]]) {
+    # CHECK:   qref.adjoint {
+    # CHECK:     [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
+    # CHECK:     [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
+    # CHECK:     qref.custom "SWAP"() [[q1]], [[q2]] : !qref.bit, !qref.bit
+    # CHECK:   }
     # CHECK: }
     qp.ctrl(qp.adjoint(qp.SWAP), control=0)(wires=[1, 2])
 
+    # adjoint over a function whose body is a ctrl region: `qref.adjoint { qref.ctrl { ... } }`.
     # CHECK: qref.adjoint {
-    # CHECK:   [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
-    # CHECK:   [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
     # CHECK:   [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
-    # CHECK:   qref.custom "SWAP"() [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
+    # CHECK:   qref.ctrl([[q0]]) ctrlvals([[true]]) {
+    # CHECK:     [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
+    # CHECK:     [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
+    # CHECK:     qref.custom "SWAP"() [[q1]], [[q2]] : !qref.bit, !qref.bit
+    # CHECK:   }
     # CHECK: }
     qp.adjoint(qp.ctrl(qp.SWAP, control=0))(wires=[1, 2])
 
@@ -549,3 +567,57 @@ def test_adjoint_with_ctrl():
 
 
 print(test_adjoint_with_ctrl.mlir)
+
+
+# CHECK: func.func public @test_ctrl_with_allocation() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_ctrl_with_allocation():
+    """
+    Test ctrl with dynamic qubit allocation
+    """
+    # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
+    # CHECK-DAG: [[true:%.+]] = arith.constant true
+    # CHECK-DAG: [[false:%.+]] = arith.constant false
+    # CHECK-DAG: [[reg_device:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    def f(wires):
+        qp.RX(0.1, wires)
+
+    # CHECK: [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[alloc_q0:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK: [[alloc_q1:%.+]] = qref.get [[reg_alloc]][ 1] : !qref.reg<2> -> !qref.bit
+    with qp.allocate(2) as q:
+
+        # CHECK:  qref.ctrl([[alloc_q1]]) ctrlvals([[false]]) {
+        # CHECK:    qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
+        # CHECK:  }
+        qp.ctrl(qp.X, control=q[1], control_values=False)(q[0])
+
+        # CHECK:  qref.ctrl([[alloc_q0]]) ctrlvals([[false]]) {
+        # CHECK:    qref.custom "RX"([[angle]]) [[alloc_q1]] : !qref.bit
+        # CHECK:  }
+        qp.ctrl(f, control=q[0], control_values=False)(q[1])
+    # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<2>
+
+    # CHECK: [[q3:%.+]] = qref.get [[reg_device]][ 3] : !qref.reg<4> -> !qref.bit
+    # CHECK: qref.ctrl([[q3]]) ctrlvals([[true]]) {
+    # CHECK:   [[reg_alloc:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK:   [[alloc_q0:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK:   [[alloc_q1:%.+]] = qref.get [[reg_alloc]][ 1] : !qref.reg<2> -> !qref.bit
+    # CHECK:   qref.custom "PauliX"() [[alloc_q0]] : !qref.bit
+    # CHECK:   [[q0:%.+]] = qref.get [[reg_device]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK:   qref.custom "CNOT"() [[q0]], [[alloc_q1]] : !qref.bit, !qref.bit
+    # CHECK:   qref.dealloc [[reg_alloc]] : !qref.reg<2>
+    # CHECK: }
+    def g():
+        with qp.allocate(2) as q:
+            qp.X(q[0])
+            qp.CNOT(wires=[0, q[1]])
+
+    qp.ctrl(g, control=3, control_values=True)()
+
+    return qp.expval(qp.X(0))
+
+
+print(test_ctrl_with_allocation.mlir)

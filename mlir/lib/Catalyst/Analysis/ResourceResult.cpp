@@ -69,6 +69,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
     }
 
     mergeStringMap(measurements, other.measurements, method);
+    mergeStringMap(detailedOperations, other.detailedOperations, method);
     mergeStringMap(classicalInstructions, other.classicalInstructions, method);
     mergeStringMap(functionCalls, other.functionCalls, method);
 
@@ -87,6 +88,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
 
     hasBranches = hasBranches || other.hasBranches;
     hasDynLoop = hasDynLoop || other.hasDynLoop;
+    collectDetailedOperations = collectDetailedOperations || other.collectDetailedOperations;
 
     for (auto [ext, otherExt] : llvm::zip(extensions, other.extensions)) {
         assert(ext->name() == otherExt->name() && "extension names must match");
@@ -102,6 +104,10 @@ void ResourceResult::multiplyBy(double scalar) {
     }
 
     for (auto &entry : measurements) {
+        entry.getValue() *= scalar;
+    }
+
+    for (auto &entry : detailedOperations) {
         entry.getValue() *= scalar;
     }
 
@@ -214,6 +220,15 @@ llvm::json::Object ResourceResult::toJson() const {
     }
     funcObj["extended_fields"] = std::move(extendedFieldObject);
 
+    // Detail operations
+    llvm::json::Object detailedOperationsObject;
+    for (const auto &entry : detailedOperations) {
+        detailedOperationsObject[entry.getKey()] = countToJson(entry.getValue());
+    }
+    if (collectDetailedOperations) {
+        funcObj["quantum_operations_detailed"] = std::move(detailedOperationsObject);
+    }
+
     return funcObj;
 }
 
@@ -235,21 +250,17 @@ llvm::json::Object ResourceResult::toJson() const {
  *
  */
 DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result) {
-    SmallVector<NamedAttribute> entries;
 
+    assert(result.collectDetailedOperations && "detailedOperations should be collected");
+
+    SmallVector<NamedAttribute> entries;
     // operations
     SmallVector<NamedAttribute> opsEntries;
-    for (const auto &opEntry : result.operations) {
+    for (const auto &opEntry : result.detailedOperations) {
         llvm::StringRef opName = opEntry.getKey();
-        for (const auto &sizeEntry : opEntry.getValue()) {
-            auto &[nQubits, nParams] = sizeEntry.first;
-            int64_t count = static_cast<int64_t>(std::llround(sizeEntry.second));
-            std::string key =
-                (opName + "(" + std::to_string(nQubits) + "," + std::to_string(nParams) + ")")
-                    .str();
-            opsEntries.push_back(NamedAttribute(
-                StringAttr::get(ctx, key), IntegerAttr::get(IntegerType::get(ctx, 64), count)));
-        }
+        int64_t count = static_cast<int64_t>(std::llround(opEntry.getValue()));
+        opsEntries.push_back(NamedAttribute(StringAttr::get(ctx, opName),
+                                            IntegerAttr::get(IntegerType::get(ctx, 64), count)));
     }
     entries.push_back(
         NamedAttribute(StringAttr::get(ctx, "operations"), DictionaryAttr::get(ctx, opsEntries)));

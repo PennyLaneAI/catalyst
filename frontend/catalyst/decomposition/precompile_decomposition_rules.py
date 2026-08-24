@@ -21,7 +21,11 @@ from jax._src.lib.mlir import ir
 from pennylane.operation import Operator, Operator2
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.decomposition_rules import GraphOpID, compile_decomposition_rules
+from catalyst.decomposition.decomposition_rules import (
+    GraphOpID,
+    compile_decomposition_rules,
+    get_rules_from_module,
+)
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # TODO: Uncomment dynamic size wires ops once they are supported
@@ -69,40 +73,6 @@ COMPILER_OPS_FOR_DECOMPOSITION = {
     # qp.MultiRZ,
     # qp.GlobalPhase,
 }
-
-
-def get_rule_funcs_from_module(module: ir.Module) -> list[ir.Operation]:
-    funcOps = []
-
-    def find_condition(op):
-        if op.name == "func.func":
-            if "target_gate" in op.attributes:
-                old_attr = op.attributes["sym_name"]
-                op.attributes["sym_name"] = ir.StringAttr.get(
-                    "__builtin_" + old_attr.value.strip('"'), context=old_attr.context
-                )
-                funcOps.append(op)
-                return ir.WalkResult.SKIP
-        return ir.WalkResult.ADVANCE
-
-    module.operation.walk(find_condition)
-    return funcOps
-
-
-def get_rules_from_module(module: ir.Module) -> str:
-    """
-    Parse and modify decomposition rules from a ModuleOp.
-
-    Args:
-        module: an MLIR module object containing a FuncOp named `rule_wrapper` to be extracted
-
-    Returns:
-        str: The string representation of any decomposition rules from `module`, pre-pending the
-             `__builtin_` prefix to their names.
-    """
-    funcOps = get_rule_funcs_from_module(module)
-
-    return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
 def get_abstract_args(op_class: type[Operator]) -> list[type]:

@@ -25,6 +25,7 @@ import catalyst
 from catalyst import qjit
 
 # pylint:disable = protected-access,attribute-defined-outside-init,too-many-lines
+# pylint:disable = no-member,no-value-for-parameter
 
 
 @qp.transform
@@ -133,7 +134,10 @@ class TestDeviceLevelSpecs:
         assert cat_specs["device_name"] == "lightning.qubit"
         check_specs_same(cat_specs, pl_specs)
 
-    @pytest.mark.xfail(reason="Broken by changes to tape-based specs. Fixed in PL PR #9988")
+    @pytest.mark.xfail(reason="""
+        ControlledQubitUnitary doesn't work with specs in non-jit PL
+        https://app.shortcut.com/xanaduai/story/128500/controlledqubitunitary-doesn-t-work-with-specs-in-non-jit-pl
+    """)
     def test_complex(self):
         """Test a complex case of qp.specs() against PennyLane"""
 

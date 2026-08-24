@@ -242,7 +242,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // Try to generate resources if they're missing
         if (!resourcesAttr) {
-            ResourceAnalysis analysis(rule);
+            ResourceAnalysis analysis(rule, {}, /*collectDetailedOperations=*/true);
             if (const ResourceResult *flat = analysis.getFlattenedResource(rule.getName())) {
                 rule->setAttr("resources", buildResourceDict(&getContext(), *flat));
             }
@@ -319,13 +319,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     LogicalResult loadUserDecompositionRules(llvm::StringSet<> &userRuleNames,
                                              std::vector<RuleNode> &ruleNodes) {
         mlir::ModuleOp module = getOperation();
-        if (userRuleNames.empty()) {
-            return success();
-        }
 
         WalkResult walkResult = module.walk([&](mlir::func::FuncOp func) {
             if (func->hasAttr(DecompUtils::target_gate_attr_name)) {
-                if (userRuleNames.contains(func.getName())) {
+                if (userRuleNames.contains(func.getName()) ||
+                    func.getName().starts_with("__builtin")) {
                     if (failed(addRuleNode(func, ruleNodes))) {
                         return WalkResult::interrupt();
                     }

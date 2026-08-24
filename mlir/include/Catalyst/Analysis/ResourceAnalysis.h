@@ -35,9 +35,11 @@ class ResourceAnalysis {
 
     // walk all func::FuncOps within the operation.
     explicit ResourceAnalysis(ModuleOp moduleOp,
-                              ArrayRef<ExtensionProvider> extensionProviders = {});
+                              ArrayRef<ExtensionProvider> extensionProviders = {},
+                              bool collectDetailedOperations = false);
     explicit ResourceAnalysis(func::FuncOp funcOp,
-                              ArrayRef<ExtensionProvider> extensionProviders = {});
+                              ArrayRef<ExtensionProvider> extensionProviders = {},
+                              bool collectDetailedOperations = false);
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 
@@ -55,6 +57,8 @@ class ResourceAnalysis {
     const ResourceResult *getFlattenedResource(llvm::StringRef funcName) const;
 
   private:
+    bool collectDetailedOperations;
+
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
 
@@ -89,6 +93,7 @@ class ResourceAnalysis {
 
     // categorize and count a single operation
     void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint) const;
+    void collectDetailedOperation(Operation *op, ResourceResult &result, bool isAdjoint) const;
 };
 
 } // namespace catalyst

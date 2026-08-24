@@ -48,6 +48,7 @@ expected_ops_names = {
     "AllocQubitOp": "quantum.alloc_qb",
     "ComputationalBasisOp": "quantum.compbasis",
     "CountsOp": "quantum.counts",
+    "CtrlOp": "quantum.ctrl",
     "CustomOp": "quantum.custom",
     "DeallocOp": "quantum.dealloc",
     "DeallocQubitOp": "quantum.dealloc_qb",
@@ -131,6 +132,14 @@ expected_ops_init_kwargs = {
         {
             "operands": (obs, int_ssa, None, None),
             "result_types": (TensorType(Float64Type(), shape=(1,)), TensorType(i64, shape=(1,))),
+        }
+    ],
+    "CtrlOp": [
+        {
+            "in_ctrl_qubits": (q0,),
+            "in_ctrl_values": (bool_ssa,),
+            "args": (q1, q2),
+            "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q1, q2)),))),
         }
     ],
     "CustomOp": [
