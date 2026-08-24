@@ -18,29 +18,24 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
+#include "ConfigParser.hpp"
 #include "HwhsControllerSession.hpp"
 #include "TransportBackend.h"
 #include "WireProtocol.hpp"
 
 namespace {
 
-std::string cfg_get(const std::string &config, const std::string &key, const std::string &dflt) {
-    const std::string needle = key + "=";
-    std::size_t pos = 0;
-    while (pos <= config.size()) {
-        std::size_t semi = config.find(';', pos);
-        std::size_t len = (semi == std::string::npos) ? std::string::npos : semi - pos;
-        std::string tok = config.substr(pos, len);
-        if (tok.rfind(needle, 0) == 0) {
-            return tok.substr(needle.size());
-        }
-        if (semi == std::string::npos) {
-            break;
-        }
-        pos = semi + 1;
-    }
-    return dflt;
+std::string cfg_get(const std::string &config, const char *key, const std::string &dflt) {
+    std::string out = dflt;
+    catalyst::transport::common::configparser::for_each_kv(
+        config, [&](std::string_view k, std::string_view v) {
+            if (k == key) {
+                out = std::string(v);
+            }
+        });
+    return out;
 }
 
 std::optional<catalyst::transport::MemKind> mem_kind_opt(const std::string &config,

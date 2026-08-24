@@ -612,12 +612,12 @@ void HwhsControllerSession::demo_diff_dump() const {
         // round n (1-based) read table entry (n-1) % table_slots
         const std::uint32_t tslot = rseq ? ((rseq - 1u) % table_slots) : 0u;
         const volatile std::uint8_t *e = exp + static_cast<std::size_t>(tslot) * 64u;
-        char eb[200] = {}, rb[200] = {}, db[200] = {};
-        int ep = 0, rp = 0, dp = 0;
-        for (int i = 0; i < 32; ++i) { // the first 32 bytes carry everything meaningful
-            ep += std::snprintf(eb + ep, sizeof(eb) - ep, "%02x", e[i]);
-            rp += std::snprintf(rb + rp, sizeof(rb) - rp, "%02x", r[i]);
-            dp += std::snprintf(db + dp, sizeof(db) - dp, "%s", e[i] == r[i] ? ".." : "XX");
+        constexpr int kBytes = 32; // the first 32 bytes carry everything meaningful
+        char eb[2 * kBytes + 1] = {}, rb[2 * kBytes + 1] = {}, db[2 * kBytes + 1] = {};
+        for (int i = 0; i < kBytes; ++i) {
+            std::snprintf(eb + 2 * i, 3, "%02x", e[i]);
+            std::snprintf(rb + 2 * i, 3, "%02x", r[i]);
+            std::snprintf(db + 2 * i, 3, "%s", e[i] == r[i] ? ".." : "XX");
         }
         std::fprintf(stderr, "  reply slot %u (seq=%u) vs table slot %u\n", slot, rseq, tslot);
         std::fprintf(stderr, "         exp %s\n", eb);
