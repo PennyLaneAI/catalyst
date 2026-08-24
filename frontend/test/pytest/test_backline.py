@@ -518,6 +518,108 @@ class TestBacklineDemoIntegration:
         result = encoded_decoded_circuit(0)  # error_kind=0: identity, no injected error
         assert len(result) == 2
 
+    def test_cpu_controller_to_gpu_coproc_triton_css_bp(self, use_capture):
+        """CSS BP decoder built via Triton, adapted from demo 2 to a local memcpy placement.
+
+        Mirrors ``demos/demo_2_remote_cpu_to_remote_gpu_triton.py``: X- and Z-type parity checks
+        of the [[13,1,3]] hypergraph-product code fed to ``qp.backline.css_bp_decoder`` to
+        produce a Triton-compiled coprocessor library, wired into the QNode. Remote SSH
+        executors from the demo are replaced with a local memcpy backend so both roles run in
+        this process on the GPU runner. Compile-only: asserts on ``.mlir`` without executing.
+        Execution would need the GPU coproc runtime side of the memcpy backend to load the
+        Triton-built ``.so``, which is orthogonal to what the demo pattern is verifying.
+        """
+        pytest.importorskip("triton")
+
+        # Detect the local GPU's compute capability so the Triton kernel targets the actual
+        # hardware. On a runner without nvidia-smi (or without a CUDA GPU), skip.
+        import subprocess  # pylint: disable=import-outside-toplevel
+
+        try:
+            cc = subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip().splitlines()[0].strip()
+            major, minor = cc.split(".")
+            platform = f"cuda:{major}{minor}:32"
+        except (FileNotFoundError, subprocess.CalledProcessError, ValueError, IndexError):
+            pytest.skip("nvidia-smi with compute_cap not available on this runner")
+
+        n_data = 13
+        aux = n_data
+        Hx = np.array(
+            [
+                [1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                [0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0],
+                [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1],
+                [0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+            ]
+        )
+        Hz = np.array(
+            [
+                [1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0],
+                [0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1],
+                [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+            ]
+        )
+
+        try:
+            decoder = qp.backline.css_bp_decoder(
+                Hx, Hz, postprocess="osd", num_iters=5, prob=0.1, platform=platform
+            )
+        except (ImportError, RuntimeError, OSError) as exc:
+            pytest.skip(f"Triton css_bp_decoder build unavailable: {exc}")
+
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=n_data + 1),
+            init_args={"backend_lib": "libcatalyst_transport_memcpy_controller.so"},
+        )
+        coproc = qp.Coprocessor(
+            name="gpu-coproc",
+            coprocessor_fn=decoder,
+            init_args={"backend_lib": "libcatalyst_transport_memcpy_gpu_coprocessor.so"},
+        )
+        dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circuit():
+            qp.Hadamard(0)
+            z_syndrome = []
+            for row in Hz:
+                for q in np.flatnonzero(row):
+                    qp.CNOT(wires=[int(q), aux])
+                z_syndrome.append(qp.measure(aux, reset=True))
+            x_syndrome = []
+            for row in Hx:
+                qp.Hadamard(wires=aux)
+                for q in np.flatnonzero(row):
+                    qp.CNOT(wires=[aux, int(q)])
+                qp.Hadamard(wires=aux)
+                x_syndrome.append(qp.measure(aux, reset=True))
+            correction_z = qp.backline.decode(x_syndrome, decoder_id=0)
+            correction_x = qp.backline.decode(z_syndrome, decoder_id=1)
+            for q in range(n_data):
+                qp.cond(correction_x[q], qp.X)(wires=q)
+                qp.cond(correction_z[q], qp.Z)(wires=q)
+            return qp.sample([qp.measure(q) for q in range(n_data)])
+
+        ir = circuit.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "memcpy"' in ir
+        assert "libcatalyst_transport_memcpy_controller.so" in ir
+        assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
+        assert decoder.symbol_name in ir
+        assert decoder.lib_path is not None and decoder.lib_path in ir
+
 
 def test_placement_behind_a_wrapper_is_found(use_capture):
     """A placement reaches the module even when qjit was applied to a wrapper, not the QNode.
