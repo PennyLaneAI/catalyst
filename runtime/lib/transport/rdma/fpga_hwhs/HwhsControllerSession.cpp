@@ -143,7 +143,7 @@ Region HwhsControllerSession::region_alloc(std::uint64_t size, int mem_type, int
     // For case we need to allocate a BRAM on MR
     // we need to allocate a placeholder chunk in PL-DDR
     // and then rebase the MR onto the BRAM PA
-    bool bram_mr = access && (mem_type == XMEM_BRAM);
+    bool bram_mr = access && (mem_type == XMEM_BRAM || mem_type == XMEM_REPLY_BRAM);
     if (bram_mr) {
         r.mr_chunk = umm_.alloc_chunk(ctx, XMEM_PL_DDR, size, size, false);
         RT_FAIL_IF(r.mr_chunk < 0, "xib_umem_alloc_chunk (MR placeholder) failed");
@@ -280,8 +280,9 @@ int HwhsControllerSession::connect(const ConnectInfo &info) {
     // So that the MR is valid before the exchange_keys() call
     std::uint64_t reply_bytes = static_cast<std::uint64_t>(ring_slots_) * stride_;
     MemKind kind = reply_kind_.value_or(MemKind::Ddr);
+    int reply_mem_type = (kind == MemKind::Other) ? XMEM_REPLY_BRAM : mem_type_of(kind);
     reply_ =
-        region_alloc(reply_bytes, mem_type_of(kind),
+        region_alloc(reply_bytes, reply_mem_type,
                      IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
 
     return kOk;
