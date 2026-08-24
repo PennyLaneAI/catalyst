@@ -51,15 +51,24 @@ std::optional<double> getEstimatedIterationsHint(Operation *op);
 // Returns std::nullopt when the trip count cannot be determined statically.
 std::optional<double> resolveForLoopTripCount(scf::ForOp forOp);
 
-// Resolve the average trip count of a loop whose upper bound is 1) a fixed constant or 2)
-// the loop variable of any enclosing scf.for loop, including chains of nested loops regardless
-// of if the loops' variables are reused by subsequent loops. An enclosing
-// loop whose induction variable is not used composes as a scalar multiplicity from its own
-// `catalyst.estimated_iterations` hint (integer or fractional) or static trip count. An integer
-// hint on an enclosing loop whose induction variable *is* used supplies the first K induction
-// values; a fractional hint cannot, so other unresolved bounds (arithmetic expressions,
-// unrelated dynamic loops, `scf.if` barriers, a fractional estimate needed as an induction
-// domain) return std::nullopt.
+// Resolve the average trip count of a loop whose upper bound is either a fixed constant or the
+// induction variable of an enclosing scf.for loop. Chains of nested loops are supported to any
+// depth, and a loop may depend on any enclosing loop rather than only its immediate parent.
+//
+// Enclosing loops contribute in one of two ways:
+//   - If a later loop uses its induction variable, it is enumerated. Its domain comes from its
+//     own resolved bounds, or from an *integral* `catalyst.estimated_iterations = K` hint, which
+//     stands in for the first K induction values starting at its lower bound.
+//   - Otherwise it only scales how often the target loop is reached, so it contributes a scalar
+//     multiplicity taken from its `catalyst.estimated_iterations` hint (integer or fractional) or
+//     its static trip count.
+//
+// Returns std::nullopt when any bound in the chain stays unresolved: an arithmetic expression, an
+// unrelated dynamic loop, a non-scf.for ancestor such as `scf.if`, or an enclosing loop that must
+// be enumerated but offers only a fractional estimate.
+//
+// Note that the result is an *average* over every enumerated context, so it may be fractional
+// even when all bounds are static.
 std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forOp);
 
 } // namespace catalyst

@@ -25,7 +25,6 @@
 #include "llvm/Support/CheckedArithmetic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
@@ -91,7 +90,13 @@ std::optional<double> getEstimatedIterationsHint(Operation *op) {
         return std::nullopt;
     }
     if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
-        return static_cast<double>(intAttr.getValue().getSExtValue());
+        // trySExtValue() rather than getSExtValue(): the dialect verifier accepts an integer
+        // attribute of any width, and getSExtValue() asserts on an APInt too wide for an int64_t.
+        auto iterations = intAttr.getValue().trySExtValue();
+        if (!iterations) {
+            return std::nullopt;
+        }
+        return static_cast<double>(*iterations);
     }
     if (auto floatAttr = dyn_cast<FloatAttr>(attr)) {
         return floatAttr.getValueAsDouble();
@@ -119,26 +124,50 @@ std::optional<double> resolveForLoopTripCount(scf::ForOp forOp) {
 // Example: while evaluating `%i=3`, the map contain `%i` -> `3`.
 using InductionValues = llvm::DenseMap<Value, int64_t>;
 
-// Resolve `loop`'s own upper bound as a concrete integer so its induction values can be
-// enumerated: a resolved constant, the recorded value of an already-enumerated enclosing loop,
-// or, for an integer `catalyst.estimated_iterations = K` hint, the first K values starting at
-// `lower`. A fractional hint has no discrete domain.
-static std::optional<int64_t> resolveEnumerableUpperBound(scf::ForOp loop, int64_t lower,
-                                                          int64_t step,
-                                                          const InductionValues &inductionValues) {
+// The concrete integer value `loop`'s upper bound takes in the current enumeration context:
+// either a statically resolvable constant, or the recorded value of an already-enumerated
+// enclosing loop whose induction variable the bound uses directly.
+//
+// This is the single place that answers "what is this loop's upper bound right now"; every other
+// helper below is expressed in terms of it.
+static std::optional<int64_t> resolveUpperBound(scf::ForOp loop,
+                                                const InductionValues &inductionValues) {
     if (auto upper = resolveConstantInt(loop.getUpperBound())) {
         return upper;
     }
     auto it = inductionValues.find(loop.getUpperBound());
-    if (it != inductionValues.end()) {
-        return it->second;
+    if (it == inductionValues.end()) {
+        return std::nullopt;
     }
+    return it->second;
+}
+
+// The `catalyst.estimated_iterations` hint, but only when it can serve as an induction domain,
+// i.e. when it is a whole, non-negative number of iterations. A fractional estimate describes an
+// average and has no discrete set of induction values to enumerate.
+static std::optional<int64_t> getIntegralEstimatedIterationsHint(scf::ForOp loop) {
     auto intAttr = dyn_cast_or_null<IntegerAttr>(loop->getAttr(EstimatedIterationsAttrName));
     if (!intAttr) {
         return std::nullopt;
     }
-    auto iterationCount = intAttr.getValue().trySExtValue();
-    if (!iterationCount || *iterationCount < 0) {
+    auto iterations = intAttr.getValue().trySExtValue();
+    if (!iterations || *iterations < 0) {
+        return std::nullopt;
+    }
+    return *iterations;
+}
+
+// Resolve `loop`'s own upper bound as a concrete integer so its induction values can be
+// enumerated: the value it takes in the current context, or failing that an integral
+// `catalyst.estimated_iterations = K` hint standing in for the first K values from `lower`.
+static std::optional<int64_t> resolveEnumerableUpperBound(scf::ForOp loop, int64_t lower,
+                                                          int64_t step,
+                                                          const InductionValues &inductionValues) {
+    if (auto upper = resolveUpperBound(loop, inductionValues)) {
+        return upper;
+    }
+    auto iterationCount = getIntegralEstimatedIterationsHint(loop);
+    if (!iterationCount) {
         return std::nullopt;
     }
     auto upper = llvm::checkedMulAdd(*iterationCount, step, lower);
@@ -149,8 +178,7 @@ static std::optional<int64_t> resolveEnumerableUpperBound(scf::ForOp loop, int64
 }
 
 // Resolve `loop`'s own scalar trip count: an estimated-iterations hint (integer or fractional),
-// or lower/step/upper bounds where the upper bound is a resolved constant or the recorded value
-// of an already-enumerated enclosing loop.
+// or lower/step/upper bounds resolved in the current enumeration context.
 static std::optional<double> resolveOwnTripCount(scf::ForOp loop,
                                                  const InductionValues &inductionValues) {
     if (auto iters = getEstimatedIterationsHint(loop)) {
@@ -158,16 +186,9 @@ static std::optional<double> resolveOwnTripCount(scf::ForOp loop,
     }
     auto lower = resolveConstantInt(loop.getLowerBound());
     auto step = resolveConstantInt(loop.getStep());
-    if (!lower || !step || *step <= 0) {
+    auto upper = resolveUpperBound(loop, inductionValues);
+    if (!lower || !step || !upper || *step <= 0) {
         return std::nullopt;
-    }
-    auto upper = resolveConstantInt(loop.getUpperBound());
-    if (!upper) {
-        auto it = inductionValues.find(loop.getUpperBound());
-        if (it == inductionValues.end()) {
-            return std::nullopt;
-        }
-        upper = it->second;
     }
     return static_cast<double>(computeTripCount(*lower, *upper, *step));
 }
