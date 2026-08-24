@@ -61,7 +61,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang make
+          sudo apt-get install -y cmake ninja-build make
           python3 -m pip install "nanobind<2.13" pybind11
 
       - name: Set up Soft-RoCE loopback
@@ -86,8 +86,8 @@ jobs:
       - name: Build Catalyst-Runtime with ENABLE_TRANSPORT=ON
         run: |
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which clang) \
-          CXX_COMPILER=$(which clang++) \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_ASAN=OFF \
           ENABLE_TRANSPORT=ON \
@@ -96,8 +96,8 @@ jobs:
       - name: Run transport test suite (Catch2 + loopback)
         run: |
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which clang) \
-          CXX_COMPILER=$(which clang++) \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           make test-runtime-transport
 
@@ -109,7 +109,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: llvm-build
-          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-clang
+          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
           fail-on-cache-miss: true
 
       - name: Restore cached StableHLO source and build
@@ -122,7 +122,7 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: stablehlo-build
-          key: ${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-clang
+          key: ${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
           fail-on-cache-miss: true
 
       - name: Restore cached Enzyme source and build
@@ -135,7 +135,7 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: enzyme-build
-          key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-clang
+          key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
           fail-on-cache-miss: true
 
       - name: Install Python runtime requirements
@@ -151,8 +151,8 @@ jobs:
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
         run: |
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which clang) \
-          CXX_COMPILER=$(which clang++) \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_BUILD_DIR="$(pwd)/llvm-build" \
           STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
