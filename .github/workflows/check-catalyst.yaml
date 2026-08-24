@@ -69,7 +69,11 @@ jobs:
 
   runtime:
     name: Catalyst-Runtime Build
-    needs: [constants, changes, determine_runner]
+    # `llvm` is only needed when ENABLE_EXECUTOR=ON (see the Build step below), but adding it
+    # unconditionally to `needs` costs some parallelism for a much smaller graph. LLVM cache
+    # restore keeps the extra work near-zero on warm cache; transport-touching PRs get
+    # catalyst-executor built for the subprocess-based rdma_loopback pytest.
+    needs: [constants, changes, llvm, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
@@ -87,8 +91,11 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install ninja-build make cmake clang
-          python3 -m pip install "nanobind<2.13" pybind11
+          # lld and libxml2-dev are consumed by HandleLLVMOptions/LLVMConfig when catalyst-
+          # executor's cmake picks up the LLVM package. numpy is required by mlir/Makefile's
+          # llvm target for the Python bindings' NumPy include-dir shell substitution.
+          sudo apt-get -y -q install ninja-build make cmake clang lld libxml2-dev
+          python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -105,6 +112,17 @@ jobs:
           repository: llvm/llvm-project
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
+
+      # When ENABLE_EXECUTOR=ON (transport-touching PRs), `make runtime` chains through
+      # `make mlir`, which needs a built LLVM to find via find_package. Restore the cache the
+      # llvm: job populated (guaranteed present by our `needs: [llvm]`).
+      - name: Get Cached LLVM Build
+        if: needs.changes.outputs.transport == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: llvm-build
+          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+          fail-on-cache-miss: true
 
       - name: Build Catalyst-Runtime
         env:
