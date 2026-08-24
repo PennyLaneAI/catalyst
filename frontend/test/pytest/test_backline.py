@@ -536,11 +536,16 @@ class TestBacklineDemoIntegration:
         import subprocess  # pylint: disable=import-outside-toplevel
 
         try:
-            cc = subprocess.check_output(
-                ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip().splitlines()[0].strip()
+            cc = (
+                subprocess.check_output(
+                    ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                )
+                .strip()
+                .splitlines()[0]
+                .strip()
+            )
             major, minor = cc.split(".")
             platform = f"cuda:{major}{minor}:32"
         except (FileNotFoundError, subprocess.CalledProcessError, ValueError, IndexError):
