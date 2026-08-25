@@ -565,7 +565,6 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             return staticValues;
         }
     }];
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
 }
 

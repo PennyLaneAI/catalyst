@@ -70,6 +70,10 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     ];
 }
 
+def AdjointLoweringCanonicalization : Pass<"adjoint-lowering-canonicalization"> {
+    let summary = "Applies canonicalization patterns for adjoint quantum operations.";
+}
+
 def CtrlLoweringPass : Pass<"ctrl-lowering"> {
     let summary = "Lower ctrl regions by distributing the controls over the enclosed operations.";
 
