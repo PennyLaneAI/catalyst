@@ -364,49 +364,34 @@ class TestBacklineDemoIntegration:
         # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
         assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
 
-    def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture, local_executor):
-        """Demo 1a: local CPU ↔ local CPU over RDMA loopback, out-of-process.
+    def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture):
+        """Demo 1a: local CPU ↔ local CPU over RDMA loopback, both in-process.
 
-        Mirrors ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``, but runs the coprocessor role
-        in a ``catalyst-executor`` subprocess on ``127.0.0.1`` (via the ``local_executor``
-        fixture) instead of in this process. An earlier in-process version SIGSEGV'd inside
-        ``ghz()`` on GH-hosted ubuntu's ``rdma_rxe`` loopback: the failure mode was specific to
-        two ibverbs QPs opened by the same process, and the subprocess split sidesteps it. This
-        also mirrors real deployments, where controller and coprocessor always live in
-        different processes.
+        Direct mirror of ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``. Both roles run in
+        this process and reach each other through the ``rxe0`` soft-RoCE device installed by
+        the ``setup-soft-roce`` composite action: the ibverbs path is real while the fabric
+        underneath it is software.
 
-        The ``local_executor`` fixture owns the ``catalyst-executor`` subprocess's lifecycle
-        and stops it on teardown, so the coprocessor's OOB TCP port is released cleanly and
-        reruns / ``pytest-xdist`` don't collide.
+        The config strings follow the demo's ``LOCAL_CFG`` shape - ``dev=<rxe device>;gid=<idx>``,
+        which ``runtime/lib/transport/rdma/common/BackendConfig.hpp`` requires. ``backend_lib``
+        is left off ``init_args`` so the compiler resolves the transport backend via the
+        (``transport``, ``hardware``) mapping in ``backline._resolve_backend_lib`` to an absolute
+        path under ``RUNTIME_LIB_DIR`` - avoiding a runtime ``dlopen`` of a bare filename that
+        the loader would search for on ``LD_LIBRARY_PATH``.
         """
         steane_lib = str(
             Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
         )
-        # The executor subprocess needs the coprocessor's decoder .so loaded (in addition to
-        # the runtime libs the fixture already loads) so that the JIT'd coprocessor module can
-        # resolve ``steane_coprocessor`` and its ``_catalyst_pyface_/ciface_coproc_*`` wrappers.
-        ex = local_executor(extra_plugins=[steane_lib])
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("null.qubit", wires=3),
-            init_args={
-                "backend_lib": "libcatalyst_transport_cpu_verbs_controller.so",
-                "config": "cfg",
-            },
+            init_args={"config": "dev=rxe0;gid=1"},
         )
         coproc = qp.Coprocessor(
             name="cpu-coproc",
             coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
             endpoint=qp.Endpoint("127.0.0.1", 18590),
-            # ``Executor()`` with no host/address is a subprocess on 127.0.0.1 (see
-            # frontend/catalyst/executor/manager.py). The ``local_executor`` fixture is a
-            # factory: it launches the subprocess with ``librt_transport.so`` + ``librt_capi.so``
-            # loaded, plus the ``extra_plugins`` above, and owns the teardown.
-            executor=ex,
-            init_args={
-                "backend_lib": "libcatalyst_transport_cpu_verbs_coprocessor.so",
-                "config": "cfg",
-            },
+            init_args={"config": "dev=rxe0;gid=1"},
         )
         dev = qp.Backline(
             controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
