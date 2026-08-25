@@ -36,6 +36,10 @@ using namespace mlir;
 
 namespace catalyst {
 
+// Evaluating loops without a closed form may require enumerating many trip counts. 
+// Bound that work so large dependency chains fall back to symbolic resource counts.
+static constexpr uint64_t kMaxEnumerationSteps = 1'000'000;
+
 static int64_t computeTripCount(int64_t lowerBound, int64_t upperBound, int64_t step) {
     assert(step > 0);
     if (upperBound <= lowerBound) {
@@ -276,7 +280,8 @@ struct TripCountSummary {
 // otherwise its own trip count is folded into `pathWeight` without enumeration.
 static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> chain,
                                                      size_t position, double pathWeight,
-                                                     InductionValues &inductionValues) {
+                                                     InductionValues &inductionValues,
+                                                     uint64_t &enumerationSteps) {
     scf::ForOp loop = chain[position];
     llvm::ArrayRef<scf::ForOp> descendants = chain.drop_front(position + 1);
     // Whether or not *any* subsequent loop's trip count depends on the current induction variable
@@ -295,7 +300,8 @@ static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> 
         if (descendants.empty()) {
             return TripCountSummary{pathWeight * *tripCount, pathWeight};
         }
-        return evaluateChain(chain, position + 1, pathWeight * *tripCount, inductionValues);
+        return evaluateChain(chain, position + 1, pathWeight * *tripCount, inductionValues,
+                             enumerationSteps);
     }
 
     auto lower = resolveConstantInt(loop.getLowerBound());
@@ -308,10 +314,19 @@ static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> 
         return std::nullopt;
     }
 
+    uint64_t tripCount = static_cast<uint64_t>(computeTripCount(*lower, *upper, *step));
+    // To avoid overflow when adding tripCount to enumerationSteps, we check if the result
+    // is greater than kMaxEnumerationSteps - enumerationSteps instead.
+    if (tripCount > kMaxEnumerationSteps - enumerationSteps) {
+        return std::nullopt;
+    }
+    enumerationSteps += tripCount;
+
     TripCountSummary summary;
     for (int64_t iv = *lower; iv < *upper; iv += *step) {
         inductionValues[loop.getInductionVar()] = iv;
-        auto nested = evaluateChain(chain, position + 1, pathWeight, inductionValues);
+        auto nested =
+            evaluateChain(chain, position + 1, pathWeight, inductionValues, enumerationSteps);
         if (!nested) {
             inductionValues.erase(loop.getInductionVar());
             return std::nullopt;
@@ -333,7 +348,8 @@ std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forO
     }
 
     InductionValues inductionValues;
-    auto summary = evaluateChain(*chain, 0, /*pathWeight=*/1.0, inductionValues);
+    uint64_t enumerationSteps = 0;
+    auto summary = evaluateChain(*chain, 0, /*pathWeight=*/1.0, inductionValues, enumerationSteps);
     if (!summary) {
         return std::nullopt;
     }
