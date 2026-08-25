@@ -39,8 +39,7 @@ _NON_INVERTIBLE_MARKERS = ("qref.measure", "quantum.measure")
 
 
 def name_wrap_adjoint(op_id: str) -> str:
-    """Name-wrap the adjoint modifier around a graphOpId.
-    """
+    """Name-wrap the adjoint modifier around a graphOpId."""
     split = len(op_id)
     for i, char in enumerate(op_id):
         if char in "{[":
