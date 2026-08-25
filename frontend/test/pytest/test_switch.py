@@ -113,6 +113,78 @@ class TestSwitchToJaxpr:
         result = circuit.jaxpr
         assert asline(expected) == asline(result)
 
+
+class TestSwitchEstimatedProbabilityValidation:
+    """Validation of the ``estimated_probability`` resource hint through the ``switch`` API."""
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_partial_probabilities_raise(self):
+        """A hint on some but not all non-default branches is an error."""
+        with pytest.raises(
+            ValueError, match="must be provided for every non-default branch"
+        ):
+
+            @qjit
+            def circuit(i):
+                @switch(i)
+                def my_switch():
+                    return -i
+
+                @my_switch.branch(0, estimated_probability=0.3)
+                def my_branch():
+                    return 0
+
+                @my_switch.branch(3)  # missing estimated_probability
+                def my_branch():  # pylint: disable=function-redefined
+                    return 3
+
+                return my_switch()
+
+            circuit(0)
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_probabilities_summing_above_one_raise(self):
+        """The non-default branch probabilities must sum to at most 1."""
+        with pytest.raises(ValueError, match="must sum to at most 1"):
+
+            @qjit
+            def circuit(i):
+                @switch(i)
+                def my_switch():
+                    return -i
+
+                @my_switch.branch(0, estimated_probability=0.7)
+                def my_branch():
+                    return 0
+
+                @my_switch.branch(3, estimated_probability=0.6)
+                def my_branch():  # pylint: disable=function-redefined
+                    return 3
+
+                return my_switch()
+
+            circuit(0)
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_out_of_range_probability_raises(self):
+        """Each probability must lie in [0, 1]."""
+        with pytest.raises(ValueError, match=r"must be in \[0, 1\]"):
+
+            @qjit
+            def circuit(i):
+                @switch(i)
+                def my_switch():
+                    return -i
+
+                @my_switch.branch(0, estimated_probability=1.5)
+                def my_branch():
+                    return 0
+
+                return my_switch()
+
+            circuit(0)
+
+
 class TestInterpreted:
     """Test that Catalyst switches can be used with the python interpreter."""
 

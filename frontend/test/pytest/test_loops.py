@@ -95,6 +95,28 @@ class TestLoopToJaxpr:
         assert expected.strip() == result
 
 
+class TestEstimatedIterationsValidation:
+    """Validation of the ``estimated_iterations`` resource hint for loops."""
+
+    @pytest.mark.parametrize("bad", [-1, -0.5])
+    def test_for_loop_negative_raises(self, bad):
+        """A negative ``estimated_iterations`` on a for loop is rejected at construction."""
+        with pytest.raises(ValueError, match="must be a non-negative int or float"):
+
+            @for_loop(0, 10, 1, estimated_iterations=bad)
+            def loop(_, v):  # pylint: disable=unused-variable
+                return v
+
+    @pytest.mark.parametrize("bad", [-1, -0.5])
+    def test_while_loop_negative_raises(self, bad):
+        """A negative ``estimated_iterations`` on a while loop is rejected at construction."""
+        with pytest.raises(ValueError, match="must be a non-negative int or float"):
+
+            @while_loop(lambda v: v < 10, estimated_iterations=bad)
+            def loop(v):  # pylint: disable=unused-variable
+                return v + 1
+
+
 class TestWhileLoops:
     """Test the Catalyst while_loop operation."""
 

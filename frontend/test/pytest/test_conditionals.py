@@ -28,6 +28,7 @@ from catalyst import api_extensions
 from catalyst import cond as catalyst_cond
 from catalyst import measure as catalyst_measure
 from catalyst import qjit
+from catalyst.api_extensions.control_flow import collect_estimated_probabilities
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=missing-function-docstring
@@ -185,6 +186,85 @@ class TestCondToJaxpr:
         result = circuit.jaxpr
         assert asline(expected) == asline(result)
 
+
+class TestEstimatedProbabilityValidation:
+    """Validation of the ``estimated_probability`` resource hint, both at the level of the
+    shared ``collect_estimated_probabilities`` helper and through the ``cond`` public API."""
+
+    def test_all_none_returns_none(self):
+        """When no branch provides a hint, no probabilities are collected."""
+        assert collect_estimated_probabilities([None, None, None]) is None
+
+    def test_valid_probabilities_are_floats(self):
+        """Valid hints are returned as a tuple of floats."""
+        assert collect_estimated_probabilities([0.2, 0.5]) == (0.2, 0.5)
+
+    def test_partial_probabilities_raise(self):
+        """A hint on some but not all non-default branches is an error."""
+        with pytest.raises(
+            ValueError, match="must be provided for every non-default branch"
+        ):
+            collect_estimated_probabilities([0.2, None])
+
+    @pytest.mark.parametrize("invalid", [-0.1, 1.5])
+    def test_out_of_range_probability_raises(self, invalid):
+        """Each probability must lie in [0, 1]."""
+        with pytest.raises(ValueError, match=r"must be in \[0, 1\]"):
+            collect_estimated_probabilities([invalid])
+
+    def test_probabilities_summing_above_one_raise(self):
+        """The non-default branch probabilities must sum to at most 1."""
+        with pytest.raises(ValueError, match="must sum to at most 1"):
+            collect_estimated_probabilities([0.6, 0.6])
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_partial_probabilities_raise_through_cond(self):
+        """The partial-probability error propagates through the ``cond`` API when only some
+        branches specify ``estimated_probability``."""
+
+        @qjit
+        def circuit(n):
+            @catalyst_cond(n == 5, estimated_probability=0.2)
+            def cond_fn():
+                return n**2
+
+            @cond_fn.else_if(n < 3)  # missing estimated_probability
+            def cond_fn():  # pylint: disable=function-redefined
+                return n**3
+
+            @cond_fn.otherwise
+            def cond_fn():  # pylint: disable=function-redefined
+                return n
+
+            return cond_fn()
+
+        with pytest.raises(
+            ValueError, match="must be provided for every non-default branch"
+        ):
+            circuit(5)
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_probabilities_summing_above_one_raise_through_cond(self):
+        """The sum-to-one error propagates through the ``cond`` API."""
+
+        @qjit
+        def circuit(n):
+            @catalyst_cond(n == 5, estimated_probability=0.7)
+            def cond_fn():
+                return n**2
+
+            @cond_fn.else_if(n < 3, estimated_probability=0.6)
+            def cond_fn():  # pylint: disable=function-redefined
+                return n**3
+
+            @cond_fn.otherwise
+            def cond_fn():  # pylint: disable=function-redefined
+                return n
+
+            return cond_fn()
+
+        with pytest.raises(ValueError, match="must sum to at most 1"):
+            circuit(5)
 
 
 # pylint: disable=too-many-public-methods,too-many-lines
