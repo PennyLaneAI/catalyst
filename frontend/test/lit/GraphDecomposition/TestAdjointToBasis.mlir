@@ -12,38 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Hadamard=1.0 alt-decomps=Adjoint(U{}{wires:1}{})=adj_u,Adjoint(Hadamard{}{wires:1}{})=adj_h})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0 alt-decomps=Adjoint(testU{}{wires:1}{})=adj_u,Adjoint(testHadamard{}{wires:1}{})=adj_h})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @self_adjoint(
 // CHECK-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @self_adjoint(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: [[O:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
+  // CHECK: [[O:%.+]] = quantum.custom "testHadamard"() [[Q]] : !quantum.bit
   // CHECK: return [[O]]
-  %out = quantum.custom "Hadamard"() %q adj : !quantum.bit
+  %out = quantum.custom "testHadamard"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }
 
 // CHECK-LABEL: func.func @distribution(
 // CHECK-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @distribution(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: [[A:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
-  // CHECK: [[B:%.+]] = quantum.custom "Hadamard"() [[A]] : !quantum.bit
+  // CHECK: [[A:%.+]] = quantum.custom "testHadamard"() [[Q]] : !quantum.bit
+  // CHECK: [[B:%.+]] = quantum.custom "testHadamard"() [[A]] : !quantum.bit
   // CHECK: return [[B]]
-  %out = quantum.custom "U"() %q adj : !quantum.bit
+  %out = quantum.custom "testU"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }
 
 func.func private @adj_h(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(Hadamard{}{wires:1}{})",
-    resources = {operations = {"Hadamard{}{wires:1}{}" = 1 : i64}} } {
-  %o = quantum.custom "Hadamard"() %q : !quantum.bit
+    target_gate = "Adjoint(testHadamard{}{wires:1}{})",
+    resources = {operations = {"testHadamard{}{wires:1}{}" = 1 : i64}} } {
+  %o = quantum.custom "testHadamard"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
 func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(U{}{wires:1}{})",
-    resources = {operations = {"Adjoint(Hadamard{}{wires:1}{})" = 2 : i64}} } {
-  %a = quantum.custom "Hadamard"() %q adj : !quantum.bit
-  %b = quantum.custom "Hadamard"() %a adj : !quantum.bit
+    target_gate = "Adjoint(testU{}{wires:1}{})",
+    resources = {operations = {"Adjoint(testHadamard{}{wires:1}{})" = 2 : i64}} } {
+  %a = quantum.custom "testHadamard"() %q adj : !quantum.bit
+  %b = quantum.custom "testHadamard"() %a adj : !quantum.bit
   return %b : !quantum.bit
 }

@@ -12,29 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Adjoint(T)=1.0 alt-decomps=S{}{wires:1}{}=s_to_adjt})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Adjoint(testT)=1.0 alt-decomps=testS{}{wires:1}{}=s_to_adjt})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @adjoint_in_gateset(
 // CHECK-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @adjoint_in_gateset(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: [[O:%.+]] = quantum.custom "T"() [[Q]] adj : !quantum.bit
+  // CHECK: [[O:%.+]] = quantum.custom "testT"() [[Q]] adj : !quantum.bit
   // CHECK: return [[O]]
-  %out = quantum.custom "T"() %q adj : !quantum.bit
+  %out = quantum.custom "testT"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }
 
 // CHECK-LABEL: func.func @decompose_to_adjoint(
 // CHECK-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @decompose_to_adjoint(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: [[O:%.+]] = quantum.custom "T"() [[Q]] adj : !quantum.bit
+  // CHECK: [[O:%.+]] = quantum.custom "testT"() [[Q]] adj : !quantum.bit
   // CHECK: return [[O]]
-  %out = quantum.custom "S"() %q : !quantum.bit
+  %out = quantum.custom "testS"() %q : !quantum.bit
   return %out: !quantum.bit
 }
 
 func.func private @s_to_adjt(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "S{}{wires:1}{}",
-    resources = {operations = {"Adjoint(T{}{wires:1}{})" = 1 : i64}} } {
-  %o = quantum.custom "T"() %q adj : !quantum.bit
+    target_gate = "testS{}{wires:1}{}",
+    resources = {operations = {"Adjoint(testT{}{wires:1}{})" = 1 : i64}} } {
+  %o = quantum.custom "testT"() %q adj : !quantum.bit
   return %o : !quantum.bit
 }
