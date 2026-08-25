@@ -94,7 +94,8 @@ jobs:
           # lld and libxml2-dev are consumed by HandleLLVMOptions/LLVMConfig when catalyst-
           # executor's cmake picks up the LLVM package. numpy is required by mlir/Makefile's
           # llvm target for the Python bindings' NumPy include-dir shell substitution.
-          sudo apt-get -y -q install ninja-build make cmake clang lld libxml2-dev
+          # ccache is picked up automatically by runtime/Makefile's COMPILER_LAUNCHER default.
+          sudo apt-get -y -q install ninja-build make cmake ccache clang lld libxml2-dev
           python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
 
       - name: Get Cached LLVM Source
@@ -124,6 +125,17 @@ jobs:
           key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
           fail-on-cache-miss: true
 
+      # Feature branches restore the most-recent main-populated ccache; they do not save (the
+      # save step below is gated on refs/heads/main) so PR runs don't overwrite main's warm cache.
+      - name: Restore CCache on feature branches
+        id: restore-ccache
+        if: ${{ github.ref != 'refs/heads/main' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          restore-keys: ${{ runner.os }}-ccache-
+
       - name: Build Catalyst-Runtime
         env:
           # Turn on ENABLE_TRANSPORT only when the PR touches transport paths (see the
@@ -134,7 +146,7 @@ jobs:
           ENABLE_TRANSPORT: ${{ needs.changes.outputs.transport == 'true' && 'ON' || 'OFF' }}
           ENABLE_EXECUTOR: ${{ needs.changes.outputs.transport == 'true' && 'ON' || 'OFF' }}
         run: |
-          COMPILER_LAUNCHER="" \
+          CCACHE_DIR="$(pwd)/.ccache" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
@@ -145,7 +157,7 @@ jobs:
           ENABLE_EXECUTOR="$ENABLE_EXECUTOR" \
           make runtime
 
-          COMPILER_LAUNCHER="" \
+          CCACHE_DIR="$(pwd)/.ccache" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
@@ -200,6 +212,15 @@ jobs:
             oqc-build/*.so
             oqc-build/backend/*.toml
           retention-days: 1
+
+      # Only main pushes save; feature branches read the newest main-populated cache above.
+      - name: Cache CCache on main branch
+        id: save-ccache
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ${{ runner.os }}-ccache-${{ github.run_id }}
 
   llvm:
     name: LLVM Build
@@ -635,14 +656,6 @@ jobs:
         dot -V
         dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
-    - name: Run Python Pytest/Lit Tests
-      run: |
-        COVERAGE_REPORT="xml" \
-        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        make coverage-frontend ENABLE_OQD=ON
-        mv coverage.xml coverage-${{ github.job }}.xml
-
     - name: Run backline transport integration tests
       # Only fires when the PR touched transport paths (see the `changes` job). The runtime
       # artifact downloaded above already includes the transport backend .so files because
@@ -658,6 +671,14 @@ jobs:
         python3 -m pytest -v \
           "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
           "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback"
+
+    - name: Run Python Pytest/Lit Tests
+      run: |
+        COVERAGE_REPORT="xml" \
+        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        make coverage-frontend ENABLE_OQD=ON
+        mv coverage.xml coverage-${{ github.job }}.xml
 
     - name: Upload to Codecov
       uses: codecov/codecov-action@v4
