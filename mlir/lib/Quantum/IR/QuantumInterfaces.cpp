@@ -158,7 +158,15 @@ std::string defaultGetGraphOpId(Operation *op) {
 
     DecomposableGate gate = cast<DecomposableGate>(op);
 
-    ss << gate.getOperatorName();
+    // Fold the adjoint modifier into the operator name so that `Op` and `Adjoint(Op)` are
+    // distinct in the graphOpId. The modifier wraps only the name; the param/wire/static/uid
+    // groups follow it, i.e. `Adjoint(Rot){...}{wires...}`, not `Adjoint(Rot{...}{wires...})`.
+    std::string name = gate.getOperatorName();
+    if (op->hasAttr("adjoint")) {
+        name = "Adjoint(" + name + ")";
+    }
+
+    ss << name;
     printDynamicShape(gate.getDynamicShape(), ss);
     printWireLens(gate.getWireLens(), ss);
     printAttr(gate.getStaticData(), ss);
@@ -167,12 +175,6 @@ std::string defaultGetGraphOpId(Operation *op) {
     }
     ss.flush();
 
-    // Fold the adjoint modifier into the identity so that `Op` and `Adjoint(Op)`
-    // are distinct in the graphOpId. Note that the modifier is now carried in
-    // the name, so the graph-solver never needs a modifier attribute.
-    if (op->hasAttr("adjoint")) {
-        return "Adjoint(" + out + ")";
-    }
     return out;
 }
 

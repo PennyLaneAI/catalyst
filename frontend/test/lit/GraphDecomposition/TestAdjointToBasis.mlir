@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0 alt-decomps=Adjoint(testU{}{wires:1}{})=adj_u,Adjoint(testHadamard{}{wires:1}{})=adj_h})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0 alt-decomps=Adjoint(testU){}{wires:1}{}=adj_u,Adjoint(testHadamard){}{wires:1}{}=adj_h})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @self_adjoint(
 // CHECK-SAME:  [[Q:%.+]]: !quantum.bit
@@ -34,15 +34,15 @@ func.func @distribution(%q: !quantum.bit) -> !quantum.bit {
 }
 
 func.func private @adj_h(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testHadamard{}{wires:1}{})",
+    target_gate = "Adjoint(testHadamard){}{wires:1}{}",
     resources = {operations = {"testHadamard{}{wires:1}{}" = 1 : i64}} } {
   %o = quantum.custom "testHadamard"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
 func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testU{}{wires:1}{})",
-    resources = {operations = {"Adjoint(testHadamard{}{wires:1}{})" = 2 : i64}} } {
+    target_gate = "Adjoint(testU){}{wires:1}{}",
+    resources = {operations = {"Adjoint(testHadamard){}{wires:1}{}" = 2 : i64}} } {
   %a = quantum.custom "testHadamard"() %q adj : !quantum.bit
   %b = quantum.custom "testHadamard"() %a adj : !quantum.bit
   return %b : !quantum.bit

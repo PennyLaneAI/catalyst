@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRZ=1.0 alt-decomps=Adjoint(testRot{}{wires:1}{})=[dedicated,distribute],Adjoint(testRZ{}{wires:1}{})=adj_rz})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRZ=1.0 alt-decomps=Adjoint(testRot){}{wires:1}{}=[dedicated,distribute],Adjoint(testRZ){}{wires:1}{}=adj_rz})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @competing(
 // CHECK-SAME:  [[Q:%.+]]: !quantum.bit
@@ -26,7 +26,7 @@ func.func @competing(%q: !quantum.bit) -> !quantum.bit {
 
 // pathway 1: Adjoint(testRot) -> testRZ (cost 1).
 func.func private @dedicated(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testRot{}{wires:1}{})",
+    target_gate = "Adjoint(testRot){}{wires:1}{}",
     resources = {operations = {"testRZ{}{wires:1}{}" = 1 : i64}} } {
   %o = quantum.custom "testRZ"() %q : !quantum.bit
   return %o : !quantum.bit
@@ -34,15 +34,15 @@ func.func private @dedicated(%q: !quantum.bit) -> !quantum.bit attributes {
 
 // pathway 2: Adjoint(testRot) -> Adjoint(testRZ) Adjoint(testRZ) -> testRZ testRZ (cost 2).
 func.func private @distribute(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testRot{}{wires:1}{})",
-    resources = {operations = {"Adjoint(testRZ{}{wires:1}{})" = 2 : i64}} } {
+    target_gate = "Adjoint(testRot){}{wires:1}{}",
+    resources = {operations = {"Adjoint(testRZ){}{wires:1}{}" = 2 : i64}} } {
   %a = quantum.custom "testRZ"() %q adj : !quantum.bit
   %b = quantum.custom "testRZ"() %a adj : !quantum.bit
   return %b : !quantum.bit
 }
 
 func.func private @adj_rz(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testRZ{}{wires:1}{})",
+    target_gate = "Adjoint(testRZ){}{wires:1}{}",
     resources = {operations = {"testRZ{}{wires:1}{}" = 1 : i64}} } {
   %o = quantum.custom "testRZ"() %q : !quantum.bit
   return %o : !quantum.bit

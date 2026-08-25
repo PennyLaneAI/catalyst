@@ -540,29 +540,27 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // solver never needs a modifier flag: a modified operator's name won't match a base
         // gate-set entry.
         if (raw.consume_front("Adjoint(")) {
-            // New graphOpId form "Adjoint(<base-id>)" (the inner carries '{'/'[' brace groups),
-            // matching defaultGetGraphOpId's wrapping. The whole string is the id; recurse on the
-            // inner base-id to recover name/wires/params.
-            if (raw.contains('{') || raw.contains('[')) {
-                llvm::StringRef inner = raw.ends_with(")") ? raw.drop_back(1) : raw;
-                OperatorNode innerNode = parseOperator(inner);
+            // Name-wrap graphOpId form "Adjoint(<name>)<suffix>": the modifier wraps only the
+            // operator name; the '{'/'[' brace groups (params/wires/static/uid), or a legacy
+            // "(w,p)" suffix, follow the closing ')'. The first ')' closes the base name.
+            auto closeIdx = raw.find(')');
+            if (closeIdx == llvm::StringRef::npos) {
+                node.name = "Adjoint(" + raw.trim().str() + ")";
+                return node;
+            }
+            llvm::StringRef baseName = raw.take_front(closeIdx);
+            llvm::StringRef suffix = raw.drop_front(closeIdx + 1); // "{...}", "(w,p)", or ""
+            if (suffix.contains('{') || suffix.contains('[')) {
+                // Recurse on the reconstructed base-id (name + brace groups) to recover metadata.
+                OperatorNode innerNode = parseOperator(baseName.str() + suffix.str());
                 node.name = "Adjoint(" + innerNode.name + ")";
                 node.numWires = innerNode.numWires;
                 node.numParams = innerNode.numParams;
                 node.id = original.str();
                 return node;
             }
-            // FIXME: Currently, the legacy pipeline form "Adjoint(Name)" optionally followed by
-            // a "(w,p)" suffix (e.g. the "Adjoint(T)(1,0)" keys buildResourceDict emits).
-            // To fix this, Add the following find check to find the first ')' closes the base
-            // name and then a trailing "(w,p)" is parsed by the suffix handler below.
-            auto closeIdx = raw.find(')');
-            if (closeIdx == llvm::StringRef::npos) {
-                node.name = "Adjoint(" + raw.trim().str() + ")";
-                return node;
-            }
-            node.name = "Adjoint(" + raw.take_front(closeIdx).trim().str() + ")";
-            raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
+            node.name = "Adjoint(" + baseName.trim().str() + ")";
+            raw = suffix; // leftover: "(w,p)" or ""
         } else if (raw.contains('[') || raw.contains('{')) {
             node.id = raw.str();
             node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
