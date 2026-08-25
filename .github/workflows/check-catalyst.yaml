@@ -190,9 +190,14 @@ jobs:
       - name: Run transport C++ test suite (Catch2 + soft-RoCE loopback)
         if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
         run: |
+          # RT_BUILD_DIR must match the Build Catalyst-Runtime step; otherwise the runtime
+          # sub-Makefile's default (runtime/build/) triggers a second cmake configure and
+          # rebuild in a different tree, doubling the work and leaving runtime-build/tests/
+          # empty (which the assertion below would then trip over).
           CCACHE_DIR="$(pwd)/.ccache" \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
           LLVM_BUILD_DIR="$(pwd)/llvm-build" \
           LLVM_TARGETS="llvm-symbolizer" \
