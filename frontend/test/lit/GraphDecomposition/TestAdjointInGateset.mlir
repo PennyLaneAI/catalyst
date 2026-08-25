@@ -15,19 +15,19 @@
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Adjoint(T)=1.0 alt-decomps=S{}{wires:1}{}=s_to_adjt})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @adjoint_in_gateset(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @adjoint_in_gateset(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: %[[O:.*]] = quantum.custom "T"() %[[Q]] adj : !quantum.bit
-  // CHECK: return %[[O]]
+  // CHECK: [[O:%.+]] = quantum.custom "T"() [[Q]] adj : !quantum.bit
+  // CHECK: return [[O]]
   %out = quantum.custom "T"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }
 
 // CHECK-LABEL: func.func @decompose_to_adjoint(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @decompose_to_adjoint(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: %[[O:.*]] = quantum.custom "T"() %[[Q]] adj : !quantum.bit
-  // CHECK: return %[[O]]
+  // CHECK: [[O:%.+]] = quantum.custom "T"() [[Q]] adj : !quantum.bit
+  // CHECK: return [[O]]
   %out = quantum.custom "S"() %q : !quantum.bit
   return %out: !quantum.bit
 }

@@ -15,20 +15,20 @@
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Hadamard=1.0 alt-decomps=Adjoint(U{}{wires:1}{})=adj_u,Adjoint(Hadamard{}{wires:1}{})=adj_h})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @self_adjoint(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @self_adjoint(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: %[[O:.*]] = quantum.custom "Hadamard"() %[[Q]] : !quantum.bit
-  // CHECK: return %[[O]]
+  // CHECK: [[O:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
+  // CHECK: return [[O]]
   %out = quantum.custom "Hadamard"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }
 
 // CHECK-LABEL: func.func @distribution(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @distribution(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: %[[A:.*]] = quantum.custom "Hadamard"() %[[Q]] : !quantum.bit
-  // CHECK: %[[B:.*]] = quantum.custom "Hadamard"() %[[A]] : !quantum.bit
-  // CHECK: return %[[B]]
+  // CHECK: [[A:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
+  // CHECK: [[B:%.+]] = quantum.custom "Hadamard"() [[A]] : !quantum.bit
+  // CHECK: return [[B]]
   %out = quantum.custom "U"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }

@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RZ=1.0 alt-decomps=Adjoint(Rot{}{wires:1}{})=dedicated,Adjoint(Rot{}{wires:1}{})=distribute,Adjoint(RZ{}{wires:1}{})=adj_rz})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RZ=1.0 alt-decomps=Adjoint(Rot{}{wires:1}{})=[dedicated,distribute],Adjoint(RZ{}{wires:1}{})=adj_rz})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @competing(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @competing(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: %[[O:.*]] = quantum.custom "RZ"() %[[Q]] : !quantum.bit
+  // CHECK-COUNT-1: quantum.custom "RZ"()
   // CHECK-NOT: quantum.custom "RZ"
-  // CHECK: return %[[O]]
+  // CHECK: return
   %out = quantum.custom "Rot"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }

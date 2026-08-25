@@ -15,11 +15,11 @@
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RZ=1.0 alt-decomps=Adjoint(RZ{0:[f64]}{wires:1}{})=adj_rz})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @parametric(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
+// CHECK-SAME:  [[Q:%.+]]: !quantum.bit, [[T:%.+]]: f64
 func.func @parametric(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
-  // CHECK: %[[NEG:.*]] = arith.negf %[[T]] : f64
-  // CHECK: %[[O:.*]] = quantum.custom "RZ"(%[[NEG]]) %[[Q]] : !quantum.bit
-  // CHECK: return %[[O]]
+  // CHECK: [[NEG:%.+]] = arith.negf [[T]] : f64
+  // CHECK: [[O:%.+]] = quantum.custom "RZ"([[NEG]]) [[Q]] : !quantum.bit
+  // CHECK: return [[O]]
   %out = quantum.custom "RZ"(%theta) %q adj : !quantum.bit
   return %out: !quantum.bit
 }
