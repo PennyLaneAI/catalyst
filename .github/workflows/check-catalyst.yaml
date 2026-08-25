@@ -95,7 +95,12 @@ jobs:
           # executor's cmake picks up the LLVM package. numpy is required by mlir/Makefile's
           # llvm target for the Python bindings' NumPy include-dir shell substitution.
           # ccache is picked up automatically by runtime/Makefile's COMPILER_LAUNCHER default.
-          sudo apt-get -y -q install ninja-build make cmake ccache clang lld libxml2-dev
+          # libibverbs-dev is required by find_library(IBVERBS_LIB ibverbs) in
+          # runtime/lib/transport/CMakeLists.txt; without it the cpu_verbs (RDMA) backends
+          # are silently skipped and the compiled program cannot resolve a controller /
+          # coprocessor at run time. The setup-soft-roce composite action later in the job
+          # also installs it, but that runs after this build step.
+          sudo apt-get -y -q install ninja-build make cmake ccache clang lld libxml2-dev libibverbs-dev
           python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
 
       - name: Get Cached LLVM Source
