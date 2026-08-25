@@ -69,12 +69,45 @@ def _detect_gpu_triton_platform():
     return None
 
 
+def _triton_driver_active():
+    """Whether Triton can actually initialize a backend driver on this runner.
+
+    ``nvidia-smi`` / ``rocminfo`` detect the GPU as hardware, but Triton has its own
+    activation path (``triton.runtime.driver.active`` -> ``is_active()`` on the CUDA or
+    HIP driver), which needs ``libcuda.so`` / ``libamdhip64.so`` and their python bindings.
+    A runner with an NVIDIA GPU visible via nvidia-smi but no CUDA runtime installed lands
+    at ``0 active drivers`` when Triton probes.
+    """
+    try:
+        import triton  # noqa: F401  -- pylint: disable=import-outside-toplevel
+        from triton.runtime.driver import (  # pylint: disable=import-outside-toplevel
+            driver as _driver,
+        )
+    except (ImportError, RuntimeError):
+        return False
+    try:
+        _driver.active  # forces driver selection; raises RuntimeError on 0 or >1 active
+    except RuntimeError:
+        return False
+    return True
+
+
 @pytest.fixture(scope="module")
 def gpu_triton_platform():
-    """Skip cleanly if no NVIDIA or AMD GPU is attached to this runner."""
+    """Skip cleanly if no usable Triton backend is attached to this runner.
+
+    Two gates: hardware detected via ``nvidia-smi`` / ``rocminfo``, and Triton's own
+    driver activation. The second catches the "GPU present, CUDA runtime missing"
+    case that surfaces as ``RuntimeError: 0 active drivers`` deep in ``triton.jit``.
+    """
     platform = _detect_gpu_triton_platform()
     if platform is None:
         pytest.skip("No NVIDIA or AMD GPU detected on this runner")
+    if not _triton_driver_active():
+        pytest.skip(
+            "GPU detected but Triton has no active driver "
+            "(missing CUDA / HIP runtime for the installed triton wheel)"
+        )
     return platform
 
 

@@ -446,12 +446,11 @@ class TestBacklineDemoIntegration:
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("null.qubit", wires=n_data + 1),
-            init_args={"backend_lib": "libcatalyst_transport_memcpy_controller.so"},
         )
         coproc = qp.Coprocessor(
             name="gpu-coproc",
             coprocessor_fn=decoder,
-            init_args={"backend_lib": "libcatalyst_transport_memcpy_gpu_coprocessor.so"},
+            hardware="gpu",
         )
         dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
 
@@ -564,12 +563,11 @@ class TestBacklineDemoIntegration:
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("null.qubit", wires=3),
-            init_args={"backend_lib": "libcatalyst_transport_memcpy_controller.so"},
         )
         coproc = qp.Coprocessor(
             name="gpu-coproc",
             coprocessor_fn=qp.CoprocessorFunction("gpu_steane_launcher"),
-            init_args={"backend_lib": "libcatalyst_transport_memcpy_gpu_coprocessor.so"},
+            hardware="gpu",
         )
         dev = qp.Backline(
             controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
@@ -593,7 +591,8 @@ class TestBacklineDemoIntegration:
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
         samples = np.asarray(ghz())
-        assert samples.shape == (3,), f"expected shape (3,), got {samples.shape}"
+        # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
+        assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
 
     def test_cpu_controller_to_gpu_coproc_triton_css_bp(self, use_capture, gpu_triton_platform):
         """CSS BP decoder built via Triton, adapted from demo 2 to a local memcpy placement.
@@ -642,12 +641,11 @@ class TestBacklineDemoIntegration:
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("null.qubit", wires=n_data + 1),
-            init_args={"backend_lib": "libcatalyst_transport_memcpy_controller.so"},
         )
         coproc = qp.Coprocessor(
             name="gpu-coproc",
             coprocessor_fn=decoder,
-            init_args={"backend_lib": "libcatalyst_transport_memcpy_gpu_coprocessor.so"},
+            hardware="gpu",
         )
         dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
 
