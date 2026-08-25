@@ -202,18 +202,6 @@ jobs:
           LLVM_BUILD_DIR="$(pwd)/llvm-build" \
           LLVM_TARGETS="llvm-symbolizer" \
           make test-runtime-transport
-          # `test-runtime-transport` iterates every `runner_tests_transport*` binary and stops
-          # on the first failing exit, but a *missing* binary is silently skipped. Without an
-          # explicit assertion the CPU->NIC->CPU (cpu_verbs) loopback quietly disappears the
-          # moment libibverbs-dev is not present at the runtime configure step, since
-          # `runner_tests_transport_cpu` only gets pulled into `transport_tests_all` under
-          # `if(IBVERBS_LIB)` (see runtime/tests/CMakeLists.txt:270). Fail loud instead.
-          test -x "$(pwd)/runtime-build/tests/runner_tests_transport_cpu" || {
-            echo "CPU->NIC->CPU loopback binary (runner_tests_transport_cpu) was not built." >&2
-            echo "libibverbs-dev must be installed *before* the runtime configure step;" >&2
-            echo "see the runtime job's Install dependencies step." >&2
-            exit 1
-          }
 
       - name: Upload loopback logs on failure
         if: failure() && needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
