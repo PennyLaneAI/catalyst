@@ -343,9 +343,12 @@ def test_to_static_data():
 # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:[0-9]+]]]" = 1
 # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_1]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_2]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_2]]
 test_to_static_data()
 
 
@@ -389,8 +392,8 @@ def test_from_static_data():
 # CHECK: func.func private @"rule_StaticData{}{reg:1}{}[4321]"
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 2 : i64}
 # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[4321]"
-# CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
-# CHECK: stablehlo.constant dense<2.200000e+00> : tensor<f64>
+# CHECK-DAG: stablehlo.constant dense<1.100000e+00> : tensor<f64>
+# CHECK-DAG: stablehlo.constant dense<2.200000e+00> : tensor<f64>
 test_from_static_data()
 
 
@@ -425,9 +428,12 @@ def test_to_hybrid_wires():
 # CHECK-DAG: "HybridWires{}{}{}[[[uid_1:[0-9]+]]]" = 1
 # CHECK-DAG: "HybridWires{}{}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_2]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_2]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_1]]
 test_to_hybrid_wires()
 
 
@@ -461,9 +467,9 @@ def test_from_hybrid_wires():
 # CHECK: func.func private @"rule_HybridWires{}{}{}[3742]"
 # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 3 : i64}}
 # CHECK-SAME:   target_gate = "HybridWires{}{}{}[3742]"
-# CHECK: stablehlo.constant dense<1> : tensor<i64>
-# CHECK: stablehlo.constant dense<2> : tensor<i64>
-# CHECK: stablehlo.constant dense<3> : tensor<i64>
+# CHECK: idx_attr = 1
+# CHECK: idx_attr = 2
+# CHECK: idx_attr = 3
 test_from_hybrid_wires()
 
 
@@ -521,9 +527,12 @@ def test_to_hybrid_op():
 # CHECK-DAG: "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[[[uid_1:[0-9]+]]]" = 1
 # CHECK-DAG: "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_2]]
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_1]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_2]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_2]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_1]]
 test_to_hybrid_op()
 
 
@@ -561,7 +570,8 @@ def test_from_hybrid_op():
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
 # CHECK-SAME:   "StaticDataMultiReg{theta:{{\[\[f64\]\]}}}{reg:1,reg2:2}{}[[[uid:[0-9]+]]]" = 1 : i64
 # CHECK-SAME:   target_gate = "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[5678]"
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid]] : i64, op_name = "StaticDataMultiReg"
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid]] : i64, op_name = "StaticDataMultiReg"
 test_from_hybrid_op()
 
 
@@ -610,7 +620,8 @@ def test_to_hybrid_op_nested():
 # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
 # CHECK-SAME: "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[[[uid:[0-9]+]]]" = 1
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid]]
 test_to_hybrid_op_nested()
 
 
@@ -655,8 +666,10 @@ def test_from_hybrid_op_nested():
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
 # CHECK-SAME:   "StaticDataMultiReg{theta:{{\[\[f64\]\]}}}{reg:1,reg2:2}{}[[[uid_inner:[0-9]+]]]" = 1 : i64
 # CHECK-SAME:   target_gate = "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[7654]"
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
 test_from_hybrid_op_nested()
 
 
@@ -719,8 +732,10 @@ def test_to_multiple_full_args_op():
 # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
 # CHECK-DAG: "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid]]
-# CHECK: "qref.operator"({{%.+}}) {UID = [[uid]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid]]
+# CHECK: "qref.operator"
+# CHECK-SAME: UID = [[uid]]
 test_to_multiple_full_args_op()
 
 
@@ -766,9 +781,12 @@ def test_from_multiple_full_args_op():
 # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   "SingleParam{x:{{\[\[i64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[4444]"
-# CHECK: "qref.operator"({{%.+}}) {op_name = "SingleParam"
-# CHECK: "qref.operator"({{%.+}}) {op_name = "SingleParam"
-# CHECK: "qref.operator"({{%.+}}) {op_name = "NoParams"
+# CHECK: "qref.operator"
+# CHECK-SAME: op_name = "SingleParam"
+# CHECK: "qref.operator"
+# CHECK-SAME: op_name = "SingleParam"
+# CHECK: "qref.operator"
+# CHECK-SAME: op_name = "NoParams"
 test_from_multiple_full_args_op()
 
 
@@ -817,10 +835,10 @@ def test_for_loop():
     """Test when the rule body has a for loop."""
 
     class LayerRX(qp.core.Operator2):
-        dynamic_argnames = ("angles",)
+        dynamic_argnames = ("angle",)
 
-        def __init__(self, angles, wires):
-            super().__init__(angles, wires)
+        def __init__(self, angle, wires):
+            super().__init__(angle, wires)
 
     class TestRX(qp.core.Operator2):
         dynamic_argnames = ("theta",)
@@ -830,11 +848,11 @@ def test_for_loop():
         def __init__(self, theta, wires):
             super().__init__(theta, wires)
 
-    @qp.register_resources(lambda angles, wires: {TestRX(Float, Wire[1]): len(wires)})
-    def test_rule(angles, wires):
+    @qp.register_resources(lambda angle, wires: {TestRX(Float, Wire[1]): len(wires)})
+    def test_rule(angle, wires):
         @qp.for_loop(len(wires))
         def l(i):
-            TestRX(angles[i], wires[i])
+            TestRX(angle, wires[i])
 
         l()  # pylint: disable=no-value-for-parameter
 
@@ -842,7 +860,7 @@ def test_for_loop():
         qp.add_decomps(LayerRX, test_rule)
 
         result = compile_decomposition_rules_wrapper(
-            "LayerRX", "TestID", {"angles": ["f64", "f64", "f64"]}, {"wires": 3}, {}
+            "LayerRX", "TestID", {"angle": ["f64"]}, {"wires": 3}, {}
         )
         print(result)
 
@@ -850,9 +868,9 @@ def test_for_loop():
 # CHECK: func.func private @test_rule_TestID
 # CHECK-SAME:   resources = {operations = {"TestRX{0:[f64]}{wires:1}{}" = 3 : i64}}
 # CHECK-SAME:   target_gate = "TestID"
-# CHECK-DAG: stablehlo.constant dense<0> : tensor<i64>
-# CHECK-DAG: stablehlo.constant dense<3> : tensor<i64>
-# CHECK-DAG: stablehlo.constant dense<1> : tensor<i64>
+# CHECK-DAG: arith.constant 0 : index
+# CHECK-DAG: arith.constant 3 : index
+# CHECK-DAG: arith.constant 1 : index
 # CHECK: scf.for
 test_for_loop()
 
@@ -869,7 +887,7 @@ def test_if():
 
     @qp.register_resources(lambda flag, wires: {NoParams(Wire[1]): 1})
     def if_decomp(flag, wires):
-        qp.cond(flag[0], NoParams)(wires)
+        qp.cond(flag, NoParams)(wires)
 
     qp.add_decomps(TestOp, if_decomp)
 
@@ -959,7 +977,7 @@ def test_rule_with_helper_functions():
         print(result)
 
 
-# CHECK: func.func private @"__builtin_rule_NoParams{}{reg:1}{}"
+# CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "MultiParams{a:{{\[\[f64\]\]}},b:{{\[\[f64\]\]}},c:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"

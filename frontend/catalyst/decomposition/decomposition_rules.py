@@ -144,7 +144,7 @@ def prepare_op_args(dynamic_shape, wire_lens, is_custom_op) -> tuple[tuple, dict
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
+        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape[0])
 
     if is_custom_op:
         args = tuple(0.0 for key, val in kwargs.items() if key != "wires")
