@@ -536,10 +536,7 @@ def test_no_capture(backend):
     """
     Test error message when used without capture.
     """
-    with pytest.raises(
-        CompileError,
-        match=r".*\.allocate\(\) with qjit is only supported with program capture enabled\.",
-    ):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
@@ -548,16 +545,19 @@ def test_no_capture(backend):
                 pass
             return qp.probs(wires=[0])
 
+    with pytest.raises(
+        CompileError,
+        match=r".*\.allocate\(\) with qjit is only supported with program capture enabled\.",
+    ):
+        circuit()
+
 
 def test_use_after_free(backend):
     """
     Test error message when used after free.
     """
 
-    with pytest.raises(
-        CompileError,
-        match="Detected use of a qubit after deallocation",
-    ):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
@@ -567,19 +567,19 @@ def test_use_after_free(backend):
             qp.Hadamard(q[0])
             return qp.probs(wires=[0])
 
+    with pytest.raises(
+        CompileError,
+        match="Detected use of a qubit after deallocation",
+    ):
+        circuit()
+
 
 def test_terminal_MP_all_wires(backend):
     """
     Test error message when used with terminal measurements on all wires.
     """
 
-    with pytest.raises(
-        CompileError,
-        match=textwrap.dedent("""
-            Terminal measurements must take in an explicit list of wires when
-            dynamically allocated wires are present in the program.
-            """),
-    ):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
@@ -588,11 +588,28 @@ def test_terminal_MP_all_wires(backend):
                 pass
             return qp.probs()
 
+    with pytest.raises(
+        CompileError,
+        match=textwrap.dedent("""
+            Terminal measurements must take in an explicit list of wires when
+            dynamically allocated wires are present in the program.
+            """),
+    ):
+        circuit()
+
 
 def test_terminal_MP_dynamic_wires(backend):
     """
     Test error message when used with terminal measurements on dynamic wires.
     """
+
+    with pytest.warns(UserWarning, match="AOT.*failed"):
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit():
+            q = qp.allocate(1)
+            return qp.probs(q)
 
     with pytest.raises(
         CompileError,
@@ -601,12 +618,7 @@ def test_terminal_MP_dynamic_wires(backend):
             since they must be temporary.
             """),
     ):
-
-        @qjit(capture=True)
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            q = qp.allocate(1)
-            return qp.probs(q)
+        circuit()
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ from xdsl.dialects.builtin import DenseIntOrFPElementsAttr, IntegerAttr, Integer
 from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import Block, SSAValue
+from xdsl.traits import SymbolTable
 
 from catalyst.compiler import CompileError, _get_catalyst_cli_cmd
 from catalyst.jit import QJIT
@@ -42,6 +43,7 @@ from catalyst.python_interface.dialects.pbc import (
     PPRotationOp,
 )
 from catalyst.python_interface.dialects.quantum import (
+    CtrlOp,
     CustomOp,
     ExtractOp,
     GlobalPhaseOp,
@@ -105,7 +107,7 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
 
     if (mlir_module := getattr(workflow, "mlir_module", None)) is not None:
         value_semantics_mlir = _quantum_opt_stderr(
-            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize)"',
             "--mlir-print-op-generic",
             stdin=str(mlir_module),
         )
@@ -117,7 +119,7 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
             mlir_module = workflow.generate_ir()
 
         value_semantics_mlir = _quantum_opt_stderr(
-            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize)"',
             "--mlir-print-op-generic",
             stdin=str(mlir_module),
         )
@@ -206,13 +208,36 @@ def _extract_dense_constant_value(op) -> float | int:
     raise NotImplementedError(f"Unexpected attr type in constant: {type(attr)}")
 
 
+def _resolve_control_value(ssa: SSAValue) -> float | int | str:
+    """Resolve a control value passed as a constant kernel argument."""
+    op = ssa.owner
+    if not (
+        isinstance(op, TensorExtractOp)
+        and isinstance(op.tensor.owner, Block)
+        and len(op.indices) == 1
+    ):
+        return resolve_constant_params(ssa)
+
+    tensor = op.tensor
+    func_op = tensor.owner.parent_op()
+    launch_op = next(
+        candidate
+        for candidate in func_op.get_toplevel_object().walk()
+        if candidate.name == "catalyst.launch_kernel"
+        and SymbolTable.lookup_symbol(candidate, candidate.callee) is func_op
+    )
+    tensor = launch_op.operands[tensor.index]
+    values = tensor.owner.properties["value"].get_values()
+    return values[resolve_constant_params(op.indices[0])]
+
+
 def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
     """Apply adjoint and control modifiers to a gate if needed."""
     if xdsl_op.properties.get("adjoint"):
         qp_op = ops.op_math.adjoint(qp_op)
     ctrls = ssa_to_qp_wires(xdsl_op, control=True)
     if ctrls:
-        cvals = ssa_to_qp_params(xdsl_op, control=True)
+        cvals = _extract(xdsl_op, "in_ctrl_values", _resolve_control_value)
         qp_op = ops.op_math.ctrl(qp_op, control=ctrls, control_values=cvals)
     return qp_op
 
@@ -334,11 +359,17 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
             return resolve_constant_wire(op.operands[0])
 
         case _ if op.name == "stablehlo.add":
-            x, y = (resolve_constant_wire(op.operands[0]), resolve_constant_wire(op.operands[1]))
+            x, y = (
+                resolve_constant_wire(op.operands[0]),
+                resolve_constant_wire(op.operands[1]),
+            )
             return f"({x} + {y})"
 
         case _ if op.name == "stablehlo.subtract":
-            x, y = (resolve_constant_wire(op.operands[0]), resolve_constant_wire(op.operands[1]))
+            x, y = (
+                resolve_constant_wire(op.operands[0]),
+                resolve_constant_wire(op.operands[1]),
+            )
             return f"({x} - {y})"
 
         case _ if op.name == "tensor.from_elements":
@@ -379,6 +410,14 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
                 getattr(op, "in_ctrl_qubits", [])
             )
             return resolve_constant_wire(all_qubits[ssa.index])
+
+        case CtrlOp():
+            # A `quantum.ctrl` result threads through from its matching input operand:
+            # out_ctrl_qubits[i] <- in_ctrl_qubits[i], and results[j] <- args[j].
+            num_ctrl = len(op.in_ctrl_qubits)
+            if ssa.index < num_ctrl:
+                return resolve_constant_wire(op.in_ctrl_qubits[ssa.index])
+            return resolve_constant_wire(op.args[ssa.index - num_ctrl])
 
         case ExtractOp():
             return dispatch_wires_extract(op)
@@ -447,7 +486,9 @@ def xdsl_to_qp_op(op) -> Operator:
                     wires=ssa_to_qp_wires(op),
                 )
             case "quantum.gphase":
-                gate = ops.GlobalPhase(ssa_to_qp_params(op, single=True), wires=ssa_to_qp_wires(op))
+                phi = _extract(op, "angle", resolve_constant_params, single=True)
+                assert phi is not None
+                gate = ops.GlobalPhase(phi)
 
             case "quantum.unitary":
                 gate = ops.qubit.matrix_ops.QubitUnitary(

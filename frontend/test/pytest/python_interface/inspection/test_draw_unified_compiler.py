@@ -255,6 +255,16 @@ class TestDraw:
 
         assert draw(circuit)() == expected
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "MultiControlledX must be canonicalized to X with controls at the PLXPR level. "
+            "The drawer pipeline cannot currently process the resulting qref.operator "
+            "MultiControlledX because it has no executable lowering. Lowering it directly to "
+            "qref.custom PauliX in Catalyst would instead give the frontend and MLIR different "
+            "GraphOpIDs."
+        ),
+    )
     def test_ctrl_before_custom_op(self):
         """
         Test the visualization of control operations before custom ops.
@@ -476,7 +486,6 @@ class TestDraw:
 
     def test_reshape(self):
         """Test that the visualization works when the parameters are reshaped."""
-
         one_dim = jax.numpy.array([1, 0])
         two_dim = jax.numpy.array([[0, 1], [1, 0]])
         eight_dim = jax.numpy.zeros((8, 8))

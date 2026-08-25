@@ -32,9 +32,9 @@ from jax.api_util import debug_info
 from jax.core import get_aval
 from pennylane import QueuingManager
 from pennylane.decomposition.resources import resolve_work_wire_type
-from pennylane.operation import Operator
+from pennylane.operation import Operator, Operator2
 from pennylane.ops.op_math.adjoint import create_adjoint_op
-from pennylane.ops.op_math.controlled import create_controlled_op
+from pennylane.ops.op_math.controlled import create_controlled_op, create_controlled_op2
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions.control_flow import cond
@@ -664,6 +664,14 @@ class CtrlCallable:
     def __call__(self, *args, **kwargs):
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
+            if isinstance(base_op, Operator2):
+                return create_controlled_op2(
+                    base_op,
+                    control_wires=self.control_wires,
+                    control_values=self.control_values,
+                    work_wires=self.work_wires,
+                    work_wire_type=self.work_wire_type,
+                )
             return create_controlled_op(
                 base_op,
                 self.control_wires,
@@ -868,13 +876,22 @@ def ctrl_distribute(
             )
             new_ops.append(create_adjoint_op(ctrl_op, lazy=True))
         else:
-            ctrl_op = create_controlled_op(
-                copy.copy(op),
-                control=control_wires,
-                control_values=control_values,
-                work_wires=work_wires,
-                work_wire_type=work_wire_type,
-            )
+            if isinstance(op, Operator2):
+                ctrl_op = create_controlled_op2(
+                    copy.copy(op),
+                    control_wires=control_wires,
+                    control_values=control_values,
+                    work_wires=work_wires,
+                    work_wire_type=work_wire_type,
+                )
+            else:
+                ctrl_op = create_controlled_op(
+                    copy.copy(op),
+                    control=control_wires,
+                    control_values=control_values,
+                    work_wires=work_wires,
+                    work_wire_type=work_wire_type,
+                )
             new_ops.append(ctrl_op)
     return new_ops
 

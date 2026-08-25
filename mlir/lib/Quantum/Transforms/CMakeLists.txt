@@ -9,6 +9,7 @@ file(GLOB SRC
     AdjointLowering/ReversePass.cpp
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
+    CtrlLowering/CtrlLowering.cpp
     ConversionPatterns.cpp
     GraphDecomposition/DecompUtils.cpp
     GraphDecomposition/DecomposeLoweringPatterns.cpp

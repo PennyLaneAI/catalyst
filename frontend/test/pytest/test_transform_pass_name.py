@@ -93,8 +93,11 @@ def test_pass_with_unsupported_options(backend):
         return qp.expval(qp.PauliZ(0))
 
     expected_msg = r"Cannot convert Python type <class 'NoneType'> to an MLIR attribute"
+    with pytest.warns(UserWarning, match="AOT.*failed"):
+        qjc = qp.qjit(target="mlir")(captured_circuit)
+
     with pytest.raises(CompileError, match=expected_msg):
-        qp.qjit(target="mlir")(captured_circuit)
+        qjc()
 
 
 def test_pass_before_tape_transform(backend):

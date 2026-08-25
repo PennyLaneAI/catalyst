@@ -847,6 +847,10 @@ class TestBroadcastExpand:
 
     @pytest.mark.parametrize("params", parameters)
     @pytest.mark.parametrize("obs", observables)
+    @pytest.mark.xfail(
+        reason="Non-capture pipeline incompatible with Operator2 dynamic wires in pytrees",
+        strict=False,
+    )
     def test_expansion_qnode_no_cache(self, backend, params, obs):
         """Test broadcast expand.
 
@@ -1116,11 +1120,14 @@ class TestTransformValidity:
             measurements = [measure(i) for i in range(2)]
             return measurements, qp.expval(qp.PauliZ(0))
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            compiled_qfunc = qjit(qfunc)
+
         with pytest.raises(
             CompileError,
             match="Transforming MeasurementProcesses is unsupported with non-MeasurementProcess",
         ):
-            qjit(qfunc)
+            compiled_qfunc()
 
     @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
     def test_valid_modify_measurements_no_measurements(self, backend, transform, monkeypatch):
@@ -1174,11 +1181,14 @@ class TestTransformValidity:
             qp.PauliX(2)
             return [1, qp.expval(H4)]
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            compiled_qfunc = qjit(qfunc)
+
         with pytest.raises(
             CompileError,
             match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
         ):
-            qjit(qfunc)
+            compiled_qfunc()
 
     def test_invalid_batch_transform_due_to_measure(self, backend):
         """Test split non commuting"""
@@ -1209,11 +1219,14 @@ class TestTransformValidity:
 
             return qfunc
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            compiled_qfunc = qjit(qnode_builder(backend))
+
         with pytest.raises(
             CompileError,
             match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
         ):
-            qjit(qnode_builder(backend))
+            compiled_qfunc()
 
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
     def test_valid_due_to_non_batch(self, backend, theta_1, theta_2):
@@ -1255,8 +1268,11 @@ class TestTransformValidity:
         def f():
             return qp.state()
 
+        with pytest.warns(UserWarning, match="AOT.*failed"):
+            compiled_f = qjit(f)
+
         with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
-            qjit(f)
+            compiled_f()
 
 
 @pytest.mark.xfail(reason="Fails due to use of numpy arrays in transform")

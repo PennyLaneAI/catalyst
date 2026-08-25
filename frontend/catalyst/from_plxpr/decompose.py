@@ -96,6 +96,15 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 }
 
 
+def _resource_num_wires(op_rep):
+    """Return the wire count from an Operator or Operator2 resource representation."""
+    if isinstance(op_rep, qp.core.Operator2):
+        return op_rep.wires.num_wires
+
+    params = getattr(op_rep, "params", {}) or {}
+    return params.get("num_wires")
+
+
 # pylint: disable=too-many-instance-attributes
 class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
@@ -162,8 +171,8 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         """
 
         self._operations.add(op)
-        data, struct = jax.tree_util.tree_flatten(op)
-        return jax.tree_util.tree_unflatten(struct, data)
+        # PennyLane's base interpreter rebinds reconstructed Operator2 instances into the trace.
+        return super().interpret_operation(op)
 
     def cleanup(self):
         """Cleanup after interpretation."""
@@ -185,24 +194,22 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
         # Create decomposition rules for each operation in the solution
         # and compile them to Catalyst JAXPR decomposition rules
         for op, rule in self._decomp_graph_solution.items():
-            # Get number of wires if exists
-            op_params = getattr(op.op, "params", {}) or {}
-            op_num_wires = op_params.get("num_wires", None)
-            if (
-                o := next(
-                    (
-                        o
-                        for o in self._operations
-                        if o.name == op.op.name and len(o.wires) == op_num_wires
-                    ),
-                    None,
-                )
-            ) is not None:
+            op_num_wires = _resource_num_wires(op.op)
+            captured_op = next(
+                (
+                    candidate
+                    for candidate in self._operations
+                    if candidate.name == op.op.name and len(candidate.wires) == op_num_wires
+                ),
+                None,
+            )
+            if op.op.name in COMPILER_OPS_FOR_DECOMPOSITION and captured_op is not None:
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                 _create_decomposition_rule(
                     rule,
                     op_name=op.op.name,
-                    num_wires=len(o.wires),
+                    op_rep=op.op,
+                    num_wires=len(captured_op.wires),
                     num_params=num_params,
                     requires_copy=num_wires == -1,
                 )
@@ -214,16 +221,23 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                 # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                 # dictionary to get the number of wires.
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
-                pauli_word = op_params.get("pauli_word", None)
                 requires_copy = num_wires == -1
+                pauli_word = None
 
                 if op.op.name in ("PauliRot", "PauliMeasure"):
+                    params = (
+                        op.op.compilable_args
+                        if isinstance(op.op, qp.core.Operator2)
+                        else op.op.params
+                    )
+                    pauli_word = params["pauli_word"]
                     num_wires = len(pauli_word)
                 elif num_wires == -1 and op_num_wires is not None:
                     num_wires = op_num_wires
                 _create_decomposition_rule(
                     rule,
                     op_name=op.op.name,
+                    op_rep=op.op,
                     num_wires=num_wires,
                     num_params=num_params,
                     requires_copy=requires_copy,
@@ -244,6 +258,7 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
 def _create_decomposition_rule(
     func: Callable,
     op_name: str,
+    op_rep,
     num_wires: int,
     num_params: int,
     requires_copy: bool = False,
@@ -254,6 +269,7 @@ def _create_decomposition_rule(
     Args:
         func (Callable): The decomposition function.
         op_name (str): The name of the operation to decompose.
+        op_rep: The abstract resource representation of the operation.
         num_wires (int): The number of wires the operation acts on.
         num_params (int): The number of parameters the operation takes.
         requires_copy (bool): Whether to create a copy of the function
@@ -271,6 +287,17 @@ def _create_decomposition_rule(
 
         # Skip tailing args or kwargs in the rules
         if name in ("__", "_"):
+            continue
+
+        if isinstance(op_rep, qp.core.Operator2):
+            if name in op_rep.dynamic_args:
+                arg_spec = op_rep.dynamic_args[name]
+                args.append(jax.ShapeDtypeStruct(arg_spec.shape, arg_spec.dtype))
+            elif name in op_rep.wire_args:
+                wire_spec = op_rep.wire_args[name]
+                args.append(qp.math.array([0] * wire_spec.num_wires, like="jax"))
+            elif name not in op_rep.compilable_args:
+                raise ValueError(f"Unknown Operator2 argument {name} in decomposition rule {func}.")
             continue
 
         # TODO: This is a temporary solution until all rules have proper type annotations.
@@ -339,12 +366,16 @@ def _create_decomposition_rule(
 
 def _should_skip_decomp_rule_capture(op_rep) -> bool:
     """Return True if a decomposition-graph op should not be captured as a JAX rule."""
-    op_type = getattr(op_rep, "op_type", None)
+    op_type = (
+        type(op_rep) if isinstance(op_rep, qp.core.Operator2) else getattr(op_rep, "op_type", None)
+    )
     if op_type is not None and issubclass(
         op_type,
         (
             qp.ops.Adjoint,
+            qp.ops.Adjoint2,
             qp.ops.Controlled,
+            qp.ops.Controlled2,
             qp.ops.ChangeOpBasis,
             qp.ops.Prod,
             qp.TemporaryAND,

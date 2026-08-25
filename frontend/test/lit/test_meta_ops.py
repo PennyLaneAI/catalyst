@@ -35,12 +35,12 @@ print(adjoint_adjoint.mlir)
 
 
 # CHECK-LABEL: @adjoint_ctrl_adjoint
-@qjit(target="mlir")
+@qjit(target="mlir", capture=True)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def adjoint_ctrl_adjoint():
     qp.adjoint(qp.ctrl(qp.adjoint(qp.S(0)), control=1))
     return qp.probs()
 
 
-# CHECK:   quantum.custom "S"() %{{[^\s]+}} ctrls(%{{[^\s]+}}) ctrlvals(%{{[^\s]+}}) : !quantum.bit
+# CHECK:   qref.custom "S"() %{{[^\s]+}} ctrls(%{{[^\s]+}}) ctrlvals(%{{[^\s]+}}) : !qref.bit ctrls !qref.bit
 print(adjoint_ctrl_adjoint.mlir)
