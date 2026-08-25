@@ -672,9 +672,16 @@ jobs:
       #   _rdma_loopback: same roles, but the coprocessor runs in a catalyst-executor
       #   subprocess on 127.0.0.1 (via ``executor=Executor()`` on the Coprocessor node).
       # GPU-coproc cases execute on check-transport-gpu.yaml.
+      #
+      # LD_LIBRARY_PATH is needed because the test's ``init_args["backend_lib"]`` are bare
+      # filenames (``libcatalyst_transport_cpu_verbs_{controller,coprocessor}.so``), which
+      # ``__catalyst__transport__create`` resolves through ``dlopen`` at runtime -- the loader
+      # searches LD_LIBRARY_PATH, not RUNTIME_LIB_DIR. Propagates into the executor subprocess
+      # via Popen's inherited env, so both sides of the loopback resolve their backends.
       if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
       env:
         CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib
+        LD_LIBRARY_PATH: ${{ github.workspace }}/runtime-build/lib:${{ github.workspace }}/llvm-build/lib
       run: |
         python3 -m pytest -v \
           "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
