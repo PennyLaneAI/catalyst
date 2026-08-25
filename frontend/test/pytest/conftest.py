@@ -80,8 +80,8 @@ def _triton_driver_active():
     """
     try:
         import triton  # noqa: F401  -- pylint: disable=import-outside-toplevel
-        from triton.runtime.driver import (  # pylint: disable=import-outside-toplevel
-            driver as _driver,
+        from triton.runtime.driver import (
+            driver as _driver,  # pylint: disable=import-outside-toplevel
         )
     except (ImportError, RuntimeError):
         return False
