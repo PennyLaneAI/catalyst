@@ -30,9 +30,14 @@ static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "
 static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
                                                "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
 
+// Canonicalize Adjoint on quantum.custom gates after adjoint-lowering.
+// For Hermitian gates, the adjoint flag is set to false.
+// For rotations, the parameters are negated.       
 struct CustomOpAdjointCanonicalizePattern : public OpRewritePattern<CustomOp> {
     using OpRewritePattern<CustomOp>::OpRewritePattern;
 
+    // Canonicalize Adjoint on quantum.custom gates
+    // moves LogicalResult CustomOp::canonicalize from QuantumOps into its own pass.
     LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override {
         if (op.getAdjoint()) {
             auto name = op.getGateName();
@@ -67,6 +72,8 @@ namespace quantum {
 #define GEN_PASS_DEF_ADJOINTLOWERINGCANONICALIZATION
 #include "Quantum/Transforms/Passes.h.inc"
 
+// Populate the patterns for the AdjointLoweringCanonicalization pass.
+// Allows reference in ions_decompositions.cpp and merge_rotation.cpp
 void populateAdjointLoweringCanonicalizationPatterns(RewritePatternSet &patterns) {
     patterns.add<CustomOpAdjointCanonicalizePattern>(patterns.getContext());
 }
