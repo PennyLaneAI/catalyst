@@ -131,7 +131,7 @@ func.func private @adj_s(%q: !quantum.bit) -> !quantum.bit
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit
 func.func @distribution(%q: !quantum.bit) -> !quantum.bit {
   // CHECK: %[[K:.*]] = arith.constant {{.*}} : f64
-  // CHECK: %[[A:.*]] = quantum.custom "Hadamard"() %[[Q]] : !quantum.bit
+  // CHECK: %[[A:.*]] = quantum.custom "PauliX"() %[[Q]] : !quantum.bit
   // CHECK: %[[B:.*]] = quantum.custom "PhaseShift"(%[[K]]) %[[A]] : !quantum.bit
   // CHECK: %[[C:.*]] = quantum.custom "Hadamard"() %[[B]] : !quantum.bit
   // CHECK: return %[[C]]
@@ -141,7 +141,7 @@ func.func @distribution(%q: !quantum.bit) -> !quantum.bit {
 
 func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit
     attributes {target_gate = "Adjoint(U{}{wires:1}{})", llvm.linkage = #llvm.linkage<internal>} {
-  %a = quantum.custom "Hadamard"() %q adj : !quantum.bit
+  %a = quantum.custom "PauliX"() %q adj : !quantum.bit
   %b = quantum.custom "T"() %a adj : !quantum.bit
   %c = quantum.custom "Hadamard"() %b adj : !quantum.bit
   return %c : !quantum.bit
@@ -150,6 +150,12 @@ func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit
 func.func private @adj_h3(%q: !quantum.bit) -> !quantum.bit
     attributes {target_gate = "Adjoint(Hadamard{}{wires:1}{})", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "Hadamard"() %q : !quantum.bit
+  return %o : !quantum.bit
+}
+
+func.func private @adj_x(%q: !quantum.bit) -> !quantum.bit
+    attributes {target_gate = "Adjoint(PauliX{}{wires:1}{})", llvm.linkage = #llvm.linkage<internal>} {
+  %o = quantum.custom "PauliX"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
