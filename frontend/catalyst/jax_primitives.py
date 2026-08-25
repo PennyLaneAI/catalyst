@@ -76,6 +76,7 @@ with Patcher(
         AssertionOp,
         CallbackCallOp,
         CallbackOp,
+        CustomCallOp,
         PrintOp,
         SymbolicArrayOp,
     )
@@ -135,6 +136,7 @@ with Patcher(
         lower_jaxpr,
     )
 
+from pennylane.backline.runtime import get_runtime_call_prim
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
@@ -157,6 +159,7 @@ from catalyst.jax_extras import (
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.runtime_artifacts import record_runtime_artifact
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
@@ -544,6 +547,25 @@ def _python_callback_lowering(
         CustomGradOp(symbol_attr, fwd_sym_attr, rev_sym_attr)
 
     return retval
+
+
+#
+# runtime_call
+#
+def _runtime_call_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *operands, signature, symbol, out_bytes, dispatch, library
+):
+    """Lower a `qp.runtime_call` operation to a `catalyst.custom_call` on the runtime symbol"""
+    # pylint: disable=unused-argument
+    results_ty = list(convert_shaped_arrays_to_tensors(jax_ctx.avals_out))
+    call_op = CustomCallOp(results_ty, list(operands), symbol, number_original_arg=len(operands))
+    if dispatch is not None:
+        call_op.operation.attributes["backend_config"] = ir.DictAttr.get(
+            {"dispatch": ir.StringAttr.get(dispatch)}
+        )
+    elif library:
+        record_runtime_artifact(jax_ctx.module_context.module.operation, library)
+    return call_op.results
 
 
 #
@@ -3129,6 +3151,7 @@ CUSTOM_LOWERING_RULES = (
     (print_p, _print_lowering),
     (assert_p, _assert_lowering),
     (python_callback_p, _python_callback_lowering),
+    (get_runtime_call_prim(), _runtime_call_lowering),
     (value_and_grad_p, _value_and_grad_lowering),
     (set_state_p, _set_state_lowering),
     (set_basis_state_p, _set_basis_state_lowering),

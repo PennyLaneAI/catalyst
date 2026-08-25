@@ -23,7 +23,6 @@ from jax.core import ShapedArray
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
-from jaxlib.mlir.dialects.arith import ConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.core.operator.utils import abstractify
 from pennylane.pytrees import unflatten
@@ -74,6 +73,7 @@ with Patcher(
         PauliRotOp,
         PCPhaseOp,
         QubitUnitaryOp,
+        SetBasisStateOp,
     )
 
 

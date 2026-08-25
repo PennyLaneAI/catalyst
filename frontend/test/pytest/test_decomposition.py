@@ -29,7 +29,7 @@ from operator2_dummy_gates import (
     SingleParam,
     StaticData,
 )
-from pennylane.typing import Complex, Float, Int
+from pennylane.typing import Bool, Complex, Float, Int
 from pennylane.wires import Wires
 
 from catalyst.decomposition.decomposition_rules import (
@@ -89,7 +89,7 @@ class TestGenericUtilities:
         ],
     )
     def test_mlir_stringify_type(self, dtype, expected):
-        """Test mlir_stringify_type."""
+        """Test convert_types_to_mlir_strings."""
         assert convert_types_to_mlir_strings(dtype) == expected
 
     @pytest.mark.parametrize(
@@ -116,11 +116,18 @@ class TestGenericUtilities:
                 "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
             ),
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
-            (HybridWires(Wires([0, 1, 2])), "HybridWires{}{}{}["),  # NOTE: open brace to match uid
+            (
+                HybridWires(Wires([0, 1, 2])),
+                "HybridWires{}{}{}[",
+            ),  # NOTE: open brace to match uid
             (
                 HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
                 "HybridOpArg{angle:[[f64]]}{cwires:2}{}[",  # NOTE: open brace to match uid
             ),
+            (
+                qp.Rot(Bool, Int, Float, Wires(0)),
+                "Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{}",
+            ),  # custom ops should be promoted to f64
         ],
     )
     def test_GraphOpId(self, op, id):
@@ -128,14 +135,19 @@ class TestGenericUtilities:
         # NOTE: use startswith to match ops with uids/extra_data
         assert GraphOpID(op).getGraphOpId().startswith(id)
 
-    def test_wrapper_operator(self):
+    def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
-        # TODO: keep this up to date with an operator that is not migrated, and decomposes to
-        # un-migrated operators until migration is complete.
+        mock_decomp = mocker.MagicMock()
+        mock_decomp._impl.__name__ = "FakeRuleName"
+        mock_decomp.compute_resources.side_effect = ValueError("Fake Resource Related Error")
+
+        mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
+
         with pytest.warns(match="Failed to get resources"):
-            compile_decomposition_rules_wrapper(
-                "PauliX", 'PauliX{}{"wires":1}{}', {}, {"wires": 1}, {}
+            res = compile_decomposition_rules_wrapper(
+                "MockOp", 'MockOp{}{"wires":1}{}', {}, {"wires": 1}, {}
             )
+        assert isinstance(res, str)
 
 
 class TestPrecompiled:

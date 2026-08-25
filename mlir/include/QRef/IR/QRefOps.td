@@ -719,6 +719,30 @@ def AdjointOp : Region_Op<"adjoint", [NoTerminator]> {
     let hasVerifier = 1;
 }
 
+def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
+    let summary = "Apply the enclosed operations controlled on the given control qubits.";
+    let description = [{
+        The `qref.ctrl` operation applies the quantum operations in its single-block region
+        conditioned on a set of control qubits. Each `ctrl_values` entry selects whether the
+        matching control qubit activates on the |1> (true) or |0> (false) state.
+
+        Measurements inside a `qref.ctrl` region are rejected.
+    }];
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        Variadic<QubitRefType>:$ctrl_qubits,
+        Variadic<I1>:$ctrl_values
+    );
+
+    let assemblyFormat = [{
+        `(` $ctrl_qubits `)` `ctrlvals` `(` $ctrl_values `)` attr-dict-with-keyword $region
+    }];
+
+    let hasVerifier = 1;
+}
+
 // -----
 
 // Observable ops are not meaningful on their own: their purpose is to be sent into a measurement

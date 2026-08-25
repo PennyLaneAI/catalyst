@@ -4,12 +4,18 @@
 
 * A new `quantum.ctrl` region op and a `ctrl-lowering` pass are added to the Quantum Dialect
   for controlled subcircuits in Catalyst.
+
   Programs can now express an entire controlled quantum region, as opposed to individual
   operations. The `ctrl-lowering` pass distributes the control wires and control values from
   the `quantum.ctrl` operation onto the individual gate operations inside the region.
+
+  The corresponding reference semantics operation `qref.ctrl`, and the bidirectional conversion
+  between the two operations, are also added.
   [(#3089)](https://github.com/PennyLaneAI/catalyst/pull/3089)
   [(#3090)](https://github.com/PennyLaneAI/catalyst/pull/3090)
   [(#3096)](https://github.com/PennyLaneAI/catalyst/pull/3096)
+  [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
+  [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
@@ -20,6 +26,10 @@
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
+
+* a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
+  through the transport passes.
+  [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
 
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
   without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
@@ -140,6 +150,13 @@
   [(#3043)](https://github.com/PennyLaneAI/catalyst/pull/3043)
   [(#3045)](https://github.com/PennyLaneAI/catalyst/pull/3045)
 
+* `qp.runtime_call` is supported to lower to an ordinary `catalyst.custom_call`. The shared library
+  exporting the symbol is given via `qp.runtime_declare(..., library=...)` (or `runtime_call(..., library=...)`)
+  and recorded on the module so the compiler links it. A local call may take a `buf` argument and
+  may return nothing (a `void` call is kept for its side effects), neither of which a dispatched
+  call allows.
+  [(#3101)](https://github.com/PennyLaneAI/catalyst/pull/3101)
+
 * A CPU transport backend built on libibverbs is added, which implements the controller and coprocessor
   session roles over RDMA.
   [(#3062)](https://github.com/PennyLaneAI/catalyst/pull/3062)
@@ -174,6 +191,9 @@
   `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
   syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
   [(#3092)](https://github.com/PennyLaneAI/catalyst/pull/3092)
+
+* CPU & GPU backline transport backends via `memcpy` are added.
+  [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
 
 * A new remote/local executor infrastructure has been added to Catalyst, enabling qnode kernels to
   be dispatched to a separate executor process.
@@ -233,7 +253,14 @@
   [(#2923)](https://github.com/PennyLaneAI/catalyst/pull/2923)
 
 * The `resource-analysis` pass JSON output now includes `depth` for worst-case PBC layer depth
-  (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry.
+  (`any_commuting_depth` / `qubit_disjoint_depth`) per function and lifted loop entry, including
+  commuting vs disjoint-qubit layer grouping and worst-case depth across ``scf.if`` /
+  ``scf.index_switch`` branches and statically-bounded ``scf.for`` loops.
+  [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
+  [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
+  [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
+  [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
+  [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
   [(#2967)](https://github.com/PennyLaneAI/catalyst/pull/2967)
 
 * The `resource-analysis` pass now supports pluggable resource metrics through the
@@ -303,22 +330,6 @@
   into the same layer only when they act on disjoint qubits. By default, commuting ops on
   overlapping qubits may still be merged into one layer.
   [(#2858)](https://github.com/PennyLaneAI/catalyst/pull/2858)
-
-* The :func:`~.passes.ppm_specs` now report circuit depth as ``depth``
-  (layer count) and ``depth_type`` (``0`` = commuting ops on overlapping qubits may share a
-  layer; ``1`` = only ops with disjoint qubit support may share a layer). The Python API accepts
-  ``only_disjoint_qubit=True`` to run ``ppm-specs{disjoint-qubit=true}``. AOT ``ppm_specs`` no
-  longer requires an explicit pipeline and no longer mixes MLIR into the JSON output.
-  [(#2863)](https://github.com/PennyLaneAI/catalyst/pull/2863)
-
-* The ``depth`` field reported by :func:`~.passes.ppm_specs` is now the worst-case depth
-  across ``scf.if`` and ``scf.index_switch`` branches (taking the maximum over all branches)
-  and across statically-bounded ``scf.for`` loops (multiplied by the trip count).
-  Previously, branches were counted sequentially and PBC ops inside ``scf.for`` produced an
-  error. ``scf.while`` and dynamically-bounded ``scf.for`` still produce an error.
-  [(#2876)](https://github.com/PennyLaneAI/catalyst/pull/2876)
-  [(#2877)](https://github.com/PennyLaneAI/catalyst/pull/2877)
-  [(#2879)](https://github.com/PennyLaneAI/catalyst/pull/2879)
 
 * Global toggles, ``compile_without_static_conditionals`` and ``compile_without_static_loops`` have
   been added to control the capture behaviour for ``catalyst``/``pennylane`` ``cond`` and
@@ -403,6 +414,11 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
+  the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
+  (``any_commuting_depth`` / ``qubit_disjoint_depth``).
+  [(#3081)](https://github.com/PennyLaneAI/catalyst/pull/3081)
+
 * Removes the non-graph decomposition fallback when `capture=True` is enabled.
   [(#3058)](https://github.com/PennyLaneAI/catalyst/pull/3058/)
 
@@ -477,15 +493,14 @@
 * Fix memory bugs in the PBC passes.
   [(#2918)](https://github.com/PennyLaneAI/catalyst/pull/2918)
 
-* Fixed incorrect ``depth`` in :func:`~.passes.ppm_specs` when a ``quantum.extract`` appeared
-  after a PBC op but read from a register not updated by that op. Layer grouping now checks
-  data dependencies through insert to extract chains instead of textual op ordering.
-  [(#2884)](https://github.com/PennyLaneAI/catalyst/pull/2884)
-
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
 <h3>Internal changes ⚙️</h3>
+
+* A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
+  the `gpu` label.
+  [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
 
 * The `--to-ppr` and `--ppm-compilation` passes now run `--symbol-dce` at the beginning,
   to eliminate unnecessary decomposition rules that might contain gates that cannot be converted to PPRs.
@@ -500,6 +515,12 @@
 * The `cond` PLxPR primitive's lowering rule no longer expects a `True` Literal for the predicate
   of the default else branch.
   [(#3018)](https://github.com/PennyLaneAI/catalyst/pull/3018)
+
+* `ResourceAnalysis` can now optionally count `DecomposableGate` operations by their full graph
+  operation ID. Decomposition-rule resource generation enables this detailed mode so that resource
+  annotations preserve parameter types, wire counts, static data, and operator UIDs used for graph
+  matching.
+  [(#3102)](https://github.com/PennyLaneAI/catalyst/pull/3102)
 
 * `from_plxpr` no longer depends on the `Transform.plxpr_transform` property.
   [(#3004)](https://github.com/PennyLaneAI/catalyst/pull/3004)

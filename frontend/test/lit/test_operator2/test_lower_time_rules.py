@@ -547,3 +547,24 @@ def test_from_custom_op():
 # CHECK-SAME:   target_gate = "SingleParamCustomOp{0:[f64]}{wires:2}{}"
 # CHECK: qref.operator "NoParams"
 test_from_custom_op()
+
+
+def test_phaseshift_to_rz():
+    """Test that PhaseShift decomposes to a quantum.custom "RZ" & quantum.gphase correctly."""
+
+    @qp.qjit(target="mlir", capture=True)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def test_phaseshift():
+        qp.PhaseShift(0.5, 1)
+
+    print(test_phaseshift.mlir)
+
+
+# CHECK-LABEL: test_phaseshift
+# CHECK: func.func private @"__builtin__phaseshift_to_rz_gp
+# CHECK-SAME: resources = {operations = {
+# CHECK-SAME: GlobalPhase{phi:[f64]}{wires:0}{}
+# CHECK-SAME: RZ{0:[f64]}{wires:1}{}
+# CHECK: qref.custom "RZ"
+# CHECK: qref.gphase
+test_phaseshift_to_rz()
