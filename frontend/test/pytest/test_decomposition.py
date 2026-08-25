@@ -29,9 +29,12 @@ from operator2_dummy_gates import (
     SingleParam,
     StaticData,
 )
-from pennylane.typing import Complex, Float, Int
+from pennylane import qnode
+from pennylane.decomposition import add_decomps, local_decomps, register_resources
+from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
+from catalyst import qjit
 from catalyst.decomposition.decomposition_rules import (
     compile_decomposition_rules_wrapper,
 )
@@ -89,7 +92,7 @@ class TestGenericUtilities:
         ],
     )
     def test_mlir_stringify_type(self, dtype, expected):
-        """Test mlir_stringify_type."""
+        """Test convert_types_to_mlir_strings."""
         assert convert_types_to_mlir_strings(dtype) == expected
 
     @pytest.mark.parametrize(
@@ -116,11 +119,18 @@ class TestGenericUtilities:
                 "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
             ),
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
-            (HybridWires(Wires([0, 1, 2])), "HybridWires{}{}{}["),  # NOTE: open brace to match uid
+            (
+                HybridWires(Wires([0, 1, 2])),
+                "HybridWires{}{}{}[",
+            ),  # NOTE: open brace to match uid
             (
                 HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
                 "HybridOpArg{angle:[[f64]]}{cwires:2}{}[",  # NOTE: open brace to match uid
             ),
+            (
+                qp.Rot(Bool, Int, Float, Wires(0)),
+                "Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{}",
+            ),  # custom ops should be promoted to f64
         ],
     )
     def test_GraphOpId(self, op, id):
@@ -128,14 +138,19 @@ class TestGenericUtilities:
         # NOTE: use startswith to match ops with uids/extra_data
         assert GraphOpID(op).getGraphOpId().startswith(id)
 
-    def test_wrapper_operator(self):
+    def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
-        # TODO: keep this up to date with an operator that is not migrated, and decomposes to
-        # un-migrated operators until migration is complete.
+        mock_decomp = mocker.MagicMock()
+        mock_decomp._impl.__name__ = "FakeRuleName"
+        mock_decomp.compute_resources.side_effect = ValueError("Fake Resource Related Error")
+
+        mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
+
         with pytest.warns(match="Failed to get resources"):
-            compile_decomposition_rules_wrapper(
-                "PauliX", 'PauliX{}{"wires":1}{}', {}, {"wires": 1}, {}
+            res = compile_decomposition_rules_wrapper(
+                "MockOp", 'MockOp{}{"wires":1}{}', {}, {"wires": 1}, {}
             )
+        assert isinstance(res, str)
 
 
 class TestPrecompiled:
@@ -213,7 +228,7 @@ class TestTraceTime:
             mlir = circuit.mlir
 
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
     def test_adjoint_gate_captures_base_and_adjoint(self):
         """Lowering the Adjoint of a gate captures the rules registered against both the plain gate
@@ -235,7 +250,7 @@ class TestTraceTime:
 
         assert 'qref.operator "NoParams"() adj' in mlir
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
     def test_distribution_rule_synthesized_from_base_only(self):
         """With only a base rule registered (no Adjoint(Op) rule), lowering still synthesizes a rule
@@ -257,9 +272,10 @@ class TestTraceTime:
 
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         # A distribution rule for Adjoint(NoParams) is synthesized even though none was registered.
-        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
         assert (
-            'resources = {operations = {"Adjoint(SingleParam{x:[f64]}{reg:2}{})" = 1 : i64}' in mlir
+            'resources = {operations = {"Adjoint(SingleParam){x:[[f64]]}{reg:2}{}" = 1 : i64}'
+            in mlir
         )
         assert "qref.adjoint" in mlir
 
@@ -288,7 +304,7 @@ class TestTraceTime:
             mlir = circuit.mlir
 
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' not in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' not in mlir
 
 
 class TestOnDemand:

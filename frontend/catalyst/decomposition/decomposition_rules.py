@@ -38,6 +38,17 @@ from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 _NON_INVERTIBLE_MARKERS = ("qref.measure", "quantum.measure")
 
 
+def name_wrap_adjoint(op_id: str) -> str:
+    """Name-wrap the adjoint modifier around a graphOpId.
+    """
+    split = len(op_id)
+    for i, char in enumerate(op_id):
+        if char in "{[":
+            split = i
+            break
+    return f"Adjoint({op_id[:split]}){op_id[split:]}"
+
+
 def get_rule_strings_from_module(module: ir.Module) -> list[str]:
     raw_funcOps = []
 
@@ -128,9 +139,11 @@ def split_call_args(kwargs, is_custom_op):
 
     Custom-op dynamic params are keyed positionally ("0", "1", ...) but the rule callables expect
     them by their real argnames, so they are passed positionally with only "wires" kept as keyword.
+    Custom-op params are always scalar f64, so scalar ``0.0`` dummies are used (a shape-(1,) array
+    would instead lower the gate through the general ``qref.operator`` path rather than ``qref.custom``).
     """
     if is_custom_op:
-        args = tuple(val for key, val in kwargs.items() if key != "wires")
+        args = tuple(0.0 for key in kwargs if key != "wires")
         return args, {"wires": kwargs["wires"]}
     return (), kwargs
 
@@ -197,10 +210,10 @@ def compile_decomposition_rules(
     )
 
     # The distribution pathway targets `Adjoint(op)` and produces adjointed resource gates.
-    target_id = f"Adjoint({op_id})" if wrap_adjoint else op_id
+    target_id = name_wrap_adjoint(op_id) if wrap_adjoint else op_id
     if wrap_adjoint:
         name_to_resource_ids = {
-            rule_name: {f"Adjoint({produced_id})": count for produced_id, count in ids.items()}
+            rule_name: {name_wrap_adjoint(produced_id): count for produced_id, count in ids.items()}
             for rule_name, ids in name_to_resource_ids.items()
         }
 
@@ -222,9 +235,12 @@ def compile_decomposition_rules(
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
-    subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
-
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+
+    subroutines = []
+    for rule in decomp_rules:
+        if rule.is_applicable(*call_args, **call_kwargs):
+            subroutines.append(rule_to_subroutine(rule))
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
@@ -318,7 +334,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                     get_rule_strings_from_module(
                         compile_decomposition_rules(
                             adj_name,
-                            f"Adjoint({op_id})",
+                            name_wrap_adjoint(op_id),
                             dynamic_shape,
                             wire_lens,
                             static_data,
@@ -380,7 +396,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         graph_op_id = GraphOpID(op)
                         probe = (
                             graph_op_id.get_operator_name(),
-                            convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
+                            convert_types_to_mlir_strings(graph_op_id.dynamic_shape),
                             graph_op_id.wire_lens,
                             graph_op_id.static_data,
                             graph_op_id.extra_data,
@@ -416,4 +432,4 @@ def _op_variants(op_name, op_id):
     """
     yield op_name, op_id
     if not op_name.startswith("Adjoint("):
-        yield f"Adjoint({op_name})", f"Adjoint({op_id})"
+        yield f"Adjoint({op_name})", name_wrap_adjoint(op_id)

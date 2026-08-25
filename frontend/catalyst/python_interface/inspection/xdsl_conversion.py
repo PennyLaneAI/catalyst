@@ -43,6 +43,7 @@ from catalyst.python_interface.dialects.pbc import (
     PPRotationOp,
 )
 from catalyst.python_interface.dialects.quantum import (
+    CtrlOp,
     CustomOp,
     ExtractOp,
     GlobalPhaseOp,
@@ -409,6 +410,14 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
                 getattr(op, "in_ctrl_qubits", [])
             )
             return resolve_constant_wire(all_qubits[ssa.index])
+
+        case CtrlOp():
+            # A `quantum.ctrl` result threads through from its matching input operand:
+            # out_ctrl_qubits[i] <- in_ctrl_qubits[i], and results[j] <- args[j].
+            num_ctrl = len(op.in_ctrl_qubits)
+            if ssa.index < num_ctrl:
+                return resolve_constant_wire(op.in_ctrl_qubits[ssa.index])
+            return resolve_constant_wire(op.args[ssa.index - num_ctrl])
 
         case ExtractOp():
             return dispatch_wires_extract(op)

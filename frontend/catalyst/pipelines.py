@@ -175,6 +175,7 @@ class CompileOptions:
     dialect_plugins: Optional[Set[Path]] = None
     capture: bool | Literal["global"] = "global"
     skip_preprocess: bool = False
+    runtime_artifacts: tuple[str, ...] = ()
     collect_decomp_rules: bool = True
 
     def __post_init__(self):

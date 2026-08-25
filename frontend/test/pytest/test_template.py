@@ -35,7 +35,7 @@ def test_adder(backend):
     work_wires = [4, 5]
 
     def adder():
-        qp.BasisEmbedding(x, wires=x_wires)
+        qp.BasisEmbedding(qp.math.int_to_binary(x, len(x_wires)), wires=x_wires)
         qp.Adder(k, x_wires, mod, work_wires)
         return qp.sample(wires=x_wires)
 
@@ -1103,7 +1103,7 @@ def test_phase_adder(backend):
     work_wire = [4]
 
     def phase_adder():
-        qp.BasisEmbedding(x, wires=x_wires)
+        qp.BasisEmbedding(qp.math.int_to_binary(x, len(x_wires)), wires=x_wires)
         qp.QFT(wires=x_wires)
         qp.PhaseAdder(k, x_wires, mod, work_wire)
         qp.adjoint(qp.QFT)(wires=x_wires)

@@ -23,7 +23,6 @@ from jax.core import ShapedArray
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
-from jaxlib.mlir.dialects.arith import ConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.core.operator.utils import abstractify
 from pennylane.pytrees import unflatten
@@ -74,6 +73,7 @@ with Patcher(
         PauliRotOp,
         PCPhaseOp,
         QubitUnitaryOp,
+        SetBasisStateOp,
     )
 
 
@@ -337,8 +337,62 @@ def compile_decomp_rules(
             static_data={},
         )
 
-    elif op_cls in (qp.QubitUnitary,):
-        raise NotImplementedError(f"{op_cls} has not been migrated to Operator2 yet")
+    elif op_cls is qp.BasisState:
+        # TODO: qp.BasisState decomp rule calls allclose, but the current infra cannot support
+        # rules that call other funcops
+        # When the above is implemented, uncomment the BasisState decomp rule collection impl below
+        op_id = ""
+        decomp_rules = []
+
+        # # qp.BasisState has the same number of booleans as the number of wires
+        # num_wires = wire_lens[0]
+        # dynamic_shape = {qp.BasisState.dynamic_argnames[0]: ["i64"] * num_wires}
+        # wire_argname = qp.BasisState.wire_argnames[0]
+        # op_id = (
+        #     "BasisState"
+        #     + format_dynamic_params_for_id(dynamic_shape)
+        #     + "{"
+        #     + f"{wire_argname}:{num_wires}"
+        #     + "}{}"
+        # )
+
+        # decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+        #     op_name="BasisState",
+        #     op_id=op_id,
+        #     dynamic_shape=dynamic_shape,
+        #     wire_lens={f"{wire_argname}": num_wires},
+        #     static_data={},
+        # )
+
+    elif op_cls is qp.QubitUnitary:
+        # TODO: qp.QubitUnitary decomp rule calls det, but the current infra cannot support
+        # rules that call other funcops
+        # When the above is implemented, uncomment the Unitary decomp rule collection impl below
+
+        op_id = ""
+        decomp_rules = []
+
+        # num_wires = wire_lens[0]
+        # matrix_size = 2**num_wires
+        # dynamic_shape = {
+        #     qp.QubitUnitary.dynamic_argnames[0]: [["complex<f64>"] * matrix_size] * matrix_size
+        # }
+        # wire_argname = qp.QubitUnitary.wire_argnames[0]
+        # op_id = (
+        #     "QubitUnitary"
+        #     + "[" + format_dynamic_params_for_id(dynamic_shape) + "]"
+        #     + "{"
+        #     + f"{wire_argname}:{wire_lens[0]}"
+        #     + "}{}"
+        # )
+
+        # decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+        #     op_name="QubitUnitary",
+        #     op_id=op_id,
+        #     dynamic_shape=dynamic_shape,
+        #     wire_lens={f"{wire_argname}": wire_lens[0]},
+        #     static_data={},
+        # )
 
     else:
         # Operator Op
@@ -584,35 +638,6 @@ def _multirz_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint):
     return []
 
 
-@_register_special_lowering(qp.MultiControlledX)
-def _multicontrolledx_lowering(
-    control_values, *qubits, ctrl_qubits, ctrl_values, adjoint, work_wire_type
-):
-    """Lower a ``MultiControlledX`` to a controlled PauliX custom operation."""
-    num_controls = ir.RankedTensorType(control_values.type).shape[0]
-
-    mcx_ctrl_values = [
-        TensorExtractOp(
-            ir.IntegerType.get_signless(1),
-            control_values,
-            [ConstantOp(ir.IndexType.get(), index)],  # pylint: disable=too-many-function-args
-        ).result
-        for index in range(num_controls)
-    ]
-    mcx_ctrl_qubits = qubits[:num_controls]
-    target = qubits[num_controls]
-
-    CustomOp(
-        params=[],
-        qubits=[target],
-        gate_name=get_mlir_attribute_from_pyval("PauliX"),
-        ctrl_qubits=[*ctrl_qubits, *mcx_ctrl_qubits],
-        ctrl_values=[*ctrl_values, *mcx_ctrl_values],
-        adjoint=adjoint,
-    )
-    return []
-
-
 @_register_special_lowering(qp.PCPhase)
 def _pcphase_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint, dim):
     dim = unflatten(*dim)
@@ -638,8 +663,16 @@ def _special_gphase_lowering(angle, *_, ctrl_qubits, ctrl_values, adjoint):
     return ()
 
 
+@_register_special_lowering(qp.BasisState)
+def _special_basis_state_lowering(state, *qubits, ctrl_qubits, ctrl_values, adjoint):
+    assert not ctrl_qubits and not ctrl_values, "ctrl(BasisState) is not supported."
+    assert not adjoint, "adjoint(BasisState) is not supported."
+    SetBasisStateOp(state, qubits)
+    return ()
+
+
 @_register_special_lowering(qp.QubitUnitary)
-def _special_unitary_lowering(matrix, *qubits, ctrl_qubits, ctrl_values, adjoint):
+def _special_unitary_lowering(matrix, *qubits, ctrl_qubits, ctrl_values, adjoint, unitary_check):
     matrix_type = matrix.type
     is_tensor = ir.RankedTensorType.isinstance(matrix_type)
     shape = ir.RankedTensorType(matrix_type).shape if is_tensor else None

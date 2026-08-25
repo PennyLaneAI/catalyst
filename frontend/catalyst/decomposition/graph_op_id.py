@@ -152,10 +152,6 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
-    def get_dynamic_shape(self) -> dict:
-        """Return a dictionary of names to dynamic shapes."""
-        return self.dynamic_shape
-
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
         return format_dynamic_params_for_id(convert_types_to_mlir_strings(self.dynamic_shape))

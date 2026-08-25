@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Hadamard=1.0 alt-decomps=Adjoint(U{}{wires:1}{})=adj_u,Adjoint(Hadamard{}{wires:1}{})=adj_h})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Hadamard=1.0 alt-decomps=Adjoint(U){}{wires:1}{}=adj_u,Adjoint(Hadamard){}{wires:1}{}=adj_h})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @distribute_region(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit
@@ -27,8 +27,8 @@ func.func @distribute_region(%q: !quantum.bit) -> !quantum.bit {
 
 // Adjoint(U) via distribution:
 func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(U{}{wires:1}{})",
-    resources = {operations = {"Adjoint(Hadamard{}{wires:1}{})" = 2 : i64}} } {
+    target_gate = "Adjoint(U){}{wires:1}{}",
+    resources = {operations = {"Adjoint(Hadamard){}{wires:1}{}" = 2 : i64}} } {
   %out = quantum.adjoint(%q) : !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %a = quantum.custom "Hadamard"() %arg0 : !quantum.bit
@@ -40,7 +40,7 @@ func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit attributes {
 
 // Self-adjoint:
 func.func private @adj_h(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(Hadamard{}{wires:1}{})",
+    target_gate = "Adjoint(Hadamard){}{wires:1}{}",
     resources = {operations = {"Hadamard{}{wires:1}{}" = 1 : i64}} } {
   %o = quantum.custom "Hadamard"() %q : !quantum.bit
   return %o : !quantum.bit

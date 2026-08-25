@@ -217,7 +217,7 @@ class ExecutorPaths:
 
     @staticmethod
     def default_executor_bin() -> str:
-        """Locate the ``catalyst-executor`` binary for ``local=True``.
+        """Locate the ``catalyst-executor`` binary for a local subprocess.
 
         Search order: packaged lib dir, then its ``remote/`` subdir. Defaults to the name on
         ``$PATH``.
