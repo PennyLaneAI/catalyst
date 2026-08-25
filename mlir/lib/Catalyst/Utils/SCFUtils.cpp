@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <optional>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -36,16 +37,20 @@ using namespace mlir;
 
 namespace catalyst {
 
-// Evaluating loops without a closed form may require enumerating many trip counts. 
+// Evaluating loops without a closed form may require enumerating many trip counts.
 // Bound that work so large dependency chains fall back to symbolic resource counts.
 static constexpr uint64_t kMaxEnumerationSteps = 1'000'000;
 
-static int64_t computeTripCount(int64_t lowerBound, int64_t upperBound, int64_t step) {
-    assert(step > 0);
+static uint64_t computeTripCount(int64_t lowerBound, int64_t upperBound, int64_t step) {
+    assert(step > 0 && "Trip count step must be positive");
     if (upperBound <= lowerBound) {
         return 0;
     }
-    return (upperBound - lowerBound + step - 1) / step;
+
+    // Unsigned subtraction represents the full distance between any two signed bounds.
+    uint64_t distance = static_cast<uint64_t>(upperBound) - static_cast<uint64_t>(lowerBound);
+    uint64_t unsignedStep = static_cast<uint64_t>(step);
+    return (distance - 1) / unsignedStep + 1;
 }
 
 static int64_t getIntFromArithConstantOp(arith::ConstantOp op) {
@@ -85,7 +90,11 @@ int64_t countStaticForOpIterations(scf::ForOp forOp) {
     }
     int64_t s = getIntFromArithConstantOp(cast<arith::ConstantOp>(stepOp));
 
-    return computeTripCount(l, u, s);
+    uint64_t tripCount = computeTripCount(l, u, s);
+    if (tripCount > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+        return -1;
+    }
+    return static_cast<int64_t>(tripCount);
 }
 
 std::optional<double> getEstimatedIterationsHint(Operation *op) {
@@ -314,7 +323,7 @@ static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> 
         return std::nullopt;
     }
 
-    uint64_t tripCount = static_cast<uint64_t>(computeTripCount(*lower, *upper, *step));
+    uint64_t tripCount = computeTripCount(*lower, *upper, *step);
     // To avoid overflow when adding tripCount to enumerationSteps, we check if the result
     // is greater than kMaxEnumerationSteps - enumerationSteps instead.
     if (tripCount > kMaxEnumerationSteps - enumerationSteps) {
@@ -323,7 +332,7 @@ static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> 
     enumerationSteps += tripCount;
 
     TripCountSummary summary;
-    for (int64_t iv = *lower; iv < *upper; iv += *step) {
+    for (int64_t iv = *lower; iv < *upper;) {
         inductionValues[loop.getInductionVar()] = iv;
         auto nested =
             evaluateChain(chain, position + 1, pathWeight, inductionValues, enumerationSteps);
@@ -333,6 +342,13 @@ static std::optional<TripCountSummary> evaluateChain(llvm::ArrayRef<scf::ForOp> 
         }
         summary.totalIterations += nested->totalIterations;
         summary.entryCount += nested->entryCount;
+
+        auto next = llvm::checkedAdd(iv, *step);
+        if (!next) {
+            loop.emitWarning("Cannot resolve loop domain: integer overflow");
+            return std::nullopt;
+        }
+        iv = *next;
     }
     inductionValues.erase(loop.getInductionVar());
     return summary;

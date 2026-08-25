@@ -1147,6 +1147,29 @@ func.func @estimated_iterations_domain_overflow(
 
 // -----
 
+// The outer loop executes twice, but its upper-lower span exceeds INT64_MAX.
+// Trip-count arithmetic must not overflow before dividing by the large step.
+
+// CHECK-LABEL: "for_loop_2": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "for_loop_1": 0.5
+func.func @static_trip_count_large_signed_span(%arg0: !quantum.bit) -> !quantum.bit {
+    %cmin = arith.constant -4611686018427387904 : index
+    %cmax = arith.constant 4611686018427387904 : index
+
+    %q = scf.for %i = %cmin to %cmax step %cmax iter_args(%outer_arg = %arg0) -> !quantum.bit {
+        %inner = scf.for %j = %cmin to %i step %cmax iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
+            %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
+            scf.yield %out : !quantum.bit
+        }
+        scf.yield %inner : !quantum.bit
+    }
+    return %q : !quantum.bit
+}
+
+// -----
+
 // A branch between the loops prevents the inner loop from being treated as directly nested.
 
 // CHECK-LABEL: "dyn_for_loop_1": {
