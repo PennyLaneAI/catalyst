@@ -361,8 +361,8 @@ class TestBacklineDemoIntegration:
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
         samples = np.asarray(ghz())
-        # 1 shot x 3 mid-circuit measurements -> a length-3 sample array.
-        assert samples.shape == (3,), f"expected shape (3,), got {samples.shape}"
+        # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
+        assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
 
     def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture, local_executor):
         """Demo 1a: local CPU ↔ local CPU over RDMA loopback, out-of-process.
@@ -427,8 +427,8 @@ class TestBacklineDemoIntegration:
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
         samples = np.asarray(ghz())
-        # 1 shot x 3 mid-circuit measurements -> a length-3 sample array.
-        assert samples.shape == (3,), f"expected shape (3,), got {samples.shape}"
+        # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
+        assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
 
     def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(self, use_capture, gpu_triton_platform):
         """CPU controller ↔ GPU coprocessor over ``memcpy`` with a manually-scheduled QEC cycle.

@@ -78,16 +78,21 @@ def gpu_triton_platform():
 
 @pytest.fixture(scope="function")
 def local_executor():
-    """A ``catalyst.Executor`` in local-subprocess mode with explicit teardown.
+    """A launched ``catalyst.Executor`` in local-subprocess mode with explicit teardown.
 
-    ``Executor()`` (no host, no address) spawns ``catalyst-executor`` on ``127.0.0.1``. Catalyst's
-    ``_SessionRegistry`` covers process-exit cleanup via an ``atexit`` hook, but that isn't
-    enough within a pytest session: without an explicit ``stop()`` the subprocess lingers and
-    keeps the coprocessor's OOB TCP port bound, so reruns / ``pytest-xdist`` / any second use
-    would fail with ``EADDRINUSE``. This fixture calls ``stop()`` on teardown regardless of
-    test outcome, which also runs ``teardown_workspace()`` to clean up the deploy dir.
+    ``Executor()`` (no host, no address) spawns ``catalyst-executor`` on ``127.0.0.1``.
+    Catalyst compiles the placement into a program that carries the executor's TCP address as
+    data, so it reads ``.address`` at compile time - an inert (unlaunched) ``Executor()``
+    raises there. This fixture calls ``.launch()`` before yielding so the address is settled.
+
+    Cleanup: ``_SessionRegistry`` covers process-exit via an ``atexit`` hook, but that isn't
+    enough within a pytest session (a lingering subprocess keeps the coprocessor's OOB TCP
+    port bound and any rerun / xdist / second use fails with ``EADDRINUSE``). Explicit
+    ``.stop()`` on teardown releases the port and runs ``teardown_workspace()`` on the deploy
+    dir, regardless of test outcome.
     """
     ex = Executor()
+    ex.launch()
     try:
         yield ex
     finally:
