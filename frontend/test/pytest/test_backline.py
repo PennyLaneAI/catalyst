@@ -382,6 +382,10 @@ class TestBacklineDemoIntegration:
         steane_lib = str(
             Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
         )
+        # The executor subprocess needs the coprocessor's decoder .so loaded (in addition to
+        # the runtime libs the fixture already loads) so that the JIT'd coprocessor module can
+        # resolve ``steane_coprocessor`` and its ``_catalyst_pyface_/ciface_coproc_*`` wrappers.
+        ex = local_executor(extra_plugins=[steane_lib])
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("null.qubit", wires=3),
@@ -395,9 +399,10 @@ class TestBacklineDemoIntegration:
             coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
             endpoint=qp.Endpoint("127.0.0.1", 18590),
             # ``Executor()`` with no host/address is a subprocess on 127.0.0.1 (see
-            # frontend/catalyst/executor/manager.py). Consumed from the ``local_executor``
-            # fixture which owns the teardown - see the docstring above.
-            executor=local_executor,
+            # frontend/catalyst/executor/manager.py). The ``local_executor`` fixture is a
+            # factory: it launches the subprocess with ``librt_transport.so`` + ``librt_capi.so``
+            # loaded, plus the ``extra_plugins`` above, and owns the teardown.
+            executor=ex,
             init_args={
                 "backend_lib": "libcatalyst_transport_cpu_verbs_coprocessor.so",
                 "config": "cfg",

@@ -18,6 +18,7 @@ Pytest configuration file for Catalyst test suite.
 import os
 import subprocess
 from importlib.util import find_spec
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 from warnings import warn
@@ -26,6 +27,7 @@ import pennylane as qp
 import pytest
 
 from catalyst import Executor
+from catalyst.utils.runtime_environment import get_lib_path
 
 
 def _detect_gpu_triton_platform():
@@ -78,25 +80,45 @@ def gpu_triton_platform():
 
 @pytest.fixture(scope="function")
 def local_executor():
-    """A launched ``catalyst.Executor`` in local-subprocess mode with explicit teardown.
+    """Factory yielding launched ``catalyst.Executor``(s) in local-subprocess mode.
 
-    ``Executor()`` (no host, no address) spawns ``catalyst-executor`` on ``127.0.0.1``.
-    Catalyst compiles the placement into a program that carries the executor's TCP address as
-    data, so it reads ``.address`` at compile time - an inert (unlaunched) ``Executor()``
-    raises there. This fixture calls ``.launch()`` before yielding so the address is settled.
+    Usage: ``ex = local_executor(extra_plugins=[coproc_fn_lib])`` returns a launched
+    ``Executor`` on ``127.0.0.1`` with ``librt_transport.so`` and ``librt_capi.so`` already
+    loaded via ``--plugin``. ``extra_plugins`` appends test-specific libraries such as a
+    coprocessor's decoder .so; on an out-of-process coprocessor these need to live in the
+    executor subprocess for the JIT'd module to resolve their symbols.
+
+    Bypassing catalyst's own plugin computation (which lives in
+    ``backline._realize_executor``): a preset ``executor=`` on a node is used as-is and skips
+    it, so the fixture has to load what the compiled program will reference.
 
     Cleanup: ``_SessionRegistry`` covers process-exit via an ``atexit`` hook, but that isn't
     enough within a pytest session (a lingering subprocess keeps the coprocessor's OOB TCP
     port bound and any rerun / xdist / second use fails with ``EADDRINUSE``). Explicit
-    ``.stop()`` on teardown releases the port and runs ``teardown_workspace()`` on the deploy
-    dir, regardless of test outcome.
+    ``.stop()`` on teardown releases each port and runs ``teardown_workspace()`` on the
+    deploy dir, regardless of test outcome.
     """
-    ex = Executor()
-    ex.launch()
+    runtime_lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    base_plugins = [
+        str(runtime_lib_dir / "librt_transport.so"),
+        str(runtime_lib_dir / "librt_capi.so"),
+    ]
+    launched: list[Executor] = []
+
+    def _make(extra_plugins=None):
+        plugins = list(base_plugins)
+        if extra_plugins:
+            plugins.extend(str(p) for p in extra_plugins)
+        ex = Executor(plugins=plugins)
+        ex.launch()
+        launched.append(ex)
+        return ex
+
     try:
-        yield ex
+        yield _make
     finally:
-        ex.stop()
+        for ex in reversed(launched):
+            ex.stop()
 
 
 @pytest.fixture(scope="function")
