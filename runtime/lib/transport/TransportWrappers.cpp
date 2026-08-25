@@ -355,10 +355,10 @@ CatalystWrapperResult __catalyst__transport__start_benchmark__wrapper(const char
         // reserve the samples buffer with the caller's capacity
         auto *samples = static_cast<std::uint64_t *>(out.reserve(samples_bytes));
         auto *rounds = out.slot<std::uint64_t>();
-        *status = checked_status(
-            __catalyst__transport__start_benchmark(session, iters, decoder_id, flags, samples,
-                                                   samples_bytes, rounds),
-            "start_benchmark");
+        *status =
+            checked_status(__catalyst__transport__start_benchmark(session, iters, decoder_id, flags,
+                                                                  samples, samples_bytes, rounds),
+                           "start_benchmark");
     }
     return finish(in, out);
 }
@@ -531,14 +531,14 @@ void __catalyst__transport__last_rtt_ns__call(void **args, void **results) {
 //===----------------------------------------------------------------------===//
 
 void __catalyst__transport__start_benchmark__call(void **args, void **results) {
-    put<std::int32_t>(
-        results, 0,
-        checked_status(
-            __catalyst__transport__start_benchmark(
-                session_arg(args, 0), arg<std::uint32_t>(args, 1), arg<std::uint32_t>(args, 2),
-                arg<std::uint32_t>(args, 3), static_cast<std::uint64_t *>(data_of(results, 1)),
-                arg<std::uint64_t>(args, 4), static_cast<std::uint64_t *>(data_of(results, 2))),
-            "start_benchmark"));
+    put<std::int32_t>(results, 0,
+                      checked_status(__catalyst__transport__start_benchmark(
+                                         session_arg(args, 0), arg<std::uint32_t>(args, 1),
+                                         arg<std::uint32_t>(args, 2), arg<std::uint32_t>(args, 3),
+                                         static_cast<std::uint64_t *>(data_of(results, 1)),
+                                         arg<std::uint64_t>(args, 4),
+                                         static_cast<std::uint64_t *>(data_of(results, 2))),
+                                     "start_benchmark"));
 }
 
 //===----------------------------------------------------------------------===//
