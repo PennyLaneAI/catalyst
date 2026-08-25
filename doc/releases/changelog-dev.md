@@ -187,7 +187,7 @@
   a transport kick/collect round over its buffers.
   [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
 
-* A `remove-global-phases` pass is added, which removes global phases by deleting phase 
+* A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`  
   operations without control wires.
   [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
 
