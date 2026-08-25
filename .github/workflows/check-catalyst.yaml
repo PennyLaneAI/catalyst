@@ -146,11 +146,19 @@ jobs:
           ENABLE_TRANSPORT: ${{ needs.changes.outputs.transport == 'true' && 'ON' || 'OFF' }}
           ENABLE_EXECUTOR: ${{ needs.changes.outputs.transport == 'true' && 'ON' || 'OFF' }}
         run: |
+          # LLVM_BUILD_DIR redirects the top-level `runtime: llvm` chain and the runtime's own
+          # find_package(LLVM) at $(LLVM_BUILD_DIR)/lib/cmake/llvm to the cache restored above,
+          # instead of the sub-Makefile default of mlir/llvm-project/build (which is empty).
+          # LLVM_TARGETS overrides mlir/Makefile's default of "check-mlir llvm-symbolizer" so
+          # the chained `make llvm` is a ninja no-op on a warm cache -- check-mlir would re-run
+          # the MLIR test suite each build otherwise.
           CCACHE_DIR="$(pwd)/.ccache" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          LLVM_TARGETS="llvm-symbolizer" \
           ENABLE_ASAN=OFF \
           ENABLE_OQD=ON \
           ENABLE_TRANSPORT="$ENABLE_TRANSPORT" \
