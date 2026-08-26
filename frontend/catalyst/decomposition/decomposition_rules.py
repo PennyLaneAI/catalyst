@@ -32,8 +32,13 @@ from catalyst.decomposition.type_utils import (
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
-# Ops that make a decomposition body non-invertible:
-_NON_INVERTIBLE_MARKERS = ("qref.measure", "quantum.measure")
+# Ops that make a decomposition body non-invertible
+_NON_INVERTIBLE_MARKERS = (
+    "qref.measure",
+    "quantum.measure",
+    "measure_in_basis",
+    ".ppm",  # pbc.ppm / pbc.ref.ppm / pbc.select.ppm
+)
 
 
 def name_wrap_adjoint(op_id: str) -> str:

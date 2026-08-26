@@ -63,11 +63,14 @@ def test_plain_gate_captures_base_and_adjoint():
 
         print(c.mlir)
 
+    # Three rules are captured, each tied to the correct target and resources:
+    #   1. base rule of NoParams          -> target NoParams,          one SingleParam
+    #   2. rule registered on Adjoint(..) -> target Adjoint(NoParams), two SingleParam
+    #   3. synthesized (adjointed base)   -> target Adjoint(NoParams), one Adjoint(SingleParam)
     # CHECK: qref.operator "NoParams"()
-    # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"
-    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-    # CHECK-DAG: func.func private @"__builtin_adj_rule_Adjoint(NoParams){}{reg:2}{}"
-    # CHECK-SAME:   target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"{{.*}}"SingleParam{{.*}}target_gate = "NoParams{}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_adj_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"SingleParam{{.*}} = 2 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_base_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
 
 
 test_plain_gate_captures_base_and_adjoint()
@@ -87,9 +90,13 @@ def test_adjoint_gate_captures_adjoint_rule():
 
         print(c.mlir)
 
+    # Lowering `adjoint(NoParams)` collects the SAME three rules as the plain case: the collector
+    # keys off the base name `NoParams` regardless of the op-level adjoint modifier, so it always
+    # explores NoParams + Adjoint(NoParams). Only the circuit body differs (the op carries `adj`).
     # CHECK: qref.operator "NoParams"() adj
-    # CHECK-DAG: target_gate = "Adjoint(NoParams){}{reg:2}{}"
-    # CHECK-DAG: target_gate = "NoParams{}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"{{.*}}"SingleParam{{.*}}target_gate = "NoParams{}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_adj_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"SingleParam{{.*}} = 2 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_base_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
 
 
 test_adjoint_gate_captures_adjoint_rule()
