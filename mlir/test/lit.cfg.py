@@ -5,7 +5,7 @@ import lit.formats
 from lit.llvm import llvm_config
 
 config.name = "Compiler test suite"
-config.test_format = lit.formats.ShTest(True)
+config.test_format = lit.formats.ShTest(execute_external=False)
 
 # Define the file extensions to treat as test files.
 config.suffixes = [".mlir", ".py"]
