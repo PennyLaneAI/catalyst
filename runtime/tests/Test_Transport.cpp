@@ -17,8 +17,11 @@
 #include <cstdint>
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
 
 #include "TransportCAPI.h"
+
+using Catch::Matchers::ContainsSubstring;
 
 namespace {
 CatalystTransportSession *make(std::int32_t role, const char *key) {
@@ -35,6 +38,25 @@ CatalystTransportSession *make_memcpy_coprocessor(const char *key) {
                                          CATALYST_TRANSPORT_ROLE_COPROCESSOR, key);
 }
 } // namespace
+
+TEST_CASE("check aborts on a non-OK status and a null session", "[transport]") {
+    __catalyst__transport__check(CATALYST_TRANSPORT_OK, "ok");
+    auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "check_live");
+    REQUIRE(s != nullptr);
+    __catalyst__transport__check_session(s, "ok");
+    __catalyst__transport__destroy(s);
+
+    REQUIRE_THROWS_WITH(__catalyst__transport__check(CATALYST_TRANSPORT_ERR, "stage_payload"),
+                        ContainsSubstring("stage_payload failed (error)"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__check(CATALYST_TRANSPORT_ERR_TIMEOUT, "collect"),
+                        ContainsSubstring("collect failed (timeout)"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__check(CATALYST_TRANSPORT_ERR_STUCK, "collect"),
+                        ContainsSubstring("stuck"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__check(CATALYST_TRANSPORT_ERR_MEMORY, "post"),
+                        ContainsSubstring("memory"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "get_session"),
+                        ContainsSubstring("get_session: null session"));
+}
 
 TEST_CASE("create registers a session resolvable by (role, key)", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "reg_ctrl");
