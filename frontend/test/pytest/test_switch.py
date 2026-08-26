@@ -34,6 +34,7 @@ QUANTUM_OPERATION_MESSAGE = escape(
     " context, and thus has no associated quantum operation."
 )
 
+
 class TestSwitchToJaxpr:
     """Run tests on the generated JAXPR of switch."""
 
@@ -120,9 +121,7 @@ class TestSwitchEstimatedProbabilityValidation:
     @pytest.mark.usefixtures("disable_capture")
     def test_partial_probabilities_raise(self):
         """A hint on some but not all non-default branches is an error."""
-        with pytest.raises(
-            ValueError, match="must be provided for every non-default branch"
-        ):
+        with pytest.raises(ValueError, match="must be provided for every non-default branch"):
 
             @qjit
             def circuit(i):

@@ -201,9 +201,7 @@ class TestEstimatedProbabilityValidation:
 
     def test_partial_probabilities_raise(self):
         """A hint on some but not all non-default branches is an error."""
-        with pytest.raises(
-            ValueError, match="must be provided for every non-default branch"
-        ):
+        with pytest.raises(ValueError, match="must be provided for every non-default branch"):
             collect_estimated_probabilities([0.2, None])
 
     @pytest.mark.parametrize("invalid", [-0.1, 1.5])
@@ -238,9 +236,7 @@ class TestEstimatedProbabilityValidation:
 
             return cond_fn()
 
-        with pytest.raises(
-            ValueError, match="must be provided for every non-default branch"
-        ):
+        with pytest.raises(ValueError, match="must be provided for every non-default branch"):
             circuit(5)
 
     @pytest.mark.usefixtures("disable_capture")

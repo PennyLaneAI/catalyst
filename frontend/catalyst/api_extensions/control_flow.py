@@ -937,9 +937,7 @@ class CondCallable:
             out_classical_tracers,
             regions,
             expansion_strategy=self.expansion_strategy,
-            estimated_probabilities=collect_estimated_probabilities(
-                self.branch_probabilities
-            ),
+            estimated_probabilities=collect_estimated_probabilities(self.branch_probabilities),
         )
         return tree_unflatten(out_tree, out_classical_tracers)
 
