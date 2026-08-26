@@ -499,8 +499,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * The `lit` test runner is now pinned to `lit<23` in `requirements.txt`. Starting with LLVM 23,
-  `lit` makes `ShTest(execute_external=True)` a fatal error, which prevented our lit suites from
-  running at all. Pinning keeps `lit` compatible with our LLVM 22 toolchain.
+  `lit` deprecates `ShTest(execute_external=True)`, which prevented our lit suites from running.
   [(#3154)](https://github.com/PennyLaneAI/catalyst/pull/3154)
 
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
