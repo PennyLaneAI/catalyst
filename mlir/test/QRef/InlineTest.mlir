@@ -23,6 +23,7 @@ func.func @my_helper() -> f64 {
 // CHECK-LABEL: test_ctrl_op
 // CHECK: [[param:%.+]] = arith.constant 4.200000e+00 : f64
 // CHECK: qref.ctrl
+// CHECK-NOT: func.call
 // CHECK: qref.custom "gate"([[param]])
 func.func @test_ctrl_op(%q: !qref.bit, %r: !qref.reg<1>)
 {
@@ -47,6 +48,7 @@ func.func @my_helper() -> f64 {
 // CHECK-LABEL: test_adjoint_op
 // CHECK: [[param:%.+]] = arith.constant 4.200000e+00 : f64
 // CHECK: qref.adjoint
+// CHECK-NOT: func.call
 // CHECK: qref.custom "gate"([[param]])
 func.func @test_adjoint_op(%q: !qref.bit)
 {
