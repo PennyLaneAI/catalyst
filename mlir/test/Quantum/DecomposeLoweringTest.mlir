@@ -840,6 +840,7 @@ module @test_if {
     return %out : !quantum.bit
   }
 
+  // CHECK-LABEL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"
   func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"(%arg0: tensor<1xi64>, %arg1: !quantum.reg) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, resources = {operations = {"PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64}}, target_gate = "T{}{wires:1}{}"} {
     %cst = arith.constant 0.78539816339744828 : f64
     %0 = stablehlo.slice %arg0 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
@@ -877,6 +878,7 @@ module @test_for_loop {
     return %rout : !quantum.bit
   }
 
+  // CHECK-LABEL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"
   func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"(%arg0: tensor<1xi64>, %arg1: !quantum.reg) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>,  target_gate = "T{}{wires:1}{}"} {
     %cst = arith.constant 0.78539816339744828 : f64
     %0 = stablehlo.slice %arg0 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
@@ -917,6 +919,7 @@ module @test_while_loop {
     return %rout : !quantum.bit
   }
 
+  // CHECK-LABEL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"
   func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"(%arg0: tensor<1xi64>, %arg1: !quantum.reg) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, resources = {operations = {"PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64}}, target_gate = "T{}{wires:1}{}"} {
     %cst = arith.constant 0.78539816339744828 : f64
     %0 = stablehlo.slice %arg0 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
