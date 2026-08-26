@@ -26,7 +26,9 @@ isort~=7.0.0
 
 # testing
 flaky
-lit
+# Pin below LLVM 23: lit>=23 makes `ShTest(execute_external=True)` a fatal error, which our lit
+# configs rely on. Our LLVM toolchain is v22, so keep lit compatible with it.
+lit<23
 pytest
 pytest-xdist
 pytest-cov
