@@ -64,6 +64,76 @@ struct CustomOpAdjointCanonicalizePattern : public OpRewritePattern<CustomOp> {
     }
 };
 
+// Creates a new pattern to match MultiRZOp with adjoint flag set to true and canonicalize it.
+struct MultiRZAdjointCanonicalizePattern : public OpRewritePattern<MultiRZOp> {
+    using OpRewritePattern<MultiRZOp>::OpRewritePattern;
+    LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override {
+        if (op.getAdjoint()) {
+            auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
+
+            rewriter.replaceOpWithNewOp<MultiRZOp>(
+                op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
+                op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+            return success();
+        };
+        return failure();
+    }
+};
+
+// Creates a new pattern to match PCPhaseOp with adjoint flag set to true and canonicalize it.
+struct PCPhaseOpAdjointCanonicalizePattern : public OpRewritePattern<PCPhaseOp> {
+    using OpRewritePattern<PCPhaseOp>::OpRewritePattern;
+    LogicalResult matchAndRewrite(PCPhaseOp op, PatternRewriter &rewriter) const override {
+        if (op.getAdjoint()) {
+            auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
+
+            rewriter.replaceOpWithNewOp<PCPhaseOp>(op, op.getOutQubits().getTypes(),
+                                                   op.getOutCtrlQubits().getTypes(), paramNeg,
+                                                   op.getDimAttr(), op.getInQubits(), nullptr,
+                                                   op.getInCtrlQubits(), op.getInCtrlValues());
+
+            return success();
+        };
+        return failure();
+    }
+};
+
+// Creates a new pattern to match PauliRotOp with adjoint flag set to true and canonicalize it.
+struct PauliRotOpAdjointCanonicalizePattern : public OpRewritePattern<PauliRotOp> {
+    using OpRewritePattern<PauliRotOp>::OpRewritePattern;
+    LogicalResult matchAndRewrite(PauliRotOp op, PatternRewriter &rewriter) const override {
+        if (op.getAdjoint()) {
+            auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getAngle());
+
+            rewriter.replaceOpWithNewOp<PauliRotOp>(op, op.getOutQubits().getTypes(),
+                                                    op.getOutCtrlQubits().getTypes(), paramNeg,
+                                                    op.getPauliProduct(), op.getInQubits(), nullptr,
+                                                    op.getInCtrlQubits(), op.getInCtrlValues());
+
+            return success();
+        };
+        return failure();
+    }
+};
+
+// Creates a new pattern to match GlobalPhaseOp with adjoint flag set to true and canonicalize it.
+struct GlobalPhaseOpAdjointCanonicalizePattern : public OpRewritePattern<GlobalPhaseOp> {
+    using OpRewritePattern<GlobalPhaseOp>::OpRewritePattern;
+    LogicalResult matchAndRewrite(GlobalPhaseOp op, PatternRewriter &rewriter) const override {
+        if (op.getAdjoint()) {
+            auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getAngle());
+
+            rewriter.replaceOpWithNewOp<GlobalPhaseOp>(op, op.getOutCtrlQubits().getTypes(),
+                                                       paramNeg, nullptr, op.getInCtrlQubits(),
+                                                       op.getInCtrlValues());
+
+            return success();
+        };
+        return failure();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -75,7 +145,9 @@ namespace quantum {
 // Populate the patterns for the AdjointLoweringCanonicalization pass.
 // Allows reference in ions_decompositions.cpp and merge_rotation.cpp
 void populateAdjointLoweringCanonicalizationPatterns(RewritePatternSet &patterns) {
-    patterns.add<CustomOpAdjointCanonicalizePattern>(patterns.getContext());
+    patterns.add<CustomOpAdjointCanonicalizePattern, MultiRZAdjointCanonicalizePattern,
+                 PCPhaseOpAdjointCanonicalizePattern, PauliRotOpAdjointCanonicalizePattern,
+                 GlobalPhaseOpAdjointCanonicalizePattern>(patterns.getContext());
 }
 
 struct AdjointLoweringCanonicalization

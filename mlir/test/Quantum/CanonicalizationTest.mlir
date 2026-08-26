@@ -165,22 +165,6 @@ func.func @test_num_qubits_no_cse() -> (i64, i64, !quantum.reg) {
     return %n1, %n2, %r  : i64, i64, !quantum.reg
 }
 
-// CHECK-LABEL: test_multirz_adjoint_canonicalize
-func.func @test_multirz_adjoint_canonicalize(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
-    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
-    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
-    %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-
-    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
-    // CHECK: [[ret:%.+]]:2 = quantum.multirz([[arg0neg]]) [[qubit1]], [[qubit2]] : !quantum.bit, !quantum.bit
-    %3:2 = quantum.multirz (%arg0) %1, %2 {adjoint} : !quantum.bit, !quantum.bit
-    return %3#0, %3#1 : !quantum.bit, !quantum.bit
-}
-
-
 // CHECK-LABEL: test_interleaved_extract_insert
 func.func @test_interleaved_extract_insert() -> tensor<4xf64> {
   %c1_i64 = arith.constant 1 : i64
