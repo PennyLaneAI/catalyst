@@ -831,6 +831,163 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 //===----------------------------------------------------------------------===//
+// DecomposableGate op interface methods.
+//===----------------------------------------------------------------------===//
+
+// CustomOp
+
+std::string CustomOp::getOperatorName() { return getGateName().str(); }
+
+llvm::StringMap<llvm::SmallVector<mlir::Type>> CustomOp::getDynamicShape() {
+    llvm::StringMap<llvm::SmallVector<mlir::Type>> ret;
+    for (auto [i, param] : llvm::enumerate(getParams())) {
+        ret[std::to_string(i)] = llvm::SmallVector<mlir::Type>({param.getType()});
+    }
+    return ret;
+}
+
+llvm::StringMap<size_t> CustomOp::getWireLens() {
+    return {{"wires", getNonCtrlQubitOperands().size()}};
+}
+
+mlir::DictionaryAttr CustomOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// MultiRZOp
+
+std::string MultiRZOp::getOperatorName() { return "MultiRZ"; }
+
+llvm::StringMap<llvm::SmallVector<mlir::Type>> MultiRZOp::getDynamicShape() {
+    return {{"theta", {mlir::Float64Type::get(getContext())}}};
+}
+
+llvm::StringMap<size_t> MultiRZOp::getWireLens() {
+    return {{"wires", getNonCtrlQubitOperands().size()}};
+}
+
+mlir::DictionaryAttr MultiRZOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// PauliRotOp
+
+std::string PauliRotOp::getOperatorName() { return "PauliRot"; }
+
+llvm::StringMap<llvm::SmallVector<mlir::Type>> PauliRotOp::getDynamicShape() {
+    return {{"theta", {mlir::Float64Type::get(getContext())}}};
+}
+
+llvm::StringMap<size_t> PauliRotOp::getWireLens() {
+    return {{"wires", getNonCtrlQubitOperands().size()}};
+}
+
+mlir::DictionaryAttr PauliRotOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
+        mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+    return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
+}
+
+// PCPhaseOp
+
+std::string PCPhaseOp::getOperatorName() { return "PCPhase"; }
+
+llvm::StringMap<llvm::SmallVector<mlir::Type>> PCPhaseOp::getDynamicShape() {
+    return {{"phi", {mlir::Float64Type::get(getContext())}}};
+}
+
+llvm::StringMap<size_t> PCPhaseOp::getWireLens() {
+    return {{"wires", getNonCtrlQubitOperands().size()}};
+}
+
+mlir::DictionaryAttr PCPhaseOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute dimEntry =
+        mlir::NamedAttribute(mlir::StringAttr::get(ctx, "dim"), getDimAttr());
+    return mlir::DictionaryAttr::get(ctx, {dimEntry});
+}
+
+// GlobalPhaseOp
+
+std::string GlobalPhaseOp::getOperatorName() { return "GlobalPhase"; }
+
+llvm::StringMap<llvm::SmallVector<mlir::Type>> GlobalPhaseOp::getDynamicShape() {
+    return {{"phi", {mlir::Float64Type::get(getContext())}}};
+}
+
+llvm::StringMap<size_t> GlobalPhaseOp::getWireLens() { return {}; }
+
+mlir::DictionaryAttr GlobalPhaseOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// QubitUnitaryOp
+
+std::string QubitUnitaryOp::getOperatorName() { return "QubitUnitary"; }
+
+llvm::StringMap<llvm::SmallVector<mlir::Type>> QubitUnitaryOp::getDynamicShape() {
+    return {{"U", {getMatrix().getType()}}};
+}
+
+llvm::StringMap<size_t> QubitUnitaryOp::getWireLens() {
+    return {{"wires", getNonCtrlQubitOperands().size()}};
+}
+
+mlir::DictionaryAttr QubitUnitaryOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// OperatorOp
+
+std::string OperatorOp::getOperatorName() { return getOpName().str(); }
+
+llvm::StringMap<llvm::SmallVector<mlir::Type>> OperatorOp::getDynamicShape() {
+    llvm::StringMap<llvm::SmallVector<mlir::Type>> map;
+
+    auto params = getParams();
+
+    for (mlir::NamedAttribute entry : getParamMap()) {
+        mlir::ArrayRef<int64_t> indices =
+            cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
+        llvm::SmallVector<mlir::Type> types;
+        for (int64_t index : indices) {
+            types.push_back(params[index].getType());
+        }
+        map[entry.getName().str()] = std::move(types);
+    }
+
+    return map;
+}
+
+llvm::StringMap<size_t> OperatorOp::getWireLens() {
+    llvm::StringMap<size_t> wireLens;
+
+    for (mlir::NamedAttribute entry : getQubitMap()) {
+        auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue());
+        size_t numQubits;
+        if (getQreg()) {
+            numQubits = 0;
+            for (int64_t index : indices.asArrayRef()) {
+                auto indexTensorType =
+                    cast<mlir::RankedTensorType>(getArrQubitIndices()[index].getType());
+                numQubits += indexTensorType.getDimSize(0);
+            }
+        } else {
+            numQubits = indices.size();
+        }
+
+        wireLens[entry.getName()] = numQubits;
+    }
+
+    return wireLens;
+}
+
+std::string OperatorOp::getExtraData() {
+    return getUID().has_value() ? std::to_string(getUID().value()) : "";
+}
+
+//===----------------------------------------------------------------------===//
 // Implement ResourceQuantumOpInterface interface methods.
 //===----------------------------------------------------------------------===//
 

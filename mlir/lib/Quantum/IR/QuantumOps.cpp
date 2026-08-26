@@ -1218,7 +1218,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 //===----------------------------------------------------------------------===//
-// Quantum op interface methods.
+// DecomposableGate interface methods.
 //===----------------------------------------------------------------------===//
 
 // CustomOp
@@ -1373,6 +1373,8 @@ llvm::StringMap<size_t> OperatorOp::getWireLens() {
 std::string OperatorOp::getExtraData() {
     return getUID().has_value() ? std::to_string(getUID().value()) : "";
 }
+
+//===----------------------------------------------------------------------===//
 // Implement ResourceQuantumOpInterface interface methods.
 //===----------------------------------------------------------------------===//
 
