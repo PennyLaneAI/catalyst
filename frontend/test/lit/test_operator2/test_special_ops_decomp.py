@@ -13,14 +13,14 @@
 """
 Test decomposition rules registered on the special operations are correctly generated.
 
-There are 5 special operators that do not lower to CustomOp or OperatorOp in MLIR, and instead lower
-to their own operations:
+There are a few special operators that do not lower to CustomOp or OperatorOp in MLIR, and instead
+lower to their own operations:
 - MultiRZ
 - PauliRot
 - GlobalPhase
 - PCPhase
 - QubitUnitary (TODO: cannot yet lower rules that call helper functions)
-- BasisState (TODO: cannot yet lower rules that call helper functions)
+- BasisState
 """
 
 # RUN: %PYTHON %s | FileCheck %s
@@ -28,6 +28,7 @@ to their own operations:
 # pylint: disable = line-too-long,unused-argument
 
 import pennylane as qp
+from jax import numpy as jnp
 
 
 def test_multirz():
@@ -127,3 +128,28 @@ def test_gphase():
 # CHECK: func.func public @gphase()
 # CHECK: qref.gphase
 test_gphase()
+
+
+def test_basis_state():
+    """
+    Test that decomposing qp.BasisState works.
+    """
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=3))
+    def basisstate():
+        qp.BasisState(jnp.array([0]), wires=[2])
+        qp.BasisState(jnp.array([1, 1]), wires=[0, 1])
+        return qp.state()
+
+    print(basisstate.mlir)
+
+
+# CHECK: func.func public @basisstate
+# CHECK: qref.set_basis_state({{%.+}}) {{%.+}} : tensor<1xi1>, !qref.bit
+# CHECK: qref.set_basis_state({{%.+}}) {{%.+}}, {{%.+}} : tensor<2xi1>, !qref.bit, !qref.bit
+# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[i1]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "BasisState{state:[i1]}{wires:1}{}"
+# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[i1,i1]}{wires:2}{}"
+# CHECK-SAME:   target_gate = "BasisState{state:[i1,i1]}{wires:2}{}"
+test_basis_state()

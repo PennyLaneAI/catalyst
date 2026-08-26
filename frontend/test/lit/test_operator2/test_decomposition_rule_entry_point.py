@@ -887,7 +887,7 @@ def test_if():
 
     @qp.register_resources(lambda flag, wires: {NoParams(Wire[1]): 1})
     def if_decomp(flag, wires):
-        qp.cond(flag, NoParams)(wires)
+        qp.cond(flag[0], NoParams)(wires)
 
     qp.add_decomps(TestOp, if_decomp)
 
@@ -911,7 +911,7 @@ def test_while_loop():
 
     @qp.register_resources(lambda angle, wires: {SingleParamCustomOp(Float[1], Wire[1]): 1})
     def while_decomp(angle, wires):
-        @qp.while_loop(lambda angle: angle < jnp.pi)
+        @qp.while_loop(lambda angle: angle[0] < jnp.pi)
         def while_body(angle):
             return angle + 1.5
 

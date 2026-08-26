@@ -144,7 +144,7 @@ def prepare_op_args(dynamic_shape, wire_lens, is_custom_op) -> tuple[tuple, dict
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape[0])
+        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
 
     if is_custom_op:
         args = tuple(0.0 for key, val in kwargs.items() if key != "wires")
@@ -213,6 +213,7 @@ def compile_decomposition_rules(
         This function updates the following attributes:
             - Adds the `target_gate` attribute.
             - Adds the `resources` attribute.
+            - Sets the visibility to public (so the inliner does not remove them)
         """
         if op.name == "func.func":
             rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + op_id)
@@ -221,6 +222,7 @@ def compile_decomposition_rules(
                     {"operations": name_to_resource_ids[rule_name]}
                 )
                 op.attributes["target_gate"] = ir.StringAttr.get(op_id)
+                op.attributes["sym_visibility"] = ir.StringAttr.get("public")
 
         return ir.WalkResult.ADVANCE
 
@@ -230,6 +232,25 @@ def compile_decomposition_rules(
     # Inline to avoid helper functions. We want all decomp rule functions to be standalone
     # Generic printing needed when parsing --quantum-opt string output back to jax IR ModuleOps
     # since Catalyst's python bindings never export the Catalyst dialects
+    # Before inlining we need to remove the qnode function, since that has a call to the compiled
+    # rule subroutine
+    qnode_func_erasure_worklist = []
+
+    def remove_qnode_func(op):
+        if op.name == "catalyst.launch_kernel":
+            qnode_func_erasure_worklist.append(op.parent)
+            return ir.WalkResult.ADVANCE
+        if op.name == "func.func" and "quantum.node" in op.attributes:
+            qnode_func_erasure_worklist.append(op)
+            return ir.WalkResult.ADVANCE
+        return ir.WalkResult.ADVANCE
+
+    with module.context:
+        module.operation.walk(remove_qnode_func)
+
+    for qnode_func in qnode_func_erasure_worklist:
+        qnode_func.erase()
+
     inlined = _quantum_opt(
         "--inline=inlining-threshold=4294967295",  # Use uint max to indicate always inline
         "--mlir-print-op-generic",
@@ -237,6 +258,17 @@ def compile_decomposition_rules(
     )
 
     inlined_module = ir.Operation.parse(inlined, context=module.context)
+
+    def re_privatize_rules(op):
+        if op.name == "func.func":
+            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + op_id)
+            if rule_name in name_to_resource_ids:
+                op.attributes["sym_visibility"] = ir.StringAttr.get("private")
+        return ir.WalkResult.ADVANCE
+
+    with inlined_module.context:
+        inlined_module.operation.walk(re_privatize_rules)
+
     return inlined_module
 
 
