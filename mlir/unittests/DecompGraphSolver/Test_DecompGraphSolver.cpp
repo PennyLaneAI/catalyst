@@ -698,7 +698,7 @@ TEST_CASE("Adjoint of an invalid target fails instead of collapsing to the base"
 // Ctrl Tests
 /////////////
 
-TEST_CASE("Test single-controlled C(1, X)", "[DecompGraph::Solver]") {
+TEST_CASE("Test single-controlled C(X)", "[DecompGraph::Solver]") {
     const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
     const OperatorNode cx{"C(PauliX){}{wires:1}{}", "C(PauliX)"};
 

@@ -551,9 +551,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      *   - "Adjoint(<inner>)<suffix>"
      *   - "C(<inner>)<suffix>" / "<n>C(<inner>)<suffix>"
      * where <inner> is a (possibly further-modified) operator name and <suffix> carries the
-     * "{params}{wires}{static}[uid]" groups. Modifiers nest, e.g. "C(Adjoint(Op)){...}". Falls
-     * back to the legacy "Name(w,p)" resource form. To add a new modifier, mirror the detection
-     * here and the wrapping in `defaultGetGraphOpId`'s `wrapModifiers`.
+     * "{params}{wires}{static}[uid]" groups.
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
