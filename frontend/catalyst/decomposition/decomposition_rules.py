@@ -77,7 +77,7 @@ def wrap_modifier_id(op_id: str, modifier: str) -> str:
     """
     new_kind = _modifier_kind(modifier)
     inner_kind = _leading_modifier_kind(op_id)
-    #`modifier is added as the new *outermost* layer. To keep graphOpIds canonical (see
+    # `modifier is added as the new *outermost* layer. To keep graphOpIds canonical (see
     # MODIFIER_CANONICAL_ORDER), the new outer modifier must not belong *inside* one that is
     # already applied (e.g. wrapping Adjoint around an already-controlled C(RX){...} would
     # produce the non-canonical Adjoint(C(RX)) and is rejected, since the canonical form is
