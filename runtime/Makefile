@@ -141,7 +141,11 @@ endif
 
 .PHONY: test-transport
 test-transport: BUILD_TYPE?=RelWithDebInfo
-test-transport: test_runner
+test-transport: configure
+	# Only build the transport suite; going through `test_runner` would rebuild the QIR,
+	# MBQC, RSDecomp, Decoder, OpenQASM, OQD binaries too -- pure waste when only the
+	# transport tests will run below.
+	cmake --build $(RT_BUILD_DIR) --target transport_tests_all -j$(NPROC)
 	@echo "Catalyst runtime transport test suites"
 	@set -e; ran=0; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
 		[ -x "$$t" ] || continue; \
