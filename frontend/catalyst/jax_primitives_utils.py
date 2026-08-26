@@ -13,9 +13,9 @@
 # limitations under the License.
 """This module contains some helper functions for translating JAX primitives to MLIR."""
 
-from collections.abc import Sequence
 import copy
 import functools
+from collections.abc import Sequence
 
 import pennylane as qp
 from jax._src import core, util
