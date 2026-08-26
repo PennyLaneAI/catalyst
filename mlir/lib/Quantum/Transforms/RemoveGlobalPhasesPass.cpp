@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "remove-global-phases"
 
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -33,6 +34,13 @@ struct RemoveGlobalPhasesRewritePattern : public OpRewritePattern<GlobalPhaseOp>
     using OpRewritePattern<GlobalPhaseOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(GlobalPhaseOp op, PatternRewriter &rewriter) const override {
+
+        // Cannot remove gphase ops in subroutines, as they might be called in a control region.
+        if (auto parentFunc = op->getParentOfType<func::FuncOp>();
+            !parentFunc || !parentFunc->hasAttr("quantum.node")) {
+            return failure();
+        }
+
         // Find out if there are any control regions in the parent chain,
         // Or if there are control qubits associated with this operation.
         // If so, it must be ignored

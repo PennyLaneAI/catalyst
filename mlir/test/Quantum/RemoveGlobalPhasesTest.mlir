@@ -15,7 +15,7 @@
 // RUN: quantum-opt --remove-global-phases --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func.func @remove_simple_global_phases
-func.func @remove_simple_global_phases(%arg0: f64) {
+func.func @remove_simple_global_phases(%arg0: f64) attributes {quantum.node} {
 
     // CHECK-NOT: quantum.gphase
     quantum.gphase(%arg0)
@@ -26,7 +26,7 @@ func.func @remove_simple_global_phases(%arg0: f64) {
 // -----
 
 // CHECK-LABEL: func.func @remove_multiple_global_phases
-func.func @remove_multiple_global_phases(%arg0: f64, %arg1: f64) {
+func.func @remove_multiple_global_phases(%arg0: f64, %arg1: f64) attributes {quantum.node}  {
 
     // CHECK-NOT: quantum.gphase
     quantum.gphase(%arg0)
@@ -39,7 +39,7 @@ func.func @remove_multiple_global_phases(%arg0: f64, %arg1: f64) {
 
 // CHECK-LABEL: func.func @keep_only_controlled_global_phases(
 // CHECK-SAME: [[CTRL:%.+]]: !quantum.bit, [[Q:%.+]]: !quantum.bit, [[THETA:%.+]]: f64) -> (!quantum.bit, !quantum.bit)
-func.func @keep_only_controlled_global_phases(%ctrl: !quantum.bit, %q: !quantum.bit, %theta: f64) -> (!quantum.bit, !quantum.bit){
+func.func @keep_only_controlled_global_phases(%ctrl: !quantum.bit, %q: !quantum.bit, %theta: f64) -> (!quantum.bit, !quantum.bit) attributes {quantum.node} {
 
     // CHECK: [[TRUE:%.+]] = arith.constant true
     %true = arith.constant true
@@ -60,6 +60,17 @@ func.func @keep_only_controlled_global_phases(%ctrl: !quantum.bit, %q: !quantum.
     %gphase = quantum.gphase(%theta) ctrls(%outq) ctrlvals(%true) : ctrls !quantum.bit
 
     return %outq, %outc : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: func.func @keep_global_phases_non_qnode
+func.func @keep_global_phases_non_qnode(%arg0: f64) {
+
+    // CHECK: quantum.gphase
+    quantum.gphase(%arg0)
+
+    return
 }
 
 // -----
