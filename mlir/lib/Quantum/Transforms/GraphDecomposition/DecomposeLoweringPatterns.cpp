@@ -87,9 +87,12 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
+        bool isAdjoint = op.getOperation()->hasAttr("adjoint");
 
-        // Only decompose the op if it is not in the target gate set
-        if (targetGateSet.contains(gateName)) {
+        // Only decompose the op if it is not in the target gate set. An adjoint op is never treated
+        // as a native gate-set member by its base name: Adjoint(Op) is a distinct gate though that
+        // must reach the gate_set through its own custom rule.
+        if (!isAdjoint && targetGateSet.contains(gateName)) {
             return failure();
         }
 
@@ -113,8 +116,10 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         if (it_gateID != decompositionRegistry.end()) {
             // Found a rule with the wanted ID, highest priority rule, just use this one
             rule = it_gateID->second;
-        } else {
-            // Didn't find ID match, try matching gate name
+        } else if (!isAdjoint) {
+            // Didn't find ID match, try matching gate name. Non-adjoint only: an adjoint op must
+            // match an Adjoint(...) rule by its id. Note that we never fall back to a plain
+            // base-name rule.
             // TODO: remove multirz's special name editing
             if (isa<quantum::MultiRZOp>(op)) {
                 gateName = gateName + "_" + std::to_string(op.getWireLens()["wires"]);
@@ -126,6 +131,9 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
                 // Didn't find any rule
                 return failure();
             }
+        } else {
+            // Didn't find ID match, try matching gate name:
+            return failure();
         }
 
         // For null decomp rules, the signature will not have any quantum values
