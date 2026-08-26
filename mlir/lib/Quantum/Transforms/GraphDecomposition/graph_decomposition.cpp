@@ -439,7 +439,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (handledOpIds.contains(opId)) {
                 continue;
             }
-            handledOpIds.insert(opId);
 
             std::string mlirText = pythonRuleLowering(op);
 
@@ -452,21 +451,39 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 return failure();
             }
 
+            // The Python wrapper returns the *whole reachable rule closure* for this op, not just
+            // its direct rules: the loader does not recurse into a rule's resource ops, so every
+            // rule on the path down to the gate set (e.g. `Adjoint(S)` -> `Adjoint(PhaseShift)` ->
+            // `PhaseShift`) must arrive together. We therefore keep every func that carries a
+            // `target_gate`, skipping helper funcs (no attribute) and any target already handled
+            // by an earlier op's closure or by rules embedded in the module.
+            llvm::SmallVector<llvm::StringRef> newlyHandled;
             moduleOp->walk([&](mlir::func::FuncOp func) {
-                if (func.getName().starts_with(opId)) {
-                    mlir::OwningOpRef<mlir::func::FuncOp> outOp;
-                    func->remove();
-                    outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
-                    mlir::func::FuncOp funcOp = outOp.get();
-                    funcOp->setAttr("target_gate", mlir::StringAttr::get(context, opId));
-
-                    // if we fail to add one of the decomps, we still want to try for the rest
-                    std::ignore = addRuleNode(funcOp, ruleNodes);
-                    LDBG() << "adding rule " << funcOp.getName();
-                    module.push_back(std::move(outOp.release()));
+                // Note: a single target gate may have several alternative rules, so we only mark a
+                // target handled *after* walking the whole module, otherwise the second alternative
+                // would be dropped.
+                auto targetGate = func->getAttrOfType<StringAttr>("target_gate");
+                if (!targetGate || handledOpIds.contains(targetGate.getValue())) {
+                    return mlir::WalkResult::advance();
                 }
+                mlir::OwningOpRef<mlir::func::FuncOp> outOp;
+                func->remove();
+                outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
+                mlir::func::FuncOp funcOp = outOp.get();
+
+                // if we fail to add one of the decomps, we still want to try for the rest
+                std::ignore = addRuleNode(funcOp, ruleNodes);
+                LDBG() << "adding rule " << funcOp.getName();
+                newlyHandled.push_back(targetGate.getValue());
+                module.push_back(std::move(outOp.release()));
                 return mlir::WalkResult::advance();
             });
+            for (llvm::StringRef target : newlyHandled) {
+                handledOpIds.insert(target);
+            }
+            // Mark this op handled even if its closure produced no rule (e.g. no decomposition
+            // exists), so repeated instances of the same gate do not re-invoke the Python loader.
+            handledOpIds.insert(opId);
         }
         return success();
     }

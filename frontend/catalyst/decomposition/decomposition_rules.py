@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module provides infrastructure for lowering decomposition rules via python.
-"""
+"""This module provides infrastructure for lowering decomposition rules via python."""
 
 # pylint: disable=protected-access,bare-except
 
@@ -46,6 +44,14 @@ def name_wrap_adjoint(op_id: str) -> str:
             split = i
             break
     return f"Adjoint({op_id[:split]}){op_id[split:]}"
+
+
+def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
+    """Inverse of :func:`name_wrap_adjoint` given the base ``op_name``."""
+    prefix = f"Adjoint({op_name})"
+    if not op_id.startswith(prefix):
+        raise ValueError(f"{op_id!r} is not an adjoint id for base op {op_name!r}")
+    return op_name + op_id[len(prefix) :]
 
 
 def get_rule_strings_from_module(module: ir.Module) -> list[str]:
@@ -274,6 +280,65 @@ def compile_decomposition_rules(
     return module
 
 
+def adjoint_variant_rule_strings(
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None, is_custom_op=False
+):
+    """Return the rule strings whose ``target_gate`` is ``Adjoint(op_name)``.
+
+    ``op_id`` is the *base* op's graphOpId (e.g. ``"S{...}"``). Two pathways contribute:
+      1. rules registered directly against ``Adjoint(op_name)`` (``list_decomps("Adjoint(S)")``), and
+      2. rules synthesized by distributing each base rule of ``op_name`` over adjoint
+         (the ``wrap_adjoint`` pathway), dropping any whose body is non-invertible.
+
+    Shared by the eager lowering-time closure (:func:`fetch_all_reachable_decomposition_rules_from_op`)
+    and the compiler's on-demand loader (:func:`compile_decomposition_rules_wrapper`) so both build
+    adjoint rules identically.
+    """
+    out = []
+    adj_name = f"Adjoint({op_name})"
+    # (1) Rules registered directly against Adjoint(op_name):
+    try:
+        out.extend(
+            get_rule_strings_from_module(
+                compile_decomposition_rules(
+                    adj_name,
+                    name_wrap_adjoint(op_id),
+                    dynamic_shape,
+                    wire_lens,
+                    static_data,
+                    extra_data=extra_data,
+                    is_custom_op=is_custom_op,
+                )
+            )
+        )
+    except Exception as e:  # pylint: disable=broad-except
+        warnings.warn(f"Failed to lower the decomposition rules for {adj_name}: {e}")
+    # (2) Rules for Adjoint(op_name) synthesized by adjointing each base rule of op_name:
+    try:
+        distributed = get_rule_strings_from_module(
+            compile_decomposition_rules(
+                op_name,
+                op_id,
+                dynamic_shape,
+                wire_lens,
+                static_data,
+                extra_data=extra_data,
+                is_custom_op=is_custom_op,
+                wrap_adjoint=True,
+            )
+        )
+        # Suppress a distribution rule whose body is non-invertible:
+        distributed = [
+            rule
+            for rule in distributed
+            if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
+        ]
+        out.extend(distributed)
+    except Exception as e:  # pylint: disable=broad-except
+        warnings.warn(f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}")
+    return out
+
+
 def compile_decomposition_rules_wrapper(
     op_name,
     op_id,
@@ -295,6 +360,51 @@ def compile_decomposition_rules_wrapper(
             is_custom_op=is_custom_op,
         )
     )
+
+
+def compile_reachable_decomposition_rules_wrapper(
+    op_name,
+    op_id,
+    dynamic_shape,
+    wire_lens,
+    static_data,
+    extra_data=None,
+    is_custom_op=False,
+) -> str:
+    """Return an MLIR module with the full reachable decomposition-rule closure for an operator.
+
+    This is the entry point for the compiler's *on-demand* rule loader (``loadPythonDecomps`` ->
+    ``pythonRuleLowering``), which passes the op's *base* name (``getOperatorName()``) together with
+    its full graphOpId (``getGraphOpId()``). Two things matter here:
+
+    * **Modifier ids.** For a plain op the name and id agree (``"S"`` / ``"S{...}"``). For an
+      op-level modifier the graphOpId is name-wrapped (``"Adjoint(S){...}"``) while the name stays
+      the base (``"S"``). We recover the base id so the closure explores the base op *and* its
+      adjoint variants; otherwise ``Adjoint(S)`` would be decomposed as if it were ``S``.
+    * **The whole closure, not just this op's direct rules.** The loader does not recurse into a
+      rule's resource ops, so it needs every rule reachable from this op down to the gate set in one
+      shot. For ``Adjoint(S)`` that includes ``Adjoint(S) -> Adjoint(PhaseShift)`` *and*
+      ``Adjoint(PhaseShift) -> PhaseShift``; returning only the first would leave the solver unable
+      to complete a path. :func:`fetch_all_reachable_decomposition_rules_from_op` builds that closure
+      (base + adjoint-registered + distributed-adjoint rules, transitively) and each returned func
+      keeps its own ``target_gate``, which is how the loader registers them.
+    """
+    base_id = op_id
+    if op_id.startswith("Adjoint(") and not op_name.startswith("Adjoint("):
+        base_id = name_unwrap_adjoint(op_name, op_id)
+
+    rule_strings = fetch_all_reachable_decomposition_rules_from_op(
+        op_name=op_name,
+        op_id=base_id,
+        dynamic_shape=dynamic_shape,
+        wire_lens=wire_lens,
+        static_data=static_data,
+        extra_data=extra_data,
+        is_custom_op=is_custom_op,
+    )
+    # Wrap the rule funcs in a module: the compiler parses this string with
+    # `parseSourceString<ModuleOp>`, which requires a single top-level op.
+    return "module {\n" + "\n".join(rule_strings) + "\n}"
 
 
 def fetch_all_reachable_decomposition_rules_from_op(
@@ -326,47 +436,17 @@ def fetch_all_reachable_decomposition_rules_from_op(
             )
         )
         if not name.startswith("Adjoint("):
-            adj_name = f"Adjoint({name})"
-            # Rules registered directly against Adjoint(name):
-            try:
-                out.extend(
-                    get_rule_strings_from_module(
-                        compile_decomposition_rules(
-                            adj_name,
-                            name_wrap_adjoint(op_id),
-                            dynamic_shape,
-                            wire_lens,
-                            static_data,
-                            extra_data=extra_data,
-                            is_custom_op=is_custom_op,
-                        )
-                    )
+            out.extend(
+                adjoint_variant_rule_strings(
+                    name,
+                    op_id,
+                    dynamic_shape,
+                    wire_lens,
+                    static_data,
+                    extra_data=extra_data,
+                    is_custom_op=is_custom_op,
                 )
-            except Exception as e:  # pylint: disable=broad-except
-                warnings.warn(f"Failed to lower the decomposition rules for {adj_name}: {e}")
-            # Rules for Adjoint(name) synthesized by adjointing each base rule of `name`:
-            try:
-                distributed = get_rule_strings_from_module(
-                    compile_decomposition_rules(
-                        name,
-                        op_id,
-                        dynamic_shape,
-                        wire_lens,
-                        static_data,
-                        extra_data=extra_data,
-                        is_custom_op=is_custom_op,
-                        wrap_adjoint=True,
-                    )
-                )
-                # Suppress a distribution rule whose body is non-invertible:
-                distributed = [
-                    rule
-                    for rule in distributed
-                    if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
-                ]
-                out.extend(distributed)
-            except Exception as e:  # pylint: disable=broad-except
-                warnings.warn(f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}")
+            )
         return out
 
     rules = compile_variants(
