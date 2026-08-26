@@ -110,9 +110,6 @@ def get_rules_from_module(module: ir.Module) -> str:
 def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
     with ir.InsertionPoint(module.body):
         for decomp_rule in decomp_rules:
-            if not decomp_rule:
-                continue
-
             decomp_rule_op = ir.Operation.parse(decomp_rule)
             rule_already_exists = False
 

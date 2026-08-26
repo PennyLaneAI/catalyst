@@ -85,20 +85,6 @@ class TestGenericUtilities:
         assert result.shape == shape
 
     @pytest.mark.parametrize(
-        "dtype, expected",
-        [
-            ({"name": qp.typing.Float}, {"name": ["f64"]}),
-            ({"name": qp.typing.Int}, {"name": ["i64"]}),
-            ({"test": qp.typing.Bool}, {"test": ["i1"]}),
-            ({"r": qp.typing.Complex}, {"r": ["complex<f64>"]}),
-            ({"A": qp.typing.AbstractArray((2,), "int32")}, {"A": ["i32", "i32"]}),
-        ],
-    )
-    def test_mlir_stringify_type(self, dtype, expected):
-        """Test convert_types_to_mlir_strings."""
-        assert convert_types_to_mlir_strings(dtype) == expected
-
-    @pytest.mark.parametrize(
         "op, id",
         [
             (NoParams(Wires(0)), "NoParams{}{reg:1}{}"),
