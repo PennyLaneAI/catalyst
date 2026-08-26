@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/Support/raw_ostream.h>
+#include <mlir/IR/MLIRContext.h>
 #define DEBUG_TYPE "resource-analysis"
-
-#include "Catalyst/Analysis/ResourceAnalysis.h"
 
 #include <algorithm>
 #include <cmath>
@@ -30,6 +30,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
+#include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/SCFUtils.h"
@@ -83,7 +84,9 @@ ResourceResult ResourceAnalysis::makeEmptyResult() const {
 }
 
 ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
-                                   ArrayRef<ExtensionProvider> extensionProviders) {
+                                   ArrayRef<ExtensionProvider> extensionProviders,
+                                   bool collectDetailedOperations)
+    : collectDetailedOperations(collectDetailedOperations) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -149,7 +152,9 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
 }
 
 ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
-                                   ArrayRef<ExtensionProvider> extensionProviders) {
+                                   ArrayRef<ExtensionProvider> extensionProviders,
+                                   bool collectDetailedOperations)
+    : collectDetailedOperations(collectDetailedOperations) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -184,16 +189,18 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
     // Try to resolve a static trip count.
-    std::optional<double> tripCount = resolveForLoopTripCount(forOp);
-
-    if (tripCount.has_value()) {
+    auto tripCount = resolveForLoopTripCount(forOp);
+    if (!tripCount) {
+        tripCount = resolveDirectNestedForLoopAverageTripCount(forOp);
+    }
+    if (tripCount) {
         // Record the loop body under a new name (for_loop_1, …).
         // The parent stores how many times the loop runs.
         // Later, classical ops from that body are added into the parent, multiplied by that count.
         // The name is always new, so we don't overwrite an old entry.
         std::string name = makeUniqueSyntheticName("for_loop_", forLoopCounter);
         funcResults[name] = std::move(bodyResult);
-        result.functionCalls[name] = tripCount.value();
+        result.functionCalls[name] = *tripCount;
         return;
     }
 
@@ -360,6 +367,10 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 
             if (needsCollection) {
                 collectOperation(&op, result, isAdjoint);
+                if (collectDetailedOperations) {
+                    result.collectDetailedOperations = true;
+                    collectDetailedOperation(&op, result, isAdjoint);
+                }
             }
         }
     }
@@ -462,6 +473,21 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
     result.classicalInstructions[op->getName().getStringRef()] += 1;
 }
 
+void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
+                                                bool isAdjoint) const {
+    if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
+        // Keep the canonical graph ID unchanged so it matches decomposition rules.
+        // Adjoint and control details will appear here once getGraphOpId() encodes them.
+        result.detailedOperations[inst.getGraphOpId()] += 1;
+        return;
+    }
+
+    if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
+        result.detailedOperations[inst.getResourceDetailedName()] += 1;
+        return;
+    }
+}
+
 /**
  * @brief Merge `source`'s quantum content, classical content, and transitive
  * call counts into `dest`, scaled by `count`. Used to fold callee/loop-body
@@ -479,6 +505,9 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
             innerDst[sizeEntry.first] += sizeEntry.second * count;
         }
     }
+    for (const auto &opEntry : source.detailedOperations) {
+        dest.detailedOperations[opEntry.getKey()] += opEntry.getValue() * count;
+    }
     for (const auto &m : source.measurements) {
         dest.measurements[m.getKey()] += m.getValue() * count;
     }
@@ -494,6 +523,8 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
     dest.numAllocQubits += source.numAllocQubits * count;
     dest.hasBranches = dest.hasBranches || source.hasBranches;
     dest.hasDynLoop = dest.hasDynLoop || source.hasDynLoop;
+    dest.collectDetailedOperations =
+        dest.collectDetailedOperations || source.collectDetailedOperations;
 }
 
 /**

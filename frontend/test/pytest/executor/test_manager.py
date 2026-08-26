@@ -14,7 +14,7 @@
 
 """Unit tests for :mod:`catalyst.executor.manager` — the public :class:`Executor`: config
 defaults, mode dispatch, attach-mode launch, workspace lifecycle (``setup_workspace`` /
-``remove_workspace``), and the ``_scp_bundle`` / ``_deploy_bundle`` split. Subprocess-facing
+``remove_workspace``), and the ``deploy`` sources placed in the workspace. Subprocess-facing
 calls (``SCP.deploy``, ``RemoteOps.rmdir``) are mocked."""
 
 from unittest.mock import patch
@@ -24,10 +24,12 @@ import pytest
 from catalyst.executor.manager import (
     Executor,
     ExecutorConfig,
+    _Mode,
     _SessionRegistry,
     _sessions,
     _start_on_free_port,
 )
+from catalyst.executor.ssh import SCP
 from catalyst.executor.utils import ExecutorPaths
 
 
@@ -39,7 +41,7 @@ class TestExecutorConfigDefaults:
         c = ExecutorConfig()
         assert c.user == ""
         assert c.port is None
-        assert c.copy is False
+        assert c.deploy is None
         assert c.sudo is False  # root is opt-in: the executor runs arbitrary compiled objects
         assert c.ready_timeout == 60.0
         assert c.verbose == 1
@@ -49,17 +51,17 @@ class TestExecutorConstruction:
     """Attribute wiring in :meth:`Executor.__init__` for each mode."""
 
     def test_carry_mode_defaults(self):
-        """Attach-only mode (no host, no local) — inert state and default name."""
+        """Attach-only mode (an address, no host) — inert state and default name."""
         ex = Executor("1.2.3.4:5")
         assert ex.host is None
-        assert ex._local is False
+        assert ex._mode is _Mode.ATTACHED
         assert ex.name == "executor"
         assert not ex._launched
 
-    def test_local_mode_flag(self):
-        """``local=True`` is stored on the instance."""
-        ex = Executor(local=True)
-        assert ex._local is True
+    def test_subprocess_mode_is_inferred(self):
+        """Naming neither a host nor an address leaves the subprocess mode."""
+        ex = Executor()
+        assert ex._mode is _Mode.LOCAL
 
     def test_host_mode_stored(self):
         """``host`` and ``user`` land on ``.host`` and the config."""
@@ -72,28 +74,19 @@ class TestExecutorConstruction:
         assert Executor()._address is None
 
 
-class TestLaunchRequiresAMode:
-    """:meth:`Executor.launch` refuses to guess a mode."""
-
-    def test_no_mode_raises(self):
-        """Neither ``local=``, ``host=``, nor an address: launch() reports it immediately.
-
-        Defaulting to a well-known address would let a program get all the way to dispatch
-        before failing, with an error pointing at the wrong place.
-        """
-        with pytest.raises(ValueError, match="no mode"):
-            Executor().launch()
+class TestModeSelection:
+    """What is given picks the mode, so there is no combination that names none."""
 
     def test_construction_stays_inert(self):
-        """The check happens in launch(), not __init__ — construction never raises."""
+        """Choosing a mode never deploys anything — construction cannot raise."""
         ex = Executor()  # must not raise
         assert not ex._launched
 
-    def test_each_mode_satisfies_the_check(self):
-        """Any one of the three modes is enough."""
+    def test_each_mode_is_reachable(self):
+        """An address attaches, a host ssh's, and neither spawns a subprocess."""
         assert Executor("1.2.3.4:5").launch()._launched
-        assert Executor(local=True)._local is True  # launch() would spawn; mode itself is enough
         assert Executor(host="h").host == "h"
+        assert Executor()._mode is _Mode.LOCAL  # launch() would spawn; the mode is enough
 
 
 class TestExecutorAddress:
@@ -121,14 +114,14 @@ class TestResolve:
         assert ex.resolve() is ex
         assert ex.address == "1.2.3.4:5"
 
-    def test_no_mode_does_not_resolve(self):
-        """Nothing to commit to without a mode; ``launch()`` is left to report that."""
+    def test_unpinned_subprocess_does_not_resolve(self):
+        """A subprocess searches for a free port, so its address is settled only once it is up."""
         ex = Executor()
         assert ex.resolve() is None
         with pytest.raises(RuntimeError, match="not launched"):
             _ = ex.address
 
-    @pytest.mark.parametrize("kwargs", [{"local": True}, {"host": "h"}])
+    @pytest.mark.parametrize("kwargs", [{}, {"host": "h"}])
     def test_pinned_port_resolves_to_loopback(self, kwargs):
         """A pinned port fixes the address: loopback for a local run, the tunnel end for a remote."""
         ex = Executor(port=9123, **kwargs)
@@ -145,32 +138,31 @@ class TestSetupWorkspace:
 
     def test_missing_host_raises(self):
         """Requires ``host=`` — otherwise :class:`ValueError`."""
-        ex = Executor(workspace="~/ws", bundle="/tmp/b")
+        ex = Executor(workspace="~/ws", deploy=["/tmp/b"])
         with pytest.raises(ValueError, match="host="):
             ex.setup_workspace()
 
     def test_missing_workspace_raises(self):
         """Requires a pinned ``workspace=`` — otherwise :class:`ValueError`."""
-        ex = Executor(host="h", bundle="/tmp/b")
+        ex = Executor(host="h", deploy=["/tmp/b"])
         with pytest.raises(ValueError, match="workspace="):
             ex.setup_workspace()
 
-    def test_missing_bundle_raises(self):
-        """Requires ``bundle=`` — otherwise :class:`ValueError`."""
+    def test_missing_deploy_raises(self):
+        """Requires ``deploy=`` — otherwise :class:`ValueError`."""
         ex = Executor(host="h", workspace="~/ws")
-        with pytest.raises(ValueError, match="bundle="):
+        with pytest.raises(ValueError, match="deploy="):
             ex.setup_workspace()
 
-    def test_calls_deploy_and_disables_copy(self, tmp_path):
-        """Deploys the bundle and flips ``copy=False`` so a later ``launch()`` won't re-copy."""
-        # Real bundle dir so _deploy_bundle runs through until SCP.deploy is mocked.
+    def test_calls_deploy_and_clears_it(self, tmp_path):
+        """Places the sources and clears ``deploy`` so a later ``launch()`` won't copy again."""
         bundle = tmp_path / "bundle"
         bundle.mkdir()
-        ex = Executor(host="h", user="me", workspace="~/ws", bundle=str(bundle), copy=True)
-        with patch.object(Executor, "_deploy_bundle") as deploy:
+        ex = Executor(host="h", user="me", workspace="~/ws", deploy=[str(bundle)])
+        with patch.object(Executor, "_deploy_sources") as deploy:
             ex.setup_workspace()
         deploy.assert_called_once()
-        assert ex._cfg.copy is False
+        assert ex._cfg.deploy == []
 
 
 class TestRemoveWorkspace:
@@ -197,54 +189,49 @@ class TestRemoveWorkspace:
         assert rmdir.call_args.kwargs.get("force") is True
 
 
-class TestScpBundleGate:
-    """The ``copy`` + ``bundle`` gate on :meth:`Executor._scp_bundle`."""
+class TestDeploySources:
+    """What :meth:`Executor._deploy_sources` places in the workspace."""
 
-    def test_noop_when_copy_false(self):
-        """No deploy when ``copy=False``."""
-        ex = Executor(host="h", bundle="/tmp/b", copy=False)
-        with patch.object(Executor, "_deploy_bundle") as deploy:
-            ex._scp_bundle("me", "h", "ws")
-        deploy.assert_not_called()
+    def test_noop_when_nothing_named(self):
+        """An executor already present on the target is used as it stands, so nothing is copied."""
+        ex = Executor(host="h")
+        with patch("catalyst.executor.manager.SCP.deploy") as scp_deploy:
+            ex._deploy_sources("me", "h", "ws")
+        scp_deploy.assert_not_called()
 
-    def test_noop_when_bundle_none(self):
-        """No deploy when ``bundle`` is unset."""
-        ex = Executor(host="h", copy=True)
-        with patch.object(Executor, "_deploy_bundle") as deploy:
-            ex._scp_bundle("me", "h", "ws")
-        deploy.assert_not_called()
-
-    def test_delegates_when_gates_open(self):
-        """Both flags set: delegates to :meth:`_deploy_bundle`."""
-        ex = Executor(host="h", bundle="/tmp/b", copy=True)
-        with patch.object(Executor, "_deploy_bundle") as deploy:
-            ex._scp_bundle("me", "h", "ws")
-        deploy.assert_called_once_with("me", "h", "ws")
-
-
-class TestDeployBundle:
-    """The scp delegation inside :meth:`Executor._deploy_bundle`."""
-
-    def test_passes_bundle_path_through(self, tmp_path):
-        """Hands the bundle directory to :meth:`SCP.deploy` as a :class:`Path`, unmodified.
+    def test_passes_sources_through_as_paths(self, tmp_path):
+        """Sources reach :meth:`SCP.deploy` as :class:`Path`, unmodified.
 
         Cross-building is the caller's job. This only copies.
         """
         bundle = tmp_path / "b"
         bundle.mkdir()
-        ex = Executor(host="h", user="me", bundle=str(bundle))
+        extra = tmp_path / "libdecoder.so"
+        extra.write_bytes(b"\x7fELF")
+        ex = Executor(host="h", user="me", deploy=[str(bundle), str(extra)])
         with patch("catalyst.executor.manager.SCP.deploy") as scp_deploy:
-            ex._deploy_bundle("me", "h", "ws")
-        scp_deploy.assert_called_once_with("me", "h", bundle, "ws")
+            ex._deploy_sources("me", "h", "ws")
+        scp_deploy.assert_called_once_with("me", "h", [bundle, extra], "ws")
 
-    def test_deploys_bundle_as_is(self, tmp_path):
-        """Deploys the bundle directory exactly as given."""
+    def test_a_directory_contributes_its_files_and_a_file_itself(self, tmp_path):
+        """The workspace is flat, so a directory is flattened into it and a file lands beside."""
         bundle = tmp_path / "b"
         bundle.mkdir()
-        ex = Executor(host="h", bundle=str(bundle))
-        with patch("catalyst.executor.manager.SCP.deploy") as scp_deploy:
-            ex._deploy_bundle("me", "h", "ws")
-        scp_deploy.assert_called_once()
+        (bundle / "librt.so").write_bytes(b"a")
+        (bundle / "README.md").write_text("not an artifact")
+        extra = tmp_path / "libdecoder.so"
+        extra.write_bytes(b"b")
+        with patch("catalyst.executor.ssh.SCP.copy") as copy, patch(
+            "catalyst.executor.ssh.RemoteOps.mkdir"
+        ):
+            SCP.deploy("me", "h", [bundle, extra], "ws")
+        copied = sorted(f.name for f in copy.call_args[0][2])
+        assert copied == ["libdecoder.so", "librt.so"]  # README.md is documentation, not payload
+
+    def test_a_missing_source_is_reported(self, tmp_path):
+        """Naming something absent fails here rather than as a dlopen error on the target."""
+        with pytest.raises(RuntimeError, match="nothing to deploy"):
+            SCP.deploy("me", "h", [tmp_path / "absent"], "ws")
 
 
 class TestAttachModeLifecycle:
@@ -283,7 +270,7 @@ class TestRepr:
 
     def test_shape(self):
         """``repr()`` includes name, host, and launched state."""
-        r = repr(Executor("1.2.3.4:5", host="h", local=False))
+        r = repr(Executor("1.2.3.4:5", host="h"))
         assert "name='executor'" in r
         assert "host='h'" in r
         assert "launched=False" in r
@@ -444,11 +431,11 @@ class TestDetectTriple:
         cap.assert_not_called()
 
     def test_local_uses_this_machine(self):
-        """``local=True`` reads the host platform rather than going over SSH."""
+        """A subprocess reads the host platform rather than going over SSH."""
         with patch("catalyst.executor.manager.platform.system", return_value="Linux"), patch(
             "catalyst.executor.manager.platform.machine", return_value="x86_64"
         ):
-            assert Executor(local=True).triple == "x86_64-unknown-linux-gnu"
+            assert Executor().triple == "x86_64-unknown-linux-gnu"
 
     def test_remote_probes_over_ssh(self):
         """``host=`` maps the remote's ``uname -sm`` onto a triple."""
@@ -469,8 +456,8 @@ class TestMakers:
     """The per-attempt process factories behind :meth:`Executor.launch`."""
 
     def test_local_maker_builds_a_local_process(self):
-        """``local=True`` produces a loopback process carrying the configured plugins and env."""
-        ex = Executor(local=True, plugins=["libx.so"], env={"K": "V"}, executor_bin="/bin/exec")
+        """The subprocess mode produces a loopback process carrying the configured plugins and env."""
+        ex = Executor(plugins=["libx.so"], env={"K": "V"}, executor_bin="/bin/exec")
         proc = ex._local_maker()(9000)
         assert proc.addr == "127.0.0.1:9000"
         assert proc._plugins == ["libx.so"]
@@ -526,7 +513,7 @@ class TestLaunchAndStop:
         _sessions._procs[:] = saved
 
     def _launched(self, **kw):
-        ex = Executor(local=True, **kw)
+        ex = Executor(**kw)
         proc = _FakeProc(9000)
         with patch("catalyst.executor.manager._start_on_free_port", return_value=proc):
             ex.launch()
@@ -547,7 +534,7 @@ class TestLaunchAndStop:
     def test_launch_pins_the_port_only_when_resolved(self, resolved):
         """A resolved address is already published, so its port is binding; unresolved, the
         free-port search stays in play."""
-        ex = Executor(local=True, port=9123)
+        ex = Executor(port=9123)
         if resolved:
             ex.resolve()
         with patch("catalyst.executor.manager._start_on_free_port") as start:

@@ -53,8 +53,6 @@ struct OperatorNode {
     std::string id;
     std::string name; // name is required for gateset checking
 
-    bool adjoint{false};
-
     // optional params, primarily for debug use
     int numWires{-1};
     int numParams{-1};
@@ -83,10 +81,14 @@ struct OperatorNodeHash {
     std::size_t operator()(const OperatorNode &node) const {
         return std::hash<std::string>{}(node.id);
     }
-};
+}; // namespace DecompGraph::Core
 
 /**
  * @brief This represents the weighted target gateset for the graph decomposition problem.
+ *
+ * @note A modified operator should carry its modifier in the name (e.g. `Adjoint(RZ)`),
+ * mirroring its id, so it never matches a base gate-set entry (`RZ`) and must
+ * reach the gate set through its own rule.
  */
 struct WeightedGateset {
     std::unordered_map<std::string, double> ops;
@@ -99,7 +101,7 @@ struct WeightedGateset {
         auto it = ops.find(op.name);
         return it != ops.end() ? it->second : std::numeric_limits<double>::infinity();
     }
-};
+}; // namespace DecompGraph::Core
 
 ///////////////////////////
 // Rules and Decompositions

@@ -71,6 +71,13 @@ void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
 
 void printShapedType(ArrayRef<int64_t> shape, int64_t dim, Type elementType,
                      llvm::raw_string_ostream &ss) {
+    // Rank-0 tensors (e.g. tensor<f64>) have an empty shape; print the
+    // element type directly instead of indexing into the empty ArrayRef.
+    if (shape.empty()) {
+        ss << elementType;
+        return;
+    }
+
     int64_t length = shape[dim];
     auto printList = [&](auto printItem) {
         ss << "[";
@@ -151,13 +158,23 @@ std::string defaultGetGraphOpId(Operation *op) {
 
     DecomposableGate gate = cast<DecomposableGate>(op);
 
-    ss << gate.getOperatorName();
+    // Fold the adjoint modifier into the operator name so that `Op` and `Adjoint(Op)` are
+    // distinct in the graphOpId. The modifier wraps only the name; the param/wire/static/uid
+    // groups follow it, i.e. `Adjoint(Rot){...}{wires...}`, not `Adjoint(Rot{...}{wires...})`.
+    std::string name = gate.getOperatorName();
+    if (op->hasAttr("adjoint")) {
+        name = "Adjoint(" + name + ")";
+    }
+
+    ss << name;
     printDynamicShape(gate.getDynamicShape(), ss);
     printWireLens(gate.getWireLens(), ss);
     printAttr(gate.getStaticData(), ss);
     if (gate.getExtraData() != "") {
         ss << '[' << gate.getExtraData() << ']';
     }
+    ss.flush();
+
     return out;
 }
 

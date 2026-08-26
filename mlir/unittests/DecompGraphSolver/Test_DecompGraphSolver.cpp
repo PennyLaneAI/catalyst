@@ -545,3 +545,150 @@ TEST_CASE("Test OperatorNode equality with staticNamedArgs", "[DecompGraph::Core
     REQUIRE(pauliRotX == pauliRotX2);
     REQUIRE_FALSE(pauliRotX == pauliRotY);
 }
+
+////////////////
+// Adjoint Tests
+////////////////
+
+TEST_CASE("Self-adjoint Adjoint(H) -> H", "[DecompGraph::Solver]") {
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode adjH{"Adjoint(H[][1]{})", "Adjoint(Hadamard)"};
+
+    const WeightedGateset gateset{{{h.name, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"adj_h_to_h", adjH, {{h, 1}}},
+    };
+
+    const DecompositionGraph graph({adjH}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    const auto &chosen = result.at(adjH);
+    REQUIRE_FALSE(chosen.isBasis);
+    REQUIRE(chosen.ruleName == "adj_h_to_h");
+    REQUIRE(chosen.totalCost == 1.0);
+    REQUIRE(result.at(h).isBasis);
+}
+
+TEST_CASE("Adjoint(RZ) -> RZ resolves at RZ's cost", "[DecompGraph::Solver]") {
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode adjRz{"Adjoint(RZ[f64][1]{})", "Adjoint(RZ)"};
+
+    const WeightedGateset gateset{{{rz.name, 4.0}}};
+    const std::vector<RuleNode> rules{
+        {"adj_rz_to_rz", adjRz, {{rz, 1}}},
+    };
+
+    const DecompositionGraph graph({adjRz}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    const auto &chosen = result.at(adjRz);
+    REQUIRE_FALSE(chosen.isBasis);
+    REQUIRE(chosen.ruleName == "adj_rz_to_rz");
+    REQUIRE(chosen.totalCost == 4.0);
+    REQUIRE(result.at(rz).isBasis);
+}
+
+TEST_CASE("Adjoint(Rot) -> Adjoint(RZ) Adjoint(RY) Adjoint(RZ)", "[DecompGraph::Solver]") {
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode ry{"RY[f64][1]{}", "RY"};
+    const OperatorNode adjRz{"Adjoint(RZ[f64][1]{})", "Adjoint(RZ)"};
+    const OperatorNode adjRy{"Adjoint(RY[f64][1]{})", "Adjoint(RY)"};
+    const OperatorNode adjRot{"Adjoint(Rot[f64,f64,f64][1]{})", "Adjoint(Rot)"};
+
+    const WeightedGateset gateset{{{rz.name, 1.0}, {ry.name, 2.0}}};
+    const std::vector<RuleNode> rules{
+        {"adj_rot_distribute", adjRot, {{adjRz, 2}, {adjRy, 1}}},
+        {"adj_rz_to_rz", adjRz, {{rz, 1}}},
+        {"adj_ry_to_ry", adjRy, {{ry, 1}}},
+    };
+
+    const DecompositionGraph graph({adjRot}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    const auto &chosen = result.at(adjRot);
+    REQUIRE_FALSE(chosen.isBasis);
+    REQUIRE(chosen.ruleName == "adj_rot_distribute");
+    REQUIRE(chosen.totalCost == 4.0);
+
+    REQUIRE_FALSE(result.at(adjRz).isBasis);
+    REQUIRE(result.at(adjRz).ruleName == "adj_rz_to_rz");
+    REQUIRE_FALSE(result.at(adjRy).isBasis);
+    REQUIRE(result.at(adjRy).ruleName == "adj_ry_to_ry");
+    REQUIRE(result.at(rz).isBasis);
+    REQUIRE(result.at(ry).isBasis);
+}
+
+TEST_CASE("Competing adjoint pathways are picked by cost", "[DecompGraph::Solver]") {
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode ry{"RY[f64][1]{}", "RY"};
+    const OperatorNode adjRz{"Adjoint(RZ[f64][1]{})", "Adjoint(RZ)"};
+    const OperatorNode adjRy{"Adjoint(RY[f64][1]{})", "Adjoint(RY)"};
+    const OperatorNode adjRot{"Adjoint(Rot[f64,f64,f64][1]{})", "Adjoint(Rot)"};
+
+    const WeightedGateset gateset{{{rz.name, 1.0}, {ry.name, 2.0}}};
+
+    const RuleNode distribute{"adj_rot_distribute", adjRot, {{adjRz, 2}, {adjRy, 1}}};
+    const RuleNode adjRzToRz{"adj_rz_to_rz", adjRz, {{rz, 1}}};
+    const RuleNode adjRyToRy{"adj_ry_to_ry", adjRy, {{ry, 1}}};
+
+    SECTION("dedicated pathway wins when it is cheaper") {
+        const RuleNode dedicated{"adj_rot_dedicated", adjRot, {{rz, 1}}}; // cost 1 < 4
+        const DecompositionGraph graph({adjRot}, gateset,
+                                       {dedicated, distribute, adjRzToRz, adjRyToRy});
+        DecompositionSolver solver(graph);
+        const auto result = solver.solve();
+        REQUIRE(result.at(adjRot).ruleName == "adj_rot_dedicated");
+        REQUIRE(result.at(adjRot).totalCost == 1.0);
+    }
+
+    SECTION("distribution pathway wins when the dedicated rule is more expensive") {
+        const RuleNode dedicated{"adj_rot_dedicated", adjRot, {{rz, 10}}}; // cost 10 > 4
+        const DecompositionGraph graph({adjRot}, gateset,
+                                       {dedicated, distribute, adjRzToRz, adjRyToRy});
+        DecompositionSolver solver(graph);
+        const auto result = solver.solve();
+        REQUIRE(result.at(adjRot).ruleName == "adj_rot_distribute");
+        REQUIRE(result.at(adjRot).totalCost == 4.0);
+    }
+}
+
+TEST_CASE("A non-adjoint decomposition can produce an adjoint input", "[DecompGraph::Solver]") {
+    const OperatorNode h{"H[][1]{}", "Hadamard"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode phaseShift{"PhaseShift[f64][1]{}", "PhaseShift"};
+    const OperatorNode adjT{"Adjoint(T[][1]{})", "Adjoint(T)"};
+    const OperatorNode myGate{"MyGate[][1]{}", "MyGate"};
+
+    const WeightedGateset gateset{{{h.name, 1.0}, {cnot.name, 5.0}, {phaseShift.name, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"mygate_decomp", myGate, {{h, 1}, {adjT, 1}, {cnot, 1}}}, // emits an Adjoint(T)
+        {"adj_t_to_phaseshift", adjT, {{phaseShift, 1}}},
+    };
+
+    const DecompositionGraph graph({myGate}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.at(myGate).ruleName == "mygate_decomp");
+    REQUIRE_FALSE(result.at(adjT).isBasis);
+    REQUIRE(result.at(adjT).ruleName == "adj_t_to_phaseshift");
+    REQUIRE(result.at(phaseShift).isBasis);
+    REQUIRE(result.at(h).isBasis);
+    REQUIRE(result.at(cnot).isBasis);
+}
+
+TEST_CASE("Adjoint of an invalid target fails instead of collapsing to the base",
+          "[DecompGraph::Solver]") {
+    const OperatorNode measure{"M[][1]{}", "Measure"};
+    const OperatorNode adjMeasure{"Adjoint(M[][1]{})", "Adjoint(Measure)"};
+
+    const WeightedGateset gateset{{{measure.name, 1.0}}};
+    const std::vector<RuleNode> rules{};
+
+    const DecompositionGraph graph({adjMeasure}, gateset, rules);
+    DecompositionSolver solver(graph);
+    REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
+}

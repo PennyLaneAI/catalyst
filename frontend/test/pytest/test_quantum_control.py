@@ -20,6 +20,7 @@
 # pylint: disable=expression-not-assigned
 # pylint: disable=too-many-arguments
 # pylint: disable=too-many-lines
+# pylint: disable=no-member # for pnp.pi, sqrt, eye, sort
 
 import copy
 from typing import Callable
@@ -322,6 +323,14 @@ class TestControlled:
         expected = native_controlled()
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
 
+    @pytest.mark.xfail(reason="""
+        ControlledQubitUnitary's decomp rules are buggy and not jittable.
+        https://app.shortcut.com/xanaduai/story/128492/ctrl-decomp-bisect-rule-of-controlledqubitunitary-is-not-jittable,
+        https://app.shortcut.com/xanaduai/story/128494/controlled-two-qubit-unitary-rule-on-controlledqubitunitary-is-not-jittable
+
+        Since qp.ctrl(qp.Unitary) now lowers to `quantum.operator "ControlledUnitary"`, which does
+        not have a runtime lowering, the only way to execute it is through decomposition rules.
+    """)
     def test_native_controlled_unitary(self, capture_mode):
         """Test native control of a custom operation."""
         dev = qp.device("lightning.qubit", wires=4)
@@ -792,7 +801,7 @@ class TestControlledProperties:
 
         with pytest.raises(
             AttributeError,
-            match="property 'data' of 'ControlledOp' object has no setter",
+            match="has no setter",
         ):
             setattr(op, "data", (pnp.array(2.3454),))
 
@@ -831,7 +840,7 @@ class TestControlledProperties:
         """Test that `catalyst.ctrl` defers to base ndim_params"""
 
         op = C_ctrl(base, 1)
-        assert op.ndim_params == base.ndim_params
+        assert op.ndim_params == qp.ctrl(base, 1).ndim_params
 
     @pytest.mark.parametrize("cwires, cvalues", [(0, [0]), ([3, 0, 2], [1, 1, 0])])
     def test_has_decomposition_true_via_control_values(self, cwires, cvalues):
@@ -999,7 +1008,7 @@ class TestControlledMiscMethods:
 
         assert copied_op.__class__ is op.__class__
         assert copied_op.control_wires == op.control_wires
-        assert copied_op.control_values == op.control_values
+        assert qp.math.allclose(copied_op.control_values, op.control_values)
         assert copied_op.data == (param1,)
 
         copied_op = qp.ops.functions.bind_new_parameters(copied_op, (6.54,))

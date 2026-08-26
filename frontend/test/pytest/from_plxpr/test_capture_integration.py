@@ -1144,6 +1144,7 @@ class TestCapture:
             == captured_rotations_inverses_result
         )
 
+    @pytest.mark.xfail(reason="qp.decompose doesn't use graph-decomposition yet.")
     def test_transform_graph_decompose_workflow(self, backend):
         """Test the integration for a circuit with a 'decompose' graph transform."""
 
