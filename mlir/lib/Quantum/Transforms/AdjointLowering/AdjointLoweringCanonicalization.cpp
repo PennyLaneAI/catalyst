@@ -32,7 +32,7 @@ static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift"
 
 // Canonicalize Adjoint on quantum.custom gates after adjoint-lowering.
 // For Hermitian gates, the adjoint flag is set to false.
-// For rotations, the parameters are negated.       
+// For rotations, the parameters are negated.
 struct CustomOpAdjointCanonicalizePattern : public OpRewritePattern<CustomOp> {
     using OpRewritePattern<CustomOp>::OpRewritePattern;
 
