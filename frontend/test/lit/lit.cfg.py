@@ -19,7 +19,7 @@ import lit.formats
 from lit.llvm import llvm_config
 
 config.name = "Frontend Tests"
-config.test_format = lit.formats.ShTest(execute_external=False)
+config.test_format = lit.formats.ShTest()
 
 # Define the file extensions to treat as test files (with the exception of this file).
 config.suffixes = [".py", ".mlir"]
