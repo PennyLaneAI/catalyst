@@ -14,11 +14,15 @@
 
 #pragma once
 
+#include <cstddef>
+#include <iterator>
 #include <variant>
 
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LLVM.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -119,6 +123,14 @@ inline QubitIndex getExtractIndex(mlir::Value qubit) {
                        mlir::dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
             qubit = measureOp.getInQubit();
             continue;
+        } else if (auto blockArg = mlir::dyn_cast_or_null<mlir::BlockArgument>(qubit)) {
+            if (auto forOp =
+                    mlir::dyn_cast_or_null<mlir::scf::ForOp>(blockArg.getOwner()->getParentOp())) {
+                // ForOp Regions (and blocks) have args (iter_arg, *init_args), so the index is
+                // off-by-one
+                qubit = forOp.getInitArgs()[blockArg.getArgNumber() - 1];
+                continue;
+            }
         }
 
         break;
