@@ -31,8 +31,8 @@ from catalyst.jax_primitives import (
     extract_scalar,
     get_call_jaxpr,
     safe_cast_to_f64,
+    unconditional_to_conditional_if_probs,
 )
-from catalyst.jax_primitives_utils import unconditional_to_conditional_if_probs
 
 # Fake some arguments used by functions to be tested.
 JAXCTX = namedtuple("jax_ctx", ["module_context"])
