@@ -403,8 +403,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief
      * Use python to lower decomposition rules for all unhandled decomposable operations in the
      * circuit, annotating the lowered decomposition rules with resources and target gates.
+     *
+     * This only *materializes* the lowered rule funcs (as `__builtin`-prefixed funcs) into the
+     * module; `loadUserDecompositionRules`, which runs afterwards, is what registers them as
+     * RuleNodes. It therefore takes no `ruleNodes` output.
      */
-    mlir::LogicalResult loadPythonDecomps(std::vector<RuleNode> &ruleNodes) {
+    mlir::LogicalResult loadPythonDecomps() {
         mlir::ModuleOp module = getOperation();
         MLIRContext *context = &getContext();
 
@@ -454,9 +458,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // The Python wrapper returns the *whole reachable rule closure* for this op, not just
             // its direct rules: the loader does not recurse into a rule's resource ops, so every
             // rule on the path down to the gate set (e.g. `Adjoint(S)` -> `Adjoint(PhaseShift)` ->
-            // `PhaseShift`) must arrive together. We therefore keep every func that carries a
-            // `target_gate`, skipping helper funcs (no attribute) and any target already handled
-            // by an earlier op's closure or by rules embedded in the module.
+            // `PhaseShift`) must arrive together. We only *materialize* each rule func (named
+            // `__builtin_...`) into the module here; `loadUserDecompositionRules` runs next and is
+            // the single place that turns `__builtin`-prefixed funcs into RuleNodes (the same path
+            // the eager frontend relies on for its pre-embedded rules). We must NOT also call
+            // `addRuleNode` here, or every on-demand rule would be registered twice. We still skip
+            // helper funcs (no `target_gate`) and any target already materialized by an earlier
+            // op's closure or embedded in the module, to avoid duplicate symbols.
             llvm::SmallVector<llvm::StringRef> newlyHandled;
             moduleOp->walk([&](mlir::func::FuncOp func) {
                 // Note: a single target gate may have several alternative rules, so we only mark a
@@ -469,11 +477,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 mlir::OwningOpRef<mlir::func::FuncOp> outOp;
                 func->remove();
                 outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
-                mlir::func::FuncOp funcOp = outOp.get();
-
-                // if we fail to add one of the decomps, we still want to try for the rest
-                std::ignore = addRuleNode(funcOp, ruleNodes);
-                LDBG() << "adding rule " << funcOp.getName();
+                LDBG() << "materializing rule " << outOp.get().getName();
                 newlyHandled.push_back(targetGate.getValue());
                 module.push_back(std::move(outOp.release()));
                 return mlir::WalkResult::advance();
@@ -617,8 +621,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Load pre-compiled rules (ignore failure, we can try to solve without)
         std::ignore = loadBuiltInDecompositionRules(filename, rules);
 
-        // Lower and load compile-time rules
-        if (failed(loadPythonDecomps(rules))) {
+        // Lower compile-time rules into the module; loadUserDecompositionRules (below) registers
+        // the materialized `__builtin`-prefixed funcs as RuleNodes.
+        if (failed(loadPythonDecomps())) {
             return failure();
         }
 
